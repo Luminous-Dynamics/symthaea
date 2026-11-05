@@ -1,0 +1,393 @@
+{
+  "schema_version": "mel-grounded-participation-cases-v1",
+  "cases": [
+    {
+      "case_id": "GPA-RESPOND-GROUNDED-001",
+      "expected_disposition": "accept",
+      "evidence": {
+        "schema_version": "mel-grounded-participation-evidence-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "temporal_grounding_evaluator_version": "mel-temporal-grounding-evaluator-v1",
+        "annotation_policy_version": "musician-pilot-v1",
+        "permitted_prefix_end_frame": 12000,
+        "committed_at_ns": 110,
+        "claims": [
+          {
+            "claim_id": "invitation-001",
+            "kind": "invitation",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "retains-floor-001",
+            "kind": "retained_floor",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "active-phrase-001",
+            "kind": "active_phrase",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "handoff-001",
+            "kind": "handoff_or_stop",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          }
+        ],
+        "claim_set_sha256": "39c4095d1d72d7b92363c9227f078abb2663c4526029ad687dea43a15d057edf",
+        "evidence_bundle_sha256": "cb5dea89a301efde99720a84a4184acd17c22e5644152a592eeb8c293cbbb896",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "decision": {
+        "schema_version": "mel-grounded-participation-receipt-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "decision_id": "decision-001",
+        "sequence": 1,
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "evidence_claim_set_sha256": "39c4095d1d72d7b92363c9227f078abb2663c4526029ad687dea43a15d057edf",
+        "evidence_bundle_sha256": "eee7c981c7a0055922648441cc39f67fcbc1ba0597f308e06bcba4466e8ae85c",
+        "observed_through_frame": 12000,
+        "decision_at_ns": 120,
+        "action": "RESPOND",
+        "cited_claim_ids": [
+          "invitation-001"
+        ],
+        "effect_window": {
+          "not_before_runner_time_ns": 10000120,
+          "expires_at_runner_time_ns": 10100120,
+          "authorization_id": "auth-001"
+        },
+        "collaborator_veto_active": false,
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "policy": {
+        "schema_version": "mel-grounded-participation-policy-v1",
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "require_grounded_claims_for_wait": true,
+        "maximum_evidence_age_ns": 2000000000,
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
+      }
+    },
+    {
+      "case_id": "GPA-ASK-AMBIGUOUS-001",
+      "expected_disposition": "accept",
+      "evidence": {
+        "schema_version": "mel-grounded-participation-evidence-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "temporal_grounding_evaluator_version": "mel-temporal-grounding-evaluator-v1",
+        "annotation_policy_version": "musician-pilot-v1",
+        "permitted_prefix_end_frame": 12000,
+        "committed_at_ns": 110,
+        "claims": [
+          {
+            "claim_id": "invitation-ambiguous-001",
+            "kind": "invitation",
+            "status": "ambiguous",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": "two plausible handoff interpretations"
+          }
+        ],
+        "claim_set_sha256": "49849b973f5fcd833613d31942dea5ae277bb56f8f2ecb1422b539efd6edb81e",
+        "evidence_bundle_sha256": "0ddd4b6b4fc6fc61d406d16509f3b7ecef55f2c8d1826ae82a7ff5105346b7a1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "decision": {
+        "schema_version": "mel-grounded-participation-receipt-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "decision_id": "decision-001",
+        "sequence": 1,
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "evidence_claim_set_sha256": "49849b973f5fcd833613d31942dea5ae277bb56f8f2ecb1422b539efd6edb81e",
+        "evidence_bundle_sha256": "b0c06cd006b7a808a2de39646287ad9c156e1504b2304844a289ed1ca67911ac",
+        "observed_through_frame": 12000,
+        "decision_at_ns": 120,
+        "action": "ASK",
+        "cited_claim_ids": [
+          "invitation-ambiguous-001"
+        ],
+        "effect_window": null,
+        "collaborator_veto_active": false,
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "policy": {
+        "schema_version": "mel-grounded-participation-policy-v1",
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "require_grounded_claims_for_wait": true,
+        "maximum_evidence_age_ns": 2000000000,
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
+      }
+    },
+    {
+      "case_id": "GPA-ABSTAIN-UNAVAILABLE-001",
+      "expected_disposition": "accept",
+      "evidence": {
+        "schema_version": "mel-grounded-participation-evidence-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "temporal_grounding_evaluator_version": "mel-temporal-grounding-evaluator-v1",
+        "annotation_policy_version": "musician-pilot-v1",
+        "permitted_prefix_end_frame": 12000,
+        "committed_at_ns": 110,
+        "claims": [
+          {
+            "claim_id": "stream-unavailable-001",
+            "kind": "stream_unavailable",
+            "status": "unavailable",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": "input chunk missing; invitation cannot be assessed"
+          }
+        ],
+        "claim_set_sha256": "a01c3fa10a4eac02686b86ed254b84b729e6effbcd69f7d35d9c54151e04b6cc",
+        "evidence_bundle_sha256": "c39927c5314226ccf2c7f4e56bae6a618a762393fe140ab66ca071e4b3bc596e",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "decision": {
+        "schema_version": "mel-grounded-participation-receipt-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "decision_id": "decision-001",
+        "sequence": 1,
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "evidence_claim_set_sha256": "a01c3fa10a4eac02686b86ed254b84b729e6effbcd69f7d35d9c54151e04b6cc",
+        "evidence_bundle_sha256": "25009f62fc8e42de40a406de1c9947b39fb3360da74f3cc66c1a77597f1e438b",
+        "observed_through_frame": 12000,
+        "decision_at_ns": 120,
+        "action": "ABSTAIN",
+        "cited_claim_ids": [
+          "stream-unavailable-001"
+        ],
+        "effect_window": null,
+        "collaborator_veto_active": false,
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "policy": {
+        "schema_version": "mel-grounded-participation-policy-v1",
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "require_grounded_claims_for_wait": true,
+        "maximum_evidence_age_ns": 2000000000,
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
+      }
+    },
+    {
+      "case_id": "GPA-RESPOND-VETO-001",
+      "expected_disposition": "reject_veto",
+      "evidence": {
+        "schema_version": "mel-grounded-participation-evidence-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "temporal_grounding_evaluator_version": "mel-temporal-grounding-evaluator-v1",
+        "annotation_policy_version": "musician-pilot-v1",
+        "permitted_prefix_end_frame": 12000,
+        "committed_at_ns": 110,
+        "claims": [
+          {
+            "claim_id": "invitation-001",
+            "kind": "invitation",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "retains-floor-001",
+            "kind": "retained_floor",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "active-phrase-001",
+            "kind": "active_phrase",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "handoff-001",
+            "kind": "handoff_or_stop",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          },
+          {
+            "claim_id": "collaborator-veto-001",
+            "kind": "collaborator_veto",
+            "status": "grounded",
+            "source_interval": {
+              "start_frame": 7200,
+              "end_frame": 9600
+            },
+            "observed_through_frame": 9600,
+            "committed_at_ns": 100,
+            "grounding_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "reason": null
+          }
+        ],
+        "claim_set_sha256": "94ee2608746f3f87239b69356735c29fac15dc2e351ee11c25c486387cbc1ede",
+        "evidence_bundle_sha256": "d9406e7406ce3b26d7e08707cb737afd7363630f833edcfcaf12139476ecf8b3",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "decision": {
+        "schema_version": "mel-grounded-participation-receipt-v1",
+        "session_id": "session-001",
+        "turn_id": "turn-001",
+        "decision_id": "decision-001",
+        "sequence": 1,
+        "artifact": {
+          "audio_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sample_rate_hz": 48000,
+          "channels": 2,
+          "total_frames": 48000
+        },
+        "evidence_claim_set_sha256": "94ee2608746f3f87239b69356735c29fac15dc2e351ee11c25c486387cbc1ede",
+        "evidence_bundle_sha256": "169185d10f1658174c25392ee0a743ffa0b44af24f44798c360ead561ee7717a",
+        "observed_through_frame": 12000,
+        "decision_at_ns": 120,
+        "action": "RESPOND",
+        "cited_claim_ids": [
+          "invitation-001",
+          "collaborator-veto-001"
+        ],
+        "effect_window": {
+          "not_before_runner_time_ns": 10000120,
+          "expires_at_runner_time_ns": 10100120,
+          "authorization_id": "auth-001"
+        },
+        "collaborator_veto_active": true,
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "runner_clock_domain_id": "runner-monotonic-v1",
+        "runner_origin_id": "runner-origin-001"
+      },
+      "policy": {
+        "schema_version": "mel-grounded-participation-policy-v1",
+        "policy_version": "mel-grounded-participation-policy-v1",
+        "require_grounded_claims_for_wait": true,
+        "maximum_evidence_age_ns": 2000000000,
+        "minimum_effect_lead_ns": 10000000,
+        "maximum_effect_window_ns": 2000000000
+      }
+    }
+  ]
+}
