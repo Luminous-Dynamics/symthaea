@@ -15,7 +15,8 @@
     "expected_evaluation_task_count",
     "evaluation_split_role",
     "license",
-    "paper_url"
+    "paper_url",
+    "documented_database_task_count"
   ],
   "properties": {
     "schema_version": {
@@ -58,6 +59,10 @@
     "paper_url": {
       "type": "string",
       "pattern": "^https://proceedings\\.mlr\\.press/"
+    },
+    "documented_database_task_count": {
+      "type": "integer",
+      "minimum": 1
     }
   }
 }
