@@ -24,8 +24,8 @@
     "confidence_level",
     "multiple_comparison_correction",
     "systems",
-    "language_gaps",
-    "nonclaims"
+    "nonclaims",
+    "tool_version"
   ],
   "properties": {
     "schema_version": {
@@ -57,9 +57,6 @@
       "minimum": 0
     },
     "systems": {
-      "type": "array"
-    },
-    "language_gaps": {
       "type": "array"
     },
     "nonclaims": {
@@ -108,6 +105,10 @@
         "none",
         "bonferroni"
       ]
+    },
+    "tool_version": {
+      "type": "string",
+      "minLength": 1
     }
   }
 }
