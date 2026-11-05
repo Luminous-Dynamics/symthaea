@@ -877,13 +877,16 @@
         "committed_forecast_and_stress_paths_show_different_minimum_cash",
         "projected_collateral_and_invoice_payments_reduce_cash_but_not_posted_cover",
         "required_cover_reassessment_changes_cover_gap_only_after_its_event",
-        "cash_floor_breach_records_first_timestamp_and_scenario",
-        "events_after_credit_cover_deadline_do_not_change_deadline_cash",
-        "missing_required_cover_keeps_cash_paths_but_no_cover_conclusion",
-        "unordered_events_duplicate_ids_and_incomplete_calendars_fail_closed",
         "peak_cover_shortfall_is_preserved_when_the_requirement_later_falls",
         "same_day_deadline_before_start_time_is_rejected",
-        "event_before_projection_start_is_rejected"
+        "cash_floor_breach_records_first_timestamp_and_scenario",
+        "events_after_credit_cover_deadline_do_not_change_deadline_cash",
+        "post_deadline_only_event_does_not_change_deadline_cash",
+        "opening_cash_below_operating_floor_is_a_breach_at_projection_start",
+        "duplicate_source_reference_cannot_be_recounted_under_another_event_id",
+        "missing_required_cover_keeps_cash_paths_but_no_cover_conclusion",
+        "event_before_projection_start_is_rejected",
+        "unordered_events_duplicate_ids_and_incomplete_calendars_fail_closed"
       ],
       "required_evidence": [
         "source-digested civil calendar covering the full cash projection horizon",
@@ -895,7 +898,9 @@
         "Market Operator Required Credit Cover notice and revisions with effective timestamps",
         "current Posted Credit Cover and receipt evidence",
         "Credit Cover Increase Notice deadline and timezone",
-        "planned collateral deposit and early invoice payment cash requirements"
+        "planned collateral deposit and early invoice payment cash requirements",
+        "explicit IANA timezone for local event minute interpretation",
+        "unique source receipt references for each cash event"
       ],
       "stress_tags": [
         "liquidity-waterfall",
@@ -921,11 +926,13 @@
         "realized_price_supersedes_forecast_only_after_period_and_publication",
         "future_known_realized_data_does_not_fill_a_missing_historical_target",
         "model_scoped_targets_do_not_mix_forecast_engines",
+        "unscoped_target_with_multiple_forecast_engines_is_rejected",
+        "forecast_issued_before_decision_but_published_after_is_excluded",
+        "known_realized_price_is_model_independent_even_with_multiple_forecasts",
         "ambiguous_latest_forecasts_fail_instead_of_choosing_arbitrarily",
         "invalid_source_and_model_digests_are_rejected",
         "observed_period_cannot_be_known_before_it_has_ended",
-        "duplicate_record_ids_and_duplicate_targets_fail_closed",
-        "unscoped_target_with_multiple_forecast_engines_is_rejected"
+        "duplicate_record_ids_and_duplicate_targets_fail_closed"
       ],
       "required_evidence": [
         "frozen historical decision timestamp in UTC",
@@ -935,7 +942,10 @@
         "realized price observation valid-time and observation timestamp",
         "source retrieval/publication timestamp and content digest",
         "model-specific forecast-series identity",
-        "sealed project/time holdout membership and decision-time evidence frontier"
+        "sealed project/time holdout membership and decision-time evidence frontier",
+        "separate source availability timestamp even when forecast issue time is earlier",
+        "model identity and digest for each competing forecast engine",
+        "known realized observation takes precedence only after target interval end and source availability"
       ],
       "stress_tags": [
         "forecast-vintage",
