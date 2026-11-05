@@ -3,7 +3,7 @@
 **Tracking:** [#10568 — adaptive query-directed observation policies](https://github.com/Luminous-Dynamics/symthaea/issues/10568)  
 **Joint support input contract:** [#10528 — correlated joint observation support](https://github.com/Luminous-Dynamics/symthaea/pull/10528)  
 **Fixed-plan predecessors:** [#10506](https://github.com/Luminous-Dynamics/symthaea/pull/10506), [#10525](https://github.com/Luminous-Dynamics/symthaea/pull/10525).  
-**Status:** Research specification on branch `research/connectome-adaptive-query-policy-v1`. Implementation and validation have not yet been claimed.
+**Status:** Rust implementation, two synthetic fixtures, independent Python oracle and exact-head CI authored on `research/connectome-adaptive-query-policy-v1`. The current exact-head validation is pending.
 
 ## 1. Research gap
 
@@ -54,7 +54,7 @@ Otherwise:
 
 The minimum is over actions that produce a valid policy for every declared admissible outcome branch. The maximum is over every outcome admitted by the currently compatible joint support.
 
-No expected cost, expected information gain or probability-weighted value is computed. Realized terminal path costs can be reported individually, along with the worst-case bound.
+No expected cost, expected information gain or probability-weighted value is computed. Realized terminal path costs are reported as a min/max range for the deterministic representative policy, along with its worst-case bound. The report also computes the exact non-adaptive fixed-bundle optimum over the same joint support and reports the signed fixed-minus-adaptive worst-case effort delta.
 
 ## 5. Proposed exact implementation bounds
 
@@ -65,20 +65,20 @@ A first implementation should be deliberately bounded:
 - Each world's compatible tuple subset can be represented by a 64-bit mask.
 - Memoize states by (remaining-action mask, per-world compatible-tuple masks).
 - Enumerate each action's distinct currently admissible outcomes; recursively solve every child.
-- Return a deterministic optimal policy, worst-case cost, minimum and maximum terminal path cost, and a bounded count of tied optimal policies.
-- Cap memoized states (proposed 25,000 initially). If the cap is reached, emit no optimality claim; report `SEARCH_LIMIT_REACHED` or fail closed.
+- Return one deterministic representative optimal policy, worst-case cost, minimum and maximum terminal path cost, and the exact count of tied optimal policy trees (checked `u128` arithmetic). Ties are counted compositionally across root actions and child branches; every optimal policy tree is not serialized.
+- Cap memoized states at 25,000. If the cap is reached, the CLI fails closed and emits no optimality claim or partial policy.
 - Never describe an incomplete or approximate search as exact.
 
 The same immutable source/model digests and dependence ancestry labels from the joint-support input remain attached to the policy.
 
 ## 6. Required fixtures
 
-1. **Adaptive savings:** four worlds. A cheap first measurement divides them into two opposing-decision branches. One branch needs a morphology action; the other needs a synapse action. The exact adaptive policy cost is the first action plus the more expensive branch, while a fixed non-adaptive bundle pays for both follow-up actions.
+1. **Adaptive savings:** five worlds. A first image inspection (cost 1) divides them into two branches. The left branch needs morphology review (cost 2); the right branch needs synapse adjudication (cost 3). The exact adaptive worst-case cost is 4. The exact fixed non-adaptive optimum is morphology plus synapse at cost 5. This synthetic example saves 1 review-minute (20%) at identical query unanimity; it is a mechanism demonstration, not evidence for the prospective 25% target.
 2. **Correlation-preserving conditioning:** observing action A filters joint tuples and changes the admissible outcomes for B. The planner must not use B's unconditional marginal set after observing A.
 3. **Query unanimity without world identification:** a terminal leaf contains multiple worlds with the same query decision.
 4. **Unresolvable ambiguity:** at least one branch retains opposing decisions after all remaining actions; the parent action cannot be selected as a valid policy node.
 5. **Out-of-model category:** an outcome absent from all declared tuples produces an explicit fail-closed disposition.
-6. **Tied exact policies:** multiple actions/policies with equal worst-case cost; canonical deterministic selection and exact tie count.
+6. **Tied exact policies:** a two-world, two-action control has two equal-cost root choices. The report must return the exact policy count of 2 and one deterministic representative.
 7. **Budget cutoff:** minimum worst-case plan exceeds budget but is still reported as the exact minimum.
 8. **Ordering invariance:** action, world and tuple order permutations preserve the canonical policy and digest.
 
@@ -102,6 +102,8 @@ These methods are comparison baselines, not assumptions to import automatically.
 | Out-of-model observations silently accepted | 0 |
 | Worst-case cost gap vs exact oracle on bounded cases | 0 |
 | Equivalent action/world/tuple ordering changes policy | 0 |
+| Tied policy count vs independent exact oracle | 100% |
+| Fixed-bundle minimum and adaptive-vs-fixed delta vs independent oracle | 100% |
 | Expert-review effort reduction vs optimal fixed plan at matched query reliability | At least 25% prospectively |
 | Exact/approximate/limit-reached states explicitly distinguished | 100% |
 
