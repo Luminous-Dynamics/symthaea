@@ -1687,7 +1687,9 @@ mod tests {
         );
     }
 
-    struct DimensionYokedPolicy;
+    struct DimensionYokedPolicy {
+        source_session_id: String,
+    }
 
     impl AgentPolicy for DimensionYokedPolicy {
         fn policy_id(&self) -> &str {
@@ -1695,7 +1697,9 @@ mod tests {
         }
 
         fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
-            Box::new(Self)
+            Box::new(Self {
+                source_session_id: self.source_session_id.clone(),
+            })
         }
 
         fn act(
@@ -1703,8 +1707,11 @@ mod tests {
             observation: &Observation,
             task: &TaskSpec,
         ) -> Result<AgentAction, HarnessError> {
-            if observation.task_id != task.task_id {
-                return Err(HarnessError::InvalidPolicy);
+            if observation.task_id != task.task_id
+                || self.source_session_id.trim().is_empty()
+                || self.source_session_id == observation.session_id
+            {
+                return Err(HarnessError::InvalidYoke);
             }
             let value = match task.target_dimension {
                 Dimension::Motif => 9,
@@ -1770,7 +1777,9 @@ mod tests {
             &OneWayPromptPolicy {
                 id: "one-way".to_owned(),
             },
-            &DimensionYokedPolicy,
+            &DimensionYokedPolicy {
+                source_session_id: "prior-session".to_owned(),
+            },
             &UnrelatedFeatureShortcutPolicy {
                 id: "distractor".to_owned(),
             },
