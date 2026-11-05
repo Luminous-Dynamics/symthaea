@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_adaptive_query_policy_audit.rs"
+      - "tools/connectomics-intake-audit/src/bin/connectome_support_expansion_lattice_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_support_expansion_lattice_oracle.py"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY_V1.md"
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_LATTICE_V1.md"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_*.example.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION*.example.json"
@@ -15,9 +18,12 @@ on:
     branches: [main, "research/**"]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_adaptive_query_policy_audit.rs"
+      - "tools/connectomics-intake-audit/src/bin/connectome_support_expansion_lattice_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_support_expansion_lattice_oracle.py"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY_V1.md"
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_LATTICE_V1.md"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_*.example.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION*.example.json"
@@ -59,5 +65,14 @@ jobs:
         run: |
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION_NO_POLICY.example.json --output "$RUNNER_TEMP/adaptive-support-no-policy.json"
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION_NO_POLICY.example.json --report "$RUNNER_TEMP/adaptive-support-no-policy.json"
+      - name: Strict Clippy for exhaustive support lattice audit
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_support_expansion_lattice_audit -- -D warnings
+      - name: Test exhaustive support inclusion lattice
+        run: |
+          cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_support_expansion_lattice_audit
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_support_expansion_lattice_audit -- --output "$RUNNER_TEMP/support-expansion-lattice.json"
+          python3 tools/connectomics-intake-audit/reference/verify_support_expansion_lattice_oracle.py --report "$RUNNER_TEMP/support-expansion-lattice.json"
       - name: Verify independent oracle syntax
-        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_support_expansion_lattice_oracle.py
