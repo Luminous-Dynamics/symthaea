@@ -575,7 +575,6 @@ fn structured_probe_one_step_state_rmse(scenario: Scenario) -> f64 {
     (squared_error / PROBE_COUNT as f64).sqrt()
 }
 
-
 fn run_episode(
     scenario: Scenario,
     policy: Policy,
@@ -935,7 +934,6 @@ fn main() {
 mod tests {
     use super::*;
 
-
     #[test]
     fn structured_probe_design_has_uniform_marginal_coverage() {
         use std::collections::BTreeSet;
@@ -1024,7 +1022,6 @@ mod tests {
         assert!(actual.state.v < 0.0);
         assert!(predicted.state.v > 0.0);
     }
-
 
     #[test]
     fn rollout_transition_count_stops_at_the_predicted_terminal() {
