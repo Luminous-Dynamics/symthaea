@@ -1915,8 +1915,8 @@ mod tests {
             Ok(ReserveCapacityPaymentResult::Determined(
                 ExactReserveCapacityPayment {
                     // 10,000 minor ZAR/MW/period × 5.5 MW × 4/5 = 44,000 minor ZAR.
-                    numerator_minor_zar: 220_000,
-                    denominator: 5,
+                    numerator_minor_zar: 220_000_000,
+                    denominator: 5_000,
                 }
             ))
         );
