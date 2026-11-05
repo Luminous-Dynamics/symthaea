@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [ENG-DESIGN-CHANGE-QUAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/10543) | Cross-domain engineering change impact and evidence applicability benchmark |
 
 ---
 
