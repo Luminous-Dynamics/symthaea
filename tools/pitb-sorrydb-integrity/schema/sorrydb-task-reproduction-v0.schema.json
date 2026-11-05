@@ -210,7 +210,10 @@
       "if": {
         "properties": {
           "goal_alignment": {
-            "const": "reviewed"
+            "enum": [
+              "normalized",
+              "reviewed"
+            ]
           }
         },
         "required": [
