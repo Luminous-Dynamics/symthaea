@@ -35,7 +35,7 @@ A successful import/export is not sufficient. The evaluator must detect when a c
 References:
 - [ISO 10303-242:2025, Edition 4](https://www.iso.org/standard/84300.html)
 - [ISO 23952:2020 — Quality Information Framework](https://committee.iso.org/standard/77461.html)
-- [MTConnect standards and Version 2.5 release](https://github.com/mtconnect/mtconnect_sysml_model/releases)
+- [MTConnect standard-download page (labels 2.5 current)](https://mtconnect.squarespace.com/standard-download20181); [normative SysML model releases (v2.7)](https://github.com/mtconnect/mtconnect_sysml_model/releases); [normative model documentation (v2.8 page)](https://model.mtconnect.org/Version2.8/); [generated XML schemas (v2.7)](https://schemas.mtconnect.org/)
 - [NIST IR 8536 final](https://csrc.nist.gov/pubs/ir/8536/final)
 - [NIST Digital Thread for Manufacturing](https://www.nist.gov/programs-projects/digital-thread-manufacturing)
 
