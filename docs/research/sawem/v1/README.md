@@ -193,6 +193,16 @@ References:
 - Public field dataset and supplementary file: https://publications.rwth-aachen.de/record/1015732
 - Dataset DOI: https://doi.org/10.18154/RWTH-2025-06555
 
+### SOC-dependent BMS capability envelopes
+
+The new `bms_capability.rs` module replaces a single static power limit with separate, source-bound charge and discharge power curves over an explicit SOC calibration range. Between measured/certified breakpoints it performs exact rational linear interpolation and rounds the available-power result down to the next whole watt. It rejects out-of-range SOC rather than extrapolating. A curve marked synthetic can be used for scenario exploration, but its result is never operationally qualified.
+
+This directly addresses a limitation identified by the M5BAT field study: its improved scheduling model uses conservative 10–80% SOC limits to avoid BMS power curtailment, while empirical SOC-dependent capability curves are identified as a practical future extension. The study also notes the trade-off: detailed SOC-dependent limits can improve usable energy and reduce curtailment, but require reliable characterization and can increase optimization complexity.
+
+The current implementation is deliberately only a **one-dimensional SOC envelope**. It is not a BMS model and must not be used alone to authorize live power. A deployable envelope needs synchronized evidence for at least SOC and direction, and should ultimately include temperature, SOH/aging, DC voltage, cell imbalance, inverter/transformer loading, thermal derating, and BMS dynamic state. The next research increment is a multi-dimensional conservative lower-envelope fitter over field measurements, with calibration/validation split by operating campaign and an explicit uncertainty margin.
+
+Benchmark case: `BMS-SOC-CAPABILITY-ENVELOPE-001`. No M5BAT capability curves have been fitted from field data yet; field parametrization and improved unfulfilled-delivery metrics remain `not_run`.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
