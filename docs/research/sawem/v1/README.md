@@ -55,6 +55,67 @@ Accordingly, the synthetic fixture has:
 
 The raw source digest is intentionally null and the source freeze state is not_frozen. This fixture cannot move to source_frozen_for_review or qualified_for_policy_evaluation until the exact sources, release digests, effective-date evidence and local interpretation have been independently reviewed.
 
+## 2A. Industry reference baseline and the competitive test
+
+The objective is not to reproduce every market optimizer. The objective is to qualify the complete chain from physical capability and market rights through dispatch, settlement, liquidity and the investment decision. Published vendor documentation already describes substantial capability in the optimisation layer; feature presence alone is not a defensible differentiation claim.
+
+| Reference system | Published strengths to include in a fair benchmark | Luminous responsibility |
+|---|---|---|
+| PLEXOS 12 / Energy Exemplar | Market simulation and optimisation; storage SOC targets, build-duration and aggregation optimisation; degradation/maintenance logic; PTDF/LODF congestion analytics; AC power-flow interoperability; ELCC/EFC analysis. | Verify the exact study inputs, project rights, rule versions, contracts, model domains, financial transformations and evidence lineage. |
+| PLEXOS Intelligence | Separate workflow layer: study-aware analytical agents, SQL/output querying, AI Studio and cloud workflow automation. | Benchmark workflow provenance, reproducibility, correction burden, source grounding and permission boundaries separately from the PLEXOS solver. |
+| Aurora Chronos | Granular battery dispatch forecasts calibrated against historical data, imperfect foresight and engineering/regulatory/geographic/operational constraints. | Independently validate forecast vintages, actual-vs-backcast calibration, contract eligibility, source provenance and realized outcomes. |
+| HOMER Front 1.6 | Imperfect-foresight price inputs, forecast/realized differences, multiple time-of-delivery contracts and multi-year participation/availability assumptions, alongside storage dispatch. | Avoid duplicating those features as supposed novelty; benchmark evidence quality, SAWEM settlement rules and underwriting conclusions. |
+| NREL SAM | Detailed PV/storage performance and front-of-meter financial modelling. | Qualify technology assumptions, degradation, replacement, cash-flow lineage and model applicability. |
+| NREL REopt | Techno-economic sizing/dispatch and resilience/cost optimisation for sites, campuses, communities and microgrids. | Extend the underwriting evidence graph across contracts, participant rights, grid capacity, collateral and financing. |
+| PyPSA / GridPath | Transparent, inspectable energy-system and network optimisation formulations. | Use as open reference formulations and independent feasibility comparators where the model boundary matches. |
+
+Primary vendor references:
+- PLEXOS August 2026 product update: https://www.energyexemplar.com/product-news/whats-new-august-2026
+- Aurora Chronos description: https://auroraer.com/company/about
+- HOMER Front release history: https://homerenergy.com/homer-front/releases
+- SAM: https://sam.nrel.gov/
+- REopt: https://www.nrel.gov/reopt/
+
+PLEXOS Intelligence must be benchmarked as an analyst-workflow layer, not confused with the mathematical optimisation engine. Likewise, a vendor's description of global optimality is scoped to its documented supported action space, model formulation and configuration; it is not a proof of global optimality for the whole real-world market or investment decision.
+
+### Paradigm shifts worth owning
+
+1. **Executable investment thesis.** Every material thesis is a typed dependency graph of falsifiable claims, proof obligations, evidence, contradictions and invalidation conditions. Strong economics cannot compensate for absent critical grid rights or participant admission.
+2. **Evidence-time correctness.** Preserve both valid time and known-at time. A document published later cannot enter a historical investment decision. Replays must reconstruct the exact evidence frontier and model versions.
+3. **Continuous underwriting.** Contract amendments, rule changes, provider downgrades, battery warranty changes, grid reassessments and model-domain exits selectively invalidate only their dependent claims.
+4. **Active diligence.** Prioritise the next evidence request by expected decision improvement, cost, delay, irreversibility and the value of waiting. Do not request another solar survey when unresolved grid allocation dominates decision risk.
+5. **Model disagreement as evidence.** Maintain a disagreement ledger across PLEXOS, HOMER, Chronos, SAM, REopt and open formulations. Attribute differences to data vintage, boundaries, algorithms, degradation, constraints and validation domain; do not average away disagreement.
+6. **Counterfactual engineering.** Search a constrained Pareto frontier over storage duration, PV/BESS sizing, POC, export limit, dispatch, contracts and financing. Report feasibility, downside, evidence gaps and model-domain limits—not one opaque score.
+7. **Proof-carrying investment decisions.** Bind exact project/evidence revisions, content digests, model/evaluator versions, scenarios, calculation outputs, independent checks, unresolved assumptions and invalidation triggers into a reproducible certificate.
+8. **Liquidity is a first-class physical constraint.** Treat cash held as collateral, invoice acceleration, settlement reruns and cure deadlines as a chronological funding problem, not a final spreadsheet line item.
+
+### Matched-information evaluation protocol
+
+Run the evaluation in two market contexts and do not mix them:
+
+- **Internal / pre-launch simulation:** reproduce the market state, rules, access cohort and synthetic or authorized test data actually available to the internal environment.
+- **External commercial participation:** evaluate only after production access, effective rule instruments, participant admission and authorized data are independently evidenced. An invitation into pre-launch testing is not admission to commercial trade.
+
+For each frozen project, all participants receive the same evidence frontier, decision timestamp, forecast vintage, topology, technology boundary, price and contract assumptions, temporal resolution, degradation settings and permitted action space. Freeze a separate sealed holdout by project and time. Compare incumbents and Luminous with blind independent reviewers; later backtest every forecast and material decision against realized measurements and settlements where rights-cleared data exists.
+
+Required benchmark dimensions:
+- Mathematical correctness: 100% of preregistered known-answer cases; exact units, date conventions, cash-flow roots and accounting invariants.
+- Evidence integrity: zero false acceptance on the finite hostile corpus for wrong project/POC, wrong issuer/authority, superseded evidence, future-known evidence, duplicate provenance and inaccessible artifacts.
+- Physical qualification: zero accepted out-of-domain results; interval energy, SOC, reserve response, availability, curtailment, export and degradation reconciliations.
+- Forecast quality: rolling-origin evaluation, project/time holdout, pinball loss and weighted interval score, empirical P50/P90/P95 exceedance calibration with confidence intervals, and calibration by regime/horizon. Evaluate realised dispatch value as well as forecast error.
+- Settlement/liquidity: zero false "funded" states; exact reconciliation of source-required cover vs posted cash; peak unrestricted-cash draw, maximum shortfall, days under shortfall, notice/deadline misses, cash lock-up duration and financing cost.
+- Decision quality: preregister a hypothesis of at least 20% relative improvement in critical-risk recall at matched false-alarm rate and 25% lower diligence time without sacrificing critical-risk recall. These are targets, not results.
+- Human review: reviewer correction burden, time to reproduce a conclusion, unsupported-claim rate, material-risk discoveries and inter-reviewer agreement.
+- Value of information: whether the next evidence request changed the decision enough to justify its cost and delay.
+
+Do not report a single "beats SOTA" score. Publish the case-level result, uncertainty interval, exclusions, missing data, model/version identity, and each system's supported domain. Agreement among vendor tools is not independent ground truth. Use metered outcomes, official operator records, independent engineering review and adjudicated historical cases as separate validation sources.
+
+### South African market phase as of 5 November 2026
+
+Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027; the report described regulatory instruments still being finalised in parallel. This is secondary reporting, not proof of participant admission, commercial bidding or settlement. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
+
+Source: https://www.engineeringnews.co.za/article/sawem-trading-platform-opens-to-85-external-entities-for-pre-launch-testing-2026-10-30
+
 ## 3. Machine-readable contract
 
 - [SAWEM BESS Underwriting Profile v1 JSON Schema](sawem-bess-underwriting-profile-v1.schema.json)
