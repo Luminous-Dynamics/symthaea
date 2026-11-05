@@ -121,7 +121,7 @@ fn nonempty(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
-fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
+pub fn dsse_pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
     let header = format!(
         "DSSEv1 {} {} {} ",
         payload_type.len(),
