@@ -342,3 +342,7 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+| [CAD-HISTORY-001 Fixture Registry](https://github.com/Luminous-Dynamics/symthaea/pull/10552) | Machine-readable 11-case parametric edit and scan-to-CAD catalog |
+| [HARDWARE-TOPOLOGY-001 Fixture Registry](https://github.com/Luminous-Dynamics/symthaea/pull/10550) | Machine-readable 20-case assembly, ECAD and buildability catalog |
+| [ENG-DESIGN-CHANGE-QUAL-001 Fixture Registry](https://github.com/Luminous-Dynamics/symthaea/pull/10547) | Machine-readable 24-case design-change impact catalog |
