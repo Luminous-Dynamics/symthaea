@@ -325,8 +325,8 @@ pub fn evaluate_dispatch(
         if !charge_power_valid {
             violations.push(Violation::ChargePowerExceeded);
         }
-        let stable_charge_valid = step.charge_mw <= EPSILON
-            || step.charge_mw + EPSILON >= limits.min_stable_charge_mw;
+        let stable_charge_valid =
+            step.charge_mw <= EPSILON || step.charge_mw + EPSILON >= limits.min_stable_charge_mw;
         if !stable_charge_valid {
             violations.push(Violation::BelowMinimumStableCharging);
         }
