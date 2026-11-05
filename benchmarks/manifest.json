@@ -110,6 +110,67 @@
             }
           ],
           "comparability_warning": "This hidden-test snapshot is not the public development leaderboard mean and is not the competition-entry development committed-artifact score. Do not compare these evaluation pathways as one baseline."
+        },
+        "development_leaderboard_snapshot": {
+          "captured_at": "2026-11-05",
+          "source_url": "https://ple-bench.com/leaderboard?set=dev",
+          "scope": "mean_score_on_29_public_development_tasks",
+          "task_count": 29,
+          "run_protocol": "Each model+harness pair is averaged over three runs on the 29 public development tasks, six-hour task limit. Scores are evaluated using the official PLE development rubric.",
+          "entries": [
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Claude Code",
+              "score": 0.551,
+              "run_count": 3,
+              "cost_per_task_usd": 17.3,
+              "median_duration_minutes": 63,
+              "notes": [
+                "Highest displayed public-development pair on the 2026-11-05 snapshot."
+              ]
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Codex",
+              "score": 0.549,
+              "run_count": 3,
+              "cost_per_task_usd": 30.38,
+              "median_duration_minutes": 110,
+              "notes": [
+                "Within run-to-run variation of the leading pair."
+              ]
+            },
+            {
+              "model": "GPT-6 Astra",
+              "agent_harness": "Codex",
+              "score": 0.53,
+              "run_count": 3,
+              "cost_per_task_usd": 8.42,
+              "median_duration_minutes": 24,
+              "notes": [
+                "The official public development leaderboard reports Codex only for Astra."
+              ]
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "OpenHands",
+              "score": 0.525,
+              "run_count": 3,
+              "cost_per_task_usd": 14.72,
+              "median_duration_minutes": 64,
+              "notes": []
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Hermes",
+              "score": 0.526,
+              "run_count": 3,
+              "cost_per_task_usd": 17.17,
+              "median_duration_minutes": 70,
+              "notes": []
+            }
+          ],
+          "comparability_warning": "This 29-task public development leaderboard is not the 56-task hidden leaderboard snapshot or the committed-artifact competition-entry dev score. It also varies both model and harness; use matched pairs and preserve the three-run protocol."
         }
       },
       "ceb_integration": {
@@ -257,7 +318,9 @@
           "The score is a mean across 100 Core cases with deterministic, non-LLM reference scoring. Parts are scored for geometry overlap and topology; assemblies additionally score placement; boards score wiring connectivity.",
           "The blog reports that 83–96% of zero-scoring part types in evaluated assembly tasks had the right shape but wrong placement. At max effort, GPT-6 Astra found 80% of board connections and Claude Opus 5.5 68%; the blog describes serious rail shorts/splits and says the runs did not test for shorts or opens.",
           "BenchCAD 2.0 scoring does not measure manufacturability or physical performance. Do not equate geometric/placement/connectivity score with engineering safety or production readiness.",
-          "Published v2.0 results and current v2.1 are different harness protocols. The current v2.1 protocol carries reasoning between rounds and allows 60 rounds / 500k output tokens per case; these are not comparable to v2.0."
+          "Published v2.0 results and current v2.1 are different harness protocols. The current v2.1 protocol carries reasoning between rounds and allows 60 rounds / 500k output tokens per case; these are not comparable to v2.0.",
+          "The 2026-10-23 Kimi K3.1 Pro result of 0.927 with tools / 0.728 without is for a random 1,000-file Vision2Code subset using voxel IoU, not the 100-case BenchCAD 2.0 Core professional engineering task set. It must not be ranked against the 0.59 Core score.",
+          "BenchCAD published v2.1 on 2026-11-05; it changes rounds, output-token budget, reasoning carry, and Task 6 scoring. See separate benchcad-2.1 registry entry. v2.1 scores are not comparable to this v2.0 entry."
         ],
         "published_results": [
           {
@@ -576,6 +639,295 @@
           "Record the exact immutable Harbor dataset digest from every official run. The dataset digest is not inferred from the version tag.",
           "Use the official public submission/review process only after the Luminous task execution isolation and grader custody prerequisites are qualified.",
           "No CEB patch-only receipt is appropriate for native CAD outputs; use generic benchmark artifact accounting."
+        ]
+      }
+    },
+    {
+      "id": "benchcad-2.1",
+      "name": "BenchCAD 2.1 Core (standard and customized-harness boards)",
+      "status": "access_gated",
+      "publisher": "BenchCAD team",
+      "official_url": "https://benchcad.com/leaderboard",
+      "repository_url": "https://github.com/BenchCAD-org/benchcad-2-main",
+      "dataset_url": "https://huggingface.co/datasets/BenchCAD/benchcad-2.0-public",
+      "paper_url": "https://benchcad.com/blog/benchcad-2-1",
+      "paper_revision": "Official BenchCAD 2.1 release and leaderboard snapshot 2026-11-05; tag v2.1",
+      "task_count": 200,
+      "splits": {
+        "development": {
+          "count": 100,
+          "access": "access_gated",
+          "score_scope": "100 public evaluation-only cases; public scores are not reportable."
+        },
+        "hidden_test": {
+          "count": 100,
+          "access": "access_gated",
+          "score_scope": "100 held-out Core cases; official v2.1 leaderboard results are computed on this set under evaluation-only access."
+        }
+      },
+      "disciplines": {
+        "structural": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "civil": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "electrical": {
+          "total_tasks": null,
+          "development_tasks": null
+        },
+        "mechanical": {
+          "total_tasks": null,
+          "development_tasks": null
+        }
+      },
+      "task_families": [
+        {
+          "id": "T1-drawing-part",
+          "name": "Drawing to CAD: part",
+          "public_count": 21,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Dimensioned part drawing to CadQuery part."
+          ]
+        },
+        {
+          "id": "T2-drawing-assembly-supplied",
+          "name": "Drawing to CAD: assembly with supplied parts",
+          "public_count": 14,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "STEP parts and assembly drawing to positioned assembly."
+          ]
+        },
+        {
+          "id": "T3-view-part",
+          "name": "3D reverse engineering: part",
+          "public_count": 23,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Four rendered views to a CAD part."
+          ]
+        },
+        {
+          "id": "T4-view-assembly",
+          "name": "3D reverse engineering: assembly",
+          "public_count": 27,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Views of mechanism and parts to parts plus an assembly."
+          ]
+        },
+        {
+          "id": "T5-drawing-parts-assembly",
+          "name": "Drawing to CAD: parts and assembly",
+          "public_count": 6,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Drawings of parts to make, supplied STEP parts, and assembly drawing to parts plus assembly."
+          ]
+        },
+        {
+          "id": "T6-ecad-wiring",
+          "name": "ECAD reverse engineering: board wiring",
+          "public_count": 9,
+          "core_count": null,
+          "score_status": "public_scores_not_reportable",
+          "notes": [
+            "Six PCB renders to an electrical wiring/schematic graph."
+          ]
+        }
+      ],
+      "licensing": {
+        "runner_code": "Official repository release tag v2.1; no redistribution licence independently verified in this pass.",
+        "development_dataset": "Evaluation-only terms for public and Core datasets. Public-set scores are not reportable; Core access requires the evaluation-only agreement.",
+        "access_gated": true
+      },
+      "execution": {
+        "official_runner": "BenchCAD-org/benchcad-2-main @ v2.1; tools/run_core.sh",
+        "harbor_version": "Native BenchCAD Docker sandbox; Harbor available for official task environment",
+        "per_task_time_limit_seconds": null,
+        "runner_revision": "v2.1",
+        "dataset_revision": null,
+        "execution_authorized": false,
+        "official_hidden_test_repeat_count": 5,
+        "repeat_policy": "Standard 2.1 board: 60 rounds and 500,000 output tokens per Core case (thinking included), reasoning carried from round to round; official Anthropic runs are means of five full passes over all 100 Core cases. Customized-harness board is separate: same 500,000 output-token budget, no round cap/retries, 8-hour wall clock, agent only reaches model API, same scorer run once in isolated no-network evaluator. Custom-harness repeat counts are not uniformly disclosed; keep the board separate. The OpenAI internal 0.875 line is sourced from OpenAI's Nov 3 post and scored with the v2.0 scorer; Anthropic custom-harness lines are self-reported. Never merge standard and customized scores.",
+        "official_development_baseline_repeat_count": null,
+        "max_rounds_per_task": 60,
+        "max_output_tokens_per_task": 500000,
+        "reasoning_carried_across_rounds": true,
+        "custom_harness_wall_clock_limit_seconds": 28800,
+        "task6_scoring_revision": "Task 6 component matching is stricter: a prediction can only claim the nearest part; duplicate answers at one location both count wrong. The official 2.1 scorer keeps correct matches at 1.0 and penalizes imprecise/duplicated matches.",
+        "network_policy": "For custom harness, agent can reach model API and nothing else; scorer runs once in separate no-network container. Follow exact v2.1 setup and access terms."
+      },
+      "baseline_context": {
+        "hidden_test_leaderboard_score": 0.49,
+        "paper_abstract_mean_score": null,
+        "all_hard_checks_clearance": null,
+        "notes": [
+          "BenchCAD 2.1 uses the same 100 held-out Core case files as 2.0, but changes the evaluation protocol and Task 6 matching; its scores are explicitly not comparable with v2.0.",
+          "Standard 2.1: Claude Opus 5.5 max 0.490 ±0.013 at $8.1/case; Sonnet 5.5 max 0.468 ±0.014 at $6.1/case; Fable 5.1 max 0.363 ±0.022 at $20/case; Haiku 5.5 max 0.186 ±0.016 at $1.4/case. Each point is the mean of five passes over all 100 Core cases.",
+          "Standard 2.1 and customized-harness boards are separate and not comparable. The customized board uses an external model/harness; Claude runs are reported by Anthropic and the OpenAI internal score comes from OpenAI's post using the 2.0 scorer.",
+          "OpenAI's 0.875 internal model result is not a standard 2.1 score. The model is unreleased and cost is estimated from the report's relative-cost plot; do not present it as independently reproducible.",
+          "BenchCAD 2.1 remains a reconstruction/assembly/ECAD benchmark, not a test of manufacturability, tolerance compliance, electrical safety or physical performance."
+        ],
+        "published_results": [
+          {
+            "model": "Claude Opus 5.5",
+            "effort": "max",
+            "score": 0.49,
+            "harness_version": "v2.1-standard",
+            "repeat_count": 5,
+            "cost_per_case_usd": 8.1,
+            "displayed_uncertainty_95": 0.013,
+            "board": "standard_2.1",
+            "notes": [
+              "Mean of five passes over 100 Core cases; ±95% as displayed by official leaderboard."
+            ]
+          },
+          {
+            "model": "Claude Sonnet 5.5",
+            "effort": "max",
+            "score": 0.468,
+            "harness_version": "v2.1-standard",
+            "repeat_count": 5,
+            "cost_per_case_usd": 6.1,
+            "displayed_uncertainty_95": 0.014,
+            "board": "standard_2.1",
+            "notes": [
+              "Mean of five passes over 100 Core cases; ±95% as displayed by official leaderboard."
+            ]
+          },
+          {
+            "model": "Claude Fable 5.1",
+            "effort": "max",
+            "score": 0.363,
+            "harness_version": "v2.1-standard",
+            "repeat_count": 5,
+            "cost_per_case_usd": 20,
+            "displayed_uncertainty_95": 0.022,
+            "board": "standard_2.1",
+            "notes": [
+              "Mean of five passes over 100 Core cases; ±95% as displayed by official leaderboard."
+            ]
+          },
+          {
+            "model": "Claude Haiku 5.5",
+            "effort": "max",
+            "score": 0.186,
+            "harness_version": "v2.1-standard",
+            "repeat_count": 5,
+            "cost_per_case_usd": 1.4,
+            "displayed_uncertainty_95": 0.016,
+            "board": "standard_2.1",
+            "notes": [
+              "Mean of five passes over 100 Core cases; ±95% as displayed by official leaderboard."
+            ]
+          }
+        ],
+        "reported_results": [
+          {
+            "publisher": "OpenAI",
+            "reported_at": "2026-11-03",
+            "model": "OpenAI internal model (unreleased)",
+            "effort": "not disclosed",
+            "score": 0.875,
+            "harness_version": "customized harness; BenchCAD 2.0 scorer",
+            "repeat_count": null,
+            "cost_per_case_usd": null,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://openai.com/index/accelerating-engineering-for-the-physical-world/",
+            "comparability": "Separate customized-harness board; OpenAI-run Codex system, scorer v2.0, not standard BenchCAD 2.1. Model ID, repeats, full per-task outcomes and exact compute budget are undisclosed; cost is estimated separately on BenchCAD's board.",
+            "notes": [
+              "Custom-board cost displayed at approximately $38/case, estimated from OpenAI's relative-cost figure."
+            ]
+          },
+          {
+            "publisher": "Anthropic",
+            "reported_at": "2026-11-05",
+            "model": "Claude Opus 5.5",
+            "effort": "max",
+            "score": 0.653,
+            "harness_version": "customized harness; Claude Code; v2.1 scorer",
+            "repeat_count": null,
+            "cost_per_case_usd": 20,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://benchcad.com/leaderboard",
+            "comparability": "Separate customized-harness board; Anthropic self-reported in Claude Code. Not comparable with standard v2.1 board and not a Luminous reproduction.",
+            "notes": []
+          },
+          {
+            "publisher": "Anthropic",
+            "reported_at": "2026-11-05",
+            "model": "Claude Sonnet 5.5",
+            "effort": "max",
+            "score": 0.609,
+            "harness_version": "customized harness; Claude Code; v2.1 scorer",
+            "repeat_count": null,
+            "cost_per_case_usd": 16,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://benchcad.com/leaderboard",
+            "comparability": "Separate customized-harness board; Anthropic self-reported in Claude Code. Not comparable with standard v2.1 board and not a Luminous reproduction.",
+            "notes": []
+          },
+          {
+            "publisher": "Anthropic",
+            "reported_at": "2026-11-05",
+            "model": "Claude Fable 5.1",
+            "effort": "max",
+            "score": 0.444,
+            "harness_version": "customized harness; Claude Code; v2.1 scorer",
+            "repeat_count": null,
+            "cost_per_case_usd": 35,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://benchcad.com/leaderboard",
+            "comparability": "Separate customized-harness board; Anthropic self-reported in Claude Code. Not comparable with standard v2.1 board and not a Luminous reproduction.",
+            "notes": []
+          },
+          {
+            "publisher": "Anthropic",
+            "reported_at": "2026-11-05",
+            "model": "Claude Haiku 5.5",
+            "effort": "max",
+            "score": 0.229,
+            "harness_version": "customized harness; Claude Code; v2.1 scorer",
+            "repeat_count": null,
+            "cost_per_case_usd": 3.2,
+            "median_duration_seconds": null,
+            "tokens_per_case": null,
+            "evidence_class": "vendor_report",
+            "source_url": "https://benchcad.com/leaderboard",
+            "comparability": "Separate customized-harness board; Anthropic self-reported in Claude Code. Not comparable with standard v2.1 board and not a Luminous reproduction.",
+            "notes": []
+          }
+        ]
+      },
+      "ceb_integration": {
+        "task_contract_owner": "Benchmark-neutral run accounting #10314 and evidence convergence #10370; CEB v0 #10115 remains for patch-bearing repository tasks.",
+        "receipt_owner": "Benchmark-neutral accounting #10314 + evidence convergence #10370; preserve native CAD and ECAD artifacts, not fabricated source-patch hashes.",
+        "custody_owner": "CEB task custody #10436",
+        "isolation_blocker": "Symthaea execution isolation #10064",
+        "notes": [
+          "Metadata only. No public or Core case has been downloaded or executed by Luminous.",
+          "Public and Core evaluation terms must be satisfied; held-out Core access requires the exact agreement.",
+          "Do not copy or expose BenchCAD public/Core cases, drawings, renders, reference artifacts or canaries in source control, retrieval or training corpora.",
+          "The benchmark emits CAD artifacts/assemblies or wiring graphs, not source patches. Use generic artifact accounting rather than CEB's patch-only DSSE subject.",
+          "A Luminous benchmark adapter must keep model-visible inputs separate from the reference/evaluator trust domain."
         ]
       }
     }
