@@ -110,6 +110,23 @@ Required benchmark dimensions:
 
 Do not report a single "beats SOTA" score. Publish the case-level result, uncertainty interval, exclusions, missing data, model/version identity, and each system's supported domain. Agreement among vendor tools is not independent ground truth. Use metered outcomes, official operator records, independent engineering review and adjudicated historical cases as separate validation sources.
 
+### Treasury liquidity waterfall: from static headroom to event-time solvency
+
+The separate `liquidity_stress.rs` check is a single-snapshot calculation. The new `liquidity_waterfall.rs` module extends that model over an explicit dated event sequence.
+
+It evaluates three paths:
+- **Committed:** source-backed commitments and expected obligations/receipts that are treated as committed in the scenario.
+- **Forecast:** committed events plus forecast events.
+- **Stress:** committed and forecast events plus adverse stress adjustments.
+
+For each path it reports minimum unrestricted cash, minimum cash before the Credit Cover deadline, cash at the deadline, first operating-cash-floor breach, maximum cover shortfall observed after source-backed reassessments, and the potential funding / external funding gap at the deadline. Events use civil-date ordinals, local minute and a deterministic sequence number; the full horizon is bound to a source-digested calendar.
+
+This is a scenario projection, not an executed treasury ledger. A projected Collateral Reserve Account deposit or early invoice payment is a cash use in the waterfall, but does **not** increase Posted Credit Cover. The current MO Required Credit Cover and Posted Credit Cover remain source-bound inputs; future posted-cover changes require a separate receipt-backed event in the credit-cover ledger. A forecast receipt is never silently treated as cash already received.
+
+The event engine is designed to expose an important failure hidden by single-snapshot arithmetic: a project can have enough cash above its operating floor at the Credit Cover deadline but breach the floor earlier in the week, or it may survive the earlier outflows but fail to fund by the required deadline. Both temporal outcomes must be visible.
+
+Benchmark case: `CREDIT-COVER-LIQUIDITY-WATERFALL-001`. The initial tests use synthetic values and do not establish source authenticity, transfer cut-off certainty, cash availability, or a real project's ability to meet a Market Operator deadline.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027; the report described regulatory instruments still being finalised in parallel. This is secondary reporting, not proof of participant admission, commercial bidding or settlement. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
