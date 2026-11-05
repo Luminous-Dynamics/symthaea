@@ -2111,7 +2111,7 @@ mod tests {
         let replacement = vec![0.25; group.len];
 
         assert!(net
-            .try_replace_parameter_group(&group.id, &replacement)
+            .try_replace_parameter_group(&net.fingerprint().unwrap().model_digest, &group.id, &replacement)
             .is_ok());
 
         let after = net.get_weights();
@@ -2131,7 +2131,7 @@ mod tests {
         let mut net = CfCNetwork::new(small_config());
         let before = net.get_weights();
         assert!(matches!(
-            net.try_replace_parameter_group(&CfCParameterGroupId::CellRecurrentProjection { cell: 999 }, &[]),
+            net.try_replace_parameter_group(&net.fingerprint().unwrap().model_digest, &CfCParameterGroupId::CellRecurrentProjection { cell: 999 }, &[]),
             Err(CfCWeightLoadError::UnknownParameterGroup { .. })
         ));
 
@@ -2142,7 +2142,7 @@ mod tests {
             .find(|group| group.name == "cells.0.w_h")
             .unwrap();
         assert!(matches!(
-            net.try_replace_parameter_group(&group.id, &[]),
+            net.try_replace_parameter_group(&net.fingerprint().unwrap().model_digest, &group.id, &[]),
             Err(CfCWeightLoadError::GroupLengthMismatch { .. })
         ));
         assert_eq!(net.get_weights(), before);
