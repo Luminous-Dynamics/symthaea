@@ -29,13 +29,13 @@ A second, controlled-partner path distinguishes a fixed partner from a responsiv
 
 ## Evidence boundary and next integration seam
 
-The manifest binds task/session/seed, policy/version, code revision, condition order, and all input/output event identities. The harness does not claim to cryptographically hash arbitrary symbolic or audio payloads. The next adapter must bind those artifacts to the verified Studio transaction and actual renderer/output receipts under MEL-013A.
+The manifest binds task/session/seed, policy/version, code revision, condition order, and all input/output event identities. The contrast API and manifest independently reject output-event rebinding; the controlled-partner adapter validates input and output feature dimensions. The harness does not claim to cryptographically hash arbitrary symbolic or audio payloads. The next adapter must bind those artifacts to the verified Studio transaction and actual renderer/output receipts under MEL-013A.
 
 The crate also represents unsupported modality metrics explicitly as NotApplicable; a PCM-only adapter cannot invent note-level MIDI evidence.
 
 ## Authored tests
 
-The crate authors 20 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
+The crate authors 23 deterministic tests covering the positive oracle, all four negative-control families, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. These are authored tests, not executed results until the dedicated GitHub Actions workflow completes on the exact head.
 
 ## Qualification and claim ceiling
 
