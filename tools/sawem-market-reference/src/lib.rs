@@ -359,6 +359,12 @@ pub struct DsuReserveQualificationInputs {
     pub official_energy_consumption_mw: Option<f64>,
     pub effective_available_capacity_mw: Option<f64>,
     pub was_utilized_for_reserve_or_balancing: Option<bool>,
+    /// Whether a not-utilized unit was nevertheless instructed to deliver energy
+    /// different from its contracted amount (Code §9.8.3(4)).
+    pub energy_instruction_differed_from_contract: Option<bool>,
+    /// SO acceptability assessment. If no criteria were established, §9.8.3(2)
+    /// deems the resource acceptable; callers must represent that rule explicitly as true.
+    pub acceptable_performance: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -751,6 +757,22 @@ pub fn qualifying_dsu_capacity_for_payment(
         });
     }
 
+    let Some(effective_available_mw) = inputs.effective_available_capacity_mw else {
+        return Ok(DsuQualificationResult::Indeterminate {
+            reason: "missing effective available capacity",
+        });
+    };
+    if !effective_available_mw.is_finite() {
+        return Err(DsuQualificationError::NonFiniteInput(
+            "effective_available_capacity_mw",
+        ));
+    }
+    if effective_available_mw < 0.0 {
+        return Err(DsuQualificationError::NegativeInput(
+            "effective_available_capacity_mw",
+        ));
+    }
+
     match inputs.product {
         DsuUpwardReserveProduct::RegulatingUp | DsuUpwardReserveProduct::Instantaneous => {
             let Some(consumption_mw) = inputs.official_energy_consumption_mw else {
@@ -781,35 +803,56 @@ pub fn qualifying_dsu_capacity_for_payment(
                     });
                 }
                 Some(true) => {
-                    return Ok(DsuQualificationResult::Indeterminate {
-                        reason: "utilized reserve/balancing qualification branch is not modeled",
+                    if inputs.acceptable_performance != Some(true) {
+                        return Ok(DsuQualificationResult::Indeterminate {
+                            reason: "utilized reserve lacks acceptable-performance evidence",
+                        });
+                    }
+                    return Ok(DsuQualificationResult::Determined {
+                        qualifying_capacity_mw: contracted_mw.min(effective_available_mw),
                     });
                 }
                 Some(false) => {}
             }
 
+            match inputs.energy_instruction_differed_from_contract {
+                None => {
+                    return Ok(DsuQualificationResult::Indeterminate {
+                        reason: "missing not-utilized instruction comparison",
+                    });
+                }
+                Some(true) => {
+                    if inputs.acceptable_performance != Some(true) {
+                        return Ok(DsuQualificationResult::Indeterminate {
+                            reason: "changed-instruction branch lacks acceptable-performance evidence",
+                        });
+                    }
+                    return Ok(DsuQualificationResult::Determined {
+                        qualifying_capacity_mw: contracted_mw.min(effective_available_mw),
+                    });
+                }
+                Some(false) => {
+                    if inputs.acceptable_performance != Some(true) {
+                        return Ok(DsuQualificationResult::Indeterminate {
+                            reason: "non-utilized unchanged-instruction branch lacks SO capability assessment",
+                        });
+                    }
+                }
+            }
+
+            // The no-utilization / no-changed-instruction DSU formula in §§9.8.4(3)
+            // and 9.8.6(4), additionally capped by §9.8.3(6) effective availability.
             let reducible_mw = (consumption_mw - curve.third_elbow_mw).max(0.0);
             Ok(DsuQualificationResult::Determined {
-                qualifying_capacity_mw: contracted_mw.min(reducible_mw),
+                qualifying_capacity_mw: contracted_mw
+                    .min(reducible_mw)
+                    .min(effective_available_mw),
             })
         }
         DsuUpwardReserveProduct::TenMinute => {
-            let Some(effective_available_mw) = inputs.effective_available_capacity_mw else {
-                return Ok(DsuQualificationResult::Indeterminate {
-                    reason: "missing effective available capacity",
-                });
-            };
-            if !effective_available_mw.is_finite() {
-                return Err(DsuQualificationError::NonFiniteInput(
-                    "effective_available_capacity_mw",
-                ));
-            }
-            if effective_available_mw < 0.0 {
-                return Err(DsuQualificationError::NegativeInput(
-                    "effective_available_capacity_mw",
-                ));
-            }
-
+            // §9.8.7(3): DSU Ten-Minute uses Effective Available Capacity less
+            // the third consumption elbow; the clause does not condition this on
+            // reserve utilization or apply a performance-adjustment factor.
             let reducible_mw = (effective_available_mw - curve.third_elbow_mw).max(0.0);
             Ok(DsuQualificationResult::Determined {
                 qualifying_capacity_mw: contracted_mw.min(reducible_mw),
@@ -1738,8 +1781,10 @@ mod tests {
                 product: DsuUpwardReserveProduct::RegulatingUp,
                 contracted_capacity_mw: Some(25.0),
                 official_energy_consumption_mw: Some(90.0),
-                effective_available_capacity_mw: None,
+                effective_available_capacity_mw: Some(80.0),
                 was_utilized_for_reserve_or_balancing: Some(false),
+                energy_instruction_differed_from_contract: Some(false),
+                acceptable_performance: Some(true),
             },
             curve,
         )
@@ -1756,8 +1801,10 @@ mod tests {
                 product: DsuUpwardReserveProduct::Instantaneous,
                 contracted_capacity_mw: Some(60.0),
                 official_energy_consumption_mw: Some(35.0),
-                effective_available_capacity_mw: None,
+                effective_available_capacity_mw: Some(10.0),
                 was_utilized_for_reserve_or_balancing: Some(false),
+                energy_instruction_differed_from_contract: Some(false),
+                acceptable_performance: Some(true),
             },
             curve,
         )
@@ -1767,6 +1814,69 @@ mod tests {
             DsuQualificationResult::Determined {
                 qualifying_capacity_mw: 15.0
             }
+        );
+    }
+
+    #[test]
+    fn dsu_regulating_capacity_is_capped_by_effective_availability_and_instruction_state() {
+        let curve = demand_side_consumption_price_curve();
+
+        let mut base = DsuReserveQualificationInputs {
+            product: DsuUpwardReserveProduct::RegulatingUp,
+            contracted_capacity_mw: Some(80.0),
+            official_energy_consumption_mw: Some(90.0),
+            effective_available_capacity_mw: Some(12.0),
+            was_utilized_for_reserve_or_balancing: Some(false),
+            energy_instruction_differed_from_contract: Some(false),
+            acceptable_performance: Some(true),
+        };
+
+        // Clause-specific consumption headroom is 70 MW, but §9.8.3(6)
+        // caps qualifying capacity at 12 MW effective availability.
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(base, curve),
+            Ok(DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 12.0
+            })
+        );
+
+        // Under §9.8.3(4), a not-utilized unit with a different energy
+        // instruction and acceptable performance can qualify up to contract
+        // and effective availability, rather than the idle consumption curve.
+        base.energy_instruction_differed_from_contract = Some(true);
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(base, curve),
+            Ok(DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 12.0
+            })
+        );
+
+        // Missing evidence of the instruction comparison cannot select a path.
+        base.energy_instruction_differed_from_contract = None;
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(base, curve),
+            Ok(DsuQualificationResult::Indeterminate {
+                reason: "missing not-utilized instruction comparison"
+            })
+        );
+
+        // An utilized reserve branch is governed by §9.8.3(3) and requires
+        // acceptable performance evidence before the contracted amount is qualified.
+        base.was_utilized_for_reserve_or_balancing = Some(true);
+        base.energy_instruction_differed_from_contract = None;
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(base, curve),
+            Ok(DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 12.0
+            })
+        );
+
+        base.acceptable_performance = None;
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(base, curve),
+            Ok(DsuQualificationResult::Indeterminate {
+                reason: "utilized reserve lacks acceptable-performance evidence"
+            })
         );
     }
 
@@ -1781,6 +1891,8 @@ mod tests {
                 official_energy_consumption_mw: None,
                 effective_available_capacity_mw: Some(75.0),
                 was_utilized_for_reserve_or_balancing: None,
+                energy_instruction_differed_from_contract: None,
+                acceptable_performance: None,
             },
             curve,
         )
@@ -1799,6 +1911,8 @@ mod tests {
                 official_energy_consumption_mw: None,
                 effective_available_capacity_mw: Some(10.0),
                 was_utilized_for_reserve_or_balancing: None,
+                energy_instruction_differed_from_contract: None,
+                acceptable_performance: None,
             },
             curve,
         )
@@ -1818,8 +1932,10 @@ mod tests {
             product: DsuUpwardReserveProduct::RegulatingUp,
             contracted_capacity_mw: Some(50.0),
             official_energy_consumption_mw: Some(90.0),
-            effective_available_capacity_mw: None,
+            effective_available_capacity_mw: Some(90.0),
             was_utilized_for_reserve_or_balancing: Some(false),
+            energy_instruction_differed_from_contract: Some(false),
+            acceptable_performance: Some(true),
         };
 
         let mut missing_meter = base;
@@ -1833,6 +1949,7 @@ mod tests {
 
         let mut utilized = base;
         utilized.was_utilized_for_reserve_or_balancing = Some(true);
+        utilized.acceptable_performance = None;
         assert_eq!(
             qualifying_dsu_capacity_for_payment(utilized, curve),
             Ok(DsuQualificationResult::Indeterminate {
@@ -1868,6 +1985,8 @@ mod tests {
             official_energy_consumption_mw: None,
             effective_available_capacity_mw: Some(75.0),
             was_utilized_for_reserve_or_balancing: None,
+                energy_instruction_differed_from_contract: None,
+                acceptable_performance: None,
         };
         assert_eq!(
             qualifying_dsu_capacity_for_payment(negative_contract, curve),
