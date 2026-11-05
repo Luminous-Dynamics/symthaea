@@ -1282,6 +1282,56 @@ mod tests {
         }
     }
 
+    fn root_with_key(store: &GenealogyStore, key: &str, created_at: u64) -> GenealogyManifest {
+        store
+            .allocate_root_from_bytes(
+                &origin(),
+                key,
+                format!("recipe-{key}").as_bytes(),
+                Some(format!("score-{key}").as_bytes()),
+                format!("audio-{key}").as_bytes(),
+                created_at,
+            )
+            .unwrap()
+    }
+
+    fn parent_input(
+        parent_id: i64,
+        idempotency_key: &str,
+        source_event_id: &str,
+    ) -> GenealogyParentInputV1 {
+        GenealogyParentInputV1 {
+            parent_manifest_id: parent_id,
+            kind: GenealogyEdgeKindV1::MotifContribution,
+            source_event_id: Some(source_event_id.to_owned()),
+            contributor_ref: Some(format!("contributor-{idempotency_key}")),
+            authority_receipt_ref: Some(format!("receipt-{idempotency_key}")),
+            idempotency_key: idempotency_key.to_owned(),
+        }
+    }
+
+    fn allocate_test_derived(
+        store: &GenealogyStore,
+        audio_key: &str,
+        parents: &[GenealogyParentInputV1],
+        operation_key: &str,
+        created_at: u64,
+    ) -> Result<GenealogyManifest, GenealogyLineageError> {
+        store.allocate_derived_from_bytes(
+            &GenealogyRelation::MotifVariation {
+                motif_ids: vec!["motif-a".to_owned(), "motif-b".to_owned()],
+            },
+            &origin(),
+            audio_key,
+            format!("recipe-{audio_key}").as_bytes(),
+            Some(format!("score-{audio_key}").as_bytes()),
+            format!("audio-{audio_key}").as_bytes(),
+            parents,
+            operation_key,
+            created_at,
+        )
+    }
+
     #[test]
     fn artifact_sha256_matches_standard_known_vectors() {
         assert_eq!(
@@ -1743,6 +1793,247 @@ mod tests {
         let found = reopened.manifest(allocated.id).unwrap().unwrap();
         assert_eq!(found, allocated);
 
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(format!("{}-wal", path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", path.display()));
+    }
+
+    #[test]
+    fn derived_single_parent_preserves_legacy_projection_and_verifies_edge() {
+        let store = store();
+        let root = root_with_key(&store, "single-parent-root", 20);
+        let parent = parent_input(root.id, "single-edge", "input-single");
+        let child = allocate_test_derived(
+            &store,
+            "single-parent-child",
+            &[parent],
+            "single-operation",
+            21,
+        )
+        .unwrap();
+
+        assert_eq!(child.parent_id, Some(root.id));
+        assert_eq!(child.family_id, root.family_id);
+        let verified = store.verify_lineage(child.id).unwrap();
+        assert_eq!(verified.parent_edges.len(), 1);
+        assert_eq!(verified.parent_edges[0].parent_manifest_id, root.id);
+        assert_eq!(store.parents(child.id).unwrap(), vec![root.clone()]);
+        assert_eq!(store.children(root.id).unwrap(), vec![child]);
+    }
+
+    #[test]
+    fn derived_multi_parent_merge_uses_edge_set_and_new_family_anchor() {
+        let store = store();
+        let left = root_with_key(&store, "merge-left-root", 30);
+        let right = root_with_key(&store, "merge-right-root", 31);
+        let child = allocate_test_derived(
+            &store,
+            "merge-child",
+            &[
+                parent_input(left.id, "merge-left-edge", "left-input"),
+                parent_input(right.id, "merge-right-edge", "right-input"),
+            ],
+            "merge-operation",
+            32,
+        )
+        .unwrap();
+
+        assert_eq!(child.parent_id, None);
+        assert_eq!(child.family_id, child.id);
+        let verified = store.verify_lineage(child.id).unwrap();
+        assert_eq!(verified.parent_edges.len(), 2);
+        let parent_ids: BTreeSet<i64> = store.parents(child.id).unwrap().iter().map(|p| p.id).collect();
+        assert_eq!(parent_ids, [left.id, right.id].into_iter().collect());
+        assert_eq!(store.children(left.id).unwrap(), vec![child.clone()]);
+        assert_eq!(store.children(right.id).unwrap(), vec![child]);
+    }
+
+    #[test]
+    fn ancestry_traverses_diamond_and_deduplicates_shared_ancestor() {
+        let store = store();
+        let root = root_with_key(&store, "diamond-root", 40);
+        let left = allocate_test_derived(
+            &store,
+            "diamond-left",
+            &[parent_input(root.id, "diamond-left-edge", "left-event")],
+            "diamond-left-operation",
+            41,
+        )
+        .unwrap();
+        let right = allocate_test_derived(
+            &store,
+            "diamond-right",
+            &[parent_input(root.id, "diamond-right-edge", "right-event")],
+            "diamond-right-operation",
+            42,
+        )
+        .unwrap();
+        let merge = allocate_test_derived(
+            &store,
+            "diamond-merge",
+            &[
+                parent_input(left.id, "diamond-merge-left-edge", "merge-left-event"),
+                parent_input(right.id, "diamond-merge-right-edge", "merge-right-event"),
+            ],
+            "diamond-merge-operation",
+            43,
+        )
+        .unwrap();
+
+        let ancestry = store.ancestry(merge.id).unwrap();
+        let ids: Vec<i64> = ancestry.iter().map(|manifest| manifest.id).collect();
+        assert_eq!(ids[0], merge.id);
+        assert_eq!(ids.iter().filter(|id| **id == root.id).count(), 1);
+        assert_eq!(
+            ids.into_iter().collect::<BTreeSet<_>>(),
+            [merge.id, left.id, right.id, root.id].into_iter().collect()
+        );
+    }
+
+    #[test]
+    fn exact_derived_retry_is_idempotent_and_does_not_duplicate_edges() {
+        let store = store();
+        let root = root_with_key(&store, "idempotent-root", 50);
+        let parents = [parent_input(root.id, "idempotent-edge", "idempotent-event")];
+        let first = allocate_test_derived(
+            &store,
+            "idempotent-child",
+            &parents,
+            "idempotent-operation",
+            51,
+        )
+        .unwrap();
+        let retry = allocate_test_derived(
+            &store,
+            "idempotent-child",
+            &parents,
+            "idempotent-operation",
+            999,
+        )
+        .unwrap();
+        assert_eq!(first.id, retry.id);
+        assert_eq!(store.parent_edges(first.id).unwrap().len(), 1);
+        assert_eq!(store.verify_lineage(first.id).unwrap().parent_edges.len(), 1);
+    }
+
+    #[test]
+    fn reusing_operation_idempotency_key_with_changed_payload_is_rejected() {
+        let store = store();
+        let root = root_with_key(&store, "conflict-root", 60);
+        allocate_test_derived(
+            &store,
+            "conflict-child",
+            &[parent_input(root.id, "conflict-edge", "event-original")],
+            "conflict-operation",
+            61,
+        )
+        .unwrap();
+        let conflict = allocate_test_derived(
+            &store,
+            "conflict-child",
+            &[parent_input(root.id, "conflict-edge", "event-substituted")],
+            "conflict-operation",
+            62,
+        );
+        assert!(matches!(conflict, Err(GenealogyLineageError::IdempotencyConflict)));
+    }
+
+    #[test]
+    fn derived_allocation_rejects_missing_parent_before_writing_any_manifest() {
+        let store = store();
+        let result = allocate_test_derived(
+            &store,
+            "missing-parent-child",
+            &[parent_input(999_991, "missing-parent-edge", "missing-parent-event")],
+            "missing-parent-operation",
+            70,
+        );
+        assert!(matches!(result, Err(GenealogyLineageError::InvalidInput(_))));
+        assert!(store.manifest_by_audio_key("missing-parent-child").unwrap().is_none());
+    }
+
+    #[test]
+    fn lineage_verifier_rejects_tampered_parent_edge() {
+        let store = store();
+        let root = root_with_key(&store, "tamper-root", 80);
+        let child = allocate_test_derived(
+            &store,
+            "tamper-child",
+            &[parent_input(root.id, "tamper-edge", "tamper-event")],
+            "tamper-operation",
+            81,
+        )
+        .unwrap();
+        {
+            let conn = store.conn.lock().unwrap();
+            conn.execute(
+                "UPDATE genealogy_parent_edges SET contributor_ref = 'substituted'
+                 WHERE child_manifest_id = ?1",
+                params![child.id],
+            )
+            .unwrap();
+        }
+        assert!(matches!(
+            store.verify_lineage(child.id),
+            Err(GenealogyLineageError::CorruptLineage)
+        ));
+    }
+
+    #[test]
+    fn parent_delete_is_restricted_and_child_delete_cascades_edges() {
+        let store = store();
+        let root = root_with_key(&store, "delete-parent-root", 90);
+        let child = allocate_test_derived(
+            &store,
+            "delete-child",
+            &[parent_input(root.id, "delete-edge", "delete-event")],
+            "delete-operation",
+            91,
+        )
+        .unwrap();
+        assert!(store.delete(root.id).is_err());
+        store.delete(child.id).unwrap();
+        assert!(store.parent_edges(child.id).unwrap().is_empty());
+        store.delete(root.id).unwrap();
+        assert!(store.manifest(root.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn plural_lineage_survives_database_reopen() {
+        let path = std::env::temp_dir().join(format!(
+            "symthaea-muse-lineage-reopen-{}-{}.sqlite3",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let (left, right, child) = {
+            let opened = GenealogyStore::open(&path).unwrap();
+            let left = root_with_key(&opened, "reopen-left", 100);
+            let right = root_with_key(&opened, "reopen-right", 101);
+            let child = allocate_test_derived(
+                &opened,
+                "reopen-merge",
+                &[
+                    parent_input(left.id, "reopen-left-edge", "reopen-left-event"),
+                    parent_input(right.id, "reopen-right-edge", "reopen-right-event"),
+                ],
+                "reopen-operation",
+                102,
+            )
+            .unwrap();
+            (left, right, child)
+        };
+        let reopened = GenealogyStore::open(&path).unwrap();
+        let verified = reopened.verify_lineage(child.id).unwrap();
+        assert_eq!(verified.parent_edges.len(), 2);
+        assert_eq!(
+            reopened.parents(child.id).unwrap().iter().map(|p| p.id).collect::<BTreeSet<_>>(),
+            [left.id, right.id].into_iter().collect()
+        );
+
+        drop(reopened);
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path.display()));
         let _ = std::fs::remove_file(format!("{}-shm", path.display()));
