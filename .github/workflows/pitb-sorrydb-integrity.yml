@@ -202,8 +202,8 @@ jobs:
           name: pitb-sorrydb-integrity-report
           path: |
             ${{ runner.temp }}/sorrydb-integrity-report.synthetic.json
-            ${{ runner.temp }}/sorrydb-task-receipt.synthetic.json
-            ${{ runner.temp }}/sorrydb-snapshot-integrity-report.jsonl
+            ${{ runner.temp }}/sorrydb-task-receipt.synthetic.jsonl
+            ${{ runner.temp }}/sorrydb-snapshot-integrity-report.json
             ${{ runner.temp }}/pitb-sorrydb-integrity/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-integrity/Cargo.lock
           if-no-files-found: warn
