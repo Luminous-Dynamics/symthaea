@@ -181,7 +181,7 @@ All bounds and ranges are caller-contractual: the implementation validates sampl
 
 ## Synthetic-observation to UVSD table adapter (experimental)
 
-The `observation_table_adapter` module converts observed category counts from `SyntheticDataset` into the `CategoryTable` expected by the UVSD fitter. It groups only by the exact frozen condition ID, stimulus-level bit pattern and response-scale ID. Signal and noise actions are combined only when all three grouping fields match.
+The `observation_table_adapter` module converts observed category counts from `SyntheticDataset` into the `CategoryTable` expected by the UVSD fitter. It groups by participant ID, exact frozen condition ID, stimulus-level bit pattern and response-scale ID. Signal and noise actions are combined only when all four grouping fields match. The v0.1 request schema has no separate session ID; use one dataset per participant-session until that field is added.
 
 The adapter reads observed category counts and action metadata only. It does not read oracle evidence, oracle categories, lapse indicators or the latent criterion values. Category order is represented as integer ranks 0..K-1.
 
