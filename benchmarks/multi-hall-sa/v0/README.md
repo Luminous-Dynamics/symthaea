@@ -124,3 +124,16 @@ A closed-book / zero-shot baseline is valid and may declare:
 - `max_retrieval_calls = 0`.
 
 Input, output and latency caps must remain positive. This lets the comparison ladder include true no-retrieval, BM25, dense, hybrid and source-grounded RAG systems under one common schema. The same zero caps apply to every system in that specific comparison; do not mix a zero-retrieval budget with systems that are expected to retrieve evidence.
+
+
+## Construct, prompt provenance and interpretation limits
+
+The released dataset card says the benchmark:
+- extracts facts from parallel English/target-language government documents rather than translating English hallucinations;
+- generates controlled temporal, entity, numerical and location perturbations;
+- is designed to measure the **cross-lingual detection gap**, with an English condition that is intentionally not hard;
+- includes fact-extraction and hallucination-generation templates in the `prompts` configuration, but does **not** include the detection prompts, which were not recorded with the generation pipeline.
+
+Therefore this scorer can reproduce the data shape and evaluate a newly preregistered detector prompt, but it cannot claim exact reproduction of the original detection prompt unless that prompt is recovered independently. Report the language gap and absolute performance together; a smaller gap caused by worse English performance is not an improvement. These four controlled error types do not exhaust naturalistic hallucinations, evidence fabrication, misleading citation, omission or causal confabulation. Use AfrIFact for a separate source-retrieval and fact-checking lane.
+
+The public card currently reports 11,373 rows and CC BY 4.0. Treat this as a mutable metadata snapshot: the real run must pin an immutable dataset repository commit and file digests. The underlying government source documents and any reuse conditions still need review before source-text ingestion.
