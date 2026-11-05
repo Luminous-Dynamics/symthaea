@@ -26,6 +26,8 @@ All values are per Trading Period and use the Trading Unit's own incremental pri
 
 The formula result is zero where the Trading Unit's relevant energy price exceeds the SMP. The price-curve source/version, contracted operating point, selected increment, boundary comparison and Trading Period must be preserved in the calculation receipt.
 
+**Unit-resolution caution:** the Code describes these as prices in R/MW per Trading Period, while the displayed expression is the difference between SMP and the unit incremental energy price. The v1 Rust reference returns only that signed price differential in the same minor-currency-per-MWh basis as its inputs. It does not infer an interval-duration conversion, multiply by reserve MW, or emit a reserve payment. The final unit conversion and settlement interpretation must be reconciled against the approved Market Operator calculation before a real cashflow uses it.
+
 ### Price-curve contract
 
 The day-ahead production/consumption submissions use unit-specific piecewise curves. For a generating curve, the Code's cost increments are bounded by the minimum generation point, three elbow points (the third equal to MCR) and Emergency Level 1. Incremental costs must be nonnegative and non-decreasing across the relevant generating segments.
