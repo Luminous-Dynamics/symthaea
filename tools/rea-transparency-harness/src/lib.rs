@@ -206,7 +206,10 @@ pub fn merkle_tree_hash(leaves: &[Vec<u8>]) -> MerkleHash {
         1 => hash_leaf(&leaves[0]),
         n => {
             let k = split_point(n);
-            hash_node(merkle_tree_hash(&leaves[..k]), merkle_tree_hash(&leaves[k..]))
+            hash_node(
+                merkle_tree_hash(&leaves[..k]),
+                merkle_tree_hash(&leaves[k..]),
+            )
         }
     }
 }
@@ -244,7 +247,11 @@ pub fn consistency_path(old_size: usize, leaves: &[Vec<u8>]) -> Option<Vec<Merkl
 
 fn subproof(old_size: usize, leaves: &[Vec<u8>], complete: bool) -> Vec<MerkleHash> {
     if old_size == leaves.len() {
-        return if complete { Vec::new() } else { vec![merkle_tree_hash(leaves)] };
+        return if complete {
+            Vec::new()
+        } else {
+            vec![merkle_tree_hash(leaves)]
+        };
     }
     let k = split_point(leaves.len());
     if old_size <= k {
@@ -292,7 +299,10 @@ pub struct CheckpointMonitor {
 }
 impl CheckpointMonitor {
     pub fn new(log_id: LogId) -> Self {
-        Self { log_id, current: None }
+        Self {
+            log_id,
+            current: None,
+        }
     }
     pub fn current(&self) -> Option<&Checkpoint> {
         self.current.as_ref()
@@ -362,7 +372,11 @@ pub fn require_subject_binding(
     expected: &TransparencySubject,
     observed: &TransparencySubject,
 ) -> Result<(), ProofError> {
-    if expected == observed { Ok(()) } else { Err(ProofError::SubjectMismatch) }
+    if expected == observed {
+        Ok(())
+    } else {
+        Err(ProofError::SubjectMismatch)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -401,11 +415,14 @@ pub fn qualify_witness_quorum(
         if item.checkpoint.log_id == expected.log_id
             && item.checkpoint.tree_size == expected.tree_size
         {
-            per_operator.entry(item.operator_id.as_str()).or_default().insert((
-                item.checkpoint.log_id,
-                item.checkpoint.tree_size,
-                item.checkpoint.root_hash,
-            ));
+            per_operator
+                .entry(item.operator_id.as_str())
+                .or_default()
+                .insert((
+                    item.checkpoint.log_id,
+                    item.checkpoint.tree_size,
+                    item.checkpoint.root_hash,
+                ));
         }
     }
     if per_operator.values().any(|roots| roots.len() > 1) {
@@ -417,12 +434,17 @@ pub fn qualify_witness_quorum(
             roots
                 .iter()
                 .any(|(log, size, root)| {
-                    *log == expected.log_id && *size == expected.tree_size && *root == expected.root_hash
+                    *log == expected.log_id
+                        && *size == expected.tree_size
+                        && *root == expected.root_hash
                 })
                 .then(|| operator.to_owned())
         })
         .collect();
-    Ok(WitnessQuorum { required_operators, matching_operators })
+    Ok(WitnessQuorum {
+        required_operators,
+        matching_operators,
+    })
 }
 
 #[cfg(test)]
@@ -445,10 +467,29 @@ mod tests {
 
     #[test]
     fn leaf_hash_is_domain_separated_and_empty_tree_is_sha256_empty() {
-        assert_eq!(hash_leaf(b""), MerkleHash(Sha256::digest([0x00]).into()));
-        assert_eq!(empty_tree_hash(), MerkleHash(Sha256::digest([]).into()));
+        assert_eq!(
+            hash_leaf(b"").0,
+            [
+                0x6e, 0x34, 0x0b, 0x9c, 0xff, 0xb3, 0x7a, 0x98,
+                0x9c, 0xa5, 0x44, 0xe6, 0xbb, 0x78, 0x0a, 0x2c,
+                0x78, 0x90, 0x1d, 0x3f, 0xb3, 0x37, 0x38, 0x76,
+                0x85, 0x11, 0xa3, 0x06, 0x17, 0xaf, 0xa0, 0x1d,
+            ]
+        );
+        assert_eq!(
+            empty_tree_hash().0,
+            [
+                0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14,
+                0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+                0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c,
+                0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
+            ]
+        );
         assert_ne!(hash_leaf(b"abc"), MerkleHash(Sha256::digest(b"abc").into()));
-        assert_ne!(hash_node(hash_leaf(b"a"), hash_leaf(b"b")), hash_node(hash_leaf(b"b"), hash_leaf(b"a")));
+        assert_ne!(
+            hash_node(hash_leaf(b"a"), hash_leaf(b"b")),
+            hash_node(hash_leaf(b"b"), hash_leaf(b"a"))
+        );
     }
 
     #[test]
@@ -469,23 +510,47 @@ mod tests {
         let root = merkle_tree_hash(&tree);
         let proof = inclusion_path(&tree, 4).unwrap();
         assert_eq!(verify_inclusion(&tree[4], 4, 7, &proof, root), Ok(()));
-        assert_eq!(verify_inclusion(&tree[4], 3, 7, &proof, root), Err(ProofError::InvalidInclusionProof));
-        assert_eq!(verify_inclusion(&tree[5], 4, 7, &proof, root), Err(ProofError::InvalidInclusionProof));
-        assert_eq!(verify_inclusion(&tree[4], 4, 7, &proof, hash_leaf(b"wrong")), Err(ProofError::InvalidInclusionProof));
+        assert_eq!(
+            verify_inclusion(&tree[4], 3, 7, &proof, root),
+            Err(ProofError::InvalidInclusionProof)
+        );
+        assert_eq!(
+            verify_inclusion(&tree[5], 4, 7, &proof, root),
+            Err(ProofError::InvalidInclusionProof)
+        );
+        assert_eq!(
+            verify_inclusion(&tree[4], 4, 7, &proof, hash_leaf(b"wrong")),
+            Err(ProofError::InvalidInclusionProof)
+        );
         let mut changed = proof.clone();
         changed[0] = hash_leaf(b"changed sibling");
-        assert_eq!(verify_inclusion(&tree[4], 4, 7, &changed, root), Err(ProofError::InvalidInclusionProof));
+        assert_eq!(
+            verify_inclusion(&tree[4], 4, 7, &changed, root),
+            Err(ProofError::InvalidInclusionProof)
+        );
         let mut extra = proof;
         extra.push(hash_leaf(b"extra"));
-        assert_eq!(verify_inclusion(&tree[4], 4, 7, &extra, root), Err(ProofError::InvalidInclusionProof));
+        assert_eq!(
+            verify_inclusion(&tree[4], 4, 7, &extra, root),
+            Err(ProofError::InvalidInclusionProof)
+        );
     }
 
     #[test]
     fn inclusion_rejects_invalid_index_empty_tree_and_oversized_path() {
-        assert_eq!(verify_inclusion(b"x", 0, 0, &[], empty_tree_hash()), Err(ProofError::EmptyTree));
-        assert_eq!(verify_inclusion(b"x", 1, 1, &[], hash_leaf(b"x")), Err(ProofError::LeafIndexOutOfRange));
+        assert_eq!(
+            verify_inclusion(b"x", 0, 0, &[], empty_tree_hash()),
+            Err(ProofError::EmptyTree)
+        );
+        assert_eq!(
+            verify_inclusion(b"x", 1, 1, &[], hash_leaf(b"x")),
+            Err(ProofError::LeafIndexOutOfRange)
+        );
         let long = vec![hash_leaf(b"sibling"); MAX_PROOF_NODES + 1];
-        assert_eq!(verify_inclusion(b"x", 0, 2, &long, hash_leaf(b"x")), Err(ProofError::ProofTooLong));
+        assert_eq!(
+            verify_inclusion(b"x", 0, 2, &long, hash_leaf(b"x")),
+            Err(ProofError::ProofTooLong)
+        );
     }
 
     #[test]
@@ -509,21 +574,39 @@ mod tests {
         let old = merkle_tree_hash(&tree[..4]);
         let new = merkle_tree_hash(&tree);
         assert_eq!(verify_consistency(4, 9, old, new, &proof), Ok(()));
-        assert_eq!(verify_consistency(9, 4, new, old, &[]), Err(ProofError::InvalidTreeSize));
-        assert_eq!(verify_consistency(4, 9, old, hash_leaf(b"wrong"), &proof), Err(ProofError::InvalidConsistencyProof));
+        assert_eq!(
+            verify_consistency(9, 4, new, old, &[]),
+            Err(ProofError::InvalidTreeSize)
+        );
+        assert_eq!(
+            verify_consistency(4, 9, old, hash_leaf(b"wrong"), &proof),
+            Err(ProofError::InvalidConsistencyProof)
+        );
         let mut changed = proof;
         changed[0] = hash_leaf(b"changed");
-        assert_eq!(verify_consistency(4, 9, old, new, &changed), Err(ProofError::InvalidConsistencyProof));
-        assert_eq!(verify_consistency(4, 9, old, new, &[]), Err(ProofError::InvalidConsistencyProof));
+        assert_eq!(
+            verify_consistency(4, 9, old, new, &changed),
+            Err(ProofError::InvalidConsistencyProof)
+        );
+        assert_eq!(
+            verify_consistency(4, 9, old, new, &[]),
+            Err(ProofError::InvalidConsistencyProof)
+        );
     }
 
     #[test]
     fn empty_and_identical_tree_consistency_boundaries_are_explicit() {
         let tree = leaves(3);
         let root = merkle_tree_hash(&tree);
-        assert_eq!(verify_consistency(0, 3, empty_tree_hash(), root, &[]), Ok(()));
+        assert_eq!(
+            verify_consistency(0, 3, empty_tree_hash(), root, &[]),
+            Ok(())
+        );
         assert_eq!(verify_consistency(3, 3, root, root, &[]), Ok(()));
-        assert_eq!(verify_consistency(3, 3, root, hash_leaf(b"other"), &[]), Err(ProofError::InvalidConsistencyProof));
+        assert_eq!(
+            verify_consistency(3, 3, root, hash_leaf(b"other"), &[]),
+            Err(ProofError::InvalidConsistencyProof)
+        );
     }
 
     #[test]
@@ -534,14 +617,35 @@ mod tests {
         let old = checkpoint(log, &old_tree, 100);
         let new = checkpoint(log, &new_tree, 200);
         let mut monitor = CheckpointMonitor::new(log);
-        assert_eq!(monitor.observe_after_signature_validation(old.clone(), None), Ok(CheckpointDisposition::FirstPinned));
-        assert_eq!(monitor.observe_after_signature_validation(old.clone(), None), Ok(CheckpointDisposition::Unchanged));
-        let conflicting = Checkpoint { root_hash: hash_leaf(b"split view"), ..old.clone() };
-        assert_eq!(monitor.observe_after_signature_validation(conflicting, None), Err(ProofError::CheckpointEquivocation));
-        assert_eq!(monitor.observe_after_signature_validation(new.clone(), None), Err(ProofError::ConsistencyRequired));
+        assert_eq!(
+            monitor.observe_after_signature_validation(old.clone(), None),
+            Ok(CheckpointDisposition::FirstPinned)
+        );
+        assert_eq!(
+            monitor.observe_after_signature_validation(old.clone(), None),
+            Ok(CheckpointDisposition::Unchanged)
+        );
+        let conflicting = Checkpoint {
+            root_hash: hash_leaf(b"split view"),
+            ..old.clone()
+        };
+        assert_eq!(
+            monitor.observe_after_signature_validation(conflicting, None),
+            Err(ProofError::CheckpointEquivocation)
+        );
+        assert_eq!(
+            monitor.observe_after_signature_validation(new.clone(), None),
+            Err(ProofError::ConsistencyRequired)
+        );
         let proof = consistency_path(old_tree.len(), &new_tree).unwrap();
-        assert_eq!(monitor.observe_after_signature_validation(new, Some(&proof)), Ok(CheckpointDisposition::ConsistentExtension));
-        assert_eq!(monitor.observe_after_signature_validation(old, None), Err(ProofError::CheckpointRollback));
+        assert_eq!(
+            monitor.observe_after_signature_validation(new, Some(&proof)),
+            Ok(CheckpointDisposition::ConsistentExtension)
+        );
+        assert_eq!(
+            monitor.observe_after_signature_validation(old, None),
+            Err(ProofError::CheckpointRollback)
+        );
     }
 
     #[test]
@@ -551,20 +655,45 @@ mod tests {
         let old = checkpoint(log, &tree[..1], 1);
         let new = checkpoint(log, &tree, 2);
         let mut monitor = CheckpointMonitor::new(log);
-        monitor.observe_after_signature_validation(old, None).unwrap();
-        let wrong_log = Checkpoint { log_id: LogId([9; 32]), ..new.clone() };
-        assert_eq!(monitor.observe_after_signature_validation(wrong_log, Some(&[])), Err(ProofError::WrongLog));
-        assert_eq!(monitor.observe_after_signature_validation(new.clone(), Some(&[])), Err(ProofError::InvalidConsistencyProof));
+        monitor
+            .observe_after_signature_validation(old, None)
+            .unwrap();
+        let wrong_log = Checkpoint {
+            log_id: LogId([9; 32]),
+            ..new.clone()
+        };
+        assert_eq!(
+            monitor.observe_after_signature_validation(wrong_log, Some(&[])),
+            Err(ProofError::WrongLog)
+        );
+        assert_eq!(
+            monitor.observe_after_signature_validation(new.clone(), Some(&[])),
+            Err(ProofError::InvalidConsistencyProof)
+        );
         let proof = consistency_path(1, &tree).unwrap();
-        assert_eq!(monitor.observe_after_signature_validation(new, Some(&proof)), Ok(CheckpointDisposition::ConsistentExtension));
+        assert_eq!(
+            monitor.observe_after_signature_validation(new, Some(&proof)),
+            Ok(CheckpointDisposition::ConsistentExtension)
+        );
     }
 
     #[test]
     fn artifact_and_code_transparency_jwt_are_distinct_subject_kinds() {
         let digest = hash_leaf(b"same bytes");
-        let artifact = TransparencySubject { kind: TransparencySubjectKind::ArtifactSha256, digest, media_type: "application/vnd.android.package-archive".into() };
-        let token = TransparencySubject { kind: TransparencySubjectKind::CodeTransparencyJwtSha256, digest, media_type: "application/jwt".into() };
-        assert_eq!(require_subject_binding(&artifact, &token), Err(ProofError::SubjectMismatch));
+        let artifact = TransparencySubject {
+            kind: TransparencySubjectKind::ArtifactSha256,
+            digest,
+            media_type: "application/vnd.android.package-archive".into(),
+        };
+        let token = TransparencySubject {
+            kind: TransparencySubjectKind::CodeTransparencyJwtSha256,
+            digest,
+            media_type: "application/jwt".into(),
+        };
+        assert_eq!(
+            require_subject_binding(&artifact, &token),
+            Err(ProofError::SubjectMismatch)
+        );
         assert_eq!(require_subject_binding(&artifact, &artifact), Ok(()));
     }
 
@@ -574,9 +703,21 @@ mod tests {
         let tree = leaves(2);
         let expected = checkpoint(log, &tree, 55);
         let observations = vec![
-            WitnessObservation { operator_id: "operator-a".into(), key_id: "key-a1".into(), checkpoint: expected.clone() },
-            WitnessObservation { operator_id: "operator-a".into(), key_id: "key-a2".into(), checkpoint: expected.clone() },
-            WitnessObservation { operator_id: "operator-b".into(), key_id: "key-b1".into(), checkpoint: expected.clone() },
+            WitnessObservation {
+                operator_id: "operator-a".into(),
+                key_id: "key-a1".into(),
+                checkpoint: expected.clone(),
+            },
+            WitnessObservation {
+                operator_id: "operator-a".into(),
+                key_id: "key-a2".into(),
+                checkpoint: expected.clone(),
+            },
+            WitnessObservation {
+                operator_id: "operator-b".into(),
+                key_id: "key-b1".into(),
+                checkpoint: expected.clone(),
+            },
         ];
         let quorum = qualify_witness_quorum(&expected, &observations, 2).unwrap();
         assert_eq!(quorum.matching_operators.len(), 2);
@@ -588,11 +729,25 @@ mod tests {
         let log = LogId([4; 32]);
         let tree = leaves(2);
         let expected = checkpoint(log, &tree, 55);
-        let conflicting = Checkpoint { root_hash: hash_leaf(b"other root"), ..expected.clone() };
+        let conflicting = Checkpoint {
+            root_hash: hash_leaf(b"other root"),
+            ..expected.clone()
+        };
         let observations = vec![
-            WitnessObservation { operator_id: "operator-a".into(), key_id: "key-a1".into(), checkpoint: expected.clone() },
-            WitnessObservation { operator_id: "operator-a".into(), key_id: "key-a2".into(), checkpoint: conflicting },
+            WitnessObservation {
+                operator_id: "operator-a".into(),
+                key_id: "key-a1".into(),
+                checkpoint: expected.clone(),
+            },
+            WitnessObservation {
+                operator_id: "operator-a".into(),
+                key_id: "key-a2".into(),
+                checkpoint: conflicting,
+            },
         ];
-        assert_eq!(qualify_witness_quorum(&expected, &observations, 1), Err(ProofError::WitnessEquivocation));
+        assert_eq!(
+            qualify_witness_quorum(&expected, &observations, 1),
+            Err(ProofError::WitnessEquivocation)
+        );
     }
 }
