@@ -4,18 +4,110 @@
   "title": "Multi-Hall-SA deterministic score report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "plan_id", "phase", "synthetic_only", "plan_sha256", "pair_manifest_sha256", "results_sha256", "cluster_count", "systems", "language_gaps", "nonclaims"],
+  "required": [
+    "schema_version",
+    "plan_id",
+    "phase",
+    "synthetic_only",
+    "dataset_id",
+    "dataset_revision",
+    "dataset_license",
+    "plan_sha256",
+    "pair_manifest_sha256",
+    "results_sha256",
+    "pair_count",
+    "result_count",
+    "cluster_count",
+    "minimum_independent_clusters",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "confidence_level",
+    "multiple_comparison_correction",
+    "systems",
+    "language_gaps",
+    "nonclaims"
+  ],
   "properties": {
-    "schema_version": {"const": "multi-hall-sa-score-report-v0"},
-    "plan_id": {"type": "string"},
-    "phase": {"type": "string"},
-    "synthetic_only": {"type": "boolean"},
-    "plan_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "pair_manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "results_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-    "cluster_count": {"type": "integer", "minimum": 0},
-    "systems": {"type": "array"},
-    "language_gaps": {"type": "array"},
-    "nonclaims": {"type": "array", "items": {"type": "string"}}
+    "schema_version": {
+      "const": "multi-hall-sa-score-report-v0"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string"
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pair_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "results_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "cluster_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "systems": {
+      "type": "array"
+    },
+    "language_gaps": {
+      "type": "array"
+    },
+    "nonclaims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dataset_id": {
+      "type": "string"
+    },
+    "dataset_revision": {
+      "type": "string"
+    },
+    "dataset_license": {
+      "type": "string"
+    },
+    "pair_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "result_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minimum_independent_clusters": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence_level": {
+      "type": "number",
+      "exclusiveMinimum": 0.5,
+      "exclusiveMaximum": 1
+    },
+    "multiple_comparison_correction": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bonferroni"
+      ]
+    }
   }
 }
