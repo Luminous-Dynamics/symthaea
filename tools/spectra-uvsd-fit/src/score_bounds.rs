@@ -802,6 +802,96 @@ mod tests {
     }
 
     #[test]
+    fn anytime_bounds_use_summable_alpha_spending_and_variable_cell_counts() {
+        let action_set = action_set();
+        let scenario_set = scenario_set();
+        let mut adaptive_records = records();
+        for (index, record) in adaptive_records.iter_mut().enumerate() {
+            let desired = 6 + index * 2;
+            let extra = desired - record.target_information.len();
+            for offset in 0..extra {
+                let shift = (offset as f64 + 1.0) * 0.001;
+                record.target_information.push(1.0 + shift);
+                record.model_discrimination_information.push(0.55 + shift);
+                record.representativeness.push(0.8 - shift);
+                record.target_utility.push(-1.5 + shift);
+                record.participant_burden_seconds.push(20.0 + shift);
+            }
+        }
+        let cfg = config();
+        let fixed = bound_candidate_score_samples(
+            &action_set,
+            &scenario_set,
+            &adaptive_records,
+            &cfg,
+        )
+        .unwrap();
+        let anytime = bound_candidate_score_samples_anytime(
+            &action_set,
+            &scenario_set,
+            &adaptive_records,
+            &cfg,
+        )
+        .unwrap();
+
+        assert_eq!(anytime.method_id, ANYTIME_SCORE_BOUND_METHOD_ID);
+        assert!(anytime.time_uniform);
+        assert_eq!(anytime.alpha_spending_rule, ANYTIME_ALPHA_SPENDING_RULE_ID);
+        assert_eq!(anytime.claim_count, 24);
+        assert!((anytime.per_claim_alpha - 0.05 / 24.0).abs() < 1.0e-12);
+        assert_eq!(
+            anytime.metrics.iter().map(|metric| metric.target_information.sample_count).collect::<Vec<_>>(),
+            vec![6, 8, 10, 12]
+        );
+
+        // Sum_{n=1}^infinity 1/[n(n+1)] = 1, so all look-specific
+        // one-sided tail probabilities spend no more than per_claim_alpha.
+        let partial_spend: f64 = (1..=10_000)
+            .map(|n| anytime.per_claim_alpha / ((n * (n + 1)) as f64))
+            .sum();
+        assert!(partial_spend <= anytime.per_claim_alpha + 1.0e-12);
+        assert!(partial_spend > anytime.per_claim_alpha * 0.999);
+
+        let count = anytime.metrics[0].target_information.sample_count;
+        let range = anytime.metrics[0].target_information.declared_range;
+        let expected_radius = range.width()
+            * (((count * (count + 1)) as f64 / anytime.per_claim_alpha).ln()
+                / (2.0 * count as f64))
+                .sqrt();
+        let expected_lower = (anytime.metrics[0].target_information.point_estimate
+            - expected_radius)
+            .max(range.lower);
+        assert!(
+            (anytime.metrics[0].target_information.lower_bound - expected_lower).abs()
+                < 1.0e-12
+        );
+        // The anytime radius pays for all future looks and is wider than the
+        // fixed-look radius at the same sample count.
+        assert!(
+            anytime.metrics[0].target_information.lower_bound
+                <= fixed.metrics[0].target_information.lower_bound
+        );
+    }
+
+    #[test]
+    fn fixed_and_anytime_receipts_have_distinct_provenance_dispositions() {
+        let action_set = action_set();
+        let scenario_set = scenario_set();
+        let cfg = config();
+        let fixed = bound_candidate_score_samples(&action_set, &scenario_set, &records(), &cfg)
+            .unwrap();
+        let anytime =
+            bound_candidate_score_samples_anytime(&action_set, &scenario_set, &records(), &cfg)
+                .unwrap();
+        assert_eq!(fixed.method_id, SCORE_BOUND_METHOD_ID);
+        assert!(!fixed.time_uniform);
+        assert_eq!(fixed.alpha_spending_rule, "none");
+        assert_eq!(anytime.method_id, ANYTIME_SCORE_BOUND_METHOD_ID);
+        assert!(anytime.time_uniform);
+        assert_ne!(fixed, anytime);
+    }
+
+    #[test]
     fn output_bounds_feed_scenario_aggregation_without_reconstruction() {
         let action_set = action_set();
         let scenario_set = scenario_set();
