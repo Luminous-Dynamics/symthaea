@@ -31,6 +31,9 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
+#[path = "landauer_erasure.rs"]
+mod landauer_erasure;
+
 /// Thermodynamic state
 #[derive(Debug, Clone)]
 pub struct ThermodynamicState {
@@ -152,16 +155,7 @@ impl ThermoEncoder {
         bits_erased: f64,
         temperature_k: f64,
     ) -> Option<f64> {
-        if !bits_erased.is_finite()
-            || bits_erased < 0.0
-            || !temperature_k.is_finite()
-            || temperature_k <= 0.0
-        {
-            return None;
-        }
-
-        let heat_j = K_BOLTZMANN * temperature_k * std::f64::consts::LN_2 * bits_erased;
-        heat_j.is_finite().then_some(heat_j)
+        landauer_erasure::erasure_heat_floor_j(bits_erased, temperature_k, K_BOLTZMANN)
     }
 
     /// Legacy one-bit Landauer reference: k_B * T * ln(2).
