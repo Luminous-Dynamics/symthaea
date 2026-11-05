@@ -121,12 +121,12 @@ fuzz_target!(|data: &[u8]| {
         if member.name_raw() != expected.raw_name
             || member.header_start() != expected.local_header_offset
             || member.data_start() != Some(expected.data_offset)
-            || member.flags().bits() != expected.general_purpose_flags
+            || member.encrypted() != expected.encrypted
             || member.compressed_size() != expected.declared_compressed_size
             || member.size() != expected.declared_uncompressed_size
             || member.crc32() != expected.declared_crc32
         {
-            mismatch("raw name, offset, flags, sizes or declared CRC differ");
+            mismatch("raw name, offset, encryption state, sizes or declared CRC differ");
         }
 
         let oracle_method = match member.compression() {
