@@ -53,8 +53,10 @@ impl ResponseRule {
         if self.modulus <= 0 {
             return Err(HarnessError::InvalidTask);
         }
-        Ok(((i64::from(value) + i64::from(self.offset))
-            .rem_euclid(i64::from(self.modulus))) as i32)
+        Ok(
+            ((i64::from(value) + i64::from(self.offset)).rem_euclid(i64::from(self.modulus)))
+                as i32,
+        )
     }
 
     /// Compute the shortest circular distance in the declared domain.
@@ -243,11 +245,7 @@ pub trait AgentPolicy {
     fn policy_id(&self) -> &str;
 
     /// Produce one next action from the observed state.
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError>;
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError>;
 }
 
 /// Policy that always emits the same feature value.
@@ -263,11 +261,7 @@ impl AgentPolicy for FixedResponsePolicy {
         &self.id
     }
 
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError> {
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         make_action(
             observation,
             self.policy_id(),
@@ -289,11 +283,7 @@ impl AgentPolicy for ImitationOnlyPolicy {
         &self.id
     }
 
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError> {
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         make_action(
             observation,
             self.policy_id(),
@@ -315,11 +305,7 @@ impl AgentPolicy for OneWayPromptPolicy {
         &self.id
     }
 
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError> {
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         let value = task
             .expected_response
             .apply(observation.initial_partner_feature.value)?;
@@ -348,11 +334,7 @@ impl AgentPolicy for YokedReplayPolicy {
         &self.id
     }
 
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError> {
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         if self.source_session_id.trim().is_empty()
             || self.source_session_id == observation.session_id
             || self.replayed_feature.dimension != task.target_dimension
@@ -382,11 +364,7 @@ impl AgentPolicy for RuleBasedPolicy {
         &self.id
     }
 
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError> {
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         let value = task
             .expected_response
             .apply(observation.current_partner_feature.value)?;
