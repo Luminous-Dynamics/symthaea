@@ -340,6 +340,41 @@ pub struct DemandSideConsumptionPriceCurve {
     pub increment_three_minor_per_mwh: i64,
 }
 
+/// DSU reserve products with explicit qualifying-capacity clauses in Code §§9.8.4(3), 9.8.6(4) and 9.8.7(3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DsuUpwardReserveProduct {
+    RegulatingUp,
+    Instantaneous,
+    TenMinute,
+}
+
+/// Inputs to the bounded DSU qualifying-capacity arithmetic.
+///
+/// Values are assumed to have been identity-, authority-, time- and provenance-qualified
+/// upstream. This pure kernel does not authenticate the underlying contract or meter data.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DsuReserveQualificationInputs {
+    pub product: DsuUpwardReserveProduct,
+    pub contracted_capacity_mw: Option<f64>,
+    pub official_energy_consumption_mw: Option<f64>,
+    pub effective_available_capacity_mw: Option<f64>,
+    pub was_utilized_for_reserve_or_balancing: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DsuQualificationError {
+    InvalidConsumptionCurve,
+    NonFiniteInput(&'static str),
+    NegativeInput(&'static str),
+}
+
+/// A missing required input or an unimplemented utilization branch is not a zero-capacity result.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DsuQualificationResult {
+    Determined { qualifying_capacity_mw: f64 },
+    Indeterminate { reason: &'static str },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReservePriceError {
     NonFiniteOperatingPoint,
@@ -608,6 +643,111 @@ pub fn dsu_upward_reserve_opportunity_price(
         selected_increment,
         price_difference_minor_per_mwh: difference.max(0),
     })
+}
+
+/// Calculate DSU qualifying-for-payment capacity for the explicit §9.8.4(3),
+/// §9.8.6(4) and §9.8.7(3) arithmetic branches.
+///
+/// Regulating Up / Instantaneous use official metered consumption minus the third
+/// consumption elbow, and are only determined here when the unit was not used for
+/// reserve/balancing. Ten-Minute uses effective available capacity minus that elbow.
+/// Payment prices, performance factors, source authenticity and utilized-service
+/// branches are intentionally outside this function.
+pub fn qualifying_dsu_capacity_for_payment(
+    inputs: DsuReserveQualificationInputs,
+    curve: DemandSideConsumptionPriceCurve,
+) -> Result<DsuQualificationResult, DsuQualificationError> {
+    curve
+        .validate()
+        .map_err(|_| DsuQualificationError::InvalidConsumptionCurve)?;
+
+    let Some(contracted_mw) = inputs.contracted_capacity_mw else {
+        return Ok(DsuQualificationResult::Indeterminate {
+            reason: "missing contracted reserve capacity",
+        });
+    };
+    if !contracted_mw.is_finite() {
+        return Err(DsuQualificationError::NonFiniteInput(
+            "contracted_capacity_mw",
+        ));
+    }
+    if contracted_mw < 0.0 {
+        return Err(DsuQualificationError::NegativeInput(
+            "contracted_capacity_mw",
+        ));
+    }
+    if contracted_mw == 0.0 {
+        return Ok(DsuQualificationResult::Determined {
+            qualifying_capacity_mw: 0.0,
+        });
+    }
+
+    match inputs.product {
+        DsuUpwardReserveProduct::RegulatingUp | DsuUpwardReserveProduct::Instantaneous => {
+            let Some(consumption_mw) = inputs.official_energy_consumption_mw else {
+                return Ok(DsuQualificationResult::Indeterminate {
+                    reason: "missing official energy consumption",
+                });
+            };
+            if !consumption_mw.is_finite() {
+                return Err(DsuQualificationError::NonFiniteInput(
+                    "official_energy_consumption_mw",
+                ));
+            }
+            if consumption_mw < 0.0 {
+                return Err(DsuQualificationError::NegativeInput(
+                    "official_energy_consumption_mw",
+                ));
+            }
+            if consumption_mw > curve.declared_consumption_mw {
+                return Ok(DsuQualificationResult::Indeterminate {
+                    reason: "official consumption exceeds declared consumption",
+                });
+            }
+
+            match inputs.was_utilized_for_reserve_or_balancing {
+                None => {
+                    return Ok(DsuQualificationResult::Indeterminate {
+                        reason: "missing reserve/balancing utilization state",
+                    });
+                }
+                Some(true) => {
+                    return Ok(DsuQualificationResult::Indeterminate {
+                        reason: "utilized reserve/balancing qualification branch is not modeled",
+                    });
+                }
+                Some(false) => {}
+            }
+
+            let reducible_mw = (consumption_mw - curve.third_elbow_mw).max(0.0);
+            Ok(DsuQualificationResult::Determined {
+                qualifying_capacity_mw: contracted_mw.min(reducible_mw),
+            })
+        }
+        DsuUpwardReserveProduct::TenMinute => {
+            let Some(effective_available_mw) = inputs.effective_available_capacity_mw else {
+                return Ok(DsuQualificationResult::Indeterminate {
+                    reason: "missing effective available capacity",
+                });
+            };
+            if !effective_available_mw.is_finite() {
+                return Err(DsuQualificationError::NonFiniteInput(
+                    "effective_available_capacity_mw",
+                ));
+            }
+            if effective_available_mw < 0.0 {
+                return Err(DsuQualificationError::NegativeInput(
+                    "effective_available_capacity_mw",
+                ));
+            }
+
+            let reducible_mw =
+                (effective_available_mw - curve.third_elbow_mw).max(0.0);
+            Ok(DsuQualificationResult::Determined {
+                qualifying_capacity_mw: contracted_mw.min(reducible_mw),
+            })
+        }
+    }
 }
 
 /// SAWEM Market Code Rev 2.3 product response requirements.
@@ -1406,6 +1546,163 @@ mod tests {
         assert_eq!(
             coincident_empty_blocks.price_at(50.0),
             Ok((PriceIncrement::Three, 30))
+        );
+    }
+
+    #[test]
+    fn dsu_regulating_up_and_instantaneous_capacity_use_metered_consumption() {
+        let curve = demand_side_consumption_price_curve();
+
+        let capped_by_contract = qualifying_dsu_capacity_for_payment(
+            DsuReserveQualificationInputs {
+                product: DsuUpwardReserveProduct::RegulatingUp,
+                contracted_capacity_mw: Some(25.0),
+                official_energy_consumption_mw: Some(90.0),
+                effective_available_capacity_mw: None,
+                was_utilized_for_reserve_or_balancing: Some(false),
+            },
+            curve,
+        )
+        .expect("synthetic Regulating Up inputs are valid");
+        assert_eq!(
+            capped_by_contract,
+            DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 25.0
+            }
+        );
+
+        let capped_by_metered_consumption = qualifying_dsu_capacity_for_payment(
+            DsuReserveQualificationInputs {
+                product: DsuUpwardReserveProduct::Instantaneous,
+                contracted_capacity_mw: Some(60.0),
+                official_energy_consumption_mw: Some(35.0),
+                effective_available_capacity_mw: None,
+                was_utilized_for_reserve_or_balancing: Some(false),
+            },
+            curve,
+        )
+        .expect("synthetic Instantaneous inputs are valid");
+        assert_eq!(
+            capped_by_metered_consumption,
+            DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 15.0
+            }
+        );
+    }
+
+    #[test]
+    fn dsu_ten_minute_capacity_uses_effective_available_capacity() {
+        let curve = demand_side_consumption_price_curve();
+
+        let qualified = qualifying_dsu_capacity_for_payment(
+            DsuReserveQualificationInputs {
+                product: DsuUpwardReserveProduct::TenMinute,
+                contracted_capacity_mw: Some(70.0),
+                official_energy_consumption_mw: None,
+                effective_available_capacity_mw: Some(75.0),
+                was_utilized_for_reserve_or_balancing: None,
+            },
+            curve,
+        )
+        .expect("synthetic Ten-Minute inputs are valid");
+        assert_eq!(
+            qualified,
+            DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 55.0
+            }
+        );
+
+        let below_third_elbow = qualifying_dsu_capacity_for_payment(
+            DsuReserveQualificationInputs {
+                product: DsuUpwardReserveProduct::TenMinute,
+                contracted_capacity_mw: Some(70.0),
+                official_energy_consumption_mw: None,
+                effective_available_capacity_mw: Some(10.0),
+                was_utilized_for_reserve_or_balancing: None,
+            },
+            curve,
+        )
+        .expect("below-elbow case remains a valid input");
+        assert_eq!(
+            below_third_elbow,
+            DsuQualificationResult::Determined {
+                qualifying_capacity_mw: 0.0
+            }
+        );
+    }
+
+    #[test]
+    fn dsu_capacity_qualification_keeps_missing_and_utilized_cases_indeterminate() {
+        let curve = demand_side_consumption_price_curve();
+        let base = DsuReserveQualificationInputs {
+            product: DsuUpwardReserveProduct::RegulatingUp,
+            contracted_capacity_mw: Some(50.0),
+            official_energy_consumption_mw: Some(90.0),
+            effective_available_capacity_mw: None,
+            was_utilized_for_reserve_or_balancing: Some(false),
+        };
+
+        let mut missing_meter = base;
+        missing_meter.official_energy_consumption_mw = None;
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(missing_meter, curve),
+            Ok(DsuQualificationResult::Indeterminate {
+                reason: "missing official energy consumption"
+            })
+        );
+
+        let mut utilized = base;
+        utilized.was_utilized_for_reserve_or_balancing = Some(true);
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(utilized, curve),
+            Ok(DsuQualificationResult::Indeterminate {
+                reason: "utilized reserve/balancing qualification branch is not modeled"
+            })
+        );
+
+        let mut missing_utilization = base;
+        missing_utilization.was_utilized_for_reserve_or_balancing = None;
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(missing_utilization, curve),
+            Ok(DsuQualificationResult::Indeterminate {
+                reason: "missing reserve/balancing utilization state"
+            })
+        );
+
+        let mut above_declared = base;
+        above_declared.official_energy_consumption_mw = Some(101.0);
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(above_declared, curve),
+            Ok(DsuQualificationResult::Indeterminate {
+                reason: "official consumption exceeds declared consumption"
+            })
+        );
+    }
+
+    #[test]
+    fn dsu_capacity_qualification_rejects_negative_and_nonfinite_inputs() {
+        let curve = demand_side_consumption_price_curve();
+        let mut negative_contract = DsuReserveQualificationInputs {
+            product: DsuUpwardReserveProduct::TenMinute,
+            contracted_capacity_mw: Some(-1.0),
+            official_energy_consumption_mw: None,
+            effective_available_capacity_mw: Some(75.0),
+            was_utilized_for_reserve_or_balancing: None,
+        };
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(negative_contract, curve),
+            Err(DsuQualificationError::NegativeInput(
+                "contracted_capacity_mw"
+            ))
+        );
+
+        negative_contract.contracted_capacity_mw = Some(20.0);
+        negative_contract.effective_available_capacity_mw = Some(f64::NAN);
+        assert_eq!(
+            qualifying_dsu_capacity_for_payment(negative_contract, curve),
+            Err(DsuQualificationError::NonFiniteInput(
+                "effective_available_capacity_mw"
+            ))
         );
     }
 
