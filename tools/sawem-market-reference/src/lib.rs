@@ -1212,13 +1212,9 @@ pub fn calculate_credit_call_reestablishment_deadline(
     if credit_call_day_ordinal > business_calendar.complete_through_day {
         return Err(CreditCoverCalendarError::DayOutsideCalendarCoverage);
     }
-    if !business_calendar
-        .business_day_ordinals
-        .contains(&credit_call_day_ordinal)
-    {
-        return Err(CreditCoverCalendarError::RequiredDayIsNotBusinessDay);
-    }
-
+    // A Credit Call can be made whenever the MO exercises its drawdown right.
+    // The two-business-day clock starts after the call date; the call date itself
+    // need not be a Business Day.
     let due_day = second_day_after(
         business_calendar.business_day_ordinals,
         business_calendar.complete_through_day,
@@ -2723,6 +2719,22 @@ mod tests {
             CreditCallReestablishmentDeadline {
                 // Business Days after day 10 are 11 and 12, not Working Days 12 and 13.
                 deadline_day_ordinal: 12,
+            }
+        );
+    }
+
+    #[test]
+    fn credit_call_on_non_business_day_starts_count_on_next_business_day() {
+        let result = calculate_credit_call_reestablishment_deadline(
+            13,
+            business_calendar_for_test(),
+        )
+        .expect("calendar covers the two Business Days after a weekend/holiday call");
+        assert_eq!(
+            result,
+            CreditCallReestablishmentDeadline {
+                // Day 13 is not a Business Day; 15 and 16 are the next two.
+                deadline_day_ordinal: 16
             }
         );
     }
