@@ -451,7 +451,7 @@ mod tests {
             envelope,
             policy,
             &sha256(policy),
-            1_800_000_000,
+            1_793_900_000,
         )
     }
 
@@ -477,7 +477,7 @@ mod tests {
     fn policy_digest_pin_is_mandatory() {
         let envelope = fixture_envelope();
         let policy = fixture_policy();
-        assert!(verify_envelope(&envelope, &policy, &"0".repeat(64), 1_800_000_000).is_err());
+        assert!(verify_envelope(&envelope, &policy, &"0".repeat(64), 1_793_900_000).is_err());
     }
 
     #[test]
