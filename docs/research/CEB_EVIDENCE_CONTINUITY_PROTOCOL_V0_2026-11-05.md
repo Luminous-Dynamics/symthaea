@@ -233,3 +233,50 @@ Do not execute candidate-controlled code, build scripts, proc macros, tests, gra
 ## 13. Claim boundary
 
 This is a design and research protocol. It does not establish that Symthaea currently maintains evidence correctly across repository evolution, that any sequence is admitted, that the scorer is independently trusted, or that a runner is isolated. It does not establish superiority over SWE-Milestone, SWE-CI, Terminal-Bench or any coding-agent leaderboard. Those claims require matched tasks, exact protocol versions, qualified execution and independently adjudicated evidence.
+
+
+## 14. CEB portfolio integration and ownership boundaries
+
+The continuity track is deliberately downstream of, and complementary to, several CEB workstreams opened during the November 5 research expansion. The protocol must compose with these owners instead of duplicating their schemas or validators.
+
+| Existing work | Owns | Continuity integration |
+|---|---|---|
+| [#10607 / #10609](https://github.com/Luminous-Dynamics/symthaea/issues/10607) task admission | Task provenance, license, human oracle, two-sided controls and admission states | Every sequence milestone must reference admitted task identity; a continuity sequence is not itself an admission bypass |
+| [#10610 / #10611](https://github.com/Luminous-Dynamics/symthaea/issues/10610) release lifecycle | Semantic versioning, saturation, resource calibration, rerun/regrade/reuse policy | Reuse its change-impact classification; continuity records the engineering-claim consequences, not another release manifest |
+| [#10612 / #10613](https://github.com/Luminous-Dynamics/symthaea/issues/10612) selective escalation | Question precision, blocker recall, ASK-F1 and help-enabled task success | Use escalation as an explicit disposition when evidence dependencies are missing or non-identifiable; preserve ASK-F1 and Pass@3 separately |
+| [#10614 / #10617](https://github.com/Luminous-Dynamics/symthaea/issues/10614) balanced sampling | Repository × fault-family allocation, holdout balance and pre-score difficulty | Sample continuity sequences by repository family and event/fault stratum; do not reuse the six-repository pilot as confirmatory evidence |
+| [#10619 / #10624](https://github.com/Luminous-Dynamics/symthaea/issues/10619) comparative statistics | Paired inference, cluster structure, primary/secondary claim rules and Pareto reporting | Use its claim classes, power and inference gates; do not invent continuity-only superiority thresholds after seeing outcomes |
+| [#10626](https://github.com/Luminous-Dynamics/symthaea/issues/10626) contamination transparency | T1–T4 leakage assessment, search-surface records, mitigation and residual uncertainty | Require task/sequence contamination cards and distinguish searched-no-match from verified-absent; never claim a public task is sealed |
+| [#10571 / #10589](https://github.com/Luminous-Dynamics/symthaea/pull/10589) observation registry | External observation provenance, configuration and denominator lineage | Keep any external continuous-benchmark observation attached to its original task/version/system definition |
+| [#10592 / #10593](https://github.com/Luminous-Dynamics/symthaea/issues/10592) metric crosswalk | Semantic correspondence and SOTA claim guard | A continuity metric can be a new construct; do not map it to generic milestone resolve rate without a matched operational definition |
+| [#10173](https://github.com/Luminous-Dynamics/symthaea/issues/10173) repository twin | Typed graph, change impact and invalidation labels | Supplies dependency/evidence-impact facts; continuity scores whether the resulting claim disposition is correct |
+| [#9112](https://github.com/Luminous-Dynamics/symthaea/issues/9112) decision-use validity | Scope, temporal validity, source-linked governing state and admissibility | Supplies the validity vocabulary and decision-use semantics; continuity measures them through repository evolution |
+| [#10366 / #10387](https://github.com/Luminous-Dynamics/symthaea/issues/10366) causal debugging | Hypotheses, prospective forecasts, intervention and update | Used for ambiguous changes and targeted revalidation; no second scheduler is introduced |
+| [#10314 / #10370](https://github.com/Luminous-Dynamics/symthaea/issues/10370) evidence and receipts | Canonical run accounting, DSSE and primary/regrade convergence | Binds task/arm/run identity and assurance evidence; no continuity-specific receipt format is allowed |
+| [#10436, #10064, #10369](https://github.com/Luminous-Dynamics/symthaea/issues/10436) custody/isolation/trust | Agent-visible release, execution isolation and signer custody | Remain hard gates for executable tasks, sealed holds and independent-regrade assertions |
+
+### 14.1 Four distinct change questions
+
+Do not conflate these questions:
+
+1. **Did the engineering system change?** #10173 and the source/configuration event record establish candidate impact.
+2. **Did the claim's validity change?** #9112 semantics determine scope, freshness and admissibility; the continuity grader assesses retain/revalidate/invalidate/supersede/unresolved.
+3. **Did the benchmark release or evaluator change?** #10610 determines rerun/regrade/reuse treatment and preserves historical denominators.
+4. **Did the comparative claim remain statistically licensed?** #10619 governs paired analysis, clustering, multiplicity, power and claim class.
+
+A single change may affect one, several, or none of these dimensions. For example, a grader-only correction may require a regrade under #10610, update a previously published comparison under #10619, and leave the engineering source claim unchanged. A dependency update may invalidate a compiler-resolved API claim and require a new run, without changing the benchmark's official grader.
+
+### 14.2 Required integration tests for a later executable release
+
+The static design should eventually be represented by paired cases where:
+
+- a product dependency change invalidates an affected claim but preserves unrelated claims;
+- a verifier-only update triggers regrade without falsely claiming a product change;
+- a metadata-only edit permits reuse only after evaluation-input digest equality;
+- public-fix exposure downgrades a task's contamination status without silently changing the task denominator;
+- holdout difficulty and repository-family allocation are fixed before candidate scores;
+- an unresolved evidence gap generates a precise question/escalation and is not counted as a failed repair;
+- a task/event sequence change triggers rerun and cannot inherit a prior score;
+- a statistical claim is downgraded when its cluster count, power evidence, or matched-input conditions fail.
+
+These are future qualification cases, not executed tests or admitted task records.
