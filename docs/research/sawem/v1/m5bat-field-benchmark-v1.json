@@ -1,0 +1,91 @@
+{
+  "benchmark_id": "M5BAT-FIELD-EXECUTION-001",
+  "version": "1",
+  "state": "discovered_not_staged",
+  "source": {
+    "dataset_title": "Improving Real-World Execution of Optimized Trading Schedules for Large-Scale Battery Storage Systems through Data-Driven Component Parametrization: Dataset",
+    "dataset_doi": "10.18154/RWTH-2025-06555",
+    "dataset_record_url": "https://publications.rwth-aachen.de/record/1015732",
+    "dataset_archive_url": "https://publications.rwth-aachen.de/record/1015732/files/Dataset.zip",
+    "supplementary_file_url": "https://publications.rwth-aachen.de/record/1015732/files/Supplementary_file.pdf",
+    "article_title": "Improving real-world execution of optimized trading schedules for large-scale battery storage systems through data-driven component parametrization",
+    "article_doi": "10.1016/j.apenergy.2025.127340",
+    "publication": "Applied Energy 407, article 127340",
+    "publication_date": "2026-03-15",
+    "publisher": "RWTH Publications / Applied Energy",
+    "license": "CC-BY-4.0",
+    "source_class": "public_field_dataset_and_peer_reviewed_article",
+    "retrieved_at_utc": "2026-11-05T20:30:00Z",
+    "archive_sha256": null,
+    "archive_size_bytes": null,
+    "staged_path": null,
+    "staging_note": "Public record and direct ZIP URL verified, but this execution environment returned an unsupported application/zip response and DNS resolution prevented direct download. No archive bytes or content hashes are claimed."
+  },
+  "asset_scope": {
+    "site": "M5BAT, Aachen, Germany",
+    "rated_power_mw": 5,
+    "nominal_energy_mwh": 7.5,
+    "technology": "hybrid multi-technology BESS",
+    "experimental_scope": "LMO subsystem used for the two schedule-execution validation tests described in the article",
+    "sampling_resolution_seconds": 1,
+    "field_tests": [
+      "Test 1: reference parametrization",
+      "Test 2: improved data-driven parametrization"
+    ]
+  },
+  "expected_data_domains": [
+    "optimized power-delivery schedules",
+    "inverter AC-side power",
+    "inverter DC-side power",
+    "individual battery-unit state of charge",
+    "system state of charge",
+    "grid-connection-point power"
+  ],
+  "frozen_claims_from_article": {
+    "test_1_unfulfilled_energy_kwh": 1094,
+    "test_2_unfulfilled_energy_kwh": 238,
+    "unfulfilled_energy_reduction_percent": 78.2,
+    "balancing_energy_cost_reduction_percent": 71.7,
+    "test_2_balancing_cost_percent_of_trading_revenue": 1.8,
+    "test_2_system_round_trip_efficiency_model_error_percentage_points": 2.2,
+    "test_2_inverter_efficiency_model_error_percentage_points": 0.55,
+    "reported_validation_duration_hours": 61,
+    "note": "These values describe the cited M5BAT study and its selected LMO test scope. They are reference targets, not Symthaea results or universal industry limits."
+  },
+  "evaluation_protocol": {
+    "calibration_test": "Test 1",
+    "validation_test": "Test 2",
+    "leakage_rule": "No Test 2 measurements, fitted parameters or revised data may be used to fit the Test 1-calibrated model. All source and model versions must be content-addressed before the validation replay.",
+    "raw_preservation": "Preserve the original ZIP and every extracted member unchanged; hash the archive and each data member before parsing.",
+    "time_alignment": "Preserve source timezone and UTC offset as supplied. Do not normalize time, daylight-saving transitions, gaps or duplicate timestamps before recording the raw mapping.",
+    "schedule_mapping": "Map each optimized schedule interval to synchronized one-second grid-point measurements, then aggregate using energy integration rather than averaging power values without duration weights.",
+    "physical_replay": "Compare schedule against grid-connection-point energy; separately evaluate inverter AC/DC efficiency, system SOC drift and individual-unit SOC trajectories.",
+    "balancing_cost": "Only calculate balancing cost when the required market price/settlement evidence is present in the dataset or separately source-frozen. Never infer a currency charge from energy deviation alone.",
+    "capability_envelope": "Fit conservative charge/discharge SOC capability curves on Test 1 data only; evaluate envelope coverage, derating decisions and delivery outcomes on Test 2.",
+    "minimum_output": "Raw digests, schema/column map, time-quality report, data coverage, 15-minute schedule reconciliation, one-second residuals, SOC drift, unfulfilled energy, efficiency errors and an exact reproduction report."
+  },
+  "target_gates": {
+    "first_gate": "Reproduce the published Test 1 and Test 2 reference metrics within the dataset's documented rounding/tolerance before claiming any improvement.",
+    "stretch_unfulfilled_energy_kwh_max": 120,
+    "stretch_reduction_vs_test_1_percent_min": 89,
+    "stretch_balancing_cost_percent_of_revenue_max": 1,
+    "stretch_system_rte_error_percentage_points_max": 1,
+    "stretch_inverter_efficiency_error_percentage_points_max": 0.3,
+    "critical_constraints": [
+      "same M5BAT asset/test scope and initial SOC",
+      "same schedule horizon and interval alignment",
+      "same price and tariff/settlement basis",
+      "same LMO units and power-delivery boundary",
+      "same data-cleaning and missing-data treatment",
+      "no Test 2 information used in calibration"
+    ]
+  },
+  "results": {
+    "dataset_downloaded": false,
+    "archive_sha256": null,
+    "test_1_reproduced": false,
+    "test_2_reproduced": false,
+    "symthaea_comparison_run": false,
+    "field_metrics_state": "not_run"
+  }
+}
