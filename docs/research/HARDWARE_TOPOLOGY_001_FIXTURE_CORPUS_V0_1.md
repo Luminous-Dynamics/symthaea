@@ -198,3 +198,31 @@ The Luminous synthetic fixtures should be designed to test our own canonical sem
 ## 9. Claim ceiling
 
 This document specifies synthetic fixture intent only. It contains no validated CAD/STEP files, native assembly, KiCad project, extracted netlist, scorer execution or benchmark result. It establishes no mechanical fit, electrical safety, manufacturability, EMC/SI/PI performance, compliance, reliability or physical qualification.
+
+
+## 8.1 Manufacturing-feasibility and physical-realization boundary
+
+A successful assembly pose or netlist reconstruction is not proof that the design can be manufactured, assembled, inspected or operated. Preserve the following progression:
+
+```
+reference reconstruction
+!= manufacturing-route feasibility
+!= tolerance/fit conformance
+!= as-built article identity
+!= calibrated inspection
+!= functional qualification
+```
+
+Add the following synthetic negative controls before any physical pilot:
+
+- **MFG-N01 — unavailable process capability:** requested PCB stack-up, plating, finish, trace/space or hole capability is unsupported by the exact route. Disposition: NOT_SUPPORTED / alternate supplier route, never pass.
+- **MFG-N02 — impossible tolerance:** a drawing tolerance is tighter than the admitted machine/process/measurement capability or the tolerance stack makes assembly infeasible. Disposition: INFEASIBLE or NEEDS_REDESIGN; no silent tolerance relaxation.
+- **MFG-N03 — inaccessible assembly:** the assembly pose is geometrically correct but the specified fastener cannot be inserted/torqued or a required connector cannot be mated with the declared tool/access envelope. Disposition: assembly-process failure.
+- **MFG-N04 — unapproved substitution:** the nominal geometry appears equivalent but the exact part variant, material/property state, revision or supplier/lot is outside the approved substitution profile. Disposition: blocked pending review.
+- **MFG-N05 — missing inspection/calibration:** design and assembly artifacts exist, but the measurement used for acceptance is missing, stale or outside its calibration/currentness profile. Disposition: EVIDENCE_INCOMPLETE.
+- **MFG-N06 — configuration drift:** manufacturing capability, fixture, tool, board revision or process recipe changed after the evidence was produced. Old evidence remains historical; applicability must be reviewed before it can support the new configuration.
+
+Compose [MFG-VALUE-001 #7608](https://github.com/Luminous-Dynamics/symthaea/issues/7608) for conventional-vs-candidate production value, [COMPUTE-MFG-001C #8223](https://github.com/Luminous-Dynamics/symthaea/issues/8223) for PCB routes, [ENG-TOL-001 #4883](https://github.com/Luminous-Dynamics/symthaea/issues/4883) for tolerance/as-built conformance, [ROB-CATALOG #4877](https://github.com/Luminous-Dynamics/symthaea/issues/4877) for exact component/substitution identity, [ROB-REALIZE #4859](https://github.com/Luminous-Dynamics/symthaea/issues/4859) for as-built/metrology lineage, and [BUILT-ROB-PILOT #6040](https://github.com/Luminous-Dynamics/symthaea/issues/6040) for integrated commissioning. Do not add a parallel manufacturing ontology, inspection ledger or production-value score.
+
+OpenAI's 2026-11-03 report provides a current industry warning: its Astra-generated enclosure/PCB device required several review rounds before manufacturing because production limits, tolerances and assembly details were not consistently accounted for. Its reported 0.875 BenchCAD score for an unnamed internal model is recorded separately in the external registry; the report does not disclose the model ID, harness, run count, budget or task outcomes. These observations motivate the additional gate but do not establish Luminous capability or a reproducible competitor score. Source: https://openai.com/index/accelerating-engineering-for-the-physical-world/
+
