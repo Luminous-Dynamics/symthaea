@@ -303,6 +303,18 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
                 "signature_cryptographic=pass requires at least one signer key/certificate record",
             ));
         }
+        for scheme in schemes.iter().filter(|scheme| {
+            scheme.get("status").and_then(Value::as_str) == Some("pass")
+        }) {
+            let scheme_name = string_at(scheme, &["scheme"])?;
+            if !signers.iter().any(|signer| {
+                signer.get("scheme").and_then(Value::as_str) == Some(scheme_name)
+            }) {
+                return Err(semantic(format!(
+                    "passing scheme {scheme_name} requires a signer record for that same scheme"
+                )));
+            }
+        }
         for signer in signers {
             let key = signer
                 .get("public_key_spki_sha256")
@@ -325,6 +337,15 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
             return Err(semantic(
                 "signer_identity=pass requires exact SPKI and certificate DER digest records",
             ));
+        }
+        for signer in signers {
+            if !is_sha256(string_at(signer, &["public_key_spki_sha256"])?)
+                || !is_sha256(string_at(signer, &["certificate_der_sha256"])?)
+            {
+                return Err(semantic(
+                    "signer identity pass requires exact public-key and certificate byte digests",
+                ));
+            }
         }
     }
 
@@ -406,6 +427,13 @@ fn validate_semantics(statement: &Value) -> Result<(), EvaluationError> {
     }
 
     if claim_status(claims, "application_authorization")? == "pass" {
+        if claim_status(claims, "signature_cryptographic")? != "pass"
+            || claim_status(claims, "signer_identity")? != "pass"
+        {
+            return Err(semantic(
+                "application authorization pass requires cryptographic signature and signer identity passes",
+            ));
+        }
         if format == "apk" {
             require_equal_identifier(
                 authorization,
