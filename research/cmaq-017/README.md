@@ -84,3 +84,36 @@ The focused workflow runs formatting, tests, Clippy, report generation, and stru
 A passing synthetic run can establish that this controlled generator, scorer, metrics, and negative controls behave as specified. It cannot establish physical safety, world-model superiority, generalization, industry leadership, or SOTA.
 
 A comparative claim requires the CMAQ-011 external bridge: pinned task and simulator revisions, paper-native and wrapper-normalized modes kept distinct, common action cadence/reward semantics, matched training and inference budgets, held-out tasks/error families, paired seeds, and independent reproduction.
+
+
+## Denoised selectable headroom (stacked v0.1 reference)
+
+The independent binary `src/bin/selectable_headroom.rs` adds a finite exact-protocol reference for the continuation-noise issue identified in the October 27, 2026 paper [How Much Can Best-of-N Help a World Action Model?](https://arxiv.org/abs/2610.37196).
+
+The standard one-continuation best-of-N estimate can select a candidate that received an unusually favorable continuation rather than one with the best expected outcome. This reference makes the distinction explicit:
+
+`candidate generation -> selection continuations -> selected candidate -> disjoint held-out continuations`
+
+It reports, independently:
+
+- naive best-of-N selection score;
+- held-out mean of the selected candidate on continuation IDs not used for selection;
+- evaluator-only true expected value of the selected candidate;
+- exact best expected candidate value and true selectable headroom;
+- captured headroom, selection regret and the gap between naive score and selected-candidate true value;
+- continuation evaluation cost for the full candidate set and held-out scoring cost for the selected candidate.
+
+The candidate bank has a known finite expected-value profile and three distinct noise components: a shared continuation/world factor, candidate-local residual noise, and candidate-by-continuation interaction. Candidate counts are 1/2/4/8/16/32; selection continuation counts are 1/2/4/8/16; held-out continuation count equals the selection count; each condition uses 64 deterministic paired selection/held-out replicates.
+
+A separate exact finite coupling fixture demonstrates why common random numbers must not be assumed to reduce variance. With the same invariant common cause and same-sign response sensitivities, the paired-difference variance falls; with opposite-sign sensitivities, the same shared draw increases paired-difference variance relative to independent draws. Causal draw alignment and statistical variance reduction remain separate claims.
+
+This is a synthetic protocol diagnostic, not a world-action model, autonomous-driving result, or reproduction of the paper's robotic manipulation experiments. It does not claim that 64×16 continuations is a universal sample size. The paper's reported 17-continuation bounds and closed-loop manipulation gains are not imported as driving targets. The next empirical stage must set continuation counts using a preregistered precision/power analysis and sealed task families.
+
+Reproduce:
+
+```sh
+cargo test --locked
+cargo run --release --locked --bin selectable_headroom
+```
+
+The focused workflow validates this report against `selectable-headroom.schema.json` and checks the expected K/M ladder, disjoint held-out ranges, selection optimism, repeated-continuation trend and both CRN variance outcomes.
