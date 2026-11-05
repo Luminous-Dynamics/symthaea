@@ -70,10 +70,37 @@ fn has_non_whitespace(value: &str) -> bool {
     !value.trim().is_empty()
 }
 
+fn is_anchor_token_char(character: char) -> bool {
+    character.is_alphanumeric() || character == '_'
+}
+
+fn contains_with_token_boundaries(query: &str, anchor_text: &str) -> bool {
+    if anchor_text.is_empty() {
+        return false;
+    }
+
+    query.match_indices(anchor_text).any(|(start, matched)| {
+        let end = start + matched.len();
+        let left_boundary = query[..start]
+            .chars()
+            .next_back()
+            .is_none_or(|character| !is_anchor_token_char(character));
+        let right_boundary = query[end..]
+            .chars()
+            .next()
+            .is_none_or(|character| !is_anchor_token_char(character));
+        left_boundary && right_boundary
+    })
+}
+
 fn contains_anchor(query: &str, anchor: &RequiredAnchor) -> bool {
     match anchor.match_mode.as_str() {
-        "exact" => query.contains(&anchor.text),
-        "case_insensitive" => query.to_lowercase().contains(&anchor.text.to_lowercase()),
+        "exact" => contains_with_token_boundaries(query, &anchor.text),
+        "case_insensitive" => {
+            let normalized_query = query.to_lowercase();
+            let normalized_anchor = anchor.text.to_lowercase();
+            contains_with_token_boundaries(&normalized_query, &normalized_anchor)
+        }
         _ => false,
     }
 }
@@ -298,6 +325,7 @@ fn validate_plan(plan: &RetrievalPlan) -> ValidationReport {
             "does not execute retrieval or authorize network access",
             "does not prove a retrieval step was executed or completed",
             "does not establish evidence truth, entailment, independence, or source rights",
+            "does not prove that a retrieval adapter applied the declared typed constraints",
             "does not establish index, cache, embedding, or model materialization time",
             "does not prove temporal coverage or benchmark performance",
         ],
@@ -562,6 +590,19 @@ mod tests {
         let report = validate_plan(&plan);
         assert!(!report.passed);
         assert!(report.errors.iter().any(|error| error.contains("2024")));
+    }
+
+    #[test]
+    fn substring_inside_larger_identifier_or_number_is_rejected() {
+        let mut plan = sample_plan();
+        plan.steps[0].query = plan.steps[0]
+            .query
+            .replace("2024", "12024")
+            .replace("v3.2", "v3.20");
+        let report = validate_plan(&plan);
+        assert!(!report.passed);
+        assert!(report.errors.iter().any(|error| error.contains("2024")));
+        assert!(report.errors.iter().any(|error| error.contains("v3.2")));
     }
 
     #[test]
