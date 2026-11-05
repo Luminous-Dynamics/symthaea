@@ -455,7 +455,8 @@
         "reserve_commitments",
         "dispatch_instruction",
         "metered_outcome",
-        "source_state"
+        "source_state",
+        "local_timezone"
       ],
       "properties": {
         "trading_period_id": {
@@ -570,6 +571,9 @@
             "source_reconciled",
             "operator_confirmed"
           ]
+        },
+        "local_timezone": {
+          "const": "Africa/Johannesburg"
         }
       }
     },
