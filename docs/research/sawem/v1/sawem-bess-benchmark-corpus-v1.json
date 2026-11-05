@@ -2,7 +2,7 @@
   "corpus_version": "1.0",
   "corpus_state": "draft_case_register",
   "benchmark_id": "SAWEM-BESS-MATCHED-001",
-  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements. The credit-cover increment computes only source-calendar-backed deadlines and notice timeliness; it does not calculate Actual Exposure, Undefined Potential Exposure, UEF, Required Credit Cover, collateral sufficiency or project liquidity. Credit-cover exposure arithmetic counts unpaid invoices and uninvoiced Settlement Statement amounts without double counting, but accepts Undefined Potential Exposure as an externally supplied value and does not calculate the Market Operator UEF or annual Required Credit Cover parameters. Remediation only counts receipt-backed early invoice payments and collateral posted by the explicit deadline; it does not model bank-provider creditworthiness or guarantee cash availability. Credit-cover remediation validates unique receipt references and source-digested civil-date coverage; it still does not authenticate the real bank/Market Operator source or model provider creditworthiness. Funding-option economics are simple-interest scenario calculations using externally supplied participant funding cost and Collateral Reserve Account yield. They compare only the two paths listed in §15.10.2(3); they do not prove bank or account eligibility, live availability of funds, actual interest credited, or optimal investment funding. Rev 2.3's acceptable Credit Cover form is a cash-held deposit in a Collateral Reserve Account; generic bank guarantees and letters of credit are not modeled as permitted alternatives. undefined The credit-cover amount calculation is a synthetic sum of exposure components and supplied UPE, not the MO's full §15.10.3 Actual Supplier Exposure / UEF result. New deadline coverage includes provider replacement within ten Business Days and advance notice of Posted Credit Cover changes one Business Day beforehand. Liquidity stress snapshots distinguish externally supplied MO Required Credit Cover and Posted Credit Cover from treasury cash headroom. Potentially fundable cover is not posted cover and assumes no transfer or MO acceptance until separately evidenced. The module does not calculate UEF, post collateral, predict cash availability, or infer the timing of payment-system transfer. The liquidity waterfall is a dated scenario projection with committed, forecast and adverse-stress paths. It does not authenticate forecast receipts, prove bank transferability/cash availability, increase Posted Credit Cover for planned deposits, or establish the Market Operator's Required Credit Cover beyond source-bound inputs.",
+  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements. The credit-cover increment computes only source-calendar-backed deadlines and notice timeliness; it does not calculate Actual Exposure, Undefined Potential Exposure, UEF, Required Credit Cover, collateral sufficiency or project liquidity. Credit-cover exposure arithmetic counts unpaid invoices and uninvoiced Settlement Statement amounts without double counting, but accepts Undefined Potential Exposure as an externally supplied value and does not calculate the Market Operator UEF or annual Required Credit Cover parameters. Remediation only counts receipt-backed early invoice payments and collateral posted by the explicit deadline; it does not model bank-provider creditworthiness or guarantee cash availability. Credit-cover remediation validates unique receipt references and source-digested civil-date coverage; it still does not authenticate the real bank/Market Operator source or model provider creditworthiness. Funding-option economics are simple-interest scenario calculations using externally supplied participant funding cost and Collateral Reserve Account yield. They compare only the two paths listed in §15.10.2(3); they do not prove bank or account eligibility, live availability of funds, actual interest credited, or optimal investment funding. Rev 2.3's acceptable Credit Cover form is a cash-held deposit in a Collateral Reserve Account; generic bank guarantees and letters of credit are not modeled as permitted alternatives. undefined The credit-cover amount calculation is a synthetic sum of exposure components and supplied UPE, not the MO's full §15.10.3 Actual Supplier Exposure / UEF result. New deadline coverage includes provider replacement within ten Business Days and advance notice of Posted Credit Cover changes one Business Day beforehand. Liquidity stress snapshots distinguish externally supplied MO Required Credit Cover and Posted Credit Cover from treasury cash headroom. Potentially fundable cover is not posted cover and assumes no transfer or MO acceptance until separately evidenced. The module does not calculate UEF, post collateral, predict cash availability, or infer the timing of payment-system transfer. The liquidity waterfall is a dated scenario projection with committed, forecast and adverse-stress paths. It does not authenticate forecast receipts, prove bank transferability/cash availability, increase Posted Credit Cover for planned deposits, or establish the Market Operator's Required Credit Cover beyond source-bound inputs. Forecast-vintage replay reconstructs only synthetic/prequalified records available by a frozen decision time. It is not a forecasting model, market price feed, source-authentication mechanism or evidence of improved forecast accuracy; rolling-origin calibration and live/historical backtests remain not_run.",
   "cases": [
     {
       "case_id": "BASE-001",
@@ -905,6 +905,46 @@
         "first-floor-breach",
         "cover-deadline",
         "no-false-posting"
+      ]
+    },
+    {
+      "case_id": "FORECAST-VINTAGE-ASOF-001",
+      "track": "forecast_and_decision_replay",
+      "title": "Leakage-free as-of forecast vintage reconstruction",
+      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate.",
+      "owner": "Symthaea",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "selects_latest_forecast_known_at_decision_and_excludes_future_vintages",
+        "realized_price_supersedes_forecast_only_after_period_and_publication",
+        "future_known_realized_data_does_not_fill_a_missing_historical_target",
+        "model_scoped_targets_do_not_mix_forecast_engines",
+        "ambiguous_latest_forecasts_fail_instead_of_choosing_arbitrarily",
+        "invalid_source_and_model_digests_are_rejected",
+        "observed_period_cannot_be_known_before_it_has_ended",
+        "duplicate_record_ids_and_duplicate_targets_fail_closed"
+      ],
+      "required_evidence": [
+        "frozen historical decision timestamp in UTC",
+        "target Trading Period start and end timestamps",
+        "forecast model identity and executable/model content digest",
+        "forecast issue timestamp and source available-at timestamp",
+        "realized price observation valid-time and observation timestamp",
+        "source retrieval/publication timestamp and content digest",
+        "model-specific forecast-series identity",
+        "sealed project/time holdout membership and decision-time evidence frontier"
+      ],
+      "stress_tags": [
+        "forecast-vintage",
+        "look-ahead-leakage",
+        "historical-replay",
+        "chronos-comparator",
+        "homer-comparator",
+        "realized-vs-forecast",
+        "model-identity",
+        "decision-time-integrity"
       ]
     }
   ]
