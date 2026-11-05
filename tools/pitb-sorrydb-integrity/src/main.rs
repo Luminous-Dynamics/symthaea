@@ -446,14 +446,18 @@ fn expected_sorry_id(record: &SorryRecord) -> Result<String, String> {
 }
 
 fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
-    if record.id.trim().is_empty() {
-        return Err(format!("{label}.id cannot be empty"));
+    if !valid_hex(&record.id, 64) {
+        return Err(format!("{label}.id must be a 64-character lowercase SHA-256 value"));
     }
-    if !record.repo.remote.starts_with("https://github.com/") {
-        return Err(format!("{label}.repo.remote must be an HTTPS GitHub URL"));
+    if !record.repo.remote.starts_with("https://github.com/") || record.repo.remote.ends_with('/') {
+        return Err(format!("{label}.repo.remote must be a canonical HTTPS GitHub repository URL"));
     }
-    if record.repo.branch.trim().is_empty() || record.repo.lean_version.trim().is_empty() {
-        return Err(format!("{label} branch and Lean version must be non-empty"));
+    let remote_tail = &record.repo.remote["https://github.com/".len()..];
+    if remote_tail.split('/').count() != 2 || remote_tail.split('/').any(|part| part.is_empty()) {
+        return Err(format!("{label}.repo.remote must contain owner/repository path components"));
+    }
+    if record.repo.branch.trim().is_empty() || !record.repo.lean_version.starts_with("v4.") {
+        return Err(format!("{label} branch and Lean 4 version must be non-empty and valid"));
     }
     if !valid_hex(&record.repo.commit, 40) {
         return Err(format!("{label}.repo.commit must be a 40-character lowercase Git commit"));
@@ -461,10 +465,13 @@ fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
     // SorryDB line numbers are 1-based; columns are 0-based character offsets.
     // Preserve the upstream convention exactly, including valid start_column=0 rows.
     if record.location.path.trim().is_empty()
+        || record.location.path.starts_with('/')
+        || record.location.path.contains('\\')
+        || record.location.path.split('/').any(|part| part.is_empty() || part == "." || part == "..")
         || record.location.start_line == 0
         || record.location.end_line == 0
     {
-        return Err(format!("{label} has an invalid source path or line coordinate"));
+        return Err(format!("{label} has an invalid or non-relative source path/coordinate"));
     }
     if (record.location.end_line, record.location.end_column)
         < (record.location.start_line, record.location.start_column)
@@ -474,10 +481,35 @@ fn validate_record(record: &SorryRecord, label: &str) -> Result<(), String> {
     if record.debug_info.goal.trim().is_empty() || record.debug_info.url.trim().is_empty() {
         return Err(format!("{label} debug goal and source URL must be non-empty"));
     }
-    if !record.debug_info.url.contains(&record.repo.commit)
-        || !record.debug_info.url.contains(&record.location.path)
+    let expected_url_prefix = format!(
+        "{}/blob/{}/{}/",
+        record.repo.remote, record.repo.commit, record.location.path
+    );
+    if !record.debug_info.url.starts_with(&expected_url_prefix)
+        || !record.debug_info.url.contains(&format!("#L{}", record.location.start_line))
     {
-        return Err(format!("{label} debug URL does not bind the pinned commit and source path"));
+        return Err(format!("{label} debug URL is not bound to the exact repo, commit, path and start line"));
+    }
+
+    let email_hash = record.metadata.get("blame_email_hash").and_then(Value::as_str)
+        .ok_or_else(|| format!("{label}.metadata.blame_email_hash is missing"))?;
+    if !valid_hex(email_hash, 12) {
+        return Err(format!("{label}.metadata.blame_email_hash must be 12 lowercase hex characters"));
+    }
+    let blame_date = record.metadata.get("blame_date").and_then(Value::as_str)
+        .ok_or_else(|| format!("{label}.metadata.blame_date is missing"))?;
+    let inclusion_date = record.metadata.get("inclusion_date").and_then(Value::as_str)
+        .ok_or_else(|| format!("{label}.metadata.inclusion_date is missing"))?;
+    if !valid_iso_offset_datetime(blame_date, false) {
+        return Err(format!("{label}.metadata.blame_date is not normalized offset-aware ISO-8601"));
+    }
+    if !valid_iso_offset_datetime(inclusion_date, true) {
+        return Err(format!("{label}.metadata.inclusion_date is not offset-aware ISO-8601"));
+    }
+
+    let expected_id = expected_sorry_id(record)?;
+    if record.id != expected_id {
+        return Err(format!("{label}.id differs from the independently recomputed upstream SorryDB ID"));
     }
     Ok(())
 }
