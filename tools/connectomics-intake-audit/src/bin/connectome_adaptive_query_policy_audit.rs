@@ -702,6 +702,24 @@ fn resolve_policy_branch<'a>(
         .ok_or("OUT_OF_MODEL_OBSERVATION")
 }
 
+fn validate_policy_tree(node: &PolicyNode) -> Result<(), String> {
+    if node.action_id.is_none() {
+        if node.terminal_query_decision.is_none() || !node.branches.is_empty() {
+            return Err("terminal policy node has inconsistent decision/branch state".into());
+        }
+        return Ok(());
+    }
+    if node.terminal_query_decision.is_some() || node.branches.is_empty() {
+        return Err("observation policy node must have branches and no terminal decision".into());
+    }
+    for branch in &node.branches {
+        let child = resolve_policy_branch(node, &branch.observed_outcome)
+            .map_err(|status| format!("policy branch resolution failed: {status}"))?;
+        validate_policy_tree(child)?;
+    }
+    Ok(())
+}
+
 fn count_policy_nodes(node: &PolicyNode) -> (usize, usize) {
     let mut nodes = 1_usize;
     let mut branches = node.branches.len();
@@ -757,6 +775,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         status,
     ) = match solution {
         Some(solution) => {
+            validate_policy_tree(&solution.node)?;
             let within = solution.worst_case_cost <= input.max_total_effort_units;
             let (nodes, branches) = count_policy_nodes(&solution.node);
             let status = if within {
