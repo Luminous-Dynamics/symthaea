@@ -69,7 +69,7 @@
       ]
     }
   ],
-  "joint_support_sha256": "fd91ee10b6fa993af5fc371f869d90631cfc2a71c11501e8593b10b6e4a611b9",
+  "joint_support_sha256": "2e32fa23a76d8f6e126b29ea82f313e2e420b82d6fb3e6c7971840ad18840f35",
   "joint_world_supports": [
     {
       "scenario_id": "world-a",
