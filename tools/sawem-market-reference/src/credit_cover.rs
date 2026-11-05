@@ -156,8 +156,12 @@ pub fn calculate_credit_cover_exposure(
                 return Err(CreditCoverExposureError::DuplicateExposureReference);
             }
             if let (
-                ActualExposureKind::UnpaidInvoice { invoice_id: left, .. },
-                ActualExposureKind::UnpaidInvoice { invoice_id: right, .. },
+                ActualExposureKind::UnpaidInvoice {
+                    invoice_id: left, ..
+                },
+                ActualExposureKind::UnpaidInvoice {
+                    invoice_id: right, ..
+                },
             ) = (previous.kind, entry.kind)
             {
                 if left == right {
@@ -202,7 +206,9 @@ pub fn calculate_credit_cover_exposure(
         .checked_add(undefined_potential)
         .ok_or(CreditCoverExposureError::ArithmeticOverflow)?;
     let additional = required.saturating_sub(inputs.posted_credit_cover_minor_units);
-    let surplus = inputs.posted_credit_cover_minor_units.saturating_sub(required);
+    let surplus = inputs
+        .posted_credit_cover_minor_units
+        .saturating_sub(required);
     // A warning is due when the remaining cover buffer is at/below the
     // participant/MGC-authorised Warning Limit, including an actual shortfall.
     let warning_notice_due = inputs
@@ -491,19 +497,17 @@ mod tests {
         .expect("both remediation actions have receipts by the deadline");
         assert_eq!(
             result,
-            CreditCoverRemediationEvaluation::Determined(
-                CreditCoverRemediationResult {
-                    status: CreditCoverRemediationStatus::Satisfied,
-                    actual_exposure_after_early_payments_minor_units: 10_000,
-                    required_credit_cover_after_actions_minor_units: 15_000,
-                    posted_credit_cover_after_actions_minor_units: 15_000,
-                    confirmed_early_invoice_payments_minor_units: 5_000,
-                    confirmed_additional_collateral_minor_units: 5_000,
-                    remaining_shortfall_minor_units: 0,
-                    expected_action_count: 0,
-                    late_action_count: 0,
-                }
-            )
+            CreditCoverRemediationEvaluation::Determined(CreditCoverRemediationResult {
+                status: CreditCoverRemediationStatus::Satisfied,
+                actual_exposure_after_early_payments_minor_units: 10_000,
+                required_credit_cover_after_actions_minor_units: 15_000,
+                posted_credit_cover_after_actions_minor_units: 15_000,
+                confirmed_early_invoice_payments_minor_units: 5_000,
+                confirmed_additional_collateral_minor_units: 5_000,
+                remaining_shortfall_minor_units: 0,
+                expected_action_count: 0,
+                late_action_count: 0,
+            })
         );
     }
 
@@ -532,8 +536,14 @@ mod tests {
         let CreditCoverRemediationEvaluation::Determined(pending) = pending else {
             panic!("base exposure was fully specified");
         };
-        assert_eq!(pending.status, CreditCoverRemediationStatus::UnconfirmedFunding);
-        assert_eq!(pending.posted_credit_cover_after_actions_minor_units, 10_000);
+        assert_eq!(
+            pending.status,
+            CreditCoverRemediationStatus::UnconfirmedFunding
+        );
+        assert_eq!(
+            pending.posted_credit_cover_after_actions_minor_units,
+            10_000
+        );
         assert_eq!(pending.remaining_shortfall_minor_units, 10_000);
 
         let late = [CreditCoverFundingAction {
