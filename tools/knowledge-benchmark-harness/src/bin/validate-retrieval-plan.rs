@@ -679,7 +679,12 @@ mod tests {
         plan.steps[0].required_constraint_ids.pop();
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("not assigned")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("not assigned"))
+        );
     }
 
     #[test]
