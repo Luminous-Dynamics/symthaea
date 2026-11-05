@@ -127,3 +127,7 @@ A system that solves 1–2 percentage points fewer tasks but has verified eviden
 - The CEB task catalog and this attack catalog are design artifacts until source fixtures, independently administered graders, pins, qualified runner and exact-head test evidence exist.
 
 **Current status:** 28 negative controls, 8 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
+
+## CEB-wide measurement linkage
+
+The integrity lane is one component of a 13-lane CEB measurement portfolio. See [the machine-readable comparison matrix](../../benchmarks/ceb/measurement-matrix.v0.json) and [the measurement/comparative-claim protocol](CEB_MEASUREMENT_AND_COMPARATIVE_CLAIM_PROTOCOL_V0_2026-11-05.md). The matrix prevents integrity, security, resolution, cost and human-review outcomes from being blended into a single compensatory score.
