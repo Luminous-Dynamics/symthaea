@@ -1779,6 +1779,20 @@ mod tests {
         .expect("hypothesis-space expansion fixture must parse")
     }
 
+    fn fixture_attestation_binding() -> EvidenceAttestationBinding {
+        EvidenceAttestationBinding {
+            envelope_json_base64: STANDARD.encode(include_bytes!(
+                "../../../../docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE.example.json"
+            )),
+            trust_policy_json_base64: STANDARD.encode(include_bytes!(
+                "../../../../docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_TRUST_POLICY.example.json"
+            )),
+            expected_trust_policy_sha256:
+                "0cb8afc26e7aafe3d212c65120ae8ef6a080be8bf75cce0f84412b2fa07d045e".into(),
+            verification_time_unix: 1_793_900_000,
+        }
+    }
+
     fn support_expansion_fixture() -> Input {
         serde_json::from_str(include_str!(
             "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION.example.json"
@@ -1994,6 +2008,72 @@ mod tests {
             .scenario_id = "world-a".into();
         let error = evaluate(&input, &bytes(&input)).unwrap_err();
         assert!(error.contains("duplicate/invalid new world"));
+    }
+
+    #[test]
+    fn signed_attestation_is_verified_in_process_and_receipt_is_bound() {
+        let binding = fixture_attestation_binding();
+        let attestation = verify_challenge_attestation(Some(&binding), true).unwrap();
+        assert_eq!(
+            attestation.status,
+            "ATTESTED_UNDER_PINNED_TRUST_POLICY"
+        );
+        assert_eq!(
+            attestation.verified_signer_roles,
+            vec![
+                "fixture-data_steward-key-v1:data_steward".to_string(),
+                "fixture-independent_reviewer-key-v1:independent_reviewer".to_string(),
+                "fixture-observer-key-v1:observer".to_string()
+            ]
+        );
+        assert!(attestation.receipt_sha256.is_some());
+        let unauthenticated =
+            verify_challenge_attestation(None, false).unwrap();
+        assert_eq!(
+            unauthenticated.status,
+            "CONTENT_BOUND_UNAUTHENTICATED"
+        );
+        assert_ne!(
+            bind_challenge_attestation_digest("base", &attestation),
+            bind_challenge_attestation_digest("base", &unauthenticated)
+        );
+    }
+
+    #[test]
+    fn required_signed_attestation_cannot_be_omitted_or_tampered() {
+        assert!(verify_challenge_attestation(None, true).is_err());
+        let mut binding = fixture_attestation_binding();
+        binding.envelope_json_base64.push('A');
+        assert!(verify_challenge_attestation(Some(&binding), true).is_err());
+    }
+
+    #[test]
+    fn support_and_scenario_challenges_count_verified_attestations() {
+        let mut input = hypothesis_expansion_fixture();
+        input.require_signed_attestations = true;
+        let binding = fixture_attestation_binding();
+        for challenge in &mut input.support_challenges {
+            challenge.attestation = Some(binding.clone());
+        }
+        for challenge in &mut input.scenario_challenges {
+            challenge.attestation = Some(binding.clone());
+        }
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.support_challenges_authenticated, input.support_challenges.len());
+        assert_eq!(report.support_challenges_unauthenticated, 0);
+        assert_eq!(report.scenario_challenges_authenticated, input.scenario_challenges.len());
+        assert_eq!(report.scenario_challenges_unauthenticated, 0);
+        assert!(report.require_signed_attestations);
+        assert!(report.support_challenges[0].attestation.receipt_sha256.is_some());
+        assert!(report.scenario_challenges[0].attestation.receipt_sha256.is_some());
+    }
+
+    #[test]
+    fn required_signed_attestation_rejects_legacy_hash_only_challenges() {
+        let mut input = hypothesis_expansion_fixture();
+        input.require_signed_attestations = true;
+        let error = evaluate(&input, &bytes(&input)).unwrap_err();
+        assert!(error.contains("signed challenge attestation is required"));
     }
 
     #[test]
