@@ -1114,7 +1114,10 @@ mod tests {
         let report = run_value(value).unwrap();
         assert_eq!(report["not_estimable_admissible_alternative_count"], 1);
         assert_eq!(report["non_query_critical_admissible_alternative_count"], 0);
-        assert_eq!(report["status"], "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES");
+        assert_eq!(
+            report["status"],
+            "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES"
+        );
     }
 
 }
