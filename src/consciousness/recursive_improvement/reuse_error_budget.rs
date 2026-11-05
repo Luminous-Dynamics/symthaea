@@ -39,6 +39,7 @@ pub enum ReuseBudgetError {
     PromotionCountExceedsHistory,
     HistoryTooLarge,
     AllocationUnderflow,
+    ComparisonCountOverflow,
 }
 
 impl fmt::Display for ReuseBudgetError {
@@ -59,6 +60,9 @@ impl fmt::Display for ReuseBudgetError {
                 f,
                 "error allocation underflowed binary64; evaluation is not numerically admissible"
             ),
+            Self::ComparisonCountOverflow => {
+                write!(f, "paired win/loss counts overflow usize")
+            }
         }
     }
 }
@@ -101,6 +105,46 @@ impl ReuseErrorAllocation {
 
     pub fn lower_bound_error_budget(&self) -> f64 {
         self.lower_bound_error_budget
+    }
+}
+
+/// The only candidate-facing output permitted by the REUSE evaluation protocol.
+/// Detailed p-values, task-level outcomes and certificates must remain in the
+/// independent evaluator service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReuseDecision {
+    Promote,
+    Reject,
+}
+
+/// Apply the exact one-sided paired sign test using the REUSE allocation.
+///
+/// `wins` is n_plus (candidate succeeds where incumbent fails) and `losses`
+/// is n_minus (incumbent succeeds where candidate fails). Tied tasks are not
+/// included. An all-tie comparison has p=1 and is rejected.
+///
+/// The exact p-value is computed by the shared paired-evaluation implementation
+/// but never returned. Only the predeclared decision is exposed. This function
+/// is suitable only inside an independently controlled evaluator; calling it
+/// inside the self-modifying proposer would violate decision-only feedback.
+pub fn reuse_sign_test_decision(
+    wins: usize,
+    losses: usize,
+    allocation: ReuseErrorAllocation,
+) -> Result<ReuseDecision, ReuseBudgetError> {
+    let total = wins
+        .checked_add(losses)
+        .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
+    if total == 0 {
+        return Ok(ReuseDecision::Reject);
+    }
+
+    let p_value = super::paired_evaluation::exact_sign_test_upper_tail(wins, losses)
+        .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
+    if p_value <= allocation.paired_test_error_budget {
+        Ok(ReuseDecision::Promote)
+    } else {
+        Ok(ReuseDecision::Reject)
     }
 }
 
@@ -287,4 +331,39 @@ mod tests {
         assert_eq!(log_binomial_coefficient(10, 0), 0.0);
         assert_eq!(log_binomial_coefficient(10, 10), 0.0);
     }
+    #[test]
+    fn decision_only_sign_test_uses_the_allocated_error_budget() {
+        let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
+        assert_eq!(
+            reuse_sign_test_decision(7, 0, allocation).unwrap(),
+            ReuseDecision::Promote
+        );
+        assert_eq!(
+            reuse_sign_test_decision(6, 0, allocation).unwrap(),
+            ReuseDecision::Reject
+        );
+        assert_eq!(
+            reuse_sign_test_decision(2, 3, allocation).unwrap(),
+            ReuseDecision::Reject
+        );
+    }
+
+    #[test]
+    fn decision_only_sign_test_rejects_all_ties_and_is_inclusive_at_boundary() {
+        let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
+        assert_eq!(
+            reuse_sign_test_decision(0, 0, allocation).unwrap(),
+            ReuseDecision::Reject
+        );
+
+        // With alpha=0.5, t=1, K=1 and rho=0.5, the paired-test
+        // allocation is exactly 1/16. Four wins and zero losses has p=1/16.
+        let boundary = allocate_reuse_error_budget(0.5, 1, 0, 1, 0.5).unwrap();
+        assert_eq!(
+            reuse_sign_test_decision(4, 0, boundary).unwrap(),
+            ReuseDecision::Promote
+        );
+    }
+
+
 }
