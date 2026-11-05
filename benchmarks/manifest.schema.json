@@ -176,7 +176,10 @@
               "type": "string"
             },
             "per_task_time_limit_seconds": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1
             },
             "runner_revision": {
@@ -195,7 +198,10 @@
               "type": "boolean"
             },
             "official_hidden_test_repeat_count": {
-              "type": "integer",
+              "type": [
+                "integer",
+                "null"
+              ],
               "minimum": 1
             },
             "repeat_policy": {
@@ -203,8 +209,22 @@
               "minLength": 20
             },
             "official_development_baseline_repeat_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "max_rounds_per_task": {
               "type": "integer",
               "minimum": 1
+            },
+            "max_output_tokens_per_task": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reasoning_carried_across_rounds": {
+              "type": "boolean"
             }
           }
         },
@@ -323,6 +343,72 @@
                   }
                 }
               }
+            },
+            "published_results": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "model",
+                  "effort",
+                  "score",
+                  "harness_version"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "effort": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "score": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "harness_version": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "repeat_count": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "cost_per_case_usd": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "median_duration_seconds": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "tokens_per_case": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "notes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
             }
           }
         },
@@ -353,6 +439,51 @@
               "type": "array",
               "items": {
                 "type": "string"
+              }
+            }
+          }
+        },
+        "task_families": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "public_count",
+              "core_count",
+              "score_status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "public_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "core_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "score_status": {
+                "type": "string",
+                "minLength": 3
+              },
+              "notes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -452,11 +583,17 @@
       ],
       "properties": {
         "total_tasks": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "development_tasks": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         }
       }
