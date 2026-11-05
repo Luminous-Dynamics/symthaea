@@ -477,7 +477,7 @@ def run(data: dict, input_bytes: bytes) -> dict:
         "probability_claim": "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
         "status": reported_status,
         "search_complete": True,
-        "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. An observation category outside every declared compatible tuple is out-of-model and must fail closed. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness.",
+        "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     }
 
 
