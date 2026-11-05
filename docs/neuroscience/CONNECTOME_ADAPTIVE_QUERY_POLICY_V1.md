@@ -3,7 +3,7 @@
 **Tracking:** [#10568 — adaptive query-directed observation policies](https://github.com/Luminous-Dynamics/symthaea/issues/10568)  
 **Joint support input contract:** [#10528 — correlated joint observation support](https://github.com/Luminous-Dynamics/symthaea/pull/10528)  
 **Fixed-plan predecessors:** [#10506](https://github.com/Luminous-Dynamics/symthaea/pull/10506), [#10525](https://github.com/Luminous-Dynamics/symthaea/pull/10525).  
-**Status:** Rust implementation, two synthetic fixtures, independent Python oracle and exact-head CI authored on `research/connectome-adaptive-query-policy-v1`. The current exact-head validation is pending.
+**Status:** Rust implementation, two synthetic fixtures, independent Python oracle and dedicated CI are implemented. Source code is validated at `72ae65bb8a732416e6afb65f0662449216e989a4`; the follow-on commit `ab2bc3380fef4faa297985a82e139654dea66fc4` updates this specification.
 
 ## 1. Research gap
 
@@ -114,3 +114,15 @@ For comparisons report both worst-case and realized terminal path effort. Do not
 This specification is limited to exact finite support over declared worlds, actions and joint outcome tuples. A policy certificate cannot prove that the joint-support model includes every physically possible observation, that evidence sources are independent, or that a biological hypothesis is true.
 
 No expected value of information, likelihood, posterior, causal effect or biological truth claim is made in V1.
+
+
+## 10. Validation receipts
+
+Source-code qualification at `72ae65bb8a732416e6afb65f0662449216e989a4`:
+
+- [Dedicated adaptive-policy workflow #42027024991](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42027024991): formatting, strict Clippy, 7/7 Rust tests, adaptive-savings and no-policy fixtures, and independent Python oracle all passed.
+- [Standalone connectomics suite #42027024955](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42027024955): 20 binaries, 384 tests, 0 failures.
+- The adaptive fixture oracle reports 25 memoized states, worst-case effort 4, and representative terminal path range 3–4. The independent report comparison also verifies the exact fixed-bundle minimum of 5, action set `inspect-y + inspect-z`, and fixed-minus-adaptive savings of 1.
+- A separate two-action synthetic control verifies that two equal-cost root choices produce an exact optimal-policy count of 2.
+
+These are finite synthetic known-answer and implementation tests. They do not establish that real connectomics observation supports are complete or biologically valid.
