@@ -2,7 +2,7 @@
   "corpus_version": "1.0",
   "corpus_state": "draft_case_register",
   "benchmark_id": "SAWEM-BESS-MATCHED-001",
-  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements. The credit-cover increment computes only source-calendar-backed deadlines and notice timeliness; it does not calculate Actual Exposure, Undefined Potential Exposure, UEF, Required Credit Cover, collateral sufficiency or project liquidity.",
+  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements. The credit-cover increment computes only source-calendar-backed deadlines and notice timeliness; it does not calculate Actual Exposure, Undefined Potential Exposure, UEF, Required Credit Cover, collateral sufficiency or project liquidity. Credit-cover exposure arithmetic counts unpaid invoices and uninvoiced Settlement Statement amounts without double counting, but accepts Undefined Potential Exposure as an externally supplied value and does not calculate the Market Operator UEF or annual Required Credit Cover parameters. Remediation only counts receipt-backed early invoice payments and collateral posted by the explicit deadline; it does not model bank-provider creditworthiness or guarantee cash availability.",
   "cases": [
     {
       "case_id": "BASE-001",
@@ -737,7 +737,7 @@
       "case_id": "CREDIT-COVER-LIQUIDITY-TIMELINE-001",
       "track": "settlement_and_liquidity",
       "title": "Daily credit-cover recalculation and posting deadline",
-      "scenario": "The kernel checks the §15.10.2 daily Business Day increase-notice deadline and separately supplied second-Working-Day collateral posting deadline, plus §15.10.4 two-Business-Day credit-call re-establishment. Business Day and Working Day calendars carry separate source digests and complete-through horizons. Exposure measurement, UEF, required-cover arithmetic, early-invoice funding and actual collateral sufficiency remain unimplemented.",
+      "scenario": "The kernel reconciles unpaid invoices and statement amounts not yet invoiced into Actual Exposure, adds a separately supplied provenance-bound Undefined Potential Exposure amount, computes required cover and the warning buffer, then evaluates receipt-backed early invoice payments and additional collateral against the source-backed posting deadline. Expected funding is not posted cover; late receipts do not satisfy the earlier deadline. The UEF and live Market Operator exposure calculation remain external.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -748,16 +748,25 @@
         "credit_cover_timeline_handles_no_increase_and_requires_business_day_recalculation",
         "credit_call_reestablishment_uses_two_business_days",
         "credit_cover_calendar_requires_authority_order_and_complete_horizon",
-        "credit_call_on_non_business_day_starts_count_on_next_business_day"
+        "credit_call_on_non_business_day_starts_count_on_next_business_day",
+        "exposure_reconciles_unpaid_invoices_and_uninvoiced_statements",
+        "exposure_keeps_missing_upe_indeterminate_and_rejects_statement_double_count",
+        "early_invoice_payment_and_new_collateral_can_satisfy_the_same_increase_notice",
+        "expected_cover_does_not_count_and_late_cover_is_excluded",
+        "remediation_rejects_overpayment_and_confirmed_actions_without_receipts"
       ],
       "required_evidence": [
-        "Actual Exposure and Undefined Potential Exposure source records (not calculated by this increment)",
+        "unpaid issued invoices with outstanding balances and stable invoice references",
+        "Settlement Statement amounts with no invoice issued, with statement references",
+        "Undefined Potential Exposure amount and its model/UEF provenance receipt",
+        "posted credit cover balance",
+        "participant/MGC-approved warning limit where used",
         "daily recalculation civil date and timestamp",
         "increase notice civil date and timestamp",
         "South African Business Day calendar, source digest and coverage horizon",
         "separate Working Day calendar, source digest and coverage horizon",
-        "Credit Call / drawdown date and amount",
-        "credit cover posted, early invoice paid and re-establishment receipts"
+        "early invoice payment receipts and additional collateral posting receipts",
+        "Credit Call / drawdown date and amount and re-establishment receipt"
       ],
       "stress_tags": [
         "collateral",
