@@ -4,6 +4,16 @@ This is a standalone Cargo-fuzz workspace, deliberately outside the large root C
 
 The initial target fuzzes the real ZipArtifactReader::open admission path. When a mutated archive is admitted, it also attempts bounded verification of up to eight eligible Stored/Deflate member occurrences. The target writes only its input bytes to a unique temporary file because the production reader binds source identity to an opened file; it never extracts archive members. A guard removes each temporary file.
 
+## Differential target
+
+A second target, `zip_parser_differential`, runs the custom Symthaea inventory/content verifier and `zip 9.3.0` with its `flate2 / zlib-rs` Deflate backend over the same mutation input.
+
+It compares only the declared intersection: non-prefixed, non-ZIP64 archives with unique raw names, unique indexed occurrences, and ordinary unencrypted Stored/Deflate regular files. It checks raw name bytes, local-header/data offsets, flags, method, compressed/uncompressed sizes and declared CRC. If both decoders reach a verified end state, it compares observed length, payload SHA-256 and CRC. A mismatch in that intersection panics intentionally so libFuzzer retains a finding.
+
+The target skips duplicate-name, ZIP64, prefixed and otherwise unsupported layouts rather than manufacturing false differences. A zip-rs stream rejection is preserved as a classification difference rather than treated as a mismatch when the input may be malformed. This target is a differential oracle, not proof that either implementation is correct; every finding must be minimized, classified, and promoted to a regression fixture with exact build and corpus provenance.
+
+The workflow now runs two separately timed 180-second campaigns and stores independent raw logs, summaries and output digests for each. The aggregate workflow duration is therefore approximately six minutes plus build/setup time, subject to runner scheduling.
+
 Resource bounds are part of the fuzz contract:
 
 - Input archive: at most 1 MiB.
