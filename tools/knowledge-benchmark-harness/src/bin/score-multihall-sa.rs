@@ -1,6 +1,6 @@
 use jsonschema::draft202012;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env;
@@ -386,6 +386,7 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
     let allowed_languages = ["isiZulu", "isiXhosa", "Sepedi", "Sesotho"];
     let allowed_types = ["temporal shift", "entity error", "numerical inaccuracy", "location mistake"];
     let mut by_id = BTreeMap::new();
+    let mut file_language_fact = HashSet::new();
 
     for pair in pairs {
         if pair.schema_version != "multi-hall-sa-pair-v0" {
@@ -399,6 +400,13 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
         }
         if !allowed_types.contains(&pair.hallucination_type.as_str()) {
             return Err(format!("pair {:?} has unsupported hallucination_type {:?}", pair.pair_id, pair.hallucination_type));
+        }
+        let fact_key = (pair.file_id.clone(), pair.language.clone(), pair.fact_index);
+        if !file_language_fact.insert(fact_key) {
+            return Err(format!(
+                "duplicate fact_index {} for source file {:?} and language {:?}",
+                pair.fact_index, pair.file_id, pair.language
+            ));
         }
         if by_id.insert(pair.pair_id.clone(), pair.clone()).is_some() {
             return Err(format!("duplicate pair_id {:?}", pair.pair_id));
