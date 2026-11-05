@@ -2139,6 +2139,9 @@ mod tests {
             ))
         );
 
+        inputs.market_price = Some(ReserveCategoryMarketPrice {
+            minor_zar_per_mw_per_trading_period: 10_000,
+        });
         inputs.contracted_capacity_milli_mw = Some(1_000);
         inputs.qualifying_capacity_milli_mw = Some(1_001);
         assert_eq!(
