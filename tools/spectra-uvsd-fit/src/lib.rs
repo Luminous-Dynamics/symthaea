@@ -1747,3 +1747,5 @@ mod tests {
 pub mod sequential;
 /// Failure-preserving scenario aggregation for adaptive candidate assessments.
 pub mod scenario;
+/// Simultaneous finite-sample score bounds for candidate-action simulations.
+pub mod score_bounds;
