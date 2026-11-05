@@ -142,7 +142,7 @@ The Rust reference now calculates three deadline paths without inventing calenda
 
 - Daily recalculation / Credit Cover Increase Notice: a notice is timely only when issued on the recalculation Business Day by 17:00 local civil time (§15.10.2(1)–(2)).
 - Increase-notice posting: the conditional deadline is 17:00 on the second source-supplied Working Day after the recalculation day (§15.10.2(2)).
-- Credit Call replenishment: the participant must re-establish at least the notified Required Credit Cover within two Business Days after drawdown (§15.10.4(2)); the kernel returns the second Business Day date and does not invent an intraday cutoff.
+- Credit Call replenishment: the participant must re-establish at least the notified Required Credit Cover within two Business Days after drawdown (§15.10.4(2)); the call date itself need not be a Business Day, and the kernel returns the second subsequent Business Day without inventing an intraday cutoff.
 
 The South African Code interpretation states that a Business Day excludes Saturday, Sunday and gazetted South African public holidays (§2.3(a)). The phrase "Working Day" is not silently aliased to that calendar in this kernel. Business Day and Working Day inputs are distinct, sorted date-ordinal calendars, each with a source digest and a complete-through horizon. If the source digest is absent, the list is unordered, the relevant date is outside its coverage, or two future eligible days are not evidenced, the function returns a calendar error rather than guessing.
 
