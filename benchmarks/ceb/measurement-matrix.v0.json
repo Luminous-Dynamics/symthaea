@@ -1070,6 +1070,12 @@
       "supports": [
         "CEB-EVAL"
       ]
+    },
+    {
+      "source_url": "https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-benchmark-integrity-2026-11-04/scripts/audit_doc_command_claims.py",
+      "supports": [
+        "CEB-DOCS"
+      ]
     }
   ]
 }
