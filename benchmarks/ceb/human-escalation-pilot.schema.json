@@ -1,0 +1,457 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/human-escalation-pilot-v0.schema.json",
+  "title": "CEB Human Escalation Pilot Preregistration V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "preregistration_id",
+    "version",
+    "status",
+    "created_on",
+    "purpose",
+    "execution_gates",
+    "population",
+    "task_custody",
+    "counterfactual_pair_contract",
+    "baseline_arms",
+    "help_protocol",
+    "metrics",
+    "task_qualification",
+    "statistics",
+    "stopping_rules",
+    "reporting",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "preregistration_id": {
+      "const": "CEB-HUMAN-ESCALATION-001"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^0\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "const": "design_only_not_executed"
+    },
+    "created_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 40
+    },
+    "execution_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_controlled_execution",
+        "independent_regrade_claim",
+        "permitted_now",
+        "prohibited_now"
+      ],
+      "properties": {
+        "candidate_controlled_execution": {
+          "const": "blocked_until_issue_10064_qualified"
+        },
+        "independent_regrade_claim": {
+          "const": "blocked_until_issue_10369_qualified"
+        },
+        "permitted_now": {
+          "type": "array",
+          "minItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        },
+        "prohibited_now": {
+          "type": "array",
+          "minItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      }
+    },
+    "population": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planned_pair_count",
+        "actual_pair_count",
+        "task_families",
+        "variants_per_pair",
+        "total_planned_variants",
+        "blockers_per_ask_variant"
+      ],
+      "properties": {
+        "planned_pair_count": {
+          "const": 24
+        },
+        "actual_pair_count": {
+          "const": 0
+        },
+        "task_families": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "family_id",
+              "planned_pairs",
+              "purpose"
+            ],
+            "properties": {
+              "family_id": {
+                "enum": [
+                  "missing_external_information",
+                  "ambiguous_requirement",
+                  "contradictory_authority",
+                  "repository_discoverable_vs_missing"
+                ]
+              },
+              "planned_pairs": {
+                "const": 6
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 15
+              }
+            }
+          }
+        },
+        "variants_per_pair": {
+          "const": 2
+        },
+        "total_planned_variants": {
+          "const": 48
+        },
+        "blockers_per_ask_variant": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "maximum"
+          ],
+          "properties": {
+            "minimum": {
+              "const": 1
+            },
+            "maximum": {
+              "const": 3
+            }
+          }
+        }
+      }
+    },
+    "task_custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "development_pairs",
+        "heldout_pairs",
+        "holdout_access",
+        "custody_boundary",
+        "public_solution_policy"
+      ],
+      "properties": {
+        "development_pairs": {
+          "const": 16
+        },
+        "heldout_pairs": {
+          "const": 8
+        },
+        "holdout_access": {
+          "type": "string",
+          "minLength": 30
+        },
+        "custody_boundary": {
+          "type": "string",
+          "minLength": 30
+        },
+        "public_solution_policy": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "counterfactual_pair_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "one_changed_fact_only",
+        "shared_source_commit",
+        "shared_environment_digest",
+        "shared_acceptance_contract",
+        "act_variant_expected_disposition",
+        "ask_variant_expected_disposition",
+        "pair_scoring_rule"
+      ],
+      "properties": {
+        "one_changed_fact_only": {
+          "const": true
+        },
+        "shared_source_commit": {
+          "const": true
+        },
+        "shared_environment_digest": {
+          "const": true
+        },
+        "shared_acceptance_contract": {
+          "const": true
+        },
+        "act_variant_expected_disposition": {
+          "const": "act"
+        },
+        "ask_variant_expected_disposition": {
+          "const": "ask"
+        },
+        "pair_scoring_rule": {
+          "type": "string",
+          "minLength": 50
+        }
+      }
+    },
+    "baseline_arms": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "description"
+        ],
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 12
+          }
+        }
+      }
+    },
+    "help_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "help_source",
+        "answer_policy",
+        "answer_authority",
+        "max_questions_per_task",
+        "max_help_turns",
+        "no_help_control",
+        "full_information_control",
+        "question_spam_policy"
+      ],
+      "properties": {
+        "help_source": {
+          "type": "string",
+          "minLength": 15
+        },
+        "answer_policy": {
+          "type": "string",
+          "minLength": 30
+        },
+        "answer_authority": {
+          "enum": [
+            "blinded_human_custodian",
+            "preauthored_expert_verified_answer",
+            "llm_only_prohibited"
+          ]
+        },
+        "max_questions_per_task": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "max_help_turns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "no_help_control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "maximum_allowed_pass_rate"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_run_blocked"
+            },
+            "maximum_allowed_pass_rate": {
+              "const": 0.05
+            }
+          }
+        },
+        "full_information_control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "minimum_required_pass_rate"
+          ],
+          "properties": {
+            "status": {
+              "const": "not_run_blocked"
+            },
+            "minimum_required_pass_rate": {
+              "const": 0.85
+            }
+          }
+        },
+        "question_spam_policy": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "definition",
+          "direction",
+          "target"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 20
+          },
+          "direction": {
+            "enum": [
+              "maximize",
+              "minimize"
+            ]
+          },
+          "target": {
+            "type": "string",
+            "minLength": 10
+          }
+        }
+      }
+    },
+    "task_qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "two_human_gold_reviewers",
+        "llm_only_oracle",
+        "reference_answer_digest_required",
+        "blocker_registry_digest_required",
+        "pair_equivalence_review",
+        "public_fix_leakage_review"
+      ],
+      "properties": {
+        "two_human_gold_reviewers": {
+          "const": true
+        },
+        "llm_only_oracle": {
+          "const": false
+        },
+        "reference_answer_digest_required": {
+          "const": true
+        },
+        "blocker_registry_digest_required": {
+          "const": true
+        },
+        "pair_equivalence_review": {
+          "type": "string",
+          "minLength": 30
+        },
+        "public_fix_leakage_review": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_runs_for_pass_at_3",
+        "paired_analysis",
+        "aggregation",
+        "uncertainty",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "independent_runs_for_pass_at_3": {
+          "const": 3
+        },
+        "paired_analysis": {
+          "type": "string",
+          "minLength": 40
+        },
+        "aggregation": {
+          "type": "string",
+          "minLength": 30
+        },
+        "uncertainty": {
+          "type": "string",
+          "minLength": 30
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 50
+        }
+      }
+    },
+    "stopping_rules": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 20
+      }
+    },
+    "reporting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mandatory"
+      ],
+      "properties": {
+        "mandatory": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
