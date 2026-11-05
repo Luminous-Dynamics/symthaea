@@ -730,6 +730,44 @@ mod tests {
         })
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn replay_snapshot_is_sealed_and_detached_from_source_path_mutations() {
+        use std::os::fd::AsRawFd;
+
+        let payload = b"sealed snapshot immutability control";
+        let (temp, bytes) = make_archive(CompressionMethod::Stored, &[("asset.bin", payload)]);
+        let expected_digest = format!("{:x}", Sha256::digest(&bytes));
+        let (mut snapshot, snapshot_digest, snapshot_size) =
+            sealed_snapshot(&temp.0, HARD_ARCHIVE_LIMIT).unwrap();
+
+        assert_eq!(snapshot_digest, expected_digest);
+        assert_eq!(snapshot_size, bytes.len() as u64);
+        let seals = unsafe { libc::fcntl(snapshot.as_raw_fd(), libc::F_GET_SEALS) };
+        let required = libc::F_SEAL_WRITE
+            | libc::F_SEAL_GROW
+            | libc::F_SEAL_SHRINK
+            | libc::F_SEAL_SEAL;
+        assert!(seals >= 0 && seals & required == required);
+
+        // Replacing the source path cannot change the already-open sealed snapshot.
+        std::fs::write(&temp.0, b"replacement at the original path").unwrap();
+        snapshot.seek(SeekFrom::Start(0)).unwrap();
+        let mut first_byte = [0u8; 1];
+        snapshot.read_exact(&mut first_byte).unwrap();
+        assert_eq!(first_byte[0], bytes[0]);
+
+        // Even a writable descriptor clone cannot alter a sealed memfd.
+        let mut write_attempt = snapshot.try_clone().unwrap();
+        write_attempt.seek(SeekFrom::Start(0)).unwrap();
+        assert!(write_attempt.write_all(b"X").is_err());
+
+        let (digest_after, size_after) =
+            hash_open_file(&mut snapshot, HARD_ARCHIVE_LIMIT).unwrap();
+        assert_eq!(digest_after, snapshot_digest);
+        assert_eq!(size_after, snapshot_size);
+    }
+
     #[test]
     fn independently_replays_stored_member_receipt() {
         let payload = b"independent Stored replay payload";
