@@ -34,11 +34,32 @@
       "source_uri": "https://csrc.nist.gov/pubs/ir/8536/final"
     },
     {
-      "id": "MTConnect",
+      "id": "MTConnect standard download package",
+      "edition": "2.5",
+      "version": "current-release label on official standard download page; February 2025",
+      "surface": "MTConnect",
+      "source_uri": "https://mtconnect.squarespace.com/standard-download20181"
+    },
+    {
+      "id": "MTConnect normative SysML model release",
       "edition": "2.7",
-      "version": "2026-02",
+      "version": "published 2026-02-27; exact XMI asset digest not yet frozen",
       "surface": "MTConnect",
       "source_uri": "https://github.com/mtconnect/mtconnect_sysml_model/releases"
+    },
+    {
+      "id": "MTConnect normative model documentation",
+      "edition": "2.8",
+      "version": "model documentation site serves Version 2.8; release and XMI digest require pinning",
+      "surface": "MTConnect",
+      "source_uri": "https://model.mtconnect.org/Version2.8/"
+    },
+    {
+      "id": "MTConnect XML schema bundle",
+      "edition": "2.7",
+      "version": "public schema index lists XSD files modified 2026-02-22",
+      "surface": "MTConnect",
+      "source_uri": "https://schemas.mtconnect.org/"
     }
   ],
   "cases": [
@@ -245,6 +266,7 @@
     "No candidate output, expected answer key, hidden oracle, execution trace, or benchmark score is included.",
     "The standard baselines are pinned for this research profile; the fixture corpus does not claim full standards coverage or certification.",
     "Candidate execution, untrusted execution, and physical testing remain unauthorized.",
-    "Any later scoring requires independent adjudication, frozen toolchains, and separate evaluator custody."
+    "Any later scoring requires independent adjudication, frozen toolchains, and separate evaluator custody.",
+    "MTConnect public version labels are not yet reconciled across the standard-download page, normative SysML model releases, model documentation, and generated XML schemas. No MTConnect adapter is eligible for scoring until exact XMI, XSD, agent and protocol revisions are separately pinned and compatibility is independently reviewed."
   ]
 }
