@@ -174,8 +174,10 @@ pub fn certify_epsilon_optimal_action(
         .ok_or(RobustSelectionError::MetricCountMismatch)?;
     let expected_per_claim_alpha =
         receipt.familywise_alpha / expected_claim_count as f64;
-    if receipt.metrics.len() != expected_metrics
-        || receipt.claim_count != expected_claim_count
+    if receipt.metrics.len() != expected_metrics {
+        return Err(RobustSelectionError::MetricCountMismatch);
+    }
+    if receipt.claim_count != expected_claim_count
         || !receipt.per_claim_alpha.is_finite()
         || receipt.per_claim_alpha <= 0.0
         || (receipt.per_claim_alpha - expected_per_claim_alpha).abs() > 1.0e-12
