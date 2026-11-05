@@ -1,0 +1,295 @@
+{
+  "schema_version": 0,
+  "preregistration_id": "CEB-RUST-PILOT-001",
+  "version": "0.1.0",
+  "status": "design_only_not_executed",
+  "created_on": "2026-11-05",
+  "purpose": "Validate task admission, oracle quality, experimental controls, evidence receipts, metrics and budget accounting for a Rust repository-repair pilot. This pilot is not designed or powered to establish state-of-the-art superiority.",
+  "execution_gate": {
+    "candidate_controlled_execution": "blocked_until_issue_10064_qualified",
+    "independent_regrade_claim": "blocked_until_issue_10369_qualified",
+    "permitted_now": [
+      "static task-manifest authoring",
+      "source snapshot and license review",
+      "gold patch and oracle review without executing candidate code",
+      "schema validation",
+      "comparison protocol authoring",
+      "synthetic negative-control mutation in memory"
+    ],
+    "prohibited_now": [
+      "candidate-controlled build scripts",
+      "procedural macros",
+      "repository tests",
+      "benchmark tasks",
+      "attack payloads",
+      "untrusted package installation",
+      "claiming isolated execution or independent pristine regrade"
+    ]
+  },
+  "population": {
+    "target_task_count": 48,
+    "acceptable_range": [
+      40,
+      60
+    ],
+    "repositories_target": 6,
+    "root_cause_families": [
+      {
+        "id": "rust-types-traits",
+        "target_tasks": 8
+      },
+      {
+        "id": "multi-crate-api-regression",
+        "target_tasks": 8
+      },
+      {
+        "id": "feature-target-configuration",
+        "target_tasks": 8
+      },
+      {
+        "id": "issue-reproduction-debugging",
+        "target_tasks": 8
+      },
+      {
+        "id": "security-correctness",
+        "target_tasks": 8
+      },
+      {
+        "id": "performance-correctness",
+        "target_tasks": 8
+      }
+    ],
+    "inclusion_criteria": [
+      "Publicly licensed Rust repository with a frozen source commit and documented task provenance.",
+      "Issue is reproducible from a clean source snapshot under a pinned supported toolchain after runner qualification.",
+      "Acceptance criteria describe observable behavior and are independently adjudicable.",
+      "A reference patch exists or independent reviewers can author and validate an equivalent gold repair.",
+      "Reference-patch and empty-patch controls can be evaluated after isolation qualification.",
+      "Task is not trivially solved by a publicly visible fix commit, leaked test, benchmark-specific prompt or ambient network retrieval."
+    ],
+    "exclusion_criteria": [
+      "Unclear or contradictory acceptance semantics.",
+      "Unresolvable dependency, missing license provenance or unstable external service dependency.",
+      "Oracle relies solely on an LLM judge.",
+      "Task cannot be replayed from the frozen source and environment.",
+      "Task execution requires secrets, production access or destructive external side effects.",
+      "Unresolved disagreement between independent gold reviewers."
+    ]
+  },
+  "task_custody": {
+    "development_partition_tasks": 32,
+    "heldout_partition_tasks": 16,
+    "holdout_access": "held outside the agent workspace and revealed only after task and grader revisions, hashes, resource budgets and analysis plan are committed",
+    "note": "The 16-task holdout is a pilot feasibility check, not a sufficient sample for a broad superiority claim."
+  },
+  "baseline_arms": [
+    {
+      "arm_id": "deterministic-tools",
+      "description": "Deterministic compiler, formatter, linter, static analysis and repository search where applicable."
+    },
+    {
+      "arm_id": "model-minimal",
+      "description": "One pinned foundation model with a minimal agent harness."
+    },
+    {
+      "arm_id": "model-strong-harness",
+      "description": "The same foundation model with a strong conventional coding-agent harness."
+    },
+    {
+      "arm_id": "model-plus-one-symthaea-component",
+      "description": "The same model and strong harness plus exactly one preregistered Symthaea component."
+    },
+    {
+      "arm_id": "symthaea-native",
+      "description": "Symthaea-native path only on tasks where the system can attempt the task without a frontier foundation model; report as a separate arm."
+    },
+    {
+      "arm_id": "expert-human",
+      "description": "Blind expert-human reference arm with recorded experience, time and review protocol; do not mix human results into agent seed counts."
+    },
+    {
+      "arm_id": "human-plus-agent",
+      "description": "Separate complementarity arm measuring review time, interventions, accepted repair and defect recall."
+    }
+  ],
+  "resource_matching": {
+    "model": "same pinned model and dated API/model identifier across the paired agent arms",
+    "harness": "hold fixed except for the explicitly named harness/component ablation",
+    "budgets": [
+      "maximum turns",
+      "input/output tokens",
+      "wall-clock time",
+      "tool calls",
+      "compute/runtime limits",
+      "inference cost"
+    ],
+    "environment": [
+      "source commit",
+      "container/image digest",
+      "Rust toolchain",
+      "Cargo.lock",
+      "feature set",
+      "target triple",
+      "network policy",
+      "environment variables",
+      "hardware for performance tasks"
+    ],
+    "deviation_policy": "Any deviation is recorded per task and removes that task from the matched comparison unless the preregistered analysis explicitly supports the deviation."
+  },
+  "primary_endpoint": {
+    "name": "accepted_regression_safe_repair_rate",
+    "definition": "Share of admitted tasks for which the candidate patch satisfies issue-specific fail-to-pass checks, preserves all qualified pass-to-pass contracts, passes independent review and has no critical security or authorization failure.",
+    "task_level_outcomes": [
+      "accepted",
+      "candidate_incorrect",
+      "regression",
+      "security_failure",
+      "invalid_task",
+      "oracle_unresolved",
+      "execution_unqualified",
+      "abstained",
+      "escalated",
+      "timeout",
+      "budget_exhausted"
+    ],
+    "rule": "Invalid, unresolved, unqualified, abstained and escalated tasks remain visible as separate dispositions; do not silently drop them from coverage or score denominators."
+  },
+  "secondary_metrics": [
+    {
+      "id": "issue_resolution_rate",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "edit_precision",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "bug_recall",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "critical_contract_preservation",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "security_false_accepts",
+      "unit": "count",
+      "direction": "minimize"
+    },
+    {
+      "id": "context_sufficiency",
+      "unit": "adjudicated proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "test_mutation_kill_rate",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "collateral_change_ratio",
+      "unit": "proportion",
+      "direction": "minimize"
+    },
+    {
+      "id": "cost_per_accepted_repair",
+      "unit": "USD",
+      "direction": "minimize"
+    },
+    {
+      "id": "wall_clock_seconds",
+      "unit": "seconds",
+      "direction": "minimize"
+    },
+    {
+      "id": "human_review_minutes",
+      "unit": "minutes",
+      "direction": "minimize"
+    },
+    {
+      "id": "abstention_precision",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "escalation_precision",
+      "unit": "proportion",
+      "direction": "maximize"
+    },
+    {
+      "id": "evidence_completeness",
+      "unit": "proportion",
+      "direction": "maximize"
+    }
+  ],
+  "oracle_qualification": {
+    "reviewers": 2,
+    "disagreement_resolution": "third independent adjudicator; unresolved tasks excluded from candidate scoring but retained in the admission report",
+    "required_pre_execution_controls": [
+      "reference patch expected to satisfy acceptance contract",
+      "empty patch expected to fail issue-specific contract",
+      "pre-existing pass-to-pass behavior identified",
+      "task instructions reviewed independently of implementation diff",
+      "security and destructive-action criteria defined"
+    ],
+    "no_llm_only_oracle": true,
+    "gold_patch_not_the_only_valid_solution": true,
+    "semantically_equivalent_repairs_allowed": true
+  },
+  "statistics": {
+    "pilot_is_exploratory": true,
+    "independent_seeds_minimum": 3,
+    "seeds_for_high_variance": 5,
+    "paired_analysis": "Compare the same admitted task across arms. Report paired effect sizes, discordant outcomes and exact task-level denominators.",
+    "uncertainty": "Use paired confidence intervals; supplement with repository/root-cause-clustered bootstrap sensitivity analysis. Do not treat multiple seeds on one task as independent tasks.",
+    "sample_size": "Use pilot discordance and cluster variance to calculate the confirmatory sample size; do not claim 80% power or superiority from the 48-task pilot without that calculation.",
+    "multiplicity": "Name one primary arm contrast and one primary endpoint before opening the 16-task holdout; treat all other comparisons as exploratory.",
+    "missingness": "Timeouts, budget exhaustion, refusals, abstentions and ungraded tasks are reported; no silent complete-case filtering."
+  },
+  "preregistered_contrasts": [
+    {
+      "contrast_id": "primary-component-ablation",
+      "treatment": "model-plus-one-symthaea-component",
+      "control": "model-strong-harness",
+      "question": "Does the selected Symthaea component improve accepted regression-safe repair under matched model, harness and budget?"
+    },
+    {
+      "contrast_id": "harness-value",
+      "treatment": "model-strong-harness",
+      "control": "model-minimal",
+      "question": "How much value comes from conventional harness engineering before attributing benefit to Symthaea?"
+    },
+    {
+      "contrast_id": "human-complementarity",
+      "treatment": "human-plus-agent",
+      "control": "expert-human",
+      "question": "Does agent assistance improve defect detection or reduce review time without lowering accepted quality?"
+    }
+  ],
+  "stopping_rules": [
+    "Stop a task immediately if isolation, authorization or secret-boundary controls fail.",
+    "Invalidate and quarantine a task when reference-patch or empty-patch qualification fails.",
+    "Stop the pilot if task identity, source digest, grader digest or evidence custody cannot be reconstructed.",
+    "Do not change primary endpoint, task exclusions or budgets after holdout access; issue a new preregistration version instead."
+  ],
+  "reporting": {
+    "mandatory": [
+      "exact source/task/grader/toolchain digests",
+      "all task dispositions",
+      "per-arm denominators",
+      "paired effect sizes and confidence intervals",
+      "repository/fault-family breakdowns",
+      "cost and latency",
+      "human-review burden",
+      "abstentions and escalations",
+      "security failures",
+      "unresolved or invalid tasks",
+      "all deviations"
+    ],
+    "claim_ceiling": "Pilot feasibility and descriptive findings only. No direct SOTA, causal component benefit or independent qualification claim without matched design, sufficient power and the appropriate infrastructure gates."
+  }
+}
