@@ -1,0 +1,1537 @@
+{
+  "schema_version": 0,
+  "registry_id": "CEB-EXTERNAL-OBSERVATIONS-V0",
+  "status": "design_only_external_reference_snapshot",
+  "snapshot_date": "2026-11-05",
+  "policy": {
+    "unit_of_observation": "One row represents one metric from one benchmark split and one named system configuration. Never combine metrics from different configurations into a synthetic system.",
+    "comparison_ceiling": "All included external scores are contextual or historical references unless a separately preregistered matched comparison is recorded; no direct CEB superiority claim is supported by this registry.",
+    "uncertainty_rule": "Preserve source-reported uncertainty notation. Do not infer a confidence level or interval method unless the source states it.",
+    "denominator_rule": "Every task or pair count belongs to its exact benchmark/split. Missing denominators must be explicitly marked not_reported, not silently imputed.",
+    "unlabeled_rule": "An unlabeled leaderboard value remains unlabeled; it cannot be mapped to a named metric by guesswork."
+  },
+  "sources": [
+    {
+      "source_id": "scale-swe-pro-v2",
+      "source_url": "https://labs.scale.com/leaderboard/swe_bench_pro_public_v2",
+      "title": "SWE-Bench Pro V2 leaderboard and methodology",
+      "source_type": "leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-09-22",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "scale-sweatlas-qna",
+      "source_url": "https://labs.scale.com/leaderboard/sweatlas-qna",
+      "title": "SWE Atlas Codebase QnA leaderboard",
+      "source_type": "leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-07-28",
+      "supports": [
+        "CEB-REPO"
+      ]
+    },
+    {
+      "source_id": "scale-sweatlas-refactoring",
+      "source_url": "https://labs.scale.com/leaderboard/sweatlas-refactoring",
+      "title": "SWE Atlas Refactoring leaderboard",
+      "source_type": "leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-REFACTOR"
+      ]
+    },
+    {
+      "source_id": "contextbench",
+      "source_url": "https://contextbench.github.io/",
+      "title": "ContextBench leaderboard",
+      "source_type": "leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-10-23",
+      "supports": [
+        "CEB-CONTEXT"
+      ]
+    },
+    {
+      "source_id": "pdb-results",
+      "source_url": "https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results",
+      "title": "Precise Debugging Benchmark result tables and raw outputs",
+      "source_type": "dataset_results",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "crbugbench",
+      "source_url": "https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/",
+      "title": "Microsoft Research CRBugBench paper",
+      "source_type": "paper",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-10-01",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "endor-agent-security",
+      "source_url": "https://www.endorlabs.com/research/ai-code-security-benchmark",
+      "title": "Endor Labs Agent Security League",
+      "source_type": "leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-SECURE"
+      ]
+    },
+    {
+      "source_id": "rust-swe-bench",
+      "source_url": "https://conf.researchr.org/details/icse-2026/icse-2026-research-track/67/Evaluating-and-Improving-Automated-Repository-Level-Rust-Issue-Resolution-with-LLM-ba",
+      "title": "Rust-SWE-bench and RUSTFORGER ICSE 2026 paper",
+      "source_type": "paper",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-02-01",
+      "supports": [
+        "CEB-RUST"
+      ]
+    },
+    {
+      "source_id": "swe-fficiency",
+      "source_url": "https://proceedings.mlr.press/v306/ma26l.html",
+      "title": "SWE-fficiency ICML 2026 paper",
+      "source_type": "paper",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-07-01",
+      "supports": [
+        "CEB-OPT"
+      ]
+    },
+    {
+      "source_id": "epoch-terminal-bench-review",
+      "source_url": "https://epoch.ai/benchmarks/terminal-bench-4/review",
+      "title": "Epoch AI Terminal-Bench 4.0.0 benchmark review",
+      "source_type": "independent_review",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-09-04",
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "terminal-bench-release",
+      "source_url": "https://www.tbench.ai/news/terminal-bench-4-0",
+      "title": "Terminal-Bench 4.0 release notes and lifecycle policy",
+      "source_type": "maintainer_documentation",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-EVAL"
+      ]
+    },
+    {
+      "source_id": "scale-leaderboard",
+      "source_url": "https://labs.scale.com/leaderboard",
+      "title": "Scale Labs consolidated benchmark leaderboard",
+      "source_type": "leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-TEST",
+        "CEB-HUMAN"
+      ]
+    },
+    {
+      "source_id": "agentabstain",
+      "source_url": "https://agentabstain.github.io/",
+      "title": "AgentAbstain benchmark and leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": "2026-11-05",
+      "supports": [
+        "CEB-HUMAN"
+      ]
+    },
+    {
+      "source_id": "scale-sweatlas-overview",
+      "source_url": "https://labs.scale.com/papers/sweatlas",
+      "title": "SWE Atlas benchmark task counts and design",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-REPO",
+        "CEB-TEST",
+        "CEB-REFACTOR"
+      ]
+    },
+    {
+      "source_id": "scale-hil",
+      "source_url": "https://labs.scale.com/leaderboard/hil",
+      "title": "HiL-Bench methodology and dataset scope",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-HUMAN"
+      ]
+    }
+  ],
+  "comparators": [
+    {
+      "comparator_id": "swe-pro-v2-full",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Bench Pro V2",
+      "benchmark_version": "2026-09-22 refresh",
+      "split": "Full",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 642,
+        "unit": "tasks"
+      },
+      "source_id": "scale-swe-pro-v2",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "11 repositories.",
+        "Scale removed 89 invalid tasks and corrected 69 contradictory instructions.",
+        "Agent phase has no web tools; patches are pristine-regraded; reference-patch-pass and empty-patch-fail are required.",
+        "Scale still documents a trusted endpoint relay and verifier execution of candidate-controlled code as residual risks."
+      ]
+    },
+    {
+      "comparator_id": "swe-pro-v2-hard",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Bench Pro V2",
+      "benchmark_version": "2026-09-22 refresh",
+      "split": "HARD",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 51,
+        "unit": "tasks"
+      },
+      "source_id": "scale-swe-pro-v2",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Separate 51-task denominator; never merge with Full.",
+        "Small split; retain task-level uncertainty."
+      ]
+    },
+    {
+      "comparator_id": "swe-atlas-qna",
+      "lane_id": "CEB-REPO",
+      "benchmark_name": "SWE Atlas Codebase QnA",
+      "benchmark_version": "2026-07-28 methodology; 2026-11-05 leaderboard snapshot",
+      "split": "Codebase QnA",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 124,
+        "unit": "tasks"
+      },
+      "source_id": "scale-sweatlas-qna",
+      "supporting_source_ids": [
+        "scale-sweatlas-overview"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "11 repositories and four languages per benchmark description.",
+        "Runtime analysis and multi-file comprehension rubric differs from CEB source-claim adjudication."
+      ]
+    },
+    {
+      "comparator_id": "contextbench-main",
+      "lane_id": "CEB-CONTEXT",
+      "benchmark_name": "ContextBench",
+      "benchmark_version": "2026-10-23 leaderboard",
+      "split": "Agent systems",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 1136,
+        "unit": "tasks"
+      },
+      "source_id": "contextbench",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "66 repositories and eight languages.",
+        "Agent systems use ContextBench-specific adaptations.",
+        "Recall, Pass@1 and Context F1 maxima belong to different systems; preserve the exact row for each metric."
+      ]
+    },
+    {
+      "comparator_id": "swe-atlas-test-writing",
+      "lane_id": "CEB-TEST",
+      "benchmark_name": "SWE Atlas Test Writing",
+      "benchmark_version": "2026-11-05 leaderboard snapshot",
+      "split": "Test Writing",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 90,
+        "unit": "tasks"
+      },
+      "source_id": "scale-leaderboard",
+      "supporting_source_ids": [
+        "scale-sweatlas-overview"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Test-writing rubric is not equivalent to mutation kill rate or oracle soundness."
+      ]
+    },
+    {
+      "comparator_id": "swe-atlas-refactoring",
+      "lane_id": "CEB-REFACTOR",
+      "benchmark_name": "SWE Atlas Refactoring",
+      "benchmark_version": "2026-11-05 leaderboard snapshot",
+      "split": "Refactoring",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 70,
+        "unit": "tasks"
+      },
+      "source_id": "scale-sweatlas-refactoring",
+      "supporting_source_ids": [
+        "scale-sweatlas-overview"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "10 repositories and six languages per benchmark description.",
+        "Score does not establish collateral-change ratio on CEB tasks."
+      ]
+    },
+    {
+      "comparator_id": "pdb-single-hard",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "Precise Debugging Benchmark",
+      "benchmark_version": "published PDB results snapshot",
+      "split": "PDB-Single Hard",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 5751,
+        "unit": "tasks"
+      },
+      "source_id": "pdb-results",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Means over all tasks; ± values are reported 95% intervals (1.96 × standard error).",
+        "Edit precision uses epsilon-relaxed matching ε=2."
+      ]
+    },
+    {
+      "comparator_id": "pdb-wild",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "Precise Debugging Benchmark",
+      "benchmark_version": "published PDB results snapshot",
+      "split": "PDB-Wild",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 484,
+        "unit": "tasks"
+      },
+      "source_id": "pdb-results",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Multi-line and repository-level tasks; do not merge with PDB-Single Hard.",
+        "Means over all tasks; ± values are reported 95% intervals (1.96 × standard error).",
+        "Edit precision uses epsilon-relaxed matching ε=1."
+      ]
+    },
+    {
+      "comparator_id": "crbugbench",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "CRBugBench",
+      "benchmark_version": "October 2026 paper",
+      "split": "Open-source review tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 1000,
+        "unit": "tasks"
+      },
+      "source_id": "crbugbench",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "98 open-source repositories.",
+        "An additional 800 proprietary tasks were collected; the cited 71.9% figure is the open-source result, not a score over 1,800 tasks.",
+        "Top-five bug detection is not precision."
+      ]
+    },
+    {
+      "comparator_id": "agent-security-league",
+      "lane_id": "CEB-SECURE",
+      "benchmark_name": "Endor Labs Agent Security League",
+      "benchmark_version": "live leaderboard accessed 2026-11-05",
+      "split": "200-task benchmark",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 200,
+        "unit": "tasks"
+      },
+      "source_id": "endor-agent-security",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "108 open-source Python projects and 77 CWE classes.",
+        "34 agent/model configurations independently benchmarked.",
+        "Functional and secure results must remain attached to the same configuration."
+      ]
+    },
+    {
+      "comparator_id": "rust-swe-bench",
+      "lane_id": "CEB-RUST",
+      "benchmark_name": "Rust-SWE-bench / RUSTFORGER",
+      "benchmark_version": "ICSE 2026 paper",
+      "split": "500 Rust repository tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 500,
+        "unit": "tasks"
+      },
+      "source_id": "rust-swe-bench",
+      "supporting_source_ids": [],
+      "comparison_class": "historical_reference",
+      "caveats": [
+        "34 Rust repositories.",
+        "Claude Sonnet 3.7 + RUSTFORGER is a historical model/harness baseline, not a November 2026 frontier comparison."
+      ]
+    },
+    {
+      "comparator_id": "swe-fficiency",
+      "lane_id": "CEB-OPT",
+      "benchmark_name": "SWE-fficiency",
+      "benchmark_version": "ICML 2026",
+      "split": "Repository-level performance tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 498,
+        "unit": "tasks"
+      },
+      "source_id": "swe-fficiency",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Nine repositories.",
+        "Expert-relative speedup requires matching hardware, workload, toolchain and correctness gates."
+      ]
+    },
+    {
+      "comparator_id": "hil-bench",
+      "lane_id": "CEB-HUMAN",
+      "benchmark_name": "HiL-Bench",
+      "benchmark_version": "2026-11-05 leaderboard and methodology snapshot",
+      "split": "Software engineering and text-to-SQL",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 300,
+        "unit": "tasks"
+      },
+      "source_id": "scale-leaderboard",
+      "supporting_source_ids": [
+        "scale-hil"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "150 software-engineering and 150 text-to-SQL tasks; 200 public and 100 private held-out.",
+        "The displayed 79.67 ± 4.17 leaderboard value is not labeled with an explicit metric name on the consolidated table; do not infer ASK-F1 or Pass@3."
+      ]
+    },
+    {
+      "comparator_id": "epoch-terminal-bench-review",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "Epoch AI review of Terminal-Bench 4.0.0",
+      "benchmark_version": "reviewed 2026-09-04",
+      "split": "Benchmark review",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 66,
+        "unit": "reviewed_tasks"
+      },
+      "source_id": "epoch-terminal-bench-review",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Independent benchmark review, not an agent performance leaderboard.",
+        "Thirty publicly noted scoring defects were identified in 66 tasks."
+      ]
+    },
+    {
+      "comparator_id": "terminal-bench-lifecycle",
+      "lane_id": "CEB-EVAL",
+      "benchmark_name": "Terminal-Bench 4.0 maintainer lifecycle",
+      "benchmark_version": "4.0 release; 4.1 roadmap",
+      "split": "Version lifecycle",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 66,
+        "unit": "benchmark_tasks"
+      },
+      "source_id": "terminal-bench-release",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Tamper-resistant verifiers are identified as a 4.1 focus, not an already-qualified released feature.",
+        "Use the source's rerun/regrade/reuse versioning distinctions as methodology only."
+      ]
+    },
+    {
+      "comparator_id": "agentabstain",
+      "lane_id": "CEB-HUMAN",
+      "benchmark_name": "AgentAbstain",
+      "benchmark_version": "NeurIPS 2026 benchmark snapshot",
+      "split": "Paired should-act / should-abstain",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 263,
+        "unit": "task_pairs"
+      },
+      "source_id": "agentabstain",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "42 executable environments; eight abstention scenarios.",
+        "Primary metric is paired accuracy: both sides of the pair must be correct.",
+        "Act, Abstain and CAR are separate component metrics, macro-averaged over scenarios."
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "swepro-full-opus-resolve",
+      "comparator_id": "swe-pro-v2-full",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus5-claude-code-xhigh",
+        "model": "Opus 5",
+        "harness": "Claude Code",
+        "configuration": "xhigh"
+      },
+      "metric": {
+        "metric_id": "resolve_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published full-split resolve rate.",
+        "value": 99.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "99.40 ± 0.40",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.4",
+          "margin": 0.4,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "resolve_rate",
+          "applies_to_task_count": 642
+        }
+      },
+      "notes": [
+        "The score is not directly comparable to CEB without matched tasks and protocol."
+      ]
+    },
+    {
+      "observation_id": "swepro-full-gemini-resolve",
+      "comparator_id": "swe-pro-v2-full",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gemini4-mini-swe-high",
+        "model": "Gemini 4 Argon",
+        "harness": "mini-swe-agent",
+        "configuration": "high"
+      },
+      "metric": {
+        "metric_id": "resolve_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published full-split resolve rate.",
+        "value": 99.22,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "99.22 ± 0.45",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.45",
+          "margin": 0.45,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "resolve_rate",
+          "applies_to_task_count": 642
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swepro-full-fable-resolve",
+      "comparator_id": "swe-pro-v2-full",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "fable51-claude-code-high",
+        "model": "Fable 5.1",
+        "harness": "Claude Code",
+        "configuration": "high"
+      },
+      "metric": {
+        "metric_id": "resolve_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published full-split resolve rate.",
+        "value": 99.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "99.10 ± 0.50",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.5",
+          "margin": 0.5,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "resolve_rate",
+          "applies_to_task_count": 642
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swepro-hard-opus-resolve",
+      "comparator_id": "swe-pro-v2-hard",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus5-claude-code-xhigh",
+        "model": "Opus 5",
+        "harness": "Claude Code",
+        "configuration": "xhigh"
+      },
+      "metric": {
+        "metric_id": "resolve_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published HARD-split resolve rate.",
+        "value": 98,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "98.00",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "resolve_rate",
+          "applies_to_task_count": 51
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swepro-hard-fable-resolve",
+      "comparator_id": "swe-pro-v2-hard",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "fable51-claude-code-high",
+        "model": "Fable 5.1",
+        "harness": "Claude Code",
+        "configuration": "high"
+      },
+      "metric": {
+        "metric_id": "resolve_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published HARD-split resolve rate.",
+        "value": 92.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "92.20",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "resolve_rate",
+          "applies_to_task_count": 51
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swepro-hard-gemini-resolve",
+      "comparator_id": "swe-pro-v2-hard",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gemini4-mini-swe-high",
+        "model": "Gemini 4 Argon",
+        "harness": "mini-swe-agent",
+        "configuration": "high"
+      },
+      "metric": {
+        "metric_id": "resolve_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published HARD-split resolve rate.",
+        "value": 92.16,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "92.16",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "resolve_rate",
+          "applies_to_task_count": 51
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "atlas-qna-opus-score",
+      "comparator_id": "swe-atlas-qna",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus5-claude-code-xhigh",
+        "model": "Opus 5",
+        "harness": "Claude Code",
+        "configuration": "xhigh"
+      },
+      "metric": {
+        "metric_id": "codebase_qna_score",
+        "label": "Codebase QnA score",
+        "definition": "Published SWE Atlas Codebase QnA leaderboard score.",
+        "value": 63.17,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "63.17 ± 5.01",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±5.01",
+          "margin": 5.01,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "codebase_qna_score",
+          "applies_to_task_count": 124
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "contextbench-codenib-recall",
+      "comparator_id": "contextbench-main",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "codenib-haiku55-opus55-miniswe",
+        "model": "Haiku 5.5 search pair + Opus 5.5",
+        "harness": "mini SWE-agent",
+        "configuration": "CodeNib system"
+      },
+      "metric": {
+        "metric_id": "recall",
+        "label": "Context retrieval recall",
+        "definition": "Published context retrieval recall.",
+        "value": 0.779,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "proportion",
+        "direction": "maximize",
+        "raw_display": "0.779",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "recall",
+          "applies_to_task_count": 1136
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "contextbench-codenib-pass1",
+      "comparator_id": "contextbench-main",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "codenib-haiku55-opus55-miniswe",
+        "model": "Haiku 5.5 search pair + Opus 5.5",
+        "harness": "mini SWE-agent",
+        "configuration": "CodeNib system"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Downstream task success",
+        "definition": "Published Pass@1 for the same CodeNib row.",
+        "value": 77.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "77.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 1136
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "contextbench-codenib-f1",
+      "comparator_id": "contextbench-main",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "codenib-haiku55-opus55-miniswe",
+        "model": "Haiku 5.5 search pair + Opus 5.5",
+        "harness": "mini SWE-agent",
+        "configuration": "CodeNib system"
+      },
+      "metric": {
+        "metric_id": "context_f1",
+        "label": "Context F1",
+        "definition": "Published Context F1 for CodeNib; not the best F1 row.",
+        "value": 0.281,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "proportion",
+        "direction": "maximize",
+        "raw_display": "0.281",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "context_f1",
+          "applies_to_task_count": 1136
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "contextbench-openjiuwen-f1",
+      "comparator_id": "contextbench-main",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "openjiuwen-deepseekv4pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "openJiuwen-JiuwenSwarm",
+        "configuration": "openJiuwen + DeepSeek V4 Pro"
+      },
+      "metric": {
+        "metric_id": "context_f1",
+        "label": "Context F1",
+        "definition": "Published best Context F1 from a different system than the best Recall row.",
+        "value": 0.389,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "proportion",
+        "direction": "maximize",
+        "raw_display": "0.389",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "context_f1",
+          "applies_to_task_count": 1136
+        }
+      },
+      "notes": [
+        "Must not be combined with CodeNib's Recall or Pass@1 as if produced by one system."
+      ]
+    },
+    {
+      "observation_id": "atlas-test-fable-score",
+      "comparator_id": "swe-atlas-test-writing",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "fable51-claude-code-xhigh",
+        "model": "Fable 5.1",
+        "harness": "Claude Code",
+        "configuration": "xHigh"
+      },
+      "metric": {
+        "metric_id": "test_writing_score",
+        "label": "Test Writing score",
+        "definition": "Published SWE Atlas Test Writing leaderboard score.",
+        "value": 67.04,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "67.04 ± 5.33",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±5.33",
+          "margin": 5.33,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "test_writing_score",
+          "applies_to_task_count": 90
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "atlas-test-opus-score",
+      "comparator_id": "swe-atlas-test-writing",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus5-claude-code-xhigh",
+        "model": "Opus 5",
+        "harness": "Claude Code",
+        "configuration": "xHigh"
+      },
+      "metric": {
+        "metric_id": "test_writing_score",
+        "label": "Test Writing score",
+        "definition": "Published SWE Atlas Test Writing leaderboard score.",
+        "value": 62.22,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "62.22 ± 5.58",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±5.58",
+          "margin": 5.58,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "test_writing_score",
+          "applies_to_task_count": 90
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "atlas-refactor-gpt-score",
+      "comparator_id": "swe-atlas-refactoring",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gpt6astra-codex-xhigh",
+        "model": "GPT-6 Astra",
+        "harness": "Codex",
+        "configuration": "xHigh"
+      },
+      "metric": {
+        "metric_id": "refactoring_score",
+        "label": "Refactoring score",
+        "definition": "Published SWE Atlas Refactoring leaderboard score.",
+        "value": 59.05,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "59.05 ± 6.43",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±6.43",
+          "margin": 6.43,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "refactoring_score",
+          "applies_to_task_count": 70
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "atlas-refactor-fable-score",
+      "comparator_id": "swe-atlas-refactoring",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "fable51-claude-code-xhigh",
+        "model": "Fable 5.1",
+        "harness": "Claude Code",
+        "configuration": "xHigh"
+      },
+      "metric": {
+        "metric_id": "refactoring_score",
+        "label": "Refactoring score",
+        "definition": "Published SWE Atlas Refactoring leaderboard score.",
+        "value": 56.67,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "56.67 ± 6.52",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±6.52",
+          "margin": 6.52,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "refactoring_score",
+          "applies_to_task_count": 70
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "pdb-single-opus-precision",
+      "comparator_id": "pdb-single-hard",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus47-pdb",
+        "model": "Claude Opus 4.7",
+        "harness": "PDB evaluation harness",
+        "configuration": "PDB-Single Hard"
+      },
+      "metric": {
+        "metric_id": "edit_precision",
+        "label": "Edit-level precision",
+        "definition": "PDB edit-level precision with epsilon-relaxed matching (ε=2).",
+        "value": 83.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "83.3 ± 0.8",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.8",
+          "margin": 0.8,
+          "confidence_level": "95%",
+          "method": "1.96 × standard error",
+          "applies_to_metric_id": "edit_precision",
+          "applies_to_task_count": 5751
+        }
+      },
+      "notes": "Published mean ± 95% interval."
+    },
+    {
+      "observation_id": "pdb-single-opus-recall",
+      "comparator_id": "pdb-single-hard",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus47-pdb",
+        "model": "Claude Opus 4.7",
+        "harness": "PDB evaluation harness",
+        "configuration": "PDB-Single Hard"
+      },
+      "metric": {
+        "metric_id": "bug_recall",
+        "label": "Bug-level recall",
+        "definition": "PDB bug-level recall.",
+        "value": 89.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "89.3 ± 0.6",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.6",
+          "margin": 0.6,
+          "confidence_level": "95%",
+          "method": "1.96 × standard error",
+          "applies_to_metric_id": "bug_recall",
+          "applies_to_task_count": 5751
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "pdb-wild-opus-precision",
+      "comparator_id": "pdb-wild",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus47-pdb",
+        "model": "Claude Opus 4.7",
+        "harness": "PDB evaluation harness",
+        "configuration": "PDB-Wild"
+      },
+      "metric": {
+        "metric_id": "edit_precision",
+        "label": "Edit-level precision",
+        "definition": "PDB edit-level precision with epsilon-relaxed matching (ε=1).",
+        "value": 77.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "77.8 ± 3.1",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±3.1",
+          "margin": 3.1,
+          "confidence_level": "95%",
+          "method": "1.96 × standard error",
+          "applies_to_metric_id": "edit_precision",
+          "applies_to_task_count": 484
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "pdb-wild-opus-recall",
+      "comparator_id": "pdb-wild",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus47-pdb",
+        "model": "Claude Opus 4.7",
+        "harness": "PDB evaluation harness",
+        "configuration": "PDB-Wild"
+      },
+      "metric": {
+        "metric_id": "bug_recall",
+        "label": "Bug-level recall",
+        "definition": "PDB bug-level recall.",
+        "value": 83.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "83.4 ± 2.8",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±2.8",
+          "margin": 2.8,
+          "confidence_level": "95%",
+          "method": "1.96 × standard error",
+          "applies_to_metric_id": "bug_recall",
+          "applies_to_task_count": 484
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "crbug-opus-recall5",
+      "comparator_id": "crbugbench",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "opus5-copilot-cli",
+        "model": "Claude Opus 5",
+        "harness": "Copilot CLI",
+        "configuration": "best reported review system"
+      },
+      "metric": {
+        "metric_id": "bug_recall_at_5",
+        "label": "Human-verified bug recall@5",
+        "definition": "Fraction of human-verified bugs surfaced within the first five review comments.",
+        "value": 71.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "71.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "bug_recall_at_5",
+          "applies_to_task_count": 1000
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "crbug-exploration-prompt-lift",
+      "comparator_id": "crbugbench",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "exploration-prompt-ablation",
+        "model": "not_reported",
+        "harness": "not_reported",
+        "configuration": "exploration-nudging prompt ablation"
+      },
+      "metric": {
+        "metric_id": "exploration_prompt_lift",
+        "label": "Exploration-prompt performance lift",
+        "definition": "Maximum reported performance lift from exploration-nudging prompt changes; not a distinct absolute score.",
+        "value": 5.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percentage_points",
+        "direction": "maximize",
+        "raw_display": "up to 5.8% performance lift",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "exploration_prompt_lift",
+          "applies_to_task_count": 1000
+        }
+      },
+      "notes": [
+        "Reported with approximately 10% higher cost; do not attribute to a named model/harness configuration."
+      ]
+    },
+    {
+      "observation_id": "als-muse-funcpass",
+      "comparator_id": "agent-security-league",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "muse-wonder-muse-code",
+        "model": "Muse Wonder",
+        "harness": "Muse Code",
+        "configuration": "leaderboard row dated 2026-10-24"
+      },
+      "metric": {
+        "metric_id": "functional_pass",
+        "label": "Functional pass rate",
+        "definition": "Fraction passing the task's functional test suite.",
+        "value": 91.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "91.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "functional_pass",
+          "applies_to_task_count": 200
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "als-muse-secpass",
+      "comparator_id": "agent-security-league",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "muse-wonder-muse-code",
+        "model": "Muse Wonder",
+        "harness": "Muse Code",
+        "configuration": "leaderboard row dated 2026-10-24"
+      },
+      "metric": {
+        "metric_id": "secure_pass",
+        "label": "Security pass rate",
+        "definition": "Fraction passing both task functional tests and security tests for the same configuration.",
+        "value": 25.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "25.1%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "secure_pass",
+          "applies_to_task_count": 200
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "als-fable-funcpass",
+      "comparator_id": "agent-security-league",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "fable51-claude-code",
+        "model": "Claude Fable 5.1",
+        "harness": "Claude Code",
+        "configuration": "leaderboard row dated 2026-09-03"
+      },
+      "metric": {
+        "metric_id": "functional_pass",
+        "label": "Functional pass rate",
+        "definition": "Fraction passing the task's functional test suite.",
+        "value": 86.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "86.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "functional_pass",
+          "applies_to_task_count": 200
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "als-fable-secpass",
+      "comparator_id": "agent-security-league",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "fable51-claude-code",
+        "model": "Claude Fable 5.1",
+        "harness": "Claude Code",
+        "configuration": "leaderboard row dated 2026-09-03"
+      },
+      "metric": {
+        "metric_id": "secure_pass",
+        "label": "Security pass rate",
+        "definition": "Fraction passing both task functional tests and security tests for the same configuration.",
+        "value": 36.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "36.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "secure_pass",
+          "applies_to_task_count": 200
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "rustforger-resolution",
+      "comparator_id": "rust-swe-bench",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "sonnet37-rustforger",
+        "model": "Claude Sonnet 3.7",
+        "harness": "RUSTFORGER",
+        "configuration": "paper-reported configuration"
+      },
+      "metric": {
+        "metric_id": "issue_resolution_rate",
+        "label": "Issue resolution rate",
+        "definition": "Published Rust-SWE-bench task resolution rate for RUSTFORGER + Claude Sonnet 3.7.",
+        "value": 28.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "28.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "issue_resolution_rate",
+          "applies_to_task_count": 500
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swefficiency-expert-speedup",
+      "comparator_id": "swe-fficiency",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "top-evaluated-swefficiency-agents",
+        "model": "top evaluated agents",
+        "harness": "SWE-fficiency evaluated agent set",
+        "configuration": "aggregate as reported by paper"
+      },
+      "metric": {
+        "metric_id": "expert_normalized_speedup",
+        "label": "Expert-normalized speedup",
+        "definition": "Average speedup relative to expert implementations for top evaluated agents; paper reports below 0.23×.",
+        "value": 0.23,
+        "value_status": "reported",
+        "operator": "less_than",
+        "unit": "expert_speedup_multiple",
+        "direction": "maximize",
+        "raw_display": "less than 0.23×",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "expert_normalized_speedup",
+          "applies_to_task_count": 498
+        }
+      },
+      "notes": [
+        "Stored as an upper-bound observation; it is not an exact 0.23× point estimate."
+      ]
+    },
+    {
+      "observation_id": "hil-muse-unlabeled-score",
+      "comparator_id": "hil-bench",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "muse-wonder-hil",
+        "model": "Muse Wonder 1.0",
+        "harness": "not_reported",
+        "configuration": "consolidated leaderboard row"
+      },
+      "metric": {
+        "metric_id": "unlabeled_leaderboard_score",
+        "label": "Unlabeled leaderboard score",
+        "definition": "The consolidated leaderboard displays this value but does not identify its metric semantics in the visible row.",
+        "value": 79.67,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "unknown_leaderboard_units",
+        "direction": "unknown",
+        "raw_display": "79.67 ± 4.17",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±4.17",
+          "margin": 4.17,
+          "confidence_level": null,
+          "method": "not_stated",
+          "applies_to_metric_id": "unlabeled_leaderboard_score",
+          "applies_to_task_count": 300
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "agentabstain-gemini-paired",
+      "comparator_id": "agentabstain",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gemini31-google-adk-agentabstain",
+        "model": "Gemini 3.1 Pro",
+        "harness": "Google ADK",
+        "configuration": "NeurIPS 2026 leaderboard"
+      },
+      "metric": {
+        "metric_id": "paired_accuracy",
+        "label": "Paired act/abstain accuracy",
+        "definition": "Share of near-identical task pairs for which both should-act and should-abstain decisions are correct; macro-averaged over eight scenarios.",
+        "value": 59.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "59.5%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "paired_accuracy",
+          "applies_to_task_count": 263
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "agentabstain-gemini-act",
+      "comparator_id": "agentabstain",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gemini31-google-adk-agentabstain",
+        "model": "Gemini 3.1 Pro",
+        "harness": "Google ADK",
+        "configuration": "NeurIPS 2026 leaderboard"
+      },
+      "metric": {
+        "metric_id": "act_accuracy",
+        "label": "Should-act accuracy",
+        "definition": "Accuracy on the should-act side of paired tasks; macro-averaged over eight scenarios.",
+        "value": 90.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "90.5%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "act_accuracy",
+          "applies_to_task_count": 263
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "agentabstain-gemini-abstain",
+      "comparator_id": "agentabstain",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gemini31-google-adk-agentabstain",
+        "model": "Gemini 3.1 Pro",
+        "harness": "Google ADK",
+        "configuration": "NeurIPS 2026 leaderboard"
+      },
+      "metric": {
+        "metric_id": "abstain_accuracy",
+        "label": "Should-abstain accuracy",
+        "definition": "Accuracy on should-abstain side of paired tasks; successful abstention requires withholding the tool action and communicating the blocker.",
+        "value": 65.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "65.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "abstain_accuracy",
+          "applies_to_task_count": 263
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "agentabstain-gemini-car",
+      "comparator_id": "agentabstain",
+      "source_locator": "Published leaderboard/table; exact row identified by metric and configuration.",
+      "system": {
+        "system_id": "gemini31-google-adk-agentabstain",
+        "model": "Gemini 3.1 Pro",
+        "harness": "Google ADK",
+        "configuration": "NeurIPS 2026 leaderboard"
+      },
+      "metric": {
+        "metric_id": "conditioned_abstention_rate",
+        "label": "Conditioned abstention rate (CAR)",
+        "definition": "Abstain accuracy restricted to pairs whose should-act side the model already solved; macro-averaged over eight scenarios.",
+        "value": 65.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "65.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "conditioned_abstention_rate",
+          "applies_to_task_count": 263
+        }
+      },
+      "notes": []
+    }
+  ]
+}
