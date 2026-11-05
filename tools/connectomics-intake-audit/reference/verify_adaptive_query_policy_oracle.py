@@ -314,6 +314,10 @@ def support_challenge_digest(base_support_sha: str, challenge: dict, action_ids:
     return h.hexdigest(), normalized_additions
 
 
+def valid_sha(value: str, length: int) -> bool:
+    return len(value) == length and all(character in "0123456789abcdef" for character in value)
+
+
 def scenario_expansion_challenge_digest(
     data: dict,
     challenge: dict,
@@ -371,9 +375,10 @@ def build_scenario_challenges(
         challenge_id = challenge["challenge_id"]
         assert challenge_id and challenge_id not in seen_challenges, "duplicate/empty scenario challenge ID"
         seen_challenges.add(challenge_id)
-        assert len(challenge["challenger_evidence_sha256"]) == 64
-        assert len(challenge["challenger_model_sha256"]) == 64
+        assert valid_sha(challenge["challenger_evidence_sha256"], 64)
+        assert valid_sha(challenge["challenger_model_sha256"], 64)
         assert challenge["additions"], "scenario challenge must append at least one world"
+        assert len(challenge["additions"]) <= 12 - len(scenarios), "scenario world cap exceeded"
         challenge_sha = scenario_expansion_challenge_digest(data, challenge, action_ids)
         expanded = copy.deepcopy(data)
         base_ids = {world["scenario_id"] for world in scenarios}
@@ -384,9 +389,12 @@ def build_scenario_challenges(
             scenario_id = scenario["scenario_id"]
             assert scenario_id not in base_ids and scenario_id not in added_ids, "duplicate/invalid new world"
             assert scenario_id == support["scenario_id"], "scenario/support identity mismatch"
-            assert len(scenario["graph_sha256"]) == 64
-            assert len(support["source_evidence_sha256"]) == 64
-            assert len(support["joint_observation_model_sha256"]) == 64
+            assert scenario["scenario_id"].strip()
+            assert valid_sha(scenario["graph_sha256"], 64)
+            assert valid_sha(support["source_evidence_sha256"], 64)
+            assert valid_sha(support["joint_observation_model_sha256"], 64)
+            assert len(support["dependence_groups"]) == len(set(support["dependence_groups"]))
+            assert all(group.strip() for group in support["dependence_groups"])
             normalized = normalized_rows(support, action_ids)
             assert 0 < len(normalized) <= 64
             added_ids.add(scenario_id)
