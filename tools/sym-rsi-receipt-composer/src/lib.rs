@@ -218,6 +218,7 @@ impl CompositionPlan {
                 "at least one metric projection is required".into(),
             ));
         }
+        let mut dimension_ids = BTreeSet::new();
         for (metric_id, projection) in &self.metrics {
             if metric_id != &projection.metric_id {
                 return Err(ComposerError::InvalidPlan(
@@ -225,6 +226,17 @@ impl CompositionPlan {
                 ));
             }
             projection.validate()?;
+            for dimension_id in [
+                metric_id.clone(),
+                format!("{metric_id}.graded_coverage"),
+                format!("{metric_id}.coverage_adjusted_yield"),
+            ] {
+                if !dimension_ids.insert(dimension_id.clone()) {
+                    return Err(ComposerError::InvalidPlan(format!(
+                        "derived capability dimension ID collision: {dimension_id}"
+                    )));
+                }
+            }
         }
         if self.cluster_by_task.is_empty()
             || self.cluster_by_task.iter().any(|(task_id, cluster_id)| {
@@ -659,12 +671,12 @@ pub fn compose_candidate(
     }
 
     let context_manifest = json!({
-        "experiment_id": plan.experiment_id,
-        "preregistration_digest": plan.preregistration_digest,
+        "experiment_id": plan.experiment_id.clone(),
+        "preregistration_digest": plan.preregistration_digest.clone(),
         "compatibility_context": shared_compatibility_context,
         "metric_contexts": Value::Object(metric_contexts),
-        "eligible_task_ids": eligible_task_ids,
-        "cluster_by_task": plan.cluster_by_task
+        "eligible_task_ids": eligible_task_ids.clone(),
+        "cluster_by_task": plan.cluster_by_task.clone()
     });
     let evidence_manifest = Value::Object(evidence_digests);
     let context_digest = digest_value(&context_manifest)?;
@@ -884,9 +896,15 @@ fn digest_value(value: &Value) -> Result<String, ComposerError> {
 }
 
 fn validate_identifier(value: &str, label: &str) -> Result<(), ComposerError> {
-    if value.trim().is_empty() || value.chars().any(char::is_control) {
+    let valid = !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        && !value.starts_with('.')
+        && !value.ends_with('.');
+    if !valid {
         return Err(ComposerError::InvalidPlan(format!(
-            "{label} must be non-empty and contain no control characters"
+            "{label} must use only ASCII letters, digits, '.', '-' or '_' and cannot start/end with a dot"
         )));
     }
     Ok(())
