@@ -67,6 +67,7 @@ The JSON Schema uses Draft 2020-12. The synthetic fixture contains fictional pro
 Retain separate values for:
 - maximum continuous charging MW;
 - minimum stable charging MW;
+- declared maximum discharging MW as a physical-feasibility extension (not an assertion that this is an additional mandatory Code registration field);
 - maximum and minimum stored energy MWh and the energy-basis convention;
 - charge-cycle efficiency and the boundary at which it is measured;
 - mode-transition times;
