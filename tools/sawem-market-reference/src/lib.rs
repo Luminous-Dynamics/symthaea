@@ -92,7 +92,8 @@ pub enum Violation {
 #[derive(Debug, Clone, PartialEq)]
 pub struct StepResult {
     pub index: usize,
-    pub mode: OperatingMode,
+    pub requested_mode: OperatingMode,
+    pub achieved_mode: OperatingMode,
     pub energy_before_mwh: f64,
     pub energy_after_mwh: f64,
     pub net_export_mw: f64,
@@ -314,22 +315,32 @@ pub fn evaluate_dispatch(
             return Err(InputError::NegativeValue("dispatch_step"));
         }
 
-        let mode = mode_for(step.charge_mw, step.discharge_mw);
-        if step.charge_mw > EPSILON && step.discharge_mw > EPSILON {
+        let requested_mode = mode_for(step.charge_mw, step.discharge_mw);
+        let simultaneous_charge_and_discharge =
+            step.charge_mw > EPSILON && step.discharge_mw > EPSILON;
+        if simultaneous_charge_and_discharge {
             violations.push(Violation::SimultaneousChargeAndDischarge);
         }
-        if step.charge_mw > limits.max_charge_mw + EPSILON {
+        let charge_power_valid = step.charge_mw <= limits.max_charge_mw + EPSILON;
+        if !charge_power_valid {
             violations.push(Violation::ChargePowerExceeded);
         }
-        if step.charge_mw > EPSILON && step.charge_mw + EPSILON < limits.min_stable_charge_mw {
+        let stable_charge_valid = step.charge_mw <= EPSILON
+            || step.charge_mw + EPSILON >= limits.min_stable_charge_mw;
+        if !stable_charge_valid {
             violations.push(Violation::BelowMinimumStableCharging);
         }
-        if step.discharge_mw > limits.max_discharge_mw + EPSILON {
+        let discharge_power_valid = step.discharge_mw <= limits.max_discharge_mw + EPSILON;
+        if !discharge_power_valid {
             violations.push(Violation::DischargePowerExceeded);
         }
+        let mode_request_valid = !simultaneous_charge_and_discharge
+            && charge_power_valid
+            && stable_charge_valid
+            && discharge_power_valid;
 
         let required_transition =
-            required_transition_seconds(previous_mode, mode, limits.transitions);
+            required_transition_seconds(previous_mode, requested_mode, limits.transitions);
         if step.transition_seconds_before_action + EPSILON < required_transition {
             violations.push(Violation::TransitionTimeInsufficient);
         }
@@ -341,10 +352,18 @@ pub fn evaluate_dispatch(
         let transition_valid = step.transition_seconds_before_action + EPSILON
             >= required_transition
             && step.transition_seconds_before_action <= interval_seconds + EPSILON;
-        let active_hours = if transition_valid {
+        let action_valid = mode_request_valid && transition_valid;
+        let active_hours = if action_valid {
             step.duration_hours - step.transition_seconds_before_action / 3_600.0
         } else {
             0.0
+        };
+        // A rejected mode request or incomplete transition must not promote the
+        // internal state. Later intervals continue from the last achieved mode.
+        let achieved_mode = if action_valid {
+            requested_mode
+        } else {
+            previous_mode
         };
 
         let net_export = step.discharge_mw - step.charge_mw;
@@ -370,8 +389,10 @@ pub fn evaluate_dispatch(
         }
 
         let energy_before = energy;
-        energy += step.charge_mw * charge_efficiency * active_hours;
-        energy -= step.discharge_mw / discharge_efficiency * active_hours;
+        if action_valid {
+            energy += step.charge_mw * charge_efficiency * active_hours;
+            energy -= step.discharge_mw / discharge_efficiency * active_hours;
+        }
 
         if energy < limits.min_energy_mwh - EPSILON {
             violations.push(Violation::EnergyBelowMinimum);
@@ -392,7 +413,8 @@ pub fn evaluate_dispatch(
 
         results.push(StepResult {
             index,
-            mode,
+            requested_mode,
+            achieved_mode,
             energy_before_mwh: energy_before,
             energy_after_mwh: energy,
             net_export_mw: net_export,
@@ -401,7 +423,7 @@ pub fn evaluate_dispatch(
             reserve_down_mw: reserve_down,
             violations,
         });
-        previous_mode = mode;
+        previous_mode = achieved_mode;
     }
 
     let feasible = results.iter().all(|step| step.violations.is_empty());
@@ -624,6 +646,28 @@ mod tests {
                 .violations
                 .contains(&Violation::TransitionTimeInsufficient)
         );
+    }
+
+    #[test]
+    fn failed_transition_does_not_promote_internal_mode() {
+        let result = evaluate_dispatch(
+            limits(),
+            100.0,
+            &[
+                step(0.0, 10.0, 60.0, empty_reserves()),
+                step(0.0, 10.0, 0.0, empty_reserves()),
+            ],
+        )
+        .expect("fixture inputs are valid");
+        assert!(!result.feasible);
+        assert_eq!(result.steps[0].achieved_mode, OperatingMode::Standstill);
+        assert_eq!(result.steps[1].achieved_mode, OperatingMode::Standstill);
+        assert!(
+            result.steps[1]
+                .violations
+                .contains(&Violation::TransitionTimeInsufficient)
+        );
+        assert_eq!(result.final_energy_mwh, 100.0);
     }
 
     #[test]
