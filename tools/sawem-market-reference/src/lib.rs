@@ -593,8 +593,7 @@ pub fn dsu_upward_reserve_opportunity_price(
     contracted_consumption_mw: f64,
     curve: DemandSideConsumptionPriceCurve,
 ) -> Result<ReserveOpportunityPrice, ReservePriceError> {
-    let (selected_increment, unit_incremental_price) =
-        curve.price_at(contracted_consumption_mw)?;
+    let (selected_increment, unit_incremental_price) = curve.price_at(contracted_consumption_mw)?;
     let difference = system_marginal_price_minor_per_mwh
         .checked_sub(unit_incremental_price)
         .ok_or(ReservePriceError::ArithmeticOverflow)?;
@@ -1354,33 +1353,21 @@ mod tests {
     fn dsu_reserve_opportunity_price_uses_consumption_curve_and_upward_products() {
         let curve = demand_side_consumption_price_curve();
 
-        let regulating = dsu_upward_reserve_opportunity_price(
-            ReserveProduct::Regulating,
-            50,
-            80.0,
-            curve,
-        )
-        .expect("DSU regulating-up price curve point is valid");
+        let regulating =
+            dsu_upward_reserve_opportunity_price(ReserveProduct::Regulating, 50, 80.0, curve)
+                .expect("DSU regulating-up price curve point is valid");
         assert_eq!(regulating.selected_increment, PriceIncrement::Two);
         assert_eq!(regulating.price_difference_minor_per_mwh, 30);
 
-        let instantaneous = dsu_upward_reserve_opportunity_price(
-            ReserveProduct::Instantaneous,
-            25,
-            50.0,
-            curve,
-        )
-        .expect("DSU instantaneous-up price curve point is valid");
+        let instantaneous =
+            dsu_upward_reserve_opportunity_price(ReserveProduct::Instantaneous, 25, 50.0, curve)
+                .expect("DSU instantaneous-up price curve point is valid");
         assert_eq!(instantaneous.selected_increment, PriceIncrement::Three);
         assert_eq!(instantaneous.price_difference_minor_per_mwh, 0);
 
-        let ten_minute = dsu_upward_reserve_opportunity_price(
-            ReserveProduct::TenMinute,
-            35,
-            90.0,
-            curve,
-        )
-        .expect("DSU ten-minute-up price curve point is valid");
+        let ten_minute =
+            dsu_upward_reserve_opportunity_price(ReserveProduct::TenMinute, 35, 90.0, curve)
+                .expect("DSU ten-minute-up price curve point is valid");
         assert_eq!(ten_minute.selected_increment, PriceIncrement::One);
         assert_eq!(ten_minute.price_difference_minor_per_mwh, 25);
     }
