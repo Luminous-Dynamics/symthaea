@@ -127,6 +127,8 @@ def run(
     assert all(isinstance(role, str) and role.strip() for role in required_roles)
     keys = {key["key_id"]: key for key in policy["trusted_keys"]}
     assert len(keys) == len(policy["trusted_keys"]), "duplicate trust key IDs"
+    public_key_material = [key["public_key_hex"] for key in policy["trusted_keys"]]
+    assert len(public_key_material) == len(set(public_key_material)), "duplicate public-key material under distinct key IDs"
     assert policy["minimum_signatures"] <= len(keys)
 
     pae = dsse_pae(envelope["payload_type"], payload_bytes)
