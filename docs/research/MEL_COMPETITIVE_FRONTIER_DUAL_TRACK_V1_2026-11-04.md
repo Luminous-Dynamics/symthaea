@@ -128,6 +128,17 @@ Treat a requested edit as a transaction:
 
 The edit receipt should include exact source/target digests, region and event mappings, requested changes, preserved properties, renderer version and independent evaluator result. This is the practical bridge from SMEBench to trustworthy DAW workflows.
 
+### C2. From unique gold outputs to negotiated response contracts
+
+Many musical tasks have several valid continuations. A benchmark that assumes one exact target can mark an excellent alternative wrong; a benchmark that treats every valid response as equally preferred can hide a collaborator being overruled. Separate:
+
+- **contract validity:** is the proposal inside the declared set of permissible musical transformations?
+- **partner authority:** has the collaborator explicitly selected or vetoed an option?
+- **ambiguity handling:** when preference is unresolved, does the agent preserve the viable set, ask for clarification, or branch within a declared fan-out budget?
+- **execution validity:** does the realized Score/audio satisfy the selected contract and preserve protected material?
+
+RMI-Bench now has a synthetic NegotiatedResponseContractV1 conformance layer for Commit / Branch / AskClarification / Abstain, vetoes, explicit selection, and bounded branching. The current implementation also enumerates 3,464 small-state authority dispositions. This qualifies only the encoded symbolic interaction rules; it does not establish perceptual equivalence, aesthetic quality, or musician preference. Compose with #9307 / PR #9325 for Score/event-level realization equivalence and validate response quality with blinded musicians.
+
 ### D. From turn-taking to causal reciprocal interaction
 
 Measure both directions of influence under controlled partner interventions:
