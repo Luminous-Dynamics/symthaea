@@ -69,7 +69,10 @@ impl fmt::Display for ReuseBudgetError {
                 write!(f, "paired win/loss counts overflow usize")
             }
             Self::InvalidEmpiricalImprovement => {
-                write!(f, "empirical paired improvement must be finite and within [-1, 1]")
+                write!(
+                    f,
+                    "empirical paired improvement must be finite and within [-1, 1]"
+                )
             }
             Self::CandidateCountMismatch { expected, actual } => {
                 write!(f, "expected {expected} candidate summaries, got {actual}")
@@ -141,9 +144,7 @@ impl ReuseCandidateEvidence {
     ) -> Result<Self, ReuseBudgetError> {
         wins.checked_add(losses)
             .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
-        if !empirical_improvement.is_finite()
-            || !(-1.0..=1.0).contains(&empirical_improvement)
-        {
+        if !empirical_improvement.is_finite() || !(-1.0..=1.0).contains(&empirical_improvement) {
             return Err(ReuseBudgetError::InvalidEmpiricalImprovement);
         }
         Ok(Self {
@@ -189,13 +190,8 @@ pub fn evaluate_reuse_round(
             actual: candidates.len(),
         });
     }
-    let allocation = allocate_reuse_error_budget(
-        alpha,
-        round,
-        prior_promotions,
-        candidates_per_round,
-        rho,
-    )?;
+    let allocation =
+        allocate_reuse_error_budget(alpha, round, prior_promotions, candidates_per_round, rho)?;
 
     let mut best: Option<(usize, f64)> = None;
     for (candidate_index, candidate) in candidates.iter().enumerate() {
@@ -207,11 +203,9 @@ pub fn evaluate_reuse_round(
             continue;
         }
 
-        let p_value = super::paired_sign_test::exact_sign_test_upper_tail(
-            candidate.wins,
-            candidate.losses,
-        )
-        .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
+        let p_value =
+            super::paired_sign_test::exact_sign_test_upper_tail(candidate.wins, candidate.losses)
+                .ok_or(ReuseBudgetError::ComparisonCountOverflow)?;
 
         if p_value <= allocation.paired_test_error_budget
             && best.is_none_or(|(_, best_improvement)| {
@@ -223,9 +217,7 @@ pub fn evaluate_reuse_round(
     }
 
     match best {
-        Some((candidate_index, _)) => {
-            Ok(ReuseRoundDecision::PromoteCandidate { candidate_index })
-        }
+        Some((candidate_index, _)) => Ok(ReuseRoundDecision::PromoteCandidate { candidate_index }),
         None => Ok(ReuseRoundDecision::RejectAll),
     }
 }
@@ -474,7 +466,10 @@ mod tests {
         let one = [ReuseCandidateEvidence::new(10, 0, 0.1).unwrap()];
         assert_eq!(
             evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &one),
-            Err(ReuseBudgetError::CandidateCountMismatch { expected: 2, actual: 1 })
+            Err(ReuseBudgetError::CandidateCountMismatch {
+                expected: 2,
+                actual: 1
+            })
         );
         assert_eq!(
             ReuseCandidateEvidence::new(10, 0, f64::NAN),
@@ -485,7 +480,6 @@ mod tests {
             Err(ReuseBudgetError::InvalidEmpiricalImprovement)
         );
     }
-
 
     #[test]
     fn rejects_overflowing_paired_comparison_counts() {
