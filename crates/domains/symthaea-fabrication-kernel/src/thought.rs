@@ -7,7 +7,9 @@
 //! and its explicit CSG operation tree, enabling bidirectional mapping
 //! between the "thought space" and "geometry space".
 
-use crate::csg::{BooleanOp, CSGNode, Primitive};
+use crate::csg::{
+    BooleanOp, CSGNode, CsgValidationError, CsgValidationLimits, Primitive,
+};
 use crate::mesh::{TriangleMesh, resolve_to_mesh};
 use crate::primitives::*;
 use crate::support::{SupportConfig, plan_column_supports};
@@ -20,6 +22,20 @@ pub struct PrinterConstraints {
     pub max_build_volume: [f32; 3], // mm
     pub min_layer_height: f32,      // mm
     pub max_layer_height: f32,      // mm
+}
+
+/// Result of comparing resolved geometry with an explicit printer profile.
+///
+/// This is a build-volume precheck only; it does not establish process
+/// qualification, material suitability, structural adequacy, or machine safety.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintFitStatus {
+    NotEvaluatedNoProfile,
+    InvalidConstraintProfile,
+    InvalidGeometryBounds,
+    InvalidGeometryStructure,
+    FitsDeclaredBuildVolume,
+    ExceedsDeclaredBuildVolume,
 }
 
 /// A geometric thought: the bridge between HDC intent and physical geometry
@@ -49,6 +65,16 @@ impl<'de> Deserialize<'de> for GeometricThought {
         }
 
         let serialized = SerializedThought::deserialize(deserializer)?;
+        serialized
+            .operation_tree
+            .validate_bounded(CsgValidationLimits::default())
+            .map_err(|error| {
+                <D::Error as serde::de::Error>::custom(format!(
+                    "invalid CSG operation tree: {error:?}"
+                ))
+            })?;
+        // This is a derived geometric representation, not provenance for the
+        // original cognitive intent that may have proposed the tree.
         let intent_hv = encode_csg_as_hv(&serialized.operation_tree);
         Ok(Self {
             intent_hv: Some(intent_hv),
@@ -60,34 +86,108 @@ impl<'de> Deserialize<'de> for GeometricThought {
 }
 
 impl GeometricThought {
-    /// Create from an explicit CSG tree, encoding the intent as HDC
-    pub fn from_csg(tree: CSGNode) -> Self {
+    /// Create from an explicit CSG tree after bounded structural validation.
+    pub fn try_from_csg(tree: CSGNode) -> Result<Self, CsgValidationError> {
+        tree.validate_bounded(CsgValidationLimits::default())?;
         let intent_hv = encode_csg_as_hv(&tree);
-        Self {
+        Ok(Self {
             intent_hv: Some(intent_hv),
+            operation_tree: tree,
+            material_binding: None,
+            printer_constraints: None,
+        })
+    }
+
+    /// Compatibility constructor: invalid trees remain proposed but receive no HDC encoding.
+    ///
+    /// Use try_from_csg when the validation reason must be surfaced.
+    pub fn from_csg(tree: CSGNode) -> Self {
+        let intent_hv = tree
+            .validate_bounded(CsgValidationLimits::default())
+            .ok()
+            .map(|_| encode_csg_as_hv(&tree));
+        Self {
+            intent_hv,
             operation_tree: tree,
             material_binding: None,
             printer_constraints: None,
         }
     }
 
-    /// Resolve to a triangle mesh
+    /// Resolve a validated CSG tree into a triangle mesh.
+    pub fn try_resolve(&self) -> Result<TriangleMesh, CsgValidationError> {
+        self.operation_tree
+            .validate_bounded(CsgValidationLimits::default())?;
+        Ok(resolve_to_mesh(&self.operation_tree))
+    }
+
+    /// Legacy unchecked resolver. Prefer try_resolve at evidence boundaries.
     pub fn resolve(&self) -> TriangleMesh {
         resolve_to_mesh(&self.operation_tree)
     }
 
-    /// Check if mesh fits within printer constraints
-    pub fn fits_constraints(&self) -> bool {
-        if let Some(ref constraints) = self.printer_constraints {
-            let mesh = self.resolve();
-            let (min, max) = mesh_aabb(&mesh);
-            let size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
-            size[0] <= constraints.max_build_volume[0]
-                && size[1] <= constraints.max_build_volume[1]
-                && size[2] <= constraints.max_build_volume[2]
-        } else {
-            true // No constraints = always fits
+    /// Evaluate the declared build-volume constraint profile without promoting unknowns.
+    pub fn evaluate_constraints(&self) -> ConstraintFitStatus {
+        let Some(constraints) = self.printer_constraints.as_ref() else {
+            return ConstraintFitStatus::NotEvaluatedNoProfile;
+        };
+
+        if constraints
+            .max_build_volume
+            .iter()
+            .any(|limit| !limit.is_finite() || *limit <= 0.0)
+            || !constraints.min_layer_height.is_finite()
+            || constraints.min_layer_height <= 0.0
+            || !constraints.max_layer_height.is_finite()
+            || constraints.max_layer_height <= 0.0
+            || constraints.min_layer_height > constraints.max_layer_height
+        {
+            return ConstraintFitStatus::InvalidConstraintProfile;
         }
+
+        let mesh = match self.try_resolve() {
+            Ok(mesh) => mesh,
+            Err(_) => return ConstraintFitStatus::InvalidGeometryStructure,
+        };
+        if mesh.vertices.is_empty()
+            || mesh.indices.is_empty()
+            || mesh
+                .vertices
+                .iter()
+                .any(|vertex| vertex.iter().any(|coordinate| !coordinate.is_finite()))
+            || mesh.indices.iter().flatten().any(|index| {
+                match usize::try_from(*index) {
+                    Ok(index) => index >= mesh.vertices.len(),
+                    Err(_) => true,
+                }
+            })
+        {
+            return ConstraintFitStatus::InvalidGeometryBounds;
+        }
+
+        let (min, max) = mesh_aabb(&mesh);
+        let size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+        if size.iter().any(|extent| !extent.is_finite() || *extent <= 0.0) {
+            return ConstraintFitStatus::InvalidGeometryBounds;
+        }
+
+        if size
+            .iter()
+            .zip(constraints.max_build_volume)
+            .any(|(extent, limit)| *extent > limit)
+        {
+            ConstraintFitStatus::ExceedsDeclaredBuildVolume
+        } else {
+            ConstraintFitStatus::FitsDeclaredBuildVolume
+        }
+    }
+
+    /// Fail-closed boolean projection for legacy/demo callers.
+    ///
+    /// A false result includes missing profiles and invalid geometry; use
+    /// evaluate_constraints when the distinction matters.
+    pub fn fits_constraints(&self) -> bool {
+        self.evaluate_constraints() == ConstraintFitStatus::FitsDeclaredBuildVolume
     }
 
     /// Autonomously derive symbolic SMT safety invariants from the CSG tree.
@@ -125,7 +225,7 @@ impl GeometricThought {
     /// interface layers, removal access, thermal effects, and branching support
     /// optimization remain outside this baseline planner.
     pub fn synthesize_tooling(&self) -> Option<CSGNode> {
-        let mesh = self.resolve();
+        let mesh = self.try_resolve().ok()?;
         let plan = plan_column_supports(&mesh, SupportConfig::default());
         if plan.requires_support() {
             tracing::info!(
@@ -322,7 +422,99 @@ mod tests {
     #[test]
     fn test_no_constraints() {
         let thought = GeometricThought::from_csg(CSGNode::cube());
-        assert!(thought.fits_constraints()); // No constraints = always fits
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::NotEvaluatedNoProfile
+        );
+        assert!(!thought.fits_constraints());
+    }
+
+    #[test]
+    fn invalid_printer_profile_is_not_treated_as_a_valid_build_volume() {
+        let mut thought = GeometricThought::from_csg(CSGNode::cube());
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, f32::NAN, 100.0],
+            min_layer_height: 0.1,
+            max_layer_height: 0.3,
+        });
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidConstraintProfile
+        );
+
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, 100.0, 100.0],
+            min_layer_height: 0.4,
+            max_layer_height: 0.3,
+        });
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidConstraintProfile
+        );
+    }
+
+    #[test]
+    fn non_finite_geometry_cannot_pass_build_volume_precheck() {
+        let mut thought =
+            GeometricThought::from_csg(CSGNode::cube().scale(f32::NAN, 1.0, 1.0));
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, 100.0, 100.0],
+            min_layer_height: 0.1,
+            max_layer_height: 0.3,
+        });
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidGeometryStructure
+        );
+        assert!(!thought.fits_constraints());
+        assert!(thought.intent_hv.is_none());
+        assert!(matches!(
+            thought.try_resolve(),
+            Err(CsgValidationError::NonFiniteTransform)
+        ));
+    }
+
+    #[test]
+    fn singular_csg_scale_is_rejected_before_mesh_resolution() {
+        let mut thought = GeometricThought::from_csg(CSGNode::cube().scale(1.0, 0.0, 1.0));
+        thought.printer_constraints = Some(PrinterConstraints {
+            max_build_volume: [100.0, 100.0, 100.0],
+            min_layer_height: 0.1,
+            max_layer_height: 0.3,
+        });
+        assert!(thought.intent_hv.is_none());
+        assert_eq!(
+            thought.evaluate_constraints(),
+            ConstraintFitStatus::InvalidGeometryStructure
+        );
+        assert!(matches!(
+            thought.try_resolve(),
+            Err(CsgValidationError::SingularScale)
+        ));
+        assert!(matches!(
+            GeometricThought::try_from_csg(CSGNode::cube().scale(1.0, 0.0, 1.0)),
+            Err(CsgValidationError::SingularScale)
+        ));
+    }
+
+    #[test]
+    fn serde_rejects_singular_csg_before_rehydrating_hdc() {
+        let json = r#"{
+            "operation_tree": {
+                "Transform": {
+                    "node": { "Primitive": "Cube" },
+                    "transform": {
+                        "scale": [1.0, 0.0, 1.0],
+                        "rotate": [0.0, 0.0, 0.0],
+                        "translate": [0.0, 0.0, 0.0]
+                    }
+                }
+            },
+            "material_binding": null,
+            "printer_constraints": null
+        }"#;
+        let restored = serde_json::from_str::<GeometricThought>(json);
+        assert!(restored.is_err());
     }
 
     #[test]
