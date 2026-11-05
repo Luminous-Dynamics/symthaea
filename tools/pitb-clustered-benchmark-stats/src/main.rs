@@ -380,6 +380,39 @@ fn validate_run(run: &ProofRun, task: &Task) -> Result<(), String> {
     Ok(())
 }
 
+fn validate_strategy_coverage(
+    tasks: &BTreeMap<String, Task>,
+    strategies: &BTreeMap<String, AggregatedStrategy>,
+) -> Result<(), String> {
+    for (id, strategy) in strategies {
+        let expected: BTreeSet<&str> = tasks.keys().map(String::as_str).collect();
+        let observed: BTreeSet<&str> = strategy.outcomes.keys().map(String::as_str).collect();
+        if observed != expected {
+            let missing = expected.difference(&observed).take(5).copied().collect::<Vec<_>>();
+            let extra = observed.difference(&expected).take(5).copied().collect::<Vec<_>>();
+            return Err(format!(
+                "strategy {id} does not cover the exact frozen task set; missing={missing:?}, extra={extra:?}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_pair_coverage(
+    tasks: &BTreeMap<String, Task>,
+    strategies: &BTreeMap<String, AggregatedStrategy>,
+    left_id: &str,
+    right_id: &str,
+) -> Result<(), String> {
+    let left = strategies.get(left_id).ok_or("left strategy ID was not found")?;
+    let right = strategies.get(right_id).ok_or("right strategy ID was not found")?;
+    let pair = BTreeMap::from([
+        (left_id.to_owned(), left.clone()),
+        (right_id.to_owned(), right.clone()),
+    ]);
+    validate_strategy_coverage(tasks, &pair)
+}
+
 fn load_runs(bytes: &[u8], tasks: &BTreeMap<String, Task>) -> Result<BTreeMap<String, AggregatedStrategy>, String> {
     let text = std::str::from_utf8(bytes).map_err(|e| format!("proof-runs JSONL is not UTF-8: {e}"))?;
     let mut strategies = BTreeMap::<String, AggregatedStrategy>::new();
@@ -446,14 +479,7 @@ fn load_runs(bytes: &[u8], tasks: &BTreeMap<String, Task>) -> Result<BTreeMap<St
     if strategies.len() < 2 {
         return Err("at least two distinct strategy identities are required for a paired comparison".into());
     }
-    for (id, strategy) in &strategies {
-        if strategy.outcomes.len() != tasks.len() {
-            return Err(format!(
-                "strategy {id} covers {} unique tasks, expected all {} evaluation tasks; no silent missing-task denominator",
-                strategy.outcomes.len(), tasks.len()
-            ));
-        }
-    }
+    validate_strategy_coverage(tasks, &strategies)?;
     Ok(strategies)
 }
 
@@ -567,6 +593,7 @@ fn compare(
     }
     let left = strategies.get(left_id).ok_or("left strategy ID was not found in proof-run JSONL")?;
     let right = strategies.get(right_id).ok_or("right strategy ID was not found in proof-run JSONL")?;
+    validate_pair_coverage(tasks, strategies, left_id, right_id)?;
     let task_count = tasks.len();
     let left_unique = left.outcomes.values().filter(|x| x.solved).count();
     let right_unique = right.outcomes.values().filter(|x| x.solved).count();
@@ -940,6 +967,6 @@ mod tests {
             });
         }
         let map: BTreeMap<String,Task> = tasks.into_iter().map(|t|(t.id.clone(),t)).collect();
-        assert!(strategies.values().any(|s| s.outcomes.len()!=map.len()));
+        assert!(validate_strategy_coverage(&map, &strategies).is_err());
     }
 }
