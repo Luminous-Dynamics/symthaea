@@ -102,6 +102,12 @@ pub enum CfCWeightLoadError {
     GroupLengthMismatch { name: String, expected: usize, actual: usize },
     /// A manifest range does not fit within the serialized parameter vector.
     ManifestRangeOutOfBounds { name: String },
+    /// The proposal was generated against a different model revision.
+    StaleModelFingerprint { expected: String, actual: String },
+    /// Fingerprinting failed before the edit could be checked.
+    FingerprintFailed { reason: String },
+    /// A batch attempted to edit the same parameter group more than once.
+    DuplicateParameterGroup { name: String },
     /// A parameter contains NaN or infinity.
     NonFiniteValue { index: usize },
     /// A time constant is below the numerical stability floor.
@@ -128,6 +134,16 @@ impl std::fmt::Display for CfCWeightLoadError {
             Self::ManifestRangeOutOfBounds { name } => {
                 write!(f, "CfC parameter group {name} is outside the serialized weight vector")
             },
+            Self::StaleModelFingerprint { expected, actual } => write!(
+                f,
+                "stale CfC edit proposal: expected model {expected}, current model is {actual}"
+            ),
+            Self::FingerprintFailed { reason } => {
+                write!(f, "could not fingerprint CfC model before edit: {reason}")
+            }
+            Self::DuplicateParameterGroup { name } => {
+                write!(f, "CfC edit batch targets parameter group more than once: {name}")
+            }
             Self::NonFiniteValue { index } => {
                 write!(f, "CfC weight at flat index {index} is not finite")
             }
@@ -201,6 +217,15 @@ pub struct CfCParameterGroup {
     pub offset: usize,
     /// Number of scalar parameters in this group.
     pub len: usize,
+}
+
+/// One owned replacement in a transactional CfC parameter-edit batch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CfCParameterGroupReplacement {
+    /// Typed identity of the group to replace.
+    pub id: CfCParameterGroupId,
+    /// Complete replacement values in the group's declared flat order.
+    pub values: Vec<f32>,
 }
 
 /// Versioned, architecture-aware description of a CfCNetwork parameter vector.
@@ -1347,46 +1372,90 @@ impl CfCNetwork {
         }
     }
 
-    /// Replace exactly one named parameter group from the architecture-aware manifest.
+    /// Apply multiple named parameter-group replacements transactionally.
     ///
-    /// The replacement is applied to a candidate flat vector and passed through
-    /// [`Self::try_set_weights`], so malformed values or invalid time constants
-    /// are rejected before any live parameter is changed.
-    pub fn try_replace_parameter_group(
+    /// The expected model digest is a hard precondition. All target groups,
+    /// duplicate IDs, exact lengths, and ranges are validated against one
+    /// manifest before the candidate is passed to try_set_weights(). The live
+    /// network is changed only once, after the complete batch validates.
+    pub fn try_apply_parameter_group_replacements(
         &mut self,
-        id: &CfCParameterGroupId,
-        values: &[f32],
+        expected_model_digest: &str,
+        edits: &[CfCParameterGroupReplacement],
     ) -> Result<(), CfCWeightLoadError> {
-        let manifest = self.parameter_manifest();
-        let group = manifest
-            .groups
-            .iter()
-            .find(|group| &group.id == id)
-            .cloned()
-            .ok_or_else(|| CfCWeightLoadError::UnknownParameterGroup {
-                name: format!("{id:?}"),
-            })?;
+        let actual_model_digest = self
+            .fingerprint()
+            .map_err(|reason| CfCWeightLoadError::FingerprintFailed { reason })?
+            .model_digest;
 
-        if values.len() != group.len {
-            return Err(CfCWeightLoadError::GroupLengthMismatch {
-                name: group.name,
-                expected: group.len,
-                actual: values.len(),
+        if actual_model_digest != expected_model_digest {
+            return Err(CfCWeightLoadError::StaleModelFingerprint {
+                expected: expected_model_digest.to_string(),
+                actual: actual_model_digest,
             });
         }
 
-        let end = group
-            .offset
-            .checked_add(group.len)
-            .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+        if edits.is_empty() {
+            return Ok(());
+        }
+
+        let manifest = self.parameter_manifest();
         let mut candidate = self.get_weights();
-        let target = candidate
-            .get_mut(group.offset..end)
-            .ok_or_else(|| CfCWeightLoadError::ManifestRangeOutOfBounds {
-                name: group.name.clone(),
-            })?;
-        target.copy_from_slice(values);
+        let mut seen = std::collections::HashSet::with_capacity(edits.len());
+
+        for edit in edits {
+            if !seen.insert(edit.id.clone()) {
+                return Err(CfCWeightLoadError::DuplicateParameterGroup {
+                    name: format!("{:?}", edit.id),
+                });
+            }
+
+            let group = manifest
+                .groups
+                .iter()
+                .find(|group| group.id == edit.id)
+                .ok_or_else(|| CfCWeightLoadError::UnknownParameterGroup {
+                    name: format!("{:?}", edit.id),
+                })?;
+
+            if edit.values.len() != group.len {
+                return Err(CfCWeightLoadError::GroupLengthMismatch {
+                    name: group.name.clone(),
+                    expected: group.len,
+                    actual: edit.values.len(),
+                });
+            }
+
+            let end = group
+                .offset
+                .checked_add(group.len)
+                .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+            let target = candidate
+                .get_mut(group.offset..end)
+                .ok_or_else(|| CfCWeightLoadError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            target.copy_from_slice(&edit.values);
+        }
+
         self.try_set_weights(&candidate)
+    }
+
+    /// Replace one typed parameter group against an exact base-model fingerprint.
+    ///
+    /// Use this method for external/editor-generated proposals so a stale proposal
+    /// cannot silently overwrite newer training updates.
+    pub fn try_replace_parameter_group(
+        &mut self,
+        expected_model_digest: &str,
+        id: &CfCParameterGroupId,
+        values: &[f32],
+    ) -> Result<(), CfCWeightLoadError> {
+        let edit = CfCParameterGroupReplacement {
+            id: id.clone(),
+            values: values.to_vec(),
+        };
+        self.try_apply_parameter_group_replacements(expected_model_digest, &[edit])
     }
 
     /// Extract all learnable weights into a flat `Vec<f32>`.
@@ -2077,6 +2146,115 @@ mod tests {
             Err(CfCWeightLoadError::GroupLengthMismatch { .. })
         ));
         assert_eq!(net.get_weights(), before);
+    }
+
+    // ---------------------------------------------------------------
+    // 15. model-digest preconditions and transactional edit batches
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_parameter_edit_rejects_stale_model_fingerprint() {
+        let mut net = CfCNetwork::new(small_config());
+        let stale_digest = net.fingerprint().unwrap().model_digest;
+        let before = net.get_weights();
+        let mut changed = before.clone();
+        changed[0] += 0.1;
+        net.try_set_weights(&changed).unwrap();
+        let current = net.get_weights();
+
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap();
+        let result = net.try_replace_parameter_group(
+            &stale_digest,
+            &group.id,
+            &vec![0.0; group.len],
+        );
+
+        assert!(matches!(
+            result,
+            Err(CfCWeightLoadError::StaleModelFingerprint { .. })
+        ));
+        assert_eq!(net.get_weights(), current);
+    }
+
+    #[test]
+    fn test_parameter_edit_batch_rejects_duplicate_groups_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let digest = net.fingerprint().unwrap().model_digest;
+        let before = net.get_weights();
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap();
+        let edit = CfCParameterGroupReplacement {
+            id: group.id.clone(),
+            values: vec![0.0; group.len],
+        };
+
+        let result = net.try_apply_parameter_group_replacements(
+            &digest,
+            &[edit.clone(), edit],
+        );
+        assert!(matches!(
+            result,
+            Err(CfCWeightLoadError::DuplicateParameterGroup { .. })
+        ));
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_parameter_edit_batch_applies_multiple_groups_atomically() {
+        let mut net = CfCNetwork::new(small_config());
+        let digest = net.fingerprint().unwrap().model_digest;
+        let before = net.get_weights();
+        let manifest = net.parameter_manifest();
+        let bias = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap();
+        let output_bias = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "output_bias")
+            .unwrap();
+        let edits = [
+            CfCParameterGroupReplacement {
+                id: bias.id.clone(),
+                values: vec![0.125; bias.len],
+            },
+            CfCParameterGroupReplacement {
+                id: output_bias.id.clone(),
+                values: vec![-0.25; output_bias.len],
+            },
+        ];
+
+        assert!(net
+            .try_apply_parameter_group_replacements(&digest, &edits)
+            .is_ok());
+
+        let after = net.get_weights();
+        for edit in &edits {
+            let group = manifest.groups.iter().find(|group| group.id == edit.id).unwrap();
+            assert_eq!(
+                &after[group.offset..group.offset + group.len],
+                edit.values.as_slice()
+            );
+        }
+        for index in 0..before.len() {
+            let edited = edits.iter().any(|edit| {
+                let group = manifest.groups.iter().find(|group| group.id == edit.id).unwrap();
+                (group.offset..group.offset + group.len).contains(&index)
+            });
+            if !edited {
+                assert_eq!(after[index], before[index], "unexpected change at {index}");
+            }
+        }
     }
 
     // ---------------------------------------------------------------
