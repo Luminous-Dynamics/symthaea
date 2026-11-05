@@ -1421,6 +1421,67 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         });
     }
 
+    let mut scenario_challenge_ids = BTreeSet::new();
+    let mut scenario_challenge_results =
+        Vec::with_capacity(input.scenario_challenges.len());
+    for challenge in &input.scenario_challenges {
+        if !scenario_challenge_ids.insert(challenge.challenge_id.as_str()) {
+            return Err(format!(
+                "duplicate scenario challenge ID {}",
+                challenge.challenge_id
+            ));
+        }
+        let (challenge_sha256, expanded_input, added_scenario_count) =
+            expand_scenario_space(input, challenge, &action_ids)?;
+        let (expanded_action_ids, expanded_tuples) = validate(&expanded_input)?;
+        let expanded_scenarios = sorted_scenarios(&expanded_input.scenarios);
+        let expanded_actions = sorted_actions(&expanded_input.actions);
+        let expanded_action_effort = expanded_actions
+            .iter()
+            .map(|action| action.effort_units)
+            .collect::<Vec<_>>();
+        let (expanded_solution, _expanded_state_count) = solve_adaptive_policy(
+            &expanded_action_ids,
+            &expanded_action_effort,
+            &expanded_scenarios,
+            &expanded_tuples,
+        )?;
+        let expanded_fixed = minimum_fixed_plan(
+            &expanded_action_ids,
+            &expanded_action_effort,
+            &expanded_scenarios,
+            &expanded_tuples,
+            expanded_input.max_total_effort_units,
+        )?;
+        let adaptive_before = solution.as_ref().map(|policy| policy.worst_case_cost);
+        let adaptive_after = expanded_solution
+            .as_ref()
+            .map(|policy| policy.worst_case_cost);
+        let fixed_before = fixed_non_adaptive_optimum.minimum_effort_units;
+        let fixed_after = expanded_fixed.minimum_effort_units;
+        let adaptive_non_decreasing =
+            effort_is_non_decreasing(adaptive_before, adaptive_after);
+        let fixed_non_decreasing = effort_is_non_decreasing(fixed_before, fixed_after);
+        scenario_challenge_results.push(ScenarioExpansionResult {
+            challenge_id: challenge.challenge_id.clone(),
+            challenge_sha256,
+            expanded_scenario_set_sha256: expanded_input.scenario_set_sha256,
+            expanded_joint_support_sha256: expanded_input.joint_support_sha256,
+            added_scenario_count,
+            adaptive_worst_case_effort_before: adaptive_before,
+            adaptive_worst_case_effort_after: adaptive_after,
+            adaptive_status_before: adaptive_status(&solution).to_string(),
+            adaptive_status_after: adaptive_status(&expanded_solution).to_string(),
+            adaptive_effort_non_decreasing: adaptive_non_decreasing,
+            fixed_minimum_effort_before: fixed_before,
+            fixed_minimum_effort_after: fixed_after,
+            fixed_status_before: fixed_status(&fixed_non_adaptive_optimum).to_string(),
+            fixed_status_after: fixed_status(&expanded_fixed).to_string(),
+            fixed_effort_non_decreasing: fixed_non_decreasing,
+            monotonicity_passed: adaptive_non_decreasing && fixed_non_decreasing,
+        });
+    }
+
     let (
         worst_case,
         min_path,
@@ -1469,10 +1530,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     let support_expansion_monotonicity_passed = support_challenge_results
         .iter()
         .all(|challenge| challenge.monotonicity_passed);
-    let reported_status = if support_expansion_monotonicity_passed {
-        status
-    } else {
+    let hypothesis_expansion_monotonicity_passed = scenario_challenge_results
+        .iter()
+        .all(|challenge| challenge.monotonicity_passed);
+    let reported_status = if !support_expansion_monotonicity_passed {
         "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+    } else if !hypothesis_expansion_monotonicity_passed {
+        "HYPOTHESIS_EXPANSION_MONOTONICITY_VIOLATION"
+    } else {
+        status
     };
 
     Ok(Report {
@@ -1503,13 +1569,16 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         support_challenge_count: support_challenge_results.len(),
         support_challenges: support_challenge_results,
         support_expansion_monotonicity_passed,
+        scenario_challenge_count: scenario_challenge_results.len(),
+        scenario_challenges: scenario_challenge_results,
+        hypothesis_expansion_monotonicity_passed,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         probability_claim: "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
         status: reported_status,
         search_complete: true,
-        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; scenario challenges append new worlds without altering the base universe. A monotonicity pass does not prove scenario-space completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     })
 }
 
@@ -1553,7 +1622,9 @@ fn main() -> ExitCode {
     } else {
         print!("{rendered}");
     }
-    if !report.support_expansion_monotonicity_passed {
+    if !report.support_expansion_monotonicity_passed
+        || !report.hypothesis_expansion_monotonicity_passed
+    {
         return ExitCode::from(4);
     }
     ExitCode::SUCCESS
