@@ -269,6 +269,7 @@ No status may be promoted solely because a local Fisher-information score is fav
 - Known-truth observer and measurement-channel DGP (Gaussian / variance-standardized Student-t, lapse, criterion drift, independent participant effects, evidence-dependent missingness and quantized RT) — [issue #10555](https://github.com/Luminous-Dynamics/symthaea/issues/10555), [draft PR #10559](https://github.com/Luminous-Dynamics/symthaea/pull/10559).
 - Simultaneous bounded-score Monte Carlo uncertainty with one-sided Hoeffding bounds and Bonferroni familywise control — [issue #10557](https://github.com/Luminous-Dynamics/symthaea/issues/10557), [draft PR #10560](https://github.com/Luminous-Dynamics/symthaea/pull/10560).
 - Per-participant fail-closed conversion of observed categories to UVSD fitter tables, with explicit missingness dispositions — [issue #10561](https://github.com/Luminous-Dynamics/symthaea/issues/10561), [draft PR #10562](https://github.com/Luminous-Dynamics/symthaea/pull/10562).
+- End-to-end known-truth DGP → observed-only adapter → UVSD recovery runner with randomized balanced schedules, failure-inclusive output and Wilson fit-availability intervals — [issue #10567](https://github.com/Luminous-Dynamics/symthaea/issues/10567), [draft PR #10572](https://github.com/Luminous-Dynamics/symthaea/pull/10572).
 - Policy interface with deterministic replay and propensity receipts ([draft PR #10493](https://github.com/Luminous-Dynamics/symthaea/pull/10493)).
 - Fixed, QUEST+-style and one-step EIG baselines.
 - Goal-oriented and model-discrimination utilities.
