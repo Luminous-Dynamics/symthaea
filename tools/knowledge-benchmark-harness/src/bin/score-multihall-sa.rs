@@ -1662,7 +1662,9 @@ mod tests {
             pair("document-3", "pair-y", "Sepedi", "numerical inaccuracy"),
             pair("document-4", "pair-z", "Sesotho", "location mistake"),
         ])
-        .expect("same pair_id in two source documents is valid within a complete language manifest");
+        .expect(
+            "same pair_id in two source documents is valid within a complete language manifest",
+        );
         assert_eq!(validated.len(), 5);
         assert_ne!(pair_key(&first), pair_key(&second));
     }
