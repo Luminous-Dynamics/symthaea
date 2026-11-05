@@ -52,5 +52,6 @@
     "invalid_and_saturated_tasks_retained": true,
     "release_comparison_rule": "Compare results only within compatible release inputs. Major agent-visible input changes require a new full rerun; minor verifier changes require regrade if raw artifacts are complete or affected-task rerun otherwise; patch metadata changes permit reuse only when evaluation-input digests are identical."
   },
-  "claim_boundary": "Design-only initial CEB release policy. No benchmark task, grader, resource envelope, saturation state or runner has been qualified."
+  "claim_boundary": "Design-only initial CEB release policy. No benchmark task, grader, resource envelope, saturation state or runner has been qualified.",
+  "previous_evaluation_input_sha256": null
 }
