@@ -665,6 +665,7 @@ fn instrument_sorry_span(
     start_column: u64,
     end_line: u64,
     end_column: u64,
+    capture_tactic: &str,
     begin_marker: &str,
     end_marker: &str,
 ) -> Result<String, String> {
@@ -673,8 +674,12 @@ fn instrument_sorry_span(
         || begin_marker == end_marker
         || source.contains(begin_marker)
         || source.contains(end_marker)
+        || source.contains(capture_tactic)
+        || !capture_tactic
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
     {
-        return Err("goal trace markers must be distinct and absent from the committed source".into());
+        return Err("goal capture identifiers must be valid, distinct, and absent from the committed source".into());
     }
     let start = position_to_byte_index(source, start_line, start_column)?;
     let end = position_to_byte_index(source, end_line, end_column)?;
@@ -689,36 +694,48 @@ fn instrument_sorry_span(
         .chars()
         .take_while(|character| matches!(character, ' ' | '\t'))
         .collect();
-    // An inline proof needs an indented continuation; an existing tactic block
-    // keeps the indentation of its committed sorry token.
     let tactic_indent = if leading_indent.is_empty() {
         "  ".to_owned()
     } else {
         leading_indent
     };
 
-    let mut instrumented = String::with_capacity(source.len() + 160);
-    instrumented.push_str(&source[..start]);
-    // Put the first instrumentation tactic on its own layout line. A SorryDB
-    // record can point to an inline by-sorry; appending trace on that line
-    // followed by an indented continuation makes Lean's tactic layout depend
-    // on the surrounding term's line structure.
-    let last_line_start = instrumented
+    // The info view emitted by trace_state is not guaranteed to reach batch
+    // compiler stdout/stderr. Define a task-unique tactic that renders the
+    // actual metavariable goal and emits it with dbg_trace.
+    let import_block_end = source
+        .find("\n\n")
+        .map(|index| index + 2)
+        .ok_or("cannot locate the import preamble boundary in Lean source")?;
+    let tactic_declaration = format!(
+        "elab \"{capture_tactic}\" : tactic => do\n\
+         \x20 let goal ← Lean.Elab.Tactic.getMainGoal\n\
+         \x20 let rendered ← Lean.Meta.ppGoal goal\n\
+         \x20 dbg_trace f!\"{begin_marker}\\n{{rendered}}\\n{end_marker}\"\n\n"
+    );
+    let import_prefix = "import Lean\n";
+    let mut instrumented = String::with_capacity(source.len() + tactic_declaration.len() + 32);
+    instrumented.push_str(import_prefix);
+    instrumented.push_str(&source[..import_block_end]);
+    instrumented.push_str(&tactic_declaration);
+    instrumented.push_str(&source[import_block_end..]);
+
+    let shifted_start = import_prefix.len() + tactic_declaration.len() + start;
+    let shifted_end = import_prefix.len() + tactic_declaration.len() + end;
+    let adjusted_line_start = instrumented[..shifted_start]
         .rfind('\n')
         .map(|index| index + 1)
         .unwrap_or(0);
-    if instrumented[last_line_start..].trim().is_empty() {
-        // Remove whitespace-only indentation already present before the sorry.
-        // The inserted tactic block supplies exactly one copy of that indent.
-        instrumented.truncate(last_line_start);
-    } else if !instrumented.ends_with('\n') {
-        instrumented.push('\n');
+    let mut rewritten = String::with_capacity(instrumented.len() + 64);
+    rewritten.push_str(&instrumented[..shifted_start]);
+    if instrumented[adjusted_line_start..shifted_start].trim().is_empty() {
+        rewritten.truncate(rewritten.len() - (shifted_start - adjusted_line_start));
+    } else if !rewritten.ends_with('\n') {
+        rewritten.push('\n');
     }
-    instrumented.push_str(&format!(
-        "{tactic_indent}trace \"{begin_marker}\"\n{tactic_indent}trace_state\n{tactic_indent}trace \"{end_marker}\"\n{tactic_indent}sorry"
-    ));
-    instrumented.push_str(&source[end..]);
-    Ok(instrumented)
+    rewritten.push_str(&format!("{tactic_indent}{capture_tactic}\n{tactic_indent}sorry"));
+    rewritten.push_str(&instrumented[shifted_end..]);
+    Ok(rewritten)
 }
 
 fn replay_goal_with_lake(
@@ -736,12 +753,14 @@ fn replay_goal_with_lake(
     let marker_tag = sha256(record.id.as_bytes())[..16].to_owned();
     let begin_marker = format!("PITB_SORRYDB_GOAL_BEGIN_{marker_tag}");
     let end_marker = format!("PITB_SORRYDB_GOAL_END_{marker_tag}");
+    let capture_tactic = format!("pitbCapture{marker_tag}");
     let instrumented = instrument_sorry_span(
         source,
         record.location.start_line,
         record.location.start_column,
         record.location.end_line,
         record.location.end_column,
+        &capture_tactic,
         &begin_marker,
         &end_marker,
     )?;
@@ -1782,8 +1801,10 @@ mod tests {
         let line = source.lines().next().unwrap();
         let byte_start = line.find("sorry").unwrap();
         let start = line[..byte_start].chars().count() as u64;
-        let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5, "PITB_BEGIN", "PITB_END").unwrap();
-        assert!(instrumented.contains("by \n  trace \"PITB_BEGIN\"\n  trace_state\n  trace \"PITB_END\"\n  sorry"));
+        let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5, "pitbCaptureInline", "PITB_BEGIN", "PITB_END").unwrap();
+        assert!(instrumented.contains("by \n  pitbCaptureInline\n  sorry"));
+        assert!(instrumented.contains("Lean.Meta.ppGoal goal"));
+        assert!(instrumented.contains("dbg_trace f!\"PITB_BEGIN\\n{rendered}\\nPITB_END\""));
         assert_eq!(source.matches("sorry").count(), 1);
         assert_eq!(instrumented.matches("sorry").count(), 1);
     }
@@ -1791,8 +1812,8 @@ mod tests {
     #[test]
     fn instrumentation_preserves_nested_tactic_indentation() {
         let source = "theorem nested : True := by\n  sorry\n";
-        let instrumented = instrument_sorry_span(source, 2, 2, 2, 7, "PITB_BEGIN", "PITB_END").unwrap();
-        assert!(instrumented.contains("by\n  trace \"PITB_BEGIN\"\n  trace_state\n  trace \"PITB_END\"\n  sorry\n"));
+        let instrumented = instrument_sorry_span(source, 2, 2, 2, 7, "pitbCaptureNested", "PITB_BEGIN", "PITB_END").unwrap();
+        assert!(instrumented.contains("by\n  pitbCaptureNested\n  sorry\n"));
     }
 
     #[test]
