@@ -1,0 +1,51 @@
+name: Signed connectome evidence envelope verification
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/Cargo.toml"
+      - "tools/connectomics-intake-audit/src/bin/connectome_evidence_attestation_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_signed_evidence_envelope_oracle.py"
+      - "docs/neuroscience/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE_V1.md"
+      - "docs/neuroscience/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE.schema.json"
+      - "docs/neuroscience/CONNECTOME_EVIDENCE_TRUST_POLICY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_*.example.json"
+      - ".github/workflows/connectome-signed-evidence-envelope.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/Cargo.toml"
+      - "tools/connectomics-intake-audit/src/bin/connectome_evidence_attestation_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_signed_evidence_envelope_oracle.py"
+      - "docs/neuroscience/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE_V1.md"
+      - "docs/neuroscience/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE.schema.json"
+      - "docs/neuroscience/CONNECTOME_EVIDENCE_TRUST_POLICY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_*.example.json"
+      - ".github/workflows/connectome-signed-evidence-envelope.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-signed-evidence:
+    name: DSSE Ed25519 trust-policy verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check Rust formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_evidence_attestation_audit.rs
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_evidence_attestation_audit -- -D warnings
+      - name: Run signature and policy negative controls
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_evidence_attestation_audit
+      - name: Verify signed synthetic evidence fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_evidence_attestation_audit --             --envelope docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE.example.json             --trust-policy docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_TRUST_POLICY.example.json             --expected-trust-policy-sha256 0cb8afc26e7aafe3d212c65120ae8ef6a080be8bf75cce0f84412b2fa07d045e             --verification-time-unix 1793900000             --output "$RUNNER_TEMP/connectome-signed-evidence-receipt.json"
+          python3 tools/connectomics-intake-audit/reference/verify_signed_evidence_envelope_oracle.py             --envelope docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE.example.json             --trust-policy docs/neuroscience/examples/CONNECTOME_SIGNED_EVIDENCE_TRUST_POLICY.example.json             --expected-trust-policy-sha256 0cb8afc26e7aafe3d212c65120ae8ef6a080be8bf75cce0f84412b2fa07d045e             --verification-time-unix 1793900000             --report "$RUNNER_TEMP/connectome-signed-evidence-receipt.json"
+      - name: Verify independent oracle syntax
+        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_signed_evidence_envelope_oracle.py
