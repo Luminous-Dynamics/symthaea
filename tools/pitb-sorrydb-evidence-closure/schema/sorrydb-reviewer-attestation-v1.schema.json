@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-reviewer-attestation-v1.schema.json",
+  "title": "PITB SorryDB signed semantic reviewer attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonicalization",
+    "key_id",
+    "reviewer_id",
+    "run_id",
+    "task_id",
+    "goal_sha256",
+    "declaration_signature_sha256",
+    "source_binding_receipt_sha256",
+    "source_correspondence_status",
+    "hypothesis_audit_status",
+    "vacuity_audit_status",
+    "reviewer_decision",
+    "semantic_log_sha256",
+    "signature_ed25519_hex"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-reviewer-attestation.v1"
+    },
+    "canonicalization": {
+      "const": "serde-json-map-sorted-compact-v0"
+    },
+    "key_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_signature_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_binding_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_correspondence_status": {
+      "const": "pass"
+    },
+    "hypothesis_audit_status": {
+      "const": "pass"
+    },
+    "vacuity_audit_status": {
+      "const": "pass"
+    },
+    "reviewer_decision": {
+      "const": "pass"
+    },
+    "semantic_log_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "signature_ed25519_hex": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{128}$"
+    }
+  }
+}
