@@ -642,7 +642,7 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         language: language.to_string(),
         hallucination_type,
         statement_count: rows.len(),
-        pair_count: rows.iter().map(|row| row.pair.pair_id.as_str()).collect::<HashSet<_>>().len(),
+        pair_count: rows.iter().map(|row| pair_key(&row.pair)).collect::<HashSet<_>>().len(),
         factual_count,
         hallucinated_count,
         true_positive: tp,
@@ -1164,6 +1164,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn duplicate_pair_ids_are_disambiguated_by_source_document() {
+        let pair = |file_id: &str| PairMeta {
+            schema_version: "multi-hall-sa-pair-v0".into(),
+            pair_id: "English_isiZulu_fact0_temporal_shift".into(),
+            file_id: file_id.into(),
+            fact_index: 0,
+            language: "isiZulu".into(),
+            hallucination_type: "temporal shift".into(),
+        };
+        let validated = validate_pairs(&[pair("document-0"), pair("document-1")])
+            .expect("same pair_id in two source documents is valid");
+        assert_eq!(validated.len(), 2);
+        assert_ne!(pair_key(&pair("document-0")), pair_key(&pair("document-1")));
+    }
+
+    #[test]
     fn splitmix_is_deterministic() {
         let mut left = SplitMix64::new(42);
         let mut right = SplitMix64::new(42);
@@ -1202,6 +1218,10 @@ mod tests {
             plan_id: "plan".into(),
             system_id: "system".into(),
             pair_id: "pair-1".into(),
+            file_id: "document-1".into(),
+            fact_index: 0,
+            language: "isiZulu".into(),
+            hallucination_type: "temporal shift".into(),
             statement_language: "target".into(),
             statement_kind: "factual".into(),
             predicted_label: "factual".into(),
@@ -1217,6 +1237,10 @@ mod tests {
             plan_id: "plan".into(),
             system_id: "system".into(),
             pair_id: "pair-1".into(),
+            file_id: "document-1".into(),
+            fact_index: 0,
+            language: "isiZulu".into(),
+            hallucination_type: "temporal shift".into(),
             statement_language: "target".into(),
             statement_kind: "hallucinated".into(),
             predicted_label: "abstain".into(),
