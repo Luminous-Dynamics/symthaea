@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/multi-hall-sa-score-report-v0.schema.json",
+  "title": "Multi-Hall-SA deterministic score report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "phase",
+    "synthetic_only",
+    "dataset_id",
+    "dataset_revision",
+    "dataset_license",
+    "plan_sha256",
+    "pair_manifest_sha256",
+    "results_sha256",
+    "pair_count",
+    "result_count",
+    "cluster_count",
+    "minimum_independent_clusters",
+    "bootstrap_replicates",
+    "bootstrap_seed",
+    "confidence_level",
+    "multiple_comparison_correction",
+    "systems",
+    "nonclaims",
+    "tool_version",
+    "system_comparisons",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "multi-hall-sa-score-report-v0"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "phase": {
+      "type": "string"
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "plan_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "pair_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "results_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "cluster_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "systems": {
+      "type": "array"
+    },
+    "nonclaims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dataset_id": {
+      "type": "string"
+    },
+    "dataset_revision": {
+      "type": "string"
+    },
+    "dataset_license": {
+      "type": "string"
+    },
+    "pair_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "result_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minimum_independent_clusters": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bootstrap_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence_level": {
+      "type": "number",
+      "exclusiveMinimum": 0.5,
+      "exclusiveMaximum": 1
+    },
+    "multiple_comparison_correction": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bonferroni"
+      ]
+    },
+    "tool_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system_comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "baseline_system_id",
+          "candidate_system_id",
+          "language",
+          "pair_count",
+          "cluster_count",
+          "baseline_pair_balanced_accuracy",
+          "candidate_pair_balanced_accuracy",
+          "paired_accuracy_difference",
+          "bootstrap_ci",
+          "inference_eligible",
+          "note"
+        ],
+        "properties": {
+          "baseline_system_id": {
+            "type": "string"
+          },
+          "candidate_system_id": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cluster_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "baseline_pair_balanced_accuracy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "candidate_pair_balanced_accuracy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "paired_accuracy_difference": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "bootstrap_ci": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lower",
+                  "upper",
+                  "confidence_level",
+                  "familywise_adjusted",
+                  "comparison_count",
+                  "replicates",
+                  "seed",
+                  "cluster_count"
+                ],
+                "properties": {
+                  "lower": {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                  },
+                  "upper": {
+                    "type": "number",
+                    "minimum": -1,
+                    "maximum": 1
+                  },
+                  "confidence_level": {
+                    "type": "number",
+                    "exclusiveMinimum": 0.5,
+                    "exclusiveMaximum": 1
+                  },
+                  "familywise_adjusted": {
+                    "type": "boolean"
+                  },
+                  "comparison_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "replicates": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "cluster_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            ]
+          },
+          "inference_eligible": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_evidence_tokens",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_retrieval_calls",
+        "max_latency_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "max_evidence_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_retrieval_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_latency_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_microusd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

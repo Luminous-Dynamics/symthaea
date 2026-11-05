@@ -755,21 +755,22 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
             ));
         }
         if severity == "release_blocker"
-            && (failure_tags.is_empty() || failure_tags.iter().any(|tag| tag == "none"))
+            && (failure_tags.is_empty() || failure_tags.iter().any(|tag| *tag == "none"))
         {
             errors.push(format!(
                 "claim {:?}: release_blocker requires explicit non-none failure tags",
                 string_field(claim, "claim_id").unwrap_or("<missing>")
             ));
         }
-        if failure_tags.iter().any(|tag| tag == "rights_violation") && severity != "release_blocker"
+        if failure_tags.iter().any(|tag| *tag == "rights_violation")
+            && severity != "release_blocker"
         {
             errors.push(format!(
                 "claim {:?}: rights_violation must be a release_blocker",
                 string_field(claim, "claim_id").unwrap_or("<missing>")
             ));
         }
-        if failure_tags.iter().any(|tag| tag == "none") && failure_tags.len() > 1 {
+        if failure_tags.iter().any(|tag| *tag == "none") && failure_tags.len() > 1 {
             errors.push(format!(
                 "claim {:?}: failure tag none cannot be combined with an error tag",
                 string_field(claim, "claim_id").unwrap_or("<missing>")
@@ -1874,6 +1875,7 @@ mod tests {
         let pair = json!({
             "split":"synthetic",
             "synthetic_only":true,
+            "source_family_ids":["SYN-FAMILY-SYN-RESTRICTED-RECORD"],
             "dimension": "rights_revocation",
             "expected_relation": "deny_access",
             "baseline": {

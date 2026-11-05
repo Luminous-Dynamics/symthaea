@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/multi-hall-sa-result-v0.schema.json",
+  "title": "Multi-Hall-SA statement-level prediction receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_id",
+    "plan_id",
+    "system_id",
+    "pair_id",
+    "statement_language",
+    "statement_kind",
+    "predicted_label",
+    "file_id",
+    "fact_index",
+    "language",
+    "hallucination_type",
+    "evidence_tokens",
+    "latency_ms",
+    "input_tokens",
+    "output_tokens",
+    "retrieval_calls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "multi-hall-sa-result-v0"
+    },
+    "result_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "statement_language": {
+      "type": "string",
+      "enum": [
+        "english",
+        "target"
+      ]
+    },
+    "statement_kind": {
+      "type": "string",
+      "enum": [
+        "factual",
+        "hallucinated"
+      ]
+    },
+    "predicted_label": {
+      "type": "string",
+      "enum": [
+        "factual",
+        "hallucinated",
+        "abstain"
+      ]
+    },
+    "p_hallucinated": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retrieval_calls": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "file_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fact_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "language": {
+      "type": "string",
+      "enum": [
+        "isiZulu",
+        "isiXhosa",
+        "Sepedi",
+        "Sesotho"
+      ]
+    },
+    "hallucination_type": {
+      "type": "string",
+      "enum": [
+        "temporal shift",
+        "entity error",
+        "numerical inaccuracy",
+        "location mistake"
+      ]
+    },
+    "evidence_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    }
+  }
+}

@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/multi-hall-sa-plan-v0.schema.json",
+  "title": "Multi-Hall-SA preregistered comparison plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "phase",
+    "synthetic_only",
+    "candidate_system_id",
+    "dataset",
+    "systems",
+    "bootstrap",
+    "budget"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "multi-hall-sa-plan-v0"
+    },
+    "plan_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "synthetic_control",
+        "development_pilot",
+        "preregistered_held_out"
+      ]
+    },
+    "synthetic_only": {
+      "type": "boolean"
+    },
+    "candidate_system_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "revision",
+        "license",
+        "pair_manifest_sha256",
+        "source_family_disjoint",
+        "rights_review_status",
+        "held_out_access",
+        "source_cluster_semantics_reviewed",
+        "split"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_family_disjoint": {
+          "type": "boolean"
+        },
+        "rights_review_status": {
+          "type": "string",
+          "enum": [
+            "approved",
+            "pending",
+            "denied",
+            "not_applicable_synthetic"
+          ]
+        },
+        "held_out_access": {
+          "type": "string",
+          "enum": [
+            "sealed_until_freeze",
+            "independent_evaluator",
+            "public",
+            "not_applicable_synthetic"
+          ]
+        },
+        "source_cluster_semantics_reviewed": {
+          "type": "boolean"
+        },
+        "split": {
+          "type": "string",
+          "enum": [
+            "synthetic",
+            "development",
+            "validation",
+            "test",
+            "holdout"
+          ]
+        }
+      }
+    },
+    "systems": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "system_id",
+          "baseline_family",
+          "model_id",
+          "model_revision"
+        ],
+        "properties": {
+          "system_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retrieval_profile_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "prompt_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replicates",
+        "seed",
+        "minimum_independent_clusters",
+        "confidence_level",
+        "multiple_comparison_correction"
+      ],
+      "properties": {
+        "replicates": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 100000
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_independent_clusters": {
+          "type": "integer",
+          "minimum": 30
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0.5,
+          "exclusiveMaximum": 1
+        },
+        "multiple_comparison_correction": {
+          "type": "string",
+          "enum": [
+            "none",
+            "bonferroni"
+          ]
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_evidence_tokens",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_retrieval_calls",
+        "max_latency_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "max_evidence_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_retrieval_calls": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_latency_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_microusd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

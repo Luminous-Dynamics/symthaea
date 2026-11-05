@@ -9,6 +9,7 @@ on:
       - "benchmarks/source-catalog/v0/**"
       - "benchmarks/knowledge-annotation/v0/**"
       - "benchmarks/benchmark-runs/v0/**"
+      - "benchmarks/multi-hall-sa/v0/**"
       - "tools/knowledge-benchmark-harness/src/bin/**"
       - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
       - "tools/knowledge-benchmark-harness/**"
@@ -22,6 +23,7 @@ on:
       - "benchmarks/source-catalog/v0/**"
       - "benchmarks/knowledge-annotation/v0/**"
       - "benchmarks/benchmark-runs/v0/**"
+      - "benchmarks/multi-hall-sa/v0/**"
       - "tools/knowledge-benchmark-harness/src/bin/**"
       - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
       - "tools/knowledge-benchmark-harness/**"
@@ -38,6 +40,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     name: Validate schemas, fixtures, and graph contracts
     runs-on: ubuntu-latest
     timeout-minutes: 15
