@@ -99,7 +99,7 @@ pub struct LiquidityPathAssessment<'a> {
     pub cash_at_cover_deadline_minor_zar: i128,
     pub cash_headroom_at_cover_deadline_minor_zar: u64,
     pub first_operating_floor_breach: Option<LiquidityBreachPoint<'a>>,
-    pub maximum_cover_shortfall_minor_zar: Option<u64>,
+    pub maximum_cover_shortfall_through_deadline_minor_zar: Option<u64>,
     pub cover_shortfall_at_deadline_minor_zar: Option<u64>,
     /// This is cash that could fit above the floor in the scenario only. It
     /// is not Posted Credit Cover and is not proof that cash can be transferred.
@@ -265,7 +265,7 @@ fn assess_path<'a>(
         cash_at_cover_deadline_minor_zar: cash_at_deadline,
         cash_headroom_at_cover_deadline_minor_zar: headroom_u64,
         first_operating_floor_breach: first_breach,
-        maximum_cover_shortfall_minor_zar: maximum_cover_shortfall,
+        maximum_cover_shortfall_through_deadline_minor_zar: maximum_cover_shortfall,
         cover_shortfall_at_deadline_minor_zar: shortfall_at_deadline,
         potentially_fundable_cover_at_deadline_minor_zar: potentially_fundable,
         external_funding_gap_at_deadline_minor_zar: external_gap,
@@ -488,6 +488,43 @@ mod tests {
         };
         assert_eq!(result.committed.cover_shortfall_at_deadline_minor_zar, Some(20_000_000));
         assert_eq!(result.committed.external_funding_gap_at_deadline_minor_zar, Some(0));
+    }
+
+    #[test]
+    fn peak_cover_shortfall_is_preserved_when_the_requirement_later_falls() {
+        let events = [
+            event("mo-reassess-up", 2, 12 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::RequiredCoverReassessment, 45_000_000),
+            event("mo-reassess-down", 3, 16 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::RequiredCoverReassessment, 35_000_000),
+        ];
+        let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
+        let LiquidityWaterfallResult::Determined(result) = result else {
+            panic!("all reassessments are source-bound");
+        };
+        assert_eq!(
+            result.committed.maximum_cover_shortfall_through_deadline_minor_zar,
+            Some(25_000_000)
+        );
+        assert_eq!(
+            result.committed.cover_shortfall_at_deadline_minor_zar,
+            Some(15_000_000)
+        );
+    }
+
+    #[test]
+    fn same_day_deadline_before_start_time_is_rejected() {
+        let inputs = LiquidityWaterfallInputs {
+            start_day_ordinal: 3,
+            start_minute_of_day: 18 * 60,
+            credit_cover_deadline_day_ordinal: 3,
+            credit_cover_deadline_minute_of_day: 17 * 60,
+            calendar_day_ordinals: &[3, 4, 5],
+            horizon_end_day_ordinal: 5,
+            ..base_inputs(&[])
+        };
+        assert_eq!(
+            evaluate_liquidity_waterfall(inputs),
+            Err(LiquidityWaterfallError::InvalidHorizon)
+        );
     }
 
     #[test]
