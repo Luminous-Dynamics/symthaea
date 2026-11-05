@@ -403,8 +403,15 @@ fn read_u32(bytes: &[u8], offset: usize) -> u32 {
 #[cfg(target_os = "linux")]
 fn sealed_snapshot(path: &Path, limit: u64) -> Result<(File, String, u64), ReplayError> {
     use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::fs::OpenOptionsExt;
 
-    let mut input = File::open(path).map_err(io_error)?;
+    // Reject a symlink at the final path component. Replay binds to the exact opened
+    // object captured below; silently following a substituted symlink is not admissible.
+    let mut input = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(io_error)?;
     let initial_length = input.metadata().map_err(io_error)?.len();
     if initial_length > limit {
         return Err(ReplayError::Rejected(
@@ -728,6 +735,22 @@ mod tests {
                 "envelope_reference": null
             }
         })
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn replay_snapshot_rejects_symlink_source() {
+        let payload = b"symlink source admission control";
+        let (temp, _) = make_archive(CompressionMethod::Stored, &[("asset.bin", payload)]);
+        let link_path = std::env::temp_dir().join(format!(
+            "rea-replay-symlink-{}-{}.zip",
+            std::process::id(),
+            NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::os::unix::fs::symlink(&temp.0, &link_path).unwrap();
+        let result = sealed_snapshot(&link_path, HARD_ARCHIVE_LIMIT);
+        let _ = std::fs::remove_file(&link_path);
+        assert!(result.is_err(), "source symlink must not be followed");
     }
 
     #[cfg(target_os = "linux")]
