@@ -79,13 +79,17 @@ pub struct CashCollateralScenario<'a> {
     pub annual_account_interest_bps: Option<u32>,
     pub account_interest_source_ref: Option<&'a str>,
     pub provider_eligibility: EligibilityEvidence,
+    pub provider_eligibility_source_ref: Option<&'a str>,
     pub reserve_account_established: EligibilityEvidence,
+    pub reserve_account_source_ref: Option<&'a str>,
     pub setup_and_transaction_fees_minor_units: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EarlyInvoicePaymentScenario<'a> {
     pub invoice_id: &'a str,
+    pub invoice_source_ref: Option<&'a str>,
+    pub invoice_is_issued_and_outstanding: EligibilityEvidence,
     pub invoice_outstanding_minor_units: u64,
     pub cover_relief_minor_units: u64,
     /// Number of days by which payment is advanced relative to the invoice due date.
@@ -141,7 +145,15 @@ pub fn assess_cash_collateral_option(
                 reason: "Credit Cover Provider eligibility is unverified",
             });
         }
-        EligibilityEvidence::Verified => {}
+        EligibilityEvidence::Verified => {
+            if scenario
+                .provider_eligibility_source_ref
+                .map(nonempty_reference)
+                != Some(true)
+            {
+                return Err(LiquidityOptionError::InvalidEvidenceReference);
+            }
+        }
     }
     match scenario.reserve_account_established {
         EligibilityEvidence::Rejected => {
@@ -152,7 +164,15 @@ pub fn assess_cash_collateral_option(
                 reason: "Collateral Reserve Account establishment is unverified",
             });
         }
-        EligibilityEvidence::Verified => {}
+        EligibilityEvidence::Verified => {
+            if scenario
+                .reserve_account_source_ref
+                .map(nonempty_reference)
+                != Some(true)
+            {
+                return Err(LiquidityOptionError::InvalidEvidenceReference);
+            }
+        }
     }
 
     let Some(funding_rate) = scenario.annual_funding_cost_bps else {
@@ -205,8 +225,21 @@ pub fn assess_cash_collateral_option(
 pub fn assess_early_invoice_payment_option(
     scenario: EarlyInvoicePaymentScenario<'_>,
 ) -> Result<LiquidityOptionResult, LiquidityOptionError> {
-    if !nonempty_reference(scenario.invoice_id) {
+    if !nonempty_reference(scenario.invoice_id)
+        || scenario.invoice_source_ref.map(nonempty_reference) != Some(true)
+    {
         return Err(LiquidityOptionError::MissingInvoice);
+    }
+    match scenario.invoice_is_issued_and_outstanding {
+        EligibilityEvidence::Rejected => {
+            return Err(LiquidityOptionError::MissingInvoice);
+        }
+        EligibilityEvidence::Unknown => {
+            return Ok(LiquidityOptionResult::Indeterminate {
+                reason: "invoice issue and outstanding status is unverified",
+            });
+        }
+        EligibilityEvidence::Verified => {}
     }
     if scenario.cover_relief_minor_units == 0 {
         return Err(LiquidityOptionError::ZeroCoverRelief);
@@ -318,7 +351,9 @@ mod tests {
             annual_account_interest_bps: Some(800), // 8%
             account_interest_source_ref: Some("market-bank-rate-sheet/001"),
             provider_eligibility: EligibilityEvidence::Verified,
+            provider_eligibility_source_ref: Some("bank-eligibility-certificate/001"),
             reserve_account_established: EligibilityEvidence::Verified,
+            reserve_account_source_ref: Some("market-bank-account-confirmation/001"),
             setup_and_transaction_fees_minor_units: 0,
         }
     }
@@ -326,6 +361,8 @@ mod tests {
     fn early_scenario(days_early: u32) -> EarlyInvoicePaymentScenario<'static> {
         EarlyInvoicePaymentScenario {
             invoice_id: "invoice/INV-002",
+            invoice_source_ref: Some("invoice-document/INV-002"),
+            invoice_is_issued_and_outstanding: EligibilityEvidence::Verified,
             invoice_outstanding_minor_units: 50_000_000,
             cover_relief_minor_units: 50_000_000,
             days_early,
@@ -415,15 +452,45 @@ mod tests {
     }
 
     #[test]
-    fn guarantees_are_not_silently_admitted_as_a_credit_cover_instrument() {
-        // The public Rev 2.3 profile has no generic bank-guarantee/LC option:
-        // only a cash-held Collateral Reserve Account deposit is modelled here.
+    fn rejected_provider_evidence_does_not_qualify_cash_collateral() {
+        // A cash-held Collateral Reserve Account deposit still requires a
+        // separately verified qualifying Credit Cover Provider.
         assert_eq!(
             assess_cash_collateral_option(CashCollateralScenario {
                 provider_eligibility: EligibilityEvidence::Rejected,
                 ..cash_scenario(90)
             }),
             Err(LiquidityOptionError::IneligibleCreditCoverProvider)
+        );
+    }
+
+    #[test]
+    fn verified_status_without_a_source_reference_is_rejected() {
+        let no_provider_source = CashCollateralScenario {
+            provider_eligibility_source_ref: None,
+            ..cash_scenario(90)
+        };
+        assert_eq!(
+            assess_cash_collateral_option(no_provider_source),
+            Err(LiquidityOptionError::InvalidEvidenceReference)
+        );
+
+        let no_account_source = CashCollateralScenario {
+            reserve_account_source_ref: None,
+            ..cash_scenario(90)
+        };
+        assert_eq!(
+            assess_cash_collateral_option(no_account_source),
+            Err(LiquidityOptionError::InvalidEvidenceReference)
+        );
+
+        let no_invoice_source = EarlyInvoicePaymentScenario {
+            invoice_source_ref: None,
+            ..early_scenario(20)
+        };
+        assert_eq!(
+            assess_early_invoice_payment_option(no_invoice_source),
+            Err(LiquidityOptionError::MissingInvoice)
         );
     }
 
