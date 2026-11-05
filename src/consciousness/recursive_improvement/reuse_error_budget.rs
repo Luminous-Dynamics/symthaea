@@ -366,4 +366,13 @@ mod tests {
     }
 
 
+    #[test]
+    fn rejects_overflowing_paired_comparison_counts() {
+        let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
+        assert_eq!(
+            reuse_sign_test_decision(usize::MAX, 1, allocation),
+            Err(ReuseBudgetError::ComparisonCountOverflow)
+        );
+    }
+
 }
