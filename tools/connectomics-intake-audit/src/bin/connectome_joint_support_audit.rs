@@ -947,8 +947,7 @@ mod tests {
                 })
                 .collect();
         }
-        input.joint_support_set_sha256 =
-            canonical_joint_support_set_sha256(&input.joint_supports);
+        input.joint_support_set_sha256 = canonical_joint_support_set_sha256(&input.joint_supports);
         input
     }
 
@@ -1188,15 +1187,11 @@ mod tests {
                         })
                         .count() as u64
                 });
-                let expected_marginally_separable =
-                    direct_projection_separates(left, right, 0b01)
-                        || direct_projection_separates(left, right, 0b10);
-                let full_projection_separates =
-                    direct_projection_separates(left, right, 0b11);
+                let expected_marginally_separable = direct_projection_separates(left, right, 0b01)
+                    || direct_projection_separates(left, right, 0b10);
+                let full_projection_separates = direct_projection_separates(left, right, 0b11);
 
-                assert_eq!(
-                    report.minimum_joint_disambiguation_effort_units,
-                    expected_minimum,
+                assert_eq!(report.minimum_joint_disambiguation_effort_units, expected_minimum,
                     "wrong minimum for alpha={alpha_mask:04b}, beta={beta_mask:04b}"
                 );
                 assert_eq!(
@@ -1257,9 +1252,7 @@ mod tests {
                 let baseline_report = evaluate(&baseline_input, &baseline_bytes).unwrap();
                 let baseline = validated(&baseline_input);
 
-                for (world_index, source_mask) in
-                    [(0_usize, alpha_mask), (1_usize, beta_mask)]
-                {
+                for (world_index, source_mask) in [(0_usize, alpha_mask), (1_usize, beta_mask)] {
                     if source_mask == 0b1111 {
                         continue;
                     }
@@ -1267,18 +1260,20 @@ mod tests {
                         .find(|tuple| source_mask & (1_u8 << *tuple) == 0)
                         .expect("a non-full support has a missing tuple");
                     let mut expanded_input = baseline_input.clone();
-                    expanded_input.joint_supports[world_index].rows.push(JointRow {
-                        outcomes: vec![
-                            JointOutcome {
-                                action_id: "inspect-x".into(),
-                                value: if missing_tuple & 1 == 0 { "0" } else { "1" }.into(),
-                            },
-                            JointOutcome {
-                                action_id: "inspect-y".into(),
-                                value: if missing_tuple & 2 == 0 { "0" } else { "1" }.into(),
-                            },
-                        ],
-                    });
+                    expanded_input.joint_supports[world_index]
+                        .rows
+                        .push(JointRow {
+                            outcomes: vec![
+                                JointOutcome {
+                                    action_id: "inspect-x".into(),
+                                    value: if missing_tuple & 1 == 0 { "0" } else { "1" }.into(),
+                                },
+                                JointOutcome {
+                                    action_id: "inspect-y".into(),
+                                    value: if missing_tuple & 2 == 0 { "0" } else { "1" }.into(),
+                                },
+                            ],
+                        });
                     expanded_input.joint_support_set_sha256 =
                         canonical_joint_support_set_sha256(&expanded_input.joint_supports);
                     let expanded_bytes = serde_json::to_vec(&expanded_input).unwrap();
@@ -1290,16 +1285,8 @@ mod tests {
                     let left_after = support_for(&expanded, "world-alpha");
                     let right_after = support_for(&expanded, "world-beta");
                     for mask in 0..4 {
-                        let before = direct_projection_separates(
-                            left_before,
-                            right_before,
-                            mask,
-                        );
-                        let after = direct_projection_separates(
-                            left_after,
-                            right_after,
-                            mask,
-                        );
+                        let before = direct_projection_separates(left_before, right_before, mask);
+                        let after = direct_projection_separates(left_after, right_after, mask);
                         assert!(
                             !after || before,
                             "expansion created separation: alpha={alpha_mask:04b}, beta={beta_mask:04b}, added_world={world_index}, mask={mask:02b}"
