@@ -773,8 +773,8 @@
     },
     {
       "lane_id": "CEB-HUMAN",
-      "capability": "Human-agent complementarity and calibrated autonomy",
-      "decision_question": "Does the system improve human decisions or reduce review effort, and can it ask, abstain or escalate at the correct boundary?",
+      "capability": "Human-agent complementarity and selective autonomy",
+      "decision_question": "Can the system improve human-agent complementarity while correctly deciding when to act, ask, abstain or escalate under missing, ambiguous or conflicting information?",
       "primary_metrics": [
         {
           "metric_id": "assisted_defect_recall_gain",
@@ -809,6 +809,20 @@
           "caveats": [
             "Leaderboard score is not the same as paired human productivity or review-time benefit.",
             "Human cohort design and time budget must be preregistered."
+          ]
+        },
+        {
+          "name": "AgentAbstain",
+          "version": "NeurIPS 2026; live benchmark snapshot retrieved 2026-11-05",
+          "sample_scope": "263 paired should-act / should-abstain tasks across 42 executable environments",
+          "published_reference": "Gemini 3.1 Pro + Google ADK: 90.5% act-side, 65.4% abstain-side, 59.5% paired accuracy, 65.7% conditioned abstention rate (CAR). Paired accuracy is primary; component rates are not interchangeable.",
+          "source_url": "https://agentabstain.github.io/",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "Each pair differs by one small change; both the should-act and should-abstain variants must be correct for paired success.",
+            "The leaderboard macro-averages over eight scenarios; preserve per-scenario outcomes where available.",
+            "Do not treat abstention-side accuracy as paired accuracy or as human productivity.",
+            "AgentAbstain is a contextual reference until CEB task semantics, tools, budgets and scoring are matched."
           ]
         }
       ],
@@ -1069,6 +1083,26 @@
       "source_url": "https://labs.scale.com/leaderboard",
       "supports": [
         "CEB-TEST",
+        "CEB-HUMAN"
+      ]
+    },
+    {
+      "source_url": "https://agentabstain.github.io/",
+      "supports": [
+        "CEB-HUMAN"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/papers/sweatlas",
+      "supports": [
+        "CEB-REPO",
+        "CEB-TEST",
+        "CEB-REFACTOR"
+      ]
+    },
+    {
+      "source_url": "https://labs.scale.com/leaderboard/hil",
+      "supports": [
         "CEB-HUMAN"
       ]
     }
