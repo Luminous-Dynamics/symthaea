@@ -260,3 +260,51 @@ No Luminous result is reported by this refresh. All values above are external, p
 - MASTG v2.0.0 signed release: https://github.com/OWASP/mastg/releases/tag/v2.0.0
 - MASWE stable catalogue: https://mas.owasp.org/MASWE/
 - MobSF official releases: https://github.com/MobSF/Mobile-Security-Framework-MobSF/releases
+
+## 2026-11-05 refresh — agentic RE, mobile security and what the industry actually measures
+
+### SRE-Bench (Columbia DAPLab / Vals AI)
+
+The current official benchmark page reports a released benchmark with 19 private programs, 262 binary instances and 1,572 deterministically graded tasks. The programs span five RE domains (firmware, malware, game, file format and network protocol), four source languages (C, C++, Rust and Go), and 44 in-house anti-analysis mechanisms. Each task is evaluated in an isolated environment with a task-specific verifier. See [official SRE-Bench page](https://daplab.cs.columbia.edu/benchmarks/sre-bench/).
+
+Its public-facing model evaluation and its unconstrained evaluation must remain distinct:
+- Public-facing GPT-6-Astra: mean 5.55/6 on 181 graded binaries; 149 full solves (82.3% of the 181 graded) and 7 zeros. The full eligible corpus has 262 instances, so the 149 solved correspond to 56.9% of all eligible instances; do not report 82.3% as full-corpus coverage.
+- Unconstrained GPT-6-Astra: 88.0% pass@1 and 99.2% pass@4. This is a different setting without production safeguards or budget limits; it must not be pooled with public-facing data.
+- Other public results also need their graded denominators and zero rates. A high conditional score with incomplete coverage is not the same as full-suite completion.
+
+The strategic lesson is that RE is increasingly measured through contamination-resistant, domain-specific environments and deterministic task verifiers, not by a language-model judge scoring plausible explanations. Our REA artifact-reader tests are a separate layer: they validate the parser and content-verification substrate that those workflows rely on. We should not claim to beat SRE-Bench until Symthaea has actually run its agent on the benchmark under the benchmark's rules.
+
+### AgentRE-Bench v3.1 (Windows PE, October 25 2026)
+
+The official v3.1 results report 500 attempts: five models × 20 artifacts × five attempts. The 20 artifacts are ten Windows PE programs with stripped and unstripped variants. Overall weights are 90% main and 10% bonus; refusals and budget exhaustion count as zero. Results:
+- Muse Wonder: 87.37/100, 100/100 valid answers.
+- GPT-6 Astra: 87.04/100, 100/100 valid answers.
+- Grok 4.7: 79.62/100, 96/100 valid answers.
+- Claude Opus 5.5: 69.66/100, 78/100 valid answers.
+- Gemini 4 Argon: 31.20/100, 36/100 valid answers.
+
+The Muse/Astra difference is only 0.3243 points and its simultaneous 95% interval spans -3.4940 to +4.1426; this run does not establish repeat-run superiority. The report also shows Astra's stronger encryption/key recovery and Muse's higher technique-identification score. See [AgentRE-Bench v3.1 results](https://www.agentre-bench.ai/results/v3-1/) and [benchmark methodology](https://www.agentre-bench.ai/).
+
+Do not compare AgentRE's weighted 0–100 score to SRE's mean tasks-per-binary or pass@k. They have different artifacts, task definitions, budgets and scoring. They are complementary agent-capability probes, not substitutes for exact-head parser, fuzz, differential, mobile-signature or evidence-reliability tests.
+
+### OWASP Mobile Application Security Testing Guide
+
+OWASP MASTG v2.0.0 is the first stable, non-beta release of its v2 refactor (June 30, 2026). The release makes the guide's components individually referenceable and machine-readable with cross-linking among MASVS, MASWE, tests, techniques, tools and best practices. See [official v2.0.0 release](https://github.com/OWASP/MASTG/releases/tag/v2.0.0).
+
+For REA, the trace should remain explicit:
+`MASVS control → MASWE weakness → MASTG test → tool/platform observation → raw evidence → versioned evaluation → qualified claim`.
+A static test finding is not automatically a passed control; a single tool result is not a complete platform evaluation.
+
+### Platform-signature reference contracts
+
+Android's official documentation confirms why APK signatures require scheme-specific interpretation:
+- v2 signs protected APK content sections and the signing block's signed-data records; the digest is chunked and covers the ZIP content region, central directory and EOCD. [Android v2](https://source.android.com/docs/security/features/apksigning/v2)
+- v3 adds supported SDK ranges and proof-of-rotation information in the signing block. [Android v3](https://source.android.com/docs/security/features/apksigning/v3)
+- v4 uses an fs-verity-shaped Merkle tree over the APK bytes, stores the signature in a separate `.apk.idsig`, and requires a complementary v2 or v3 signature. [Android v4](https://source.android.com/docs/security/features/apksigning/v4)
+
+Apple's reference material makes a different distinction:
+- Provisioning profiles are CMS-wrapped authorization documents containing an entitlement allowlist; code-signature entitlements must be authorized by the profile. Apple documents the profile structure as implementation-defined, so supported platform tools/APIs—not assumed plist serialization—must anchor platform-trust claims. [TN3125](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles)
+- CodeDirectory contains per-page and special-slot hashes that protect executable pages, resources and metadata. [TN3126](https://developer.apple.com/documentation/technotes/tn3126-inside-code-signing-hashes)
+
+The same core rule applies to both platforms: content integrity, signature mathematics, signer key/certificate identity, chain/trust policy, application authorization and runtime behavior are distinct propositions. The benchmark must include valid-but-unexpected signers and authorization mismatches, not only corrupted-signature negatives.
+
