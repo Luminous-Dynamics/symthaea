@@ -621,3 +621,71 @@ The first external-facing result should not be a universal Symthaea score. Publi
 - TukaBench (safety, refusal, deflection and harmful compliance as separate outcomes).
 
 Include raw per-case receipts under the dataset license, exact model/data/scoring revisions, worst-group slices, uncertainty intervals, calibration, usage and cost. Keep all four as separate task tracks. Ask MzansiBench/DataLens for their data manifests and reproducibility receipts before describing scores as apples-to-apples.
+
+
+## 15. Literary knowledge and narrative evaluation programme
+
+Tracked in [LIT-KNOW-001 / #10558](https://github.com/Luminous-Dynamics/symthaea/issues/10558). Compose existing MythologyBench, EsotericaBench, Glyph Codex, source-family, and narrative-graph work. Do not create a second harness.
+
+### 15.1 Keep three constructs separate
+
+1. **Literary knowledge and criticism:** work/authorship/edition/witness identity, historical context, genre, form, rhetoric, influence and evidence-backed critical interpretations.
+2. **Narrative understanding:** event anchors, time, causality, focalization, character goals, motifs, revelation, narrative function, style and global orchestration.
+3. **Creative writing quality:** reader preference and craft quality of generated text.
+
+They are not interchangeable. A system can remember literature but fail to analyze narrative structure; it can analyze a story without knowing its historical witness; it can generate compelling prose while misidentifying an author's work.
+
+### 15.2 New benchmark evidence
+
+**NarraBench (EACL 2026)** surveys 78 narrative benchmarks and estimates that existing benchmarks cover approximately 27% of its narrative taxonomy. It highlights gaps around events, style, perspective and revelation, and notes that some interpretations are perspectival rather than single-answer. This supports a plural-answer evaluation protocol, not a single canonical key.
+
+https://aclanthology.org/2026.eacl-long.176/
+
+**LitVISTA (ACL 2026)** evaluates narrative function and structure jointly in literary texts. Its experiments report that frontier models struggle to build an integrated global view; end-to-end weaknesses are strongly affected by event-anchor identification/localization. Preserve separate oracle-anchor and end-to-end conditions.
+
+https://aclanthology.org/2026.acl-long.1024/
+
+**LitBench (EACL 2026)** evaluates creative-writing preferences. It reports 43,827 human preference training pairs and a 2,480-pair test set; the paper reports 73% agreement with human preferences for the strongest off-the-shelf LLM judge and 78% for trained Bradley–Terry / generative reward models. This is preference ranking—not literary knowledge, truth or narrative comprehension.
+
+**Rights:** LitBench's test examples are Reddit comment IDs requiring rehydration. The paper states that Reddit users retain copyright, the authors do not offer relicensing, and they had not received a response from Reddit about API terms at submission time. Do not ingest the Reddit test stories into product training, prompts, fixtures or commercial corpora solely because a benchmark is public. Review current API terms, user rights and dataset access conditions independently.
+
+https://aclanthology.org/2026.eacl-long.362/
+
+### 15.3 Source-witnessed, plural interpretation
+
+The intended paradigm shift is to represent a literary work as a family of source witnesses, editions, translations, adaptations and performances—not a single flattened canonical text. The unit of evidence is a contexted claim linked to its witness, locator, language and provenance family. The output should preserve:
+- textual observation versus interpretation versus reader preference;
+- original text versus translation, adaptation and later quotation;
+- narrator, character, editor, translator and attributed author;
+- established attribution versus disputed/unknown authorship;
+- resemblance versus shared motif versus documented historical influence;
+- multiple admissible readings and their critical premises;
+- rights, cultural authority, consent and access scope.
+
+Do not force one answer where the source and critical tradition admit multiple defensible readings. Do not infer community permission from public availability.
+
+### 15.4 Evaluation lanes and baselines
+
+For literary knowledge, compare lexical/BM25, dense retrieval, conventional RAG, witness/edition-aware retrieval, typed literary graph, graph+HDC, full Symthaea, pinned frontier models, and appropriate subject experts.
+
+For narrative understanding, evaluate both:
+- **oracle-anchor:** gold event anchors provided, isolating downstream function/structure reasoning;
+- **end-to-end:** model must find and localize anchors itself.
+
+For creative quality, compare blinded human reader panels, domain experts, off-the-shelf LLM judges, published reward models when lawful, and a Symthaea evaluator. Use pairwise rankings, randomized order, ties/indifference, and multiple rubric dimensions. Report inter-rater disagreement and reader-group differences; no LLM judge is the sole gold authority.
+
+Metrics include exact witness/locator precision, citation precision/recall, attribution status accuracy, anchor localization error, temporal/causal relation F1, perspective and narrative-function ratings, legitimate alternative-reading recall, pairwise human preference accuracy, ranking correlation, judge calibration, and worst-genre/language/reader-group performance.
+
+### 15.5 Provisional goals (not results)
+
+- Zero fabricated citations/locators and zero cross-witness leakage in rights-cleared adversarial controls.
+- At least 90% exact locator precision on a reviewed answerable pilot.
+- At least 20% reduction in end-to-end narrative-anchor localization error versus the strongest matched retrieval/RAG baseline, without oracle-anchor regression.
+- For creative quality, exceed the strongest lawful comparator by at least 3 percentage points in paired human-preference agreement, then validate on newly generated unseen stories.
+- Preserve multiple valid readings and report worst-group performance rather than optimizing only aggregate preference.
+
+Recalibrate targets after rights review and pilot power analysis. These are proposed qualification gates, not current SOTA claims.
+
+### 15.6 Implementation and rights boundary
+
+Reuse #8245/#8252/#8253/#7365 and the existing Rust harness. Admit content-bearing materials only when public-domain, explicitly licensed or permissioned. Use metadata-only records when full text cannot lawfully be used. Treat oral/community narrative as consent- and purpose-bound. Rights review, attribution, source lineage and expert review are separate gates.
