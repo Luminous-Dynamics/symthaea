@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/task-admission-registry-v0.schema.json",
+  "title": "CEB Task Admission Registry V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "version",
+    "status",
+    "created_on",
+    "pilot_protocol_id",
+    "target_task_count",
+    "actual_task_count",
+    "family_targets",
+    "tasks",
+    "execution_gates",
+    "source_policy",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "registry_id": {
+      "const": "CEB-TASK-ADMISSION-V0"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^0\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "enum": [
+        "intake_contract_only_no_tasks_admitted",
+        "admission_in_progress",
+        "tasks_admitted"
+      ]
+    },
+    "created_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "pilot_protocol_id": {
+      "const": "CEB-RUST-PILOT-001"
+    },
+    "target_task_count": {
+      "const": 48
+    },
+    "actual_task_count": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 48
+    },
+    "family_targets": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "family_id",
+          "target_tasks"
+        ],
+        "properties": {
+          "family_id": {
+            "enum": [
+              "rust-types-traits",
+              "multi-crate-api-regression",
+              "feature-target-configuration",
+              "issue-reproduction-debugging",
+              "security-correctness",
+              "performance-correctness"
+            ]
+          },
+          "target_tasks": {
+            "const": 8
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "maxItems": 48,
+      "items": {
+        "type": "object"
+      }
+    },
+    "execution_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_controlled_execution",
+        "independent_regrade_claim",
+        "reference_patch_and_empty_patch_controls",
+        "note"
+      ],
+      "properties": {
+        "candidate_controlled_execution": {
+          "const": "blocked_until_issue_10064_qualified"
+        },
+        "independent_regrade_claim": {
+          "const": "blocked_until_issue_10369_qualified"
+        },
+        "reference_patch_and_empty_patch_controls": {
+          "const": "not_run_before_runner_qualification"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "source_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "development_candidates",
+        "holdout_candidates",
+        "public_solution_search",
+        "license_policy",
+        "oracle_policy",
+        "task_identity"
+      ],
+      "properties": {
+        "development_candidates": {
+          "type": "string",
+          "minLength": 30
+        },
+        "holdout_candidates": {
+          "type": "string",
+          "minLength": 30
+        },
+        "public_solution_search": {
+          "type": "string",
+          "minLength": 30
+        },
+        "license_policy": {
+          "type": "string",
+          "minLength": 30
+        },
+        "oracle_policy": {
+          "type": "string",
+          "minLength": 30
+        },
+        "task_identity": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 40
+    }
+  }
+}

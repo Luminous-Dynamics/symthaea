@@ -1,0 +1,52 @@
+{
+  "schema_version": 0,
+  "registry_id": "CEB-TASK-ADMISSION-V0",
+  "version": "0.1.0",
+  "status": "intake_contract_only_no_tasks_admitted",
+  "created_on": "2026-11-05",
+  "pilot_protocol_id": "CEB-RUST-PILOT-001",
+  "target_task_count": 48,
+  "actual_task_count": 0,
+  "family_targets": [
+    {
+      "family_id": "rust-types-traits",
+      "target_tasks": 8
+    },
+    {
+      "family_id": "multi-crate-api-regression",
+      "target_tasks": 8
+    },
+    {
+      "family_id": "feature-target-configuration",
+      "target_tasks": 8
+    },
+    {
+      "family_id": "issue-reproduction-debugging",
+      "target_tasks": 8
+    },
+    {
+      "family_id": "security-correctness",
+      "target_tasks": 8
+    },
+    {
+      "family_id": "performance-correctness",
+      "target_tasks": 8
+    }
+  ],
+  "tasks": [],
+  "execution_gates": {
+    "candidate_controlled_execution": "blocked_until_issue_10064_qualified",
+    "independent_regrade_claim": "blocked_until_issue_10369_qualified",
+    "reference_patch_and_empty_patch_controls": "not_run_before_runner_qualification",
+    "note": "The registry contains quota slots only. No repository, issue, task, oracle, gold patch or holdout has been admitted."
+  },
+  "source_policy": {
+    "development_candidates": "Public Rust-SWE-bench or issue-linked merged-PR tasks may be used as development candidates only after license, fix-visibility, source-revision, task-quality and oracle review.",
+    "holdout_candidates": "A holdout must not have a publicly visible task/fix pair or equivalent solution at the task freeze date. Public benchmark tasks cannot be called sealed merely because their files are kept outside the agent workspace.",
+    "public_solution_search": "Search source host, package registries, benchmark datasets, forks, commit history, release notes and available code indexes. Record search date, locations, query protocol and a digest of the search record. A search cannot prove absence of leakage.",
+    "license_policy": "Require a repository license expression and exact license-file digest. Unknown, missing or incompatible license provenance blocks admission.",
+    "oracle_policy": "Require two distinct human gold reviewers, blinded to the candidate model output. A third independent adjudicator resolves disagreement. LLM-only adjudication is prohibited.",
+    "task_identity": "Task identity binds repository full name, source commit, task specification digest, acceptance-contract digest and environment digest."
+  },
+  "claim_boundary": "This is an intake contract and quota plan, not a set of qualified or admitted tasks."
+}
