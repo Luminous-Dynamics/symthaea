@@ -121,6 +121,9 @@ struct Report {
     repository_commit_count: usize,
     receipt_count: usize,
     reproducible_task_count: usize,
+    assurance_qualified_task_count: usize,
+    assurance_disqualified_task_ids: Vec<String>,
+    assurance_unreviewed_task_ids: Vec<String>,
     goal_alignment_counts: BTreeMap<String, usize>,
     semantic_audit_counts: BTreeMap<String, usize>,
     vacuity_audit_counts: BTreeMap<String, usize>,
@@ -422,7 +425,10 @@ fn verify(
     let receipts = load_receipts(receipts_bytes)?;
     let mut receipt_by_id = BTreeMap::<String, &TaskReceipt>::new();
     let mut reproducible = 0usize;
+    let mut assurance_qualified = 0usize;
     let mut unqualified = Vec::new();
+    let mut assurance_disqualified = Vec::new();
+    let mut assurance_unreviewed = Vec::new();
     let mut goal_alignments = Vec::new();
     let mut semantic = Vec::new();
     let mut vacuity = Vec::new();
@@ -441,6 +447,20 @@ fn verify(
             reproducible += 1;
         } else {
             unqualified.push(receipt.task_id.clone());
+        }
+        let audit_finding = receipt.goal_alignment == "mismatch"
+            || receipt.semantic_audit_status == "finding"
+            || receipt.vacuity_audit_status == "finding"
+            || receipt.assumption_audit_status == "finding";
+        let audits_complete_and_passed = receipt.semantic_audit_status == "passed"
+            && receipt.vacuity_audit_status == "passed"
+            && receipt.assumption_audit_status == "passed";
+        if pass && audits_complete_and_passed {
+            assurance_qualified += 1;
+        } else if audit_finding {
+            assurance_disqualified.push(receipt.task_id.clone());
+        } else {
+            assurance_unreviewed.push(receipt.task_id.clone());
         }
         goal_alignments.push(receipt.goal_alignment.clone());
         semantic.push(receipt.semantic_audit_status.clone());
@@ -472,6 +492,9 @@ fn verify(
         repository_commit_count: unique_repositories.len(),
         receipt_count: receipts.len(),
         reproducible_task_count: reproducible,
+        assurance_qualified_task_count: assurance_qualified,
+        assurance_disqualified_task_ids: assurance_disqualified,
+        assurance_unreviewed_task_ids: assurance_unreviewed,
         goal_alignment_counts: status_counts(goal_alignments),
         semantic_audit_counts: status_counts(semantic),
         vacuity_audit_counts: status_counts(vacuity),
@@ -735,6 +758,10 @@ mod tests {
         let mut receipt = synthetic_receipt(&record);
         receipt.semantic_audit_status = "finding".into();
         receipt.semantic_audit_receipt_sha256 = Some(fake_hash("finding"));
-        assert!(validate_receipt(&receipt, &record, 1).unwrap());
+        let reproduced = validate_receipt(&receipt, &record, 1).unwrap();
+        assert!(reproduced);
+        assert_eq!(receipt.semantic_audit_status, "finding");
+        assert_eq!(receipt.vacuity_audit_status, "not_run");
+        assert_eq!(receipt.assumption_audit_status, "not_run");
     }
 }
