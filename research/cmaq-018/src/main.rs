@@ -1,6 +1,6 @@
 use std::fmt::Write as _;
 
-const SCHEMA: &str = "cmaq-018-counterfactual-branch-fidelity-v0.1";
+const SCHEMA: &str = "cmaq-018-counterfactual-branch-fidelity-v0.2";
 const EPISODES: usize = 64;
 const BASE_SEED: u64 = 0xC0A9_0018_2026_1031;
 const SIGN_EPSILON: f64 = 1e-9;
