@@ -584,7 +584,6 @@ jobs:
             ${{ runner.temp }}/sorrydb-source-task.json
             ${{ runner.temp }}/sorrydb-lean-build-status.txt
             ${{ runner.temp }}/sorrydb-lean-toolchain-status.txt
-            ${{ github.workspace }}/sorrydb-real-source/.lake/build/build.log
             ${{ github.workspace }}/sorrydb-real-source/lake-manifest.json
             ${{ runner.temp }}/sorrydb-input/
             ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
