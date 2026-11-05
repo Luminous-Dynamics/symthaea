@@ -18,7 +18,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use super::scenario::{RobustUtility, ScenarioDefinition};
-use super::score_bounds::{ScoreBoundsReceipt, SCORE_BOUND_METHOD_ID};
+use super::score_bounds::{
+    ScoreBoundsReceipt, ANYTIME_ALPHA_SPENDING_RULE_ID, ANYTIME_SCORE_BOUND_METHOD_ID,
+    SCORE_BOUND_METHOD_ID,
+};
 
 /// Robust-utility interval for one operational action.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -126,7 +129,15 @@ pub fn certify_epsilon_optimal_action(
     {
         return Err(RobustSelectionError::InvalidFamilywiseConfidence);
     }
-    if receipt.method_id != SCORE_BOUND_METHOD_ID
+    let score_method_is_valid = match receipt.method_id {
+        SCORE_BOUND_METHOD_ID => !receipt.time_uniform && receipt.alpha_spending_rule == "none",
+        ANYTIME_SCORE_BOUND_METHOD_ID => {
+            receipt.time_uniform
+                && receipt.alpha_spending_rule == ANYTIME_ALPHA_SPENDING_RULE_ID
+        }
+        _ => false,
+    };
+    if !score_method_is_valid
         || receipt.action_set_digest.trim().is_empty()
         || receipt.scenario_set_digest.trim().is_empty()
         || receipt.score_contract_digest.trim().is_empty()
