@@ -116,21 +116,48 @@
     "reserve_commitments": [
       {
         "product": "regulating_reserve",
+        "direction": "up",
         "committed_mw": 5,
         "capability_class": "synthetic",
-        "simultaneous_energy_double_counted": false
+        "simultaneous_energy_double_counted": false,
+        "start_response_seconds": 5,
+        "full_activation_seconds": 580,
+        "sustain_duration_seconds": 600,
+        "proven_sustain_seconds": 600,
+        "response_evidence_class": "synthetic",
+        "sustain_evidence_class": "synthetic",
+        "response_evidence_ref": null,
+        "sustain_evidence_ref": null
       },
       {
         "product": "instantaneous_reserve",
+        "direction": "up",
         "committed_mw": 5,
         "capability_class": "synthetic",
-        "simultaneous_energy_double_counted": false
+        "simultaneous_energy_double_counted": false,
+        "start_response_seconds": null,
+        "full_activation_seconds": 8,
+        "sustain_duration_seconds": 600,
+        "proven_sustain_seconds": 600,
+        "response_evidence_class": "synthetic",
+        "sustain_evidence_class": "synthetic",
+        "response_evidence_ref": null,
+        "sustain_evidence_ref": null
       },
       {
         "product": "ten_minute_reserve",
+        "direction": "up",
         "committed_mw": 5,
         "capability_class": "synthetic",
-        "simultaneous_energy_double_counted": false
+        "simultaneous_energy_double_counted": false,
+        "start_response_seconds": null,
+        "full_activation_seconds": 600,
+        "sustain_duration_seconds": null,
+        "proven_sustain_seconds": null,
+        "response_evidence_class": "synthetic",
+        "sustain_evidence_class": "unknown",
+        "response_evidence_ref": null,
+        "sustain_evidence_ref": null
       }
     ],
     "dispatch_instruction": {
