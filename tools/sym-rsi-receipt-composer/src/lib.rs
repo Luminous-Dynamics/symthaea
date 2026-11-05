@@ -206,6 +206,10 @@ pub struct CompositionPlan {
     pub experiment_id: String,
     pub preregistration_digest: String,
     pub metrics: BTreeMap<String, MetricProjection>,
+    /// Candidate system-identity digests for every declared parent. Empty for a root;
+    /// multiple entries represent a hybrid. These are in-memory lineage claims supplied
+    /// by the frozen experiment plan, not authenticated by the receipt validator.
+    pub parent_system_identity_digests: BTreeSet<String>,
     /// Exact eligible task ID -> independent cluster ID assignment.
     pub cluster_by_task: BTreeMap<String, String>,
 }
@@ -214,6 +218,9 @@ impl CompositionPlan {
     pub fn validate(&self) -> Result<(), ComposerError> {
         validate_identifier(&self.experiment_id, "experiment_id")?;
         validate_sha256(&self.preregistration_digest, "preregistration_digest")?;
+        for parent_digest in &self.parent_system_identity_digests {
+            validate_sha256(parent_digest, "parent_system_identity_digest")?;
+        }
         if self.metrics.is_empty() {
             return Err(ComposerError::InvalidPlan(
                 "at least one metric projection is required".into(),
@@ -310,6 +317,8 @@ pub struct ComposedCandidateEvidence {
     candidate_system_identity_digest: String,
     composite_context_digest: String,
     evidence_set_digest: String,
+    lineage_manifest_digest: String,
+    parent_system_identity_digests: BTreeSet<String>,
     eligible_task_ids: Vec<String>,
     cluster_by_task: BTreeMap<String, String>,
     metrics: BTreeMap<String, MetricEvidence>,
@@ -326,6 +335,14 @@ impl ComposedCandidateEvidence {
 
     pub fn evidence_set_digest(&self) -> &str {
         &self.evidence_set_digest
+    }
+
+    pub fn lineage_manifest_digest(&self) -> &str {
+        &self.lineage_manifest_digest
+    }
+
+    pub fn parent_system_identity_digests(&self) -> &BTreeSet<String> {
+        &self.parent_system_identity_digests
     }
 
     pub fn eligible_task_ids(&self) -> &[String] {
@@ -441,6 +458,12 @@ pub fn compare_candidates(
     }
     if parent.candidate_system_identity_digest == candidate.candidate_system_identity_digest {
         return Err(ComposerError::SameCandidate);
+    }
+    if !candidate
+        .parent_system_identity_digests
+        .contains(&parent.candidate_system_identity_digest)
+    {
+        return Err(ComposerError::ParentLineageMismatch);
     }
     if parent.eligible_task_ids != candidate.eligible_task_ids
         || parent.cluster_by_task != candidate.cluster_by_task
@@ -695,8 +718,12 @@ pub fn compose_candidate(
         "cluster_by_task": plan.cluster_by_task.clone()
     });
     let evidence_manifest = Value::Object(evidence_digests);
+    let lineage_manifest = json!({
+        "parent_system_identity_digests": plan.parent_system_identity_digests
+    });
     let context_digest = digest_value(&context_manifest)?;
     let evidence_set_digest = digest_value(&evidence_manifest)?;
+    let lineage_manifest_digest = digest_value(&lineage_manifest)?;
     let candidate_identity =
         shared_candidate_identity.ok_or(ComposerError::CandidateIdentityMismatch)?;
     let candidate_system_identity_digest = digest_value(&candidate_identity)?;
@@ -705,6 +732,8 @@ pub fn compose_candidate(
         candidate_system_identity_digest,
         composite_context_digest: context_digest,
         evidence_set_digest,
+        lineage_manifest_digest,
+        parent_system_identity_digests: plan.parent_system_identity_digests.clone(),
         eligible_task_ids,
         cluster_by_task: plan.cluster_by_task.clone(),
         metrics,
@@ -1051,6 +1080,7 @@ pub enum ComposerError {
     },
     ContextMismatch,
     SameCandidate,
+    ParentLineageMismatch,
     MetricSetMismatch,
     TaskInputMismatch {
         metric_id: String,
@@ -1144,6 +1174,9 @@ impl fmt::Display for ComposerError {
             ),
             Self::ContextMismatch => write!(f, "candidate evaluation contexts differ"),
             Self::SameCandidate => write!(f, "cannot compare a candidate with itself"),
+            Self::ParentLineageMismatch => {
+                write!(f, "candidate did not declare the compared parent system identity")
+            }
             Self::MetricSetMismatch => write!(f, "candidate metric sets differ"),
             Self::TaskInputMismatch { metric_id, task_id } => {
                 write!(
@@ -1222,6 +1255,7 @@ mod tests {
                 .into_iter()
                 .map(|projection| (projection.metric_id.clone(), projection))
                 .collect(),
+            parent_system_identity_digests: BTreeSet::new(),
             cluster_by_task,
         }
     }
