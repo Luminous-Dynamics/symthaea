@@ -27,18 +27,18 @@
       "source_uri": "https://committee.iso.org/standard/77461.html"
     },
     {
-      "id": "MTConnect",
-      "edition": "2.5",
-      "version": "2025-02",
-      "surface": "MTConnect",
-      "source_uri": "https://mtconnect.squarespace.com/standard-download20181"
-    },
-    {
       "id": "NIST IR 8536",
       "edition": "Final",
       "version": "2026-09-09",
       "surface": "traceability_principles",
       "source_uri": "https://csrc.nist.gov/pubs/ir/8536/final"
+    },
+    {
+      "id": "MTConnect",
+      "edition": "2.7",
+      "version": "2026-02",
+      "surface": "MTConnect",
+      "source_uri": "https://github.com/mtconnect/mtconnect_sysml_model/releases"
     }
   ],
   "cases": [
