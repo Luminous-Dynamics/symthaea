@@ -165,3 +165,8 @@ This contract is a decision-policy and benchmark proposal. It does not authorize
 ## 11. Machine-readable synthetic challenge manifest
 
 The companion fixture `household-resource-arbitration-scenarios-v0.1.json` carries HRA-001…014 with structured stimuli, expected decision semantics, required assertions, prohibited behaviors and explicit acceptance gates. All entries are marked synthetic-only and proposed/not executed. This is a challenge manifest; it does not authorize equipment actuation or establish physical performance.
+
+
+### Positive-control requirement
+
+The companion machine-readable manifest includes HRA-POS-001…003. These are valid, fully authorized candidates that should remain eligible for local-controller evaluation, not direct actuation. A validator that rejects every request must fail. The positive controls deliberately include an ordinary non-water action, a precisely source/use-qualified water action, and an explicitly authorized optional-load deferral.
