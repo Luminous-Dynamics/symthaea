@@ -102,10 +102,7 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn validate_vintage(vintage: PriceVintage<'_>) -> Result<(), AsOfReplayError> {
-    if !nonempty(vintage.record_id)
-        || !nonempty(vintage.source_ref)
-        || !nonempty(vintage.series_id)
-    {
+    if !nonempty(vintage.record_id) || !nonempty(vintage.source_ref) || !nonempty(vintage.series_id) {
         return Err(AsOfReplayError::InvalidEvidenceReference);
     }
     if !valid_sha256(vintage.source_sha256) {
@@ -142,10 +139,7 @@ fn validate_vintage(vintage: PriceVintage<'_>) -> Result<(), AsOfReplayError> {
     Ok(())
 }
 
-fn target_matches(
-    vintage: PriceVintage<'_>,
-    target: AsOfReplayTarget<'_>,
-) -> bool {
+fn target_matches(vintage: PriceVintage<'_>, target: AsOfReplayTarget<'_>) -> bool {
     if vintage.series_id != target.series_id
         || vintage.valid_period_start_utc != target.valid_period_start_utc
         || vintage.valid_period_end_utc != target.valid_period_end_utc
@@ -153,9 +147,10 @@ fn target_matches(
         return false;
     }
     match vintage.kind {
-        PriceVintageKind::Forecast { model_id, .. } => {
-            target.model_id.map(|expected| expected == model_id).unwrap_or(true)
-        }
+        PriceVintageKind::Forecast { model_id, .. } => target
+            .model_id
+            .map(|expected| expected == model_id)
+            .unwrap_or(true),
         PriceVintageKind::Realized { .. } => true,
     }
 }
@@ -207,7 +202,11 @@ pub fn replay_prices_as_of<'a>(
     // Never select whichever forecast engine happened to publish last when
     // the target does not name a model. Model outputs are separate evidence,
     // not interchangeable revisions of one series.
-    for target in targets.iter().copied().filter(|target| target.model_id.is_none()) {
+    for target in targets
+        .iter()
+        .copied()
+        .filter(|target| target.model_id.is_none())
+    {
         let mut forecast_model: Option<&str> = None;
         for vintage in vintages.iter().copied() {
             if !target_matches(vintage, target) || vintage.available_at_utc > decision_time_utc {
@@ -244,9 +243,7 @@ pub fn replay_prices_as_of<'a>(
         let mut eligible_count = 0_u32;
 
         for (record_index, vintage) in vintages.iter().copied().enumerate() {
-            if !target_matches(vintage, target)
-                || vintage.available_at_utc > decision_time_utc
-            {
+            if !target_matches(vintage, target) || vintage.available_at_utc > decision_time_utc {
                 continue;
             }
 
@@ -312,10 +309,8 @@ pub fn replay_prices_as_of<'a>(
 mod tests {
     use super::*;
 
-    const SOURCE_SHA: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const MODEL_SHA: &str =
-        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const MODEL_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     fn target(model_id: Option<&'static str>) -> AsOfReplayTarget<'static> {
         AsOfReplayTarget {
