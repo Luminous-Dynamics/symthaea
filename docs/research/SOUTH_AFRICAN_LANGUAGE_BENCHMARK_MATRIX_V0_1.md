@@ -414,3 +414,19 @@ Keep safety compliance, benign helpfulness, comprehension/deflection and cultura
 ### Competitive retrieval challenge
 
 The most important new retrieval ablation is: **keep the claim constant and vary only the language of the answer-critical evidence**. A multilingual system must retrieve a relevant isiXhosa/Zulu/Sesotho/Afrikaans source even when the query is English or another language. If it suppresses decisive evidence due to language preference, high final-answer accuracy can simply reflect memorization. This is a direct, measurable target for a language-neutral evidence ranker.
+
+
+### Multi-Hall-SA interpretation boundary and prompt provenance
+
+The current [Multi-Hall-SA dataset card](https://huggingface.co/datasets/sello-ralethe/Multi-Hall-SA) states that:
+- facts are extracted from **parallel** government-document pairs, rather than extracting in English and translating hallucinated variants;
+- each fact is paired with one of four controlled perturbation classes: temporal, entity, numerical or location;
+- the benchmark is designed to measure the **cross-lingual detection gap**; the English condition is intentionally not hard;
+- the `prompts` configuration preserves fact-extraction and hallucination-generation templates and their model/decoding notes, but **detection prompts were not recorded** with the generation pipeline.
+
+Consequences for our evaluation:
+1. We can reproduce the data split and run a preregistered detection prompt; we cannot claim exact reproduction of the original detection prompt from the `prompts` config.
+2. Report the cross-language paired gap as a primary paper-aligned endpoint, but also report absolute accuracy/macro-F1, false positives, missed hallucinations and calibration. A gap can shrink because English worsens.
+3. Treat the four generated perturbation types as controlled extrinsic factual errors, not a complete sample of real-world LLM hallucinations, source misrepresentation, fabricated citations, causal confabulation or omission.
+4. Keep an additional source-grounded fact-checking track (AfrIFact) for retrieval and evidence validity. Do not conflate it with Multi-Hall-SA.
+5. Pin the exact dataset commit and file digests before any score. The currently visible card reports 11,373 rows / 5.9 MB and CC BY 4.0; those are a mutable card snapshot, not an immutable benchmark denominator.
