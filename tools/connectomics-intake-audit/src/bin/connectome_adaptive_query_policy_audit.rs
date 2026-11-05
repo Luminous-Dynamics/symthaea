@@ -52,6 +52,8 @@ struct Input {
     joint_world_supports: Vec<JointWorldSupport>,
     #[serde(default)]
     support_challenges: Vec<SupportChallenge>,
+    #[serde(default)]
+    scenario_challenges: Vec<ScenarioExpansionChallenge>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -126,6 +128,22 @@ struct JointSupportAddition {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+struct ScenarioExpansionChallenge {
+    challenge_id: String,
+    challenger_evidence_sha256: String,
+    challenger_model_sha256: String,
+    additions: Vec<ScenarioWorldAddition>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ScenarioWorldAddition {
+    scenario: Scenario,
+    support: JointWorldSupport,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 struct JointOutcome {
     outcomes: Vec<ActionOutcome>,
 }
@@ -196,6 +214,26 @@ struct SupportChallengeResult {
 }
 
 #[derive(Debug, Serialize)]
+struct ScenarioExpansionResult {
+    challenge_id: String,
+    challenge_sha256: String,
+    expanded_scenario_set_sha256: String,
+    expanded_joint_support_sha256: String,
+    added_scenario_count: usize,
+    adaptive_worst_case_effort_before: Option<u64>,
+    adaptive_worst_case_effort_after: Option<u64>,
+    adaptive_status_before: String,
+    adaptive_status_after: String,
+    adaptive_effort_non_decreasing: bool,
+    fixed_minimum_effort_before: Option<u64>,
+    fixed_minimum_effort_after: Option<u64>,
+    fixed_status_before: String,
+    fixed_status_after: String,
+    fixed_effort_non_decreasing: bool,
+    monotonicity_passed: bool,
+}
+
+#[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
     tool: &'static str,
@@ -224,6 +262,9 @@ struct Report {
     support_challenge_count: usize,
     support_challenges: Vec<SupportChallengeResult>,
     support_expansion_monotonicity_passed: bool,
+    scenario_challenge_count: usize,
+    scenario_challenges: Vec<ScenarioExpansionResult>,
+    hypothesis_expansion_monotonicity_passed: bool,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
@@ -955,6 +996,146 @@ fn expand_joint_support(
     ))
 }
 
+fn canonical_scenario_expansion_challenge_sha256(
+    base_scenario_sha256: &str,
+    base_joint_support_sha256: &str,
+    challenge: &ScenarioExpansionChallenge,
+    action_ids: &[String],
+) -> Result<String, String> {
+    let mut additions = challenge.additions.iter().collect::<Vec<_>>();
+    additions.sort_by(|left, right| left.scenario.scenario_id.cmp(&right.scenario.scenario_id));
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectome-adaptive-hypothesis-space-expansion-v1");
+    hasher.update(base_scenario_sha256.as_bytes());
+    hasher.update(base_joint_support_sha256.as_bytes());
+    hash_field(&mut hasher, &challenge.challenge_id);
+    hasher.update(challenge.challenger_evidence_sha256.as_bytes());
+    hasher.update(challenge.challenger_model_sha256.as_bytes());
+    hasher.update((additions.len() as u64).to_be_bytes());
+    for addition in additions {
+        if addition.scenario.scenario_id != addition.support.scenario_id {
+            return Err(format!(
+                "scenario/support identity mismatch for {}",
+                addition.scenario.scenario_id
+            ));
+        }
+        hasher.update(b"NEW-WORLD");
+        hash_field(&mut hasher, &addition.scenario.scenario_id);
+        hasher.update(addition.scenario.graph_sha256.as_bytes());
+        hasher.update([u8::from(addition.scenario.decision_met)]);
+        hasher.update(addition.support.source_evidence_sha256.as_bytes());
+        hasher.update(addition.support.joint_observation_model_sha256.as_bytes());
+        let mut groups = addition.support.dependence_groups.clone();
+        groups.sort();
+        hasher.update((groups.len() as u64).to_be_bytes());
+        for group in groups {
+            hasher.update(b"DEPENDENCE");
+            hash_field(&mut hasher, &group);
+        }
+        let rows = normalized_joint_rows(&addition.support, action_ids)?;
+        hasher.update((rows.len() as u64).to_be_bytes());
+        for row in rows {
+            hasher.update(b"JOINT-TUPLE");
+            for (action_id, outcome) in action_ids.iter().zip(row) {
+                hash_field(&mut hasher, action_id);
+                hash_field(&mut hasher, &outcome);
+            }
+        }
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn expand_scenario_space(
+    base_input: &Input,
+    challenge: &ScenarioExpansionChallenge,
+    action_ids: &[String],
+) -> Result<(String, Input, usize), String> {
+    if !nonempty(&challenge.challenge_id) {
+        return Err("scenario challenge ID must be non-empty".into());
+    }
+    if !valid_hex(&challenge.challenger_evidence_sha256, 64)
+        || !valid_hex(&challenge.challenger_model_sha256, 64)
+    {
+        return Err(format!(
+            "scenario challenge {} challenger evidence/model digests must be SHA-256",
+            challenge.challenge_id
+        ));
+    }
+    let remaining_capacity = MAX_SCENARIOS.saturating_sub(base_input.scenarios.len());
+    if challenge.additions.is_empty() || challenge.additions.len() > remaining_capacity {
+        return Err(format!(
+            "scenario challenge {} must append 1..={remaining_capacity} worlds",
+            challenge.challenge_id
+        ));
+    }
+    let base_ids = base_input
+        .scenarios
+        .iter()
+        .map(|world| world.scenario_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut added_ids = BTreeSet::new();
+    let mut expanded = base_input.clone();
+    for addition in &challenge.additions {
+        let scenario = &addition.scenario;
+        let support = &addition.support;
+        if !nonempty(&scenario.scenario_id)
+            || !valid_hex(&scenario.graph_sha256, 64)
+            || base_ids.contains(scenario.scenario_id.as_str())
+            || !added_ids.insert(scenario.scenario_id.as_str())
+        {
+            return Err(format!(
+                "scenario challenge {} has a duplicate/invalid new world {}",
+                challenge.challenge_id, scenario.scenario_id
+            ));
+        }
+        if support.scenario_id != scenario.scenario_id
+            || !valid_hex(&support.source_evidence_sha256, 64)
+            || !valid_hex(&support.joint_observation_model_sha256, 64)
+        {
+            return Err(format!(
+                "scenario challenge {} world {} has mismatched identity or invalid support provenance",
+                challenge.challenge_id, scenario.scenario_id
+            ));
+        }
+        let mut groups = BTreeSet::new();
+        for group in &support.dependence_groups {
+            if !nonempty(group) || !groups.insert(group) {
+                return Err(format!(
+                    "scenario challenge {} world {} has duplicate/empty dependence group",
+                    challenge.challenge_id, scenario.scenario_id
+                ));
+            }
+        }
+        let rows = normalized_joint_rows(support, action_ids)?;
+        if rows.is_empty() || rows.len() > MAX_JOINT_TUPLES_PER_WORLD {
+            return Err(format!(
+                "scenario challenge {} world {} has invalid joint support size",
+                challenge.challenge_id, scenario.scenario_id
+            ));
+        }
+        expanded.scenarios.push(scenario.clone());
+        expanded.joint_world_supports.push(support.clone());
+    }
+
+    expanded.scenario_set_scope = "sampled_sensitivity_set".into();
+    expanded.joint_support_scope = "sampled_sensitivity_support".into();
+    expanded.scenario_set_sha256 = canonical_scenario_set_sha256(&expanded.scenarios);
+    expanded.joint_support_sha256 = canonical_joint_support_sha256(
+        &expanded.scenarios,
+        &expanded.actions,
+        &expanded.joint_world_supports,
+    )?;
+    // Re-run the same strict base validator against the appended universe.
+    validate(&expanded)?;
+    let challenge_sha256 = canonical_scenario_expansion_challenge_sha256(
+        &base_input.scenario_set_sha256,
+        &base_input.joint_support_sha256,
+        challenge,
+        action_ids,
+    )?;
+    Ok((challenge_sha256, expanded, challenge.additions.len()))
+}
+
 fn effort_is_non_decreasing(before: Option<u64>, after: Option<u64>) -> bool {
     match (before, after) {
         (Some(before), Some(after)) => after >= before,
@@ -1232,6 +1413,65 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         });
     }
 
+    let mut scenario_challenge_ids = BTreeSet::new();
+    let mut scenario_challenge_results = Vec::with_capacity(input.scenario_challenges.len());
+    for challenge in &input.scenario_challenges {
+        if !scenario_challenge_ids.insert(challenge.challenge_id.as_str()) {
+            return Err(format!(
+                "duplicate scenario challenge ID {}",
+                challenge.challenge_id
+            ));
+        }
+        let (challenge_sha256, expanded_input, added_scenario_count) =
+            expand_scenario_space(input, challenge, &action_ids)?;
+        let (expanded_action_ids, expanded_tuples) = validate(&expanded_input)?;
+        let expanded_scenarios = sorted_scenarios(&expanded_input.scenarios);
+        let expanded_actions = sorted_actions(&expanded_input.actions);
+        let expanded_action_effort = expanded_actions
+            .iter()
+            .map(|action| action.effort_units)
+            .collect::<Vec<_>>();
+        let (expanded_solution, _expanded_state_count) = solve_adaptive_policy(
+            &expanded_action_ids,
+            &expanded_action_effort,
+            &expanded_scenarios,
+            &expanded_tuples,
+        )?;
+        let expanded_fixed = minimum_fixed_plan(
+            &expanded_action_ids,
+            &expanded_action_effort,
+            &expanded_scenarios,
+            &expanded_tuples,
+            expanded_input.max_total_effort_units,
+        )?;
+        let adaptive_before = solution.as_ref().map(|policy| policy.worst_case_cost);
+        let adaptive_after = expanded_solution
+            .as_ref()
+            .map(|policy| policy.worst_case_cost);
+        let fixed_before = fixed_non_adaptive_optimum.minimum_effort_units;
+        let fixed_after = expanded_fixed.minimum_effort_units;
+        let adaptive_non_decreasing = effort_is_non_decreasing(adaptive_before, adaptive_after);
+        let fixed_non_decreasing = effort_is_non_decreasing(fixed_before, fixed_after);
+        scenario_challenge_results.push(ScenarioExpansionResult {
+            challenge_id: challenge.challenge_id.clone(),
+            challenge_sha256,
+            expanded_scenario_set_sha256: expanded_input.scenario_set_sha256,
+            expanded_joint_support_sha256: expanded_input.joint_support_sha256,
+            added_scenario_count,
+            adaptive_worst_case_effort_before: adaptive_before,
+            adaptive_worst_case_effort_after: adaptive_after,
+            adaptive_status_before: adaptive_status(&solution).to_string(),
+            adaptive_status_after: adaptive_status(&expanded_solution).to_string(),
+            adaptive_effort_non_decreasing: adaptive_non_decreasing,
+            fixed_minimum_effort_before: fixed_before,
+            fixed_minimum_effort_after: fixed_after,
+            fixed_status_before: fixed_status(&fixed_non_adaptive_optimum).to_string(),
+            fixed_status_after: fixed_status(&expanded_fixed).to_string(),
+            fixed_effort_non_decreasing: fixed_non_decreasing,
+            monotonicity_passed: adaptive_non_decreasing && fixed_non_decreasing,
+        });
+    }
+
     let (
         worst_case,
         min_path,
@@ -1280,10 +1520,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     let support_expansion_monotonicity_passed = support_challenge_results
         .iter()
         .all(|challenge| challenge.monotonicity_passed);
-    let reported_status = if support_expansion_monotonicity_passed {
-        status
-    } else {
+    let hypothesis_expansion_monotonicity_passed = scenario_challenge_results
+        .iter()
+        .all(|challenge| challenge.monotonicity_passed);
+    let reported_status = if !support_expansion_monotonicity_passed {
         "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+    } else if !hypothesis_expansion_monotonicity_passed {
+        "HYPOTHESIS_EXPANSION_MONOTONICITY_VIOLATION"
+    } else {
+        status
     };
 
     Ok(Report {
@@ -1314,13 +1559,16 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         support_challenge_count: support_challenge_results.len(),
         support_challenges: support_challenge_results,
         support_expansion_monotonicity_passed,
+        scenario_challenge_count: scenario_challenge_results.len(),
+        scenario_challenges: scenario_challenge_results,
+        hypothesis_expansion_monotonicity_passed,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         probability_claim: "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
         status: reported_status,
         search_complete: true,
-        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; scenario challenges append new worlds without altering the base universe. A monotonicity pass does not prove scenario-space completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     })
 }
 
@@ -1364,7 +1612,9 @@ fn main() -> ExitCode {
     } else {
         print!("{rendered}");
     }
-    if !report.support_expansion_monotonicity_passed {
+    if !report.support_expansion_monotonicity_passed
+        || !report.hypothesis_expansion_monotonicity_passed
+    {
         return ExitCode::from(4);
     }
     ExitCode::SUCCESS
@@ -1386,6 +1636,13 @@ mod tests {
             "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_NO_POLICY.example.json"
         ))
         .expect("adaptive no-policy fixture must parse")
+    }
+
+    fn hypothesis_expansion_fixture() -> Input {
+        serde_json::from_str(include_str!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json"
+        ))
+        .expect("hypothesis-space expansion fixture must parse")
     }
 
     fn support_expansion_fixture() -> Input {
@@ -1550,6 +1807,59 @@ mod tests {
         assert_eq!(report.worst_case_effort_units, Some(1));
         assert_eq!(report.optimal_policy_count, 2);
         assert!(report.policy.is_some());
+    }
+
+    #[test]
+    fn appending_an_opposing_world_can_destroy_a_previously_valid_policy() {
+        let input = hypothesis_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        assert_eq!(report.worst_case_effort_units, Some(4));
+        assert_eq!(report.scenario_challenge_count, 2);
+        let opposing = report
+            .scenario_challenges
+            .iter()
+            .find(|challenge| {
+                challenge.challenge_id == "append-refuting-world-sharing-observation-tuple"
+            })
+            .unwrap();
+        assert_eq!(opposing.added_scenario_count, 1);
+        assert_eq!(opposing.adaptive_worst_case_effort_before, Some(4));
+        assert_eq!(opposing.adaptive_worst_case_effort_after, None);
+        assert_eq!(opposing.adaptive_status_after, "NO_POLICY");
+        assert!(opposing.adaptive_effort_non_decreasing);
+        assert!(opposing.monotonicity_passed);
+    }
+
+    #[test]
+    fn appending_a_same_decision_world_preserves_the_query_policy() {
+        let input = hypothesis_expansion_fixture();
+        let report = evaluate(&input, &bytes(&input)).unwrap();
+        let same_decision = report
+            .scenario_challenges
+            .iter()
+            .find(|challenge| {
+                challenge.challenge_id == "append-supporting-world-with-covered-observation"
+            })
+            .unwrap();
+        assert_eq!(same_decision.adaptive_worst_case_effort_before, Some(4));
+        assert_eq!(same_decision.adaptive_worst_case_effort_after, Some(4));
+        assert_eq!(same_decision.fixed_minimum_effort_before, Some(5));
+        assert_eq!(same_decision.fixed_minimum_effort_after, Some(5));
+        assert!(same_decision.monotonicity_passed);
+        assert!(report.hypothesis_expansion_monotonicity_passed);
+    }
+
+    #[test]
+    fn hypothesis_expansion_rejects_a_base_world_id_reuse() {
+        let mut input = hypothesis_expansion_fixture();
+        input.scenario_challenges[0].additions[0]
+            .scenario
+            .scenario_id = "world-a".into();
+        input.scenario_challenges[0].additions[0]
+            .support
+            .scenario_id = "world-a".into();
+        let error = evaluate(&input, &bytes(&input)).unwrap_err();
+        assert!(error.contains("duplicate/invalid new world"));
     }
 
     #[test]

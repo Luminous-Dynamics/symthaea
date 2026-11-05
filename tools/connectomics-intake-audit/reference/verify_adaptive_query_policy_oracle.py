@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import itertools
 import math
@@ -313,6 +314,140 @@ def support_challenge_digest(base_support_sha: str, challenge: dict, action_ids:
     return h.hexdigest(), normalized_additions
 
 
+def valid_sha(value: str, length: int) -> bool:
+    return len(value) == length and all(character in "0123456789abcdef" for character in value)
+
+
+def scenario_expansion_challenge_digest(
+    data: dict,
+    challenge: dict,
+    action_ids: list[str],
+) -> str:
+    additions = sorted(
+        challenge["additions"],
+        key=lambda item: item["scenario"]["scenario_id"],
+    )
+    h = hashlib.sha256()
+    h.update(b"connectome-adaptive-hypothesis-space-expansion-v1")
+    h.update(data["scenario_set_sha256"].encode("ascii"))
+    h.update(data["joint_support_sha256"].encode("ascii"))
+    hash_field(h, challenge["challenge_id"])
+    h.update(challenge["challenger_evidence_sha256"].encode("ascii"))
+    h.update(challenge["challenger_model_sha256"].encode("ascii"))
+    h.update(len(additions).to_bytes(8, "big"))
+    for addition in additions:
+        scenario = addition["scenario"]
+        support = addition["support"]
+        if scenario["scenario_id"] != support["scenario_id"]:
+            raise AssertionError("scenario/support identity mismatch")
+        h.update(b"NEW-WORLD")
+        hash_field(h, scenario["scenario_id"])
+        h.update(scenario["graph_sha256"].encode("ascii"))
+        h.update(bytes([int(scenario["decision_met"])]))
+        h.update(support["source_evidence_sha256"].encode("ascii"))
+        h.update(support["joint_observation_model_sha256"].encode("ascii"))
+        groups = sorted(support["dependence_groups"])
+        h.update(len(groups).to_bytes(8, "big"))
+        for group in groups:
+            h.update(b"DEPENDENCE")
+            hash_field(h, group)
+        rows = normalized_rows(support, action_ids)
+        h.update(len(rows).to_bytes(8, "big"))
+        for row in rows:
+            h.update(b"JOINT-TUPLE")
+            for action_id, outcome in zip(action_ids, row):
+                hash_field(h, action_id)
+                hash_field(h, outcome)
+    return h.hexdigest()
+
+
+def build_scenario_challenges(
+    data: dict,
+    scenarios: list[dict],
+    actions: list[dict],
+    baseline_solution: dict | None,
+    baseline_fixed: dict,
+) -> list[dict]:
+    action_ids = [action["action_id"] for action in actions]
+    seen_challenges = set()
+    results = []
+    for challenge in data.get("scenario_challenges", []):
+        challenge_id = challenge["challenge_id"]
+        assert challenge_id and challenge_id not in seen_challenges, "duplicate/empty scenario challenge ID"
+        seen_challenges.add(challenge_id)
+        assert valid_sha(challenge["challenger_evidence_sha256"], 64)
+        assert valid_sha(challenge["challenger_model_sha256"], 64)
+        assert challenge["additions"], "scenario challenge must append at least one world"
+        assert len(challenge["additions"]) <= 12 - len(scenarios), "scenario world cap exceeded"
+        challenge_sha = scenario_expansion_challenge_digest(data, challenge, action_ids)
+        expanded = copy.deepcopy(data)
+        base_ids = {world["scenario_id"] for world in scenarios}
+        added_ids = set()
+        for addition in challenge["additions"]:
+            scenario = addition["scenario"]
+            support = addition["support"]
+            scenario_id = scenario["scenario_id"]
+            assert scenario_id not in base_ids and scenario_id not in added_ids, "duplicate/invalid new world"
+            assert scenario_id == support["scenario_id"], "scenario/support identity mismatch"
+            assert scenario["scenario_id"].strip()
+            assert valid_sha(scenario["graph_sha256"], 64)
+            assert valid_sha(support["source_evidence_sha256"], 64)
+            assert valid_sha(support["joint_observation_model_sha256"], 64)
+            assert len(support["dependence_groups"]) == len(set(support["dependence_groups"]))
+            assert all(group.strip() for group in support["dependence_groups"])
+            normalized = normalized_rows(support, action_ids)
+            assert 0 < len(normalized) <= 64
+            added_ids.add(scenario_id)
+            expanded["scenarios"].append(scenario)
+            expanded["joint_world_supports"].append(support)
+        assert len(expanded["scenarios"]) <= 12, "world cap exceeded"
+        expanded["scenario_set_scope"] = "sampled_sensitivity_set"
+        expanded["joint_support_scope"] = "sampled_sensitivity_support"
+        expanded["scenario_set_sha256"] = scenario_digest(expanded["scenarios"])
+        expanded["joint_support_sha256"] = joint_digest(
+            expanded["scenarios"], expanded["actions"], expanded["joint_world_supports"]
+        )
+        expanded_scenarios = sorted(expanded["scenarios"], key=lambda row: row["scenario_id"])
+        expanded_actions = sorted(expanded["actions"], key=lambda row: row["action_id"])
+        expanded_action_ids = [row["action_id"] for row in expanded_actions]
+        support_by_world = {row["scenario_id"]: row for row in expanded["joint_world_supports"]}
+        expanded_rows = [
+            normalized_rows(support_by_world[world["scenario_id"]], expanded_action_ids)
+            for world in expanded_scenarios
+        ]
+        expanded_solution, _states = adaptive_solution(
+            expanded_actions, expanded_scenarios, expanded_rows
+        )
+        expanded_fixed = fixed_plan_summary(
+            expanded_actions, expanded_scenarios, expanded_rows, data["max_total_effort_units"]
+        )
+        adaptive_before = None if baseline_solution is None else baseline_solution["worst_case_cost"]
+        adaptive_after = None if expanded_solution is None else expanded_solution["worst_case_cost"]
+        fixed_before = baseline_fixed["minimum_effort_units"]
+        fixed_after = expanded_fixed["minimum_effort_units"]
+        adaptive_monotone = effort_non_decreasing(adaptive_before, adaptive_after)
+        fixed_monotone = effort_non_decreasing(fixed_before, fixed_after)
+        results.append({
+            "challenge_id": challenge_id,
+            "challenge_sha256": challenge_sha,
+            "expanded_scenario_set_sha256": expanded["scenario_set_sha256"],
+            "expanded_joint_support_sha256": expanded["joint_support_sha256"],
+            "added_scenario_count": len(added_ids),
+            "adaptive_worst_case_effort_before": adaptive_before,
+            "adaptive_worst_case_effort_after": adaptive_after,
+            "adaptive_status_before": "POLICY_EXISTS" if baseline_solution is not None else "NO_POLICY",
+            "adaptive_status_after": "POLICY_EXISTS" if expanded_solution is not None else "NO_POLICY",
+            "adaptive_effort_non_decreasing": adaptive_monotone,
+            "fixed_minimum_effort_before": fixed_before,
+            "fixed_minimum_effort_after": fixed_after,
+            "fixed_status_before": "FIXED_PLAN_EXISTS" if fixed_before is not None else "NO_FIXED_PLAN",
+            "fixed_status_after": "FIXED_PLAN_EXISTS" if fixed_after is not None else "NO_FIXED_PLAN",
+            "fixed_effort_non_decreasing": fixed_monotone,
+            "monotonicity_passed": adaptive_monotone and fixed_monotone,
+        })
+    return results
+
+
 def build_support_challenges(
     data: dict,
     scenarios: list[dict],
@@ -409,6 +544,9 @@ def run(data: dict, input_bytes: bytes) -> dict:
     support_challenges = build_support_challenges(
         data, scenarios, actions, tuple_rows, solution, fixed_summary
     )
+    scenario_challenges = build_scenario_challenges(
+        data, scenarios, actions, solution, fixed_summary
+    )
 
     def count_tree(node: dict) -> tuple[int, int]:
         nodes = 1
@@ -441,7 +579,15 @@ def run(data: dict, input_bytes: bytes) -> dict:
     support_expansion_monotonicity_passed = all(
         challenge["monotonicity_passed"] for challenge in support_challenges
     )
-    reported_status = status if support_expansion_monotonicity_passed else "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+    hypothesis_expansion_monotonicity_passed = all(
+        challenge["monotonicity_passed"] for challenge in scenario_challenges
+    )
+    if not support_expansion_monotonicity_passed:
+        reported_status = "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+    elif not hypothesis_expansion_monotonicity_passed:
+        reported_status = "HYPOTHESIS_EXPANSION_MONOTONICITY_VIOLATION"
+    else:
+        reported_status = status
 
     return {
         "schema_version": 1,
@@ -471,13 +617,16 @@ def run(data: dict, input_bytes: bytes) -> dict:
         "support_challenge_count": len(support_challenges),
         "support_challenges": support_challenges,
         "support_expansion_monotonicity_passed": support_expansion_monotonicity_passed,
+        "scenario_challenge_count": len(scenario_challenges),
+        "scenario_challenges": scenario_challenges,
+        "hypothesis_expansion_monotonicity_passed": hypothesis_expansion_monotonicity_passed,
         "policy": policy,
         "out_of_model_observation_disposition": "FAIL_CLOSED_NO_QUERY_DECISION",
         "expected_cost_claim": "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         "probability_claim": "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
         "status": reported_status,
         "search_complete": True,
-        "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; scenario challenges append new worlds without altering the base universe. A monotonicity pass does not prove scenario-space completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     }
 
 

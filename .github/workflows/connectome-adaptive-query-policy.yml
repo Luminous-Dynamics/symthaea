@@ -11,6 +11,8 @@ on:
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_BENCHMARK_V1.md"
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_LATTICE_V1.md"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY.schema.json"
+      - "docs/neuroscience/CONNECTOME_HYPOTHESIS_SPACE_EXPANSION_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_*.example.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION*.example.json"
       - ".github/workflows/connectome-adaptive-query-policy.yml"
@@ -25,6 +27,8 @@ on:
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_BENCHMARK_V1.md"
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_LATTICE_V1.md"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY.schema.json"
+      - "docs/neuroscience/CONNECTOME_HYPOTHESIS_SPACE_EXPANSION_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_*.example.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION*.example.json"
       - ".github/workflows/connectome-adaptive-query-policy.yml"
@@ -72,6 +76,10 @@ jobs:
           cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_support_expansion_lattice_audit
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_support_expansion_lattice_audit -- --output "$RUNNER_TEMP/support-expansion-lattice.json"
           python3 tools/connectomics-intake-audit/reference/verify_support_expansion_lattice_oracle.py --report "$RUNNER_TEMP/support-expansion-lattice.json"
+      - name: Evaluate adversarial hypothesis-space expansion
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json --output "$RUNNER_TEMP/adaptive-hypothesis-expansion.json"
+          python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json --report "$RUNNER_TEMP/adaptive-hypothesis-expansion.json"
       - name: Verify independent oracle syntax
         run: |
           python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py
