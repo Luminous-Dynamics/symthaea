@@ -737,3 +737,53 @@ The updated baseline portfolio now spans:
 The paradigm shift should be **complementary independent evidence channels**, not one universal detector: source-evidence/lineage verification, model-internal uncertainty/anomaly signals, and controlled cross-view/counterfactual consistency. The verifier should return an inspectable assessment with evidence links, uncertainty and a reason to abstain. A hidden-state probe can indicate likely unreliability; it cannot establish why a claim is false or prove a source supports the alternative.
 
 Track these benchmarks separately and compare on matched model revisions and resource budgets. No result is transferable across tracks without a direct experiment.
+
+
+## 16. African fact-checking and safety/comprehension tracks
+
+### 16.1 AfrIFact — end-to-end evidence-grounded fact checking
+
+[AfrIFact (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.133/) covers ten African languages plus English and evaluates the complete fact-checking pipeline: information retrieval, evidence extraction and claim verification. The paper reports weak cross-lingual retrieval even for strong embedding models; cultural/news documents are easier to retrieve than healthcare documents; few-shot prompting improves reported performance by up to 43% in AfriqueQwen-14B and task-specific fine-tuning by up to 26%.
+
+**Why it matters:** Multi-Hall-SA mostly evaluates whether a system detects synthetic perturbations in aligned facts. AfrIFact evaluates the harder operational chain: find evidence in the right language/domain, locate the relevant passage, identify support or contradiction, then qualify the verdict. It is a much closer test of Mycelix evidence-plane + Symthaea reasoning.
+
+Required experiment decomposition:
+1. claim parsing and scope;
+2. same-language and cross-language retrieval;
+3. source-family deduplication / provenance;
+4. evidence span extraction and locator validity;
+5. evidence-to-claim relation (supports / contradicts / qualifies / contextualizes / irrelevant / unknown);
+6. final assessment (supported / contradicted / mixed / insufficient / not assessable / restricted);
+7. calibrated abstention.
+
+Report Recall@k, MRR/nDCG, source-family recall, evidence-span precision/recall, relation macro-F1, verdict macro-F1, Brier/ECE, selective risk/coverage, and cost/latency separately. Stratify culture/news/healthcare: the paper's findings indicate domain-level retrieval disparity, so a pooled score can hide clinically important failures.
+
+Admission: paper citation does not authorize corpus use. Pin repository revision and file digests, enumerate exact ten languages and South African language overlap, inspect license, source rights, split/lineage and data access. Until then, the issue's data-admission status remains pending. Work is tracked in [AFR-FACT-001 / #10544](https://github.com/Luminous-Dynamics/symthaea/issues/10544).
+
+### 16.2 TukaBench — multilingual safety *and* comprehension
+
+[TukaBench (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.692/) evaluates jailbreak robustness across seven African languages and English. The paper separates human-translated prompts, culturally adapted prompts, human-curated prompts and code-switched prompts. It distinguishes **Jailbroken**, **Refused** and **Deflected** (off-target/incoherent) responses, exposing comprehension failure that a binary safe/unsafe metric would misclassify.
+
+The currently visible [Hugging Face card](https://huggingface.co/datasets/Victor-Akinode/tukabench) declares **CC BY-NC 4.0**. It exposes three configs—`afri-jbb-harm`, `afri-jbb-benign`, `afri-jbb-culture`—with 100 prompts per config and language split; current splits show English plus Amharic, Hausa, Igbo, Nyanja, Swahili, isiXhosa and Yoruba. The repository README says the prompt data is not in the code repository and points to separate data access. Do not assume all four paper settings are downloadable in the currently exposed public card. Confirm release revision and exact settings before reproduction.
+
+The benchmark reports lower refusal in African languages than English, with culturally adapted prompts producing the lowest refusal; it also finds weaker LLM-judge agreement in lower-resource languages/scripts. Native-speaker human annotation is therefore a primary measurement channel, not an optional sanity check.
+
+Metrics must keep the following separate:
+- harmful compliance / attack success;
+- appropriate refusal on unsafe prompts;
+- false refusal on matched benign prompts;
+- deflection/comprehension failure;
+- helpful completion on allowed prompts;
+- native-speaker vs. automated-judge agreement by language, prompt origin and script.
+
+This is a safety track, not evidence of factuality and not a reason to maximize refusal indiscriminately. Keep harmful prompt content out of general source fixtures; use restricted evaluation assets and exact data permissions. Work is tracked in [AFR-SAFE-001 / #10545](https://github.com/Luminous-Dynamics/symthaea/issues/10545).
+
+### 16.3 Portfolio boundaries
+
+The African evaluation portfolio now has four distinct capability lanes:
+- Multi-Hall-SA: detection of controlled factual perturbations across English and four South African languages;
+- AfrIFact: retrieval → evidence extraction → fact checking;
+- TukaBench: harmful compliance, appropriate refusal, benign helpfulness and comprehension in African-language/culturally adapted/code-switched prompts;
+- MzansiBench / Uhura / AFROBENCH: broader language/task and scientific knowledge coverage.
+
+Do not merge their labels or aggregate metrics. A lower jailbreak rate can be caused by comprehension failure; a high hallucination detector AUROC does not prove evidence retrieval; a successful retrieval hit does not establish that the source supports the claim. Competitive quality means improving the complete chain while retaining stage-level measurements and non-compensatory rights/safety gates.
