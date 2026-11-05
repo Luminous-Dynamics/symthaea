@@ -51,7 +51,9 @@ pub struct LiquidityOptionAssessment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LiquidityOptionResult {
     Determined(LiquidityOptionAssessment),
-    Indeterminate { reason: &'static str },
+    Indeterminate {
+        reason: &'static str,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,9 +116,10 @@ fn checked_cost(
         .and_then(|value| value.checked_mul(i128::from(horizon_days)))
         .ok_or(LiquidityOptionError::ArithmeticOverflow)?;
     let fees_numerator = i128::from(fees_minor_units)
-        .checked_mul(i128::try_from(COST_DENOMINATOR).map_err(|_| {
-            LiquidityOptionError::ArithmeticOverflow
-        })?)
+        .checked_mul(
+            i128::try_from(COST_DENOMINATOR)
+                .map_err(|_| LiquidityOptionError::ArithmeticOverflow)?,
+        )
         .ok_or(LiquidityOptionError::ArithmeticOverflow)?;
     let numerator = carry_numerator
         .checked_add(fees_numerator)
@@ -165,11 +168,7 @@ pub fn assess_cash_collateral_option(
             });
         }
         EligibilityEvidence::Verified => {
-            if scenario
-                .reserve_account_source_ref
-                .map(nonempty_reference)
-                != Some(true)
-            {
+            if scenario.reserve_account_source_ref.map(nonempty_reference) != Some(true) {
                 return Err(LiquidityOptionError::InvalidEvidenceReference);
             }
         }
@@ -315,16 +314,18 @@ pub fn compare_liquidity_options(
     let cash_left = cash
         .net_carry_cost
         .numerator_minor_units
-        .checked_mul(i128::try_from(early.net_carry_cost.denominator).map_err(|_| {
-            LiquidityOptionError::ArithmeticOverflow
-        })?)
+        .checked_mul(
+            i128::try_from(early.net_carry_cost.denominator)
+                .map_err(|_| LiquidityOptionError::ArithmeticOverflow)?,
+        )
         .ok_or(LiquidityOptionError::ArithmeticOverflow)?;
     let early_left = early
         .net_carry_cost
         .numerator_minor_units
-        .checked_mul(i128::try_from(cash.net_carry_cost.denominator).map_err(|_| {
-            LiquidityOptionError::ArithmeticOverflow
-        })?)
+        .checked_mul(
+            i128::try_from(cash.net_carry_cost.denominator)
+                .map_err(|_| LiquidityOptionError::ArithmeticOverflow)?,
+        )
         .ok_or(LiquidityOptionError::ArithmeticOverflow)?;
 
     let lower_cost_option = match cash_left.cmp(&early_left) {
@@ -380,7 +381,10 @@ mod tests {
             panic!("the synthetic account and rate evidence is complete");
         };
         assert_eq!(assessment.restricted_cash_minor_units, 50_000_000);
-        assert_eq!(assessment.net_carry_cost.numerator_minor_units, 1_800_000_000_000);
+        assert_eq!(
+            assessment.net_carry_cost.numerator_minor_units,
+            1_800_000_000_000
+        );
         assert_eq!(assessment.net_carry_cost.denominator, COST_DENOMINATOR);
     }
 
@@ -393,7 +397,10 @@ mod tests {
         };
         assert_eq!(assessment.restricted_cash_minor_units, 0);
         assert_eq!(assessment.invoice_liability_reduced_minor_units, 50_000_000);
-        assert_eq!(assessment.net_carry_cost.numerator_minor_units, 1_200_000_000_000);
+        assert_eq!(
+            assessment.net_carry_cost.numerator_minor_units,
+            1_200_000_000_000
+        );
     }
 
     #[test]
@@ -406,7 +413,9 @@ mod tests {
         let LiquidityOptionResult::Determined(long) = long else {
             panic!("long scenario is determined");
         };
-        assert!(long.net_carry_cost.numerator_minor_units > short.net_carry_cost.numerator_minor_units);
+        assert!(
+            long.net_carry_cost.numerator_minor_units > short.net_carry_cost.numerator_minor_units
+        );
     }
 
     #[test]
