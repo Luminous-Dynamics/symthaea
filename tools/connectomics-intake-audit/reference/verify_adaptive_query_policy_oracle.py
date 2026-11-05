@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import itertools
+import math
 import json
 import sys
 from pathlib import Path
@@ -218,6 +219,7 @@ def run(data: dict, input_bytes: bytes) -> dict:
                 "worst_case_cost": 0,
                 "minimum_path_cost": 0,
                 "maximum_path_cost": 0,
+                "optimal_policy_count": 1,
                 "node": {
                     "action_id": None,
                     "action_cost_units": 0,
@@ -271,6 +273,7 @@ def run(data: dict, input_bytes: bytes) -> dict:
                 "worst_case_cost": cost + child_worst,
                 "minimum_path_cost": cost + child_min,
                 "maximum_path_cost": cost + child_max,
+                "optimal_policy_count": math.prod(child["optimal_policy_count"] for child in child_solutions),
                 "node": {
                     "action_id": action_id,
                     "action_cost_units": cost,
@@ -283,6 +286,8 @@ def run(data: dict, input_bytes: bytes) -> dict:
             # matching the Rust deterministic policy selection contract.
             if best is None or candidate["worst_case_cost"] < best["worst_case_cost"]:
                 best = candidate
+            elif candidate["worst_case_cost"] == best["worst_case_cost"]:
+                best["optimal_policy_count"] += candidate["optimal_policy_count"]
 
         memo[key] = best
         return best
@@ -308,10 +313,12 @@ def run(data: dict, input_bytes: bytes) -> dict:
 
     if solution is None:
         worst = minimum_path = maximum_path = within = policy = None
+        optimal_policy_count = 0
         policy_nodes = policy_branches = 0
         status = "NO_ADAPTIVE_POLICY_WITHIN_DECLARED_ACTIONS"
     else:
         worst = solution["worst_case_cost"]
+        optimal_policy_count = solution["optimal_policy_count"]
         minimum_path = solution["minimum_path_cost"]
         maximum_path = solution["maximum_path_cost"]
         within = worst <= data["max_total_effort_units"]
@@ -343,6 +350,7 @@ def run(data: dict, input_bytes: bytes) -> dict:
         "policy_node_count": policy_nodes,
         "policy_branch_count": policy_branches,
         "worst_case_effort_units": worst,
+        "optimal_policy_count": optimal_policy_count,
         "minimum_terminal_path_effort_units": minimum_path,
         "maximum_terminal_path_effort_units": maximum_path,
         "worst_case_policy_within_budget": within,
