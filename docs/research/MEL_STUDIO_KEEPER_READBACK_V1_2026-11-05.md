@@ -17,7 +17,7 @@ The keep path now:
 2. Computes the audio, recipe and score hashes over the exact bytes that are intended to be written.
 3. Writes and syncs each required artifact in the staging directory; if MIDI export succeeds, it syncs and hashes the exact staged MIDI bytes.
 4. Atomically renames the staging directory to `data/taste/audio/<audio_key>`; on Unix, it syncs the parent directory after the rename.
-5. Re-opens the published directory using its final path, reads every required file (and MIDI when present), re-computes SHA-256 and byte lengths, and rejects any digest mismatch, missing required file or unexpected MIDI file.
+5. Re-opens the published directory using its final path, enumerates the complete published directory, rejects unexpected names, symlinks and non-regular entries, then reads every required file (and MIDI when present), re-computes SHA-256 and byte lengths, and rejects any digest mismatch or missing required file.
 6. Creates a `KeeperArtifactReadbackReceiptV1` with the exact keeper key, artifact layout, digest scope and sorted file evidence.
 7. Hashes the serialized read-back receipt and stores both receipt and receipt digest in the keeper JSONL entry and the keep response.
 8. Only after successful read-back does it allocate the genealogy root and append the keeper index. A failed read-back removes the published bundle before it becomes discoverable. If the index append fails later, the existing rollback path removes the bundle and deletes any allocated genealogy manifest.
@@ -26,11 +26,13 @@ The receipt declares `sha256-exact-persisted-file-bytes-v1`. For new keepers, `r
 
 ## Tests and workflow
 
-Three targeted tests cover:
+Five targeted tests cover:
 
 - receipt content, byte lengths, sorted artifact names and exact digests for audio, recipe, score and MIDI;
 - rejection when the committed Score bytes differ from their expected digest;
-- rejection of a missing Score file and an unexpected MIDI file when the keep record says MIDI is unavailable.
+- rejection of a missing Score file and an unexpected MIDI file when the keep record says MIDI is unavailable;
+- rejection of any unreceipted extra file in the published keeper directory;
+- rejection of symlinked artifacts and non-regular directory entries.
 
 A new exact-head workflow pins Rust 1.96.0, checks formatting of the Studio binary source, and runs only the `keeper_readback_tests` module with `--locked` under the `studio` feature.
 
