@@ -128,6 +128,73 @@ jobs:
                           assert lower is not None and upper is not None
                           assert lower <= upper
 
+          # DACS is a distinct physical action-response contract, not another utility/ranking score.
+          dacs_interval_metrics = [
+              ("mean_action_pair_separation_rate", "action_pair_separation_episode_count",
+               "action_pair_separation_ci95_lower", "action_pair_separation_ci95_upper"),
+              ("mean_action_response_sign_accuracy", "action_response_sign_episode_count",
+               "action_response_sign_ci95_lower", "action_response_sign_ci95_upper"),
+              ("mean_action_response_vector_mae", "action_response_vector_episode_count",
+               "action_response_vector_ci95_lower", "action_response_vector_ci95_upper"),
+              ("mean_neutral_input_drift_energy", "neutral_input_drift_episode_count",
+               "neutral_input_drift_ci95_lower", "neutral_input_drift_ci95_upper"),
+              ("mean_multi_step_response_mae", "multi_step_response_episode_count",
+               "multi_step_response_ci95_lower", "multi_step_response_ci95_upper"),
+          ]
+          for row in rows:
+              dacs = row["dacs"]
+              assert 0.0 <= dacs["mean_prediction_coverage"] <= 1.0
+              assert 0.0 <= dacs["mean_multi_step_action_coverage"] <= 1.0
+              for mean_key, count_key, lower_key, upper_key in dacs_interval_metrics:
+                  value = dacs[mean_key]
+                  count = dacs[count_key]
+                  lower, upper = dacs[lower_key], dacs[upper_key]
+                  assert isinstance(count, int) and 0 <= count <= 64
+                  if value is None:
+                      assert count == 0
+                      assert lower is None and upper is None
+                  else:
+                      assert math.isfinite(value)
+                      assert count >= 1
+                      if count < 2:
+                          assert lower is None and upper is None
+                      else:
+                          assert lower is not None and upper is not None
+                          assert lower <= upper
+              for key in ("mean_action_pair_separation_rate", "mean_action_response_sign_accuracy"):
+                  value = dacs[key]
+                  assert value is None or 0.0 <= value <= 1.0
+              for key in ("mean_action_response_vector_mae", "mean_neutral_input_drift_energy",
+                          "mean_multi_step_response_mae"):
+                  value = dacs[key]
+                  assert value is None or (math.isfinite(value) and value >= 0.0)
+
+          # The point predictor and evaluator-only analytic oracle exactly follow
+          # the declared state-transition/action response profile.
+          for scenario in report["scenarios"]:
+              for model in ("point_outcome", "oracle"):
+                  dacs = get(scenario, model)["dacs"]
+                  assert dacs["mean_prediction_coverage"] == 1.0
+                  assert dacs["mean_action_pair_separation_rate"] == 1.0
+                  assert dacs["mean_action_response_sign_accuracy"] == 1.0
+                  assert dacs["mean_action_response_vector_mae"] == 0.0
+                  assert dacs["mean_neutral_input_drift_energy"] == 0.0
+                  assert dacs["mean_multi_step_response_mae"] == 0.0
+                  assert dacs["mean_multi_step_action_coverage"] == 1.0
+
+          support_dacs = get("monotone", "support_aware_point")["dacs"]
+          assert abs(support_dacs["mean_prediction_coverage"] - 4.0 / 7.0) < 1e-9
+          assert support_dacs["mean_action_pair_separation_rate"] == 1.0
+          assert support_dacs["mean_action_response_sign_accuracy"] == 1.0
+          assert abs(support_dacs["mean_multi_step_action_coverage"] - 4.0 / 7.0) < 1e-9
+
+          effect_dacs = get("monotone", "explicit_effect_head")["dacs"]
+          assert effect_dacs["mean_prediction_coverage"] == 0.0
+          assert effect_dacs["mean_action_pair_separation_rate"] is None
+          assert effect_dacs["mean_action_response_sign_accuracy"] is None
+          assert effect_dacs["mean_neutral_input_drift_energy"] is None
+          assert effect_dacs["mean_multi_step_response_mae"] is None
+
           # Null effects must not be mistaken for evidence of a nonzero action effect.
           null_point = get("null_effect", "point_outcome")
           assert null_point["mean_null_false_effect_rate"] == 1.0
