@@ -1,0 +1,78 @@
+name: VIS-DVPC-ONLINE-001 Online decision-value allocation policy
+
+on:
+  push:
+    branches: ["research/vision-dvpc-online-allocation-v1-20261022"]
+    paths:
+      - "tools/vision-decision-value-online-policy.rs"
+      - ".github/workflows/vis-dvpc-online-policy.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: ["main"]
+    paths:
+      - "tools/vision-decision-value-online-policy.rs"
+      - ".github/workflows/vis-dvpc-online-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vis-dvpc-online-001-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify-online-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+
+      - name: Verify exact head and pinned Rust
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          rustc --version | grep -F "1.96.0"
+
+      - name: Run online-policy contract tests
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test tools/vision-decision-value-online-policy.rs -o /tmp/vis-dvpc-online-tests
+          /tmp/vis-dvpc-online-tests
+
+      - name: Replay deterministic allocation scenarios
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 -O tools/vision-decision-value-online-policy.rs -o /tmp/vis-dvpc-online
+          /tmp/vis-dvpc-online > vis-dvpc-online.tsv
+          /tmp/vis-dvpc-online > vis-dvpc-online-repeat.tsv
+          cmp vis-dvpc-online.tsv vis-dvpc-online-repeat.tsv
+          grep -Fq $'META\tformat\tVIS-DVPC-ONLINE-001-v0.1' vis-dvpc-online.tsv
+          grep -Fq $'META\ttruth_visibility\tproducer-input-excludes-counterfactual-losses-future-frames-and-evaluator-truth' vis-dvpc-online.tsv
+          grep -Fq $'META\tresource_units\tabstract-declared-units-not-measured-energy' vis-dvpc-online.tsv
+          awk -F '\t' '
+            $1 == "ROW_HEADER" { if (NF != 8) bad=1; headers++ }
+            $1 == "ROW" { if (NF != 8) bad=1; rows++ }
+            END { if (bad || headers != 1 || rows != 6) exit 1 }
+          ' vis-dvpc-online.tsv
+          grep -Fq "reservation_overrun" vis-dvpc-online.tsv
+          sha256sum tools/vision-decision-value-online-policy.rs .github/workflows/vis-dvpc-online-policy.yml vis-dvpc-online.tsv > vis-dvpc-online.sha256
+          sha256sum -c vis-dvpc-online.sha256
+
+      - name: Upload deterministic reference evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: vis-dvpc-online-policy-reference
+          path: |
+            vis-dvpc-online.tsv
+            vis-dvpc-online.sha256
+          if-no-files-found: error
