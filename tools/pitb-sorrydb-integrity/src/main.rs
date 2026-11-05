@@ -771,6 +771,34 @@ fn synthetic_record(label: &str, commit: &str) -> SorryRecord {
     record
 }
 
+fn upstream_reference_record() -> SorryRecord {
+    SorryRecord {
+        repo: RepoInfo {
+            remote: "https://github.com/AlexKontorovich/PrimeNumberTheoremAnd".into(),
+            branch: "pitmonticone/feat-Erdos392_balance_large_prime_ge".into(),
+            commit: "713c442c94e38fe5fdf96320af2718e635b37d08".into(),
+            lean_version: "v4.26.0".into(),
+        },
+        location: Location {
+            path: "PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean".into(),
+            start_line: 24,
+            start_column: 208,
+            end_line: 24,
+            end_column: 213,
+        },
+        debug_info: DebugInfo {
+            goal: "b₁ b₂ b₃ U V : ℝ\nhU : U ≥ 1\nhV : V ≥ U\nhR : riemannZeta.Riemann_vonMangoldt_bound b₁ b₂ b₃\n⊢ (riemannZeta.zeroes_sum Set.univ (Set.Ico U V) fun ρ => 1 / ρ.im) ≤ FKS.B₁ b₁ b₂ b₃ U V".into(),
+            url: "https://github.com/AlexKontorovich/PrimeNumberTheoremAnd/blob/713c442c94e38fe5fdf96320af2718e635b37d08/PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean#L24".into(),
+        },
+        metadata: serde_json::json!({
+            "blame_email_hash": "d7f0e4a42bbb",
+            "blame_date": "2026-01-03T17:03:28-08:00",
+            "inclusion_date": "2026-01-08T16:29:37.387017+00:00"
+        }),
+        id: "7f4998b816279fb67100528ac9595b1a2272d32fa43421578a0af253003d6861".into(),
+    }
+}
+
 fn synthetic_receipt(record: &SorryRecord) -> TaskReceipt {
     TaskReceipt {
         schema_version: RECEIPT_SCHEMA.into(),
@@ -808,6 +836,29 @@ fn synthetic_receipt(record: &SorryRecord) -> TaskReceipt {
 }
 
 fn run_self_tests() -> Result<(), String> {
+    let upstream = upstream_reference_record();
+    let recomputed = expected_sorry_id(&upstream)?;
+    if recomputed != upstream.id {
+        return Err(format!("Python-compatible SorryDB ID mismatch: expected {}, got {recomputed}", upstream.id));
+    }
+    validate_record(&upstream, "upstream reference fixture")?;
+    println!("SELF_TEST_PASS reproduces an actual upstream Python SorryDB ID and Unicode goal");
+
+    let mut inclusion_changed = upstream.clone();
+    inclusion_changed.metadata["inclusion_date"] =
+        Value::String("2026-11-05T18:06:00.000000+02:00".into());
+    if expected_sorry_id(&inclusion_changed)? != upstream.id {
+        return Err("inclusion_date unexpectedly changes the upstream SorryDB task ID".into());
+    }
+    println!("SELF_TEST_PASS inclusion_date is excluded from the upstream task identity");
+
+    let mut goal_changed = upstream.clone();
+    goal_changed.debug_info.goal = "True".into();
+    if expected_sorry_id(&goal_changed)? == upstream.id {
+        return Err("changing the upstream goal failed to change the canonical task ID".into());
+    }
+    println!("SELF_TEST_PASS changing the debug goal changes the upstream task identity");
+
     let full = Database { sorries: vec![
         synthetic_record("task-a", &"1".repeat(40)),
         synthetic_record("task-b", &"2".repeat(40)),
