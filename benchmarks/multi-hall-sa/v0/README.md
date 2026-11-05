@@ -35,7 +35,9 @@ One JSONL record per released dataset row:
 }
 ```
 
-The `file_id` is a **provisional source-document cluster key**. Confirm its semantics against the pinned dataset files and source metadata before using it for statistical inference. `pair_id` is the matched fact unit.
+The released builder assigns `file_id` as a document ordinal within each language-pair build. The original evaluator uses it to look up the source document. It is a valid cluster key **within that language split**, not a globally stable source ID across independently built language splits. Therefore all bootstrap comparisons, including English-vs-English-system comparisons, stay within one target-language split. A future release should include a stable source-document hash or canonical document-family ID.
+
+**Important:** the released builder constructs `pair_id` from language, `fact_index` and error type, but `fact_index` resets for every source document. Therefore `pair_id` is not globally unique. The normalized row identity is the composite tuple `(file_id, pair_id, fact_index, language, hallucination_type)`; the scorer validates and joins on the complete tuple.
 
 ## Prediction receipt
 
@@ -47,7 +49,7 @@ Each system emits four result rows per pair:
 
 The result includes a predicted label (`factual`, `hallucinated`, or `abstain`) and optionally a calibrated `p_hallucinated`. Language and kind are separate fields; target resolves to the pair manifest's language.
 
-Every pair/system must have exactly one result for each of the four combinations. Duplicates, omissions, unknown pair IDs, unknown systems, invalid probabilities and inconsistent plan IDs fail closed.
+Every composite pair/system must have exactly one result for each of the four combinations. Each prediction repeats `file_id`, `fact_index`, `language` and `hallucination_type` alongside `pair_id`. This is intentional: `pair_id` alone collides across source documents in the released builder. Duplicates, omissions, unknown composite identities, unknown systems, invalid probabilities and inconsistent plan IDs fail closed.
 
 ## Metrics
 
