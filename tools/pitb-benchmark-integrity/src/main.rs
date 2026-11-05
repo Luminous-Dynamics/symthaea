@@ -836,7 +836,7 @@ fn load_inputs(
     let attempt_bytes = fs::read(attempts_path).map_err(|e| format!("read attempt JSONL: {e}"))?;
     let tasks = parse_jsonl(&task_bytes, "task JSONL")?;
     let reproductions = parse_jsonl(&reproduction_bytes, "reproduction receipt JSONL")?;
-    let attempts = if attempt_bytes.iter().all(u8::is_ascii_whitespace) {
+    let attempts = if attempt_bytes.iter().all(|byte| byte.is_ascii_whitespace()) {
         ParsedRows { rows: Vec::new(), raw_sha256: sha256(&attempt_bytes) }
     } else {
         parse_jsonl(&attempt_bytes, "attempt outcome JSONL")?
