@@ -858,20 +858,23 @@ fn build_system_comparisons(
 ) -> Vec<SystemComparison> {
     let candidate = &plan.candidate_system_id;
     let mut comparisons = Vec::new();
-    let mut conditions = vec!["english".to_string()];
-    conditions.extend(target_languages.iter().map(|language| format!("target:{language}")));
+    let mut conditions = Vec::new();
+    for language in target_languages {
+        conditions.push(format!("english:{language}"));
+        conditions.push(format!("target:{language}"));
+    }
 
     for baseline in plan.systems.iter().filter(|system| system.system_id != *candidate) {
         for condition in &conditions {
             let selected_pairs: Vec<&PairMeta> = pairs.values()
-                .filter(|pair| condition == "english" || condition == &format!("target:{}", pair.language))
+                .filter(|pair| condition.ends_with(&pair.language))
                 .collect();
             let mut clusters: BTreeMap<String, Vec<f64>> = BTreeMap::new();
             let mut baseline_values = Vec::new();
             let mut candidate_values = Vec::new();
 
             for pair in &selected_pairs {
-                let language = if condition == "english" { "english" } else { "target" };
+                let language = if condition.starts_with("english:") { "english" } else { "target" };
                 let baseline_accuracy = pair_balanced_accuracy(
                     &baseline.system_id, pair, language, predictions
                 );
@@ -1034,7 +1037,10 @@ fn run() -> Result<(), String> {
 
     let target_languages: Vec<String> = pair_map.values().map(|pair| pair.language.clone())
         .collect::<BTreeSet<_>>().into_iter().collect();
-    let cluster_count = pair_map.values().map(|pair| pair.file_id.clone())
+    // file_id is a document ordinal generated independently within each
+    // language-pair build; it is only a cluster key inside that language split.
+    let cluster_count = pair_map.values()
+        .map(|pair| (pair.language.clone(), pair.file_id.clone()))
         .collect::<BTreeSet<_>>().len();
     if plan.phase == "preregistered_held_out" && cluster_count < plan.bootstrap.minimum_independent_clusters {
         return Err(format!(
@@ -1048,7 +1054,7 @@ fn run() -> Result<(), String> {
         .count();
     let comparison_count = (
         plan.systems.len().saturating_mul(target_languages.len())
-        + baseline_count.saturating_mul(target_languages.len() + 1)
+        + baseline_count.saturating_mul(target_languages.len().saturating_mul(2))
     ).max(1);
     if plan.phase == "preregistered_held_out"
         && comparison_count > 1
