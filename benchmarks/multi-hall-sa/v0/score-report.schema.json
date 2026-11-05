@@ -26,7 +26,8 @@
     "systems",
     "nonclaims",
     "tool_version",
-    "system_comparisons"
+    "system_comparisons",
+    "budget"
   ],
   "properties": {
     "schema_version": {
@@ -234,6 +235,47 @@
           "note": {
             "type": "string"
           }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_evidence_tokens",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_retrieval_calls",
+        "max_latency_ms",
+        "max_cost_microusd"
+      ],
+      "properties": {
+        "max_evidence_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_retrieval_calls": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_latency_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_cost_microusd": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     }
