@@ -1,64 +1,122 @@
-# RMI-Bench v1 — deterministic synthetic harness implementation
+# RMI-Bench v1 — synthetic Track A implementation
 
-**Protocol:** crates/domains/symthaea-muse/RMI_BENCH_V1_PREREGISTRATION_2026-11-02.md  
-**Implementation:** tools/mel-rmi-synthetic/  
-**Date:** 2026-11-05
+**Date:** 5 November 2026  
+**Protocol:** `crates/domains/symthaea-muse/RMI_BENCH_V1_PREREGISTRATION_2026-11-02.md`  
+**Implementation:** `tools/mel-rmi-synthetic/`  
+**Pull request:** [#10524](https://github.com/Luminous-Dynamics/symthaea/pull/10524)
 
-## Scope
+## Scope and claim ceiling
 
-This implementation advances only the preregistered Track A harness milestone. It uses a dependency-minimal Rust harness and finite symbolic feature fixtures. It does not run Melothaea, a vendor model, MIDI hardware, a human performer, or a listener study.
+This is a deterministic Rust implementation of the preregistered offline Track A benchmark-integrity milestone. It tests whether the evaluator distinguishes specific synthetic policies and whether its event, intervention, content-digest, negotiation, and scoped-authority checks reject declared invalid cases.
 
-## Causal separation
+It does **not** evaluate the Melothaea model, human musical value, perceived ownership, live performance, hardware timing, commercial model quality, consciousness, legal authorship, or rights. Passing the synthetic controls is not a SOTA result.
 
-Each fixture contains four observations sharing the same task, session, random seed, initial partner feature, and frozen history identity:
+## Causal design
 
-1. control — untreated partner observation;
-2. targeted — the target musical feature changes;
-3. sham — target feature remains unchanged;
-4. unrelated — a different feature changes while the target stays fixed.
+Each task uses four paired symbolic observations sharing one task/session/seed/frozen-history identity:
 
-The validator rejects cross-session/history/seed leakage, duplicate event IDs, unrecorded condition ordering, and changes to protected inputs. The paired contrast therefore has an explicit finite intervention boundary rather than assuming two conveniently similar samples are counterfactuals.
+1. **Control:** untreated partner observation.
+2. **Targeted:** only the declared target feature changes.
+3. **Sham:** the target feature is unchanged.
+4. **Unrelated:** a different feature changes while the target feature remains fixed.
 
-## Policy controls
+The intervention validator rejects event-ID duplication, task/session/history/seed leakage, wrong dimensions, a no-op treatment, a changed sham, and mismatched assignment order. The deterministic Fisher–Yates scheduler binds order to the recorded seed for replay. It is a synthetic fixture scheduler, not an approved randomization procedure for a human study.
 
-The crate implements fixed-response, imitation-only, one-way-prompt and cross-session yoked controls. A rule-based positive oracle applies the task's declared response transformation. The evaluator reports target-action delta, sham delta, unrelated-feature delta, input sensitivity, target specificity and synthetic response-rule agreement separately. Policy calls execute in the recorded seeded condition order, while output records are restored to canonical condition slots for paired comparison. Each condition receives a fresh policy fork restored from the same frozen pre-intervention checkpoint and receives the same explicit common-random-number seed; the trait contract forbids carrying mutable action/memory state across arms. The stateful-counter test asserts fork seeds 41,41,41,41 as well as per-fork ordinals 1,1,1,1.
+Policy arms execute in that recorded order, but output actions are stored in canonical condition slots for paired contrasts. Each arm calls `fork_from_frozen_state` with the same task seed; the API contract requires a fresh policy restored from the same pre-intervention checkpoint. A stateful-counter test checks that each arm starts at ordinal one and receives the same seed. The trait cannot prove that an arbitrary production adapter obeys this contract; a real adapter still needs its own isolation test.
 
-The imitation control is intentionally important: copying the current partner can be input-sensitive but is not automatically considered musically complementary. The oracle relation is deliberately narrow and task-defined; it must not be presented as a human judgment or a general metric of musicality.
+## Baselines and dimensions
 
-A second, controlled-partner path now runs all four matched agent-action conditions and reports targeted, sham and unrelated effects separately. It distinguishes a fixed partner from a responsive simulator. A joint synthetic record requires both partner-to-agent and agent-to-partner gates, including a declared reverse-direction response-rule match; input-sensitive but rule-inconsistent partner behavior fails. These results are controlled-simulator evidence, not proof of influence over musicians.
+The fixed five-feature suite is expanded to **32 deterministic variants per dimension (160 total)**:
 
-## Evidence boundary and next integration seam
+- motif transformation;
+- rhythmic response;
+- tempo drift;
+- role exchange;
+- texture change.
 
-The manifest binds task/session/seed, policy/version, code revision, condition order, and all input/output event identities. The contrast API and manifest independently reject output-event rebinding; the controlled-partner adapter validates input and output feature dimensions.
+The policy controls are:
 
-An optional content-evidence layer now hashes the exact bytes for each of the four input and four output event artifact sets (Score JSON, MIDI, WAV or little-endian f32 PCM) and the exact serialized Studio transaction-receipt bytes. The `sha2` implementation is pinned to 0.10.9 and the standalone lockfile is committed. A separate verification call re-reads the supplied payloads and receipt bytes, recomputes each digest/length and rejects any mismatch, event substitution, empty artifact set, duplicate representation or attempted rebinding. This is content-integrity evidence—not signer authentication, consent verification, rights, authorship, provenance of the original capture, or proof of musical quality. The verifier identity/version fields are caller-supplied and therefore are not a cryptographic attestation of the verifier binary.
+- rule-based positive oracle;
+- fixed response;
+- imitation-only;
+- one-way prompt response;
+- cross-session yoked replay;
+- unrelated-feature shortcut (input-sensitive for the wrong reason).
 
-The next adapter must populate these payloads from Studio-owned artifact storage after a committed MEL-013A transaction and verify the transaction signature/actor/purpose under a trusted policy. Missing or unverifiable receipts must remain unqualified; a hash of an untrusted receipt is not a trusted transaction.
+The rule-based relation is task-authored synthetic ground truth. It is intentionally not described as general musical complementarity or perceptual equivalence.
 
-The crate also represents unsupported modality metrics explicitly as NotApplicable; a PCM-only adapter cannot invent note-level MIDI evidence.
+## Bidirectional contingency
 
-## Canonical runnable fixture suite
+Partner-to-agent and agent-to-controlled-partner effects remain separate. Both directions report targeted, sham, and unrelated-feature contrasts. The agent-to-partner oracle also checks whether the partner follows the task-declared reverse response relation; a partner that changes in response to the agent for an arbitrary reason does not pass that oracle.
 
-A frozen 160-case stress suite now exercises motif, rhythm, tempo, role and texture dimensions (32 deterministic replicates per dimension). The example emits per-policy, per-dimension descriptive summaries for mean targeted contrast, normalized target effect, standard deviation across synthetic fixture seeds, mean sham/unrelated contrasts and negative-control/oracle pass counts. Reverse partner summaries are reported separately. No confidence interval or cross-dimension composite is calculated. `canonical_suite` emits a CSV of fixed, imitation, one-way, yoked and rule-based policy results, plus the reverse-direction four-condition controlled-partner contrast. It includes an unrelated-feature shortcut baseline that changes the target action for the wrong reason. The dedicated workflow asserts: rule-based positive control 160/160; fixed, imitation, one-way, yoked and distractor-shortcut controls each 0/160; and the rule-consistent responsive-partner reciprocal oracle 160/160. A stateful-counter adversarial test confirms each condition begins from the same policy checkpoint (ordinals 1,1,1,1), so a stateful implementation cannot leak condition history into the paired contrast. The runner also binds and re-verifies exact synthetic score/MIDI payload and transaction receipt bytes for 1,120 records. This is synthetic content-integrity coverage, not Studio-origin evidence. These are finite synthetic control counts—not SOTA results or estimates of performance with musicians.
+A joint synthetic reciprocal flag requires the partner-to-agent oracle and all reverse-direction gates. This is a controlled simulator result only. A human-partner causal claim requires a separately approved, randomized or otherwise defensible human study; observational performance traces alone cannot support the same causal label.
 
-## Authored tests
+## Multi-valid response negotiation
 
-The crate authors 61 deterministic tests covering the positive oracle, fixed, imitation, one-way, yoked and distractor negative controls, sham and unrelated control integrity, intervention isolation, event identity, cross-session yoking, controlled partner influence, manifest validation, modality applicability, and exact replay equality. Earlier exact-head runs passed the 31-test, 160-fixture revision and the 42-test artifact-binding revision. The 42-test artifact-binding revision passed its dedicated workflow on exact head 618fa4d719b68c6fe0b401c072e7177e2a2cd3ed (run 42025215684) using Rust 1.96.0 and the committed locked dependency graph: 42 passed, 0 failed. The 160-case positive oracle passed 160/160; fixed, imitation, one-way, yoked and unrelated-feature shortcut controls each passed 0/160; the rule-consistent reciprocal simulator passed 160/160. It re-verified 1,120/1,120 synthetic artifact/receipt sets, emitted 17,920 per-artifact digest rows and passed the 30 agent + 5 partner summary gates. GitHub uploaded all three evidence files as a 90-day artifact (ID 13413217507, SHA-256 316c6a7bfc7966dd8e0f44866215fa65bca52e64299a060c1ff00629eed04c33). The repository-wide CI, governance, benchmark and showroom workflows remain skipped, not passed.
+`NegotiatedResponseContractV1` represents a set of admissible symbolic alternatives without ranking them. Partner authority is separate: it may contain an explicit selection and a veto set. The agent can commit, branch, ask for clarification, or abstain.
 
-## Negotiated response authority
+The evaluator separately reports contract validity, veto compliance, explicit-choice compliance, ambiguity preservation, action shape, and qualification. It rejects a premature single choice under unresolved multi-option preference, a vetoed branch, a branch that omits viable alternatives, an invalid response after all alternatives are removed, and branching beyond the declared fan-out budget. An explicit partner selection must be followed; if all choices are vetoed, abstention is the valid disposition.
 
-The RMI harness now includes a distinct symbolic interaction contract admitting multiple acceptable response values. A partner may select one option, veto options, or leave preference unresolved. The evaluator distinguishes contract validity from partner-choice compliance: unresolved alternatives must be preserved as a complete branch set or sent for clarification; a premature single commitment fails even if the committed value is contract-valid. Explicit partner selection must be followed; vetoed options are excluded; if no option remains, the valid outcome is abstention.
+This is a symbolic interaction/authority contract, not a perceptual-equivalence evaluator. Compose it with [#9307 / PR #9325](https://github.com/Luminous-Dynamics/symthaea/pull/9325) for Score/event-level realization equivalence rather than duplicating that logic here.
 
-The executable report now includes nine synthetic negotiation cases with five expected qualified outcomes and four expected rejections. This is a finite conformance suite for interaction/authority semantics, not a human preference test or perceptual-equivalence result. It composes with #9307 / PR #9325 for event/score-level edit validity; the RMI module does not duplicate score-event matching.
+The canonical runner has **11 negotiation cases**: six expected qualified outcomes and five expected rejections. The Rust unit suite also enumerates **3,464** small-state dispositions across non-empty accepted-offset sets for cyclic domains of size 2–5, source values, veto subsets, and unresolved/explicit choices.
 
-## Negotiated response authority
+## Scoped authority-event checks
 
-The RMI harness now includes a separate interaction contract for tasks admitting multiple valid symbolic response values. Partner authority is modeled separately through an explicit selection and a veto set. The evaluator distinguishes contract validity from preference compliance and checks whether unresolved ambiguity is preserved by branching the complete available set or asking for clarification. A valid-but-unselected alternative fails when a partner preference has already been made explicit; a veto cannot be overridden; if no option remains, abstention is the qualified disposition.
+`PartnerAuthorityEventV1` binds a selection/veto payload structurally to the exact session, task, source observation event, control sequence, monotonic clock origin, effective time, exclusive expiry, and an opaque receipt reference. The current suite has **seven authority-scope cases**: one structurally valid event and six rejected cross-event, stale-sequence, wrong-clock, premature, expired, and missing-reference cases.
 
-Nineteen new tests exercise multi-valid negotiation, bounded branching, exhaustive finite-state behavior, and scope-bound authority events. The canonical runner emits eleven negotiation cases (six expected qualified, five rejected) and seven authority-scope cases (one valid event, six rejected replay/scope/time cases). Authority events bind session, task, source event, control sequence, monotonic clock origin and an exclusive validity window. The opaque receipt reference is not authenticated by this crate; signature and purpose-specific consent verification remain at the MEL-013A / identity trust boundary. These are finite synthetic authority checks, not human judgments or perceptual-equivalence results. This module composes with #9307 / PR #9325 for Score/event-level edit validity and does not duplicate event matching.
+This crate does **not** authenticate the actor, verify the receipt signature, or evaluate purpose-specific consent. The receipt reference is opaque. A production adapter must verify actor and authority through the MEL-013A / trusted identity boundary before using this structural evaluator. A digest or opaque string does not prove consent.
 
-## Qualification and claim ceiling
+## Artifact content evidence
 
-Passing the finite oracle suite qualifies only the harness's ability to distinguish the declared synthetic policies and reject malformed fixtures. It does not establish actual Melothaea contingency, reciprocal collaboration, musician-valued outcomes, low latency, or commercial competitiveness.
+`ArtifactPayloadSetV1` accepts exact byte arrays for a synthetic Score JSON, MIDI, WAV or little-endian f32 PCM representation and the exact serialized transaction-receipt bytes. The pinned `sha2 = 0.10.9` implementation binds SHA-256 and byte length per representation and hashes the receipt bytes. A second call recomputes those digests against the supplied payload sets and rejects changed bytes, missing sets, duplicate formats, or event rebinding.
 
-The expanded negotiation revision (52-test unit suite plus nine executable negotiation cases) is pending its exact-head workflow; the previous 42-test/160-seed/artifact-binding revision remains the last fully qualified exact-head result. The next integration step is an adapter against MEL-013A exact artifact transactions, followed by a sealed symbolic task split and only then a separately approved human pilot.
+**Important limitation:** the helper does not access Studio storage, persist artifacts, reopen them, verify receipt signatures, authenticate the actor, validate consent scope, or attest to the verifier binary. The canonical example passes its generated payload arrays back to the verifier; this proves deterministic byte equality for those in-memory synthetic sets only. The helper provides a seam for a real adapter to pass independently re-fetched bytes, but does not itself prove such a read-back occurred.
+
+The `verifier_id` and `verifier_version` fields are caller-supplied labels, not a signed attestation. Hashing a synthetic receipt is not evidence that it originated from Studio or that its signer is trusted. The production integration must reuse MEL-013A: resolve Studio-owned artifacts, independently re-read exact bytes after commit, authenticate the transaction receipt and purpose-specific actor authority, and bind the verified transaction into the RMI trial. Do not create a parallel artifact registry.
+
+## Executable suite and output
+
+The standalone example writes:
+
+- a trial CSV for six policies across 160 fixtures (960 policy trials);
+- a four-condition reciprocal CSV for 160 rule-based-agent / responsive-partner simulator trials;
+- per-dimension descriptive agent and partner summaries;
+- an artifact-digest CSV with **17,920 rows** for the synthetic records;
+- eleven negotiation rows and seven authority-scope outcomes.
+
+The dedicated workflow pins Rust 1.96.0, stages the crate outside the root workspace, checks formatting, runs the unit tests, executes the example, and enforces these synthetic gates:
+
+| Gate | Expected |
+|---|---:|
+| Rule-based positive oracle | 160 / 160 |
+| Fixed response qualified | 0 / 160 |
+| Imitation-only qualified | 0 / 160 |
+| One-way prompt qualified | 0 / 160 |
+| Yoked replay qualified | 0 / 160 |
+| Unrelated-feature shortcut qualified | 0 / 160 |
+| Rule-consistent reciprocal simulator | 160 / 160 |
+| Negotiation cases | 6 qualified / 5 rejected |
+| Scoped authority cases | 1 structurally valid / 6 rejected |
+| Synthetic artifact byte-set reverifications | 1,120 |
+| Artifact digest rows | 17,920 |
+| Agent summaries | 30 (six policies × five dimensions) |
+| Partner summaries | 5 dimensions |
+
+These counts are finite fixture-control results, not benchmark accuracy estimates or evidence of generalization. The per-dimension means/standard deviations are descriptive summaries across constructed deterministic variants; no confidence intervals, statistical population inference, or cross-dimension composite score are reported.
+
+## Verification history
+
+- The **42-test** artifact-binding revision passed its exact-head dedicated workflow on commit `618fa4d719b68c6fe0b401c072e7177e2a2cd3ed`, run `42025215684`: 42 passed, 0 failed; the five-dimension positive/negative-control gates passed; 1,120 synthetic byte sets were re-verified; the workflow checked 17,920 digest rows, 30 agent summaries, and five partner summaries. Repository-wide CI, governance, benchmark, and showroom workflows were skipped, not passed.
+- The current **61-test** revision adds multi-valid response negotiation, the 3,464-state finite model check, and scoped authority events. It requires a fresh exact-head pass. The earlier 42-test result is not evidence that the 61-test revision passed.
+- No musician pilot, human-partner study, hardware/device loopback, real Studio read-back, receipt-signature verification, or external commercial benchmark run has been performed.
+
+## Next integration steps
+
+1. Implement the MEL-013A adapter against the existing Studio artifact lifecycle—not a parallel store.
+2. Fetch the committed source/result artifact bytes from durable Studio storage on an independent read path and bind the actual transaction receipt.
+3. Verify the actor/signature and action/purpose scope through a trusted authority provider; unavailable verification must fail closed.
+4. Run a sealed symbolic task split with unseen motifs, rhythms, tempo patterns, role changes, and negotiated alternatives.
+5. Add actual renderer/backend adapters and log intended action, output artifact, callback admission, predicted playback, and loopback-observed playback separately.
+6. Pilot with musicians under approved consent and ethics review; estimate variance/ICC before preregistering power and primary outcomes.
+7. Compare production quality against blind instrumental/vocal preferences, editing against native IFR/CR/EMR and preservation measures, and agency against the RMI human study. Never combine these into one score.
