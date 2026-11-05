@@ -135,8 +135,8 @@ pub fn audit_non_anticipative_policy<'a>(
         shared_information_set_count = shared_information_set_count
             .checked_add(1)
             .ok_or(NonAnticipativityError::ArithmeticOverflow)?;
-        let group_len = u64::try_from(group.len())
-            .map_err(|_| NonAnticipativityError::ArithmeticOverflow)?;
+        let group_len =
+            u64::try_from(group.len()).map_err(|_| NonAnticipativityError::ArithmeticOverflow)?;
         let pairs = group_len
             .checked_mul(group_len.saturating_sub(1))
             .and_then(|value| value.checked_div(2))
@@ -176,10 +176,8 @@ pub fn audit_non_anticipative_policy<'a>(
 mod tests {
     use super::*;
 
-    const INFO_SHA_A: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const INFO_SHA_B: &str =
-        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const INFO_SHA_A: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const INFO_SHA_B: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     const ACTION_A: DispatchAction = DispatchAction {
         net_power_w: 2_000,
