@@ -74,6 +74,8 @@ pub struct ReserveAssessment {
 pub struct TransitionTimes {
     pub standstill_to_charging_seconds: f64,
     pub standstill_to_discharging_seconds: f64,
+    pub charging_to_standstill_seconds: f64,
+    pub discharging_to_standstill_seconds: f64,
     pub charging_to_discharging_seconds: f64,
     pub discharging_to_charging_seconds: f64,
 }
@@ -214,6 +216,14 @@ impl AssetLimits {
                 self.transitions.standstill_to_discharging_seconds,
             ),
             (
+                "charging_to_standstill_seconds",
+                self.transitions.charging_to_standstill_seconds,
+            ),
+            (
+                "discharging_to_standstill_seconds",
+                self.transitions.discharging_to_standstill_seconds,
+            ),
+            (
                 "charging_to_discharging_seconds",
                 self.transitions.charging_to_discharging_seconds,
             ),
@@ -268,6 +278,12 @@ fn required_transition_seconds(
         }
         (OperatingMode::Standstill, OperatingMode::Discharging) => {
             times.standstill_to_discharging_seconds
+        }
+        (OperatingMode::Charging, OperatingMode::Standstill) => {
+            times.charging_to_standstill_seconds
+        }
+        (OperatingMode::Discharging, OperatingMode::Standstill) => {
+            times.discharging_to_standstill_seconds
         }
         (OperatingMode::Charging, OperatingMode::Discharging) => {
             times.charging_to_discharging_seconds
@@ -862,6 +878,8 @@ mod tests {
             transitions: TransitionTimes {
                 standstill_to_charging_seconds: 300.0,
                 standstill_to_discharging_seconds: 900.0,
+                charging_to_standstill_seconds: 300.0,
+                discharging_to_standstill_seconds: 300.0,
                 charging_to_discharging_seconds: 600.0,
                 discharging_to_charging_seconds: 600.0,
             },
