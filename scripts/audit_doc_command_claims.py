@@ -24,7 +24,7 @@ UNAVAILABLE = re.compile(
     r"not present|does not exist|were not found)\b",
     re.IGNORECASE,
 )
-DYNAMIC = ("$", chr(96), "*", "?", "{", "}")
+DYNAMIC = ("$", chr(96), "*", "?", "{", "}", "<", ">")
 FENCE = re.compile(r"^ {0,3}(\x60{3,}|~{3,})(.*)$")
 
 
@@ -320,10 +320,34 @@ def bin_source(manifest: Path, name: str):
     return next((candidate.resolve() for candidate in candidates if candidate.is_file()), None)
 
 
+def nearest_manifest_for_document(
+    root: Path,
+    file: Path,
+    cargo_manifests: list[Path],
+) -> Path:
+    """Choose the nearest tracked Cargo manifest above the Markdown file."""
+    available = {manifest.resolve() for manifest in cargo_manifests}
+    current = file.parent.resolve()
+    root_resolved = root.resolve()
+    while True:
+        candidate = (current / "Cargo.toml").resolve()
+        if candidate in available:
+            return candidate
+        if current == root_resolved or current.parent == current:
+            break
+        try:
+            current.relative_to(root_resolved)
+        except ValueError:
+            break
+        current = current.parent
+    return (root_resolved / "Cargo.toml").resolve()
+
+
 def audit_markdown(
     root: Path,
     file: Path,
     cargo_manifests: list[Path],
+    package_index_cache: dict[Path, dict[str, list[Path]]],
 ):
     text = file.read_text(encoding="utf-8")
     failures, checked, unavailable, dynamic, packages_checked = [], 0, 0, 0, 0
@@ -376,8 +400,14 @@ def audit_markdown(
                 if anchor_path is None or not anchor_path.is_file():
                     dynamic += 1
                     continue
+            selected_anchor = anchor_path or nearest_manifest_for_document(root, file, cargo_manifests)
+            cache_key = selected_anchor.resolve()
             try:
-                index = workspace_package_index(root, cargo_manifests, anchor_path)
+                if cache_key not in package_index_cache:
+                    package_index_cache[cache_key] = workspace_package_index(
+                        root, cargo_manifests, cache_key
+                    )
+                index = package_index_cache[cache_key]
             except ValueError as error:
                 failures.append(f"{file}:{line}: {error}")
                 continue
@@ -521,10 +551,11 @@ def main() -> int:
 
     failures = []
     checked = unavailable = dynamic = packages_checked = 0
+    package_index_cache: dict[Path, dict[str, list[Path]]] = {}
     for file in files:
         try:
             found, count, missing, dynamic_count, package_count = audit_markdown(
-                root, file, cargo_manifests
+                root, file, cargo_manifests, package_index_cache
             )
         except (OSError, UnicodeError) as error:
             failures.append(f"{file}: cannot read Markdown: {error}")
