@@ -68,7 +68,8 @@
           "The Google Cloud / Mercor launch report (3 Nov 2026) reports 91% average individual-constraint satisfaction on co-authored tasks but only 41.3% of those deliverables passed every hard safety and feasibility check. This cohort scope must not be generalized to all 85 tasks.",
           "The paper abstract reports an average of 27 million tokens and 63 minutes per task for its strongest configuration.",
           "Do not use hidden-test scores as a baseline for a development-set result. Pin and compare against the official public development leaderboard on the same task revision.",
-          "The official competition page's 2026-11-04 snapshot also shows committed-artifact development scores (for example, Claude Opus 5.5 / Claude Code 55.1% and GPT-6 Astra / Codex 53.0%). These are competition-entry artifact scores, not the three-run public development leaderboard mean described by the dataset card; do not compare them as the same evaluation mode."
+          "The official competition page's 2026-11-04 snapshot also shows committed-artifact development scores (for example, Claude Opus 5.5 / Claude Code 55.1% and GPT-6 Astra / Codex 53.0%). These are competition-entry artifact scores, not the three-run public development leaderboard mean described by the dataset card; do not compare them as the same evaluation mode.",
+          "The official all-85 leaderboard snapshot (2026-11-05) reports Claude Opus 5.5 / Claude Code at 50.6% (three runs per task; $17.18/task; 63 min median) and GPT-6 Astra / Codex at 48.3% ($9.15/task; 25 min median). This all-task result is a separate snapshot from both 29-task public development and 56-task hidden boards."
         ],
         "leaderboard_snapshot": {
           "captured_at": "2026-11-05",
@@ -232,6 +233,76 @@
             }
           ],
           "comparability_warning": "The partner page's 48.3% Opus/Claude Code summary is one native pairing; the official cross-harness leaderboard currently shows Opus/OpenHands at 48.6%. Keep the model+harness pair explicit. These 56 hidden-test runs are not comparable with the 29 public-dev snapshot or the 85-task paper mean."
+        },
+        "all_tasks_leaderboard_snapshot": {
+          "captured_at": "2026-11-05",
+          "source_url": "https://ple-bench.com/leaderboard?set=all",
+          "scope": "mean_score_on_all_85_tasks",
+          "task_count": 85,
+          "run_protocol": "Official all-task leaderboard: three runs per model+harness pair, all 85 tasks across four disciplines, six-hour per-task limit, highest available reasoning effort. Score is the mean model+harness result under the official rubric.",
+          "entries": [
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Claude Code",
+              "score": 0.506,
+              "run_count": 3,
+              "cost_per_task_usd": 17.18,
+              "median_duration_minutes": 63,
+              "notes": [
+                "Highest displayed all-85 model+harness pair on the 2026-11-05 snapshot."
+              ]
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "OpenHands",
+              "score": 0.499,
+              "run_count": 3,
+              "cost_per_task_usd": 14.82,
+              "median_duration_minutes": 65,
+              "notes": []
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Codex",
+              "score": 0.493,
+              "run_count": 3,
+              "cost_per_task_usd": 35.15,
+              "median_duration_minutes": 123,
+              "notes": []
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Hermes",
+              "score": 0.486,
+              "run_count": 3,
+              "cost_per_task_usd": 16.42,
+              "median_duration_minutes": 67,
+              "notes": []
+            },
+            {
+              "model": "Claude Opus 5.5",
+              "agent_harness": "Agy",
+              "score": 0.484,
+              "run_count": 3,
+              "cost_per_task_usd": 42.32,
+              "median_duration_minutes": 44,
+              "notes": [
+                "Cost shown as approximate on official page."
+              ]
+            },
+            {
+              "model": "GPT-6 Astra",
+              "agent_harness": "Codex",
+              "score": 0.483,
+              "run_count": 3,
+              "cost_per_task_usd": 9.15,
+              "median_duration_minutes": 25,
+              "notes": [
+                "Codex is the only listed harness for this model on this all-task snapshot."
+              ]
+            }
+          ],
+          "comparability_warning": "This 85-task all-task leaderboard is distinct from the 29-task public development leaderboard, 56-task hidden leaderboard, the paper's abstract summary if calculated under a different aggregation, and the committed-artifact competition-entry dev score. Model+harness pairings are complete systems; never call these model-only scores."
         }
       },
       "ceb_integration": {
