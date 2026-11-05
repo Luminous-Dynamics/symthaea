@@ -223,6 +223,7 @@ struct Report {
     fixed_non_adaptive_optimum: FixedPlanSummary,
     support_challenge_count: usize,
     support_challenges: Vec<SupportChallengeResult>,
+    support_expansion_monotonicity_passed: bool,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
@@ -1282,6 +1283,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         ),
     };
 
+    let support_expansion_monotonicity_passed = support_challenge_results
+        .iter()
+        .all(|challenge| challenge.monotonicity_passed);
+    let reported_status = if support_expansion_monotonicity_passed {
+        status
+    } else {
+        "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+    };
+
     Ok(Report {
         schema_version: 1,
         tool: "connectome-adaptive-query-policy-audit",
@@ -1309,11 +1319,12 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         fixed_non_adaptive_optimum,
         support_challenge_count: support_challenge_results.len(),
         support_challenges: support_challenge_results,
+        support_expansion_monotonicity_passed,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         probability_claim: "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
-        status,
+        status: reported_status,
         search_complete: true,
         scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     })
@@ -1358,6 +1369,9 @@ fn main() -> ExitCode {
         }
     } else {
         print!("{rendered}");
+    }
+    if !report.support_expansion_monotonicity_passed {
+        return ExitCode::from(4);
     }
     ExitCode::SUCCESS
 }
