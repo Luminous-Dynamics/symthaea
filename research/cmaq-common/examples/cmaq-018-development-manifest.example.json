@@ -5,8 +5,8 @@
   "frozen_at_utc": "2026-10-31T12:00:00Z",
   "track": {
     "id": "cmaq-018",
-    "protocol_version": "0.1.0",
-    "scientific_claim": "Measure same-history action-effect and action-ranking behavior on a controlled synthetic intervention panel.",
+    "protocol_version": "0.2.0",
+    "scientific_claim": "Measure same-history action-effect/ranking behavior and synthetic analytic action-controllability diagnostics on a controlled intervention panel.",
     "status": "development"
   },
   "repository": {
@@ -33,12 +33,12 @@
     "config_path": "research/cmaq-common/examples/assets/cmaq018/generator-config.v0.1.json"
   },
   "evaluator": {
-    "name": "CMAQ-018 branch-fidelity evaluator",
+    "name": "CMAQ-018 branch-fidelity and DACS-0 evaluator",
     "source_commit": "2503b1b0abb69a822c1b8fa86e81e47177362736",
-    "metric_bundle_sha256": "dcc58899a6d7abd2fbe70d5325f980c82998d59a7a2b1494e0744695d15ba5a3",
-    "version": "0.1.0",
+    "metric_bundle_sha256": "43125d0c001eb26a9ad0d8068d0cf2ab9f0f0532b709e87a60a3936efb770cc0",
+    "version": "0.2.0",
     "external_judge": null,
-    "metric_bundle_path": "research/cmaq-common/examples/assets/cmaq018/metric-bundle.v0.1.json"
+    "metric_bundle_path": "research/cmaq-common/examples/assets/cmaq018/metric-bundle.v0.2.json"
   },
   "data_sources": [
     {
@@ -63,7 +63,7 @@
   "task_contract": {
     "suite": "CMAQ-018",
     "environment_id": "cmaq018-matched-history-synthetic",
-    "environment_revision": "0.1.0",
+    "environment_revision": "0.2.0",
     "observation_schema_sha256": "68b19f4c240da5f57e9a258dbcbe0e38012976e4abad16e0d75b546bcb64e124",
     "action_schema_sha256": "5206eed15d9bea16ca7cd2edf3c1e54cce79f7f49afe91d4425f2b00bc410fd0",
     "reward_definition_sha256": "1a410b977370fa9e24e3e03e54552b1ad1ac38b22d0ae3a54409245d38645cff",
@@ -199,11 +199,25 @@
       ],
       "claim": "Verify degradation under deliberately corrupted action identity.",
       "limitation": "Negative control only."
+    },
+    {
+      "id": "dacs_analytic_conformance",
+      "treatment_id": "point_outcome",
+      "control_id": "oracle",
+      "status": "diagnostic_only",
+      "matched_dimensions": [
+        "initial_state",
+        "canonical_action_interface",
+        "analytic_transition",
+        "four_step_horizon"
+      ],
+      "claim": "Check action-response separation, sign, magnitude, neutral-input drift and four-step controllability against a deterministic analytic oracle.",
+      "limitation": "Synthetic analytic conformance only; not physical actuator fidelity, vehicle safety, real-world counterfactual accuracy or SOTA."
     }
   ],
   "metrics": {
-    "bundle_id": "cmaq018-v0.1-metrics",
-    "bundle_sha256": "dcc58899a6d7abd2fbe70d5325f980c82998d59a7a2b1494e0744695d15ba5a3",
+    "bundle_id": "cmaq018-v0.2-metrics",
+    "bundle_sha256": "43125d0c001eb26a9ad0d8068d0cf2ab9f0f0532b709e87a60a3936efb770cc0",
     "required_metrics": [
       "pair_coverage",
       "effect_sign_accuracy",
@@ -228,7 +242,14 @@
       "terminal_false_safe_rate_episode_count",
       "terminal_false_safe_rate_ci95",
       "branch_outcome_mae_episode_count",
-      "branch_state_mae_episode_count"
+      "branch_state_mae_episode_count",
+      "dacs_prediction_coverage",
+      "action_pair_separation_rate",
+      "action_response_sign_accuracy",
+      "action_response_vector_mae",
+      "neutral_input_drift_energy",
+      "multi_step_response_mae",
+      "multi_step_action_coverage"
     ],
     "cross_track_pooling": false
   },
