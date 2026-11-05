@@ -474,6 +474,10 @@ fn write_replicate_row(
         String::new(),
         String::new(),
         String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
     ]);
 }
 
