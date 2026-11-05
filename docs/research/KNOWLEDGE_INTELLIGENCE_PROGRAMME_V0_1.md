@@ -377,3 +377,51 @@ Preserve the target-language, source-language, prompt-language and response-lang
 This work is decomposed into [SA-FACT-001 / Symthaea #10531](https://github.com/Luminous-Dynamics/symthaea/issues/10531). It composes the existing knowledge-benchmark harness and Mycelix evidence/provenance contracts; it must not create a second benchmark runner or evidence envelope.
 
 The proposed qualification goal is at least a 25% reduction in the worst target-language missed-hallucination gap against a matched zero-retrieval baseline, while keeping English and target-language absolute macro-F1 within 1 percentage point or better. This is a provisional target to be recalibrated after a pilot and preregistered before held-out evaluation—not a result or a guaranteed SOTA claim.
+
+
+## 14. Broader South African evaluation comparators
+
+Multi-Hall-SA should be the first factuality task, not the only South African benchmark input. Add a benchmark-admission matrix for three complementary resources:
+
+### 14.1 MzansiBench (UCT 2026 project showcase)
+
+The UCT project describes a unified South African language evaluation system spanning **13 tasks, 16 datasets and all 11 official written languages**, with prompt-based and fine-tuning pipelines and a public leaderboard.
+
+- Project page: https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36
+- Technical overview: https://projects.cs.uct.ac.za/honsproj/cgi-bin/view/2026/karriem_vondoorze.zip/index.html
+
+Treat this as a promising evaluation integration/aggregation project, not automatically as an established external SOTA benchmark. Inspect the exact code, dataset manifests, task coverage, model revisions, licenses, leaderboard methodology, and reproducibility before adopting its scores. Its reported language coverage is a useful target map, but does not mean all 13 tasks cover all 11 languages.
+
+### 14.2 Uhura (LREC 2026)
+
+[Uhura](https://aclanthology.org/2026.lrec-1.115/) evaluates scientific question answering and truthfulness in six typologically diverse African languages. It contains:
+- Uhura-ARC-Easy: multiple-choice scientific questions;
+- Uhura-TruthfulQA: truthfulness / safety questions across domains including health, law, finance and politics.
+
+Its questions are human-translated from existing English benchmarks. This is complementary to Multi-Hall-SA's parallel government-source design. Treat translation lineage and technical-term equivalence as explicit variables; do not pool its scores with source-native parallel-language tasks.
+
+### 14.3 MzansiText and MzansiLM (LREC 2026)
+
+The [MzansiText / MzansiLM paper](https://aclanthology.org/2026.lrec-1.109/) introduces a curated South African multilingual corpus and a 125M-parameter decoder-only model. The paper reports 20.65 BLEU for an isiXhosa data-to-text task and 78.5% macro-F1 for an isiXhosa topic-classification task under task-specific adaptation. Few-shot reasoning remained challenging in the reported experiments.
+
+Use MzansiLM as a locally relevant small-model reference where exact weights, tokenizer, dataset license and evaluation split can be pinned. Do not compare its task-specific BLEU or classification F1 directly with factuality macro-F1 or broad reasoning accuracy.
+
+### 14.4 Evaluation portfolio design
+
+Keep these lanes separate, with a shared run-receipt vocabulary:
+
+| Evaluation lane | Primary question | Reference resources |
+|---|---|---|
+| South African factuality | Does the system detect unsupported or altered facts in the target language? | Multi-Hall-SA |
+| Broad language/task coverage | Which tasks and languages are actually supported, and where are the gaps? | MzansiBench / AFROBENCH |
+| Scientific knowledge | Can the system answer technical questions and recognize false claims? | Uhura |
+| Local-model adaptation | What can a small South African-focused model do under comparable conditions? | MzansiLM |
+| Narrative/cultural understanding | Can the system preserve source-specific context and interpretive plurality? | NarraBench / LitVISTA + MythologyBench |
+
+Do not collapse all of these into a single “African-language score”. Report exact language × task × split availability, worst-group quality, calibration, absolute performance and cross-language gaps. Keep translated benchmarks distinct from source-native parallel benchmarks. Dataset and code use requires exact revision/licensing review.
+
+This portfolio should support two separate competitive claims:
+1. **Coverage and parity:** fewer severe gaps across South African languages and tasks.
+2. **Evidence-grounded factuality:** better supported answers, calibrated abstention and verifiable source lineage.
+
+A win in one lane does not imply a win in another.
