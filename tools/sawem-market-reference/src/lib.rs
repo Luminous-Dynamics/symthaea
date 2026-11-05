@@ -2849,8 +2849,8 @@ mod tests {
         assert_eq!(
             calculate_credit_cover_provider_replacement_deadline(13, calendar),
             Ok(CreditCoverProviderReplacementDeadline {
-                // Cessation on a non-Business Day: 15 is day one, 27 is day ten.
-                deadline_day_ordinal: 27,
+                // Cessation on a non-Business Day: 14 is day one, 23 is day ten.
+                deadline_day_ordinal: 23,
                 excluded_from_settlement_risk_period: true,
             })
         );
