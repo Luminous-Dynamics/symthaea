@@ -39,8 +39,18 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
         adjudicator = task["oracle"]["adjudicator_id"]
         if not adjudicator or adjudicator in reviewer_ids:
             semantic.append("third adjudicator must be identified separately from the two gold reviewers")
-    if task["oracle"]["disagreement_status"] == "none" and task["oracle"]["adjudicator_id"] is not None:
-        semantic.append("adjudicator must be null when there is no disagreement")
+        if not task["oracle"]["adjudication_record_sha256"]:
+            semantic.append("adjudicator decision must have a record digest")
+        if task["oracle"]["adjudication_decision"] not in ("accept", "reject"):
+            semantic.append("resolved disagreement requires an explicit accept/reject adjudicator decision")
+        if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted") and task["oracle"]["adjudication_decision"] != "accept":
+            semantic.append("only an accepting adjudication can qualify a task")
+    if task["oracle"]["disagreement_status"] == "none":
+        if task["oracle"]["adjudicator_id"] is not None or task["oracle"]["adjudication_record_sha256"] is not None or task["oracle"]["adjudication_decision"] != "not_needed":
+            semantic.append("adjudicator fields must be empty when gold reviewers agree")
+    if task["oracle"]["disagreement_status"] == "unresolved":
+        if task["task_status"] != "proposed" or task["oracle"]["adjudication_decision"] != "unresolved":
+            semantic.append("unresolved disagreement remains proposed and cannot be qualified")
     if not task["oracle"]["blinded_to_candidate_output"]:
         semantic.append("gold review must be blinded to candidate output")
     if task["repository"]["license"]["review_status"] != "compatible" and task["task_status"] != "proposed":
@@ -155,7 +165,7 @@ def valid_fixture() -> dict:
        "blind_solve_review":{"status":"passed","reviewer_id":"blind-reviewer-01","review_record_sha256":digest,"instruction_only_sufficient":True}},
       "environment":{"rust_toolchain":"1.96.0","cargo_lock_sha256":digest,"target_triple":"x86_64-unknown-linux-gnu","feature_set":["default"],"environment_image_digest":"sha256:"+"e"*64,"resource_policy_sha256":digest,"network_policy":"disabled","replay_manifest_sha256":digest,"workload_sha256":None},
       "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","destructive_side_effects":False},
-      "oracle":{"reviewers":[{"reviewer_id":"gold-reviewer-01","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"},{"reviewer_id":"gold-reviewer-02","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"}],"blinded_to_candidate_output":True,"llm_only_oracle":False,"disagreement_status":"none","adjudicator_id":None,"gold_patch_sha256":digest,"semantically_equivalent_repairs_allowed":True,"reference_patch_control":"not_run_blocked","empty_patch_control":"not_run_blocked","oracle_record_sha256":digest},
+      "oracle":{"reviewers":[{"reviewer_id":"gold-reviewer-01","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"},{"reviewer_id":"gold-reviewer-02","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"}],"blinded_to_candidate_output":True,"llm_only_oracle":False,"disagreement_status":"none","adjudicator_id":None,"adjudication_record_sha256":None,"adjudication_decision":"not_needed","gold_patch_sha256":digest,"semantically_equivalent_repairs_allowed":True,"reference_patch_control":"not_run_blocked","empty_patch_control":"not_run_blocked","oracle_record_sha256":digest},
       "custody":{"partition":"development","custody_domain_id":"dev-custody-01","custody_manifest_sha256":digest,"holdout_material_outside_agent_workspace":False,"agent_access_before_freeze":False,"public_fix_exposure_accepted":True},
       "execution_qualification":{"candidate_code_executed":False,"isolation_status":"blocked_issue_10064","isolation_profile_sha256":None,"trust_status":"blocked_issue_10369","trust_policy_sha256":None,"independent_regrade_claimed":False},
       "dispositions":{"timeouts_counted":True,"abstentions_counted":True,"escalations_counted":True,"ungraded_counted":True,"denominator_policy_sha256":digest},
