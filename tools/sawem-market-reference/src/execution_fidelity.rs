@@ -73,7 +73,9 @@ pub enum ExecutionFidelityError {
     OverlappingIntervals,
     DuplicateIntervalId,
     DuplicateMeterRecordId,
+    DuplicateMeterSourceReference,
     DuplicateSettlementRecordId,
+    DuplicateSettlementSourceReference,
     ArithmeticOverflow,
     EmptyExecutionTrace,
 }
@@ -208,7 +210,9 @@ pub fn evaluate_execution_fidelity<'a>(
     let mut known_balancing_charge = 0_i128;
     let mut interval_ids = BTreeSet::new();
     let mut meter_record_ids = BTreeSet::new();
+    let mut meter_source_refs = BTreeSet::new();
     let mut settlement_record_ids = BTreeSet::new();
+    let mut settlement_source_refs = BTreeSet::new();
     let mut metered_interval_count = 0_u64;
     let mut settlement_interval_count = 0_u64;
 
@@ -275,6 +279,9 @@ pub fn evaluate_execution_fidelity<'a>(
                 if !meter_record_ids.insert(meter.record_id) {
                     return Err(ExecutionFidelityError::DuplicateMeterRecordId);
                 }
+                if !meter_source_refs.insert(meter.source_ref) {
+                    return Err(ExecutionFidelityError::DuplicateMeterSourceReference);
+                }
 
                 metered_interval_count = metered_interval_count
                     .checked_add(1)
@@ -306,6 +313,9 @@ pub fn evaluate_execution_fidelity<'a>(
                     }
                     if !settlement_record_ids.insert(settlement.record_id) {
                         return Err(ExecutionFidelityError::DuplicateSettlementRecordId);
+                    }
+                    if !settlement_source_refs.insert(settlement.source_ref) {
+                        return Err(ExecutionFidelityError::DuplicateSettlementSourceReference);
                     }
                     settlement_interval_count = settlement_interval_count
                         .checked_add(1)
@@ -626,6 +636,68 @@ mod tests {
         assert_eq!(
             evaluate_execution_fidelity(inputs(&out_of_order)),
             Err(ExecutionFidelityError::IntervalsOutOfOrder)
+        );
+    }
+
+    #[test]
+    fn duplicate_meter_source_cannot_be_recounted_under_a_second_record_id() {
+        let duplicate_source = [
+            ExecutionInterval {
+                meter: Some(MeteredEnergyEvidence {
+                    source_ref: "meter/source/same",
+                    ..meter("meter-id-one", 5_000)
+                }),
+                ..interval("interval-one", 100, 200, 5_000, None, None)
+            },
+            ExecutionInterval {
+                meter: Some(MeteredEnergyEvidence {
+                    source_ref: "meter/source/same",
+                    ..meter("meter-id-two", 5_000)
+                }),
+                ..interval("interval-two", 200, 300, 5_000, None, None)
+            },
+        ];
+        assert_eq!(
+            evaluate_execution_fidelity(inputs(&duplicate_source)),
+            Err(ExecutionFidelityError::DuplicateMeterSourceReference)
+        );
+    }
+
+    #[test]
+    fn duplicate_settlement_source_cannot_be_recounted_under_a_second_line_id() {
+        let duplicate_source = [
+            ExecutionInterval {
+                settlement: Some(BalancingSettlementEvidence {
+                    source_ref: "settlement/source/same",
+                    ..settlement("settlement-id-one", 10)
+                }),
+                ..interval(
+                    "settlement-interval-one",
+                    100,
+                    200,
+                    5_000,
+                    Some(meter("meter-one", 5_000)),
+                    None,
+                )
+            },
+            ExecutionInterval {
+                settlement: Some(BalancingSettlementEvidence {
+                    source_ref: "settlement/source/same",
+                    ..settlement("settlement-id-two", 10)
+                }),
+                ..interval(
+                    "settlement-interval-two",
+                    200,
+                    300,
+                    5_000,
+                    Some(meter("meter-two", 5_000)),
+                    None,
+                )
+            },
+        ];
+        assert_eq!(
+            evaluate_execution_fidelity(inputs(&duplicate_source)),
+            Err(ExecutionFidelityError::DuplicateSettlementSourceReference)
         );
     }
 
