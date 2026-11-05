@@ -579,7 +579,7 @@ fn selected_action_ids(mask: usize, actions: &[Action]) -> Vec<String> {
     actions
         .iter()
         .enumerate()
-        .filter(|(index, _)| mask & (1_usize << index) != 0)
+        .filter(|(index, _)| mask & (1_usize << *index) != 0)
         .map(|(_, action)| action.action_id.clone())
         .collect()
 }
@@ -932,7 +932,7 @@ mod tests {
                 beta_mask
             };
             support.rows = (0..4)
-                .filter(|tuple| mask & (1_u8 << tuple) != 0)
+                .filter(|tuple| mask & (1_u8 << *tuple) != 0)
                 .map(|tuple| JointRow {
                     outcomes: vec![
                         JointOutcome {
@@ -1182,7 +1182,7 @@ mod tests {
                                 .actions
                                 .iter()
                                 .enumerate()
-                                .filter(|(index, _)| **mask & (1_usize << index) != 0)
+                                .filter(|(index, _)| **mask & (1_usize << *index) != 0)
                                 .map(|(_, action)| action.effort_units)
                                 .sum::<u64>()
                                 == minimum
@@ -1306,10 +1306,7 @@ mod tests {
                             "expansion created separation: alpha={alpha_mask:04b}, beta={beta_mask:04b}, added_world={world_index}, mask={mask:02b}"
                         );
                     }
-                    if let (
-                        Some(before_cost),
-                        Some(after_cost),
-                    ) = (
+                    if let (Some(before_cost), Some(after_cost)) = (
                         baseline_report.minimum_joint_disambiguation_effort_units,
                         expanded_report.minimum_joint_disambiguation_effort_units,
                     ) {
