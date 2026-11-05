@@ -8,6 +8,7 @@ on:
       - "docs/research/CEB_RUST_PILOT_PREREGISTRATION_V0_2026-11-05.md"
       - "scripts/validate_ceb_observations.py"
       - "scripts/validate_ceb_human_escalation_pilot.py"
+      - "scripts/validate_ceb_balanced_sampling.py"
       - "docs/**/*.md"
       - "scripts/audit_doc_command_claims.py"
       - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
@@ -637,3 +638,8 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_human_escalation_pilot.py --self-test --repo-root .
+      - name: Validate CEB balanced Rust sampling plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_balanced_sampling.py --self-test --repo-root .
