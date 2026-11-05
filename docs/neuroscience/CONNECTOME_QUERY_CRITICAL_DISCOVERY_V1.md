@@ -92,7 +92,7 @@ The statistical estimator and inclusion-probability arithmetic remain with #9204
 
 Independent adjudicators determine whether a proposal corresponds to a real, biologically admissible reconstruction alternative. Adjudicators must not see channel identity, rank, confidence, treatment assignment, or whether the alternative changes the query.
 
-Preserve confirmed matches, false positives, ambiguous matches, disputed alternatives and inaccessible evidence as separate states. Do not force ambiguous identity linkage into a confirmed match.
+Preserve confirmed matches, false positives, ambiguous matches, disputed alternatives and inaccessible evidence as separate states. Every proposal disposition binds an adjudication receipt; a confirmed proposal-to-alternative link additionally binds a blinded match-adjudication receipt. Every alternative binds its independent biological-adjudication receipt and its before/after query decision. Do not force ambiguous identity linkage into a confirmed match.
 
 Every confirmed alternative binds its graph digest, source evidence, adjudication protocol, dependence ancestry, and exact #10603 challenge report.
 
