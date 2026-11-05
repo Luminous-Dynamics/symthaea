@@ -579,7 +579,7 @@ fn selected_action_ids(mask: usize, actions: &[Action]) -> Vec<String> {
     actions
         .iter()
         .enumerate()
-        .filter(|(index, _)| mask & (1_usize << index) != 0)
+        .filter(|(index, _)| mask & (1_usize << *index) != 0)
         .map(|(_, action)| action.action_id.clone())
         .collect()
 }
@@ -921,6 +921,58 @@ mod tests {
         find_support(&validated.supports, world)
     }
 
+    fn two_action_support_case(alpha_mask: u8, beta_mask: u8) -> Input {
+        let mut input = fixture();
+        input.actions.truncate(2);
+        input.action_set_sha256 = canonical_action_set_sha256(&input.actions);
+        for support in &mut input.joint_supports {
+            let mask = if support.scenario_id == "world-alpha" {
+                alpha_mask
+            } else {
+                beta_mask
+            };
+            support.rows = (0..4)
+                .filter(|tuple| mask & (1_u8 << *tuple) != 0)
+                .map(|tuple| JointRow {
+                    outcomes: vec![
+                        JointOutcome {
+                            action_id: "inspect-x".into(),
+                            value: if tuple & 1 == 0 { "0" } else { "1" }.into(),
+                        },
+                        JointOutcome {
+                            action_id: "inspect-y".into(),
+                            value: if tuple & 2 == 0 { "0" } else { "1" }.into(),
+                        },
+                    ],
+                })
+                .collect();
+        }
+        input.joint_support_set_sha256 = canonical_joint_support_set_sha256(&input.joint_supports);
+        input
+    }
+
+    fn direct_projection_separates(
+        left: &NormalizedSupport,
+        right: &NormalizedSupport,
+        mask: usize,
+    ) -> bool {
+        let project = |support: &NormalizedSupport| {
+            support
+                .rows
+                .iter()
+                .map(|row| {
+                    (0..row.len())
+                        .filter(|index| mask & (1_usize << index) != 0)
+                        .map(|index| row[index].clone())
+                        .collect::<Vec<_>>()
+                })
+                .collect::<BTreeSet<_>>()
+        };
+        let left_projection = project(left);
+        let right_projection = project(right);
+        left_projection.is_disjoint(&right_projection)
+    }
+
     #[test]
     fn xor_complementarity_is_recovered_without_marginal_independence() {
         let input = fixture();
@@ -1091,6 +1143,168 @@ mod tests {
             support_digest,
             canonical_joint_support_set_sha256(&input.joint_supports)
         );
+    }
+
+    #[test]
+    fn exhaustive_two_action_two_world_supports_match_direct_projection_oracle() {
+        let mut case_count = 0_usize;
+        for alpha_mask in 1_u8..16 {
+            for beta_mask in 1_u8..16 {
+                let input = two_action_support_case(alpha_mask, beta_mask);
+                let bytes = serde_json::to_vec(&input).unwrap();
+                let report = evaluate(&input, &bytes).unwrap();
+                let validated = validated(&input);
+                let left = support_for(&validated, "world-alpha");
+                let right = support_for(&validated, "world-beta");
+
+                let valid_masks = (1_usize..4)
+                    .filter(|mask| direct_projection_separates(left, right, *mask))
+                    .collect::<Vec<_>>();
+                let expected_minimum = valid_masks
+                    .iter()
+                    .map(|mask| {
+                        validated
+                            .actions
+                            .iter()
+                            .enumerate()
+                            .filter(|(index, _)| *mask & (1_usize << *index) != 0)
+                            .map(|(_, action)| action.effort_units)
+                            .sum::<u64>()
+                    })
+                    .min();
+                let expected_count = expected_minimum.map_or(0, |minimum| {
+                    valid_masks
+                        .iter()
+                        .filter(|mask| {
+                            validated
+                                .actions
+                                .iter()
+                                .enumerate()
+                                .filter(|(index, _)| **mask & (1_usize << *index) != 0)
+                                .map(|(_, action)| action.effort_units)
+                                .sum::<u64>()
+                                == minimum
+                        })
+                        .count() as u64
+                });
+                let expected_marginally_separable = direct_projection_separates(left, right, 0b01)
+                    || direct_projection_separates(left, right, 0b10);
+                let full_projection_separates = direct_projection_separates(left, right, 0b11);
+
+                assert_eq!(
+                    report.minimum_joint_disambiguation_effort_units, expected_minimum,
+                    "wrong minimum for alpha={alpha_mask:04b}, beta={beta_mask:04b}"
+                );
+                assert_eq!(
+                    report.minimum_joint_plan_count, expected_count,
+                    "wrong tied-plan count for alpha={alpha_mask:04b}, beta={beta_mask:04b}"
+                );
+                assert_eq!(
+                    report.marginally_separable_pair_count,
+                    usize::from(expected_marginally_separable)
+                );
+                assert_eq!(
+                    report.jointly_separable_pair_count,
+                    usize::from(full_projection_separates)
+                );
+                assert_eq!(
+                    report.unavoidable_shared_full_joint_tuple_pairs.is_empty(),
+                    full_projection_separates
+                );
+                assert!(report.search_complete);
+
+                let expected_ids = valid_masks
+                    .iter()
+                    .filter(|mask| {
+                        expected_minimum.is_some_and(|minimum| {
+                            validated
+                                .actions
+                                .iter()
+                                .enumerate()
+                                .filter(|(index, _)| **mask & (1_usize << *index) != 0)
+                                .map(|(_, action)| action.effort_units)
+                                .sum::<u64>()
+                                == minimum
+                        })
+                    })
+                    .map(|mask| selected_action_ids(*mask, &validated.actions))
+                    .collect::<BTreeSet<_>>();
+                let actual_ids = report
+                    .minimum_joint_plans
+                    .iter()
+                    .map(|plan| plan.action_ids.clone())
+                    .collect::<BTreeSet<_>>();
+                assert_eq!(
+                    actual_ids, expected_ids,
+                    "wrong tied-plan membership for alpha={alpha_mask:04b}, beta={beta_mask:04b}"
+                );
+                case_count += 1;
+            }
+        }
+        assert_eq!(case_count, 225);
+    }
+
+    #[test]
+    fn exhaustive_small_support_expansions_never_create_projection_separation() {
+        for alpha_mask in 1_u8..16 {
+            for beta_mask in 1_u8..16 {
+                let baseline_input = two_action_support_case(alpha_mask, beta_mask);
+                let baseline_bytes = serde_json::to_vec(&baseline_input).unwrap();
+                let baseline_report = evaluate(&baseline_input, &baseline_bytes).unwrap();
+                let baseline = validated(&baseline_input);
+
+                for (world_index, source_mask) in [(0_usize, alpha_mask), (1_usize, beta_mask)] {
+                    if source_mask == 0b1111 {
+                        continue;
+                    }
+                    let missing_tuple = (0_u8..4)
+                        .find(|tuple| source_mask & (1_u8 << *tuple) == 0)
+                        .expect("a non-full support has a missing tuple");
+                    let mut expanded_input = baseline_input.clone();
+                    expanded_input.joint_supports[world_index]
+                        .rows
+                        .push(JointRow {
+                            outcomes: vec![
+                                JointOutcome {
+                                    action_id: "inspect-x".into(),
+                                    value: if missing_tuple & 1 == 0 { "0" } else { "1" }.into(),
+                                },
+                                JointOutcome {
+                                    action_id: "inspect-y".into(),
+                                    value: if missing_tuple & 2 == 0 { "0" } else { "1" }.into(),
+                                },
+                            ],
+                        });
+                    expanded_input.joint_support_set_sha256 =
+                        canonical_joint_support_set_sha256(&expanded_input.joint_supports);
+                    let expanded_bytes = serde_json::to_vec(&expanded_input).unwrap();
+                    let expanded_report = evaluate(&expanded_input, &expanded_bytes).unwrap();
+                    let expanded = validated(&expanded_input);
+
+                    let left_before = support_for(&baseline, "world-alpha");
+                    let right_before = support_for(&baseline, "world-beta");
+                    let left_after = support_for(&expanded, "world-alpha");
+                    let right_after = support_for(&expanded, "world-beta");
+                    for mask in 0..4 {
+                        let before = direct_projection_separates(left_before, right_before, mask);
+                        let after = direct_projection_separates(left_after, right_after, mask);
+                        assert!(
+                            !after || before,
+                            "expansion created separation: alpha={alpha_mask:04b}, beta={beta_mask:04b}, added_world={world_index}, mask={mask:02b}"
+                        );
+                    }
+                    if let (Some(before_cost), Some(after_cost)) = (
+                        baseline_report.minimum_joint_disambiguation_effort_units,
+                        expanded_report.minimum_joint_disambiguation_effort_units,
+                    ) {
+                        assert!(
+                            after_cost >= before_cost,
+                            "minimum cost decreased after support expansion: alpha={alpha_mask:04b}, beta={beta_mask:04b}"
+                        );
+                    }
+                }
+            }
+        }
     }
 
     #[test]
