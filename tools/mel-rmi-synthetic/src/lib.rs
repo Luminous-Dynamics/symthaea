@@ -2374,6 +2374,137 @@ mod tests {
         assert_eq!(explored, 3_464, "unexpected exhaustive negotiation state-space coverage");
     }
 
+    fn scoped_authority_event(observation: &Observation) -> PartnerAuthorityEventV1 {
+        PartnerAuthorityEventV1 {
+            event_id: "authority-event-1".to_owned(),
+            session_id: observation.session_id.clone(),
+            task_id: observation.task_id.clone(),
+            source_event_id: observation.event_id.clone(),
+            control_sequence: 7,
+            clock_origin_id: "runner-clock-session-a".to_owned(),
+            issued_at_ns: 100,
+            expires_at_ns: 200,
+            authority_receipt_ref: "opaque-authority-receipt-ref".to_owned(),
+            authority: unresolved_authority(),
+        }
+    }
+
+    #[test]
+    fn scoped_authority_applies_only_to_its_exact_observation() {
+        let (_, interventions) = fixture();
+        let observation = &interventions.control;
+        let event = scoped_authority_event(observation);
+        let result = assess_scoped_negotiation(
+            &negotiated_contract(),
+            observation,
+            &event,
+            7,
+            "runner-clock-session-a",
+            150,
+            &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
+        ).unwrap();
+        assert!(result.qualified);
+        assert_eq!(
+            validate_partner_authority_event(
+                &event,
+                &interventions.targeted,
+                7,
+                "runner-clock-session-a",
+                150
+            ),
+            Err(HarnessError::InvalidAuthorityScope)
+        );
+    }
+
+    #[test]
+    fn scoped_authority_rejects_cross_session_and_cross_task_replay() {
+        let (_, interventions) = fixture();
+        let observation = &interventions.control;
+        let mut event = scoped_authority_event(observation);
+        event.session_id = "other-session".to_owned();
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 7, "runner-clock-session-a", 150
+            ),
+            Err(HarnessError::InvalidAuthorityScope)
+        );
+        let mut event = scoped_authority_event(observation);
+        event.task_id = "other-task".to_owned();
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 7, "runner-clock-session-a", 150
+            ),
+            Err(HarnessError::InvalidAuthorityScope)
+        );
+    }
+
+    #[test]
+    fn scoped_authority_rejects_stale_or_future_control_sequence() {
+        let (_, interventions) = fixture();
+        let observation = &interventions.control;
+        let event = scoped_authority_event(observation);
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 8, "runner-clock-session-a", 150
+            ),
+            Err(HarnessError::InvalidAuthoritySequence)
+        );
+    }
+
+    #[test]
+    fn scoped_authority_rejects_clock_origin_mismatch() {
+        let (_, interventions) = fixture();
+        let observation = &interventions.control;
+        let event = scoped_authority_event(observation);
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 7, "device-clock-other-session", 150
+            ),
+            Err(HarnessError::InvalidAuthorityClockOrigin)
+        );
+    }
+
+    #[test]
+    fn scoped_authority_rejects_not_yet_effective_expired_and_invalid_windows() {
+        let (_, interventions) = fixture();
+        let observation = &interventions.control;
+        let event = scoped_authority_event(observation);
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 7, "runner-clock-session-a", 99
+            ),
+            Err(HarnessError::AuthorityNotYetEffective)
+        );
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 7, "runner-clock-session-a", 200
+            ),
+            Err(HarnessError::AuthorityExpired)
+        );
+        let mut invalid_window = event;
+        invalid_window.expires_at_ns = invalid_window.issued_at_ns;
+        assert_eq!(
+            validate_partner_authority_event(
+                &invalid_window, observation, 7, "runner-clock-session-a", 150
+            ),
+            Err(HarnessError::InvalidAuthorityTimeWindow)
+        );
+    }
+
+    #[test]
+    fn scoped_authority_requires_an_opaque_receipt_reference() {
+        let (_, interventions) = fixture();
+        let observation = &interventions.control;
+        let mut event = scoped_authority_event(observation);
+        event.authority_receipt_ref.clear();
+        assert_eq!(
+            validate_partner_authority_event(
+                &event, observation, 7, "runner-clock-session-a", 150
+            ),
+            Err(HarnessError::InvalidAuthorityScope)
+        );
+    }
+
     #[test]
     fn rule_based_positive_control_passes_all_synthetic_gates() {
         let (task, interventions) = fixture();
