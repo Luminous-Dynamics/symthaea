@@ -1003,11 +1003,7 @@ fn canonical_scenario_expansion_challenge_sha256(
     action_ids: &[String],
 ) -> Result<String, String> {
     let mut additions = challenge.additions.iter().collect::<Vec<_>>();
-    additions.sort_by(|left, right| {
-        left.scenario
-            .scenario_id
-            .cmp(&right.scenario.scenario_id)
-    });
+    additions.sort_by(|left, right| left.scenario.scenario_id.cmp(&right.scenario.scenario_id));
     let mut hasher = Sha256::new();
     hasher.update(b"connectome-adaptive-hypothesis-space-expansion-v1");
     hasher.update(base_scenario_sha256.as_bytes());
@@ -1137,11 +1133,7 @@ fn expand_scenario_space(
         challenge,
         action_ids,
     )?;
-    Ok((
-        challenge_sha256,
-        expanded,
-        challenge.additions.len(),
-    ))
+    Ok((challenge_sha256, expanded, challenge.additions.len()))
 }
 
 fn effort_is_non_decreasing(before: Option<u64>, after: Option<u64>) -> bool {
@@ -1422,8 +1414,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
     }
 
     let mut scenario_challenge_ids = BTreeSet::new();
-    let mut scenario_challenge_results =
-        Vec::with_capacity(input.scenario_challenges.len());
+    let mut scenario_challenge_results = Vec::with_capacity(input.scenario_challenges.len());
     for challenge in &input.scenario_challenges {
         if !scenario_challenge_ids.insert(challenge.challenge_id.as_str()) {
             return Err(format!(
@@ -1459,8 +1450,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             .map(|policy| policy.worst_case_cost);
         let fixed_before = fixed_non_adaptive_optimum.minimum_effort_units;
         let fixed_after = expanded_fixed.minimum_effort_units;
-        let adaptive_non_decreasing =
-            effort_is_non_decreasing(adaptive_before, adaptive_after);
+        let adaptive_non_decreasing = effort_is_non_decreasing(adaptive_before, adaptive_after);
         let fixed_non_decreasing = effort_is_non_decreasing(fixed_before, fixed_after);
         scenario_challenge_results.push(ScenarioExpansionResult {
             challenge_id: challenge.challenge_id.clone(),
@@ -1828,7 +1818,9 @@ mod tests {
         let opposing = report
             .scenario_challenges
             .iter()
-            .find(|challenge| challenge.challenge_id == "append-refuting-world-sharing-observation-tuple")
+            .find(|challenge| {
+                challenge.challenge_id == "append-refuting-world-sharing-observation-tuple"
+            })
             .unwrap();
         assert_eq!(opposing.added_scenario_count, 1);
         assert_eq!(opposing.adaptive_worst_case_effort_before, Some(4));
@@ -1845,7 +1837,9 @@ mod tests {
         let same_decision = report
             .scenario_challenges
             .iter()
-            .find(|challenge| challenge.challenge_id == "append-supporting-world-with-covered-observation")
+            .find(|challenge| {
+                challenge.challenge_id == "append-supporting-world-with-covered-observation"
+            })
             .unwrap();
         assert_eq!(same_decision.adaptive_worst_case_effort_before, Some(4));
         assert_eq!(same_decision.adaptive_worst_case_effort_after, Some(4));
@@ -1858,8 +1852,12 @@ mod tests {
     #[test]
     fn hypothesis_expansion_rejects_a_base_world_id_reuse() {
         let mut input = hypothesis_expansion_fixture();
-        input.scenario_challenges[0].additions[0].scenario.scenario_id = "world-a".into();
-        input.scenario_challenges[0].additions[0].support.scenario_id = "world-a".into();
+        input.scenario_challenges[0].additions[0]
+            .scenario
+            .scenario_id = "world-a".into();
+        input.scenario_challenges[0].additions[0]
+            .support
+            .scenario_id = "world-a".into();
         let error = evaluate(&input, &bytes(&input)).unwrap_err();
         assert!(error.contains("duplicate/invalid new world"));
     }
