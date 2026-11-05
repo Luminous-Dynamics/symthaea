@@ -338,6 +338,8 @@ pub fn evaluate_liquidity_waterfall<'a>(
             || event.minute_of_day >= 24 * 60
             || event.day_ordinal < inputs.start_day_ordinal
             || event.day_ordinal > inputs.horizon_end_day_ordinal
+            || (event.day_ordinal == inputs.start_day_ordinal
+                && event.minute_of_day < inputs.start_minute_of_day)
             || !inputs.calendar_day_ordinals.contains(&event.day_ordinal)
         {
             return Err(LiquidityWaterfallError::InvalidEvent);
@@ -570,6 +572,27 @@ mod tests {
         assert_eq!(result.committed.minimum_cash_minor_zar, 45_000_000);
         assert_eq!(result.committed.cover_shortfall_at_deadline_minor_zar, None);
         assert_eq!(result.committed.external_funding_gap_at_deadline_minor_zar, None);
+    }
+
+    #[test]
+    fn event_before_projection_start_is_rejected() {
+        let events = [event(
+            "already-passed",
+            1,
+            9 * 60,
+            0,
+            LiquidityEventClass::Committed,
+            LiquidityCashEventKind::MandatoryOutflow,
+            1_000_000,
+        )];
+        let inputs = LiquidityWaterfallInputs {
+            start_minute_of_day: 10 * 60,
+            ..base_inputs(&events)
+        };
+        assert_eq!(
+            evaluate_liquidity_waterfall(inputs),
+            Err(LiquidityWaterfallError::InvalidEvent)
+        );
     }
 
     #[test]
