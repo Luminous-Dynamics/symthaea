@@ -58,7 +58,8 @@
       "discharging_to_charging": 600,
       "standstill_to_discharging": 900
     },
-    "capability_status": "synthetic_only"
+    "capability_status": "synthetic_only",
+    "max_continuous_discharging_mw": 60
   },
   "energy_constraints": {
     "daily_limit_mwh": 250,
