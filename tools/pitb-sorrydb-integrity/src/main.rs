@@ -652,6 +652,7 @@ fn synthetic_report_and_receipt() -> Result<(Report, TaskReceipt), String> {
         database_git_blob_sha1: git_blob_sha1(&full_bytes, "synthetic full database")?,
         evaluation_split_git_blob_sha1: git_blob_sha1(&split_bytes, "synthetic split")?,
         expected_database_task_count: 2,
+        documented_database_task_count: 2,
         expected_evaluation_task_count: 1,
         evaluation_split_role: "test".into(),
         license: "Apache-2.0".into(),
