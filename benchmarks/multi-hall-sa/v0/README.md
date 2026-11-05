@@ -67,15 +67,17 @@ A held-out comparison requires a preregistered, rights-approved, source-family-d
 
 ## Commands
 
-From the isolated harness crate:
+From the repository root:
 
 ```bash
-cargo run --locked --release --bin score-multihall-sa -- \
+cargo run --manifest-path tools/knowledge-benchmark-harness/Cargo.toml --locked --release --bin score-multihall-sa -- \
   --plan benchmarks/multi-hall-sa/v0/synthetic-plan.json \
   --pairs benchmarks/multi-hall-sa/v0/synthetic-pairs.jsonl \
   --results benchmarks/multi-hall-sa/v0/synthetic-results.jsonl \
   --out target/multi-hall-sa-synthetic-report.json
 ```
+
+The synthetic fixture uses four pairs across the four target languages and four error types. It exercises the complete four-prediction matrix for two systems, probability calibration inputs, and an intentional missed target-language hallucination. With only four synthetic source clusters, the scorer must emit point metrics but no qualifying bootstrap interval. The fixture is designed to test the scorer contract, not simulate the published benchmark or provide a model comparison.
 
 The synthetic plan and output are scorer-contract fixtures only. They are not model outputs or benchmark results.
 
