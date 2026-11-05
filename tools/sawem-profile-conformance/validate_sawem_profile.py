@@ -103,7 +103,7 @@ def main() -> None:
     unconstrained, constrained, intraday = stages
     if unconstrained["scheduled_discharge_mw"] < constrained["scheduled_discharge_mw"]:
         fail("network-constrained schedule unexpectedly exceeds the unconstrained schedule")
-    for stage in (constrained, intraday):
+    for stage in stages:
         if stage["scheduled_discharge_mw"] > stage["network_export_limit_mw"]:
             fail(f"{stage['stage']} exceeds its declared network export limit")
 
@@ -120,6 +120,10 @@ def main() -> None:
         fail("reserve commitments must not be marked as double-counted energy")
     if any(item["capability_class"] != "synthetic" for item in period["reserve_commitments"]):
         fail("synthetic reserve commitments cannot be promoted to certified capability")
+    committed_reserve_mw = sum(item["committed_mw"] for item in period["reserve_commitments"])
+    for stage in stages:
+        if stage["scheduled_discharge_mw"] + committed_reserve_mw > unit["max_continuous_discharging_mw"]:
+            fail(f"{stage['stage']} double-counts discharge power and reserve headroom")
 
     dispatch = period["dispatch_instruction"]["instructed_discharge_mw"]
     metered = period["metered_outcome"]["metered_discharge_mw"]
