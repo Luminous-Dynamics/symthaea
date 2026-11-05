@@ -1188,3 +1188,33 @@ Exact-head qualification:
 
 This exact-head result qualifies the Linux sealed-snapshot implementation and synthetic Stored/Deflate receipts. It is not production corpus coverage, producer authentication, package signature validity, runtime safety or non-Linux support. Non-Linux replay explicitly returns Unsupported until an equivalent immutable snapshot backend is independently implemented and tested.
 
+## 28. 2026-11-05 — current-head receipt replay and differential fuzz qualification
+
+### Receipt replay rebase and source-selection hardening
+
+The replay work now has a clean stacked successor, [PR #10591](https://github.com/Luminous-Dynamics/symthaea/pull/10591), on the current receipt-validator base. Its exact-head run [42059013582](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42059013582) passed 22/22 tests, formatting and Clippy with warnings denied. In addition to sealed Linux memfd capture, the final path component is opened with `O_NOFOLLOW | O_CLOEXEC`; a symlink fixture is refused. The prior exact-head workflow at run 41994293575 is historical predecessor evidence only; #10591 is the current promotion candidate.
+
+### Differential fuzz exact-head outcome
+
+The differential ZIP PR [#10520](https://github.com/Luminous-Dynamics/symthaea/pull/10520) completed both 181-second fuzz arms at head `0a0be459e78da42ce2a201db2d4168e543706783` in [run 42056996386](https://github.com/Luminous-Dynamics/symthaea/actions/runs/42056996386):
+
+- Production REA reader: 3,096,936 executions, 17,110 exec/s, 278 MiB peak RSS.
+- zip-rs 9.3.0 / flate2-zlib-rs differential arm: 3,719,505 executions, 20,549 exec/s, 279 MiB peak RSS.
+- Both arms ran 181 seconds; no crashes, timeouts or differential mismatch artifacts were reported.
+- Run artifact 13430387200 SHA-256 `59ebc18993fdae991d26a48b0afae6a24baaa5bb7870ba6cf2753f54e0894c36`.
+
+These figures are bounded campaign statistics, not correctness percentages or a proof against ZIP-spec defects. The differential target's shared subset remains: complete traversal, unique raw names, no prefix, no ZIP64, single-disk ordinary archives, and bounded unencrypted Stored/Deflate regular files. All other cases are explicit abstentions or separate compatibility families.
+
+PR #10520 now adds a standalone deterministic Rust seed generator. It creates Stored, Deflate, mixed method, zero-length, directory+child, UTF-8 path and EOCD-signature-in-payload fixtures, then content-addresses each corpus file in the run context. This expanded-seed head must be rerun before its generated corpus is treated as qualified.
+
+### Updated security-model implication
+
+The current chain now has five separate executable claims:
+1. Production reader admits and inventories a bounded archive.
+2. The reader streams and verifies a member to EOF with size, decoder CRC and custom CRC acceptance.
+3. A versioned schema/semantic/JCS validator rejects ambiguous or overclaiming receipt documents.
+4. A second parser/Deflate path replays member bytes against the exact whole-archive digest.
+5. On Linux, replay consumes a sealed private snapshot and refuses a final-component source symlink.
+
+None of these claims establishes producer identity, APK/IPA signature validity, trust policy, package authorization, archive completeness, installability or runtime safety. Those remain separate child workstreams in #10508 and #10537–#10540.
+
