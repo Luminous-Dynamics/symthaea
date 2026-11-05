@@ -371,8 +371,19 @@ jobs:
           record = next((row for row in dataset["sorries"] if row["id"] == expected), None)
           if record is None:
               raise SystemExit("pinned source sample is missing from frozen SorryDB evaluation split")
+          expected_location = {
+              "path": "PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean",
+              "start_line": 44,
+              "start_column": 137,
+              "end_line": 44,
+              "end_column": 142,
+          }
           if record["repo"]["commit"] != "ddcb6542f2b62883c8642d3db4ecc115afcce33e":
               raise SystemExit("pinned source sample repository commit changed")
+          if record["repo"]["lean_version"] != "v4.26.0":
+              raise SystemExit("pinned source sample Lean toolchain changed")
+          if record["location"] != expected_location:
+              raise SystemExit(f"pinned task coordinates changed: {record['location']}")
           Path(sys.argv[2]).write_text(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
           print("PITB_SORRYDB_REAL_TASK_SELECTED", record["id"])
           PY
@@ -394,7 +405,7 @@ jobs:
           lake_manifest_blob="$(git -C "$repo_dir" rev-parse HEAD:lake-manifest.json)"
           test "$toolchain_blob" = "2654c20bb16bfd3a12f77a6cdeb73d48bf3b8359"
           test "$source_blob" = "6214f90ce5f8c61aca4a4d696ff5687d872dfc0e"
-          test -n "$lake_manifest_blob"
+          test "$lake_manifest_blob" = "c0405e3c9643b00b1ce6a8120516ca482e6fe4ec"
           git -C "$repo_dir" show HEAD:lean-toolchain
           echo "PITB_SORRYDB_REAL_SOURCE_COMMIT_PASS $actual_commit"
           echo "PITB_SORRYDB_REAL_SOURCE_FILE_BLOB_PASS $source_blob"
@@ -404,6 +415,7 @@ jobs:
 
 
       - name: Install the exact Lean toolchain and build the pinned source project
+        id: lean-build
         uses: leanprover/lean-action@fe408643ea7367d8c0404a8be3975bb145f5fb64 # v1.7.0
         with:
           lake-package-directory: sorrydb-real-source
@@ -413,6 +425,21 @@ jobs:
           lint: "false"
           use-mathlib-cache: "auto"
           use-github-cache: "true"
+
+      - name: Record exact Lean build and toolchain status
+        shell: bash
+        env:
+          LEAN_ACTION_BUILD_STATUS: \${{ steps.lean-build.outputs.build-status }}
+        run: |
+          set -euo pipefail
+          test "$LEAN_ACTION_BUILD_STATUS" = "SUCCESS"
+          (
+            cd "$PITB_SORRYDB_REAL_SOURCE_DIR"
+            lean --version
+            lake --version
+          ) | tee "$RUNNER_TEMP/sorrydb-lean-toolchain-status.txt"
+          echo "$LEAN_ACTION_BUILD_STATUS" > "$RUNNER_TEMP/sorrydb-lean-build-status.txt"
+          echo "PITB_SORRYDB_LEAN_PROJECT_BUILD_PASS"
 
       - name: Verify real SorryDB task source coordinates from Git objects
         shell: bash
@@ -555,8 +582,10 @@ jobs:
             ${{ runner.temp }}/sorrydb-real-goal-replay.log
             ${{ runner.temp }}/sorrydb-instrumented-goal-replay.lean
             ${{ runner.temp }}/sorrydb-source-task.json
-            ${{ github.workspace }}/sorrydb-real-source/.lake/build
-            ${{ runner.temp }}/sorrydb-real-source/
+            ${{ runner.temp }}/sorrydb-lean-build-status.txt
+            ${{ runner.temp }}/sorrydb-lean-toolchain-status.txt
+            ${{ github.workspace }}/sorrydb-real-source/.lake/build/build.log
+            ${{ github.workspace }}/sorrydb-real-source/lake-manifest.json
             ${{ runner.temp }}/sorrydb-input/
             ${{ runner.temp }}/pitb-sorrydb-audit/src/main.rs
             ${{ runner.temp }}/pitb-sorrydb-audit/Cargo.lock
