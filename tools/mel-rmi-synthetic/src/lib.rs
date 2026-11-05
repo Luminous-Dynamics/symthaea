@@ -1026,6 +1026,52 @@ pub fn verify_trial_artifact_bindings(
     Ok(())
 }
 
+/// Read-only boundary implemented by a durable Studio adapter.
+///
+/// Each call must independently resolve the committed event from the storage
+/// system of record after transaction commit. Returning a caller's original
+/// pre-commit buffers or an in-memory cache does not satisfy this contract.
+/// The harness can verify the returned bytes and event bindings, but cannot
+/// prove that an arbitrary implementation really queried durable storage.
+pub trait CommittedArtifactReadbackV1 {
+    /// Fetch the exact committed artifact set and serialized transaction
+    /// receipt for one event identity.
+    fn read_committed_event(
+        &self,
+        event_id: &str,
+    ) -> Result<ArtifactPayloadSetV1, HarnessError>;
+}
+
+/// Re-fetch all eight trial event artifact sets through a committed-storage
+/// adapter and compare their exact bytes against the trial's content evidence.
+///
+/// This is stronger as an integration seam than passing the same payload
+/// arrays used during binding, but the adapter remains responsible for
+/// demonstrating durable read-after-commit semantics and authenticating the
+/// transaction receipt/actor/purpose through MEL-013A.
+pub fn verify_trial_from_committed_readback(
+    record: &TrialRecordV1,
+    readback: &dyn CommittedArtifactReadbackV1,
+) -> Result<(), HarnessError> {
+    let mut inputs = Vec::with_capacity(4);
+    for event_id in &record.manifest.input_event_ids {
+        inputs.push(readback.read_committed_event(event_id)?);
+    }
+    let inputs: [ArtifactPayloadSetV1; 4] = inputs
+        .try_into()
+        .map_err(|_| HarnessError::ArtifactBindingMissing)?;
+
+    let mut outputs = Vec::with_capacity(4);
+    for event_id in &record.manifest.output_event_ids {
+        outputs.push(readback.read_committed_event(event_id)?);
+    }
+    let outputs: [ArtifactPayloadSetV1; 4] = outputs
+        .try_into()
+        .map_err(|_| HarnessError::ArtifactBindingMissing)?;
+
+    verify_trial_artifact_bindings(record, &inputs, &outputs)
+}
+
 /// Full replayable output for one Track A paired fixture.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrialRecordV1 {
@@ -3176,6 +3222,99 @@ mod tests {
                 "v1",
             ),
             Err(HarnessError::InvalidArtifactSet)
+        );
+    }
+
+    struct FixtureCommittedReadback {
+        sets: Vec<ArtifactPayloadSetV1>,
+        requested: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    }
+
+    impl CommittedArtifactReadbackV1 for FixtureCommittedReadback {
+        fn read_committed_event(
+            &self,
+            event_id: &str,
+        ) -> Result<ArtifactPayloadSetV1, HarnessError> {
+            self.requested
+                .lock()
+                .map_err(|_| HarnessError::InvalidArtifactSet)?
+                .push(event_id.to_owned());
+            self.sets
+                .iter()
+                .find(|set| set.event_id == event_id)
+                .cloned()
+                .ok_or(HarnessError::ArtifactBindingMissing)
+        }
+    }
+
+    #[test]
+    fn committed_readback_fetches_all_eight_events_by_manifest_identity() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        let mut committed_sets = inputs.to_vec();
+        committed_sets.extend(outputs.to_vec());
+        bind_verified_artifacts(
+            &mut record,
+            inputs,
+            outputs,
+            "independent-sha256-verifier",
+            "v1",
+        )
+        .unwrap();
+
+        let requested = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let readback = FixtureCommittedReadback {
+            sets: committed_sets,
+            requested: std::sync::Arc::clone(&requested),
+        };
+        verify_trial_from_committed_readback(&record, &readback).unwrap();
+
+        let mut expected = record.manifest.input_event_ids.to_vec();
+        expected.extend(record.manifest.output_event_ids.to_vec());
+        assert_eq!(*requested.lock().unwrap(), expected);
+    }
+
+    #[test]
+    fn committed_readback_rejects_post_commit_artifact_substitution() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        let mut committed_sets = inputs.to_vec();
+        committed_sets.extend(outputs.to_vec());
+        bind_verified_artifacts(
+            &mut record,
+            inputs,
+            outputs,
+            "independent-sha256-verifier",
+            "v1",
+        )
+        .unwrap();
+
+        committed_sets[6].artifacts[0].bytes.push(0x7f);
+        let readback = FixtureCommittedReadback {
+            sets: committed_sets,
+            requested: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+        };
+        assert_eq!(
+            verify_trial_from_committed_readback(&record, &readback),
+            Err(HarnessError::ArtifactDigestMismatch)
         );
     }
 
