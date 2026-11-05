@@ -103,7 +103,7 @@ It reports, independently:
 - captured headroom, selection regret and the gap between naive score and selected-candidate true value;
 - continuation evaluation cost for the full candidate set and held-out scoring cost for the selected candidate.
 
-The candidate bank has a known finite expected-value profile and three distinct noise components: a shared continuation/world factor, candidate-local residual noise, and candidate-by-continuation interaction. Candidate counts are 1/2/4/8/16/32; selection continuation counts are 1/2/4/8/16; held-out continuation count equals the selection count; each condition uses 64 deterministic paired selection/held-out replicates.
+The candidate bank has a known finite expected-value profile and a three-way variance decomposition: candidate expected-value main effect, a continuation/world main effect shared across candidates, and candidate-by-continuation interaction. It deliberately does not add a second candidate-local term that would duplicate the interaction variance. Candidate counts are 1/2/4/8/16/32; selection continuation counts are 1/2/4/8/16; held-out continuation count equals the selection count; each condition uses 64 deterministic paired selection/held-out replicates.
 
 A separate exact finite coupling fixture demonstrates why common random numbers must not be assumed to reduce variance. With the same invariant common cause and same-sign response sensitivities, the paired-difference variance falls; with opposite-sign sensitivities, the same shared draw increases paired-difference variance relative to independent draws. Causal draw alignment and statistical variance reduction remain separate claims.
 
