@@ -68,6 +68,9 @@ impl ScenarioSet {
         }
         for scenario in &mut scenarios {
             scenario.weight /= total_weight;
+            if !scenario.weight.is_finite() || scenario.weight <= 0.0 {
+                return Err(ScenarioAssessmentError::ScenarioWeightOverflow);
+            }
         }
 
         Ok(Self { scenarios, digest })
