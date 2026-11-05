@@ -1,0 +1,515 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/external-observations-v0.schema.json",
+  "title": "CEB External Comparator Observation Registry V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "registry_id",
+    "status",
+    "snapshot_date",
+    "policy",
+    "sources",
+    "comparators",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "registry_id": {
+      "const": "CEB-EXTERNAL-OBSERVATIONS-V0"
+    },
+    "status": {
+      "const": "design_only_external_reference_snapshot"
+    },
+    "snapshot_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_of_observation",
+        "comparison_ceiling",
+        "uncertainty_rule",
+        "denominator_rule",
+        "unlabeled_rule"
+      ],
+      "properties": {
+        "unit_of_observation": {
+          "type": "string",
+          "minLength": 20
+        },
+        "comparison_ceiling": {
+          "type": "string",
+          "minLength": 20
+        },
+        "uncertainty_rule": {
+          "type": "string",
+          "minLength": 20
+        },
+        "denominator_rule": {
+          "type": "string",
+          "minLength": 20
+        },
+        "unlabeled_rule": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "comparators": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/comparator"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 20,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_url",
+        "title",
+        "source_type",
+        "accessed_on",
+        "published_on",
+        "supports"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3
+        },
+        "source_type": {
+          "enum": [
+            "leaderboard",
+            "dataset_results",
+            "paper",
+            "independent_review",
+            "maintainer_documentation",
+            "benchmark_leaderboard",
+            "benchmark_paper",
+            "benchmark_documentation"
+          ]
+        },
+        "accessed_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "published_on": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "supports": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^CEB-[A-Z]+$"
+          }
+        }
+      }
+    },
+    "denominator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "reported",
+            "not_reported"
+          ]
+        },
+        "value": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "comparator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparator_id",
+        "lane_id",
+        "benchmark_name",
+        "benchmark_version",
+        "split",
+        "sample_denominator",
+        "source_id",
+        "supporting_source_ids",
+        "comparison_class",
+        "caveats"
+      ],
+      "properties": {
+        "comparator_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "lane_id": {
+          "type": "string",
+          "pattern": "^CEB-[A-Z]+$"
+        },
+        "benchmark_name": {
+          "type": "string",
+          "minLength": 3
+        },
+        "benchmark_version": {
+          "type": "string",
+          "minLength": 3
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_denominator": {
+          "$ref": "#/$defs/denominator"
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "supporting_source_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          }
+        },
+        "comparison_class": {
+          "enum": [
+            "contextual_reference",
+            "historical_reference",
+            "methodological_reference"
+          ]
+        },
+        "caveats": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      }
+    },
+    "system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "system_id",
+        "model",
+        "harness",
+        "configuration"
+      ],
+      "properties": {
+        "system_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 2
+        },
+        "harness": {
+          "type": "string",
+          "minLength": 2
+        },
+        "configuration": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "raw_notation",
+        "margin",
+        "confidence_level",
+        "method",
+        "applies_to_metric_id",
+        "applies_to_task_count"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "reported",
+            "not_reported"
+          ]
+        },
+        "raw_notation": {
+          "type": "string",
+          "minLength": 2
+        },
+        "margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "confidence_level": {
+          "type": "string",
+          "minLength": 2
+        },
+        "method": {
+          "type": "string",
+          "minLength": 2
+        },
+        "applies_to_metric_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "applies_to_task_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "label",
+        "definition",
+        "value",
+        "value_status",
+        "operator",
+        "unit",
+        "direction",
+        "raw_display",
+        "uncertainty"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 2
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 8
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "value_status": {
+          "enum": [
+            "reported",
+            "unlabeled",
+            "qualitative"
+          ]
+        },
+        "operator": {
+          "enum": [
+            "equal",
+            "less_than",
+            "reported_qualitative"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 2
+        },
+        "direction": {
+          "enum": [
+            "maximize",
+            "minimize",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "raw_display": {
+          "type": "string",
+          "minLength": 2
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "value_status": {
+                "const": "reported"
+              }
+            },
+            "required": [
+              "value_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number"
+              },
+              "operator": {
+                "enum": [
+                  "equal",
+                  "less_than"
+                ]
+              },
+              "metric_id": {
+                "not": {
+                  "const": "unlabeled_leaderboard_score"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "value_status": {
+                "const": "unlabeled"
+              }
+            },
+            "required": [
+              "value_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "metric_id": {
+                "const": "unlabeled_leaderboard_score"
+              },
+              "value": {
+                "type": "number"
+              },
+              "direction": {
+                "const": "unknown"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "value_status": {
+                "const": "qualitative"
+              }
+            },
+            "required": [
+              "value_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "metric_id": {
+                "const": "verifier_lifecycle_policy"
+              },
+              "value": {
+                "type": "null"
+              },
+              "operator": {
+                "const": "reported_qualitative"
+              },
+              "direction": {
+                "const": "not_applicable"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "comparator_id",
+        "source_locator",
+        "system",
+        "metric",
+        "notes"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "comparator_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "source_locator": {
+          "type": "string",
+          "minLength": 5
+        },
+        "system": {
+          "$ref": "#/$defs/system"
+        },
+        "metric": {
+          "$ref": "#/$defs/metric"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 4
+          }
+        }
+      }
+    }
+  }
+}
