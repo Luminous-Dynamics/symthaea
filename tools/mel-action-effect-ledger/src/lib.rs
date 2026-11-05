@@ -877,33 +877,36 @@ impl ActionEffectLedger {
             return Err(LedgerError::MissingEvidenceDigest);
         }
 
-        match receipt.stage {
+        let next_pending_frames = match receipt.stage {
             EffectStage::EnqueuedToApplicationOutput => {
                 if receipt.application_frames == 0 {
                     return Err(LedgerError::InvalidFrameAccounting);
                 }
-                self.state.pending_application_frames = self
-                    .state
-                    .pending_application_frames
-                    .checked_add(receipt.application_frames)
-                    .ok_or(LedgerError::InvalidFrameAccounting)?;
+                Some(
+                    self.state
+                        .pending_application_frames
+                        .checked_add(receipt.application_frames)
+                        .ok_or(LedgerError::InvalidFrameAccounting)?,
+                )
             }
             EffectStage::CallbackObserved => {
                 if receipt.application_frames == 0 {
                     return Err(LedgerError::InvalidFrameAccounting);
                 }
-                self.state.pending_application_frames = self
-                    .state
-                    .pending_application_frames
-                    .checked_sub(receipt.application_frames)
-                    .ok_or(LedgerError::InvalidFrameAccounting)?;
+                Some(
+                    self.state
+                        .pending_application_frames
+                        .checked_sub(receipt.application_frames)
+                        .ok_or(LedgerError::InvalidFrameAccounting)?,
+                )
             }
             _ => {
                 if receipt.application_frames != 0 {
                     return Err(LedgerError::InvalidFrameAccounting);
                 }
+                None
             }
-        }
+        };
 
         let key = (receipt.clock_domain, receipt.clock_origin_id.clone());
         if self
@@ -914,6 +917,9 @@ impl ActionEffectLedger {
             return Err(LedgerError::ClockRegression);
         }
         self.clock_times.insert(key, receipt.observed_at);
+        if let Some(pending_frames) = next_pending_frames {
+            self.state.pending_application_frames = pending_frames;
+        }
         state.current_stage = Some(receipt.stage);
         state.observed_stages.insert(receipt.stage);
         Ok(())
@@ -1498,6 +1504,68 @@ mod tests {
             Err(LedgerError::ConflictingDuplicateEvent {
                 event_id: "same-id".into()
             })
+        );
+    }
+
+    #[test]
+    fn rejected_enqueue_clock_regression_does_not_mutate_pending_frame_count() {
+        let mut ledger = ledger();
+        commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
+        ledger.apply(respond_event("decision-0", 2)).unwrap();
+        let mut regressed = stage_event(
+            "decision-0",
+            "regressed-enqueue",
+            3,
+            EffectStage::EnqueuedToApplicationOutput,
+            ClockDomain::RunnerMonotonic,
+            RUNNER,
+            900,
+        );
+        if let EventKind::EffectObserved(receipt) = &mut regressed.kind {
+            receipt.application_frames = 120;
+        }
+        assert_eq!(
+            ledger.apply(regressed),
+            Err(LedgerError::ClockRegression)
+        );
+        assert_eq!(ledger.state().pending_application_frames, 480);
+        assert_eq!(ledger.effect_stage("decision-0"), Some(EffectStage::AppliedAtNoteQueue));
+    }
+
+    #[test]
+    fn callback_frame_count_cannot_exceed_application_queue_pending_count() {
+        let mut ledger = ledger();
+        commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
+        ledger.apply(respond_event("decision-0", 2)).unwrap();
+        ledger.apply(stage_event(
+            "decision-0",
+            "enqueue",
+            3,
+            EffectStage::EnqueuedToApplicationOutput,
+            ClockDomain::RunnerMonotonic,
+            RUNNER,
+            1_200,
+        )).unwrap();
+        let mut oversized = stage_event(
+            "decision-0",
+            "oversized-callback",
+            4,
+            EffectStage::CallbackObserved,
+            ClockDomain::CpalCallback,
+            "cpal-callback-1",
+            1_000,
+        );
+        if let EventKind::EffectObserved(receipt) = &mut oversized.kind {
+            receipt.application_frames = 10_000;
+        }
+        assert_eq!(
+            ledger.apply(oversized),
+            Err(LedgerError::InvalidFrameAccounting)
+        );
+        assert_eq!(ledger.state().pending_application_frames, 600);
+        assert_eq!(
+            ledger.effect_stage("decision-0"),
+            Some(EffectStage::EnqueuedToApplicationOutput)
         );
     }
 
