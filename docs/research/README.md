@@ -15,22 +15,23 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | Topic | Description |
 |-------|-------------|
 | [Theoretical Foundations](#theoretical-foundations) | Core theories underlying Symthaea |
-| [Φ-Topology Research](#φ-topology-research) | Publication-ready findings on consciousness and network structure |
+| [Φ-Topology Research](#φ-topology-research) | Publication-quality findings on consciousness and network structure |
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
 | [Evidence-Driven Invention](INVENTOR_LOOP_001_PROGRAM_V0_1.md) | Engineering intelligence, physical validation and human learning |
-| [Bridge / Truss Learner Packet](INVENTOR_LOOP_001_BRIDGE_TRUSS_LEARNER_PACKET_V0_1.md) | Design-only first learner project using existing Symtropy truss analysis |
-| [Bridge / Truss Instructor Key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) | Analytical reference for the paper-only symmetric two-bar exercise |
+| [Bridge / Truss Learner Packet](INVENTOR_LOOP_001_BRIDGE_TRUSS_LEARNER_PACKET_V0_1.md) | Paper-only first learner project |
+| [Bridge / Truss Instructor Key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) | Separate analytical reference for the symmetric two-bar exercise |
 | [CAD-HISTORY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10510) | Parametric and scan-to-CAD reconstruction benchmark |
 | [CAD-HISTORY-001 Fixture Corpus](https://github.com/Luminous-Dynamics/symthaea/pull/10529) | Synthetic editable-history and scan-to-CAD fixture specification |
+| [CAD-HISTORY-001 Fixture Registry](https://github.com/Luminous-Dynamics/symthaea/pull/10552) | Machine-readable 11-case catalog |
 | [HARDWARE-TOPOLOGY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10530) | Assembly pose, mating and ECAD connectivity benchmark |
-| [HARDWARE-TOPOLOGY-001 Fixture Corpus](https://github.com/Luminous-Dynamics/symthaea/pull/10532) | Assembly, netlist and buildability synthetic fixtures |
+| [HARDWARE-TOPOLOGY-001 Fixture Corpus](https://github.com/Luminous-Dynamics/symthaea/pull/10532) | Assembly, netlist and buildability fixture specification |
+| [HARDWARE-TOPOLOGY-001 Fixture Registry](https://github.com/Luminous-Dynamics/symthaea/pull/10550) | Machine-readable 20-case catalog |
 | [ENG-DESIGN-CHANGE-QUAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/10543) | Engineering change impact and evidence applicability benchmark |
 | [ENG-DESIGN-CHANGE-QUAL-001 Fixture Bank](https://github.com/Luminous-Dynamics/symthaea/pull/10546) | Public 24-scenario blueprint bank |
-| [PLE and BenchCAD external benchmark registry](../../benchmarks/manifest.json) | Versioned metadata, evaluation pathways and reproduction constraints |
-| [CAD-HISTORY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10510) | Edit-preserving parametric feature-history reconstruction benchmark |
-| [PLE external benchmark registry](../../benchmarks/manifest.json) | Versioned metadata, evaluation pathways and reproduction constraints |
+| [ENG-DESIGN-CHANGE-QUAL-001 Fixture Registry](https://github.com/Luminous-Dynamics/symthaea/pull/10547) | Machine-readable 24-case catalog |
+| [PLE, BenchCAD and Parametric CAD V3 Registry](../../benchmarks/manifest.json) | Versioned external benchmark metadata and reproduction constraints |
 
 ---
 
