@@ -1,0 +1,40 @@
+name: Landauer Erasure Verification 001
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/physics/landauer_erasure.rs"
+      - "crates/core/symthaea-core/src/physics/thermodynamics.rs"
+      - "research/landauer-erasure-001/**"
+      - ".github/workflows/landauer-erasure-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: landauer-erasure-001-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-source-verification:
+    name: Exact-source Landauer arithmetic, tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format standalone harness and included production module
+        run: cargo fmt --manifest-path research/landauer-erasure-001/Cargo.toml -- --check
+
+      - name: Run exact production arithmetic tests
+        run: cargo test --locked --manifest-path research/landauer-erasure-001/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/landauer-erasure-001/Cargo.toml --all-targets -- -D warnings
