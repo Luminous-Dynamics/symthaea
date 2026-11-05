@@ -713,12 +713,11 @@ fn evaluate(
     if let (Some(before), Some(after)) = (
         baseline_summary.minimum_effort_units,
         challenged_summary.minimum_effort_units,
-    ) {
-        if after < before {
-            violations.push(format!(
-                "minimum effort decreased from {before} to {after} after support expansion"
-            ));
-        }
+    ) && after < before
+    {
+        violations.push(format!(
+            "minimum effort decreased from {before} to {after} after support expansion"
+        ));
     }
     if baseline_summary
         .robustly_undiscriminable_pairs
