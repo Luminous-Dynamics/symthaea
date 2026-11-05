@@ -49,6 +49,9 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
     psus = {item["psu_id"]: item for item in psu_rows}
     alternatives = {item["alternative_id"]: item for item in alternative_rows}
     proposals_for_psu: dict[str, set[str]] = {psu_id: set() for psu_id in psus}
+    false_positive_proposal_count = 0
+    ambiguous_proposal_count = 0
+    unadjudicated_proposal_count = 0
     channel_proposals: dict[str, list[dict]] = {channel_id: [] for channel_id in channels}
     captures_by_channel: dict[str, set[str]] = {channel_id: set() for channel_id in channels}
     capture_union: set[str] = set()
@@ -76,6 +79,12 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
             require(disposition in {"FALSE_POSITIVE", "AMBIGUOUS", "UNADJUDICATED"}, "unknown proposal disposition")
             require("matched_alternative_id" not in proposal, "non-confirmed proposal carries an alternative")
             require("match_adjudication_sha256" not in proposal, "non-confirmed proposal carries a match receipt")
+            if disposition == "FALSE_POSITIVE":
+                false_positive_proposal_count += 1
+            elif disposition == "AMBIGUOUS":
+                ambiguous_proposal_count += 1
+            else:
+                unadjudicated_proposal_count += 1
 
     complete = incomplete = inaccessible = zero_proposal = 0
     for psu_id, psu in psus.items():
@@ -134,7 +143,14 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
     critical_ids = sorted(item["alternative_id"] for item in critical_rows)
     captured_critical = sorted(set(critical_ids) & capture_union)
     missed_critical = sorted(set(critical_ids) - set(captured_critical))
-    noncritical_admissible = len(admissible) - len(critical_rows)
+    not_estimable_admissible = sum(
+        1 for item in admissible if item["query_consequence"] == "NOT_ESTIMABLE"
+    )
+    noncritical_admissible = len(admissible) - len(critical_rows) - not_estimable_admissible
+    unresolved_biological = sum(
+        1 for item in alternative_rows
+        if item["biological_disposition"] in {"INDETERMINATE", "DISPUTED", "NOT_ADJUDICATED"}
+    )
 
     channel_summaries = []
     for channel_id in sorted(channels):
@@ -164,6 +180,10 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
 
     if incomplete or inaccessible:
         status = "NOT_PROMOTABLE_INCOMPLETE_OR_INACCESSIBLE_SEARCH"
+    elif ambiguous_proposal_count or unadjudicated_proposal_count:
+        status = "NOT_PROMOTABLE_UNRESOLVED_PROPOSAL_ADJUDICATION"
+    elif unresolved_biological or not_estimable_admissible:
+        status = "NOT_PROMOTABLE_UNRESOLVED_OR_NOT_ESTIMABLE_ALTERNATIVES"
     elif data["claim_scope"] == "synthetic_known_truth":
         status = "SYNTHETIC_OBSERVED_SAMPLE_VALIDATED"
     else:
@@ -204,6 +224,9 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
         "confirmed_match_count": sum(
             1 for row in proposal_rows if row["adjudication_disposition"] == "CONFIRMED_MATCH"
         ),
+        "false_positive_proposal_count": false_positive_proposal_count,
+        "ambiguous_proposal_count": ambiguous_proposal_count,
+        "unadjudicated_proposal_count": unadjudicated_proposal_count,
         "alternative_count": len(alternative_rows),
         "admissible_alternative_count": len(admissible),
         "query_critical_alternative_count": len(critical_ids),
@@ -211,6 +234,8 @@ def verify(raw: bytes, data: dict, actual: dict) -> None:
         "missed_query_critical_alternative_ids": missed_critical,
         "query_critical_alternative_ids": critical_ids,
         "non_query_critical_admissible_alternative_count": noncritical_admissible,
+        "not_estimable_admissible_alternative_count": not_estimable_admissible,
+        "unresolved_biological_alternative_count": unresolved_biological,
         "channel_summaries": channel_summaries,
         "shared_ancestry_overlaps": overlaps,
         "all_list_missed_sensitivity_owner": "9248",
