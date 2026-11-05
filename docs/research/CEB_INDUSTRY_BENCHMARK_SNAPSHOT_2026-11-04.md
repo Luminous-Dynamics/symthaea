@@ -265,7 +265,7 @@ The current Scale consolidated leaderboard adds an important capability comparis
 
 These are different tasks and rubrics. They are not combined into a single agent score. Use the Scale consolidated page as the source index and pin the exact task leaderboard/revision when conducting any replication: https://labs.scale.com/leaderboard
 
-The CEB machine-readable measurement matrix now has 13 lanes, 41 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.
+The CEB machine-readable measurement matrix now has 13 lanes, 45 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.
 
 
 ## 2026-11-05 normalized-comparator refresh
@@ -280,3 +280,8 @@ Newly explicit source-backed details:
 The parent 13-lane matrix now records 16 comparator records and 16 source URLs. Of those source URLs, 15 are external benchmark or methodology references and one is the internal documentation-audit implementation reference. The external-observation registry contains only the 15 external sources. These counts are different by design; they are not to be silently equated.
 
 No CEB performance result is implied by these external observations.
+
+
+## 2026-11-05 selective-autonomy metric expansion
+
+The CEB-HUMAN lane now explicitly separates four paired-act/abstain outcomes: paired accuracy (both variants correct), act-side accuracy, abstain-side accuracy and conditioned abstention rate (CAR). This mirrors the useful metric separation in AgentAbstain without claiming identical tasks or a matched comparison. Prospective CEB targets are 0.70 paired accuracy in the pilot and 0.75 on a sealed holdout, with separate act/abstain guardrails. These remain unmeasured design targets.
