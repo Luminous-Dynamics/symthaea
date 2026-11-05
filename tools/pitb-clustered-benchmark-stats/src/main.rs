@@ -19,7 +19,7 @@ struct Dataset {
     sorries: Vec<Task>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Task {
     id: String,
     repo: Repo,
@@ -27,14 +27,14 @@ struct Task {
     debug_info: DebugInfo,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Repo {
     remote: String,
     commit: String,
     lean_version: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Location {
     path: String,
     start_line: u64,
@@ -43,7 +43,7 @@ struct Location {
     end_column: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct DebugInfo {
     goal: String,
 }
@@ -57,7 +57,7 @@ struct Strategy {
     model_version: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct ProofRun {
     schema_version: String,
     run_id: String,
