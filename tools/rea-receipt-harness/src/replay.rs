@@ -68,8 +68,7 @@ pub fn replay_member_claim(
     let archive_size = decimal_at(receipt, &["source", "archive_size_bytes"])?;
     // Copy once into a sealed, content-addressed snapshot. Every parser and digest below
     // consumes this immutable object; the mutable source path is never reopened.
-    let (mut snapshot, archive_sha, actual_size) =
-        sealed_snapshot(path.as_ref(), archive_limit)?;
+    let (mut snapshot, archive_sha, actual_size) = sealed_snapshot(path.as_ref(), archive_limit)?;
     if actual_size != archive_size {
         return Err(ReplayError::Rejected(
             "archive size differs from receipt".into(),
@@ -84,8 +83,12 @@ pub fn replay_member_claim(
     let max_central_directory = decimal_at(receipt, &["limits", "max_central_directory_bytes"])?
         .min(HARD_CENTRAL_DIRECTORY_LIMIT);
     let max_entries = decimal_at(receipt, &["limits", "max_entries"])?.min(HARD_ENTRY_LIMIT);
-    let preflight_entries =
-        preflight_regular_zip(&mut snapshot, actual_size, max_central_directory, max_entries)?;
+    let preflight_entries = preflight_regular_zip(
+        &mut snapshot,
+        actual_size,
+        max_central_directory,
+        max_entries,
+    )?;
 
     let parser_handle = snapshot.try_clone().map_err(io_error)?;
     let mut archive = zip::ZipArchive::new(parser_handle)
@@ -435,9 +438,9 @@ fn sealed_snapshot(path: &Path, limit: u64) -> Result<(File, String, u64), Repla
         if read == 0 {
             break;
         }
-        copied = copied.checked_add(read as u64).ok_or_else(|| {
-            ReplayError::Rejected("archive copy byte count overflow".into())
-        })?;
+        copied = copied
+            .checked_add(read as u64)
+            .ok_or_else(|| ReplayError::Rejected("archive copy byte count overflow".into()))?;
         if copied > limit || copied > initial_length {
             return Err(ReplayError::Rejected(
                 "source grew or exceeded the archive byte limit while snapshotting".into(),
@@ -454,14 +457,11 @@ fn sealed_snapshot(path: &Path, limit: u64) -> Result<(File, String, u64), Repla
     }
     snapshot.flush().map_err(io_error)?;
 
-    let required_seals = libc::F_SEAL_WRITE
-        | libc::F_SEAL_GROW
-        | libc::F_SEAL_SHRINK
-        | libc::F_SEAL_SEAL;
+    let required_seals =
+        libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
     // SAFETY: fcntl operates on the owned memfd, with a bitmask of Linux file seals.
-    let seal_result = unsafe {
-        libc::fcntl(snapshot.as_raw_fd(), libc::F_ADD_SEALS, required_seals)
-    };
+    let seal_result =
+        unsafe { libc::fcntl(snapshot.as_raw_fd(), libc::F_ADD_SEALS, required_seals) };
     if seal_result < 0 {
         return Err(ReplayError::Unsupported(format!(
             "kernel/filesystem refused required memfd seals: {}",
@@ -744,10 +744,8 @@ mod tests {
         assert_eq!(snapshot_digest, expected_digest);
         assert_eq!(snapshot_size, bytes.len() as u64);
         let seals = unsafe { libc::fcntl(snapshot.as_raw_fd(), libc::F_GET_SEALS) };
-        let required = libc::F_SEAL_WRITE
-            | libc::F_SEAL_GROW
-            | libc::F_SEAL_SHRINK
-            | libc::F_SEAL_SEAL;
+        let required =
+            libc::F_SEAL_WRITE | libc::F_SEAL_GROW | libc::F_SEAL_SHRINK | libc::F_SEAL_SEAL;
         assert!(seals >= 0 && seals & required == required);
 
         // Replacing the source path cannot change the already-open sealed snapshot.
@@ -762,8 +760,7 @@ mod tests {
         write_attempt.seek(SeekFrom::Start(0)).unwrap();
         assert!(write_attempt.write_all(b"X").is_err());
 
-        let (digest_after, size_after) =
-            hash_open_file(&mut snapshot, HARD_ARCHIVE_LIMIT).unwrap();
+        let (digest_after, size_after) = hash_open_file(&mut snapshot, HARD_ARCHIVE_LIMIT).unwrap();
         assert_eq!(digest_after, snapshot_digest);
         assert_eq!(size_after, snapshot_size);
     }
