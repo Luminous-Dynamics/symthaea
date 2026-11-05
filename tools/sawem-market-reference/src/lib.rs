@@ -16,6 +16,7 @@ pub mod forecast_metrics;
 pub mod liquidity_options;
 pub mod liquidity_stress;
 pub mod liquidity_waterfall;
+pub mod revenue_realization;
 
 const EPSILON: f64 = 1.0e-9;
 
