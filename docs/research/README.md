@@ -12,6 +12,8 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 
 ## Quick Navigation
 
+| [ENG-DESIGN-CHANGE-QUAL-001 Fixture Bank](ENG_DESIGN_CHANGE_QUAL_001_FIXTURE_BANK_V0_1.md) | Public synthetic blueprint bank for engineering change impact and evidence applicability |
+
 | Topic | Description |
 |-------|-------------|
 | [Theoretical Foundations](#theoretical-foundations) | Core theories underlying Symthaea |
