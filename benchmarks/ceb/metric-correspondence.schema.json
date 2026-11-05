@@ -61,8 +61,8 @@
     },
     "metric_mappings": {
       "type": "array",
-      "minItems": 49,
-      "maxItems": 49,
+      "minItems": 56,
+      "maxItems": 56,
       "items": {
         "$ref": "#/$defs/mapping"
       }
