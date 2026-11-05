@@ -429,7 +429,7 @@ jobs:
       - name: Record exact Lean build and toolchain status
         shell: bash
         env:
-          LEAN_ACTION_BUILD_STATUS: \${{ steps.lean-build.outputs.build-status }}
+          LEAN_ACTION_BUILD_STATUS: ${{ steps.lean-build.outputs.build-status }}
         run: |
           set -euo pipefail
           test "$LEAN_ACTION_BUILD_STATUS" = "SUCCESS"
