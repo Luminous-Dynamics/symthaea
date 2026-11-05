@@ -4,7 +4,12 @@
 //! action outcome. It stops when all still-compatible worlds agree on the
 //! frozen query decision; it does not require identifying the exact world.
 
+#[path = "../evidence_attestation.rs"]
+mod evidence_attestation;
+
+use base64::{Engine, engine::general_purpose::STANDARD};
 use clap::Parser;
+use evidence_attestation::{VerificationReceipt, verify_envelope};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -54,6 +59,8 @@ struct Input {
     support_challenges: Vec<SupportChallenge>,
     #[serde(default)]
     scenario_challenges: Vec<ScenarioExpansionChallenge>,
+    #[serde(default)]
+    require_signed_attestations: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -114,6 +121,8 @@ struct SupportChallenge {
     challenger_evidence_sha256: String,
     challenger_model_sha256: String,
     additions: Vec<JointSupportAddition>,
+    #[serde(default)]
+    attestation: Option<EvidenceAttestationBinding>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -133,6 +142,8 @@ struct ScenarioExpansionChallenge {
     challenger_evidence_sha256: String,
     challenger_model_sha256: String,
     additions: Vec<ScenarioWorldAddition>,
+    #[serde(default)]
+    attestation: Option<EvidenceAttestationBinding>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -140,6 +151,25 @@ struct ScenarioExpansionChallenge {
 struct ScenarioWorldAddition {
     scenario: Scenario,
     support: JointWorldSupport,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct EvidenceAttestationBinding {
+    envelope_json_base64: String,
+    trust_policy_json_base64: String,
+    expected_trust_policy_sha256: String,
+    verification_time_unix: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct AttestationSummary {
+    status: String,
+    receipt_sha256: Option<String>,
+    envelope_sha256: Option<String>,
+    payload_sha256: Option<String>,
+    trust_policy_sha256: Option<String>,
+    verified_signer_roles: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
