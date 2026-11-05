@@ -413,7 +413,8 @@ mod tests {
     }
 
     #[test]
-    fn variance_decomposition_keeps_candidate_shared_continuation_and_interaction_effects_separate() {
+    fn variance_decomposition_keeps_candidate_shared_continuation_and_interaction_effects_separate()
+    {
         let result = variance_decomposition(32);
         assert!(result.candidate_mean_variance > 0.0);
         assert!(result.shared_continuation_variance > 0.0);
