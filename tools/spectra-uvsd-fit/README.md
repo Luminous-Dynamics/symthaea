@@ -196,3 +196,28 @@ Because the score-bound intervals are simultaneous over all action × scenario u
 A failed certificate still identifies the most conservative candidate (highest robust lower bound), but returns `NoSelectionCertificate`; it does not pretend the candidate is proven best. Epsilon is measured in the caller's declared utility units and must be fixed before opening the evaluation seed bank.
 
 This is not a guarantee that the frozen scenarios cover reality, a participant-sampling interval, a causal effect estimate, or an automatic authorization to run the recommended experiment. The score model, scenario bank, objective and utility ranges remain external scientific assumptions.
+
+
+## Anytime-valid robust simulation allocation (experimental)
+
+The `score_bounds` module exposes `bound_candidate_score_samples_anytime` in addition to the fixed-look Hoeffding estimator.
+
+For each action × scenario cell, the six one-sided tails (four lower score bounds, upper utility, upper burden) receive base per-claim alpha `delta = familywise_alpha / (6 × actions × scenarios)`. At replication count n, the look-specific tail budget is
+
+```text
+delta_n = delta / (n * (n + 1))
+radius_n = range_width * sqrt(log(n * (n + 1) / delta) / (2 * n))
+```
+
+Since `sum_{n>=1} 1/(n(n+1)) = 1`, a union bound over every look and every claim gives time-uniform coverage under independent bounded replication streams within each action × scenario cell. This allows the score allocator to request data-dependent new replications and stop on a robust certificate without reusing fixed-look intervals as though they were anytime-valid. Cross-cell dependence from common random numbers is allowed for the union-bound statement; this module does not estimate paired action-difference intervals.
+
+The `allocation` module provides a first deterministic **robust interval-width heuristic**:
+- it requires the time-uniform receipt, a frozen robust objective and a preregistered epsilon;
+- it stops when the existing robust indifference-zone certificate succeeds;
+- otherwise it considers actions whose robust upper bound can still be within epsilon of the selected robust lower bound;
+- it allocates more score simulations to the competitive action/scenario cell with the largest contribution to unresolved maximin or CVaR utility uncertainty;
+- it returns `NO_SELECTION_CERTIFICATE` when the compute budget is exhausted or cannot fund an atomic paired batch.
+
+Common-random-number mode requests every action in the selected scenario at the same replication indices and with the same per-index seed. Independent-per-cell mode requests only the selected cell. The receipt records the allocation policy, root seed, seed mode, chosen cell priorities, current certificate and all next-batch seeds.
+
+This is **not OCBA, Track-and-Stop, Top Two or a sample-optimal ranking-and-selection algorithm**. It is a transparent baseline to benchmark against robust OCBA, fixed allocation, sequential elimination, Track-and-Stop where assumptions apply, and Top Two where assumptions apply. Seeds are deterministic research-simulation seeds, not cryptographic randomization. The policy does not run human-subject experiments.
