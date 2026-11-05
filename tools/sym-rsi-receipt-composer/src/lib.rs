@@ -634,8 +634,7 @@ pub fn compose_candidate(
     let mut seen_receipt_digests = BTreeSet::new();
     let mut shared_candidate_identity: Option<Value> = None;
     // Only metrics that explicitly declare the same pairing group share task units.
-    let mut pairing_group_contracts: BTreeMap<String, PairingGroupContract> =
-        BTreeMap::new();
+    let mut pairing_group_contracts: BTreeMap<String, PairingGroupContract> = BTreeMap::new();
 
     for (metric_id, projection) in &plan.metrics {
         let bytes = receipt_bytes_by_metric
@@ -666,13 +665,19 @@ pub fn compose_candidate(
                 input_digests,
             };
             match pairing_group_contracts.get(group_id) {
-                Some(expected) if expected.eligible_task_ids != pairing_contract.eligible_task_ids => {
+                Some(expected)
+                    if expected.eligible_task_ids != pairing_contract.eligible_task_ids =>
+                {
                     return Err(ComposerError::TaskUniverseMismatch);
                 }
-                Some(expected) if expected.cluster_by_task != pairing_contract.cluster_by_task => {
+                Some(expected)
+                    if expected.cluster_by_task != pairing_contract.cluster_by_task =>
+                {
                     return Err(ComposerError::ClusterMapMismatch);
                 }
-                Some(expected) if expected.input_digests != pairing_contract.input_digests => {
+                Some(expected)
+                    if expected.input_digests != pairing_contract.input_digests =>
+                {
                     return Err(ComposerError::TaskInputUniverseMismatch);
                 }
                 Some(_) => {}
