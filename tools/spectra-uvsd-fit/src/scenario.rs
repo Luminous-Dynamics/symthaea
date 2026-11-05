@@ -660,6 +660,30 @@ mod tests {
             ),
             Err(ScenarioAssessmentError::InvalidTailMass)
         );
+
+        let mut inverted_bound = reference_outcomes();
+        inverted_bound[0].target_utility_lower_bound = 11.0;
+        assert_eq!(
+            aggregate_scenario_assessments(
+                &action_set,
+                &scenario_set,
+                &inverted_bound,
+                RobustUtility::Maximin,
+                "sha256:scenario-score-contract",
+            ),
+            Err(ScenarioAssessmentError::InvalidOutcomeValue)
+        );
+
+        assert_eq!(
+            aggregate_scenario_assessments(
+                &action_set,
+                &scenario_set,
+                &reference_outcomes(),
+                RobustUtility::Maximin,
+                " ",
+            ),
+            Err(ScenarioAssessmentError::MissingScoreContractDigest)
+        );
     }
 
     #[test]
