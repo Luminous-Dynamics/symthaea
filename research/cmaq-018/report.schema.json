@@ -130,7 +130,8 @@
           "null_false_effect_rate_ci95_lower",
           "null_false_effect_rate_ci95_upper",
           "branch_outcome_mae_episode_count",
-          "branch_state_mae_episode_count"
+          "branch_state_mae_episode_count",
+          "dacs"
         ],
         "properties": {
           "scenario": {
@@ -372,6 +373,182 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 64
+          },
+          "dacs": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mean_prediction_coverage",
+              "mean_action_pair_separation_rate",
+              "action_pair_separation_episode_count",
+              "action_pair_separation_ci95_lower",
+              "action_pair_separation_ci95_upper",
+              "mean_action_response_sign_accuracy",
+              "action_response_sign_episode_count",
+              "action_response_sign_ci95_lower",
+              "action_response_sign_ci95_upper",
+              "mean_action_response_vector_mae",
+              "action_response_vector_episode_count",
+              "action_response_vector_ci95_lower",
+              "action_response_vector_ci95_upper",
+              "mean_neutral_input_drift_energy",
+              "neutral_input_drift_episode_count",
+              "neutral_input_drift_ci95_lower",
+              "neutral_input_drift_ci95_upper",
+              "mean_multi_step_response_mae",
+              "multi_step_response_episode_count",
+              "multi_step_response_ci95_lower",
+              "multi_step_response_ci95_upper",
+              "mean_multi_step_action_coverage"
+            ],
+            "properties": {
+              "mean_prediction_coverage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "mean_action_pair_separation_rate": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "action_pair_separation_episode_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 64
+              },
+              "action_pair_separation_ci95_lower": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "action_pair_separation_ci95_upper": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "mean_action_response_sign_accuracy": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "action_response_sign_episode_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 64
+              },
+              "action_response_sign_ci95_lower": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "action_response_sign_ci95_upper": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "mean_action_response_vector_mae": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "action_response_vector_episode_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 64
+              },
+              "action_response_vector_ci95_lower": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "action_response_vector_ci95_upper": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "mean_neutral_input_drift_energy": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "neutral_input_drift_episode_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 64
+              },
+              "neutral_input_drift_ci95_lower": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "neutral_input_drift_ci95_upper": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "mean_multi_step_response_mae": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "multi_step_response_episode_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 64
+              },
+              "multi_step_response_ci95_lower": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "multi_step_response_ci95_upper": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "mean_multi_step_action_coverage": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            }
           }
         }
       }
