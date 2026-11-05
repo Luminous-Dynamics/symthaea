@@ -154,6 +154,8 @@ The benchmark landscape now exposes nine separable gaps between coding success a
 
 SRE-Bench remains a separate optional source-free reverse-engineering capability, not a substitute for source-based repository comprehension.
 
+A tenth gap is benchmark trustworthiness itself. Epoch AI's September 4, 2026 review rated Terminal-Bench 4.0.0 flawed, reporting publicly noted scoring defects in 30 of 66 tasks (45.5%); the maintainer roadmap names tamper-resistant verifiers as a Terminal-Bench 4.1 focus. CEB should evaluate verifier integrity, custody, answer-leakage resistance, false-accept/false-reject behavior and regrade independence as first-class capabilities, not hidden assumptions.
+
 ## 4. CEB strategy
 
 ### Primary research claims to pursue
@@ -169,6 +171,8 @@ SRE-Bench remains a separate optional source-free reverse-engineering capability
 - **CEB-SECURE:** secure code-change correctness, CWE coverage, false-accept rate and functional/security non-inferiority.
 - **CEB-RUST:** Rust-specific issue reproduction, trait/type correctness, configuration scope and repository comprehension.
 - **CEB-CONTEXT:** context retrieval precision/recall/F1, sufficiency, token cost and downstream task success.
+- **CEB-EVAL / CEB-VERIFY:** evaluator integrity, benchmark admission, answer-leakage resistance, receipt binding, independent regrading and false-accept/false-reject behavior.
+- **CEB-DOCS:** static evidence that documented Cargo manifest/package/binary commands refer to tracked sources in the selected workspace; this is a documentation-integrity control, not proof that commands build or pass.
 
 ### Matched baseline design
 
@@ -211,6 +215,8 @@ Suggested first gates already tracked in #10385 / #10400:
 - secure-task pass >= 0.55 initially, >= 0.65 on sealed holdout, while functional correctness remains within a preregistered 2 pp non-inferiority margin;
 - context retrieval Recall@10 >= 0.85 initially, >= 0.90 sealed; Context F1 >= 0.45 initially, >= 0.50 sealed, with downstream task success and retrieval cost reported;
 - Rust-SWE-bench issue resolution >30% in a matched replication before pursuing >35%; do not compare this directly with the February 2026 RUSTFORGER/Claude Sonnet 3.7 result without matched harness and model controls.
+- evaluator integrity: zero critical false accepts; at least 300 distinct negative and 300 distinct positive control instantiations across at least 30 negative fault families; report false-accept and false-reject uncertainty separately, plus unresolved rate and regrade disagreement;
+- documentation executability: zero unannotated missing Cargo manifest, package or binary references in tracked Markdown; report manifest, package-selector and dynamic/out-of-scope denominators separately.
 
 These are prospective CEB goals, not current Symthaea results. Final sample sizes and confidence bounds must be set from pilot variance and repository/fault-family clustering.
 
@@ -242,5 +248,21 @@ The immediate route is runner-independent authoring, static source/manifest chec
 - Agent Security League: Endor Labs, live benchmark page: https://www.endorlabs.com/research/ai-code-security-benchmark
 - Rust-SWE-bench / RUSTFORGER: Xiang et al., ICSE 2026: https://arxiv.org/abs/2602.22764
 - ContextBench: Li et al., 2026, leaderboard updated October 23: https://contextbench.github.io/
+- Terminal-Bench 4.0 maintainer release notes and 4.1 verifier roadmap: https://www.tbench.ai/news/terminal-bench-4-0
+- Epoch AI independent review of Terminal-Bench 4.0.0 (2026-09-04): https://epoch.ai/benchmarks/terminal-bench-4/review
 
 **Snapshot limitation:** this is a dated source audit. Re-read the cited pages before future claims; live score tables, model identities, harness settings and benchmark revisions can change.
+
+
+## 2026-11-05 leaderboard delta
+
+The current Scale consolidated leaderboard adds an important capability comparison alongside SWE-Bench Pro V2:
+
+- SWE Atlas Test Writing: Fable 5.1 + Claude Code 67.04 ± 5.33; Opus 5 + Claude Code 62.22 ± 5.58.
+- SWE Atlas Refactoring: GPT-6 Astra + Codex 59.05 ± 6.43; Fable 5.1 + Claude Code 56.67 ± 6.52.
+- SWE Atlas Codebase QnA: Opus 5 + Claude Code 63.17 ± 5.01; Fable 5.1 + Claude Code 59.95 ± 4.85; GPT-6 Astra + Codex 59.14 ± 4.88.
+- HiL-Bench: Muse Wonder 1.0 79.67 ± 4.17.
+
+These are different tasks and rubrics. They are not combined into a single agent score. Use the Scale consolidated page as the source index and pin the exact task leaderboard/revision when conducting any replication: https://labs.scale.com/leaderboard
+
+The CEB machine-readable measurement matrix now has 13 lanes, 41 primary metrics, 15 comparator records and 13 registered source URLs. Its comparator registry uses the consolidated Scale source for Test Writing and HiL-Bench rather than unverified deep links. This matrix is a design artifact, not a Symthaea result.

@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "benchmarks/ceb/**"
+      - "docs/**/*.md"
+      - "scripts/audit_doc_command_claims.py"
       - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
       - "docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md"
       - ".github/workflows/ceb-contract-validation-v0.yml"
@@ -54,10 +56,12 @@ jobs:
           receipt_schema = load_schema("run-receipt.schema.json")
           envelope_schema = load_schema("dsse-envelope.schema.json")
           worlds_schema = load_schema("repository-worlds.schema.json")
+          matrix_schema = load_schema("measurement-matrix.schema.json")
           task_validator = Draft202012Validator(task_schema, format_checker=format_checker)
           receipt_validator = Draft202012Validator(receipt_schema, format_checker=format_checker)
           envelope_validator = Draft202012Validator(envelope_schema, format_checker=format_checker)
           worlds_validator = Draft202012Validator(worlds_schema, format_checker=format_checker)
+          matrix_validator = Draft202012Validator(matrix_schema, format_checker=format_checker)
 
           def expect_reject(validator, value, label):
               if not list(validator.iter_errors(value)):
@@ -82,6 +86,43 @@ jobs:
               raise SystemExit("benchmark_integrity lane missing from task schema")
           if "isolated_microvm" not in str(task_schema["allOf"]):
               raise SystemExit("fixture-ready/qualified tasks must pin isolated runner profiles")
+
+          matrix = json.loads((root / "measurement-matrix.v0.json").read_text())
+          matrix_validator.validate(matrix)
+          lane_ids = [lane["lane_id"] for lane in matrix["lanes"]]
+          if len(lane_ids) != len(set(lane_ids)):
+              raise SystemExit("measurement matrix contains duplicate lane IDs")
+          source_urls = {source["source_url"]: set(source["supports"]) for source in matrix["sources"]}
+          for lane in matrix["lanes"]:
+              metric_ids = [metric["metric_id"] for metric in lane["primary_metrics"]]
+              if len(metric_ids) != len(set(metric_ids)):
+                  raise SystemExit(f"duplicate primary metric in {lane['lane_id']}")
+              if not lane["evidence_contract"]["independent_adjudication"]:
+                  raise SystemExit(f"independent adjudication missing from {lane['lane_id']}")
+              if not lane["evidence_contract"]["unresolved_state_required"]:
+                  raise SystemExit(f"unresolved-state handling missing from {lane['lane_id']}")
+              if lane["lane_id"] != "CEB-DOCS" and not lane["comparators"]:
+                  raise SystemExit(f"external comparator missing from {lane['lane_id']}")
+              for comparator in lane["comparators"]:
+                  if comparator["source_url"] not in source_urls:
+                      raise SystemExit(f"unregistered comparator source in {lane['lane_id']}")
+                  if lane["lane_id"] not in source_urls[comparator["source_url"]]:
+                      raise SystemExit(f"comparator source does not list support for {lane['lane_id']}")
+          if set(lane_ids) != {lane for source in matrix["sources"] for lane in source["supports"]}:
+              raise SystemExit("matrix lane/source registry contains an unsupported or orphaned lane reference")
+          expect_reject(
+              matrix_validator,
+              {**matrix, "status": "qualified"},
+              "design-only measurement matrix marked qualified",
+          )
+          malformed_matrix = copy.deepcopy(matrix)
+          malformed_matrix["lanes"][0]["primary_metrics"] = []
+          expect_reject(matrix_validator, malformed_matrix, "measurement lane without a primary metric")
+          malformed_matrix = copy.deepcopy(matrix)
+          malformed_matrix["lanes"][0]["comparators"] = [
+              {**malformed_matrix["lanes"][0]["comparators"][0], "comparison_class": "beats_sota"}
+          ]
+          expect_reject(matrix_validator, malformed_matrix, "unsupported benchmark comparison claim")
 
           # The repository-twin gold graph is itself benchmark evidence: validate
           # every node anchor and relationship before it can be used as an oracle.
@@ -252,8 +293,9 @@ jobs:
               return len(world_ids), len(facts)
 
           world_count, conditional_fact_count = validate_repository_worlds(worlds, graph)
-          if world_count != 8 or conditional_fact_count != 7:
-              raise SystemExit("repository target/feature world matrix changed without an explicit benchmark revision")
+          # V0 schema and worlds.v0.json pin five feature modes on each of two target OSes.
+          if world_count != 10 or conditional_fact_count != 7:
+              raise SystemExit("repository target/feature world matrix differs from the pinned V0 schema")
 
           def expect_world_reject(worlds_value, graph_value, label):
               try:
@@ -531,7 +573,8 @@ jobs:
               ("fail without a failed/error check", lambda p: p["result"].update({"verdict": "fail"})),
           ]:
               mutant = copy.deepcopy(valid_primary_pass)
-              mutate(mutant["predicate"] if label != "candidate subject digest mismatch" else mutant)
+              # In-toto subjects are top-level; all other receipt mutations target the predicate.
+              mutate(mutant if "subject digest mismatch" in label else mutant["predicate"])
               expect_statement_reject(mutant, label)
 
           # A shape-only envelope with a real serialized statement payload.
@@ -553,7 +596,14 @@ jobs:
           print(
               "CEB_CONTRACT_SCHEMA_PASS: "
               f"tasks={len(task_ids)} unique_tasks={len(set(task_ids))} "
-              f"schemas=4 negative_controls=39 worlds={world_count} conditional_facts={conditional_fact_count}"
+              f"schemas=5 negative_controls=39 worlds={world_count} conditional_facts={conditional_fact_count} "
+              f"measurement_lanes={len(lane_ids)} registered_sources={len(matrix['sources'])}"
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
+      - name: Audit documented Cargo command targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/audit_doc_command_claims.py --self-test
+          python scripts/audit_doc_command_claims.py --repo-root .

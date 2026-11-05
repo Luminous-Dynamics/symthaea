@@ -2,6 +2,8 @@
 
 Status: research contract and synthetic qualification corpus. No beverage model, real-world performance, food-safety claim, or production improvement is qualified by this document alone.
 
+**Execution status (2026-11-04):** `tools/beverage-benchmark-harness/Cargo.toml` exists, but its declared binary sources are absent from this checkout: `crates/domains/symthaea-culinary/src/bin/beverage_benchmark_receipt.rs`, `crates/domains/symthaea-culinary/src/bin/wine_quality_source_audit.rs`, `crates/domains/symthaea-culinary/src/bin/fermentation_time_series_audit.rs`, and `tools/beverage-benchmark-harness/src/bin/schema_contract_audit.rs`. The related `--bin` commands below are intended interfaces only and are not currently runnable. No compile, test, schema-audit or beverage-performance result is claimed.
+
 Tracking issue: https://github.com/Luminous-Dynamics/symthaea/issues/8232  
 Related general culinary benchmark: https://github.com/Luminous-Dynamics/symthaea/issues/7859  
 Cross-project process twin: https://github.com/Luminous-Dynamics/symtropy/issues/2387  

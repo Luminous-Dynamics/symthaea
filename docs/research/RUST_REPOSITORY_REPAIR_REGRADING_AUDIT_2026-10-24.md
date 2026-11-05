@@ -1,7 +1,7 @@
 # Independent Fresh-Image Regrade Audit (2026-10-24)
 
 **Protocol ID:** `symthaea-rust-regrade-audit-v1`  
-**Status:** verifier implementation; actual primary/regrade runs remain required.
+**Status:** design specification only in this checkout. `tools/rust-repair-benchmark-harness/Cargo.toml` and the `rust-repair-regrade-audit` binary source are absent; the commands below are intended interfaces only and are not currently runnable. No generated parity report or scored independent regrade is claimed. See issue #10138.
 
 ## Purpose
 

@@ -493,8 +493,8 @@
       "execution_status": "design_only",
       "lane": "benchmark_integrity",
       "title": "Audit and harden an adversarial benchmark verifier",
-      "objective": "Detect and remediate benchmark-verifier weaknesses including reward-channel tampering, answer leakage, evaluator mutation, false-negative scoring, environment asymmetry and version drift while preserving valid task outcomes.",
-      "agent_prompt": "Audit the supplied benchmark task, evaluator design and run protocol as untrusted systems. Identify concrete false-accept and false-reject paths, propose minimal fixes, and specify independent positive and negative controls. Do not alter or weaken the grader to make the candidate pass. Distinguish confirmed exploit paths from hypotheses and preserve all unresolved cases.",
+      "objective": "Audit an adversarial benchmark evaluation stack for grader compromise, answer leakage, evidence forgery, custody failures, false accepts, false rejects and benchmark-version drift. Distinguish invalid evidence from a genuinely failing candidate, and require an independent pristine regrade.",
+      "agent_prompt": "Inspect the public design-only CEB benchmark-integrity corpus and produce a threat-to-control traceability plan. For each negative and positive control, identify the protected asset, trust boundary, expected qualification decision, required evidence and unresolved dependency. Do not execute candidate code, grader code, attack payloads or task-controlled scripts. Do not modify the evaluator or weaken a gate. Keep task-resolution outcomes separate from evidence qualification.",
       "source_snapshot": {
         "kind": "synthetic_fixture",
         "uri": null,
@@ -544,10 +544,12 @@
         "freshness_policy": "Design-only. Future executable variants must use independently authored verifier attack cases and preserve sealed holdouts."
       },
       "notes": [
-        "Not executable: no source fixture, pinned environment, reference patch or independent grader has been provisioned.",
-        "No benchmark score is produced by identifying or documenting a hypothetical weakness.",
-        "The grader-integrity lane is separate from the agent task-resolution denominator.",
-        "Do not execute task-controlled code until OS-level isolation is qualified under issue #10064."
+        "Design-only benchmark-integrity task. The machine-readable scenario catalog is benchmarks/ceb/integrity/attack-catalog.v0.json.",
+        "The initial catalog contains 28 negative/adversarial controls and 8 positive/valid-state controls; all are unexecuted scenario definitions.",
+        "False-accept and false-reject rates must be reported separately with raw denominators and uncertainty; critical false accepts are hard qualification failures.",
+        "A valid receipt for an incorrect candidate is a legitimate candidate failure, not a verifier false reject. Evidence qualification and candidate correctness are separate axes.",
+        "No performance score is produced by writing or reviewing this design record. Keep it out of all agent task-resolution aggregates.",
+        "Do not execute task-controlled code or attack payloads until OS-level isolation is independently qualified under issue #10064; signer custody and failure-domain independence remain tracked under #10369."
       ]
     },
     {
