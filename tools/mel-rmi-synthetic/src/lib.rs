@@ -97,6 +97,9 @@ pub struct NegotiatedResponseContractV1 {
     pub modulus: i32,
     /// Distinct, nonzero offsets that satisfy the request.
     pub accepted_offsets: BTreeSet<i32>,
+    /// Maximum number of alternatives the agent may emit as simultaneous branches.
+    /// Larger unresolved sets must use AskClarification instead.
+    pub max_branch_count: usize,
 }
 
 impl NegotiatedResponseContractV1 {
@@ -104,6 +107,7 @@ impl NegotiatedResponseContractV1 {
     pub fn validate(&self) -> Result<(), HarnessError> {
         if self.modulus <= 1
             || self.accepted_offsets.is_empty()
+            || self.max_branch_count == 0
             || self
                 .accepted_offsets
                 .iter()
@@ -201,7 +205,9 @@ pub fn assess_negotiation(
             let unique: BTreeSet<i32> = values.iter().copied().collect();
             (
                 values.clone(),
-                values.len() >= 2 && unique.len() == values.len(),
+                values.len() >= 2
+                    && values.len() <= contract.max_branch_count
+                    && unique.len() == values.len(),
             )
         }
         NegotiationChoiceV1::AskClarification | NegotiationChoiceV1::Abstain => (Vec::new(), true),
@@ -220,7 +226,7 @@ pub fn assess_negotiation(
     let ambiguity_preserved = match (authority.selected_value, available.len(), choice) {
         (None, count, NegotiationChoiceV1::AskClarification) if count > 1 => true,
         (None, count, NegotiationChoiceV1::Branch(_)) if count > 1 => {
-            action_well_formed && proposed_set == available
+            count <= contract.max_branch_count && action_well_formed && proposed_set == available
         }
         (None, 1, NegotiationChoiceV1::Commit(value)) => available.contains(value),
         (None, 0, NegotiationChoiceV1::Abstain) => true,
@@ -1836,6 +1842,7 @@ mod tests {
             target_dimension: Dimension::Motif,
             modulus: 12,
             accepted_offsets: [3, 5, 7].into_iter().collect(),
+            max_branch_count: 3,
         }
     }
 
@@ -2036,6 +2043,7 @@ mod tests {
             target_dimension: Dimension::Motif,
             modulus: 12,
             accepted_offsets: [0].into_iter().collect(),
+            max_branch_count: 3,
         };
         assert_eq!(
             noop.valid_values(motif_input()),
@@ -2046,6 +2054,55 @@ mod tests {
                 dimension: Dimension::Texture,
                 value: 2,
             }),
+            Err(HarnessError::InvalidResponseContract)
+        );
+    }
+
+    #[test]
+    fn large_unresolved_option_set_requires_clarification_instead_of_branch_explosion() {
+        let contract = NegotiatedResponseContractV1 {
+            target_dimension: Dimension::Motif,
+            modulus: 12,
+            accepted_offsets: (1..=10).collect(),
+            max_branch_count: 3,
+        };
+        let input = Feature {
+            dimension: Dimension::Motif,
+            value: 0,
+        };
+        let authority = unresolved_authority();
+        let clarified = assess_negotiation(
+            &contract,
+            input,
+            &authority,
+            &NegotiationChoiceV1::AskClarification,
+        )
+        .unwrap();
+        assert_eq!(clarified.available_option_count, 10);
+        assert!(clarified.qualified);
+
+        let excessive_branch = assess_negotiation(
+            &contract,
+            input,
+            &authority,
+            &NegotiationChoiceV1::Branch((1..=10).collect()),
+        )
+        .unwrap();
+        assert!(!excessive_branch.action_well_formed);
+        assert!(!excessive_branch.ambiguity_preserved);
+        assert!(!excessive_branch.qualified);
+    }
+
+    #[test]
+    fn zero_branch_budget_is_not_a_valid_negotiation_contract() {
+        let contract = NegotiatedResponseContractV1 {
+            target_dimension: Dimension::Motif,
+            modulus: 12,
+            accepted_offsets: [3, 5, 7].into_iter().collect(),
+            max_branch_count: 0,
+        };
+        assert_eq!(
+            contract.valid_values(motif_input()),
             Err(HarnessError::InvalidResponseContract)
         );
     }
