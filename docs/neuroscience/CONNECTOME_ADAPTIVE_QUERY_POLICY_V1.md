@@ -3,7 +3,7 @@
 **Tracking:** [#10568 — adaptive query-directed observation policies](https://github.com/Luminous-Dynamics/symthaea/issues/10568)  
 **Joint support input contract:** [#10528 — correlated joint observation support](https://github.com/Luminous-Dynamics/symthaea/pull/10528)  
 **Fixed-plan predecessors:** [#10506](https://github.com/Luminous-Dynamics/symthaea/pull/10506), [#10525](https://github.com/Luminous-Dynamics/symthaea/pull/10525).  
-**Status:** Rust implementation, two synthetic fixtures, independent Python oracle and dedicated CI are implemented. Source code is validated at `72ae65bb8a732416e6afb65f0662449216e989a4`; the follow-on commit `ab2bc3380fef4faa297985a82e139654dea66fc4` updates this specification.
+**Status:** Base adaptive policy validated at `290503a92b0691c23fd9d132de02a739f1129c4a` with dedicated and standalone CI. Additive support-expansion sensitivity is now implemented on `research/connectome-support-expansion-monotonicity-v1`; its exact-head validation is pending.
 
 ## 1. Research gap
 
@@ -116,7 +116,7 @@ This specification is limited to exact finite support over declared worlds, acti
 No expected value of information, likelihood, posterior, causal effect or biological truth claim is made in V1.
 
 
-## 10. Validation receipts
+## 11. Validation receipts
 
 Source-code qualification at `72ae65bb8a732416e6afb65f0662449216e989a4`:
 
@@ -126,3 +126,32 @@ Source-code qualification at `72ae65bb8a732416e6afb65f0662449216e989a4`:
 - A separate two-action synthetic control verifies that two equal-cost root choices produce an exact optimal-policy count of 2.
 
 These are finite synthetic known-answer and implementation tests. They do not establish that real connectomics observation supports are complete or biologically valid.
+
+
+## 10. Adversarial support expansion: monotonicity, not reassurance
+
+The policy is conditional on the caller-supplied finite joint-support relation. A model can produce a stable-looking policy merely because an admissible observation outcome was omitted. The next assurance layer therefore allows a challenger to **add** possible joint tuples and forces a complete re-optimization.
+
+Each support challenge is an independent additive branch applied to the same frozen base (worlds, query, actions, effort costs and base support digest). Challenges are not silently applied cumulatively. Each addition binds a world, evidence SHA-256, joint-observation-model SHA-256, dependence groups and complete tuples over the unchanged action universe.
+
+The implementation rejects:
+- unknown worlds or actions, duplicate challenge IDs, repeated world entries;
+- malformed provenance, empty or duplicate tuples, tuples already in the base support;
+- post-expansion per-world tuple counts above the exact 64-row mask limit;
+- any attempt to alter the query/world/action/effort universe by the challenge mechanism.
+
+For a support expansion \(J'(w) \supseteq J(w)\), the exact optimum must obey:
+
+\`C^*_{adaptive}(J') \\ge C^*_{adaptive}(J)\`
+
+and
+
+\`C^*_{fixed}(J') \\ge C^*_{fixed}(J)\`.
+
+A previously impossible policy must remain impossible. A previously feasible policy may become more expensive or infeasible, but cannot become cheaper. Violations are surfaced in the report and make the CLI exit non-zero; they are not converted into a warning or a passing certificate.
+
+### Synthetic expansion control
+
+The expansion fixture adds one novel joint tuple to world-d, leaving the base evidence unchanged. It increases the exact adaptive worst-case effort from 4 to 5 while the exact fixed bundle remains 5. This intentionally removes the adaptive advantage in that challenge case. The no-policy fixture adds a non-shared tuple to one side but preserves the original shared tuple, so the opposing-decision worlds must remain unresolved.
+
+These controls demonstrate a property of the finite planner, not the completeness or biological validity of real observation supports.
