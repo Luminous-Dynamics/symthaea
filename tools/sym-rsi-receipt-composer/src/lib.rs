@@ -1644,9 +1644,7 @@ mod tests {
                 ("task-005", "family-c"),
             ]
             .into_iter()
-            .map(|(task_id, family)| {
-                (format!("{prefix}{task_id}"), family.to_owned())
-            })
+            .map(|(task_id, family)| (format!("{prefix}{task_id}"), family.to_owned()))
             .collect();
         }
 
@@ -1675,16 +1673,12 @@ mod tests {
             .collect();
         }
 
-        let mut paired_receipts =
-            paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
+        let mut paired_receipts = paired_receipt_set("candidate-a", 'a', "candidate", "disabled");
         let mut retention: Value =
             serde_json::from_slice(paired_receipts.get("retention").unwrap()).unwrap();
         retention["task_results"][0]["input_sha256"] =
             json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        paired_receipts.insert(
-            "retention".into(),
-            serde_json::to_vec(&retention).unwrap(),
-        );
+        paired_receipts.insert("retention".into(), serde_json::to_vec(&retention).unwrap());
         assert_eq!(
             compose_candidate(&paired_plan, &paired_receipts),
             Err(ComposerError::TaskInputUniverseMismatch)
