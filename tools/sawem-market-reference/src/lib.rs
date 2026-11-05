@@ -2674,7 +2674,10 @@ mod tests {
             working_calendar_for_test(),
         )
         .expect("missing notice remains explicitly represented");
-        assert_eq!(missing.notice_timeliness, CreditCoverNoticeTimeliness::Missing);
+        assert_eq!(
+            missing.notice_timeliness,
+            CreditCoverNoticeTimeliness::Missing
+        );
         assert_eq!(missing.posting_deadline.unwrap().day_ordinal, 13);
     }
 
@@ -2712,11 +2715,9 @@ mod tests {
 
     #[test]
     fn credit_call_reestablishment_uses_two_business_days() {
-        let result = calculate_credit_call_reestablishment_deadline(
-            10,
-            business_calendar_for_test(),
-        )
-        .expect("Business Day calendar covers two days after call");
+        let result =
+            calculate_credit_call_reestablishment_deadline(10, business_calendar_for_test())
+                .expect("Business Day calendar covers two days after call");
         assert_eq!(
             result,
             CreditCallReestablishmentDeadline {
