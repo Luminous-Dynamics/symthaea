@@ -473,6 +473,10 @@ struct GoalReplayReceipt {
     replay_command: String,
     replay_command_sha256: String,
     replay_log_sha256: String,
+    goal_capture_begin_marker: String,
+    goal_capture_end_marker: String,
+    goal_capture_status: String,
+    captured_goal_sha256: String,
     replay_exit_code: i32,
     goal_reproduced: bool,
     scoring_admission: bool,
@@ -629,13 +633,49 @@ fn normalized_goal(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+fn extract_marked_goal(
+    log: &str,
+    begin_marker: &str,
+    end_marker: &str,
+) -> Result<String, String> {
+    let begin_positions: Vec<usize> = log.match_indices(begin_marker).map(|(index, _)| index).collect();
+    let end_positions: Vec<usize> = log.match_indices(end_marker).map(|(index, _)| index).collect();
+    if begin_positions.len() != 1 || end_positions.len() != 1 {
+        return Err(format!(
+            "expected exactly one bounded goal trace marker pair; found begin={} end={}",
+            begin_positions.len(),
+            end_positions.len()
+        ));
+    }
+    let content_start = begin_positions[0] + begin_marker.len();
+    let content_end = end_positions[0];
+    if content_end <= content_start {
+        return Err("goal trace end marker precedes or touches the begin marker".into());
+    }
+    let captured = log[content_start..content_end].trim();
+    if captured.is_empty() {
+        return Err("bounded Lean goal trace is empty".into());
+    }
+    Ok(captured.to_owned())
+}
+
 fn instrument_sorry_span(
     source: &str,
     start_line: u64,
     start_column: u64,
     end_line: u64,
     end_column: u64,
+    begin_marker: &str,
+    end_marker: &str,
 ) -> Result<String, String> {
+    if begin_marker.trim().is_empty()
+        || end_marker.trim().is_empty()
+        || begin_marker == end_marker
+        || source.contains(begin_marker)
+        || source.contains(end_marker)
+    {
+        return Err("goal trace markers must be distinct and absent from the committed source".into());
+    }
     let start = position_to_byte_index(source, start_line, start_column)?;
     let end = position_to_byte_index(source, end_line, end_column)?;
     if end <= start || source.get(start..end) != Some("sorry") {
@@ -649,13 +689,19 @@ fn instrument_sorry_span(
         .chars()
         .take_while(|character| matches!(character, ' ' | '\t'))
         .collect();
-    let next_tactic_indent = format!("{leading_indent}  ");
+    // An inline proof needs an indented continuation; an existing tactic block
+    // keeps the indentation of its committed sorry token.
+    let tactic_indent = if leading_indent.is_empty() {
+        "  ".to_owned()
+    } else {
+        leading_indent
+    };
 
-    let mut instrumented = String::with_capacity(source.len() + 32);
+    let mut instrumented = String::with_capacity(source.len() + 128);
     instrumented.push_str(&source[..start]);
-    instrumented.push_str("trace_state\n");
-    instrumented.push_str(&next_tactic_indent);
-    instrumented.push_str("sorry");
+    instrumented.push_str(&format!(
+        "trace \"{begin_marker}\"\n{tactic_indent}trace_state\n{tactic_indent}trace \"{end_marker}\"\n{tactic_indent}sorry"
+    ));
     instrumented.push_str(&source[end..]);
     Ok(instrumented)
 }
@@ -672,12 +718,17 @@ fn replay_goal_with_lake(
     let source_bytes = git_output(repo_root, &["show", source_spec.as_str()])?;
     let source = std::str::from_utf8(&source_bytes)
         .map_err(|e| format!("committed Lean source is not UTF-8: {e}"))?;
+    let marker_tag = sha256(record.id.as_bytes())[..16].to_owned();
+    let begin_marker = format!("PITB_SORRYDB_GOAL_BEGIN_{marker_tag}");
+    let end_marker = format!("PITB_SORRYDB_GOAL_END_{marker_tag}");
     let instrumented = instrument_sorry_span(
         source,
         record.location.start_line,
         record.location.start_column,
         record.location.end_line,
         record.location.end_column,
+        &begin_marker,
+        &end_marker,
     )?;
     let manifest_bytes = git_output(repo_root, &["show", "HEAD:lake-manifest.json"])?;
     let toolchain_bytes = git_output(repo_root, &["show", "HEAD:lean-toolchain"])?;
@@ -723,8 +774,21 @@ fn replay_goal_with_lake(
         .map_err(|e| format!("write Lean goal-replay log: {e}"))?;
     let log_text = String::from_utf8_lossy(&log_bytes);
     let expected_goal = normalized_goal(&record.debug_info.goal);
-    let actual_log = normalized_goal(&log_text);
-    let goal_reproduced = output.status.success() && actual_log.contains(&expected_goal);
+    let captured_goal = extract_marked_goal(&log_text, &begin_marker, &end_marker);
+    let goal_capture_status = if captured_goal.is_ok() {
+        "captured".to_owned()
+    } else {
+        "missing_or_ambiguous".to_owned()
+    };
+    let captured_goal_sha256 = captured_goal
+        .as_ref()
+        .map(|goal| sha256(goal.as_bytes()))
+        .unwrap_or_else(|_| sha256(b""));
+    let goal_reproduced = output.status.success()
+        && captured_goal
+            .as_ref()
+            .map(|goal| normalized_goal(goal) == expected_goal)
+            .unwrap_or(false);
     let replay_command_sha256 = sha256(replay_command.as_bytes());
 
     let receipt = GoalReplayReceipt {
@@ -747,6 +811,10 @@ fn replay_goal_with_lake(
         replay_command,
         replay_command_sha256,
         replay_log_sha256: sha256(&log_bytes),
+        goal_capture_begin_marker: begin_marker,
+        goal_capture_end_marker: end_marker,
+        goal_capture_status,
+        captured_goal_sha256,
         replay_exit_code: output.status.code().unwrap_or(-1),
         goal_reproduced,
         scoring_admission: false,
@@ -758,9 +826,10 @@ fn replay_goal_with_lake(
         .map_err(|e| format!("write Lean goal-replay receipt: {e}"))?;
     if !goal_reproduced {
         return Err(format!(
-            "Lean goal replay failed for {} (exit={}); expected goal digest {}. Inspect {}",
+            "Lean goal replay failed for {} (exit={}, capture_status={}); expected goal digest {}. Inspect {}",
             record.id,
             receipt.replay_exit_code,
+            receipt.goal_capture_status,
             receipt.goal_sha256,
             log_path.display()
         ));
@@ -1688,8 +1757,8 @@ mod tests {
         let line = source.lines().next().unwrap();
         let byte_start = line.find("sorry").unwrap();
         let start = line[..byte_start].chars().count() as u64;
-        let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5).unwrap();
-        assert!(instrumented.contains("by trace_state\n  sorry"));
+        let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5, "PITB_BEGIN", "PITB_END").unwrap();
+        assert!(instrumented.contains("by trace \"PITB_BEGIN\"\n  trace_state\n  trace \"PITB_END\"\n  sorry"));
         assert_eq!(source.matches("sorry").count(), 1);
         assert_eq!(instrumented.matches("sorry").count(), 1);
     }
@@ -1697,15 +1766,41 @@ mod tests {
     #[test]
     fn instrumentation_preserves_nested_tactic_indentation() {
         let source = "theorem nested : True := by\n  sorry\n";
-        let instrumented = instrument_sorry_span(source, 2, 2, 2, 7).unwrap();
-        assert!(instrumented.contains("by\n  trace_state\n    sorry\n"));
+        let instrumented = instrument_sorry_span(source, 2, 2, 2, 7, "PITB_BEGIN", "PITB_END").unwrap();
+        assert!(instrumented.contains("by\n  trace \"PITB_BEGIN\"\n  trace_state\n  trace \"PITB_END\"\n  sorry\n"));
     }
 
     #[test]
     fn instrumentation_rejects_a_source_range_that_is_not_sorry() {
         let source = "theorem sample : True := by trivial\n";
         let start = source.find("trivial").unwrap() as u64;
-        assert!(instrument_sorry_span(source, 1, start, 1, start + 7).is_err());
+        assert!(instrument_sorry_span(source, 1, start, 1, start + 7, "PITB_BEGIN", "PITB_END").is_err());
+    }
+
+    #[test]
+    fn goal_capture_requires_one_exact_ordered_marker_pair() {
+        let log = "unrelated goal text\nPITB_BEGIN\nx : Nat\n⊢ x = x\nPITB_END\nmore unrelated text";
+        let captured = extract_marked_goal(log, "PITB_BEGIN", "PITB_END").unwrap();
+        assert_eq!(normalized_goal(&captured), "x : Nat ⊢ x = x");
+        assert!(extract_marked_goal("PITB_BEGIN\nx : Nat", "PITB_BEGIN", "PITB_END").is_err());
+        assert!(extract_marked_goal("PITB_BEGIN\nx\nPITB_END\nPITB_END", "PITB_BEGIN", "PITB_END").is_err());
+        assert!(extract_marked_goal("PITB_END\nx\nPITB_BEGIN", "PITB_BEGIN", "PITB_END").is_err());
+        assert!(extract_marked_goal("PITB_BEGIN\nPITB_END", "PITB_BEGIN", "PITB_END").is_err());
+    }
+
+    #[test]
+    fn goal_capture_does_not_match_text_outside_the_marked_region() {
+        let expected = normalized_goal("x : Nat\n⊢ x = x");
+        let log = "x : Nat\n⊢ x = x\nPITB_BEGIN\ny : Nat\n⊢ y = y\nPITB_END";
+        let captured = extract_marked_goal(log, "PITB_BEGIN", "PITB_END").unwrap();
+        assert_ne!(normalized_goal(&captured), expected);
+    }
+
+    #[test]
+    fn goal_instrumentation_rejects_marker_collisions_with_source() {
+        let source = "theorem sample : True := by sorry -- PITB_BEGIN\n";
+        let start = source.find("sorry").unwrap() as u64;
+        assert!(instrument_sorry_span(source, 1, start, 1, start + 5, "PITB_BEGIN", "PITB_END").is_err());
     }
 
     #[test]
