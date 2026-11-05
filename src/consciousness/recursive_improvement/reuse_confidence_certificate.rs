@@ -32,14 +32,23 @@ impl std::fmt::Display for ReuseCertificateError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidErrorBudget => {
-                write!(f, "certificate error budget must be finite and strictly between 0 and 1")
+                write!(
+                    f,
+                    "certificate error budget must be finite and strictly between 0 and 1"
+                )
             }
             Self::EmptySample => write!(f, "paired certificate requires at least one task"),
             Self::SampleCountTooLarge { actual, maximum } => {
-                write!(f, "sample count {actual} exceeds reviewed maximum {maximum}")
+                write!(
+                    f,
+                    "sample count {actual} exceeds reviewed maximum {maximum}"
+                )
             }
             Self::InvalidPairedDifference(value) => {
-                write!(f, "pass/fail paired difference must be -1, 0 or +1, got {value}")
+                write!(
+                    f,
+                    "pass/fail paired difference must be -1, 0 or +1, got {value}"
+                )
             }
             Self::InvalidSuccessCount { successes, trials } => {
                 write!(f, "success count {successes} exceeds trial count {trials}")
@@ -160,15 +169,10 @@ pub fn pass_fail_confidence_certificate(
     }
 
     let discordant_count = candidate_wins + incumbent_wins;
-    let empirical_improvement =
-        (candidate_wins as f64 - incumbent_wins as f64) / n as f64;
-    let conditional_win_lower = clopper_pearson_lower(
-        candidate_wins,
-        discordant_count,
-        delta_c / 4.0,
-    )?;
-    let discordance_rate_lower =
-        clopper_pearson_lower(discordant_count, n, delta_c / 4.0)?;
+    let empirical_improvement = (candidate_wins as f64 - incumbent_wins as f64) / n as f64;
+    let conditional_win_lower =
+        clopper_pearson_lower(candidate_wins, discordant_count, delta_c / 4.0)?;
+    let discordance_rate_lower = clopper_pearson_lower(discordant_count, n, delta_c / 4.0)?;
 
     // Lemma A3: if q_lo <= 1/2 the sign-based lower bound is -infinity.
     // For M=0, both exact limits are zero, so this branch is also the
@@ -189,8 +193,7 @@ pub fn pass_fail_confidence_certificate(
             "paired empirical-Bernstein deviation",
         ));
     }
-    let empirical_bernstein_lower_bound =
-        empirical_improvement - linear - radicand.sqrt();
+    let empirical_bernstein_lower_bound = empirical_improvement - linear - radicand.sqrt();
     if !empirical_bernstein_lower_bound.is_finite() {
         return Err(ReuseCertificateError::NumericalFailure(
             "paired empirical-Bernstein lower bound",
@@ -268,10 +271,7 @@ pub fn clopper_pearson_lower(
             high = midpoint;
         }
     }
-    finite_probability(
-        low + (high - low) * 0.5,
-        "Clopper-Pearson beta quantile",
-    )
+    finite_probability(low + (high - low) * 0.5, "Clopper-Pearson beta quantile")
 }
 
 /// Upper confidence limit for E[Z^2] from the Bernoulli KL inequality:
@@ -328,10 +328,7 @@ fn bernoulli_kl(a: f64, b: f64) -> f64 {
     a * (a.ln() - b.ln()) + (1.0 - a) * ((1.0 - a).ln() - (1.0 - b).ln())
 }
 
-fn finite_probability(
-    value: f64,
-    operation: &'static str,
-) -> Result<f64, ReuseCertificateError> {
+fn finite_probability(value: f64, operation: &'static str) -> Result<f64, ReuseCertificateError> {
     if value.is_finite() && (0.0..=1.0).contains(&value) {
         Ok(value)
     } else {
@@ -365,9 +362,7 @@ mod tests {
     fn clopper_pearson_handles_zero_all_success_and_invalid_counts() {
         assert_eq!(clopper_pearson_lower(0, 100, 0.025).unwrap(), 0.0);
         let expected = 0.025_f64.powf(0.01);
-        assert!(
-            (clopper_pearson_lower(100, 100, 0.025).unwrap() - expected).abs() < 1e-15
-        );
+        assert!((clopper_pearson_lower(100, 100, 0.025).unwrap() - expected).abs() < 1e-15);
         assert_eq!(
             clopper_pearson_lower(3, 2, 0.025),
             Err(ReuseCertificateError::InvalidSuccessCount {
