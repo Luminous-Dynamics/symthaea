@@ -47,7 +47,7 @@ jobs:
         run: cargo fmt --check --manifest-path "$MEL_RMI_MANIFEST"
       - name: Test deterministic RMI oracle
         run: cargo test --locked --manifest-path "$MEL_RMI_MANIFEST"
-      - name: Run canonical five-dimension suite and verify control separation
+      - name: Run 160-case five-dimension seed sweep and verify control separation
         shell: bash
         run: |
           set -euo pipefail
@@ -62,11 +62,11 @@ jobs:
           distractor_passes="$(awk -F, '$1 == "trial" && $3 == "distractor-shortcut" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
           reciprocal_count="$(awk -F, '$1 == "reciprocal" && $18 == "true" { count++ } END { print count + 0 }' "$report")"
           reciprocal_oracle_count="$(awk -F, '$1 == "reciprocal" && $17 == "true" { count++ } END { print count + 0 }' "$report")"
-          test "$rule_count" -eq 5
+          test "$rule_count" -eq 160
           test "$fixed_passes" -eq 0
           test "$imitation_passes" -eq 0
           test "$one_way_passes" -eq 0
           test "$yoked_passes" -eq 0
           test "$distractor_passes" -eq 0
-          test "$reciprocal_oracle_count" -eq 5
-          test "$reciprocal_count" -eq 5
+          test "$reciprocal_oracle_count" -eq 160
+          test "$reciprocal_count" -eq 160
