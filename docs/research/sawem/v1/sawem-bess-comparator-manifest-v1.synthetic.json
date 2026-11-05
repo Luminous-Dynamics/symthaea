@@ -1,0 +1,463 @@
+{
+  "manifest_version": "1.0",
+  "manifest_state": "synthetic_protocol_example",
+  "benchmark_id": "SAWEM-BESS-MATCHED-001",
+  "case_id": "synthetic-standalone-bess-base-001",
+  "run_state": "not_run",
+  "market_context": {
+    "market_id": "SAWEM",
+    "jurisdiction": "ZA",
+    "market_code_revision": "Rev 2.3",
+    "publication_state": "published",
+    "effective_status": "unknown",
+    "participant_admission": "unknown",
+    "commercial_operation": "unknown",
+    "rule_profile_sha256": null,
+    "interpretation_note": "The published code revision is a declared study input. Effective rule status and participant-specific eligibility remain unknown and cannot be inferred from publication or pre-launch reporting."
+  },
+  "decision_information": {
+    "decision_time_utc": "2026-10-01T00:00:00Z",
+    "forecast_vintage_cutoff_utc": "2026-10-01T00:00:00Z",
+    "actual_outcome_window_end_utc": "2026-10-08T00:00:00Z",
+    "no_lookahead_enforced": true,
+    "timezone": "Africa/Johannesburg"
+  },
+  "scenario": {
+    "scenario_family": "synthetic_base",
+    "scenario_seed": 42001,
+    "interval_minutes": 60,
+    "interval_basis": "synthetic_not_market_default",
+    "horizon_start_utc": "2026-10-01T00:00:00Z",
+    "horizon_end_utc": "2026-10-08T00:00:00Z",
+    "scenario_count": 4,
+    "uncertainty_dimensions": [
+      "energy_price",
+      "reserve_price",
+      "renewable_output",
+      "network_outage",
+      "asset_availability",
+      "degradation",
+      "settlement_delay",
+      "credit_cover"
+    ],
+    "stress_tags": [
+      "price-spike",
+      "network-export-cap",
+      "settlement-delay"
+    ]
+  },
+  "asset_model": {
+    "asset_class": "standalone_bess",
+    "data_class": "synthetic",
+    "charge_power_mw": 50,
+    "discharge_power_mw": 60,
+    "energy_capacity_mwh": 200,
+    "min_soc_fraction": 0.1,
+    "max_soc_fraction": 0.95,
+    "round_trip_efficiency": 0.9,
+    "degradation_model_id": "synthetic-throughput-calendar-v1",
+    "warranty_model_id": "synthetic-warranty-envelope-v1",
+    "constraint_manifest_sha256": null
+  },
+  "network_model": {
+    "data_class": "synthetic",
+    "topology_id": "synthetic-node-01",
+    "topology_sha256": null,
+    "point_of_connection_id": "synthetic-poc-north-001",
+    "network_constraint_model": "single_export_cap",
+    "constraint_enforcement": "hard"
+  },
+  "input_packages": [
+    {
+      "package_id": "synthetic-market-series-v1",
+      "role": "market_prices",
+      "data_class": "synthetic",
+      "source_vintage_utc": "2026-10-01T00:00:00Z",
+      "content_sha256": null,
+      "source": {
+        "publisher": "Luminous Dynamics synthetic fixture",
+        "url": "https://github.com/Luminous-Dynamics/symthaea",
+        "source_class": "synthetic_assumption",
+        "retrieved_at": "2026-11-05T00:00:00Z",
+        "raw_artifact_sha256": null
+      },
+      "licence_state": "not_applicable_synthetic"
+    },
+    {
+      "package_id": "synthetic-network-v1",
+      "role": "network_topology",
+      "data_class": "synthetic",
+      "source_vintage_utc": "2026-10-01T00:00:00Z",
+      "content_sha256": null,
+      "source": {
+        "publisher": "Luminous Dynamics synthetic fixture",
+        "url": "https://github.com/Luminous-Dynamics/symthaea",
+        "source_class": "synthetic_assumption",
+        "retrieved_at": "2026-11-05T00:00:00Z",
+        "raw_artifact_sha256": null
+      },
+      "licence_state": "not_applicable_synthetic"
+    },
+    {
+      "package_id": "synthetic-storage-v1",
+      "role": "asset_constraints",
+      "data_class": "synthetic",
+      "source_vintage_utc": "2026-10-01T00:00:00Z",
+      "content_sha256": null,
+      "source": {
+        "publisher": "Luminous Dynamics synthetic fixture",
+        "url": "https://github.com/Luminous-Dynamics/symthaea",
+        "source_class": "synthetic_assumption",
+        "retrieved_at": "2026-11-05T00:00:00Z",
+        "raw_artifact_sha256": null
+      },
+      "licence_state": "not_applicable_synthetic"
+    }
+  ],
+  "policy_baseline": {
+    "policy_class": "rolling_horizon_policy",
+    "implementable": true,
+    "forecast_policy": "ensemble_forecast",
+    "objective_version": "net-value-risk-adjusted-v1",
+    "risk_measure": "cvar",
+    "oracle_use": "not_used"
+  },
+  "engine_roster": [
+    {
+      "engine_id": "plexos",
+      "vendor_or_project": "Energy Exemplar",
+      "product": "PLEXOS",
+      "version": "12 R04 (published August 2026)",
+      "build_or_commit": null,
+      "engine_class": "commercial",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "unknown",
+      "capability_claims": [
+        {
+          "capability": "battery_physics",
+          "status": "documented",
+          "source": {
+            "publisher": "Energy Exemplar",
+            "url": "https://www.energyexemplar.com/plexos",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "degradation",
+          "status": "documented",
+          "source": {
+            "publisher": "Energy Exemplar",
+            "url": "https://www.energyexemplar.com/product-news/whats-new-august-2026",
+            "source_class": "official_release_note",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "reserve_cooptimization",
+          "status": "not_evaluated",
+          "source": null
+        },
+        {
+          "capability": "sa_wem_code_semantics",
+          "status": "not_evaluated",
+          "source": null
+        }
+      ]
+    },
+    {
+      "engine_id": "homer-front",
+      "vendor_or_project": "HOMER Energy",
+      "product": "HOMER Front",
+      "version": "1.6.0 (19 October 2026)",
+      "build_or_commit": null,
+      "engine_class": "commercial",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "unknown",
+      "capability_claims": [
+        {
+          "capability": "market_price_forecast",
+          "status": "documented",
+          "source": {
+            "publisher": "HOMER Energy",
+            "url": "https://homerenergy.com/homer-v16",
+            "source_class": "official_release_note",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "contract_obligations",
+          "status": "documented",
+          "source": {
+            "publisher": "HOMER Energy",
+            "url": "https://support.homerenergy.com/docs/changelog",
+            "source_class": "official_release_note",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "sa_wem_code_semantics",
+          "status": "not_evaluated",
+          "source": null
+        }
+      ]
+    },
+    {
+      "engine_id": "sam",
+      "vendor_or_project": "NREL",
+      "product": "System Advisor Model",
+      "version": "not_pinned",
+      "build_or_commit": null,
+      "engine_class": "open_source",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "open_source",
+      "capability_claims": [
+        {
+          "capability": "battery_physics",
+          "status": "documented",
+          "source": {
+            "publisher": "National Renewable Energy Laboratory",
+            "url": "https://sam.nlr.gov/index.php?Itemid=360&id=94&option=com_content&view=article",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "degradation",
+          "status": "documented",
+          "source": {
+            "publisher": "National Renewable Energy Laboratory",
+            "url": "https://sam.nlr.gov/index.php?Itemid=360&id=94&option=com_content&view=article",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "settlement_reconciliation",
+          "status": "not_evaluated",
+          "source": null
+        }
+      ]
+    },
+    {
+      "engine_id": "pypsa",
+      "vendor_or_project": "PyPSA",
+      "product": "PyPSA",
+      "version": "not_pinned",
+      "build_or_commit": null,
+      "engine_class": "open_source",
+      "execution_state": "not_run",
+      "adapter_state": "unknown",
+      "license_state": "open_source",
+      "capability_claims": [
+        {
+          "capability": "energy_dispatch",
+          "status": "documented",
+          "source": {
+            "publisher": "PyPSA project",
+            "url": "https://github.com/PyPSA/PyPSA",
+            "source_class": "open_source_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "network_constraints",
+          "status": "documented",
+          "source": {
+            "publisher": "PyPSA project",
+            "url": "https://docs.pypsa.org/latest/api/networks/optimize/",
+            "source_class": "open_source_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        },
+        {
+          "capability": "rolling_horizon",
+          "status": "documented",
+          "source": {
+            "publisher": "PyPSA project",
+            "url": "https://docs.pypsa.org/latest/api/networks/optimize/",
+            "source_class": "open_source_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        }
+      ]
+    },
+    {
+      "engine_id": "luminous-evidence-layer",
+      "vendor_or_project": "Luminous Dynamics",
+      "product": "Symthaea/Mycelix/Symtropy/Sol-Atlas evidence-qualified underwriting composition",
+      "version": "research-protocol-v1",
+      "build_or_commit": null,
+      "engine_class": "internal_reference",
+      "execution_state": "not_run",
+      "adapter_state": "none",
+      "license_state": "unknown",
+      "capability_claims": [
+        {
+          "capability": "sa_wem_code_semantics",
+          "status": "not_evaluated",
+          "source": null
+        },
+        {
+          "capability": "participant_admission",
+          "status": "not_evaluated",
+          "source": null
+        },
+        {
+          "capability": "settlement_reconciliation",
+          "status": "not_evaluated",
+          "source": null
+        },
+        {
+          "capability": "credit_cover_liquidity",
+          "status": "not_evaluated",
+          "source": null
+        },
+        {
+          "capability": "evidence_provenance",
+          "status": "documented",
+          "source": {
+            "publisher": "Luminous Dynamics",
+            "url": "https://github.com/Luminous-Dynamics/mycelix/pull/5815",
+            "source_class": "official_documentation",
+            "retrieved_at": "2026-11-05T00:00:00Z",
+            "raw_artifact_sha256": null
+          }
+        }
+      ]
+    }
+  ],
+  "matching_contract": {
+    "comparison_group_id": "SAWEM-BESS-MATCHED-001",
+    "shared_input_manifest_sha256": null,
+    "dimensions": [
+      {
+        "dimension": "market_rule_version",
+        "status": "not_assessed",
+        "note": "No engine has yet been configured with the same frozen SAWEM rule interpretation."
+      },
+      {
+        "dimension": "information_frontier",
+        "status": "not_assessed",
+        "note": "No vendor adapters or forecast vintages have been executed."
+      },
+      {
+        "dimension": "price_vintage",
+        "status": "not_assessed",
+        "note": "Synthetic price package is declared but not frozen or consumed."
+      },
+      {
+        "dimension": "scenario_seed",
+        "status": "matched",
+        "note": "Synthetic protocol assigns seed 42001 to all future runs."
+      },
+      {
+        "dimension": "topology",
+        "status": "not_assessed",
+        "note": "Synthetic topology is declared; no shared engine input export exists yet."
+      },
+      {
+        "dimension": "asset_constraints",
+        "status": "not_assessed",
+        "note": "A common battery constraint manifest remains to be produced."
+      },
+      {
+        "dimension": "warranty",
+        "status": "not_assessed",
+        "note": "Warranty envelope has a synthetic identifier but no shared machine-readable limits yet."
+      },
+      {
+        "dimension": "time_resolution",
+        "status": "matched",
+        "note": "All future protocol exports use the explicitly synthetic 60-minute interval; this is not a SAWEM Trading Period assertion."
+      },
+      {
+        "dimension": "objective_function",
+        "status": "not_assessed",
+        "note": "No engine objective has been normalized or executed."
+      },
+      {
+        "dimension": "risk_measure",
+        "status": "not_assessed",
+        "note": "CVaR is the target common policy measure; vendor implementations have not been compared."
+      },
+      {
+        "dimension": "settlement_rules",
+        "status": "not_assessed",
+        "note": "No frozen operator settlement rule interpretation is loaded."
+      },
+      {
+        "dimension": "participant_eligibility",
+        "status": "not_assessed",
+        "note": "Participant eligibility remains unknown for this synthetic profile."
+      }
+    ],
+    "mismatch_policy": "exclude_from_head_to_head",
+    "oracle_separation_required": true
+  },
+  "reported_metrics": [
+    {
+      "metric_id": "feasible_dispatch_violations",
+      "unit": "count",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Number of physical, network, time and contractual hard-constraint violations in a complete run."
+    },
+    {
+      "metric_id": "reserve_shortfall_mwh",
+      "unit": "MWh",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Unserved certified reserve obligation, distinguished from synthetic or unawarded reserve."
+    },
+    {
+      "metric_id": "net_revenue_after_degradation_zar",
+      "unit": "ZAR",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Cash-equivalent market revenue after energy and balancing payments, charges, degradation, augmentation and replacement."
+    },
+    {
+      "metric_id": "credit_cover_peak_zar",
+      "unit": "ZAR",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Peak required credit cover including actual and undefined-potential exposure under the frozen rule interpretation."
+    },
+    {
+      "metric_id": "working_capital_peak_zar",
+      "unit": "ZAR",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Peak cash and collateral required before settlement receipts become available."
+    },
+    {
+      "metric_id": "rolling_horizon_regret_pct",
+      "unit": "%",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Regret against the implementable non-anticipative benchmark on identical information and constraints; perfect foresight is reported separately."
+    },
+    {
+      "metric_id": "material_risk_recall_pct",
+      "unit": "%",
+      "value": null,
+      "comparison_status": "not_run",
+      "definition": "Fraction of independently adjudicated material project risks detected before the decision deadline."
+    }
+  ],
+  "execution_receipt": null,
+  "claim_ceiling": "Protocol and synthetic comparator roster only. No engine has been run, licensed inputs verified, matched-input claim made, SAM/HOMER/PLEXOS/Aurora/EnCompass/PyPSA performance measured, or live SAWEM participant/project eligibility established."
+}
