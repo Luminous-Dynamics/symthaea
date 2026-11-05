@@ -1775,7 +1775,7 @@ mod tests {
         let byte_start = line.find("sorry").unwrap();
         let start = line[..byte_start].chars().count() as u64;
         let instrumented = instrument_sorry_span(source, 1, start, 1, start + 5, "PITB_BEGIN", "PITB_END").unwrap();
-        assert!(instrumented.contains("by trace \"PITB_BEGIN\"\n  trace_state\n  trace \"PITB_END\"\n  sorry"));
+        assert!(instrumented.contains("by \n  trace \"PITB_BEGIN\"\n  trace_state\n  trace \"PITB_END\"\n  sorry"));
         assert_eq!(source.matches("sorry").count(), 1);
         assert_eq!(instrumented.matches("sorry").count(), 1);
     }
