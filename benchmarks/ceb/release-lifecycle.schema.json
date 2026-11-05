@@ -230,7 +230,6 @@
       "required": [
         "status",
         "planned_independent_runs_per_reference_task",
-        "actual_independent_runs",
         "infrastructure_failure_rate_target",
         "observed_infrastructure_failure_rate",
         "p95_runtime_seconds",
@@ -238,7 +237,10 @@
         "calibration_record_sha256",
         "agent_and_infrastructure_failures_separated",
         "agent_timeout_policy_sha256",
-        "claim_boundary"
+        "claim_boundary",
+        "planned_reference_task_count",
+        "actual_reference_task_count",
+        "minimum_trials_observed_per_reference_task"
       ],
       "properties": {
         "status": {
@@ -251,10 +253,6 @@
         },
         "planned_independent_runs_per_reference_task": {
           "const": 10
-        },
-        "actual_independent_runs": {
-          "type": "integer",
-          "minimum": 0
         },
         "infrastructure_failure_rate_target": {
           "const": 0.01
@@ -301,6 +299,18 @@
         "claim_boundary": {
           "type": "string",
           "minLength": 30
+        },
+        "planned_reference_task_count": {
+          "type": "integer",
+          "minimum": 3
+        },
+        "actual_reference_task_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_trials_observed_per_reference_task": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
