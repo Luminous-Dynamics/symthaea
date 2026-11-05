@@ -9,7 +9,7 @@ mod evidence_attestation;
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use clap::Parser;
-use evidence_attestation::{VerificationReceipt, verify_envelope};
+use evidence_attestation::verify_envelope;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -2050,6 +2050,7 @@ mod tests {
     #[test]
     fn support_and_scenario_challenges_count_verified_attestations() {
         let mut input = hypothesis_expansion_fixture();
+        input.support_challenges = support_expansion_fixture().support_challenges;
         input.require_signed_attestations = true;
         let binding = fixture_attestation_binding();
         for challenge in &mut input.support_challenges {
