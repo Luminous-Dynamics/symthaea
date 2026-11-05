@@ -2,10 +2,11 @@ use mel_rmi_synthetic::{
     ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
     ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, NegotiatedResponseContractV1, NegotiationChoiceV1,
-    Observation, OneWayPromptPolicy, PartnerAuthorityV1, ReciprocalTrialRecordV1,
-    ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1, TrialRunConfig,
-    UnrelatedFeatureShortcutPolicy, assess_negotiation, bind_verified_artifacts,
-    canonical_fixture_replicates_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
+    Observation, OneWayPromptPolicy, PartnerAuthorityEventV1, PartnerAuthorityV1,
+    ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec,
+    TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
+    assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
+    run_policy_suite_v1, run_reciprocal_suite_v1, validate_partner_authority_event,
     verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
@@ -491,8 +492,175 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         rejected += 1;
     }
 
+    let wide_contract = NegotiatedResponseContractV1 {
+        target_dimension: Dimension::Motif,
+        modulus: 12,
+        accepted_offsets: (1..=10).collect(),
+        max_branch_count: 3,
+    };
+    let wide_input = Feature {
+        dimension: Dimension::Motif,
+        value: 0,
+    };
+    let wide_authority = PartnerAuthorityV1 {
+        selected_value: None,
+        vetoed_values: Default::default(),
+    };
+    let wide_options: Vec<i32> = wide_contract.valid_values(wide_input)?.into_iter().collect();
+    let clarification = assess_negotiation(
+        &wide_contract,
+        wide_input,
+        &wide_authority,
+        &NegotiationChoiceV1::AskClarification,
+    )?;
+    let excessive_branch = assess_negotiation(
+        &wide_contract,
+        wide_input,
+        &wide_authority,
+        &NegotiationChoiceV1::Branch(wide_options),
+    )?;
+    println!(
+        "negotiation,branch_explosion_clarify,{},{},{},{},{},{},{},{}",
+        clarification.available_option_count,
+        clarification.proposed_option_count,
+        clarification.contract_valid,
+        clarification.veto_respected,
+        clarification.preference_respected,
+        clarification.ambiguity_preserved,
+        clarification.action_well_formed,
+        clarification.qualified,
+    );
+    println!(
+        "negotiation,branch_explosion_rejected,{},{},{},{},{},{},{},{}",
+        excessive_branch.available_option_count,
+        excessive_branch.proposed_option_count,
+        excessive_branch.contract_valid,
+        excessive_branch.veto_respected,
+        excessive_branch.preference_respected,
+        excessive_branch.ambiguity_preserved,
+        excessive_branch.action_well_formed,
+        excessive_branch.qualified,
+    );
+    if clarification.qualified {
+        qualified += 1;
+    } else {
+        rejected += 1;
+    }
+    if excessive_branch.qualified {
+        qualified += 1;
+    } else {
+        rejected += 1;
+    }
     println!("negotiation_qualified,{qualified}");
     println!("negotiation_rejected,{rejected}");
+    Ok((qualified, rejected))
+}
+
+fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
+    let observation = Observation {
+        event_id: "authority-source-event".to_owned(),
+        session_id: "authority-session".to_owned(),
+        history_id: "authority-history".to_owned(),
+        task_id: "authority-task".to_owned(),
+        seed: 5,
+        initial_partner_feature: Feature {
+            dimension: Dimension::Motif,
+            value: 2,
+        },
+        current_partner_feature: Feature {
+            dimension: Dimension::Motif,
+            value: 2,
+        },
+        unrelated_feature: Feature {
+            dimension: Dimension::Texture,
+            value: 0,
+        },
+    };
+    let contract = NegotiatedResponseContractV1 {
+        target_dimension: Dimension::Motif,
+        modulus: 12,
+        accepted_offsets: [3, 5, 7].into_iter().collect(),
+        max_branch_count: 3,
+    };
+    let mut event = PartnerAuthorityEventV1 {
+        event_id: "authority-event".to_owned(),
+        session_id: observation.session_id.clone(),
+        task_id: observation.task_id.clone(),
+        source_event_id: observation.event_id.clone(),
+        control_sequence: 7,
+        clock_origin_id: "runner-clock-authority-session".to_owned(),
+        issued_at_ns: 100,
+        expires_at_ns: 200,
+        authority_receipt_ref: "opaque-authority-receipt-ref".to_owned(),
+        authority: PartnerAuthorityV1 {
+            selected_value: None,
+            vetoed_values: Default::default(),
+        },
+    };
+
+    let valid = assess_scoped_negotiation(
+        &contract,
+        &observation,
+        &event,
+        7,
+        "runner-clock-authority-session",
+        150,
+        &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
+    )?
+    .qualified;
+    println!("authority_scope,valid_event,{valid}");
+    let mut qualified = usize::from(valid);
+    let mut rejected = 0usize;
+
+    event.source_event_id = "different-observation".to_owned();
+    let wrong_source = validate_partner_authority_event(
+        &event, &observation, 7, "runner-clock-authority-session", 150,
+    );
+    let passed = wrong_source.is_err();
+    println!("authority_scope,cross_event_rejected,{passed}");
+    if passed { rejected += 1; } else { qualified += 1; }
+
+    event.source_event_id = observation.event_id.clone();
+    event.control_sequence = 6;
+    let stale_sequence = validate_partner_authority_event(
+        &event, &observation, 7, "runner-clock-authority-session", 150,
+    );
+    let passed = stale_sequence.is_err();
+    println!("authority_scope,stale_sequence_rejected,{passed}");
+    if passed { rejected += 1; } else { qualified += 1; }
+
+    event.control_sequence = 7;
+    let wrong_clock = validate_partner_authority_event(
+        &event, &observation, 7, "different-clock-origin", 150,
+    );
+    let passed = wrong_clock.is_err();
+    println!("authority_scope,clock_origin_rejected,{passed}");
+    if passed { rejected += 1; } else { qualified += 1; }
+
+    let not_effective = validate_partner_authority_event(
+        &event, &observation, 7, "runner-clock-authority-session", 99,
+    );
+    let passed = not_effective.is_err();
+    println!("authority_scope,not_yet_effective_rejected,{passed}");
+    if passed { rejected += 1; } else { qualified += 1; }
+
+    let expired = validate_partner_authority_event(
+        &event, &observation, 7, "runner-clock-authority-session", 200,
+    );
+    let passed = expired.is_err();
+    println!("authority_scope,expired_rejected,{passed}");
+    if passed { rejected += 1; } else { qualified += 1; }
+
+    event.authority_receipt_ref.clear();
+    let missing_receipt = validate_partner_authority_event(
+        &event, &observation, 7, "runner-clock-authority-session", 150,
+    );
+    let passed = missing_receipt.is_err();
+    println!("authority_scope,missing_receipt_rejected,{passed}");
+    if passed { rejected += 1; } else { qualified += 1; }
+
+    println!("authority_scope_qualified,{qualified}");
+    println!("authority_scope_rejected,{rejected}");
     Ok((qualified, rejected))
 }
 
@@ -603,8 +771,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     report_reciprocal_aggregates(&reciprocal);
 
     let (negotiation_qualified, negotiation_rejected) = run_negotiation_conformance()?;
-    if negotiation_qualified != 5 || negotiation_rejected != 4 {
+    if negotiation_qualified != 6 || negotiation_rejected != 5 {
         return Err("negotiation conformance count mismatch".into());
+    }
+    let (authority_scope_qualified, authority_scope_rejected) =
+        run_authority_scope_conformance()?;
+    if authority_scope_qualified != 1 || authority_scope_rejected != 6 {
+        return Err("authority scope conformance count mismatch".into());
     }
 
     artifact_report.flush()?;
