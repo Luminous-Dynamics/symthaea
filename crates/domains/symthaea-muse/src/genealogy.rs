@@ -117,10 +117,10 @@ impl GenealogyStore {
     ) -> Result<GenealogyManifest, GenealogyBundleError> {
         let recipe_bytes = std::fs::read(bundle_directory.join("recipe.json"))
             .map_err(GenealogyBundleError::Io)?;
-        let score_bytes = std::fs::read(bundle_directory.join("score.json"))
-            .map_err(GenealogyBundleError::Io)?;
-        let audio_bytes = std::fs::read(bundle_directory.join("audio.wav"))
-            .map_err(GenealogyBundleError::Io)?;
+        let score_bytes =
+            std::fs::read(bundle_directory.join("score.json")).map_err(GenealogyBundleError::Io)?;
+        let audio_bytes =
+            std::fs::read(bundle_directory.join("audio.wav")).map_err(GenealogyBundleError::Io)?;
 
         if recipe_bytes != expected_recipe_bytes {
             return Err(GenealogyBundleError::ByteMismatch {
@@ -553,10 +553,12 @@ mod tests {
                 artifact: "score.json"
             })
         ));
-        assert!(store
-            .manifest_by_audio_key("bundle-substituted")
-            .unwrap()
-            .is_none());
+        assert!(
+            store
+                .manifest_by_audio_key("bundle-substituted")
+                .unwrap()
+                .is_none()
+        );
 
         let _ = std::fs::remove_dir_all(directory);
     }
