@@ -1,5 +1,5 @@
 use jsonschema::draft202012;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -9,7 +9,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 const TOOL_VERSION: &str = "score-multihall-sa-v0.1.0";
-const REPORT_SCHEMA: &str = include_str!("../../../../benchmarks/multi-hall-sa/v0/score-report.schema.json");
+const REPORT_SCHEMA: &str =
+    include_str!("../../../../benchmarks/multi-hall-sa/v0/score-report.schema.json");
 
 #[derive(Debug)]
 struct Args {
@@ -280,9 +281,8 @@ fn parse_args() -> Result<Args, String> {
     let mut output = None;
 
     while let Some(argument) = raw.next() {
-        let mut next_value = |flag: &str| {
-            raw.next().ok_or_else(|| format!("{flag} requires a path"))
-        };
+        let mut next_value =
+            |flag: &str| raw.next().ok_or_else(|| format!("{flag} requires a path"));
         match argument.as_str() {
             "--plan" => plan = Some(PathBuf::from(next_value("--plan")?)),
             "--pairs" => pairs = Some(PathBuf::from(next_value("--pairs")?)),
@@ -306,8 +306,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn read_jsonl<T: DeserializeOwned>(bytes: &[u8], label: &str) -> Result<Vec<T>, String> {
-    let text = std::str::from_utf8(bytes)
-        .map_err(|error| format!("{label} is not UTF-8: {error}"))?;
+    let text =
+        std::str::from_utf8(bytes).map_err(|error| format!("{label} is not UTF-8: {error}"))?;
     let mut rows = Vec::new();
 
     for (index, line) in text.lines().enumerate() {
@@ -326,22 +326,33 @@ fn read_jsonl<T: DeserializeOwned>(bytes: &[u8], label: &str) -> Result<Vec<T>, 
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn is_git_sha(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn validate_plan(plan: &Plan) -> Result<(), String> {
     if plan.schema_version != "multi-hall-sa-plan-v0" {
-        return Err(format!("unsupported plan schema_version {:?}", plan.schema_version));
+        return Err(format!(
+            "unsupported plan schema_version {:?}",
+            plan.schema_version
+        ));
     }
     if plan.plan_id.trim().is_empty() || plan.candidate_system_id.trim().is_empty() {
         return Err("plan_id and candidate_system_id must be non-empty".into());
     }
     if !is_sha256(&plan.dataset.pair_manifest_sha256) {
-        return Err("dataset.pair_manifest_sha256 must be 64 lowercase hexadecimal characters".into());
+        return Err(
+            "dataset.pair_manifest_sha256 must be 64 lowercase hexadecimal characters".into(),
+        );
     }
     if plan.dataset.dataset_id != "Multi-Hall-SA" && !plan.synthetic_only {
         return Err("non-synthetic plans must identify dataset_id=Multi-Hall-SA".into());
@@ -367,7 +378,10 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
     if !(plan.bootstrap.confidence_level > 0.5 && plan.bootstrap.confidence_level < 1.0) {
         return Err("confidence_level must be in (0.5, 1.0)".into());
     }
-    if !matches!(plan.bootstrap.multiple_comparison_correction.as_str(), "none" | "bonferroni") {
+    if !matches!(
+        plan.bootstrap.multiple_comparison_correction.as_str(),
+        "none" | "bonferroni"
+    ) {
         return Err("multiple_comparison_correction must be none or bonferroni".into());
     }
 
@@ -391,7 +405,10 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
                 return Err("development_pilot requires non-synthetic development/validation data with approved rights".into());
             }
             if !is_git_sha(&plan.dataset.revision) {
-                return Err("non-synthetic dataset revision must be an immutable 40-character commit SHA".into());
+                return Err(
+                    "non-synthetic dataset revision must be an immutable 40-character commit SHA"
+                        .into(),
+                );
             }
         }
         "preregistered_held_out" => {
@@ -399,16 +416,27 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
                 || !matches!(plan.dataset.split.as_str(), "test" | "holdout")
                 || !plan.dataset.source_family_disjoint
                 || plan.dataset.rights_review_status != "approved"
-                || !matches!(plan.dataset.held_out_access.as_str(), "sealed_until_freeze" | "independent_evaluator")
+                || !matches!(
+                    plan.dataset.held_out_access.as_str(),
+                    "sealed_until_freeze" | "independent_evaluator"
+                )
                 || !plan.dataset.source_cluster_semantics_reviewed
             {
                 return Err("held-out scoring requires real test/holdout data, source-family disjointness, approved rights, sealed/independent access and reviewed cluster semantics".into());
             }
             if !is_git_sha(&plan.dataset.revision) {
-                return Err("non-synthetic dataset revision must be an immutable 40-character commit SHA".into());
+                return Err(
+                    "non-synthetic dataset revision must be an immutable 40-character commit SHA"
+                        .into(),
+                );
             }
-            if plan.systems.len() > 1 && plan.bootstrap.multiple_comparison_correction != "bonferroni" {
-                return Err("held-out multi-system comparisons require Bonferroni familywise correction".into());
+            if plan.systems.len() > 1
+                && plan.bootstrap.multiple_comparison_correction != "bonferroni"
+            {
+                return Err(
+                    "held-out multi-system comparisons require Bonferroni familywise correction"
+                        .into(),
+                );
             }
         }
         other => return Err(format!("unsupported phase {other:?}")),
@@ -421,14 +449,19 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
             || system.model_id.trim().is_empty()
             || system.model_revision.trim().is_empty()
         {
-            return Err("system_id, baseline_family, model_id and model_revision must be non-empty".into());
+            return Err(
+                "system_id, baseline_family, model_id and model_revision must be non-empty".into(),
+            );
         }
         if !system_ids.insert(system.system_id.clone()) {
             return Err(format!("duplicate system_id {:?}", system.system_id));
         }
         if let Some(prompt_sha) = &system.prompt_sha256 {
             if !is_sha256(prompt_sha) {
-                return Err(format!("system {:?} has invalid prompt_sha256", system.system_id));
+                return Err(format!(
+                    "system {:?} has invalid prompt_sha256",
+                    system.system_id
+                ));
             }
         }
     }
@@ -471,22 +504,36 @@ fn result_pair_key(result: &Prediction) -> String {
 
 fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, String> {
     let allowed_languages = ["isiZulu", "isiXhosa", "Sepedi", "Sesotho"];
-    let allowed_types = ["temporal shift", "entity error", "numerical inaccuracy", "location mistake"];
+    let allowed_types = [
+        "temporal shift",
+        "entity error",
+        "numerical inaccuracy",
+        "location mistake",
+    ];
     let mut by_id = BTreeMap::new();
     let mut composite_keys = HashSet::new();
 
     for pair in pairs {
         if pair.schema_version != "multi-hall-sa-pair-v0" {
-            return Err(format!("pair {:?} has unsupported schema_version", pair.pair_id));
+            return Err(format!(
+                "pair {:?} has unsupported schema_version",
+                pair.pair_id
+            ));
         }
         if pair.pair_id.trim().is_empty() || pair.file_id.trim().is_empty() {
             return Err("pair_id and file_id must be non-empty".into());
         }
         if !allowed_languages.contains(&pair.language.as_str()) {
-            return Err(format!("pair {:?} has unsupported language {:?}", pair.pair_id, pair.language));
+            return Err(format!(
+                "pair {:?} has unsupported language {:?}",
+                pair.pair_id, pair.language
+            ));
         }
         if !allowed_types.contains(&pair.hallucination_type.as_str()) {
-            return Err(format!("pair {:?} has unsupported hallucination_type {:?}", pair.pair_id, pair.hallucination_type));
+            return Err(format!(
+                "pair {:?} has unsupported hallucination_type {:?}",
+                pair.pair_id, pair.hallucination_type
+            ));
         }
         // pair_id is not globally unique in the released builder: fact_index is
         // reset for each source document, while file_id is assigned per document.
@@ -508,42 +555,78 @@ fn validate_predictions(
     pairs: &BTreeMap<String, PairMeta>,
     results: &[Prediction],
 ) -> Result<HashMap<(String, String, String, String), Prediction>, String> {
-    let systems: HashSet<&str> = plan.systems.iter().map(|system| system.system_id.as_str()).collect();
+    let systems: HashSet<&str> = plan
+        .systems
+        .iter()
+        .map(|system| system.system_id.as_str())
+        .collect();
     let mut result_ids = HashSet::new();
     let mut keyed = HashMap::new();
 
     for result in results {
         if result.schema_version != "multi-hall-sa-result-v0" {
-            return Err(format!("result {:?} has unsupported schema_version", result.result_id));
+            return Err(format!(
+                "result {:?} has unsupported schema_version",
+                result.result_id
+            ));
         }
         if result.plan_id != plan.plan_id {
-            return Err(format!("result {:?} has plan_id mismatch", result.result_id));
+            return Err(format!(
+                "result {:?} has plan_id mismatch",
+                result.result_id
+            ));
         }
         if !systems.contains(result.system_id.as_str()) {
-            return Err(format!("result {:?} references unknown system {:?}", result.result_id, result.system_id));
+            return Err(format!(
+                "result {:?} references unknown system {:?}",
+                result.result_id, result.system_id
+            ));
         }
         let pair_key = result_pair_key(result);
         if !pairs.contains_key(&pair_key) {
             return Err(format!(
                 "result {:?} references unknown composite pair identity (file_id={:?}, pair_id={:?}, fact_index={}, language={:?}, type={:?})",
-                result.result_id, result.file_id, result.pair_id, result.fact_index, result.language, result.hallucination_type
+                result.result_id,
+                result.file_id,
+                result.pair_id,
+                result.fact_index,
+                result.language,
+                result.hallucination_type
             ));
         }
         if result.result_id.trim().is_empty() || !result_ids.insert(result.result_id.clone()) {
-            return Err(format!("empty or duplicate result_id {:?}", result.result_id));
+            return Err(format!(
+                "empty or duplicate result_id {:?}",
+                result.result_id
+            ));
         }
         if !matches!(result.statement_language.as_str(), "english" | "target") {
-            return Err(format!("result {:?} has invalid statement_language", result.result_id));
+            return Err(format!(
+                "result {:?} has invalid statement_language",
+                result.result_id
+            ));
         }
         if !matches!(result.statement_kind.as_str(), "factual" | "hallucinated") {
-            return Err(format!("result {:?} has invalid statement_kind", result.result_id));
+            return Err(format!(
+                "result {:?} has invalid statement_kind",
+                result.result_id
+            ));
         }
-        if !matches!(result.predicted_label.as_str(), "factual" | "hallucinated" | "abstain") {
-            return Err(format!("result {:?} has invalid predicted_label", result.result_id));
+        if !matches!(
+            result.predicted_label.as_str(),
+            "factual" | "hallucinated" | "abstain"
+        ) {
+            return Err(format!(
+                "result {:?} has invalid predicted_label",
+                result.result_id
+            ));
         }
         if let Some(probability) = result.p_hallucinated {
             if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
-                return Err(format!("result {:?} has p_hallucinated outside [0,1]", result.result_id));
+                return Err(format!(
+                    "result {:?} has p_hallucinated outside [0,1]",
+                    result.result_id
+                ));
             }
         }
         if result.evidence_tokens > plan.budget.max_evidence_tokens
@@ -554,15 +637,29 @@ fn validate_predictions(
         {
             return Err(format!(
                 "result {:?} exceeds shared budget (evidence={}, input={}, output={}, retrieval_calls={}, latency_ms={})",
-                result.result_id, result.evidence_tokens, result.input_tokens,
-                result.output_tokens, result.retrieval_calls, result.latency_ms
+                result.result_id,
+                result.evidence_tokens,
+                result.input_tokens,
+                result.output_tokens,
+                result.retrieval_calls,
+                result.latency_ms
             ));
         }
         if let Some(max_cost) = plan.budget.max_cost_microusd {
             match result.cost_microusd {
                 Some(cost) if cost <= max_cost => {}
-                Some(cost) => return Err(format!("result {:?} exceeds max_cost_microusd: {} > {}", result.result_id, cost, max_cost)),
-                None => return Err(format!("result {:?} omits cost_microusd required by the shared budget plan", result.result_id)),
+                Some(cost) => {
+                    return Err(format!(
+                        "result {:?} exceeds max_cost_microusd: {} > {}",
+                        result.result_id, cost, max_cost
+                    ));
+                }
+                None => {
+                    return Err(format!(
+                        "result {:?} omits cost_microusd required by the shared budget plan",
+                        result.result_id
+                    ));
+                }
             }
         }
 
@@ -573,7 +670,10 @@ fn validate_predictions(
             result.statement_kind.clone(),
         );
         if keyed.insert(key, result.clone()).is_some() {
-            return Err(format!("duplicate statement prediction for pair {:?}", result.pair_id));
+            return Err(format!(
+                "duplicate statement prediction for pair {:?}",
+                result.pair_id
+            ));
         }
     }
 
@@ -588,7 +688,10 @@ fn validate_predictions(
                         kind.to_string(),
                     );
                     if !keyed.contains_key(&key) {
-                        return Err(format!("missing prediction: system={}, pair={}, language={}, kind={}", system.system_id, pair_id, language, kind));
+                        return Err(format!(
+                            "missing prediction: system={}, pair={}, language={}, kind={}",
+                            system.system_id, pair_id, language, kind
+                        ));
                     }
                 }
             }
@@ -597,29 +700,49 @@ fn validate_predictions(
 
     let expected = plan.systems.len() * pairs.len() * 4;
     if results.len() != expected {
-        return Err(format!("prediction row count {} does not equal expected complete matrix {}", results.len(), expected));
+        return Err(format!(
+            "prediction row count {} does not equal expected complete matrix {}",
+            results.len(),
+            expected
+        ));
     }
     Ok(keyed)
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
-    if denominator == 0 { None } else { Some(numerator as f64 / denominator as f64) }
+    if denominator == 0 {
+        None
+    } else {
+        Some(numerator as f64 / denominator as f64)
+    }
 }
 
 fn safe_mean(values: &[f64]) -> Option<f64> {
-    if values.is_empty() { None } else { Some(values.iter().sum::<f64>() / values.len() as f64) }
+    if values.is_empty() {
+        None
+    } else {
+        Some(values.iter().sum::<f64>() / values.len() as f64)
+    }
 }
 
 fn class_f1(tp: usize, fp: usize, false_negative: usize) -> Option<f64> {
     let denominator = 2 * tp + fp + false_negative;
-    if denominator == 0 { None } else { Some((2 * tp) as f64 / denominator as f64) }
+    if denominator == 0 {
+        None
+    } else {
+        Some((2 * tp) as f64 / denominator as f64)
+    }
 }
 
 fn calibration_metrics(rows: &[&Observed]) -> (usize, Option<f64>, Option<f64>, Option<f64>) {
     let mut values = Vec::new();
     for row in rows {
         if let Some(probability) = row.prediction.p_hallucinated {
-            let actual = if row.prediction.statement_kind == "hallucinated" { 1.0 } else { 0.0 };
+            let actual = if row.prediction.statement_kind == "hallucinated" {
+                1.0
+            } else {
+                0.0
+            };
             values.push((probability, actual));
         }
     }
@@ -627,9 +750,11 @@ fn calibration_metrics(rows: &[&Observed]) -> (usize, Option<f64>, Option<f64>, 
         return (0, None, None, None);
     }
 
-    let brier = values.iter()
+    let brier = values
+        .iter()
         .map(|(probability, actual)| (probability - actual).powi(2))
-        .sum::<f64>() / values.len() as f64;
+        .sum::<f64>()
+        / values.len() as f64;
 
     let mut bins: Vec<Vec<(f64, f64)>> = vec![Vec::new(); 10];
     for (probability, actual) in &values {
@@ -638,19 +763,29 @@ fn calibration_metrics(rows: &[&Observed]) -> (usize, Option<f64>, Option<f64>, 
     }
     let mut ece = 0.0;
     for bin in bins {
-        if bin.is_empty() { continue; }
+        if bin.is_empty() {
+            continue;
+        }
         let mean_probability = bin.iter().map(|row| row.0).sum::<f64>() / bin.len() as f64;
         let mean_actual = bin.iter().map(|row| row.1).sum::<f64>() / bin.len() as f64;
         ece += (bin.len() as f64 / values.len() as f64) * (mean_probability - mean_actual).abs();
     }
-    (values.len(), Some(values.len() as f64 / rows.len() as f64), Some(brier), Some(ece))
+    (
+        values.len(),
+        Some(values.len() as f64 / rows.len() as f64),
+        Some(brier),
+        Some(ece),
+    )
 }
 
 fn probability_ranking_metrics(rows: &[&Observed]) -> (Option<f64>, Option<f64>) {
-    let mut values: Vec<(f64, bool)> = rows.iter()
-        .filter_map(|row| row.prediction.p_hallucinated.map(|probability| {
-            (probability, row.prediction.statement_kind == "hallucinated")
-        }))
+    let mut values: Vec<(f64, bool)> = rows
+        .iter()
+        .filter_map(|row| {
+            row.prediction
+                .p_hallucinated
+                .map(|probability| (probability, row.prediction.statement_kind == "hallucinated"))
+        })
         .collect();
     let positives = values.iter().filter(|row| row.1).count();
     let negatives = values.len().saturating_sub(positives);
@@ -674,7 +809,7 @@ fn probability_ranking_metrics(rows: &[&Observed]) -> (Option<f64>, Option<f64>)
     }
     let roc_auc = Some(
         (positive_rank_sum - (positives * (positives + 1) / 2) as f64)
-            / (positives as f64 * negatives as f64)
+            / (positives as f64 * negatives as f64),
     );
 
     // Tie-grouped average precision; no arbitrary within-tie ordering.
@@ -700,7 +835,11 @@ fn probability_ranking_metrics(rows: &[&Observed]) -> (Option<f64>, Option<f64>)
     (roc_auc, Some(average_precision))
 }
 
-fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<String>) -> SliceMetrics {
+fn metric_slice(
+    rows: &[&Observed],
+    language: &str,
+    hallucination_type: Option<String>,
+) -> SliceMetrics {
     let mut tp = 0usize;
     let mut fp = 0usize;
     let mut tn = 0usize;
@@ -718,7 +857,11 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
 
     for row in rows {
         let actual_hallucinated = row.prediction.statement_kind == "hallucinated";
-        if actual_hallucinated { hallucinated_count += 1; } else { factual_count += 1; }
+        if actual_hallucinated {
+            hallucinated_count += 1;
+        } else {
+            factual_count += 1;
+        }
 
         match row.prediction.predicted_label.as_str() {
             "hallucinated" if actual_hallucinated => tp += 1,
@@ -727,7 +870,9 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
             "factual" => tn += 1,
             "abstain" => {
                 abstained += 1;
-                if actual_hallucinated { abstained_hallucinated += 1; }
+                if actual_hallucinated {
+                    abstained_hallucinated += 1;
+                }
             }
             _ => unreachable!("predicted_label is validated before scoring"),
         }
@@ -737,7 +882,9 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         input_tokens.push(row.prediction.input_tokens as f64);
         output_tokens.push(row.prediction.output_tokens as f64);
         retrieval_calls.push(row.prediction.retrieval_calls as f64);
-        if let Some(value) = row.prediction.cost_microusd { cost_microusd.push(value as f64); }
+        if let Some(value) = row.prediction.cost_microusd {
+            cost_microusd.push(value as f64);
+        }
     }
 
     let covered = tp + fp + tn + fn_count;
@@ -756,7 +903,11 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         language: language.to_string(),
         hallucination_type,
         statement_count: rows.len(),
-        pair_count: rows.iter().map(|row| pair_key(&row.pair)).collect::<HashSet<_>>().len(),
+        pair_count: rows
+            .iter()
+            .map(|row| pair_key(&row.pair))
+            .collect::<HashSet<_>>()
+            .len(),
         factual_count,
         hallucinated_count,
         true_positive: tp,
@@ -772,7 +923,10 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         f1_factual,
         macro_f1,
         false_negative_rate_on_covered: ratio(fn_count, tp + fn_count),
-        missed_hallucination_rate_unconditional: ratio(fn_count + abstained_hallucinated, hallucinated_count),
+        missed_hallucination_rate_unconditional: ratio(
+            fn_count + abstained_hallucinated,
+            hallucinated_count,
+        ),
         false_hallucination_rate_unconditional: ratio(fp, factual_count),
         selective_risk: ratio(errors, covered),
         probability_count,
@@ -797,33 +951,55 @@ fn paired_misses(
     predictions: &HashMap<(String, String, String, String), Prediction>,
 ) -> BTreeMap<String, Vec<PairedMiss>> {
     let mut clusters: BTreeMap<String, Vec<PairedMiss>> = BTreeMap::new();
-    for pair in pairs.values().filter(|pair| pair.language == target_language) {
+    for pair in pairs
+        .values()
+        .filter(|pair| pair.language == target_language)
+    {
         let composite_pair_key = pair_key(pair);
         let english_key = (
-            system_id.to_string(), composite_pair_key.clone(), "english".to_string(), "hallucinated".to_string()
+            system_id.to_string(),
+            composite_pair_key.clone(),
+            "english".to_string(),
+            "hallucinated".to_string(),
         );
         let target_key = (
-            system_id.to_string(), composite_pair_key, "target".to_string(), "hallucinated".to_string()
+            system_id.to_string(),
+            composite_pair_key,
+            "target".to_string(),
+            "hallucinated".to_string(),
         );
-        let english = predictions.get(&english_key).expect("complete result matrix validated");
-        let target = predictions.get(&target_key).expect("complete result matrix validated");
+        let english = predictions
+            .get(&english_key)
+            .expect("complete result matrix validated");
+        let target = predictions
+            .get(&target_key)
+            .expect("complete result matrix validated");
         let miss = |result: &Prediction| result.predicted_label != "hallucinated";
-        clusters.entry(pair.file_id.clone()).or_default().push(PairedMiss {
-            target_missed: miss(target),
-            english_missed: miss(english),
-        });
+        clusters
+            .entry(pair.file_id.clone())
+            .or_default()
+            .push(PairedMiss {
+                target_missed: miss(target),
+                english_missed: miss(english),
+            });
     }
     clusters
 }
 
-fn paired_rates(clusters: &BTreeMap<String, Vec<PairedMiss>>) -> (usize, Option<f64>, Option<f64>, Option<f64>) {
+fn paired_rates(
+    clusters: &BTreeMap<String, Vec<PairedMiss>>,
+) -> (usize, Option<f64>, Option<f64>, Option<f64>) {
     let mut target = 0usize;
     let mut english = 0usize;
     let mut count = 0usize;
     for rows in clusters.values() {
         for row in rows {
-            if row.target_missed { target += 1; }
-            if row.english_missed { english += 1; }
+            if row.target_missed {
+                target += 1;
+            }
+            if row.english_missed {
+                english += 1;
+            }
             count += 1;
         }
     }
@@ -837,7 +1013,9 @@ fn paired_rates(clusters: &BTreeMap<String, Vec<PairedMiss>>) -> (usize, Option<
 }
 
 fn percentile(sorted: &[f64], probability: f64) -> Option<f64> {
-    if sorted.is_empty() { return None; }
+    if sorted.is_empty() {
+        return None;
+    }
     let index = ((sorted.len() - 1) as f64 * probability).round() as usize;
     sorted.get(index).copied()
 }
@@ -869,14 +1047,21 @@ fn bootstrap_gap_ci(
         for _ in 0..cluster_values.len() {
             let selected = cluster_values[rng.index(cluster_values.len())];
             for row in selected {
-                if row.target_missed { target_misses += 1; }
-                if row.english_missed { english_misses += 1; }
+                if row.target_missed {
+                    target_misses += 1;
+                }
+                if row.english_missed {
+                    english_misses += 1;
+                }
                 total_pairs += 1;
             }
         }
 
         if total_pairs > 0 {
-            gaps.push((target_misses as f64 / total_pairs as f64) - (english_misses as f64 / total_pairs as f64));
+            gaps.push(
+                (target_misses as f64 / total_pairs as f64)
+                    - (english_misses as f64 / total_pairs as f64),
+            );
         }
     }
 
@@ -954,7 +1139,9 @@ fn pair_balanced_accuracy(
             statement_language.to_string(),
             kind.to_string(),
         );
-        let prediction = predictions.get(&key).expect("complete prediction matrix validated");
+        let prediction = predictions
+            .get(&key)
+            .expect("complete prediction matrix validated");
         let is_correct = if kind == "factual" {
             prediction.predicted_label == "factual"
         } else {
@@ -982,9 +1169,14 @@ fn build_system_comparisons(
         conditions.push(format!("target:{language}"));
     }
 
-    for baseline in plan.systems.iter().filter(|system| system.system_id != *candidate) {
+    for baseline in plan
+        .systems
+        .iter()
+        .filter(|system| system.system_id != *candidate)
+    {
         for condition in &conditions {
-            let selected_pairs: Vec<&PairMeta> = pairs.values()
+            let selected_pairs: Vec<&PairMeta> = pairs
+                .values()
                 .filter(|pair| condition.ends_with(&pair.language))
                 .collect();
             let mut clusters: BTreeMap<String, Vec<f64>> = BTreeMap::new();
@@ -992,22 +1184,27 @@ fn build_system_comparisons(
             let mut candidate_values = Vec::new();
 
             for pair in &selected_pairs {
-                let language = if condition.starts_with("english:") { "english" } else { "target" };
-                let baseline_accuracy = pair_balanced_accuracy(
-                    &baseline.system_id, pair, language, predictions
-                );
-                let candidate_accuracy = pair_balanced_accuracy(
-                    candidate, pair, language, predictions
-                );
+                let language = if condition.starts_with("english:") {
+                    "english"
+                } else {
+                    "target"
+                };
+                let baseline_accuracy =
+                    pair_balanced_accuracy(&baseline.system_id, pair, language, predictions);
+                let candidate_accuracy =
+                    pair_balanced_accuracy(candidate, pair, language, predictions);
                 baseline_values.push(baseline_accuracy);
                 candidate_values.push(candidate_accuracy);
-                clusters.entry(pair.file_id.clone())
+                clusters
+                    .entry(pair.file_id.clone())
                     .or_default()
                     .push(candidate_accuracy - baseline_accuracy);
             }
 
             let mean = |values: &[f64]| {
-                if values.is_empty() { None } else {
+                if values.is_empty() {
+                    None
+                } else {
                     Some(values.iter().sum::<f64>() / values.len() as f64)
                 }
             };
@@ -1054,14 +1251,16 @@ fn build_system_report(
     comparison_count: usize,
 ) -> SystemReport {
     let mut slices = Vec::new();
-    let system_rows: Vec<&Observed> = predictions.iter()
+    let system_rows: Vec<&Observed> = predictions
+        .iter()
         .filter(|row| row.prediction.system_id == system.system_id)
         .collect();
 
     let mut languages = vec!["english".to_string()];
     languages.extend(target_languages.iter().cloned());
     for language in &languages {
-        let rows: Vec<&Observed> = system_rows.iter()
+        let rows: Vec<&Observed> = system_rows
+            .iter()
             .copied()
             .filter(|row| {
                 if language == "english" {
@@ -1073,9 +1272,14 @@ fn build_system_report(
             .collect();
         slices.push(metric_slice(&rows, language, None));
 
-        let error_types: BTreeSet<String> = rows.iter().map(|row| row.pair.hallucination_type.clone()).collect();
+        let error_types: BTreeSet<String> = rows
+            .iter()
+            .map(|row| row.pair.hallucination_type.clone())
+            .collect();
         for error_type in error_types {
-            let typed: Vec<&Observed> = rows.iter().copied()
+            let typed: Vec<&Observed> = rows
+                .iter()
+                .copied()
                 .filter(|row| row.pair.hallucination_type == error_type)
                 .collect();
             slices.push(metric_slice(&typed, language, Some(error_type)));
@@ -1127,8 +1331,12 @@ fn run() -> Result<(), String> {
     let args = parse_args()?;
     let plan_bytes = fs::read(&args.plan)
         .map_err(|error| format!("cannot read plan {}: {error}", args.plan.display()))?;
-    let pair_bytes = fs::read(&args.pairs)
-        .map_err(|error| format!("cannot read pair manifest {}: {error}", args.pairs.display()))?;
+    let pair_bytes = fs::read(&args.pairs).map_err(|error| {
+        format!(
+            "cannot read pair manifest {}: {error}",
+            args.pairs.display()
+        )
+    })?;
     let result_bytes = fs::read(&args.results)
         .map_err(|error| format!("cannot read results {}: {error}", args.results.display()))?;
 
@@ -1138,7 +1346,10 @@ fn run() -> Result<(), String> {
 
     let actual_pair_digest = sha256_hex(&pair_bytes);
     if actual_pair_digest != plan.dataset.pair_manifest_sha256 {
-        return Err(format!("pair-manifest SHA-256 mismatch: plan={}, actual={}", plan.dataset.pair_manifest_sha256, actual_pair_digest));
+        return Err(format!(
+            "pair-manifest SHA-256 mismatch: plan={}, actual={}",
+            plan.dataset.pair_manifest_sha256, actual_pair_digest
+        ));
     }
 
     let pairs: Vec<PairMeta> = read_jsonl(&pair_bytes, "pair manifest")?;
@@ -1148,22 +1359,36 @@ fn run() -> Result<(), String> {
 
     let mut observed = Vec::with_capacity(result_rows.len());
     for result in &result_rows {
-        let pair = pair_map.get(&result_pair_key(result))
-            .ok_or_else(|| format!("validated composite pair for result {:?} disappeared", result.result_id))?;
-        observed.push(Observed { pair: pair.clone(), prediction: result.clone() });
+        let pair = pair_map.get(&result_pair_key(result)).ok_or_else(|| {
+            format!(
+                "validated composite pair for result {:?} disappeared",
+                result.result_id
+            )
+        })?;
+        observed.push(Observed {
+            pair: pair.clone(),
+            prediction: result.clone(),
+        });
     }
 
-    let target_languages: Vec<String> = pair_map.values().map(|pair| pair.language.clone())
-        .collect::<BTreeSet<_>>().into_iter().collect();
+    let target_languages: Vec<String> = pair_map
+        .values()
+        .map(|pair| pair.language.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
     // file_id is a document ordinal generated independently within each
     // language-pair build; it is only a cluster key inside that language split.
-    let cluster_count = pair_map.values()
+    let cluster_count = pair_map
+        .values()
         .map(|pair| (pair.language.clone(), pair.file_id.clone()))
-        .collect::<BTreeSet<_>>().len();
+        .collect::<BTreeSet<_>>()
+        .len();
     if plan.phase == "preregistered_held_out" {
         let mut clusters_by_language: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         for pair in pair_map.values() {
-            clusters_by_language.entry(pair.language.clone())
+            clusters_by_language
+                .entry(pair.language.clone())
                 .or_default()
                 .insert(pair.file_id.clone());
         }
@@ -1178,13 +1403,14 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let baseline_count = plan.systems.iter()
+    let baseline_count = plan
+        .systems
+        .iter()
         .filter(|system| system.system_id != plan.candidate_system_id)
         .count();
-    let comparison_count = (
-        plan.systems.len().saturating_mul(target_languages.len())
-        + baseline_count.saturating_mul(target_languages.len().saturating_mul(2))
-    ).max(1);
+    let comparison_count = (plan.systems.len().saturating_mul(target_languages.len())
+        + baseline_count.saturating_mul(target_languages.len().saturating_mul(2)))
+    .max(1);
     if plan.phase == "preregistered_held_out"
         && comparison_count > 1
         && plan.bootstrap.multiple_comparison_correction != "bonferroni"
@@ -1192,16 +1418,20 @@ fn run() -> Result<(), String> {
         return Err("held-out language-gap confidence intervals require Bonferroni correction across system/language comparisons".into());
     }
 
-    let system_reports: Vec<SystemReport> = plan.systems.iter()
-        .map(|system| build_system_report(
-            system,
-            &plan,
-            &pair_map,
-            &observed,
-            &prediction_map,
-            &target_languages,
-            comparison_count,
-        ))
+    let system_reports: Vec<SystemReport> = plan
+        .systems
+        .iter()
+        .map(|system| {
+            build_system_report(
+                system,
+                &plan,
+                &pair_map,
+                &observed,
+                &prediction_map,
+                &target_languages,
+                comparison_count,
+            )
+        })
         .collect();
 
     let system_comparisons = build_system_comparisons(
@@ -1258,17 +1488,30 @@ fn run() -> Result<(), String> {
         .should_validate_formats(true)
         .build(&report_schema)
         .map_err(|error| format!("cannot compile report schema: {error}"))?;
-    let validation_errors: Vec<String> = validator.iter_errors(&report_value)
-        .map(|error| error.to_string()).collect();
+    let validation_errors: Vec<String> = validator
+        .iter_errors(&report_value)
+        .map(|error| error.to_string())
+        .collect();
     if !validation_errors.is_empty() {
-        return Err(format!("generated report violates score-report schema: {}", validation_errors.join("; ")));
+        return Err(format!(
+            "generated report violates score-report schema: {}",
+            validation_errors.join("; ")
+        ));
     }
 
     let bytes = serde_json::to_vec_pretty(&report_value)
         .map_err(|error| format!("cannot serialize JSON report: {error}"))?;
-    if let Some(parent) = args.output.parent().filter(|parent| !parent.as_os_str().is_empty()) {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("cannot create output directory {}: {error}", parent.display()))?;
+    if let Some(parent) = args
+        .output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|error| {
+            format!(
+                "cannot create output directory {}: {error}",
+                parent.display()
+            )
+        })?;
     }
     fs::write(&args.output, &bytes)
         .map_err(|error| format!("cannot write report {}: {error}", args.output.display()))?;
@@ -1344,7 +1587,10 @@ mod tests {
         let english_missed = false; // English detected
         let clusters = BTreeMap::from([(
             "doc-1".to_string(),
-            vec![PairedMiss { target_missed, english_missed }],
+            vec![PairedMiss {
+                target_missed,
+                english_missed,
+            }],
         )]);
         let (_, english, target, gap) = paired_rates(&clusters);
         assert_eq!(english, Some(0.0));
@@ -1405,8 +1651,14 @@ mod tests {
             cost_microusd: Some(1),
         };
         let rows = vec![
-            Observed { pair: pair.clone(), prediction: factual },
-            Observed { pair, prediction: hallucinated },
+            Observed {
+                pair: pair.clone(),
+                prediction: factual,
+            },
+            Observed {
+                pair,
+                prediction: hallucinated,
+            },
         ];
         let metrics = metric_slice(&rows, "isiZulu", None);
 
@@ -1437,7 +1689,8 @@ mod tests {
             confidence_level: 0.95,
             multiple_comparison_correction: "none".into(),
         };
-        let first = bootstrap_gap_ci(&clusters, &plan, 1).expect("30 clusters qualify for an exploratory interval");
+        let first = bootstrap_gap_ci(&clusters, &plan, 1)
+            .expect("30 clusters qualify for an exploratory interval");
         let second = bootstrap_gap_ci(&clusters, &plan, 1).expect("same input must score twice");
         assert_eq!(first.lower, 1.0);
         assert_eq!(first.upper, 1.0);
