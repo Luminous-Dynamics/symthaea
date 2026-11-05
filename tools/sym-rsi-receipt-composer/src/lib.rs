@@ -14,8 +14,7 @@ use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-pub const EVIDENCE_CLAIM_CEILING: &str =
-    "accounting-validated only; producer authentication, runner isolation, grader truth, \
+pub const EVIDENCE_CLAIM_CEILING: &str = "accounting-validated only; producer authentication, runner isolation, grader truth, \
      and independent regrade are not established by this composer";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,14 +26,9 @@ pub enum ScoreTransform {
         higher_is_better: bool,
     },
     /// Map a binary grade with explicitly declared outcome values.
-    Binary {
-        true_score: f64,
-        false_score: f64,
-    },
+    Binary { true_score: f64, false_score: f64 },
     /// Map each observed categorical value through an explicit frozen lookup.
-    Categorical {
-        scores: BTreeMap<String, f64>,
-    },
+    Categorical { scores: BTreeMap<String, f64> },
 }
 
 impl ScoreTransform {
@@ -71,8 +65,7 @@ impl ScoreTransform {
                         .any(|(label, score)| label.trim().is_empty() || !valid_score(*score)) =>
             {
                 Err(ComposerError::InvalidPlan(
-                    "categorical transform requires non-empty labels and scores in [0, 1]"
-                        .into(),
+                    "categorical transform requires non-empty labels and scores in [0, 1]".into(),
                 ))
             }
             _ => Ok(()),
@@ -80,9 +73,9 @@ impl ScoreTransform {
     }
 
     fn apply(&self, grade: &Value) -> Result<f64, ComposerError> {
-        let grade_object = grade.as_object().ok_or_else(|| {
-            ComposerError::InvalidGrade("task grade must be an object".into())
-        })?;
+        let grade_object = grade
+            .as_object()
+            .ok_or_else(|| ComposerError::InvalidGrade("task grade must be an object".into()))?;
         let kind = required_string(grade_object, "kind", "task grade")?;
         if kind != self.expected_grade_kind() {
             return Err(ComposerError::GradeKindMismatch {
@@ -128,9 +121,9 @@ impl ScoreTransform {
                 let label = value.as_str().ok_or_else(|| {
                     ComposerError::InvalidGrade("categorical grade value is not a string".into())
                 })?;
-                *scores.get(label).ok_or_else(|| {
-                    ComposerError::UnmappedCategory(label.to_owned())
-                })?
+                *scores
+                    .get(label)
+                    .ok_or_else(|| ComposerError::UnmappedCategory(label.to_owned()))?
             }
         };
         if !score.is_finite() || !(0.0..=1.0).contains(&score) {
@@ -360,18 +353,17 @@ impl ComposedCandidateEvidence {
     pub fn capability_dimensions(&self) -> Result<BTreeMap<String, f64>, ComposerError> {
         let mut dimensions = BTreeMap::new();
         for (metric_id, evidence) in &self.metrics {
-            if evidence.summary.graded_coverage
-                < evidence.projection.minimum_graded_coverage
-            {
+            if evidence.summary.graded_coverage < evidence.projection.minimum_graded_coverage {
                 return Err(ComposerError::CoverageBelowMinimum {
                     metric_id: metric_id.clone(),
                     observed: evidence.summary.graded_coverage,
                     minimum: evidence.projection.minimum_graded_coverage,
                 });
             }
-            let mean = evidence.summary.graded_mean.ok_or_else(|| {
-                ComposerError::NoGradedOutcomes(metric_id.clone())
-            })?;
+            let mean = evidence
+                .summary
+                .graded_mean
+                .ok_or_else(|| ComposerError::NoGradedOutcomes(metric_id.clone()))?;
             dimensions.insert(metric_id.clone(), mean);
             dimensions.insert(
                 format!("{metric_id}.graded_coverage"),
@@ -387,7 +379,9 @@ impl ComposedCandidateEvidence {
 
     /// Returns complete per-task score vectors only when every eligible task has a grade
     /// for every metric. It never silently complete-case-filters the task universe.
-    pub fn complete_case_scores(&self) -> Result<BTreeMap<String, BTreeMap<String, f64>>, ComposerError> {
+    pub fn complete_case_scores(
+        &self,
+    ) -> Result<BTreeMap<String, BTreeMap<String, f64>>, ComposerError> {
         let mut rows = BTreeMap::new();
         for task_id in &self.eligible_task_ids {
             let mut scores = BTreeMap::new();
@@ -580,9 +574,7 @@ pub fn compose_candidate(
 ) -> Result<ComposedCandidateEvidence, ComposerError> {
     plan.validate()?;
     if receipt_bytes_by_metric.len() != plan.metrics.len()
-        || receipt_bytes_by_metric
-            .keys()
-            .ne(plan.metrics.keys())
+        || receipt_bytes_by_metric.keys().ne(plan.metrics.keys())
     {
         return Err(ComposerError::MetricReceiptSetMismatch);
     }
@@ -705,9 +697,8 @@ pub fn compose_candidate(
     let evidence_manifest = Value::Object(evidence_digests);
     let context_digest = digest_value(&context_manifest)?;
     let evidence_set_digest = digest_value(&evidence_manifest)?;
-    let candidate_identity = shared_candidate_identity.ok_or(
-        ComposerError::CandidateIdentityMismatch,
-    )?;
+    let candidate_identity =
+        shared_candidate_identity.ok_or(ComposerError::CandidateIdentityMismatch)?;
     let candidate_system_identity_digest = digest_value(&candidate_identity)?;
 
     Ok(ComposedCandidateEvidence {
@@ -732,8 +723,7 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
     let benchmark_revision = required_string(benchmark, "revision", "benchmark")?;
     let dataset_manifest_sha256 =
         required_string(benchmark, "dataset_manifest_sha256", "benchmark")?;
-    let scoring_formula_id =
-        required_string(benchmark, "scoring_formula_id", "benchmark")?;
+    let scoring_formula_id = required_string(benchmark, "scoring_formula_id", "benchmark")?;
     let grader_version = required_string(benchmark, "grader_version", "benchmark")?;
     if benchmark_id != projection.benchmark_id
         || benchmark_version != projection.benchmark_version
@@ -785,8 +775,7 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
     let task_results = required_array(value, "task_results", "receipt")?;
     let mut tasks = BTreeMap::new();
     for row in task_results {
-        let task_id =
-            required_string_from_value(row, "task_id", "task_result")?.to_owned();
+        let task_id = required_string_from_value(row, "task_id", "task_result")?.to_owned();
         let input_sha256 =
             required_string_from_value(row, "input_sha256", "task_result")?.to_owned();
         let attempt_state =
@@ -808,7 +797,8 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
                         "a scored task must have a terminal passed/failed disposition".into(),
                     ));
                 }
-                let kind = required_string_from_value(grade_value, "kind", "task grade")?.to_owned();
+                let kind =
+                    required_string_from_value(grade_value, "kind", "task grade")?.to_owned();
                 let score = projection.transform.apply(grade_value)?;
                 (Some(kind), Some(score))
             }
@@ -848,10 +838,7 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
     })
 }
 
-fn summarize(
-    tasks: &BTreeMap<String, TaskMetricOutcome>,
-    eligible_count: usize,
-) -> MetricSummary {
+fn summarize(tasks: &BTreeMap<String, TaskMetricOutcome>, eligible_count: usize) -> MetricSummary {
     let mut score_sum = 0.0_f64;
     let mut graded_count = 0usize;
     let mut disposition_counts = BTreeMap::new();
@@ -962,12 +949,9 @@ fn required_object<'a>(
     key: &str,
     context: &str,
 ) -> Result<&'a Map<String, Value>, ComposerError> {
-    value
-        .get(key)
-        .and_then(Value::as_object)
-        .ok_or_else(|| {
-            ComposerError::InvalidReceiptShape(format!("{context}.{key} must be an object"))
-        })
+    value.get(key).and_then(Value::as_object).ok_or_else(|| {
+        ComposerError::InvalidReceiptShape(format!("{context}.{key} must be an object"))
+    })
 }
 
 fn required_array<'a>(
@@ -975,12 +959,9 @@ fn required_array<'a>(
     key: &str,
     context: &str,
 ) -> Result<&'a Vec<Value>, ComposerError> {
-    value
-        .get(key)
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            ComposerError::InvalidReceiptShape(format!("{context}.{key} must be an array"))
-        })
+    value.get(key).and_then(Value::as_array).ok_or_else(|| {
+        ComposerError::InvalidReceiptShape(format!("{context}.{key} must be an array"))
+    })
 }
 
 fn required_value(
@@ -991,9 +972,7 @@ fn required_value(
     value
         .get(key)
         .cloned()
-        .ok_or_else(|| {
-            ComposerError::InvalidReceiptShape(format!("{context}.{key} is required"))
-        })
+        .ok_or_else(|| ComposerError::InvalidReceiptShape(format!("{context}.{key} is required")))
 }
 
 fn required_value_from_value(
@@ -1001,9 +980,10 @@ fn required_value_from_value(
     key: &str,
     context: &str,
 ) -> Result<Value, ComposerError> {
-    value.get(key).cloned().ok_or_else(|| {
-        ComposerError::InvalidReceiptShape(format!("{context}.{key} is required"))
-    })
+    value
+        .get(key)
+        .cloned()
+        .ok_or_else(|| ComposerError::InvalidReceiptShape(format!("{context}.{key} is required")))
 }
 
 fn required_string_from_value<'a>(
@@ -1032,7 +1012,9 @@ fn required_string<'a>(
         .and_then(Value::as_str)
         .filter(|string| !string.trim().is_empty())
         .ok_or_else(|| {
-            ComposerError::InvalidReceiptShape(format!("{context}.{key} must be a non-empty string"))
+            ComposerError::InvalidReceiptShape(format!(
+                "{context}.{key} must be a non-empty string"
+            ))
         })
 }
 
@@ -1045,7 +1027,10 @@ pub enum ComposerError {
     ReceiptValidation(String),
     InvalidReceiptShape(String),
     InvalidGrade(String),
-    GradeKindMismatch { expected: String, actual: String },
+    GradeKindMismatch {
+        expected: String,
+        actual: String,
+    },
     UnmappedCategory(String),
     CandidateIdentityMismatch,
     IncompatibleMetricRunContext,
@@ -1067,7 +1052,10 @@ pub enum ComposerError {
     ContextMismatch,
     SameCandidate,
     MetricSetMismatch,
-    TaskInputMismatch { metric_id: String, task_id: String },
+    TaskInputMismatch {
+        metric_id: String,
+        task_id: String,
+    },
 }
 
 impl fmt::Display for ComposerError {
@@ -1078,35 +1066,62 @@ impl fmt::Display for ComposerError {
                 write!(f, "missing receipt for metric {metric}")
             }
             Self::MetricReceiptSetMismatch => {
-                write!(f, "receipt metric keys must exactly match the frozen metric plan")
+                write!(
+                    f,
+                    "receipt metric keys must exactly match the frozen metric plan"
+                )
             }
             Self::MetricSourceMismatch(metric) => {
-                write!(f, "receipt benchmark identity does not match metric {metric}")
+                write!(
+                    f,
+                    "receipt benchmark identity does not match metric {metric}"
+                )
             }
             Self::ReceiptValidation(message) => write!(f, "receipt validation failed: {message}"),
             Self::InvalidReceiptShape(message) => write!(f, "invalid receipt shape: {message}"),
             Self::InvalidGrade(message) => write!(f, "invalid task grade: {message}"),
             Self::GradeKindMismatch { expected, actual } => {
-                write!(f, "grade kind mismatch: expected {expected}, received {actual}")
+                write!(
+                    f,
+                    "grade kind mismatch: expected {expected}, received {actual}"
+                )
             }
             Self::UnmappedCategory(label) => write!(f, "unmapped categorical grade: {label}"),
             Self::CandidateIdentityMismatch => {
-                write!(f, "metric receipts do not share one candidate system identity")
+                write!(
+                    f,
+                    "metric receipts do not share one candidate system identity"
+                )
             }
             Self::IncompatibleMetricRunContext => {
-                write!(f, "metric receipts have incompatible cohort, runner, protocol or budget context")
+                write!(
+                    f,
+                    "metric receipts have incompatible cohort, runner, protocol or budget context"
+                )
             }
             Self::TaskUniverseMismatch => {
-                write!(f, "metric receipts do not cover the exact same eligible task universe")
+                write!(
+                    f,
+                    "metric receipts do not cover the exact same eligible task universe"
+                )
             }
             Self::TaskInputUniverseMismatch => {
-                write!(f, "metric receipts use different input bytes for one or more matched task IDs")
+                write!(
+                    f,
+                    "metric receipts use different input bytes for one or more matched task IDs"
+                )
             }
             Self::ClusterMapMismatch => {
-                write!(f, "cluster map must cover exactly the eligible task universe")
+                write!(
+                    f,
+                    "cluster map must cover exactly the eligible task universe"
+                )
             }
             Self::DuplicateEvidenceDigest => {
-                write!(f, "one receipt digest cannot be counted as multiple metrics")
+                write!(
+                    f,
+                    "one receipt digest cannot be counted as multiple metrics"
+                )
             }
             Self::CoverageBelowMinimum {
                 metric_id,
@@ -1131,7 +1146,10 @@ impl fmt::Display for ComposerError {
             Self::SameCandidate => write!(f, "cannot compare a candidate with itself"),
             Self::MetricSetMismatch => write!(f, "candidate metric sets differ"),
             Self::TaskInputMismatch { metric_id, task_id } => {
-                write!(f, "input digest mismatch for metric {metric_id}, task {task_id}")
+                write!(
+                    f,
+                    "input digest mismatch for metric {metric_id}, task {task_id}"
+                )
             }
         }
     }
@@ -1176,7 +1194,8 @@ mod tests {
             benchmark_id: benchmark_id.into(),
             benchmark_version: "0.1".into(),
             benchmark_revision: "fixture-1".into(),
-            dataset_manifest_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            dataset_manifest_sha256:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             scoring_formula_id: "binary-pass-rate-v1".into(),
             grader_version: "fixture-grader-1".into(),
             transform: ScoreTransform::Binary {
@@ -1197,7 +1216,8 @@ mod tests {
         ]);
         CompositionPlan {
             experiment_id: "SYM-RSI-SYNTHETIC-COMPOSER-001".into(),
-            preregistration_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
+            preregistration_digest:
+                "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".into(),
             metrics: metrics
                 .into_iter()
                 .map(|projection| (projection.metric_id.clone(), projection))
@@ -1242,11 +1262,8 @@ mod tests {
             metric("quality", "synthetic-quality", 0.4),
             metric("retention", "synthetic-retention", 0.4),
         ]);
-        let composed = compose_candidate(
-            &plan,
-            &receipt_set("candidate-a", 'a', "a", "disabled"),
-        )
-        .unwrap();
+        let composed =
+            compose_candidate(&plan, &receipt_set("candidate-a", 'a', "a", "disabled")).unwrap();
 
         assert_eq!(composed.eligible_task_ids().len(), 5);
         let quality = composed.metric("quality").unwrap();
@@ -1256,8 +1273,14 @@ mod tests {
         assert!((quality.summary.graded_coverage - 0.4).abs() < 1e-12);
         assert!((quality.summary.coverage_adjusted_yield - 0.4).abs() < 1e-12);
         assert_eq!(quality.summary.disposition_counts.get("refused"), Some(&1));
-        assert_eq!(quality.summary.disposition_counts.get("unsupported"), Some(&1));
-        assert_eq!(quality.summary.disposition_counts.get("not_attempted"), Some(&1));
+        assert_eq!(
+            quality.summary.disposition_counts.get("unsupported"),
+            Some(&1)
+        );
+        assert_eq!(
+            quality.summary.disposition_counts.get("not_attempted"),
+            Some(&1)
+        );
 
         let dimensions = composed.capability_dimensions().unwrap();
         assert_eq!(dimensions["quality"], 1.0);
@@ -1289,11 +1312,9 @@ mod tests {
             metric("quality", "synthetic-quality", 0.4),
             metric("retention", "synthetic-retention", 0.4),
         ]);
-        let parent = compose_candidate(
-            &plan,
-            &receipt_set("parent-rev", 'a', "parent", "disabled"),
-        )
-        .unwrap();
+        let parent =
+            compose_candidate(&plan, &receipt_set("parent-rev", 'a', "parent", "disabled"))
+                .unwrap();
         let candidate = compose_candidate(
             &plan,
             &receipt_set("candidate-rev", 'b', "candidate", "disabled"),
@@ -1310,7 +1331,14 @@ mod tests {
         assert_eq!(quality.parent_only_graded_count, 0);
         assert_eq!(quality.candidate_only_graded_count, 0);
         assert_eq!(quality.mean_delta_on_jointly_graded_tasks, Some(0.0));
-        assert_eq!(quality.by_cluster.get("family-a").unwrap().paired_task_count, 2);
+        assert_eq!(
+            quality
+                .by_cluster
+                .get("family-a")
+                .unwrap()
+                .paired_task_count,
+            2
+        );
     }
 
     #[test]
@@ -1338,10 +1366,7 @@ mod tests {
         .unwrap();
         receipt["benchmark"]["dataset_manifest_sha256"] =
             json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        let receipts = BTreeMap::from([(
-            "quality".into(),
-            serde_json::to_vec(&receipt).unwrap(),
-        )]);
+        let receipts = BTreeMap::from([("quality".into(), serde_json::to_vec(&receipt).unwrap())]);
         assert_eq!(
             compose_candidate(&plan, &receipts),
             Err(ComposerError::MetricSourceMismatch("quality".into()))
@@ -1359,10 +1384,7 @@ mod tests {
             serde_json::from_slice(receipts.get("retention").unwrap()).unwrap();
         retention["task_results"][0]["input_sha256"] =
             json!("eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
-        receipts.insert(
-            "retention".into(),
-            serde_json::to_vec(&retention).unwrap(),
-        );
+        receipts.insert("retention".into(), serde_json::to_vec(&retention).unwrap());
         assert_eq!(
             compose_candidate(&plan, &receipts),
             Err(ComposerError::TaskInputUniverseMismatch)
@@ -1382,7 +1404,8 @@ mod tests {
             Err(ComposerError::ClusterMapMismatch)
         );
 
-        plan.cluster_by_task.insert("extra-task".into(), "family-z".into());
+        plan.cluster_by_task
+            .insert("extra-task".into(), "family-z".into());
         assert_eq!(
             compose_candidate(&plan, &receipts),
             Err(ComposerError::ClusterMapMismatch)
@@ -1396,7 +1419,13 @@ mod tests {
             &plan,
             &BTreeMap::from([(
                 "quality".into(),
-                make_receipt("synthetic-quality", "parent-rev", 'a', "run-parent", "disabled"),
+                make_receipt(
+                    "synthetic-quality",
+                    "parent-rev",
+                    'a',
+                    "run-parent",
+                    "disabled",
+                ),
             )]),
         )
         .unwrap();
@@ -1404,7 +1433,13 @@ mod tests {
             &plan,
             &BTreeMap::from([(
                 "quality".into(),
-                make_receipt("synthetic-quality", "candidate-rev", 'b', "run-child", "allowlisted"),
+                make_receipt(
+                    "synthetic-quality",
+                    "candidate-rev",
+                    'b',
+                    "run-child",
+                    "allowlisted",
+                ),
             )]),
         )
         .unwrap();
