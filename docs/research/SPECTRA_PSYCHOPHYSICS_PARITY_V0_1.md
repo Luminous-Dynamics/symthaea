@@ -27,7 +27,7 @@ The 85% figure is a result within the paper's own tasks and protocol. It is not 
 
 ## 3A. Psyphy (Flatiron Institute): JAX/GPU Bayesian active learning
 
-[Psyphy](https://github.com/flatironinstitute/psyphy) is an open-source JAX framework for psychophysics, using GPU acceleration and approximate inference for Bayesian active-learning experiments. Its current focus is human color perception, with stated adaptation potential to other modalities. Its documentation includes examples on recovering Weber's law, Wishart psychophysical-process modeling and reproducing a 2025 study.
+[Psyphy](https://github.com/flatironinstitute/psyphy) is an open-source JAX framework for psychophysics, using GPU acceleration and approximate inference for Bayesian active-learning experiments. Its current focus is human color perception, with stated adaptation potential to other modalities. The upstream repository declares an MIT license and includes a committed `uv.lock`; record the exact commit and lockfile used rather than relying on a floating main branch. Its documentation includes examples on recovering Weber's law, Wishart psychophysical-process modeling and reproducing a 2025 study.
 
 Include Psyphy as a serious contemporary comparator on its supported color-perception / spatially varying psychophysical tasks. Pin its exact source commit, `uv.lock`, JAX/CUDA stack and data. Its GPU-oriented inference architecture makes it a useful compute/latency comparator against NEST, AEPsych and SPECTRA. Do not assume its present color-perception model or evaluation applies directly to UVSD parameter recovery.
 
@@ -35,14 +35,15 @@ Include Psyphy as a serious contemporary comparator on its supported color-perce
 
 Its documentation describes applications with six or eight stimulus dimensions and positions its models as flexible alternatives to parametric procedures such as QUEST+ and psignifit.
 
-Pin exact package release, model, acquisition function, inference method, configuration and transitive dependencies. The framework is a comparator, not a required SPECTRA production dependency.
+The current PyPI listing identifies AEPsych 0.8.0, released 11 April 2025, and a CC-BY-NC 4.0 license. Pin the package release and upstream source commit separately; record the exact model, acquisition function, inference method, configuration and transitive dependencies. Treat the release age as a maintenance / reproducibility variable, and do not incorporate AEPsych into a commercial SPECTRA production stack without separate legal permission. The framework is a comparator, not a required SPECTRA production dependency.
 
 ## 4. Comparator registry
 
 Include only on tasks where the method's assumptions and estimands apply:
 
-- NEST v0.9.1.
-- AEPsych 0.8.0 (PyPI package) and a separately pinned upstream source commit, with pinned model and acquisition function.
+- NEST v0.9.1 (MIT-licensed public implementation; pin exact tag/commit).
+- AEPsych 0.8.0 (PyPI, CC-BY-NC 4.0) and a separately pinned upstream source commit, with pinned model and acquisition function; comparator-only unless commercial permission is obtained.
+- Psyphy (Flatiron Institute; MIT-licensed, JAX/GPU; pin exact commit and committed `uv.lock`), on its supported color-perception and psychophysical-process tasks.
 - Psyphy with a pinned source commit, `uv.lock`, JAX version and CPU/GPU configuration.
 - QUEST+ and other parametric Bayesian threshold procedures.
 - Psi, Psi-marginal, Psi-grid and Psi-marg-grid.
@@ -122,7 +123,7 @@ Reproduce NEST's AUC-based measures using the same task definitions and integrat
 
 ## 8. Fairness, versioning and reproducibility
 
-- Pin NEST v0.9.1, AEPsych 0.8.0 plus exact upstream commit, Psyphy source commit / `uv.lock` / JAX and CUDA configuration, QUEST+/Psi implementation and all transitive dependencies.
+- Pin NEST v0.9.1 and its MIT license; AEPsych 0.8.0 plus exact upstream commit and CC-BY-NC 4.0 license; Psyphy source commit / `uv.lock` / JAX and CUDA configuration and MIT license; QUEST+/Psi implementation and all transitive dependencies. Record license compatibility separately from scientific performance.
 - Give every comparator equal access to development data and comparable tuning budgets.
 - Do not use oracle parameters, test seeds or evaluator-only stress worlds in model selection or hyperparameter tuning.
 - Preserve numerical failures, convergence failures, timeouts and unsupported settings in denominators.
