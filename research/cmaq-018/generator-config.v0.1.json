@@ -1,0 +1,71 @@
+{
+  "schema_version": "cmaq-018-generator-config-v0.1",
+  "base_seed_hex": "0xC0A9001820261031",
+  "episodes_per_scenario": 64,
+  "scenario_count": 7,
+  "total_scenario_episode_cases": 448,
+  "seed_derivation": "base XOR ((episode_index * 0x9E3779B97F4A7C15) mod 2^64)",
+  "rng_streams": {
+    "observation": "seed XOR 0x018B12A7",
+    "hidden_regime": "seed XOR 0xA11C0180",
+    "common_disturbance": "seed XOR 0xD1570180"
+  },
+  "common_random_numbers": "one evaluator-owned disturbance draw is shared across all action branches in an episode",
+  "scenarios": [
+    "null_effect",
+    "monotone",
+    "non_monotone",
+    "state_dependent_reversal",
+    "action_interaction",
+    "termination_seam",
+    "hidden_regime"
+  ],
+  "action_bank": [
+    {
+      "id": 0,
+      "force_milli": 0,
+      "grip_milli": 0
+    },
+    {
+      "id": 1,
+      "force_milli": 250,
+      "grip_milli": 0
+    },
+    {
+      "id": 2,
+      "force_milli": 500,
+      "grip_milli": 0
+    },
+    {
+      "id": 3,
+      "force_milli": 750,
+      "grip_milli": 0
+    },
+    {
+      "id": 4,
+      "force_milli": 1000,
+      "grip_milli": 0
+    },
+    {
+      "id": 5,
+      "force_milli": 500,
+      "grip_milli": 1000
+    },
+    {
+      "id": 6,
+      "force_milli": 1000,
+      "grip_milli": 1000
+    }
+  ],
+  "candidate_visible_history_fields": [
+    "x",
+    "v"
+  ],
+  "evaluator_only_fields": [
+    "history_id",
+    "hidden_regime_positive",
+    "common_disturbance",
+    "scenario",
+    "realized_branch_outcomes"
+  ]
+}

@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cmaq-018-report-v0.1.json",
+  "title": "CMAQ-018 Matched-History Counterfactual Branch Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "episode_count",
+    "action_count",
+    "pair_count_per_episode",
+    "seed",
+    "scenarios",
+    "models",
+    "actions",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "cmaq-018-counterfactual-branch-fidelity-v0.1"
+    },
+    "episode_count": {
+      "const": 64
+    },
+    "action_count": {
+      "const": 7
+    },
+    "pair_count_per_episode": {
+      "const": 21
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "scenarios": {
+      "const": [
+        "null_effect",
+        "monotone",
+        "non_monotone",
+        "state_dependent_reversal",
+        "action_interaction",
+        "termination_seam",
+        "hidden_regime"
+      ]
+    },
+    "models": {
+      "const": [
+        "point_outcome",
+        "explicit_effect_head",
+        "shuffled_action_labels",
+        "support_aware_point",
+        "oracle"
+      ]
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "force",
+          "grip",
+          "training_supported"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "force": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "grip": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "training_supported": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "array",
+      "minItems": 35,
+      "maxItems": 35,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario",
+          "model",
+          "episode_count",
+          "pair_count_per_episode",
+          "mean_pair_coverage",
+          "mean_effect_sign_accuracy",
+          "mean_effect_magnitude_mae",
+          "mean_rank_tau_b",
+          "mean_top1_regret",
+          "mean_null_false_effect_rate",
+          "mean_branch_coverage",
+          "mean_branch_outcome_mae",
+          "mean_branch_state_mae",
+          "mean_terminal_false_safe_rate",
+          "mean_branch_prediction_evaluations",
+          "mean_pair_effect_evaluations",
+          "mean_oracle_branch_evaluations",
+          "effect_sign_accuracy_ci95_lower",
+          "effect_sign_accuracy_ci95_upper",
+          "effect_magnitude_mae_ci95_lower",
+          "effect_magnitude_mae_ci95_upper",
+          "rank_tau_b_ci95_lower",
+          "rank_tau_b_ci95_upper",
+          "top1_regret_ci95_lower",
+          "top1_regret_ci95_upper",
+          "terminal_false_safe_rate_ci95_lower",
+          "terminal_false_safe_rate_ci95_upper",
+          "effect_sign_accuracy_episode_count",
+          "effect_magnitude_mae_episode_count",
+          "rank_tau_b_episode_count",
+          "top1_regret_episode_count",
+          "terminal_false_safe_rate_episode_count",
+          "null_false_effect_episode_count",
+          "null_false_effect_rate_ci95_lower",
+          "null_false_effect_rate_ci95_upper",
+          "branch_outcome_mae_episode_count",
+          "branch_state_mae_episode_count"
+        ],
+        "properties": {
+          "scenario": {
+            "enum": [
+              "null_effect",
+              "monotone",
+              "non_monotone",
+              "state_dependent_reversal",
+              "action_interaction",
+              "termination_seam",
+              "hidden_regime"
+            ]
+          },
+          "model": {
+            "enum": [
+              "point_outcome",
+              "explicit_effect_head",
+              "shuffled_action_labels",
+              "support_aware_point",
+              "oracle"
+            ]
+          },
+          "episode_count": {
+            "const": 64
+          },
+          "pair_count_per_episode": {
+            "const": 21
+          },
+          "mean_pair_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_effect_sign_accuracy": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_effect_magnitude_mae": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_rank_tau_b": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "mean_top1_regret": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_null_false_effect_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_branch_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_branch_outcome_mae": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_branch_state_mae": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "mean_terminal_false_safe_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "mean_branch_prediction_evaluations": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_pair_effect_evaluations": {
+            "type": "number",
+            "minimum": 0
+          },
+          "mean_oracle_branch_evaluations": {
+            "type": "number",
+            "minimum": 0
+          },
+          "effect_sign_accuracy_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "effect_sign_accuracy_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "effect_magnitude_mae_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "effect_magnitude_mae_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "rank_tau_b_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "rank_tau_b_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "top1_regret_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "top1_regret_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "terminal_false_safe_rate_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "terminal_false_safe_rate_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "effect_sign_accuracy_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "effect_magnitude_mae_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "rank_tau_b_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "top1_regret_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "terminal_false_safe_rate_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "null_false_effect_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "null_false_effect_rate_ci95_lower": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "null_false_effect_rate_ci95_upper": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "branch_outcome_mae_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          },
+          "branch_state_mae_episode_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 64
+          }
+        }
+      }
+    }
+  }
+}
