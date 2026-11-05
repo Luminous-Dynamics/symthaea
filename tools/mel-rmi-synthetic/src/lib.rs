@@ -890,24 +890,24 @@ pub fn canonical_fixture_replicates_v1(replicates_per_dimension: usize) -> Vec<S
             let mut task = base_fixture.task.clone();
             task.task_id = task_id.clone();
             let observation = |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
-                    event_id: format!("{task_id}-{suffix}"),
-                    session_id: format!("synthetic-session-{dimension_index}-{replicate}"),
-                    history_id: format!("synthetic-history-{dimension_index}-{replicate}"),
-                    task_id: task_id.clone(),
-                    seed: task_seed as u64,
-                    initial_partner_feature: Feature {
-                        dimension: task.target_dimension,
-                        value: baseline,
-                    },
-                    current_partner_feature: Feature {
-                        dimension: task.target_dimension,
-                        value: target_value,
-                    },
-                    unrelated_feature: Feature {
-                        dimension: task.unrelated_dimension,
-                        value: unrelated_value,
-                    },
-                };
+                event_id: format!("{task_id}-{suffix}"),
+                session_id: format!("synthetic-session-{dimension_index}-{replicate}"),
+                history_id: format!("synthetic-history-{dimension_index}-{replicate}"),
+                task_id: task_id.clone(),
+                seed: task_seed as u64,
+                initial_partner_feature: Feature {
+                    dimension: task.target_dimension,
+                    value: baseline,
+                },
+                current_partner_feature: Feature {
+                    dimension: task.target_dimension,
+                    value: target_value,
+                },
+                unrelated_feature: Feature {
+                    dimension: task.unrelated_dimension,
+                    value: unrelated_value,
+                },
+            };
 
             expanded.push(SyntheticFixtureV1 {
                 task,
