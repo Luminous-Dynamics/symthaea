@@ -9,3 +9,6 @@ description = "Standalone qualification harness for Symthaea's shared exact sign
 [workspace]
 members = ["."]
 resolver = "2"
+
+[dependencies]
+symthaea-statistics = { path = "../../crates/domains/symthaea-statistics" }
