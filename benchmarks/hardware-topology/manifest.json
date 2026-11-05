@@ -1,0 +1,545 @@
+{
+  "benchmark_id": "HARDWARE-TOPOLOGY-001",
+  "version": "0.1.0",
+  "updated_at": "2026-11-05",
+  "status": "public_blueprint_specification_only",
+  "task_count": 20,
+  "task_families": [
+    {
+      "id": "mechanical-assembly",
+      "name": "Mechanical assembly pose, mating and clearance",
+      "case_ids": [
+        "ASM-P01",
+        "ASM-P02",
+        "ASM-P03",
+        "ASM-N01",
+        "ASM-N02",
+        "ASM-N03",
+        "ASM-N04",
+        "ASM-N05"
+      ]
+    },
+    {
+      "id": "ecad-connectivity",
+      "name": "ECAD pin-to-net and layer/via connectivity",
+      "case_ids": [
+        "ECAD-P01",
+        "ECAD-N01",
+        "ECAD-N02",
+        "ECAD-N03",
+        "ECAD-N04",
+        "ECAD-N05"
+      ]
+    },
+    {
+      "id": "manufacturing-feasibility",
+      "name": "Manufacturing, tolerance, assembly access and inspection",
+      "case_ids": [
+        "MFG-N01",
+        "MFG-N02",
+        "MFG-N03",
+        "MFG-N04",
+        "MFG-N05",
+        "MFG-N06"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "ASM-P01",
+      "family_id": "mechanical-assembly",
+      "title": "Six-part instrument support frame",
+      "candidate_visible_scenario": "Reconstruct a six-part support frame from exact component identities, datum references and assembly dimensions. Nominal geometry includes a base plate, two posts, top beam, rear tie and handed gussets.",
+      "changed_subjects": [
+        "part_variant_identity",
+        "global_frame",
+        "rigid_transforms",
+        "mating_constraints",
+        "clearance"
+      ],
+      "evaluation_axes": [
+        "component_completeness",
+        "pose_error",
+        "datum_mating_satisfaction",
+        "interference",
+        "assembly_envelope"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-P02",
+      "family_id": "mechanical-assembly",
+      "title": "Bearing and shaft alignment",
+      "candidate_visible_scenario": "Reconstruct two bearing pedestals, two exact bearing variants, a shaft, keyed hub and coupling; compare shaft and bore axes.",
+      "changed_subjects": [
+        "bearing_variant",
+        "shaft_axis",
+        "bore_axis",
+        "key_orientation"
+      ],
+      "evaluation_axes": [
+        "coaxiality",
+        "engagement_length",
+        "axis_alignment",
+        "part_identity"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-P03",
+      "family_id": "mechanical-assembly",
+      "title": "Symmetry-equivalent spacer placement",
+      "candidate_visible_scenario": "Place two geometrically identical spacers in a symmetric assembly where available evidence does not identify left/right instance assignment.",
+      "changed_subjects": [
+        "symmetry_group",
+        "instance_identity",
+        "datum_constraints"
+      ],
+      "evaluation_axes": [
+        "symmetry_aware_pose_equivalence",
+        "ambiguity_handling",
+        "abstention_quality"
+      ],
+      "critical_control": false,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-N01",
+      "family_id": "mechanical-assembly",
+      "title": "Asymmetric component reversed",
+      "candidate_visible_scenario": "Reverse a keyed/asymmetric gusset or brace while retaining a similar bounding box and component shape.",
+      "changed_subjects": [
+        "asymmetric_orientation",
+        "keyed_feature",
+        "handed_variant"
+      ],
+      "evaluation_axes": [
+        "pose_error",
+        "mating_constraints",
+        "false_accept_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-N02",
+      "family_id": "mechanical-assembly",
+      "title": "Datum displacement",
+      "candidate_visible_scenario": "Offset one bearing or support datum while preserving all part geometry.",
+      "changed_subjects": [
+        "datum_position",
+        "reference_frame"
+      ],
+      "evaluation_axes": [
+        "datum_mismatch_detection",
+        "assembly_interface_error"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-N03",
+      "family_id": "mechanical-assembly",
+      "title": "Collision and clearance violation",
+      "candidate_visible_scenario": "Shift an otherwise correctly placed spacer into a declared keep-out envelope by a small measurable amount.",
+      "changed_subjects": [
+        "keepout_envelope",
+        "component_transform"
+      ],
+      "evaluation_axes": [
+        "collision_detection",
+        "clearance_measurement",
+        "false_accept_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-N04",
+      "family_id": "mechanical-assembly",
+      "title": "Missing duplicate or incompatible part",
+      "candidate_visible_scenario": "Omit a critical fastener, duplicate a post, or substitute a visually similar bearing with a different bore or width.",
+      "changed_subjects": [
+        "component_count",
+        "component_variant",
+        "assembly_bom"
+      ],
+      "evaluation_axes": [
+        "completeness",
+        "duplicate_detection",
+        "variant_identity",
+        "false_accept_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ASM-N05",
+      "family_id": "mechanical-assembly",
+      "title": "BOM revision mismatch",
+      "candidate_visible_scenario": "Use geometrically equivalent article geometry under a superseded or unapproved component revision.",
+      "changed_subjects": [
+        "manufacturer_part_number",
+        "hardware_revision",
+        "approved_substitution"
+      ],
+      "evaluation_axes": [
+        "article_identity",
+        "substitution_policy",
+        "traceability"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ECAD-P01",
+      "family_id": "ecad-connectivity",
+      "title": "Low-voltage sensor-controller board",
+      "candidate_visible_scenario": "Recover component references, package pin identities and the exact pin-to-net partition for a synthetic two-layer sensor/controller board.",
+      "changed_subjects": [
+        "board_revision",
+        "library_revision",
+        "component_refs",
+        "pin_map",
+        "layer_via_topology"
+      ],
+      "evaluation_axes": [
+        "component_identity",
+        "pin_to_net_exactness",
+        "net_partition_equivalence",
+        "no_connect_semantics"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ECAD-N01",
+      "family_id": "ecad-connectivity",
+      "title": "Critical power rail short",
+      "candidate_visible_scenario": "Merge VIN, +3V3 and GND into one candidate net.",
+      "changed_subjects": [
+        "net_partition",
+        "power_rail_aliases"
+      ],
+      "evaluation_axes": [
+        "critical_short_detection",
+        "false_negative_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ECAD-N02",
+      "family_id": "ecad-connectivity",
+      "title": "Critical power rail open",
+      "candidate_visible_scenario": "Split a required MCU VDD pin from +3V3 while the top-layer render appears continuous.",
+      "changed_subjects": [
+        "net_partition",
+        "pin_to_net_map"
+      ],
+      "evaluation_axes": [
+        "critical_open_detection",
+        "false_negative_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ECAD-N03",
+      "family_id": "ecad-connectivity",
+      "title": "Visual crossing without junction",
+      "candidate_visible_scenario": "Two same-layer traces cross in a render but no electrical junction/node is present.",
+      "changed_subjects": [
+        "trace_geometry",
+        "junction_semantics",
+        "layer_identity"
+      ],
+      "evaluation_axes": [
+        "false_connection_rate",
+        "net_partition_equivalence"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ECAD-N04",
+      "family_id": "ecad-connectivity",
+      "title": "Via and layer connectivity",
+      "candidate_visible_scenario": "Compare a declared via connecting top/bottom copper with a near-identical crossing lacking a via; hide via evidence in one variant.",
+      "changed_subjects": [
+        "layer_stack",
+        "via_identity",
+        "visible_evidence_coverage"
+      ],
+      "evaluation_axes": [
+        "layer_connectivity",
+        "unknown_handling",
+        "false_connection_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "ECAD-N05",
+      "family_id": "ecad-connectivity",
+      "title": "Swapped pin map and no-connect ambiguity",
+      "candidate_visible_scenario": "Exchange pin identities on a visually identical package and distinguish explicit NC from unreadable or missing pin evidence.",
+      "changed_subjects": [
+        "device_library_revision",
+        "pin_map",
+        "no_connect_state"
+      ],
+      "evaluation_axes": [
+        "pin_identity",
+        "no_connect_vs_unknown",
+        "abstention_quality"
+      ],
+      "critical_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "MFG-N01",
+      "family_id": "manufacturing-feasibility",
+      "title": "Unavailable process capability",
+      "candidate_visible_scenario": "Request a PCB stack-up, plating, surface finish or feature size outside the exact selected route capability.",
+      "changed_subjects": [
+        "process_route",
+        "machine_capability_profile",
+        "board_stackup"
+      ],
+      "evaluation_axes": [
+        "route_feasibility",
+        "unsupported_disposition",
+        "false_accept_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "MFG-N02",
+      "family_id": "manufacturing-feasibility",
+      "title": "Impossible tolerance or tolerance-stack conflict",
+      "candidate_visible_scenario": "Specify an acceptance tolerance tighter than the admitted process/measurement capability or mutually incompatible stack constraints.",
+      "changed_subjects": [
+        "tolerance_profile",
+        "process_capability",
+        "measurement_uncertainty"
+      ],
+      "evaluation_axes": [
+        "feasibility",
+        "tolerance_stack",
+        "no_silent_relaxation"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "MFG-N03",
+      "family_id": "manufacturing-feasibility",
+      "title": "Inaccessible fastener or connector",
+      "candidate_visible_scenario": "A geometrically correct assembly blocks the declared tool approach, fastening sequence or connector mating envelope.",
+      "changed_subjects": [
+        "assembly_sequence",
+        "tool_access_envelope",
+        "service_access"
+      ],
+      "evaluation_axes": [
+        "assembly_access",
+        "process_feasibility",
+        "interference"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "MFG-N04",
+      "family_id": "manufacturing-feasibility",
+      "title": "Unapproved component substitution",
+      "candidate_visible_scenario": "A visually/geometrically similar part changes protected part number, material, rating or revision without an approved equivalence witness.",
+      "changed_subjects": [
+        "component_variant",
+        "material_state",
+        "substitution_authority"
+      ],
+      "evaluation_axes": [
+        "substitution_policy",
+        "claim_applicability",
+        "false_accept_rate"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "MFG-N05",
+      "family_id": "manufacturing-feasibility",
+      "title": "Missing or stale inspection calibration",
+      "candidate_visible_scenario": "An assembly is complete but the measurement used for acceptance is missing, stale or outside its calibration/currentness profile.",
+      "changed_subjects": [
+        "instrument_identity",
+        "calibration_profile",
+        "inspection_receipt"
+      ],
+      "evaluation_axes": [
+        "evidence_completeness",
+        "measurement_applicability",
+        "stale_evidence_detection"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    },
+    {
+      "id": "MFG-N06",
+      "family_id": "manufacturing-feasibility",
+      "title": "Configuration drift after evidence capture",
+      "candidate_visible_scenario": "Change the fixture, board revision, manufacturing route or process recipe after commissioning/inspection evidence was produced.",
+      "changed_subjects": [
+        "configuration_generation",
+        "process_recipe",
+        "fixture_identity"
+      ],
+      "evaluation_axes": [
+        "currentness_review",
+        "historical_evidence_preservation",
+        "requalification_obligations"
+      ],
+      "critical_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "materialization_status": "blueprint_only",
+      "terminal_disposition_contract": "per_subject_and_claim"
+    }
+  ],
+  "terminal_dispositions": [
+    "AcceptedWithinDeclaredContract",
+    "Rejected",
+    "UnknownNeedsEvidence",
+    "Unsupported",
+    "Infeasible",
+    "EvidenceIncomplete"
+  ],
+  "score_dimensions": [
+    "component_identity",
+    "assembly_pose_and_mating",
+    "interference_and_clearance",
+    "pin_to_net_connectivity",
+    "critical_short_open_detection",
+    "manufacturing_feasibility",
+    "metrology_and_inspection_applicability",
+    "ambiguity_handling",
+    "integrity"
+  ],
+  "hard_gates": [
+    "zero_false_pass_on_critical_pose_mating_or_clearance_controls",
+    "zero_false_pass_on_authored_critical_short_open_controls",
+    "zero_unapproved_component_substitution_acceptances",
+    "no_reconstruction_score_promotes_manufacturing_or_physical_qualification"
+  ],
+  "external_comparator": {
+    "id": "benchcad-2.0",
+    "official_protocol_version": "v2.0",
+    "published_reference_harness_v2_1_not_comparable": true,
+    "core_access_agreement_required": true,
+    "public_cases_not_reportable": true,
+    "metadata_registry": "https://github.com/Luminous-Dynamics/symthaea/blob/research/ple-external-registry-v0-1/benchmarks/manifest.json"
+  },
+  "ownership": {
+    "workcell_digital_thread": "https://github.com/Luminous-Dynamics/symthaea/issues/6040",
+    "component_identity": "https://github.com/Luminous-Dynamics/symthaea/issues/4877",
+    "as_built_realization": "https://github.com/Luminous-Dynamics/symthaea/issues/4859",
+    "tolerance_metrology": "https://github.com/Luminous-Dynamics/symthaea/issues/4883",
+    "pcb_manufacturing": "https://github.com/Luminous-Dynamics/symthaea/issues/8223",
+    "emc_si_pi": "https://github.com/Luminous-Dynamics/symthaea/issues/6179",
+    "circuit_simulation": "https://github.com/Luminous-Dynamics/symthaea/issues/5633",
+    "geometry_identity": "https://github.com/Luminous-Dynamics/symthaea/issues/4927",
+    "manufacturing_value": "https://github.com/Luminous-Dynamics/symthaea/issues/7608"
+  },
+  "custody": {
+    "candidate_visible_blueprints": true,
+    "gold_labels_adjudicated": false,
+    "sealed_holdout_created": false,
+    "external_public_task_material_downloaded": false,
+    "core_task_material_downloaded": false,
+    "execution_authorized": false,
+    "physical_testing_authorized": false
+  },
+  "claim_ceiling": "Public fixture blueprints only. No CAD/ECAD artifact, pose score, netlist score, manufacturing feasibility, product conformity, electrical safety, mechanical safety or physical qualification is established."
+}
