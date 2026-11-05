@@ -211,8 +211,8 @@ pub struct VetoReceipt {
     pub turn_id: String,
     /// Pseudonymous participant reference.
     pub participant_id: String,
-    /// Result from the trusted authority boundary.
-    pub authority_valid: bool,
+    /// Opaque reference to the trusted signed authority receipt.
+    pub authority_receipt_ref: String,
     /// Monotonic control sequence.
     pub control_sequence: u64,
     /// State before the veto.
@@ -223,6 +223,30 @@ pub struct VetoReceipt {
     pub discarded_unconsumed_notes: u64,
     /// Exact pending application frames invalidated.
     pub discarded_application_frames: u64,
+}
+
+/// Exact scope passed to the trusted VETO authority verifier.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VetoAuthorization<'a> {
+    /// Session identity.
+    pub session_id: &'a str,
+    /// Turn identity.
+    pub turn_id: &'a str,
+    /// Pseudonymous participant reference.
+    pub participant_id: &'a str,
+    /// Monotonic control sequence.
+    pub control_sequence: u64,
+    /// Opaque signed authority receipt reference.
+    pub authority_receipt_ref: &'a str,
+}
+
+/// Explicit dependency on the trusted identity/consent verifier.
+///
+/// Production adapters must validate signature, actor, session/turn, operation
+/// and purpose. A permissive verifier is suitable only for synthetic tests.
+pub trait VetoAuthorityVerifier {
+    /// Verify the exact VETO scope; rejection must fail closed.
+    fn verify_veto(&self, authorization: VetoAuthorization<'_>) -> Result<(), LedgerError>;
 }
 
 /// Reducer input event.
@@ -310,6 +334,8 @@ pub enum LedgerError {
     AuthorizationExpired,
     /// Trusted authority boundary rejected the veto.
     VetoAuthorityRejected,
+    /// VETO cannot be applied through the unauthenticated reducer entry point.
+    VetoVerifierUnavailable,
     /// Veto did not advance epoch and invalidate exact pending work.
     InvalidVetoTransition,
     /// An effect was applied to a non-RESPOND action.
@@ -454,9 +480,37 @@ impl ActionEffectLedger {
         &self.state
     }
 
-    /// Apply one event. Exact replays are idempotent. Invalid transitions do
-    /// not advance order or mutate state.
+    /// Apply a non-VETO event. VETO is unavailable here because no trusted
+    /// authority verifier has been supplied.
     pub fn apply(&mut self, event: LedgerEvent) -> Result<(), LedgerError> {
+        self.apply_inner(event, false)
+    }
+
+    /// Apply an event with an explicit trusted authority verifier for VETO.
+    pub fn apply_with_authority_verifier(
+        &mut self,
+        event: LedgerEvent,
+        verifier: &dyn VetoAuthorityVerifier,
+    ) -> Result<(), LedgerError> {
+        if let EventKind::VetoApplied(receipt) = &event.kind {
+            verifier.verify_veto(VetoAuthorization {
+                session_id: &receipt.session_id,
+                turn_id: &receipt.turn_id,
+                participant_id: &receipt.participant_id,
+                control_sequence: receipt.control_sequence,
+                authority_receipt_ref: &receipt.authority_receipt_ref,
+            })?;
+            self.apply_inner(event, true)
+        } else {
+            self.apply_inner(event, false)
+        }
+    }
+
+    fn apply_inner(
+        &mut self,
+        event: LedgerEvent,
+        veto_authority_verified: bool,
+    ) -> Result<(), LedgerError> {
         if event.event_id.trim().is_empty() {
             return Err(LedgerError::EmptyIdentity);
         }
@@ -504,7 +558,9 @@ impl ActionEffectLedger {
             )?,
             EventKind::ContinueApplied(receipt) => self.apply_continue(receipt)?,
             EventKind::YieldApplied(receipt) => self.apply_yield(receipt)?,
-            EventKind::VetoApplied(receipt) => self.apply_veto(receipt)?,
+            EventKind::VetoApplied(receipt) => {
+                self.apply_veto(receipt, veto_authority_verified)?
+            },
             EventKind::EffectObserved(receipt) => self.apply_effect(receipt)?,
             EventKind::FinalizeTurn {
                 session_id,
@@ -756,15 +812,19 @@ impl ActionEffectLedger {
         Ok(())
     }
 
-    fn apply_veto(&mut self, receipt: &VetoReceipt) -> Result<(), LedgerError> {
+    fn apply_veto(
+        &mut self,
+        receipt: &VetoReceipt,
+        authority_verified: bool,
+    ) -> Result<(), LedgerError> {
+        if !authority_verified {
+            return Err(LedgerError::VetoVerifierUnavailable);
+        }
         if receipt.session_id != self.session_id || receipt.turn_id != self.turn_id {
             return Err(LedgerError::SessionTurnMismatch);
         }
         if receipt.participant_id.trim().is_empty() {
             return Err(LedgerError::EmptyIdentity);
-        }
-        if !receipt.authority_valid {
-            return Err(LedgerError::VetoAuthorityRejected);
         }
         if receipt.control_sequence <= self.last_control_sequence {
             return Err(LedgerError::StaleControlSequence);
@@ -1077,6 +1137,31 @@ mod tests {
     const ARTIFACT: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const BRIDGE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const LOOPBACK: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+
+    struct AcceptVetoVerifier;
+
+    impl VetoAuthorityVerifier for AcceptVetoVerifier {
+        fn verify_veto(&self, authorization: VetoAuthorization<'_>) -> Result<(), LedgerError> {
+            if authorization.session_id == "session-1"
+                && authorization.turn_id == "turn-1"
+                && !authorization.participant_id.is_empty()
+                && !authorization.authority_receipt_ref.is_empty()
+                && authorization.control_sequence > 0
+            {
+                Ok(())
+            } else {
+                Err(LedgerError::VetoAuthorityRejected)
+            }
+        }
+    }
+
+    struct RejectVetoVerifier;
+
+    impl VetoAuthorityVerifier for RejectVetoVerifier {
+        fn verify_veto(&self, _authorization: VetoAuthorization<'_>) -> Result<(), LedgerError> {
+            Err(LedgerError::VetoAuthorityRejected)
+        }
+    }
 
     fn initial_state() -> OutputState {
         OutputState {
@@ -1411,7 +1496,7 @@ mod tests {
                     session_id: "session-1".into(),
                     turn_id: "turn-1".into(),
                     participant_id: "performer-1".into(),
-                    authority_valid: false,
+                    authority_receipt_ref: "rejected-veto-ref".into(),
                     control_sequence: 1,
                     before,
                     after,
@@ -1438,7 +1523,7 @@ mod tests {
                     session_id: "session-1".into(),
                     turn_id: "turn-1".into(),
                     participant_id: "performer-1".into(),
-                    authority_valid: true,
+                    authority_receipt_ref: "signed-veto-ref-1".into(),
                     control_sequence: 2,
                     before,
                     after,
@@ -1831,7 +1916,7 @@ mod tests {
                     session_id: "session-1".into(),
                     turn_id: "turn-1".into(),
                     participant_id: "performer-1".into(),
-                    authority_valid: true,
+                    authority_receipt_ref: "signed-veto-ref-1".into(),
                     control_sequence: 2,
                     before,
                     after,
@@ -1880,7 +1965,7 @@ mod tests {
                     session_id: "session-1".into(),
                     turn_id: "turn-1".into(),
                     participant_id: "performer-1".into(),
-                    authority_valid: true,
+                    authority_receipt_ref: "signed-veto-ref-1".into(),
                     control_sequence: 2,
                     before,
                     after,
