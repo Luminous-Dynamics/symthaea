@@ -44,7 +44,7 @@ impl Scenario {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Policy {
-    DirectPolicy,
+    Direct,
     DirectSearchControl,
     RandomPointSearch,
     AdaptivePointCem,
@@ -56,7 +56,7 @@ enum Policy {
 
 impl Policy {
     const ALL: [Self; 8] = [
-        Self::DirectPolicy,
+        Self::Direct,
         Self::DirectSearchControl,
         Self::RandomPointSearch,
         Self::AdaptivePointCem,
@@ -68,7 +68,7 @@ impl Policy {
 
     fn name(self) -> &'static str {
         match self {
-            Self::DirectPolicy => "direct_policy",
+            Self::Direct => "direct_policy",
             Self::DirectSearchControl => "direct_search_control",
             Self::RandomPointSearch => "random_point_search",
             Self::AdaptivePointCem => "adaptive_point_cem",
@@ -100,7 +100,7 @@ impl Policy {
             Self::RandomPointSearch
             | Self::AdaptivePointCem
             | Self::ShuffledFutureNegativeControl => 1,
-            Self::DirectPolicy | Self::DirectSearchControl | Self::OracleCem => 0,
+            Self::Direct | Self::DirectSearchControl | Self::OracleCem => 0,
         }
     }
 }
@@ -460,7 +460,7 @@ fn plan_actions(
     candidate_budget: usize,
     decision_seed: u64,
 ) -> Plan {
-    if policy == Policy::DirectPolicy {
+    if policy == Policy::Direct {
         return Plan {
             actions: vec![direct_action(state); horizon],
             predicted_prefix_return: None,
@@ -621,7 +621,7 @@ fn run_episode(
 
         let mut actual_block_return = 0.0;
         for index in 0..block_len {
-            let action = if policy == Policy::DirectPolicy {
+            let action = if policy == Policy::Direct {
                 direct_action(state)
             } else {
                 plan.actions[index]
@@ -1052,7 +1052,7 @@ mod tests {
     fn direct_policy_has_no_candidate_or_model_query_cost() {
         let plan = plan_actions(
             Scenario::Benign,
-            Policy::DirectPolicy,
+            Policy::Direct,
             State { x: -0.2, v: 0.0 },
             0,
             4,
