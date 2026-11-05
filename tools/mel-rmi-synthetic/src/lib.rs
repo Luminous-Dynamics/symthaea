@@ -7,6 +7,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use sha2::{Digest, Sha256};
+
 /// Version of the synthetic trial-manifest schema.
 pub const RMI_SCHEMA_VERSION: u16 = 1;
 /// Version of the separately reported causal-contrast metrics.
@@ -528,6 +530,241 @@ pub struct CausalContrast {
     pub qualified_synthetic_contingency: bool,
 }
 
+/// Stable file/media representation for one exact artifact byte stream.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ArtifactFormatV1 {
+    /// Canonical symbolic score representation.
+    ScoreJson,
+    /// Standard MIDI file bytes.
+    Midi,
+    /// WAV container bytes.
+    Wav,
+    /// Interleaved little-endian f32 PCM bytes.
+    PcmF32Le,
+}
+
+/// Exact bytes for one artifact, supplied by the Studio-owned artifact loader.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArtifactPayloadV1 {
+    /// Declared representation of these exact bytes.
+    pub format: ArtifactFormatV1,
+    /// Exact stored bytes; never a path, URL, or caller-supplied digest.
+    pub bytes: Vec<u8>,
+}
+
+/// Exact artifact set and transaction-receipt bytes for one RMI event.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArtifactPayloadSetV1 {
+    /// Input or output event to which these bytes are bound.
+    pub event_id: String,
+    /// Exact serialized Studio transaction receipt bytes.
+    ///
+    /// This is hashed for lineage. Hashing does not verify a signature,
+    /// authenticate an actor, or establish consent.
+    pub transaction_receipt_bytes: Vec<u8>,
+    /// One or more exact artifacts produced/consumed by the transaction.
+    pub artifacts: Vec<ArtifactPayloadV1>,
+}
+
+/// SHA-256 identity of exact artifact bytes.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArtifactDigestV1 {
+    /// Artifact representation.
+    pub format: ArtifactFormatV1,
+    /// Lowercase 64-character SHA-256 hex digest.
+    pub sha256_hex: String,
+    /// Exact byte length hashed.
+    pub byte_len: u64,
+}
+
+/// Content digest evidence for one event and its Studio receipt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ArtifactSetEvidenceV1 {
+    /// Event identity in the RMI event ledger.
+    pub event_id: String,
+    /// SHA-256 of the exact serialized Studio transaction receipt bytes.
+    pub transaction_receipt_sha256: String,
+    /// Sorted content identities for every artifact in the set.
+    pub artifacts: Vec<ArtifactDigestV1>,
+}
+
+/// Content-addressed artifact evidence attached to one RMI trial.
+///
+/// This proves byte equality on independent re-read. It does not prove
+/// authorship, rights, identity, consent, or the trustworthiness of the
+/// Studio transaction signer.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrialArtifactBindingsV1 {
+    /// Identity of the verifier implementation selected by the caller.
+    pub verifier_id: String,
+    /// Immutable verifier version selected by the caller.
+    pub verifier_version: String,
+    /// Four input artifact sets in canonical condition order.
+    pub inputs: [ArtifactSetEvidenceV1; 4],
+    /// Four output artifact sets in canonical condition order.
+    pub outputs: [ArtifactSetEvidenceV1; 4],
+}
+
+impl TrialArtifactBindingsV1 {
+    /// Validate digest syntax, unique formats, and event lineage against a
+    /// trial's immutable manifest.
+    pub fn validate(&self, manifest: &TrialManifestV1) -> Result<(), HarnessError> {
+        if self.verifier_id.trim().is_empty() || self.verifier_version.trim().is_empty() {
+            return Err(HarnessError::InvalidArtifactVerifier);
+        }
+        for (index, evidence) in self.inputs.iter().enumerate() {
+            validate_artifact_evidence(evidence)?;
+            if evidence.event_id != manifest.input_event_ids[index] {
+                return Err(HarnessError::ArtifactEventMismatch);
+            }
+        }
+        for (index, evidence) in self.outputs.iter().enumerate() {
+            validate_artifact_evidence(evidence)?;
+            if evidence.event_id != manifest.output_event_ids[index] {
+                return Err(HarnessError::ArtifactEventMismatch);
+            }
+        }
+        Ok(())
+    }
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        encoded.push_str(&format!("{byte:02x}"));
+    }
+    encoded
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_artifact_evidence(evidence: &ArtifactSetEvidenceV1) -> Result<(), HarnessError> {
+    if evidence.event_id.trim().is_empty()
+        || !is_sha256_hex(&evidence.transaction_receipt_sha256)
+        || evidence.artifacts.is_empty()
+    {
+        return Err(HarnessError::InvalidArtifactSet);
+    }
+    let mut formats = BTreeSet::new();
+    for artifact in &evidence.artifacts {
+        if !formats.insert(artifact.format)
+            || !is_sha256_hex(&artifact.sha256_hex)
+            || artifact.byte_len == 0
+        {
+            return Err(HarnessError::InvalidArtifactSet);
+        }
+    }
+    Ok(())
+}
+
+fn digest_artifact_set(
+    payload: &ArtifactPayloadSetV1,
+) -> Result<ArtifactSetEvidenceV1, HarnessError> {
+    if payload.event_id.trim().is_empty()
+        || payload.transaction_receipt_bytes.is_empty()
+        || payload.artifacts.is_empty()
+    {
+        return Err(HarnessError::InvalidArtifactSet);
+    }
+    let mut formats = BTreeSet::new();
+    let mut artifacts = Vec::with_capacity(payload.artifacts.len());
+    for artifact in &payload.artifacts {
+        if artifact.bytes.is_empty() || !formats.insert(artifact.format) {
+            return Err(HarnessError::InvalidArtifactSet);
+        }
+        artifacts.push(ArtifactDigestV1 {
+            format: artifact.format,
+            sha256_hex: sha256_hex(&artifact.bytes),
+            byte_len: artifact.bytes.len() as u64,
+        });
+    }
+    artifacts.sort_by_key(|artifact| artifact.format);
+    Ok(ArtifactSetEvidenceV1 {
+        event_id: payload.event_id.clone(),
+        transaction_receipt_sha256: sha256_hex(&payload.transaction_receipt_bytes),
+        artifacts,
+    })
+}
+
+fn digest_artifact_sets(
+    payloads: [ArtifactPayloadSetV1; 4],
+    expected_event_ids: &[String; 4],
+) -> Result<[ArtifactSetEvidenceV1; 4], HarnessError> {
+    let mut evidence = Vec::with_capacity(4);
+    for (payload, expected_event_id) in payloads.into_iter().zip(expected_event_ids) {
+        if &payload.event_id != expected_event_id {
+            return Err(HarnessError::ArtifactEventMismatch);
+        }
+        evidence.push(digest_artifact_set(&payload)?);
+    }
+    evidence
+        .try_into()
+        .map_err(|_| HarnessError::InvalidArtifactSet)
+}
+
+/// Hash exact input/output payload and Studio receipt bytes, then attach their
+/// content identities to an already-scored trial. Rebinding is rejected.
+pub fn bind_verified_artifacts(
+    record: &mut TrialRecordV1,
+    inputs: [ArtifactPayloadSetV1; 4],
+    outputs: [ArtifactPayloadSetV1; 4],
+    verifier_id: impl Into<String>,
+    verifier_version: impl Into<String>,
+) -> Result<(), HarnessError> {
+    if record.artifact_bindings.is_some() {
+        return Err(HarnessError::ArtifactAlreadyBound);
+    }
+    let verifier_id = verifier_id.into();
+    let verifier_version = verifier_version.into();
+    if verifier_id.trim().is_empty() || verifier_version.trim().is_empty() {
+        return Err(HarnessError::InvalidArtifactVerifier);
+    }
+    let bindings = TrialArtifactBindingsV1 {
+        verifier_id,
+        verifier_version,
+        inputs: digest_artifact_sets(inputs, &record.manifest.input_event_ids)?,
+        outputs: digest_artifact_sets(outputs, &record.manifest.output_event_ids)?,
+    };
+    bindings.validate(&record.manifest)?;
+    record.artifact_bindings = Some(bindings);
+    Ok(())
+}
+
+/// Independently re-hash exact source, output and Studio receipt bytes and
+/// compare them with the attached trial evidence.
+pub fn verify_trial_artifact_bindings(
+    record: &TrialRecordV1,
+    inputs: &[ArtifactPayloadSetV1; 4],
+    outputs: &[ArtifactPayloadSetV1; 4],
+) -> Result<(), HarnessError> {
+    let bindings = record
+        .artifact_bindings
+        .as_ref()
+        .ok_or(HarnessError::ArtifactBindingMissing)?;
+    bindings.validate(&record.manifest)?;
+    for (index, payload) in inputs.iter().enumerate() {
+        if payload.event_id != record.manifest.input_event_ids[index]
+            || digest_artifact_set(payload)? != bindings.inputs[index]
+        {
+            return Err(HarnessError::ArtifactDigestMismatch);
+        }
+    }
+    for (index, payload) in outputs.iter().enumerate() {
+        if payload.event_id != record.manifest.output_event_ids[index]
+            || digest_artifact_set(payload)? != bindings.outputs[index]
+        {
+            return Err(HarnessError::ArtifactDigestMismatch);
+        }
+    }
+    Ok(())
+}
+
 /// Full replayable output for one Track A paired fixture.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrialRecordV1 {
@@ -541,6 +778,8 @@ pub struct TrialRecordV1 {
     pub actions: [AgentAction; 4],
     /// Per-dimension synthetic causal contrasts.
     pub contrast: CausalContrast,
+    /// Optional independently re-verifiable source/output content evidence.
+    pub artifact_bindings: Option<TrialArtifactBindingsV1>,
 }
 
 /// Immutable identity and assignment record for one synthetic trial.
@@ -706,6 +945,7 @@ pub fn run_trial(
         interventions,
         actions,
         contrast,
+        artifact_bindings: None,
     })
 }
 
@@ -1306,6 +1546,18 @@ pub enum HarnessError {
     InvalidYoke,
     /// Manifest is incomplete, inconsistent, or not versioned as expected.
     InvalidManifest,
+    /// Required content-addressed artifact evidence is absent.
+    ArtifactBindingMissing,
+    /// An artifact set is empty, malformed, or has duplicate representations.
+    InvalidArtifactSet,
+    /// Artifact evidence is bound to the wrong RMI event.
+    ArtifactEventMismatch,
+    /// Recomputed artifact or receipt bytes differ from committed evidence.
+    ArtifactDigestMismatch,
+    /// Verifier identity or version is absent.
+    InvalidArtifactVerifier,
+    /// Artifact evidence has already been committed to this trial.
+    ArtifactAlreadyBound,
 }
 
 impl fmt::Display for HarnessError {
@@ -1367,6 +1619,41 @@ mod tests {
             policy_version: "fixture-v1".to_owned(),
             code_revision: CODE_REVISION.to_owned(),
         }
+    }
+
+    fn artifact_payload_set(event_id: &str, marker: &[u8]) -> ArtifactPayloadSetV1 {
+        ArtifactPayloadSetV1 {
+            event_id: event_id.to_owned(),
+            transaction_receipt_bytes: [b"studio-receipt:".as_slice(), marker].concat(),
+            artifacts: vec![
+                ArtifactPayloadV1 {
+                    format: ArtifactFormatV1::ScoreJson,
+                    bytes: [b"{\"score\":".as_slice(), marker, b"}"].concat(),
+                },
+                ArtifactPayloadV1 {
+                    format: ArtifactFormatV1::Midi,
+                    bytes: [b"MThd".as_slice(), marker].concat(),
+                },
+            ],
+        }
+    }
+
+    fn artifact_payloads(
+        record: &TrialRecordV1,
+    ) -> ([ArtifactPayloadSetV1; 4], [ArtifactPayloadSetV1; 4]) {
+        let inputs = std::array::from_fn(|index| {
+            artifact_payload_set(
+                &record.manifest.input_event_ids[index],
+                format!("input-{index}").as_bytes(),
+            )
+        });
+        let outputs = std::array::from_fn(|index| {
+            artifact_payload_set(
+                &record.manifest.output_event_ids[index],
+                format!("output-{index}").as_bytes(),
+            )
+        });
+        (inputs, outputs)
     }
 
     #[test]
@@ -1816,6 +2103,220 @@ mod tests {
                 .filter(|record| record.qualified_synthetic_reciprocity)
                 .count(),
             160
+        );
+    }
+
+    #[test]
+    fn sha256_implementation_matches_published_known_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn artifact_binding_hashes_exact_input_output_and_receipt_bytes() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        bind_verified_artifacts(
+            &mut record,
+            inputs.clone(),
+            outputs.clone(),
+            "independent-sha256-verifier",
+            "v1",
+        ).unwrap();
+        assert_eq!(record.artifact_bindings.as_ref().unwrap().inputs.len(), 4);
+        assert_eq!(record.artifact_bindings.as_ref().unwrap().outputs.len(), 4);
+        verify_trial_artifact_bindings(&record, &inputs, &outputs).unwrap();
+    }
+
+    #[test]
+    fn artifact_verifier_detects_mutated_output_bytes() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        bind_verified_artifacts(
+            &mut record,
+            inputs.clone(),
+            outputs.clone(),
+            "independent-sha256-verifier",
+            "v1",
+        ).unwrap();
+        let mut altered_outputs = outputs;
+        altered_outputs[1].artifacts[0].bytes.push(0xff);
+        assert_eq!(
+            verify_trial_artifact_bindings(&record, &inputs, &altered_outputs),
+            Err(HarnessError::ArtifactDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn artifact_verifier_detects_mutated_transaction_receipt_bytes() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        bind_verified_artifacts(
+            &mut record,
+            inputs.clone(),
+            outputs.clone(),
+            "independent-sha256-verifier",
+            "v1",
+        ).unwrap();
+        let mut altered_inputs = inputs;
+        altered_inputs[2].transaction_receipt_bytes.push(b'!');
+        assert_eq!(
+            verify_trial_artifact_bindings(&record, &altered_inputs, &outputs),
+            Err(HarnessError::ArtifactDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn artifact_binder_rejects_cross_event_substitution() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (mut inputs, outputs) = artifact_payloads(&record);
+        inputs.swap(0, 1);
+        assert_eq!(
+            bind_verified_artifacts(
+                &mut record,
+                inputs,
+                outputs,
+                "independent-sha256-verifier",
+                "v1",
+            ),
+            Err(HarnessError::ArtifactEventMismatch)
+        );
+        assert!(record.artifact_bindings.is_none());
+    }
+
+    #[test]
+    fn artifact_binding_rejects_empty_receipt_and_duplicate_format() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (mut inputs, outputs) = artifact_payloads(&record);
+        inputs[0].transaction_receipt_bytes.clear();
+        assert_eq!(
+            bind_verified_artifacts(
+                &mut record,
+                inputs,
+                outputs.clone(),
+                "independent-sha256-verifier",
+                "v1",
+            ),
+            Err(HarnessError::InvalidArtifactSet)
+        );
+
+        let (mut inputs, _) = artifact_payloads(&record);
+        inputs[0].artifacts.push(inputs[0].artifacts[0].clone());
+        assert_eq!(
+            bind_verified_artifacts(
+                &mut record,
+                inputs,
+                outputs,
+                "independent-sha256-verifier",
+                "v1",
+            ),
+            Err(HarnessError::InvalidArtifactSet)
+        );
+    }
+
+    #[test]
+    fn artifact_binding_is_write_once_and_required_for_content_verification() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        assert_eq!(
+            verify_trial_artifact_bindings(&record, &inputs, &outputs),
+            Err(HarnessError::ArtifactBindingMissing)
+        );
+        bind_verified_artifacts(
+            &mut record,
+            inputs.clone(),
+            outputs.clone(),
+            "independent-sha256-verifier",
+            "v1",
+        ).unwrap();
+        assert_eq!(
+            bind_verified_artifacts(
+                &mut record,
+                inputs,
+                outputs,
+                "independent-sha256-verifier",
+                "v1",
+            ),
+            Err(HarnessError::ArtifactAlreadyBound)
+        );
+    }
+
+    #[test]
+    fn artifact_evidence_rejects_malformed_digest_and_zero_length() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        bind_verified_artifacts(
+            &mut record,
+            inputs,
+            outputs,
+            "independent-sha256-verifier",
+            "v1",
+        ).unwrap();
+        let bindings = record.artifact_bindings.as_mut().unwrap();
+        bindings.outputs[0].artifacts[0].sha256_hex = "not-a-hash".to_owned();
+        assert_eq!(
+            bindings.validate(&record.manifest),
+            Err(HarnessError::InvalidArtifactSet)
+        );
+    }
+
+    #[test]
+    fn artifact_verifier_identity_is_required() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy { id: "rule-positive".to_owned() },
+            config(),
+        ).unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        assert_eq!(
+            bind_verified_artifacts(&mut record, inputs, outputs, " ", "v1"),
+            Err(HarnessError::InvalidArtifactVerifier)
         );
     }
 
