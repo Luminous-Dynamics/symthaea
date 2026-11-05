@@ -182,10 +182,9 @@ struct DacsSummary {
 
 #[derive(Clone, Copy, Debug)]
 struct Summary {
-    scenario: &'static str;
-    model: &'static str;
-    dacs: DacsSummary,
+    scenario: &'static str,
     model: &'static str,
+    dacs: DacsSummary,
     mean_pair_coverage: f64,
     mean_effect_sign_accuracy: Option<f64>,
     effect_sign_accuracy_episode_count: usize,
