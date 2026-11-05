@@ -116,12 +116,17 @@ fn validate_plan(plan: &RetrievalPlan) -> ValidationReport {
         errors.push("original_query must be non-empty".to_string());
     }
     if plan.original_query_sha256 != sha256_hex(plan.original_query.as_bytes()) {
-        errors.push("original_query_sha256 does not match the exact original_query bytes".to_string());
+        errors.push(
+            "original_query_sha256 does not match the exact original_query bytes".to_string(),
+        );
     }
     if plan.fallback_query != plan.original_query {
         errors.push("fallback_query must equal the immutable original_query exactly".to_string());
     }
-    if !matches!(plan.rewrite_policy.as_str(), "original_only" | "anchor_preserving") {
+    if !matches!(
+        plan.rewrite_policy.as_str(),
+        "original_only" | "anchor_preserving"
+    ) {
         errors.push(format!(
             "rewrite_policy must be original_only or anchor_preserving, got {:?}",
             plan.rewrite_policy
@@ -132,7 +137,10 @@ fn validate_plan(plan: &RetrievalPlan) -> ValidationReport {
     for anchor in &plan.required_anchors {
         if !has_non_whitespace(&anchor.anchor_id) {
             errors.push("anchor_id must be non-empty".to_string());
-        } else if anchors_by_id.insert(anchor.anchor_id.as_str(), anchor).is_some() {
+        } else if anchors_by_id
+            .insert(anchor.anchor_id.as_str(), anchor)
+            .is_some()
+        {
             errors.push(format!("duplicate anchor_id {:?}", anchor.anchor_id));
         }
         if !valid_anchor_kind(&anchor.kind) {
@@ -149,8 +157,7 @@ fn validate_plan(plan: &RetrievalPlan) -> ValidationReport {
                 "anchor {:?} has unsupported match_mode {:?}",
                 anchor.anchor_id, anchor.match_mode
             ));
-        } else if has_non_whitespace(&anchor.text)
-            && !contains_anchor(&plan.original_query, anchor)
+        } else if has_non_whitespace(&anchor.text) && !contains_anchor(&plan.original_query, anchor)
         {
             errors.push(format!(
                 "required anchor {:?} is absent from immutable original_query",
@@ -305,12 +312,14 @@ fn parse_args() -> Result<(PathBuf, PathBuf), String> {
         match arg.as_str() {
             "--schema" => {
                 schema = Some(PathBuf::from(
-                    args.next().ok_or_else(|| "--schema requires a path".to_string())?,
+                    args.next()
+                        .ok_or_else(|| "--schema requires a path".to_string())?,
                 ));
             }
             "--input" => {
                 input = Some(PathBuf::from(
-                    args.next().ok_or_else(|| "--input requires a path".to_string())?,
+                    args.next()
+                        .ok_or_else(|| "--input requires a path".to_string())?,
                 ));
             }
             "--help" | "-h" => {
@@ -491,24 +500,18 @@ mod tests {
                     value: "2024-01-01/2024-12-31".to_string(),
                 },
             ],
-            steps: vec![
-                RetrievalStep {
-                    step_id: "s-primary".to_string(),
-                    query:
-                        "What did the 2024 report say about KineticTrust v3.2 in isiZulu?"
-                            .to_string(),
-                    required_anchor_ids: vec![
-                        "a-report-year".to_string(),
-                        "a-product".to_string(),
-                        "a-version".to_string(),
-                        "a-language".to_string(),
-                    ],
-                    required_constraint_ids: vec![
-                        "c-language".to_string(),
-                        "c-time".to_string(),
-                    ],
-                },
-            ],
+            steps: vec![RetrievalStep {
+                step_id: "s-primary".to_string(),
+                query: "What did the 2024 report say about KineticTrust v3.2 in isiZulu?"
+                    .to_string(),
+                required_anchor_ids: vec![
+                    "a-report-year".to_string(),
+                    "a-product".to_string(),
+                    "a-version".to_string(),
+                    "a-language".to_string(),
+                ],
+                required_constraint_ids: vec!["c-language".to_string(), "c-time".to_string()],
+            }],
         }
     }
 
@@ -516,25 +519,36 @@ mod tests {
     fn valid_anchor_preserving_plan_passes() {
         let report = validate_plan(&sample_plan());
         assert!(report.passed, "{:?}", report.errors);
-        assert_eq!(report.recommended_action, "plan_contract_valid_candidate_only");
+        assert_eq!(
+            report.recommended_action,
+            "plan_contract_valid_candidate_only"
+        );
     }
 
     #[test]
     fn removed_named_entity_is_rejected() {
         let mut plan = sample_plan();
-        plan.steps[0].query = "What did the 2024 report say about the product v3.2 in isiZulu?"
-            .to_string();
+        plan.steps[0].query =
+            "What did the 2024 report say about the product v3.2 in isiZulu?".to_string();
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("KineticTrust")));
-        assert_eq!(report.recommended_action, "reject_rewrite_and_use_original_query");
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("KineticTrust"))
+        );
+        assert_eq!(
+            report.recommended_action,
+            "reject_rewrite_and_use_original_query"
+        );
     }
 
     #[test]
     fn changed_numeric_or_version_anchor_is_rejected() {
         let mut plan = sample_plan();
-        plan.steps[0].query = "What did the 2024 report say about KineticTrust v3.3 in isiZulu?"
-            .to_string();
+        plan.steps[0].query =
+            "What did the 2024 report say about KineticTrust v3.3 in isiZulu?".to_string();
         let report = validate_plan(&plan);
         assert!(!report.passed);
         assert!(report.errors.iter().any(|error| error.contains("v3.2")));
@@ -543,8 +557,8 @@ mod tests {
     #[test]
     fn removed_date_anchor_is_rejected() {
         let mut plan = sample_plan();
-        plan.steps[0].query = "What did the report say about KineticTrust v3.2 in isiZulu?"
-            .to_string();
+        plan.steps[0].query =
+            "What did the report say about KineticTrust v3.2 in isiZulu?".to_string();
         let report = validate_plan(&plan);
         assert!(!report.passed);
         assert!(report.errors.iter().any(|error| error.contains("2024")));
@@ -553,8 +567,8 @@ mod tests {
     #[test]
     fn case_insensitive_anchor_accepts_case_only_change() {
         let mut plan = sample_plan();
-        plan.steps[0].query = "What did the 2024 report say about KineticTrust v3.2 in ISIZULU?"
-            .to_string();
+        plan.steps[0].query =
+            "What did the 2024 report say about KineticTrust v3.2 in ISIZULU?".to_string();
         let report = validate_plan(&plan);
         assert!(report.passed, "{:?}", report.errors);
     }
@@ -567,7 +581,12 @@ mod tests {
         plan.fallback_query = plan.original_query.clone();
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("absent from immutable original_query")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("absent from immutable original_query"))
+        );
     }
 
     #[test]
@@ -585,7 +604,12 @@ mod tests {
         plan.fallback_query.push_str(" altered");
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("fallback_query")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("fallback_query"))
+        );
     }
 
     #[test]
@@ -595,16 +619,28 @@ mod tests {
         plan.required_anchors.push(duplicate);
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("duplicate anchor_id")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("duplicate anchor_id"))
+        );
     }
 
     #[test]
     fn unknown_anchor_references_are_rejected() {
         let mut plan = sample_plan();
-        plan.steps[0].required_anchor_ids.push("missing-anchor".to_string());
+        plan.steps[0]
+            .required_anchor_ids
+            .push("missing-anchor".to_string());
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("unknown anchor")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("unknown anchor"))
+        );
     }
 
     #[test]
@@ -613,7 +649,12 @@ mod tests {
         plan.steps[0].required_anchor_ids.pop();
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("not assigned")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("not assigned"))
+        );
     }
 
     #[test]
@@ -624,7 +665,12 @@ mod tests {
             .push("missing-constraint".to_string());
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("unknown constraint")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("unknown constraint"))
+        );
     }
 
     #[test]
@@ -643,7 +689,12 @@ mod tests {
         plan.steps[0].query = "different query".to_string();
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("original_only")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("original_only"))
+        );
     }
 
     #[test]
@@ -652,20 +703,29 @@ mod tests {
         plan.steps.clear();
         let report = validate_plan(&plan);
         assert!(!report.passed);
-        assert!(report.errors.iter().any(|error| error.contains("at least one")));
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.contains("at least one"))
+        );
     }
 
     #[test]
     fn reports_never_claim_execution_or_truth() {
         let report = validate_plan(&sample_plan());
         assert!(report.passed);
-        assert!(report
-            .nonclaims
-            .iter()
-            .any(|claim| claim.contains("does not execute retrieval")));
-        assert!(report
-            .nonclaims
-            .iter()
-            .any(|claim| claim.contains("evidence truth")));
+        assert!(
+            report
+                .nonclaims
+                .iter()
+                .any(|claim| claim.contains("does not execute retrieval"))
+        );
+        assert!(
+            report
+                .nonclaims
+                .iter()
+                .any(|claim| claim.contains("evidence truth"))
+        );
     }
 }
