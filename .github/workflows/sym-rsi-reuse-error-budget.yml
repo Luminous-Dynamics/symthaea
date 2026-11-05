@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "src/consciousness/recursive_improvement/reuse_error_budget.rs"
+      - "src/consciousness/recursive_improvement/paired_sign_test.rs"
       - "src/consciousness/recursive_improvement/paired_evaluation.rs"
       - "src/consciousness/recursive_improvement/mod.rs"
       - "tools/sym-rsi-reuse-gate/**"
@@ -13,8 +14,10 @@ on:
     branches: [main]
     paths:
       - "src/consciousness/recursive_improvement/reuse_error_budget.rs"
+      - "src/consciousness/recursive_improvement/paired_sign_test.rs"
       - "src/consciousness/recursive_improvement/paired_evaluation.rs"
       - "src/consciousness/recursive_improvement/mod.rs"
+      - "tools/sym-rsi-reuse-gate/**"
       - ".github/workflows/sym-rsi-reuse-error-budget.yml"
   workflow_dispatch:
 
@@ -41,17 +44,27 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
+
       - name: Assert Rust toolchain
         run: |
           test "$(rustc --version | cut -d ' ' -f 2)" = "1.96.0"
           cargo --version
 
-      - name: Validate root workspace metadata
-        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/sym-rsi-reuse-metadata.json"
+      - name: Validate standalone harness metadata
+        run: |
+          cargo metadata \
+            --manifest-path tools/sym-rsi-reuse-gate/Cargo.toml \
+            --locked --no-deps --format-version 1 \
+            > "$RUNNER_TEMP/sym-rsi-reuse-metadata.json"
 
       - name: Format changed Rust modules
         run: |
-          rustfmt --edition 2024 --check --config skip_children=true             src/consciousness/recursive_improvement/reuse_error_budget.rs             src/consciousness/recursive_improvement/paired_evaluation.rs             src/consciousness/recursive_improvement/mod.rs
+          rustfmt --edition 2024 --check --config skip_children=true \
+            src/consciousness/recursive_improvement/reuse_error_budget.rs \
+            src/consciousness/recursive_improvement/paired_sign_test.rs \
+            src/consciousness/recursive_improvement/paired_evaluation.rs \
+            src/consciousness/recursive_improvement/mod.rs \
+            tools/sym-rsi-reuse-gate/src/lib.rs
 
       - name: Test REUSE allocation and decision gate
         run: cargo test --manifest-path tools/sym-rsi-reuse-gate/Cargo.toml --locked
