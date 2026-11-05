@@ -304,3 +304,14 @@ References:
 - https://cadbench.ai/news/cad-bench-v3-paper
 - https://arxiv.org/abs/2611.02659
 
+
+
+## 9. Runner-independent source geometry materialization (2026-11-05)
+
+A separate development fixture package is tracked in [ENGINEERING-FIXTURE-MATERIALIZATION-001 #10622](https://github.com/Luminous-Dynamics/symthaea/issues/10622).
+
+All six positive fixture geometries now have a source STEP B-rep and a corresponding semantic-edit STEP variant (12 artifacts total). The pinned local generator used CadQuery 2.8.0 with OCP / Open CASCADE 7.9.3.1 and Python 3.13.5. STEP output is AP214 `AUTOMOTIVE_DESIGN`, not AP242. The Open CASCADE wall-clock header timestamp was normalized before hashing; two clean generator runs reproduced all outputs byte-for-byte.
+
+Every source/edit STEP artifact was re-imported and passed the kernel's B-rep validity check. All 12 volumes matched independently derived analytic volume references within 1e-5 mm³. The machine-readable materialization manifest binds dimensions, bounds, expected volumes and exact artifact SHA-256 values.
+
+Important claim boundary: these are history-less input solids for a future reconstruction evaluation. The generator source is parametric, but no FreeCAD .FCStd feature-history answer, native FreeCAD rebuild, CADBench V3 run, agent score, edit-preservation score, manufacturing validation, or physical test has been produced. The actual future candidate must still return an editable native CAD artifact and pass its required edit sequence.
