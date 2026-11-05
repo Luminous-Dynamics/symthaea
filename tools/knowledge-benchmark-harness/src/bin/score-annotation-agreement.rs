@@ -86,17 +86,14 @@ fn parse_args() -> Result<Args, String> {
             raw.next().ok_or_else(|| format!("{flag} requires a value"))
         };
         match arg.as_str() {
-            "--annotations" => {
-                annotations = Some(PathBuf::from(value(&mut raw, "--annotations")?))
-            }
+            "--annotations" => annotations = Some(PathBuf::from(value(&mut raw, "--annotations")?)),
             "--out" => output = Some(PathBuf::from(value(&mut raw, "--out")?)),
             "--help" | "-h" => return Err(usage().to_string()),
             other => return Err(format!("unknown argument {other:?}\n{}", usage())),
         }
     }
     Ok(Args {
-        annotations: annotations
-            .ok_or_else(|| format!("missing --annotations\n{}", usage()))?,
+        annotations: annotations.ok_or_else(|| format!("missing --annotations\n{}", usage()))?,
         output: output.ok_or_else(|| format!("missing --out\n{}", usage()))?,
     })
 }
@@ -127,7 +124,10 @@ fn parse_annotations(bytes: &[u8]) -> Result<Vec<Annotation>, String> {
             ));
         }
         let annotation: Annotation = serde_json::from_str(line).map_err(|error| {
-            format!("annotation input has invalid JSON at line {}: {error}", index + 1)
+            format!(
+                "annotation input has invalid JSON at line {}: {error}",
+                index + 1
+            )
         })?;
         if annotation.annotation_id.trim().is_empty()
             || annotation.annotator_id.trim().is_empty()
@@ -183,7 +183,11 @@ fn validate_review_set(annotations: &[Annotation]) -> Result<bool, String> {
         return Ok(true);
     }
 
-    let allowed_roles = ["independent_reviewer", "subject_expert", "calibration_reviewer"];
+    let allowed_roles = [
+        "independent_reviewer",
+        "subject_expert",
+        "calibration_reviewer",
+    ];
     for annotation in annotations {
         if !allowed_roles.contains(&annotation.annotation_role.as_str()) {
             return Err(format!(
@@ -267,7 +271,10 @@ fn agreement_metric(
 ) -> Result<AgreementMetric, String> {
     let mut units: BTreeMap<String, Vec<Rating>> = BTreeMap::new();
     for rating in ratings {
-        units.entry(rating.unit_id.clone()).or_default().push(rating);
+        units
+            .entry(rating.unit_id.clone())
+            .or_default()
+            .push(rating);
     }
 
     let mut eligible = Vec::<Vec<Rating>>::new();
@@ -317,8 +324,7 @@ fn agreement_metric(
     let expected_disagreement = if rating_count < 2 {
         None
     } else {
-        let same_ordered_pairs: usize =
-            category_counts.values().map(|count| count * count).sum();
+        let same_ordered_pairs: usize = category_counts.values().map(|count| count * count).sum();
         let all_ordered_pairs = rating_count * (rating_count - 1);
         Some((rating_count * rating_count - same_ordered_pairs) as f64 / all_ordered_pairs as f64)
     };
@@ -327,16 +333,14 @@ fn agreement_metric(
     } else {
         Some(exact_matches as f64 / eligible_unit_count as f64)
     };
-    let (krippendorff_alpha_nominal, interpretation) = match (
-        observed_disagreement,
-        expected_disagreement,
-    ) {
-        (Some(observed), Some(expected)) if expected > 0.0 => {
-            (Some(1.0 - observed / expected), "estimated")
-        }
-        (Some(_), Some(_)) => (None, "undefined_no_category_variation"),
-        _ => (None, "insufficient_multi_reviewed_units"),
-    };
+    let (krippendorff_alpha_nominal, interpretation) =
+        match (observed_disagreement, expected_disagreement) {
+            (Some(observed), Some(expected)) if expected > 0.0 => {
+                (Some(1.0 - observed / expected), "estimated")
+            }
+            (Some(_), Some(_)) => (None, "undefined_no_category_variation"),
+            _ => (None, "insufficient_multi_reviewed_units"),
+        };
 
     Ok(AgreementMetric {
         field,
@@ -464,7 +468,12 @@ fn run() -> Result<(), String> {
         serde_json::to_vec_pretty(&report_value)
             .map_err(|error| format!("cannot encode agreement report: {error}"))?,
     )
-    .map_err(|error| format!("cannot write agreement report {}: {error}", args.output.display()))?;
+    .map_err(|error| {
+        format!(
+            "cannot write agreement report {}: {error}",
+            args.output.display()
+        )
+    })?;
     println!(
         "Scored {} annotations; qualification_only={}; report={}",
         report.annotation_count,
@@ -617,8 +626,9 @@ mod tests {
 
     #[test]
     fn bundled_annotation_fixture_retains_intended_disagreement() {
-        let bytes =
-            include_bytes!("../../../../benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl");
+        let bytes = include_bytes!(
+            "../../../../benchmarks/knowledge-annotation/v0/synthetic-fixtures.jsonl"
+        );
         let annotations = parse_annotations(bytes).unwrap();
         assert!(validate_review_set(&annotations).unwrap());
         let metric = agreement_metric(
