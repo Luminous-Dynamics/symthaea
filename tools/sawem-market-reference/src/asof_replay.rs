@@ -102,7 +102,8 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn validate_vintage(vintage: PriceVintage<'_>) -> Result<(), AsOfReplayError> {
-    if !nonempty(vintage.record_id) || !nonempty(vintage.source_ref) || !nonempty(vintage.series_id) {
+    if !nonempty(vintage.record_id) || !nonempty(vintage.source_ref) || !nonempty(vintage.series_id)
+    {
         return Err(AsOfReplayError::InvalidEvidenceReference);
     }
     if !valid_sha256(vintage.source_sha256) {
