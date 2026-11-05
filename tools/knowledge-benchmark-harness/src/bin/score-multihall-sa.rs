@@ -601,8 +601,10 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
         by_id.insert(key, pair.clone());
     }
 
-    let required_languages: BTreeSet<String> =
-        allowed_languages.iter().map(|language| language.to_string()).collect();
+    let required_languages: BTreeSet<String> = allowed_languages
+        .iter()
+        .map(|language| language.to_string())
+        .collect();
     if observed_languages != required_languages {
         return Err(format!(
             "pair manifest must include all four Multi-Hall-SA languages {:?}; observed {:?}",
@@ -1624,9 +1626,11 @@ mod tests {
             hallucination_type: "temporal shift".into(),
         };
         let result = validate_pairs(&[pair]);
-        assert!(result
-            .expect_err("a partial language manifest is not the complete benchmark")
-            .contains("must include all four Multi-Hall-SA languages"));
+        assert!(
+            result
+                .expect_err("a partial language manifest is not the complete benchmark")
+                .contains("must include all four Multi-Hall-SA languages")
+        );
     }
 
     #[test]
