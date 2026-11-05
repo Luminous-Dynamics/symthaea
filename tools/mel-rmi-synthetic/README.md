@@ -29,6 +29,7 @@ cargo fmt --check
 cargo test --locked
 MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" \
   MEL_RMI_ARTIFACT_REPORT="./mel-rmi-artifact-digests.csv" \
+  MEL_RMI_TRIAL_EVENT_REPORT="./mel-rmi-trial-events.csv" \
   cargo run --locked --example canonical_suite
 ```
 
@@ -46,14 +47,21 @@ example also emits dimension-specific agent and partner summaries to stderr:
 fixture count, means, targeted-effect dispersion, sham/unrelated contrasts,
 and control/oracle qualification counts. These are descriptive summaries over
 constructed fixtures, not statistical estimates from sampled musicians; no
-confidence interval or cross-dimension composite is reported. The separately
+confidence interval or cross-dimension composite is reported. The event-level CSV contains **4,480 condition rows** (four rows for every
+policy and reciprocal trial). Each row binds task/session/seed, randomized
+condition order, exact input/output event IDs, input target/unrelated values,
+the agent action value and mechanism, both directional contrasts, and the
+reciprocal outcome where applicable. It can be joined to the artifact-digest
+CSV by event ID.
+
+The separately
 written artifact-digest CSV contains one row per input/output artifact,
 including event ID, session/task/assignment seeds, policy/version, code
 revision, metric version, caller-supplied verifier identity/version,
 transaction-receipt SHA-256, artifact SHA-256, format and byte length
 (17,920 rows for the canonical sweep).
 
-The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head using pinned Rust 1.96.0 and a committed `--locked` dependency graph, gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications, then uploads the raw trial CSV, per-dimension summaries and digest CSV as a 90-day workflow artifact.
+The repository workflow stages this crate outside the root Cargo workspace, tests the exact pull-request head using pinned Rust 1.96.0 and a committed `--locked` dependency graph, gates all expected positive/negative-control counts, all five dimensions' summaries, and 1,120 successful artifact re-verifications, then uploads the trial summary CSV, 4,480-row condition event ledger, per-dimension summaries and digest CSV as a 90-day workflow artifact. It checks all event rows have the fixed 40-column schema.
 
 The same executable emits eleven `negotiation` rows. Six are expected to qualify: complete branch within budget, clarification, veto-compliant branch, following explicit partner selection, abstention after all options are vetoed, and clarification when the viable set exceeds the branch budget. Five are expected to fail: premature single commitment, a branch containing a vetoed value, fabricated commitment after all options are removed, incomplete branching, and attempted branch explosion above the configured fan-out limit. The workflow gates these counts separately from causal-contingency and artifact-integrity outcomes.
 
