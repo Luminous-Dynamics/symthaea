@@ -50,6 +50,7 @@ pub mod candidate_archive;
 pub mod paired_evaluation;
 pub mod paired_sign_test;
 pub mod reuse_error_budget;
+pub mod reuse_confidence_certificate;
 pub mod core;
 pub mod types;
 
@@ -78,6 +79,10 @@ pub use candidate_archive::{
 pub use paired_evaluation::{
     CandidateEvaluationView, CaseScore, MetricPairedResult, PairedComparison,
     PairedEvaluationError,
+};
+pub use reuse_confidence_certificate::{
+    pass_fail_confidence_certificate, ReuseCertificateError, ReuseConfidenceCertificate,
+    MAX_CERTIFICATE_SAMPLE_COUNT,
 };
 pub use reuse_error_budget::{
     allocate_reuse_error_budget, evaluate_reuse_round, ReuseBudgetError,
