@@ -1076,61 +1076,198 @@ impl CfCNetwork {
     }
 
     /// Restore learnable weights from a flat slice produced by [`Self::get_weights`].
+    ///
+    /// This compatibility wrapper validates the complete payload before mutating
+    /// the network. New callers that need to handle untrusted or externally
+    /// generated weight vectors should use [`Self::try_set_weights`] instead.
     pub fn set_weights(&mut self, weights: &[f32]) {
-        let mut pos = 0;
+        self.try_set_weights(weights)
+            .expect("invalid CfC network weight payload");
+    }
+
+    /// Validate and apply a complete weight vector without partial mutation.
+    ///
+    /// Validation is performed before the first write:
+    /// - exact parameter count (short and overlong payloads are rejected);
+    /// - all values are finite;
+    /// - all time constants are at least [`MIN_TAU`];
+    /// - every destination array has a contiguous backing slice.
+    ///
+    /// The flat ordering is exactly the ordering emitted by [`Self::get_weights`].
+    /// The existing infallible [`Self::set_weights`] method remains available for
+    /// compatibility, but this method is the required boundary for proposed,
+    /// loaded, federated, or otherwise untrusted parameter edits.
+    pub fn try_set_weights(&mut self, weights: &[f32]) -> Result<(), String> {
+        let mut expected = self
+            .output_weights
+            .len()
+            .checked_add(self.output_bias.len())
+            .ok_or_else(|| "CfC weight count overflow".to_string())?;
+
+        for cell in &self.cells {
+            for count in [
+                cell.w_in.len(),
+                cell.w_h.len(),
+                cell.b_h.len(),
+                cell.tau.len(),
+            ] {
+                expected = expected
+                    .checked_add(count)
+                    .ok_or_else(|| "CfC weight count overflow".to_string())?;
+            }
+            for tensor in &cell.backbone_weights {
+                expected = expected
+                    .checked_add(tensor.len())
+                    .ok_or_else(|| "CfC weight count overflow".to_string())?;
+            }
+            for tensor in &cell.backbone_biases {
+                expected = expected
+                    .checked_add(tensor.len())
+                    .ok_or_else(|| "CfC weight count overflow".to_string())?;
+            }
+        }
+
+        if weights.len() != expected {
+            return Err(format!(
+                "CfC weight count mismatch: expected {expected}, received {}",
+                weights.len()
+            ));
+        }
+
+        if let Some((index, value)) = weights
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            return Err(format!(
+                "CfC weight at flat index {index} is not finite: {value}"
+            ));
+        }
+
+        // Check temporal constants using the same flat layout as get_weights().
+        // This is still a read-only pass; no live parameter is changed here.
+        let mut offset = 0usize;
+        for (cell_index, cell) in self.cells.iter().enumerate() {
+            offset += cell.w_in.len() + cell.w_h.len() + cell.b_h.len();
+            for (neuron_index, tau) in weights[offset..offset + cell.tau.len()]
+                .iter()
+                .copied()
+                .enumerate()
+            {
+                if tau < MIN_TAU {
+                    return Err(format!(
+                        "CfC tau at cell {cell_index}, neuron {neuron_index} is below MIN_TAU ({MIN_TAU}): {tau}"
+                    ));
+                }
+            }
+            offset += cell.tau.len();
+            for tensor in &cell.backbone_weights {
+                offset += tensor.len();
+            }
+            for tensor in &cell.backbone_biases {
+                offset += tensor.len();
+            }
+        }
+
+        // Preflight all destination slices. Owned ndarray fields are normally
+        // contiguous, but validate the complete destination layout before writes
+        // so this boundary remains safe if storage changes in a future refactor.
+        for (cell_index, cell) in self.cells.iter().enumerate() {
+            if cell.w_in.as_slice().is_none()
+                || cell.w_h.as_slice().is_none()
+                || cell.b_h.as_slice().is_none()
+                || cell.tau.as_slice().is_none()
+            {
+                return Err(format!(
+                    "CfC cell {cell_index} contains a non-contiguous parameter array"
+                ));
+            }
+            for (tensor_index, tensor) in cell.backbone_weights.iter().enumerate() {
+                if tensor.as_slice().is_none() {
+                    return Err(format!(
+                        "CfC cell {cell_index} backbone weight {tensor_index} is non-contiguous"
+                    ));
+                }
+            }
+            for (tensor_index, tensor) in cell.backbone_biases.iter().enumerate() {
+                if tensor.as_slice().is_none() {
+                    return Err(format!(
+                        "CfC cell {cell_index} backbone bias {tensor_index} is non-contiguous"
+                    ));
+                }
+            }
+        }
+        if self.output_weights.as_slice().is_none() || self.output_bias.as_slice().is_none() {
+            return Err("CfC output parameters are non-contiguous".to_string());
+        }
+
+        // All error conditions are checked above. The following copies therefore
+        // cannot fail for malformed input and preserve all-or-nothing semantics.
+        let mut pos = 0usize;
         for cell in &mut self.cells {
             let n = cell.w_in.len();
             cell.w_in
                 .as_slice_mut()
-                .expect("w_in array not contiguous")
+                .expect("preflighted w_in array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
+
             let n = cell.w_h.len();
             cell.w_h
                 .as_slice_mut()
-                .expect("w_h array not contiguous")
+                .expect("preflighted w_h array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
+
             let n = cell.b_h.len();
             cell.b_h
                 .as_slice_mut()
-                .expect("b_h array not contiguous")
+                .expect("preflighted b_h array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
+
             let n = cell.tau.len();
             cell.tau
                 .as_slice_mut()
-                .expect("tau array not contiguous")
+                .expect("preflighted tau array")
                 .copy_from_slice(&weights[pos..pos + n]);
             pos += n;
-            for bw in &mut cell.backbone_weights {
-                let n = bw.len();
-                bw.as_slice_mut()
-                    .expect("backbone_weight array not contiguous")
+
+            for tensor in &mut cell.backbone_weights {
+                let n = tensor.len();
+                tensor
+                    .as_slice_mut()
+                    .expect("preflighted backbone weight array")
                     .copy_from_slice(&weights[pos..pos + n]);
                 pos += n;
             }
-            for bb in &mut cell.backbone_biases {
-                let n = bb.len();
-                bb.as_slice_mut()
-                    .expect("backbone_bias array not contiguous")
+            for tensor in &mut cell.backbone_biases {
+                let n = tensor.len();
+                tensor
+                    .as_slice_mut()
+                    .expect("preflighted backbone bias array")
                     .copy_from_slice(&weights[pos..pos + n]);
                 pos += n;
             }
         }
+
         let n = self.output_weights.len();
         self.output_weights
             .as_slice_mut()
-            .expect("output_weights array not contiguous")
+            .expect("preflighted output_weights array")
             .copy_from_slice(&weights[pos..pos + n]);
         pos += n;
+
         let n = self.output_bias.len();
         self.output_bias
             .as_slice_mut()
-            .expect("output_bias array not contiguous")
+            .expect("preflighted output_bias array")
             .copy_from_slice(&weights[pos..pos + n]);
         pos += n;
-        assert_eq!(pos, weights.len(), "weight count mismatch");
+
+        debug_assert_eq!(pos, weights.len(), "validated CfC weight count");
+        Ok(())
     }
 
     // =========================================================================
@@ -1567,5 +1704,56 @@ mod tests {
                 b
             );
         }
+    
+    // ---------------------------------------------------------------
+    // 15. try_set_weights() rejects malformed payloads transactionally
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_try_set_weights_rejects_wrong_length_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+
+        assert!(net.try_set_weights(&before[..before.len() - 1]).is_err());
+        assert_eq!(net.get_weights(), before);
+
+        let mut overlong = before.clone();
+        overlong.push(0.0);
+        assert!(net.try_set_weights(&overlong).is_err());
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_try_set_weights_rejects_non_finite_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let mut malformed = before.clone();
+        malformed[0] = f32::NAN;
+
+        assert!(net.try_set_weights(&malformed).is_err());
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_try_set_weights_rejects_invalid_tau_without_mutation() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let first_tau = net.cells[0].w_in.len()
+            + net.cells[0].w_h.len()
+            + net.cells[0].b_h.len();
+        let mut malformed = before.clone();
+        malformed[first_tau] = 0.0;
+
+        assert!(net.try_set_weights(&malformed).is_err());
+        assert_eq!(net.get_weights(), before);
+    }
+
+    #[test]
+    fn test_try_set_weights_accepts_valid_round_trip() {
+        let mut net = CfCNetwork::new(small_config());
+        let weights = net.get_weights();
+
+        assert!(net.try_set_weights(&weights).is_ok());
+        assert_eq!(net.get_weights(), weights);
+    }
     }
 }
