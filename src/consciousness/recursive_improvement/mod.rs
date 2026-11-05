@@ -74,8 +74,10 @@ pub use candidate_archive::{
 };
 
 pub use paired_evaluation::{
-    CandidateEvaluationView, CaseScore, MetricPairedResult, PairedComparison,
-    PairedEvaluationError,
+    CandidateEvaluationView, CaseScore, CompositeCandidateEvaluationView,
+    CompositeEvaluationError, CompositeMetricPairedResult, CompositeMetricSummary,
+    CompositePairedComparison, MetricPairedResult, MetricTaskOutcome, PairedComparison,
+    PairedEvaluationError, TaskDisposition,
 };
 
 pub use core::{
