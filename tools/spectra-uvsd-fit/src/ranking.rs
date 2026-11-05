@@ -134,6 +134,7 @@ pub fn certify_epsilon_optimal_action(
         || !receipt.familywise_alpha.is_finite()
         || receipt.familywise_alpha <= 0.0
         || receipt.familywise_alpha >= 1.0
+        || receipt.minimum_replicates < 2
         || (receipt.familywise_confidence - (1.0 - receipt.familywise_alpha)).abs() > 1.0e-12
     {
         return Err(RobustSelectionError::InvalidScoreReceiptProvenance);
@@ -201,6 +202,8 @@ pub fn certify_epsilon_optimal_action(
             || utility.point_estimate > utility.upper_bound
             || utility.lower_bound < utility.declared_range.lower
             || utility.upper_bound > utility.declared_range.upper
+            || utility.declared_range != receipt.ranges.target_utility
+            || utility.sample_count < receipt.minimum_replicates
             || !utility.declared_range.lower.is_finite()
             || !utility.declared_range.upper.is_finite()
             || utility.declared_range.lower > utility.declared_range.upper
@@ -568,6 +571,17 @@ mod tests {
             ),
             Err(RobustSelectionError::InvalidTailMass)
         );
+        let mut corrupted_provenance = receipt.clone();
+        corrupted_provenance.per_claim_alpha *= 2.0;
+        assert_eq!(
+            certify_epsilon_optimal_action(
+                &corrupted_provenance,
+                RobustUtility::Maximin,
+                0.2
+            ),
+            Err(RobustSelectionError::InvalidScoreReceiptProvenance)
+        );
+
         receipt.metrics.pop();
         assert_eq!(
             certify_epsilon_optimal_action(&receipt, RobustUtility::Maximin, 0.2),
