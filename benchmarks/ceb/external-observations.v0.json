@@ -178,6 +178,28 @@
       "supports": [
         "CEB-HUMAN"
       ]
+    },
+    {
+      "source_id": "swe-milestone-leaderboard",
+      "source_url": "https://swe-milestone.com/",
+      "title": "SWE-Milestone v1.0.2 live leaderboard and task methodology",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "swe-milestone-pmlr",
+      "source_url": "https://proceedings.mlr.press/v306/deng26d.html",
+      "title": "SWE-Milestone ICML 2026 paper",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-05",
+      "published_on": null,
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
     }
   ],
   "comparators": [
@@ -541,6 +563,28 @@
       "caveats": [
         "150 SQL tasks; 3–5 injected blockers per task; exact blocker count not separately stated.",
         "Domain maximum blocker-recall result; system identity not stated in overview."
+      ]
+    },
+    {
+      "comparator_id": "swe-milestone-v1-0-2",
+      "lane_id": "CEB-CONTINUITY",
+      "benchmark_name": "SWE-Milestone",
+      "benchmark_version": "v1.0.2",
+      "split": "Live leaderboard; top listed GLM-5.3 + Claude Code row",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "repository release-range sequences; denominator not stated in visible leaderboard row"
+      },
+      "source_id": "swe-milestone-leaderboard",
+      "supporting_source_ids": [
+        "swe-milestone-pmlr"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "The benchmark uses continuous release-history milestone DAGs; it is not a CEB evidence-disposition task set.",
+        "The visible leaderboard row does not expose the task denominator, exact aggregation details, uncertainty interval or all run configuration fields.",
+        "No metric correspondence here licenses a direct CEB superiority comparison."
       ]
     }
   ],
@@ -1785,6 +1829,111 @@
       "notes": [
         "Domain-specific maximum; the exact blocker denominator and system identity are not supplied in the overview.",
         "Do not combine this maximum with the SWE-domain maximum as if one system produced both."
+      ]
+    },
+    {
+      "observation_id": "swemilestone-glm53-resolve",
+      "comparator_id": "swe-milestone-v1-0-2",
+      "source_locator": "SWE-Milestone v1.0.2 live leaderboard; top listed GLM-5.3 + Claude Code row; Resolve column.",
+      "system": {
+        "system_id": "glm53-claude-code-swe-milestone-top-row",
+        "model": "GLM-5.3",
+        "harness": "Claude Code",
+        "configuration": "Top listed SWE-Milestone v1.0.2 live leaderboard row; detailed prompt and run-budget metadata not exposed in the visible row."
+      },
+      "metric": {
+        "metric_id": "milestone_resolve_rate",
+        "label": "Resolve",
+        "definition": "SWE-Milestone's displayed Resolve percentage. The site explains that a milestone is fully resolved when every fail-to-pass test passes and no previously-passing test regresses; exact leaderboard aggregation/denominator is not stated in the visible row.",
+        "value": 29.75,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "29.75%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not stated",
+          "method": "not stated",
+          "applies_to_metric_id": "milestone_resolve_rate",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Contextual reference only: milestone-level resolution is not CEB sequence-complete rate.",
+        "Do not infer an exact task or sequence denominator from the visible leaderboard row."
+      ]
+    },
+    {
+      "observation_id": "swemilestone-glm53-precision",
+      "comparator_id": "swe-milestone-v1-0-2",
+      "source_locator": "SWE-Milestone v1.0.2 live leaderboard; top listed GLM-5.3 + Claude Code row; Precision column.",
+      "system": {
+        "system_id": "glm53-claude-code-swe-milestone-top-row",
+        "model": "GLM-5.3",
+        "harness": "Claude Code",
+        "configuration": "Top listed SWE-Milestone v1.0.2 live leaderboard row; detailed prompt and run-budget metadata not exposed in the visible row."
+      },
+      "metric": {
+        "metric_id": "milestone_test_precision",
+        "label": "Precision",
+        "definition": "SWE-Milestone's published milestone precision: credit for previously-passing tests (P2P) that remain passing, per the benchmark's test precision/recall description.",
+        "value": 60.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "60.30%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not stated",
+          "method": "not stated",
+          "applies_to_metric_id": "milestone_test_precision",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Test precision is not evidence-disposition precision or evidence-disposition macro-F1.",
+        "Context only; benchmark-specific aggregation and denominator remain attached to the original source."
+      ]
+    },
+    {
+      "observation_id": "swemilestone-glm53-recall",
+      "comparator_id": "swe-milestone-v1-0-2",
+      "source_locator": "SWE-Milestone v1.0.2 live leaderboard; top listed GLM-5.3 + Claude Code row; Recall column.",
+      "system": {
+        "system_id": "glm53-claude-code-swe-milestone-top-row",
+        "model": "GLM-5.3",
+        "harness": "Claude Code",
+        "configuration": "Top listed SWE-Milestone v1.0.2 live leaderboard row; detailed prompt and run-budget metadata not exposed in the visible row."
+      },
+      "metric": {
+        "metric_id": "milestone_test_recall",
+        "label": "Recall",
+        "definition": "SWE-Milestone's published milestone recall: credit for fail-to-pass tests (F2P) that the agent gets passing, per the benchmark's test precision/recall description.",
+        "value": 75.07,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75.07%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not stated",
+          "method": "not stated",
+          "applies_to_metric_id": "milestone_test_recall",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Test recall is not a direct measure of CEB evidence invalidation or evidence continuity.",
+        "Context only; do not pool with precision or the benchmark's separate aggregate Score."
       ]
     }
   ]

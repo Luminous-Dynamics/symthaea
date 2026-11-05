@@ -10,8 +10,8 @@
 The measurement matrix is useful for selecting external comparators, but its `published_reference` text can bundle multiple systems and multiple metrics. This registry normalizes those values into atomic observations. One observation has exactly one metric and one model/harness/configuration. No score is reconstructed by joining the best Recall from one system to the best Context F1 from another, or the best functional score from one security configuration to the best secure score from another.
 
 The registry currently contains:
-- **15 external source records** (the parent measurement matrix has 16 registered URLs because it also registers one internal documentation-audit implementation reference).
-- **18 comparator records**, including the 15 comparator records present in the previous matrix plus AgentAbstain.
+- **17 external source records** (the parent measurement matrix has 16 registered URLs because it also registers one internal documentation-audit implementation reference).
+- **19 comparator records**, including the 15 comparator records present in the previous matrix plus AgentAbstain.
 - One observation for each reported metric/configuration pair; metric values, displayed uncertainty, denominators and source locators remain separately inspectable.
 
 ## Data semantics
@@ -69,3 +69,22 @@ The combined HiL comparator retains the 300-task population. Two additional comp
 - 61% highest SQL-domain blocker recall; winning identity and exact blocker denominator are not stated.
 
 ASK-F1 is the harmonic mean of Question Precision and Blocker Recall. Pass@3 is task success in at least one of three independent assisted runs. These are distinct measures. The consolidated Muse Wonder 1.0 score of 79.67 ± 4.17 remains unlabeled and cannot be assigned either metric. Source: https://labs.scale.com/leaderboard/hil
+
+
+## SWE-Milestone v1.0.2 normalized observations (2026-11-05)
+
+The CEB-CONTINUITY lane now carries an atomic contextual snapshot from the official live leaderboard for the top listed GLM-5.3 + Claude Code row:
+
+- Resolve: 29.75%.
+- Precision: 60.30%.
+- Recall: 75.07%.
+
+The visible leaderboard row does not expose its task/sequence denominator, aggregation details, or a reported uncertainty interval. Those fields are explicitly not reported in the machine-readable observations. The benchmark site explains that a milestone is fully resolved when every fail-to-pass test passes and no previously-passing test regresses; it describes precision as retained P2P tests and recall as passed F2P tests. These are benchmark-specific measures, not direct CEB evidence-disposition metrics.
+
+The same leaderboard row also displays a 58.75 aggregate Score, $42.76 cost, 886K output tokens, 10.61 wall-clock hours and 2,193 turns. The aggregate score formula and full configuration metadata are not sufficiently explicit in the visible table snapshot, so those figures are not promoted into the atomic metric registry. Do not synthesize a best-of-metric system or compare its cost directly with CEB cost per accepted sequence.
+
+Sources:
+- Official leaderboard: https://swe-milestone.com/
+- ICML 2026 paper: https://proceedings.mlr.press/v306/deng26d.html
+
+The external-observation registry now contains 17 external sources, 19 comparator records and 41 atomic observations. All remain contextual references; no direct CEB superiority claim is enabled.
