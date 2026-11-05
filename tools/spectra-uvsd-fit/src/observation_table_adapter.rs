@@ -169,6 +169,7 @@ pub fn adapt_synthetic_dataset_for_uvsd(
         }
     }
 
+    let mut category_count_by_scale = BTreeMap::<u16, usize>::new();
     let mut groups = BTreeMap::<FitGroupKey, GroupAccumulator>::new();
     for action in action_set.actions() {
         let summary = summaries_by_id
@@ -178,15 +179,20 @@ pub fn adapt_synthetic_dataset_for_uvsd(
         if summary.stimulus_class != action.stimulus_class {
             return Err(ObservationFitAdapterError::SummaryClassMismatch);
         }
-        let scale = dataset
-            .scenario
-            .response_scales
-            .iter()
-            .find(|scale| scale.response_scale_id == action.response_scale_id)
-            .ok_or(ObservationFitAdapterError::SummaryCategoryCountMismatch)?;
-        let category_count = scale.latent_criteria.len() + 1;
-        if summary.category_counts.len() != category_count {
+        // The observed summary vector defines the presented category count;
+        // the adapter never consults the DGP's latent criterion values.
+        let category_count = summary.category_counts.len();
+        if category_count < 3 {
             return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
+        }
+        match category_count_by_scale.get(&action.response_scale_id) {
+            Some(existing) if *existing != category_count => {
+                return Err(ObservationFitAdapterError::SummaryCategoryCountMismatch);
+            }
+            Some(_) => {}
+            None => {
+                category_count_by_scale.insert(action.response_scale_id, category_count);
+            }
         }
         let key = FitGroupKey {
             condition_id: action.condition_id,
@@ -314,7 +320,7 @@ fn validate_summary_conservation(
     let rt_total = checked_add(summary.rt_observed, summary.rt_timeouts)?;
     let rt_total = checked_add(rt_total, summary.rt_out_of_range)?;
     let rt_total = checked_add(rt_total, summary.rt_not_collected)?;
-    if rt_total != summary.requested_trials || summary.lapse_count_oracle > summary.requested_trials {
+    if rt_total != summary.requested_trials {
         return Err(ObservationFitAdapterError::InconsistentCategorySummary);
     }
     Ok(())
