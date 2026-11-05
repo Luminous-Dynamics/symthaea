@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/CONNECTOME_OBSERVATION_SUPPORT_CHALLENGE_V1.json",
+  "title": "Connectome observation support challenge set",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "dataset_revision_commit_sha",
+    "query_id",
+    "query_spec_sha256",
+    "scenario_set_sha256",
+    "baseline_action_set_sha256",
+    "challenger_protocol_sha256",
+    "records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "analysis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_revision_commit_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "query_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "query_spec_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "scenario_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "baseline_action_set_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Canonical action-set digest computed using CONNECTOME_ROBUST_QUERY_DISAMBIGUATION_V1."
+    },
+    "challenger_protocol_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Digest of the frozen challenge/reviewer protocol; does not establish protocol validity."
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "challenge_id",
+          "action_id",
+          "scenario_id",
+          "additional_possible_outcomes",
+          "source_evidence_sha256",
+          "dependence_groups"
+        ],
+        "properties": {
+          "challenge_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additional_possible_outcomes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Only adds plausible outcomes. The contract has no operation to remove or narrow baseline supports."
+          },
+          "source_evidence_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "dependence_groups": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "Shared provenance/ancestry labels; no independence is inferred."
+          }
+        }
+      },
+      "description": "Challenge records can target one action/world more than once, but challenge_id values must be unique. Repeated outcome additions are retained as records but counted only once in effective support expansion."
+    }
+  }
+}
