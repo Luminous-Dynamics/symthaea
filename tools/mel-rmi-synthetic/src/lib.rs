@@ -877,9 +877,7 @@ pub fn measure_partner_contrast(
         }
         next.push(result);
     }
-    let next: [Feature; 4] = next
-        .try_into()
-        .map_err(|_| HarnessError::InvalidPolicy)?;
+    let next: [Feature; 4] = next.try_into().map_err(|_| HarnessError::InvalidPolicy)?;
     let rule = task.expected_response;
     let targeted_delta = rule.distance(next[0].value, next[1].value)?;
     let sham_delta = rule.distance(next[0].value, next[2].value)?;
