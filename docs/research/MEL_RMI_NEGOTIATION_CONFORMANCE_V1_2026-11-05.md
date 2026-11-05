@@ -25,6 +25,20 @@ Agent dispositions:
 - `AskClarification`: ask the partner to resolve an outstanding preference;
 - `Abstain`: decline when no admissible response remains.
 
+## Scoped authority-event binding
+
+The raw `PartnerAuthorityV1` is a small decision state, not a credential. The harness now wraps it in `PartnerAuthorityEventV1`, binding the preference/veto payload to:
+- the exact session and task;
+- the exact source observation event;
+- a monotonically expected session-control sequence;
+- an explicit monotonic clock-origin identifier;
+- an effective time and exclusive expiry time;
+- an opaque reference to the authority receipt that an external verifier must authenticate.
+
+`assess_scoped_negotiation` refuses to score the decision unless these fields match the current observation and caller-provided sequence/clock context. It rejects cross-session/task/event replay, stale sequence, mismatched clock origin, not-yet-effective events, expired events, invalid time windows, and absent receipt references.
+
+**Important trust boundary:** this is structural scope/time/replay validation, not signature verification or actor authentication. The opaque receipt reference is not verified by this crate. A production adapter must authenticate the referenced receipt, actor, and action/purpose scope through MEL-013A / the trusted identity layer before invoking the structural evaluator. A SHA-256 or opaque reference alone does not establish consent or authority.
+
 ## Independent predicates
 
 The evaluator reports each property separately:
@@ -47,7 +61,7 @@ The Rust unit suite also exhaustively enumerates 3,464 dispositions across every
 
 ## Adversarial unit-test coverage
 
-Thirteen new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after an already explicit partner selection; bounded branch fan-out; clarification instead of excessive branching; and an exhaustive small-state model check of 3,464 dispositions.
+Thirteen new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after an already explicit partner selection; bounded branch fan-out; clarification instead of excessive branching; an exhaustive small-state model check of 3,464 dispositions, and six scoped authority-event tests.
 
 ## Relationship to existing work
 
