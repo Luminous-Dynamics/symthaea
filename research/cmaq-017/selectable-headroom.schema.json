@@ -139,7 +139,6 @@
       "required": [
         "candidate_mean_variance",
         "shared_continuation_variance",
-        "candidate_local_variance",
         "candidate_continuation_interaction_variance"
       ],
       "properties": {
@@ -148,10 +147,6 @@
           "minimum": 0
         },
         "shared_continuation_variance": {
-          "type": "number",
-          "minimum": 0
-        },
-        "candidate_local_variance": {
           "type": "number",
           "minimum": 0
         },
