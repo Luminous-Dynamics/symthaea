@@ -424,21 +424,23 @@
       "comparator_id": "hil-bench",
       "lane_id": "CEB-HUMAN",
       "benchmark_name": "HiL-Bench",
-      "benchmark_version": "2026-11-05 leaderboard and methodology snapshot",
+      "benchmark_version": "2026-11-05 HiL-Bench methodology and leaderboard snapshot",
       "split": "Software engineering and text-to-SQL",
       "sample_denominator": {
         "status": "reported",
         "value": 300,
         "unit": "tasks"
       },
-      "source_id": "scale-leaderboard",
+      "source_id": "scale-hil",
       "supporting_source_ids": [
-        "scale-hil"
+        "scale-leaderboard"
       ],
       "comparison_class": "contextual_reference",
       "caveats": [
-        "150 software-engineering and 150 text-to-SQL tasks; 200 public and 100 private held-out.",
-        "The displayed 79.67 ± 4.17 leaderboard value is not labeled with an explicit metric name on the consolidated table; do not infer ASK-F1 or Pass@3."
+        "150 software-engineering and 150 text-to-SQL tasks; 200 public and 100 private held-out; 1,131 injected blockers.",
+        "ASK-F1 is Question Precision/Blocker Recall harmonic mean; Pass@3 is at least one success in three independent assisted runs.",
+        "The consolidated leaderboard value 79.67 ± 4.17 remains unlabeled; do not assign it ASK-F1 or Pass@3 semantics.",
+        "The best domain blocker-recall figures are stored separately for SWE and SQL; model identities are not reported in the overview."
       ]
     },
     {
@@ -497,6 +499,48 @@
         "42 executable environments; eight abstention scenarios.",
         "Primary metric is paired accuracy: both sides of the pair must be correct.",
         "Act, Abstain and CAR are separate component metrics, macro-averaged over scenarios."
+      ]
+    },
+    {
+      "comparator_id": "hil-bench-swe",
+      "lane_id": "CEB-HUMAN",
+      "benchmark_name": "HiL-Bench",
+      "benchmark_version": "2026-11-05 methodology snapshot",
+      "split": "Software engineering domain",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 150,
+        "unit": "tasks"
+      },
+      "source_id": "scale-hil",
+      "supporting_source_ids": [
+        "scale-leaderboard"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "150 SWE tasks; 3–5 injected blockers per task; exact blocker count not separately stated.",
+        "Domain maximum blocker-recall result; system identity not stated in overview."
+      ]
+    },
+    {
+      "comparator_id": "hil-bench-sql",
+      "lane_id": "CEB-HUMAN",
+      "benchmark_name": "HiL-Bench",
+      "benchmark_version": "2026-11-05 methodology snapshot",
+      "split": "Text-to-SQL domain",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 150,
+        "unit": "tasks"
+      },
+      "source_id": "scale-hil",
+      "supporting_source_ids": [
+        "scale-leaderboard"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "150 SQL tasks; 3–5 injected blockers per task; exact blocker count not separately stated.",
+        "Domain maximum blocker-recall result; system identity not stated in overview."
       ]
     }
   ],
@@ -1601,6 +1645,146 @@
       },
       "notes": [
         "Roadmap statement is not evidence that the 4.1 verifier improvements are already released."
+      ]
+    },
+    {
+      "observation_id": "hil-best-ask-f1",
+      "comparator_id": "hil-bench",
+      "source_locator": "HiL-Bench official overview, metric definitions/results section; https://labs.scale.com/leaderboard/hil",
+      "system": {
+        "system_id": "hil-best-ask-f1-identity-unreported",
+        "model": "not_reported_in_overview",
+        "harness": "SWE-Agent scaffold",
+        "configuration": "highest combined ASK-F1; system identity not stated"
+      },
+      "metric": {
+        "metric_id": "ask_f1",
+        "label": "Highest combined ASK-F1",
+        "definition": "Harmonic mean of Question Precision and Blocker Recall; combined software-engineering and text-to-SQL overview result. System identity is not stated in the overview.",
+        "value": 44,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "44%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "ask_f1",
+          "applies_to_task_count": 300
+        }
+      },
+      "notes": [
+        "The system identity is not stated in the overview; do not attribute this result to Claude Opus 4.6 or Muse Wonder.",
+        "ASK-F1 is distinct from Pass@3 and from AgentAbstain paired act/abstain accuracy."
+      ]
+    },
+    {
+      "observation_id": "hil-opus-pass3",
+      "comparator_id": "hil-bench",
+      "source_locator": "HiL-Bench official overview, metric definitions/results section; https://labs.scale.com/leaderboard/hil",
+      "system": {
+        "system_id": "claude-opus-4-6-hil-pass3",
+        "model": "Claude Opus 4.6",
+        "harness": "SWE-Agent scaffold",
+        "configuration": "combined SWE + SQL; ask_human help tool; Pass@3"
+      },
+      "metric": {
+        "metric_id": "pass_at_3",
+        "label": "Claude Opus 4.6 combined Pass@3",
+        "definition": "Task success in at least one of three independent runs after help is available; combined software-engineering and text-to-SQL result.",
+        "value": 24,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "24%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "pass_at_3",
+          "applies_to_task_count": 300
+        }
+      },
+      "notes": [
+        "Pass@3 is not ASK-F1; it measures task completion after help.",
+        "Do not map this result to the unlabeled 79.67 ± 4.17 Muse Wonder leaderboard row."
+      ]
+    },
+    {
+      "observation_id": "hil-swe-blocker-recall",
+      "comparator_id": "hil-bench-swe",
+      "source_locator": "HiL-Bench official overview, metric definitions/results section; https://labs.scale.com/leaderboard/hil",
+      "system": {
+        "system_id": "hil-swe-blocker-recall-identity-unreported",
+        "model": "not_reported_in_overview",
+        "harness": "SWE-Agent scaffold",
+        "configuration": "highest reported SWE-domain blocker recall; identity not stated"
+      },
+      "metric": {
+        "metric_id": "blocker_recall",
+        "label": "Highest SWE-domain Blocker Recall",
+        "definition": "Fraction of registered task blockers in the 150-task software-engineering domain that are identified and asked about; model identity not stated in the overview.",
+        "value": 36,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "36%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "blocker_recall",
+          "applies_to_task_count": 150
+        }
+      },
+      "notes": [
+        "Domain-specific maximum; the exact blocker denominator and system identity are not supplied in the overview.",
+        "Do not combine this maximum with the SQL-domain maximum as if one system produced both."
+      ]
+    },
+    {
+      "observation_id": "hil-sql-blocker-recall",
+      "comparator_id": "hil-bench-sql",
+      "source_locator": "HiL-Bench official overview, metric definitions/results section; https://labs.scale.com/leaderboard/hil",
+      "system": {
+        "system_id": "hil-sql-blocker-recall-identity-unreported",
+        "model": "not_reported_in_overview",
+        "harness": "SWE-Agent scaffold",
+        "configuration": "highest reported SQL-domain blocker recall; identity not stated"
+      },
+      "metric": {
+        "metric_id": "blocker_recall",
+        "label": "Highest SQL-domain Blocker Recall",
+        "definition": "Fraction of registered task blockers in the 150-task text-to-SQL domain that are identified and asked about; model identity not stated in the overview.",
+        "value": 61,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "61%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "blocker_recall",
+          "applies_to_task_count": 150
+        }
+      },
+      "notes": [
+        "Domain-specific maximum; the exact blocker denominator and system identity are not supplied in the overview.",
+        "Do not combine this maximum with the SWE-domain maximum as if one system produced both."
       ]
     }
   ]
