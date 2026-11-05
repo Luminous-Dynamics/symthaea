@@ -36,6 +36,8 @@ pub enum ReplicationSeedMode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AdaptiveAllocationConfig {
     pub policy_version: String,
+    /// Caller-supplied digest of the complete canonical current score receipt.
+    pub score_receipt_digest: String,
     pub root_seed: u64,
     pub seed_mode: ReplicationSeedMode,
     pub robust_utility: RobustUtility,
@@ -87,6 +89,11 @@ pub struct AdaptiveAllocationReceipt {
     pub score_bound_method_id: &'static str,
     pub score_contract_digest: String,
     pub source_digest: String,
+    pub action_set_digest: String,
+    pub scenario_set_digest: String,
+    /// Digest of the exact score snapshot that produced this allocation.
+    pub score_receipt_digest: String,
+    pub current_cell_sample_counts: Vec<CellSampleCount>,
     pub root_seed: u64,
     pub seed_mode: ReplicationSeedMode,
     pub robust_utility: RobustUtility,
@@ -99,6 +106,13 @@ pub struct AdaptiveAllocationReceipt {
     pub competitive_action_ids: Vec<u32>,
     pub cell_priorities: Vec<CellPriority>,
     pub next_batch: Option<SimulationBatchRequest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CellSampleCount {
+    pub action_id: u32,
+    pub scenario_id: u16,
+    pub sample_count: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -114,6 +128,7 @@ pub struct CellPriority {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AdaptiveAllocationError {
     MissingPolicyVersion,
+    MissingScoreReceiptDigest,
     InvalidEpsilon,
     InvalidBudget,
     FixedLookBoundsNotAllowed,
@@ -134,6 +149,7 @@ impl fmt::Display for AdaptiveAllocationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {
             Self::MissingPolicyVersion => "adaptive allocation policy version must not be empty",
+            Self::MissingScoreReceiptDigest => "score-receipt digest must not be empty",
             Self::InvalidEpsilon => "indifference-zone epsilon must be finite and nonnegative",
             Self::InvalidBudget => "maximum total and next batch budgets must be positive",
             Self::FixedLookBoundsNotAllowed => "adaptive allocation requires time-uniform score bounds",
@@ -167,6 +183,9 @@ pub fn allocate_next_score_batch(
 ) -> Result<AdaptiveAllocationReceipt, AdaptiveAllocationError> {
     if config.policy_version.trim().is_empty() {
         return Err(AdaptiveAllocationError::MissingPolicyVersion);
+    }
+    if config.score_receipt_digest.trim().is_empty() {
+        return Err(AdaptiveAllocationError::MissingScoreReceiptDigest);
     }
     if !config.epsilon.is_finite() || config.epsilon < 0.0 {
         return Err(AdaptiveAllocationError::InvalidEpsilon);
@@ -223,7 +242,7 @@ pub fn allocate_next_score_batch(
             certificate,
             competitive_action_ids,
             AllocationDisposition::CertifiedStop,
-        ));
+        )?);
     }
 
     if current_total_replications >= config.max_total_replications {
@@ -234,7 +253,7 @@ pub fn allocate_next_score_batch(
             certificate,
             competitive_action_ids,
             AllocationDisposition::BudgetExhaustedWithoutCertificate,
-        ));
+        )?);
     }
 
     let remaining_budget = config.max_total_replications - current_total_replications;
@@ -288,7 +307,7 @@ pub fn allocate_next_score_batch(
             certificate,
             competitive_action_ids,
             AllocationDisposition::BudgetInsufficientForAtomicBatch,
-        ));
+        )?);
     }
     let requested_count = affordable_count.min(config.next_batch_size);
     let first_index = u32::try_from(selected_cell.sample_count)
@@ -340,6 +359,10 @@ pub fn allocate_next_score_batch(
         score_bound_method_id: receipt.method_id,
         score_contract_digest: receipt.score_contract_digest.clone(),
         source_digest: receipt.source_digest.clone(),
+        action_set_digest: receipt.action_set_digest.clone(),
+        scenario_set_digest: receipt.scenario_set_digest.clone(),
+        score_receipt_digest: config.score_receipt_digest.clone(),
+        current_cell_sample_counts: current_cell_sample_counts(receipt)?,
         root_seed: config.root_seed,
         seed_mode: config.seed_mode,
         robust_utility: config.robust_utility,
@@ -362,13 +385,17 @@ fn build_stop_receipt(
     certificate: RobustSelectionCertificate,
     competitive_action_ids: Vec<u32>,
     disposition: AllocationDisposition,
-) -> AdaptiveAllocationReceipt {
-    AdaptiveAllocationReceipt {
+) -> Result<AdaptiveAllocationReceipt, AdaptiveAllocationError> {
+    Ok(AdaptiveAllocationReceipt {
         method_id: "robust-interval-width-allocation-v1",
         policy_version: config.policy_version.clone(),
         score_bound_method_id: receipt.method_id,
         score_contract_digest: receipt.score_contract_digest.clone(),
         source_digest: receipt.source_digest.clone(),
+        action_set_digest: receipt.action_set_digest.clone(),
+        scenario_set_digest: receipt.scenario_set_digest.clone(),
+        score_receipt_digest: config.score_receipt_digest.clone(),
+        current_cell_sample_counts: current_cell_sample_counts(receipt)?,
         root_seed: config.root_seed,
         seed_mode: config.seed_mode,
         robust_utility: config.robust_utility,
@@ -381,7 +408,7 @@ fn build_stop_receipt(
         competitive_action_ids,
         cell_priorities: Vec::new(),
         next_batch: None,
-    }
+    })
 }
 
 fn common_cell_sample_count(
@@ -455,6 +482,24 @@ fn compute_cell_priorities(
         }
     }
     Ok(priorities)
+}
+
+fn current_cell_sample_counts(
+    receipt: &ScoreBoundsReceipt,
+) -> Result<Vec<CellSampleCount>, AdaptiveAllocationError> {
+    let mut counts = receipt
+        .samples
+        .iter()
+        .map(|cell| {
+            Ok(CellSampleCount {
+                action_id: cell.action_id,
+                scenario_id: cell.scenario_id,
+                sample_count: common_cell_sample_count(cell)?,
+            })
+        })
+        .collect::<Result<Vec<_>, AdaptiveAllocationError>>()?;
+    counts.sort_by_key(|cell| (cell.action_id, cell.scenario_id));
+    Ok(counts)
 }
 
 fn validate_receipt_sample_grid(
@@ -743,6 +788,7 @@ mod tests {
     fn config(epsilon: f64, max_total: usize, batch: usize) -> AdaptiveAllocationConfig {
         AdaptiveAllocationConfig {
             policy_version: "spectra-test-allocator-v1".to_owned(),
+            score_receipt_digest: "sha256:test-score-receipt".to_owned(),
             root_seed: 77,
             seed_mode: ReplicationSeedMode::CommonRandomNumbersWithinScenario,
             robust_utility: RobustUtility::Maximin,
