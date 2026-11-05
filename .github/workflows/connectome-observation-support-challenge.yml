@@ -1,0 +1,57 @@
+name: Connectome observation support challenge envelope
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_observation_support_challenge_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py"
+      - "docs/neuroscience/CONNECTOME_OBSERVATION_SUPPORT_CHALLENGE.schema.json"
+      - "docs/neuroscience/CONNECTOME_OBSERVATION_SUPPORT_CHALLENGE_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_*.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json"
+      - ".github/workflows/connectome-observation-support-challenge.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_observation_support_challenge_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py"
+      - "docs/neuroscience/CONNECTOME_OBSERVATION_SUPPORT_CHALLENGE.schema.json"
+      - "docs/neuroscience/CONNECTOME_OBSERVATION_SUPPORT_CHALLENGE_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_*.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json"
+      - ".github/workflows/connectome-observation-support-challenge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-support-expansion-audit:
+    name: Exact support expansion audit and independent oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check support challenge formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_observation_support_challenge_audit.rs
+      - name: Run strict Clippy for support challenge audit
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_observation_support_challenge_audit -- -D warnings
+      - name: Run Rust support challenge tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_observation_support_challenge_audit
+      - name: Evaluate cost-increase fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_observation_support_challenge_audit -- --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --challenge docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_COST_INCREASE.example.json --output "$RUNNER_TEMP/support-cost-increase.json"
+          python3 tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --challenge docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_COST_INCREASE.example.json --report "$RUNNER_TEMP/support-cost-increase.json"
+      - name: Evaluate destroyed-plan negative control
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_observation_support_challenge_audit -- --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --challenge docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_DESTROYED.example.json --output "$RUNNER_TEMP/support-destroyed.json"
+          python3 tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --challenge docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_DESTROYED.example.json --report "$RUNNER_TEMP/support-destroyed.json"
+      - name: Evaluate no-op control
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_observation_support_challenge_audit -- --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --challenge docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_NOOP.example.json --output "$RUNNER_TEMP/support-noop.json"
+          python3 tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py --input docs/neuroscience/examples/CONNECTOME_ROBUST_QUERY_DISAMBIGUATION.example.json --challenge docs/neuroscience/examples/CONNECTOME_SUPPORT_CHALLENGE_NOOP.example.json --report "$RUNNER_TEMP/support-noop.json"
+      - name: Verify independent oracle syntax
+        run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py
