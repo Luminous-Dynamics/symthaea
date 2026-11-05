@@ -384,6 +384,7 @@ fn load_runs(bytes: &[u8], tasks: &BTreeMap<String, Task>) -> Result<BTreeMap<St
     let text = std::str::from_utf8(bytes).map_err(|e| format!("proof-runs JSONL is not UTF-8: {e}"))?;
     let mut strategies = BTreeMap::<String, AggregatedStrategy>::new();
     let mut seen_run_ids = BTreeSet::new();
+    let mut task_contexts = BTreeMap::<String, (String, String, String)>::new();
     for (index, line) in text.lines().enumerate() {
         if line.trim().is_empty() { continue; }
         let run: ProofRun = serde_json::from_str(line)
@@ -391,6 +392,21 @@ fn load_runs(bytes: &[u8], tasks: &BTreeMap<String, Task>) -> Result<BTreeMap<St
         let task = tasks.get(&run.task_id)
             .ok_or_else(|| format!("proof-run {} references task outside frozen evaluation split", run.run_id))?;
         validate_run(&run, task)?;
+        let context = (
+            run.source_file_sha256.clone(),
+            run.goal_sha256.clone(),
+            run.declaration_signature_before_sha256.clone(),
+        );
+        if let Some(previous) = task_contexts.get(&run.task_id) {
+            if previous != &context {
+                return Err(format!(
+                    "task {} source file, goal or declaration-signature identity differs across strategy runs",
+                    run.task_id
+                ));
+            }
+        } else {
+            task_contexts.insert(run.task_id.clone(), context);
+        }
         if !seen_run_ids.insert(run.run_id.clone()) {
             return Err(format!("duplicate proof run ID {}", run.run_id));
         }
@@ -651,7 +667,7 @@ fn synthetic_run(task: &Task, strategy: &Strategy, run_id: &str, solved: bool) -
         start_column: task.location.start_column,
         end_line: task.location.end_line,
         end_column: task.location.end_column,
-        goal_sha256: fake_hash(&format!("goal:{}", task.id)),
+        goal_sha256: sha256(task.debug_info.goal.as_bytes()),
         declaration_signature_before_sha256: fake_hash(&format!("before:{}", task.id)),
         declaration_signature_after_sha256: fake_hash(&format!("after:{}", task.id)),
         target_is_prop: true,
