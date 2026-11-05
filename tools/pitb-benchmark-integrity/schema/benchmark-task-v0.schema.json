@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/benchmark-task-v0.schema.json",
+  "title": "PITB normalized real-world Lean task v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "source_task_id",
+    "repo_remote",
+    "repo_branch",
+    "repo_commit",
+    "lean_version",
+    "path",
+    "start_line",
+    "start_column",
+    "end_line",
+    "end_column",
+    "debug_goal_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.benchmark-task.v0"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "repo_remote": {
+      "type": "string",
+      "pattern": "^https://[^@]+$"
+    },
+    "repo_branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"
+    },
+    "start_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "start_column": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_column": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "debug_goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitSha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    }
+  }
+}
