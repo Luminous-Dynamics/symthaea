@@ -340,7 +340,7 @@ fn true_outcome(case: EpisodeCase, scenario: Scenario, action: Intervention) -> 
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ForecastKind {
+pub enum ForecastKind {
     Predicted,
     Counterfactual,
 }
@@ -829,11 +829,10 @@ fn evaluate_episode(
     let mut selected_score = f64::NEG_INFINITY;
     for action in &canonical {
         if let Some(score) = predicted_effect(model, case.history, *action, baseline, &predictions)
+            && score > selected_score
         {
-            if score > selected_score {
-                selected_score = score;
-                selected_action = Some(*action);
-            }
+            selected_score = score;
+            selected_action = Some(*action);
         }
     }
     let top1_regret = selected_action.map(|action| {
