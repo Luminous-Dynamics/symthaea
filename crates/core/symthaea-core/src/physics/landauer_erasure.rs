@@ -42,7 +42,7 @@ mod tests {
         let at_300k = erasure_heat_floor_j(1.0, 300.0, K_BOLTZMANN).unwrap();
         let at_310k = erasure_heat_floor_j(1.0, 310.0, K_BOLTZMANN).unwrap();
 
-        assert!((at_300k - 2.870_973e-21).abs() < 1e-27);
+        assert!((at_300k - 2.870_978_885_078_724e-21).abs() < 1e-35);
         assert!((at_310k - 2.966_678_181_248_014_7e-21).abs() < 1e-35);
     }
 
