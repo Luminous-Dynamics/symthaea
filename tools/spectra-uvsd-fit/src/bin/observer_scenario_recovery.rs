@@ -6,19 +6,19 @@
 //! Flow: frozen operational schedule -> synthetic DGP -> observed-only
 //! participant-level adapter -> UVSD fitter -> failure-inclusive CSV.
 //!
-//! Oracle values are read only after the fit for known-answer scoring. They
-//! are never passed to the adapter or the fitter. This runner is exploratory:
-//! it does not calibrate Wald intervals, model-selection tests, or human data.
+//! Oracle fields are used only after fitting (or after adapter abstention) to
+//! score known synthetic truth. They are never passed to the adapter or fitter.
+//! This is exploratory recovery, not interval calibration or a human study.
 
 use std::error::Error;
 use std::io;
 
 use spectra_uvsd_fit::observation_table_adapter::{
-    FitDisposition, adapt_synthetic_dataset_for_uvsd,
+    FitDisposition, ObservationFitGroup, adapt_synthetic_dataset_for_uvsd,
 };
 use spectra_uvsd_fit::scenario_dgp::{
     EvidenceFamily, ObserverScenario, ParticipantHeterogeneity, ResponseScaleSpec,
-    RtChannelSpec, TrialRequest, generate_synthetic_dataset,
+    RtChannelSpec, SyntheticDataset, TrialRequest, generate_synthetic_dataset,
 };
 use spectra_uvsd_fit::sequential::{
     OperationalAction, OperationalActionSet, StimulusClass,
@@ -46,9 +46,8 @@ impl Default for Cli {
 struct ScenarioCase {
     id: u16,
     name: &'static str,
-    family: EvidenceFamily,
     spec: ObserverScenario,
-    correctly_specified_gaussian: bool,
+    correctly_specified_single_observer_gaussian: bool,
 }
 
 #[derive(Debug, Default)]
@@ -104,12 +103,20 @@ impl Accumulator {
         }
     }
 
-    fn rmse(&self, squared_error_sum: f64) -> Option<f64> {
-        (self.converged > 0).then(|| (squared_error_sum / self.converged as f64).sqrt())
+    fn rmse(&self, squared_error_sum: f64) -> String {
+        if self.converged == 0 {
+            String::new()
+        } else {
+            format!("{:.9}", (squared_error_sum / self.converged as f64).sqrt())
+        }
     }
 
-    fn mean_error(&self, error_sum: f64) -> Option<f64> {
-        (self.converged > 0).then(|| error_sum / self.converged as f64)
+    fn mean_error(&self, error_sum: f64) -> String {
+        if self.converged == 0 {
+            String::new()
+        } else {
+            format!("{:.9}", error_sum / self.converged as f64)
+        }
     }
 }
 
@@ -213,9 +220,8 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases.push(ScenarioCase {
         id: 1,
         name: "gaussian_null_sigma_1",
-        family: null.evidence_family,
         spec: null,
-        correctly_specified_gaussian: true,
+        correctly_specified_single_observer_gaussian: true,
     });
 
     let mut high_variance = base_scenario(2);
@@ -223,9 +229,8 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases.push(ScenarioCase {
         id: 2,
         name: "gaussian_uvsd_sigma_1_3",
-        family: high_variance.evidence_family,
         spec: high_variance,
-        correctly_specified_gaussian: true,
+        correctly_specified_single_observer_gaussian: true,
     });
 
     let mut low_variance = base_scenario(3);
@@ -233,9 +238,8 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases.push(ScenarioCase {
         id: 3,
         name: "gaussian_uvsd_sigma_0_7",
-        family: low_variance.evidence_family,
         spec: low_variance,
-        correctly_specified_gaussian: true,
+        correctly_specified_single_observer_gaussian: true,
     });
 
     let mut heavy_tail = base_scenario(4);
@@ -246,9 +250,8 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases.push(ScenarioCase {
         id: 4,
         name: "student_t5_heavy_tail_stress",
-        family: heavy_tail.evidence_family,
         spec: heavy_tail,
-        correctly_specified_gaussian: false,
+        correctly_specified_single_observer_gaussian: false,
     });
 
     let mut lapse = base_scenario(5);
@@ -257,9 +260,8 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases.push(ScenarioCase {
         id: 5,
         name: "uniform_lapse_5pct_stress",
-        family: lapse.evidence_family,
         spec: lapse,
-        correctly_specified_gaussian: false,
+        correctly_specified_single_observer_gaussian: false,
     });
 
     let mut drift = base_scenario(6);
@@ -268,23 +270,37 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases.push(ScenarioCase {
         id: 6,
         name: "criterion_drift_0_4_per_100_stress",
-        family: drift.evidence_family,
         spec: drift,
-        correctly_specified_gaussian: false,
+        correctly_specified_single_observer_gaussian: false,
     });
 
-    let mut missing = base_scenario(7);
+    let mut heterogeneous = base_scenario(7);
+    heterogeneous.signal_sigma = 1.3;
+    heterogeneous.heterogeneity = Some(ParticipantHeterogeneity {
+        signal_mean_sd: 0.25,
+        log_signal_sigma_sd: 0.12,
+        criterion_offset_sd: 0.18,
+    });
+    // Within a single participant-session these random effects are fixed,
+    // so the conditional individual Gaussian UVSD estimand remains valid.
+    cases.push(ScenarioCase {
+        id: 7,
+        name: "between_observer_effects_single_observer_fit",
+        spec: heterogeneous,
+        correctly_specified_single_observer_gaussian: true,
+    });
+
+    let mut missing = base_scenario(8);
     missing.signal_sigma = 1.3;
     missing.confidence_missing_probability = 0.05;
     cases.push(ScenarioCase {
-        id: 7,
+        id: 8,
         name: "missing_category_5pct_abstention_stress",
-        family: missing.evidence_family,
         spec: missing,
-        correctly_specified_gaussian: false,
+        correctly_specified_single_observer_gaussian: false,
     });
 
-    let mut rt = base_scenario(8);
+    let mut rt = base_scenario(9);
     rt.signal_sigma = 1.3;
     rt.rt_channel = Some(RtChannelSpec {
         base_latency_ms: 700.0,
@@ -295,11 +311,10 @@ fn scenario_cases() -> Vec<ScenarioCase> {
         default_deadline_ms: Some(1_800),
     });
     cases.push(ScenarioCase {
-        id: 8,
+        id: 9,
         name: "quantized_rt_channel_sigma_1_3",
-        family: rt.evidence_family,
         spec: rt,
-        correctly_specified_gaussian: true,
+        correctly_specified_single_observer_gaussian: true,
     });
 
     cases
@@ -309,7 +324,10 @@ fn trial_schedule(trials_per_class: u32) -> Result<Vec<TrialRequest>, Box<dyn Er
     let total = trials_per_class.checked_mul(2).ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "requested trial count overflow")
     })?;
-    let mut requests = Vec::with_capacity(total as usize);
+    let capacity = usize::try_from(total).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidInput, "requested trial count exceeds platform capacity")
+    })?;
+    let mut requests = Vec::with_capacity(capacity);
     for trial in 0..total {
         requests.push(TrialRequest {
             action_id: if trial % 2 == 0 { 1 } else { 2 },
@@ -320,8 +338,17 @@ fn trial_schedule(trials_per_class: u32) -> Result<Vec<TrialRequest>, Box<dyn Er
     Ok(requests)
 }
 
+fn csv_number(value: f64) -> String {
+    format!("{value:.9}")
+}
+
 fn csv_option(value: Option<f64>) -> String {
-    value.map_or_else(String::new, |number| format!("{number:.9}"))
+    value.map_or_else(String::new, csv_number)
+}
+
+fn emit_csv_row(fields: Vec<String>) {
+    debug_assert_eq!(fields.len(), 39, "CSV row must match the header");
+    println!("{}", fields.join(","));
 }
 
 fn write_replicate_header() {
@@ -330,113 +357,137 @@ fn write_replicate_header() {
     );
 }
 
-#[allow(clippy::too_many_arguments)]
 fn write_replicate_row(
     case: &ScenarioCase,
     replicate: usize,
     seed: u64,
     trials_per_class: u32,
-    dataset: &spectra_uvsd_fit::scenario_dgp::SyntheticDataset,
-    group: Option<&spectra_uvsd_fit::observation_table_adapter::ObservationFitGroup>,
-    adapter_disposition: &str,
+    dataset: &SyntheticDataset,
+    group: &ObservationFitGroup,
     fit_status: &str,
     qualified: bool,
-    truth_mu: f64,
-    truth_sigma: f64,
-    truth_d_a: f64,
+    truth: (f64, f64, f64),
     estimates: Option<(f64, f64, f64)>,
     errors: Option<(f64, f64, f64)>,
 ) {
-    let (observed_signal, observed_noise, missing_signal, missing_noise, rt_observed, rt_timeouts) =
-        group.map_or((0, 0, 0, 0, 0, 0), |group| {
-            (
-                group.observed_signal_trials,
-                group.observed_noise_trials,
-                group.missing_signal_categories,
-                group.missing_noise_categories,
-                group.rt_observed,
-                group.rt_timeouts,
-            )
-        });
-    let (estimate_mu, estimate_sigma, estimate_d_a) =
-        estimates.map_or((None, None, None), |(mu, sigma, d_a)| {
-            (Some(mu), Some(sigma), Some(d_a))
-        });
-    let (mu_error, sigma_error, d_a_error) =
-        errors.map_or((None, None, None), |(mu, sigma, d_a)| {
-            (Some(mu), Some(sigma), Some(d_a))
-        });
-    println!(
-        "REPLICATE,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},,,,,,,,,{},{}",
-        case.id,
-        case.name,
-        if case.correctly_specified_gaussian { "gaussian_uvsd_track" } else { "misspecification_stress_track" },
-        replicate,
-        seed,
-        dataset.prng_version,
-        trials_per_class,
-        trials_per_class.saturating_mul(2),
-        observed_signal,
-        observed_noise,
-        missing_signal,
-        missing_noise,
-        rt_observed,
-        rt_timeouts,
-        adapter_disposition,
-        fit_status,
-        qualified,
-        truth_mu,
-        truth_sigma,
-        truth_d_a,
+    let (estimate_mu, estimate_sigma, estimate_d_a) = estimates
+        .map(|(mu, sigma, d_a)| (Some(mu), Some(sigma), Some(d_a)))
+        .unwrap_or((None, None, None));
+    let (mu_error, sigma_error, d_a_error) = errors
+        .map(|(mu, sigma, d_a)| (Some(mu), Some(sigma), Some(d_a)))
+        .unwrap_or((None, None, None));
+    let track = if case.correctly_specified_single_observer_gaussian {
+        "gaussian_single_observer_track"
+    } else {
+        "misspecification_stress_track"
+    };
+    emit_csv_row(vec![
+        "REPLICATE".to_owned(),
+        case.id.to_string(),
+        case.name.to_owned(),
+        track.to_owned(),
+        replicate.to_string(),
+        seed.to_string(),
+        dataset.prng_version.to_owned(),
+        trials_per_class.to_string(),
+        trials_per_class.saturating_mul(2).to_string(),
+        group.observed_signal_trials.to_string(),
+        group.observed_noise_trials.to_string(),
+        group.missing_signal_categories.to_string(),
+        group.missing_noise_categories.to_string(),
+        group.rt_observed.to_string(),
+        group.rt_timeouts.to_string(),
+        format!("{:?}", group.disposition),
+        fit_status.to_owned(),
+        qualified.to_string(),
+        csv_number(truth.0),
+        csv_number(truth.1),
+        csv_number(truth.2),
         csv_option(estimate_mu),
         csv_option(estimate_sigma),
         csv_option(estimate_d_a),
         csv_option(mu_error),
         csv_option(sigma_error),
         csv_option(d_a_error),
-        "",
-        "",
-    );
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+    ]);
 }
 
 fn write_summary_row(case: &ScenarioCase, aggregate: &Accumulator) {
-    let fit_availability_all = if aggregate.campaigns > 0 {
-        aggregate.converged as f64 / aggregate.campaigns as f64
+    let fit_availability_all = aggregate.converged as f64 / aggregate.campaigns.max(1) as f64;
+    let fit_availability_eligible =
+        aggregate.converged as f64 / aggregate.adapter_ready.max(1) as f64;
+    let track = if case.correctly_specified_single_observer_gaussian {
+        "gaussian_single_observer_track"
     } else {
-        0.0
+        "misspecification_stress_track"
     };
-    let fit_availability_eligible = if aggregate.adapter_ready > 0 {
-        aggregate.converged as f64 / aggregate.adapter_ready as f64
-    } else {
-        0.0
-    };
-    let mean_mu = aggregate.mean_error(aggregate.mu_error_sum);
-    let mean_sigma = aggregate.mean_error(aggregate.sigma_error_sum);
-    let mean_d_a = aggregate.mean_error(aggregate.d_a_error_sum);
-    let rmse_mu = aggregate.rmse(aggregate.mu_squared_error_sum);
-    let rmse_sigma = aggregate.rmse(aggregate.sigma_squared_error_sum);
-    let rmse_d_a = aggregate.rmse(aggregate.d_a_squared_error_sum);
-    println!(
-        "SUMMARY,{},{},{},ALL,,,,,,,,,,,,,SUMMARY,,,,,,,,,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-        case.id,
-        case.name,
-        if case.correctly_specified_gaussian { "gaussian_uvsd_track" } else { "misspecification_stress_track" },
-        csv_option(mean_mu),
-        csv_option(mean_sigma),
-        csv_option(mean_d_a),
-        csv_option(rmse_mu),
-        csv_option(rmse_sigma),
-        csv_option(rmse_d_a),
-        fit_availability_all,
-        fit_availability_eligible,
-        aggregate.adapter_ready,
-        aggregate.adapter_abstentions,
-        aggregate.boundary,
-        aggregate.not_identifiable,
-        aggregate.weakly_identified,
-        aggregate.not_converged,
-        aggregate.not_evaluable,
-    );
+    emit_csv_row(vec![
+        "SUMMARY".to_owned(),
+        case.id.to_string(),
+        case.name.to_owned(),
+        track.to_owned(),
+        "ALL".to_owned(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        "SUMMARY".to_owned(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        aggregate.mean_error(aggregate.mu_error_sum),
+        aggregate.mean_error(aggregate.sigma_error_sum),
+        aggregate.mean_error(aggregate.d_a_error_sum),
+        aggregate.rmse(aggregate.mu_squared_error_sum),
+        aggregate.rmse(aggregate.sigma_squared_error_sum),
+        aggregate.rmse(aggregate.d_a_squared_error_sum),
+        csv_number(fit_availability_all),
+        csv_number(fit_availability_eligible),
+        aggregate.adapter_ready.to_string(),
+        aggregate.adapter_abstentions.to_string(),
+        aggregate.boundary.to_string(),
+        aggregate.not_identifiable.to_string(),
+        aggregate.weakly_identified.to_string(),
+        aggregate.not_converged.to_string(),
+        aggregate.not_evaluable.to_string(),
+    ]);
+}
+
+fn known_truth_after_fit(dataset: &SyntheticDataset) -> io::Result<(f64, f64, f64)> {
+    let signal = dataset
+        .trials
+        .iter()
+        .find(|trial| trial.stimulus_class == StimulusClass::Signal)
+        .ok_or_else(|| io::Error::other("synthetic schedule contained no signal trials"))?;
+    let mu = signal.oracle_signal_mean;
+    let sigma = signal.oracle_signal_sigma;
+    if !mu.is_finite() || !sigma.is_finite() || sigma <= 0.0 {
+        return Err(io::Error::other("synthetic oracle truth was invalid"));
+    }
+    let d_a = mu / ((1.0 + sigma * sigma) / 2.0).sqrt();
+    Ok((mu, sigma, d_a))
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -444,15 +495,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let action_set = action_set()?;
     let requests = trial_schedule(cli.trials_per_class)?;
     let fit_options = FitOptions::default();
-    let fit_mu = 1.1 + 0.3; // Must match base_scenario stimulus mapping below.
 
     write_replicate_header();
 
     for case in scenario_cases() {
         let mut aggregate = Accumulator::default();
-        let true_mu = fit_mu;
-        let true_sigma = case.spec.signal_sigma;
-        let true_d_a = true_mu / ((1.0 + true_sigma * true_sigma) / 2.0).sqrt();
 
         for replicate in 0..cli.outer {
             aggregate.record_campaign();
@@ -470,26 +517,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                     && group.key.condition_id == 1
                     && group.key.stimulus_level() == 1.0
                     && group.key.response_scale_id == 5
-            });
-            let Some(group) = group else {
-                return Err(io::Error::other("expected participant/session fit group missing").into());
-            };
+            }).ok_or_else(|| io::Error::other("expected participant-session fit group missing"))?;
             aggregate.record_adapter_disposition(group.disposition);
 
             if group.disposition != FitDisposition::Ready {
+                let truth = known_truth_after_fit(&dataset)?;
                 write_replicate_row(
                     &case,
                     replicate,
                     seed,
                     cli.trials_per_class,
                     &dataset,
-                    Some(group),
-                    &format!("{:?}", group.disposition),
+                    group,
                     "NOT_RUN",
                     false,
-                    true_mu,
-                    true_sigma,
-                    true_d_a,
+                    truth,
                     None,
                     None,
                 );
@@ -500,17 +542,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                 io::Error::other("Ready adapter disposition did not include CategoryTable")
             })?;
             let fit_result = fit(table, fit_options);
+            // Oracle fields are accessed only after the estimator has returned.
+            let truth = known_truth_after_fit(&dataset)?;
             let estimate = fit_result.estimate.as_ref();
-            let estimated = estimate.map(|estimate| {
-                (estimate.mu, estimate.sigma, estimate.d_a)
-            });
+            let estimated = estimate.map(|estimate| (estimate.mu, estimate.sigma, estimate.d_a));
             let qualified = fit_result.status == FitStatus::Converged;
             let errors = if qualified {
                 estimate.map(|estimate| {
                     (
-                        estimate.mu - true_mu,
-                        estimate.sigma - true_sigma,
-                        estimate.d_a - true_d_a,
+                        estimate.mu - truth.0,
+                        estimate.sigma - truth.1,
+                        estimate.d_a - truth.2,
                     )
                 })
             } else {
@@ -523,13 +565,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 seed,
                 cli.trials_per_class,
                 &dataset,
-                Some(group),
-                "Ready",
+                group,
                 &format!("{:?}", fit_result.status),
                 qualified,
-                true_mu,
-                true_sigma,
-                true_d_a,
+                truth,
                 estimated,
                 errors,
             );
