@@ -553,6 +553,197 @@ fn lower_tail_mass(
     included
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::score_bounds::{
+        bound_candidate_score_samples, bound_candidate_score_samples_anytime,
+        BoundedScoreSamples, ScoreBoundsConfig, ScoreRange, ScoreRanges,
+    };
+    use super::super::scenario::ScenarioSet;
+    use super::super::sequential::{OperationalActionSet, StimulusClass};
+
+    fn action_set() -> OperationalActionSet {
+        OperationalActionSet::new(
+            vec![
+                OperationalAction {
+                    action_id: 1,
+                    audit_stratum: 1,
+                    condition_id: 1,
+                    stimulus_class: StimulusClass::Noise,
+                    stimulus_level: 0.0,
+                    response_scale_id: 1,
+                    rt_deadline_ms: None,
+                },
+                OperationalAction {
+                    action_id: 2,
+                    audit_stratum: 1,
+                    condition_id: 1,
+                    stimulus_class: StimulusClass::Signal,
+                    stimulus_level: 1.0,
+                    response_scale_id: 1,
+                    rt_deadline_ms: None,
+                },
+            ],
+            "sha256:allocation-actions",
+        )
+        .unwrap()
+    }
+
+    fn scenario_set() -> ScenarioSet {
+        ScenarioSet::new(
+            vec![
+                ScenarioDefinition { scenario_id: 10, weight: 0.6 },
+                ScenarioDefinition { scenario_id: 20, weight: 0.4 },
+            ],
+            "sha256:allocation-scenarios",
+        )
+        .unwrap()
+    }
+
+    fn score_config() -> ScoreBoundsConfig {
+        ScoreBoundsConfig {
+            familywise_alpha: 0.05,
+            minimum_replicates: 4,
+            ranges: ScoreRanges {
+                target_information: ScoreRange { lower: 0.0, upper: 1.0 },
+                model_discrimination_information: ScoreRange { lower: 0.0, upper: 1.0 },
+                representativeness: ScoreRange { lower: 0.0, upper: 1.0 },
+                target_utility: ScoreRange { lower: 0.0, upper: 1.0 },
+                participant_burden_seconds: ScoreRange { lower: 0.0, upper: 2.0 },
+            },
+            score_contract_digest: "sha256:allocation-score".to_owned(),
+            source_digest: "sha256:allocation-generator".to_owned(),
+            root_seed: 123,
+        }
+    }
+
+    fn score_receipt(n: usize, action_utilities: [f64; 2], anytime: bool) -> ScoreBoundsReceipt {
+        let actions = action_set();
+        let scenarios = scenario_set();
+        let mut samples = Vec::new();
+        for action in actions.actions() {
+            for scenario in scenarios.scenarios() {
+                let utility = if action.action_id == 1 {
+                    action_utilities[0]
+                } else {
+                    action_utilities[1]
+                };
+                samples.push(BoundedScoreSamples {
+                    action_id: action.action_id,
+                    scenario_id: scenario.scenario_id,
+                    operational_mapping_qualified: true,
+                    model_adequacy_qualified: true,
+                    target_information: vec![0.5; n],
+                    model_discrimination_information: vec![0.5; n],
+                    representativeness: vec![0.9; n],
+                    target_utility: vec![utility; n],
+                    participant_burden_seconds: vec![1.0; n],
+                });
+            }
+        }
+        if anytime {
+            bound_candidate_score_samples_anytime(&actions, &scenarios, &samples, &score_config())
+                .unwrap()
+        } else {
+            bound_candidate_score_samples(&actions, &scenarios, &samples, &score_config()).unwrap()
+        }
+    }
+
+    fn config(epsilon: f64, max_total: usize, batch: usize) -> AdaptiveAllocationConfig {
+        AdaptiveAllocationConfig {
+            policy_version: "spectra-test-allocator-v1".to_owned(),
+            root_seed: 77,
+            seed_mode: ReplicationSeedMode::CommonRandomNumbersWithinScenario,
+            robust_utility: RobustUtility::Maximin,
+            epsilon,
+            max_total_replications: max_total,
+            next_batch_size: batch,
+        }
+    }
+
+    #[test]
+    fn rejects_fixed_look_bounds_for_adaptive_allocation() {
+        let receipt = score_receipt(4, [0.8, 0.7], false);
+        assert_eq!(
+            allocate_next_score_batch(&receipt, &config(0.1, 100, 2)),
+            Err(AdaptiveAllocationError::FixedLookBoundsNotAllowed)
+        );
+    }
+
+    #[test]
+    fn requests_more_samples_from_a_competitive_uncertain_cell() {
+        let receipt = score_receipt(4, [0.8, 0.7], true);
+        let decision = allocate_next_score_batch(&receipt, &config(0.01, 40, 3)).unwrap();
+        assert_eq!(decision.disposition, AllocationDisposition::AllocateMore);
+        assert_eq!(decision.current_total_replications, 16);
+        assert_eq!(decision.competitive_action_ids, vec![1, 2]);
+        let request = decision.next_batch.unwrap();
+        assert!(decision
+            .cell_priorities
+            .iter()
+            .any(|cell| cell.action_id == request.action_id
+                && cell.scenario_id == request.scenario_id
+                && cell.priority == decision.selected_cell_priority.unwrap()));
+        assert_eq!(request.first_replication_index, 4);
+        assert_eq!(request.replication_count, 3);
+        assert_eq!(request.seeds.len(), 3);
+        assert_eq!(
+            request.seeds[0],
+            derive_replication_seed(
+                77,
+                request.action_id,
+                request.scenario_id,
+                4,
+                ReplicationSeedMode::CommonRandomNumbersWithinScenario,
+            )
+        );
+    }
+
+    #[test]
+    fn stops_when_indifference_zone_certificate_is_reached() {
+        let receipt = score_receipt(2_000, [0.9, 0.1], true);
+        let decision = allocate_next_score_batch(&receipt, &config(0.3, 20_000, 10)).unwrap();
+        assert_eq!(decision.disposition, AllocationDisposition::CertifiedStop);
+        assert_eq!(
+            decision.certificate.status,
+            RobustSelectionStatus::CertifiedWithinIndifferenceZone
+        );
+        assert!(decision.next_batch.is_none());
+    }
+
+    #[test]
+    fn exhausted_budget_returns_no_selection_certificate() {
+        let receipt = score_receipt(4, [0.8, 0.7], true);
+        let decision = allocate_next_score_batch(&receipt, &config(0.01, 16, 4)).unwrap();
+        assert_eq!(
+            decision.disposition,
+            AllocationDisposition::BudgetExhaustedWithoutCertificate
+        );
+        assert_eq!(
+            decision.certificate.status,
+            RobustSelectionStatus::NoSelectionCertificate
+        );
+        assert!(decision.next_batch.is_none());
+    }
+
+    #[test]
+    fn common_random_number_seeds_match_across_actions_but_independent_seeds_do_not() {
+        let common_a = derive_replication_seed(
+            7, 1, 20, 4, ReplicationSeedMode::CommonRandomNumbersWithinScenario,
+        );
+        let common_b = derive_replication_seed(
+            7, 2, 20, 4, ReplicationSeedMode::CommonRandomNumbersWithinScenario,
+        );
+        assert_eq!(common_a, common_b);
+        let independent_a =
+            derive_replication_seed(7, 1, 20, 4, ReplicationSeedMode::IndependentPerCell);
+        let independent_b =
+            derive_replication_seed(7, 2, 20, 4, ReplicationSeedMode::IndependentPerCell);
+        assert_ne!(independent_a, independent_b);
+    }
+}
+
 /// Deterministic simulation seed derivation. The schedule must use the same
 /// function and the caller's frozen root seed to replay score generation.
 pub fn derive_replication_seed(
