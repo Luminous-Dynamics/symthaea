@@ -1488,25 +1488,27 @@ mod tests {
         let mut ledger = ledger();
         let before = initial_state();
         let after = invalidate_state(&before);
+        let veto = event(
+            1,
+            "veto-rejected",
+            EventKind::VetoApplied(VetoReceipt {
+                session_id: "session-1".into(),
+                turn_id: "turn-1".into(),
+                participant_id: "performer-1".into(),
+                authority_receipt_ref: "rejected-veto-ref".into(),
+                control_sequence: 1,
+                before,
+                after,
+                discarded_unconsumed_notes: 5,
+                discarded_application_frames: 480,
+            }),
+        );
         assert_eq!(
-            ledger.apply(event(
-                1,
-                "veto",
-                EventKind::VetoApplied(VetoReceipt {
-                    session_id: "session-1".into(),
-                    turn_id: "turn-1".into(),
-                    participant_id: "performer-1".into(),
-                    authority_receipt_ref: "rejected-veto-ref".into(),
-                    control_sequence: 1,
-                    before,
-                    after,
-                    discarded_unconsumed_notes: 5,
-                    discarded_application_frames: 480,
-                })
-            )),
+            ledger.apply_with_authority_verifier(veto.clone(), &RejectVetoVerifier),
             Err(LedgerError::VetoAuthorityRejected)
         );
         assert_eq!(ledger.state().epoch, 0);
+        assert_eq!(ledger.apply(veto), Err(LedgerError::VetoVerifierUnavailable));
     }
 
     #[test]
@@ -1516,21 +1518,24 @@ mod tests {
         let before = initial_state();
         let after = invalidate_state(&before);
         ledger
-            .apply(event(
-                2,
-                "veto",
-                EventKind::VetoApplied(VetoReceipt {
-                    session_id: "session-1".into(),
-                    turn_id: "turn-1".into(),
-                    participant_id: "performer-1".into(),
-                    authority_receipt_ref: "signed-veto-ref-1".into(),
-                    control_sequence: 2,
-                    before,
-                    after,
-                    discarded_unconsumed_notes: 5,
-                    discarded_application_frames: 480,
-                }),
-            ))
+            .apply_with_authority_verifier(
+                event(
+                    2,
+                    "veto",
+                    EventKind::VetoApplied(VetoReceipt {
+                        session_id: "session-1".into(),
+                        turn_id: "turn-1".into(),
+                        participant_id: "performer-1".into(),
+                        authority_receipt_ref: "signed-veto-ref-1".into(),
+                        control_sequence: 2,
+                        before,
+                        after,
+                        discarded_unconsumed_notes: 5,
+                        discarded_application_frames: 480,
+                    }),
+                ),
+                &AcceptVetoVerifier,
+            )
             .unwrap();
         assert_eq!(ledger.decision_revoked("decision-0"), Some(true));
         assert_eq!(
@@ -1909,21 +1914,24 @@ mod tests {
         let before = ledger.state().clone();
         let after = invalidate_state(&before);
         ledger
-            .apply(event(
-                5,
-                "veto",
-                EventKind::VetoApplied(VetoReceipt {
-                    session_id: "session-1".into(),
-                    turn_id: "turn-1".into(),
-                    participant_id: "performer-1".into(),
-                    authority_receipt_ref: "signed-veto-ref-1".into(),
-                    control_sequence: 2,
-                    before,
-                    after,
-                    discarded_unconsumed_notes: 5,
-                    discarded_application_frames: 480,
-                }),
-            ))
+            .apply_with_authority_verifier(
+                event(
+                    5,
+                    "veto",
+                    EventKind::VetoApplied(VetoReceipt {
+                        session_id: "session-1".into(),
+                        turn_id: "turn-1".into(),
+                        participant_id: "performer-1".into(),
+                        authority_receipt_ref: "signed-veto-ref-1".into(),
+                        control_sequence: 2,
+                        before,
+                        after,
+                        discarded_unconsumed_notes: 5,
+                        discarded_application_frames: 480,
+                    }),
+                ),
+                &AcceptVetoVerifier,
+            )
             .unwrap();
         ledger
             .apply(stage_event(
@@ -1937,6 +1945,7 @@ mod tests {
             ))
             .unwrap();
         assert_eq!(ledger.summary().cpal_predicted, 1);
+        assert_eq!(ledger.summary().callback_observed, 1);
     }
 
     #[test]
@@ -1958,21 +1967,24 @@ mod tests {
         let before = ledger.state().clone();
         let after = invalidate_state(&before);
         ledger
-            .apply(event(
-                4,
-                "veto",
-                EventKind::VetoApplied(VetoReceipt {
-                    session_id: "session-1".into(),
-                    turn_id: "turn-1".into(),
-                    participant_id: "performer-1".into(),
-                    authority_receipt_ref: "signed-veto-ref-1".into(),
-                    control_sequence: 2,
-                    before,
-                    after,
-                    discarded_unconsumed_notes: 5,
-                    discarded_application_frames: 600,
-                }),
-            ))
+            .apply_with_authority_verifier(
+                event(
+                    4,
+                    "veto",
+                    EventKind::VetoApplied(VetoReceipt {
+                        session_id: "session-1".into(),
+                        turn_id: "turn-1".into(),
+                        participant_id: "performer-1".into(),
+                        authority_receipt_ref: "signed-veto-ref-1".into(),
+                        control_sequence: 2,
+                        before,
+                        after,
+                        discarded_unconsumed_notes: 5,
+                        discarded_application_frames: 600,
+                    }),
+                ),
+                &AcceptVetoVerifier,
+            )
             .unwrap();
         let callback = stage_event(
             "decision-0",
