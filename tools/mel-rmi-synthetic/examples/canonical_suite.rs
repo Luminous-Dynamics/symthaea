@@ -3,9 +3,8 @@ use mel_rmi_synthetic::{
     ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ReciprocalTrialRecordV1,
     ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1, TrialRunConfig,
-    UnrelatedFeatureShortcutPolicy, bind_verified_artifacts,
-    canonical_fixture_replicates_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
-    verify_trial_artifact_bindings,
+    UnrelatedFeatureShortcutPolicy, bind_verified_artifacts, canonical_fixture_replicates_v1,
+    run_policy_suite_v1, run_reciprocal_suite_v1, verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
