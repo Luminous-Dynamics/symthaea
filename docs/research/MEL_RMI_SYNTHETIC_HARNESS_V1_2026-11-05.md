@@ -22,7 +22,7 @@ Each task uses four paired symbolic observations sharing one task/session/seed/f
 
 The intervention validator rejects event-ID duplication, task/session/history/seed leakage, wrong dimensions, a no-op treatment, a changed sham, and mismatched assignment order. The deterministic Fisher–Yates scheduler binds order to the recorded seed for replay. It is a synthetic fixture scheduler, not an approved randomization procedure for a human study.
 
-Policy arms execute in that recorded order, but output actions are stored in canonical condition slots for paired contrasts. Each arm calls `fork_from_frozen_state` with the same task seed; the API contract requires a fresh policy restored from the same pre-intervention checkpoint. A stateful-counter test checks that each arm starts at ordinal one and receives the same seed. The trait cannot prove that an arbitrary production adapter obeys this contract; a real adapter still needs its own isolation test.
+Policy arms execute in that recorded order, but output actions are stored in canonical condition slots for paired contrasts. Each arm calls `fork_from_frozen_state` with the same task seed; the API contract requires a fresh policy restored from the same pre-intervention checkpoint. A stateful-counter test checks that each arm starts at ordinal one and receives the same seed. The reverse-direction controlled partner is now independently forked per condition as well, using the same task seed and registered condition order; a stateful-partner test checks fresh per-fork call state, shared seed and invocation order. These traits cannot prove that an arbitrary production adapter obeys the contract; real adapters still need their own isolation tests.
 
 ## Baselines and dimensions
 
@@ -110,7 +110,7 @@ These counts are finite fixture-control results, not benchmark accuracy estimate
 ## Verification history
 
 - The **42-test** artifact-binding revision passed its exact-head dedicated workflow on commit `618fa4d719b68c6fe0b401c072e7177e2a2cd3ed`, run `42025215684`: 42 passed, 0 failed; the five-dimension positive/negative-control gates passed; 1,120 synthetic byte sets were re-verified; the workflow checked 17,920 digest rows, 30 agent summaries, and five partner summaries. Repository-wide CI, governance, benchmark, and showroom workflows were skipped, not passed.
-- The current **61-test** revision adds multi-valid response negotiation, the 3,464-state finite model check, and scoped authority events. It requires a fresh exact-head pass. The earlier 42-test result is not evidence that the 61-test revision passed.
+- The **63-test** revision added multi-valid response negotiation, the 3,464-state finite model check, and scoped authority events; it passed on exact head `95bb88bdf7b41223d564f6af19686e41db93bf3c`. The current **64-test** revision additionally isolates controlled-partner counterfactual forks and checks their order/seed/state; it requires a fresh exact-head pass. Earlier 42- and 63-test results do not prove the 64-test revision passed.
 - No musician pilot, human-partner study, hardware/device loopback, real Studio read-back, receipt-signature verification, or external commercial benchmark run has been performed.
 
 ## Next integration steps
