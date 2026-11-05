@@ -598,6 +598,7 @@ mod tests {
                 &scenario_set,
                 &duplicate,
                 RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::DuplicateActionScenarioOutcome)
         );
@@ -615,6 +616,7 @@ mod tests {
                 &scenario_set,
                 &unknown_action,
                 RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::UnknownActionId)
         );
@@ -627,6 +629,7 @@ mod tests {
                 &scenario_set,
                 &unknown_scenario,
                 RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::UnknownScenarioId)
         );
@@ -639,6 +642,7 @@ mod tests {
                 &scenario_set,
                 &invalid_score,
                 RobustUtility::Maximin,
+            "sha256:scenario-score-contract",
             ),
             Err(ScenarioAssessmentError::InvalidOutcomeValue)
         );
