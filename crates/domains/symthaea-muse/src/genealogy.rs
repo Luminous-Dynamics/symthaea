@@ -90,7 +90,10 @@ impl std::fmt::Display for GenealogyBundleError {
                 write!(formatter, "persisted keeper artifact differs: {artifact}")
             }
             Self::ManifestMismatch { artifact } => {
-                write!(formatter, "keeper artifact no longer matches genealogy manifest: {artifact}")
+                write!(
+                    formatter,
+                    "keeper artifact no longer matches genealogy manifest: {artifact}"
+                )
             }
             Self::MissingManifest { audio_key } => {
                 write!(formatter, "keeper has no genealogy manifest: {audio_key}")
@@ -98,7 +101,9 @@ impl std::fmt::Display for GenealogyBundleError {
             Self::InvalidRmiBinding(reason) => {
                 write!(formatter, "invalid RMI artifact binding: {reason}")
             }
-            Self::Database(error) => write!(formatter, "genealogy database operation failed: {error}"),
+            Self::Database(error) => {
+                write!(formatter, "genealogy database operation failed: {error}")
+            }
         }
     }
 }
@@ -187,8 +192,8 @@ impl GenealogyStore {
 
         let recipe_bytes = std::fs::read(bundle_directory.join("recipe.json"))
             .map_err(GenealogyBundleError::Io)?;
-        let audio_bytes = std::fs::read(bundle_directory.join("audio.wav"))
-            .map_err(GenealogyBundleError::Io)?;
+        let audio_bytes =
+            std::fs::read(bundle_directory.join("audio.wav")).map_err(GenealogyBundleError::Io)?;
         let score_bytes = match manifest.score_sha256.as_ref() {
             Some(_) => Some(
                 std::fs::read(bundle_directory.join("score.json"))
@@ -815,7 +820,10 @@ mod tests {
             .unwrap();
         assert_eq!(binding.genealogy.audio_key, "rmi-binding-key");
         assert_eq!(binding.genealogy.recipe_sha256, artifact_sha256_hex(recipe));
-        assert_eq!(binding.genealogy.score_sha256, Some(artifact_sha256_hex(score)));
+        assert_eq!(
+            binding.genealogy.score_sha256,
+            Some(artifact_sha256_hex(score))
+        );
         assert_eq!(binding.genealogy.audio_sha256, artifact_sha256_hex(audio));
         assert_eq!(binding.source_event_id, "partner-input-17");
         assert_eq!(binding.action_event_id, "agent-action-18");
@@ -880,14 +888,7 @@ mod tests {
         std::fs::write(directory.join("recipe.json"), recipe).unwrap();
         std::fs::write(directory.join("audio.wav"), audio).unwrap();
         store
-            .allocate_root_from_bytes(
-                &origin(),
-                "verify-no-score",
-                recipe,
-                None,
-                audio,
-                1007,
-            )
+            .allocate_root_from_bytes(&origin(), "verify-no-score", recipe, None, audio, 1007)
             .unwrap();
         let verified = store.verify_bundle("verify-no-score", &directory).unwrap();
         assert_eq!(verified.score_sha256, None);
