@@ -1,0 +1,179 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "ENG-ARTIFACT-TRUST-001",
+  "source_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10647",
+  "status": {
+    "corpus": "blueprint_only",
+    "gold_adjudication": "not_yet_adjudicated",
+    "scoring": "not_scored",
+    "candidate_execution_authorized": false,
+    "production_keys_authorized": false,
+    "physical_execution_authorized": false
+  },
+  "standards": [
+    {
+      "id": "in-toto Attestation Framework",
+      "version": "profile revision to be pinned",
+      "source_uri": "https://github.com/in-toto/attestation"
+    },
+    {
+      "id": "DSSE Envelope v1",
+      "version": "profile revision to be pinned",
+      "source_uri": "https://github.com/in-toto/attestation/blob/main/spec/v1/envelope.md"
+    },
+    {
+      "id": "SLSA Build Provenance",
+      "version": "v1.1",
+      "source_uri": "https://slsa.dev/spec/v1.1/provenance"
+    },
+    {
+      "id": "SLSA Verification",
+      "version": "v1.1",
+      "source_uri": "https://slsa.dev/spec/v1.1/verifying-artifacts"
+    }
+  ],
+  "cases": [
+    {
+      "id": "TRUST-P01",
+      "kind": "positive_blueprint",
+      "family": "design_artifact",
+      "critical": true,
+      "intent": "Accept a synthetic signed design artifact with expected repository, workflow, source revision, subject digest and predicate scope.",
+      "expected_disposition": "accept_authenticated_subject",
+      "seeded_attack": null
+    },
+    {
+      "id": "TRUST-P02",
+      "kind": "positive_blueprint",
+      "family": "inspection_artifact",
+      "critical": true,
+      "intent": "Accept a synthetic signed inspection package bound to exact article, lot, characteristic, instrument/calibration and inspection-event identities.",
+      "expected_disposition": "accept_authenticated_subject",
+      "seeded_attack": null
+    },
+    {
+      "id": "TRUST-P03",
+      "kind": "positive_blueprint",
+      "family": "provenance_chain",
+      "critical": true,
+      "intent": "Accept a complete signed chain from design export through manufacturing plan/execution to exact article and inspection result.",
+      "expected_disposition": "accept_complete_scoped_chain",
+      "seeded_attack": null
+    },
+    {
+      "id": "TRUST-N01",
+      "kind": "negative_control_blueprint",
+      "family": "bundle_replacement",
+      "critical": true,
+      "intent": "Reject a fully self-consistent replacement bundle when no trusted signature authenticates its subject.",
+      "expected_disposition": "reject_unauthenticated_subject",
+      "seeded_attack": "Replace payload and unsigned manifest/receipt together."
+    },
+    {
+      "id": "TRUST-N02",
+      "kind": "negative_control_blueprint",
+      "family": "signer_trust",
+      "critical": true,
+      "intent": "Reject a mathematically valid signature from a signer absent from the independent trust root.",
+      "expected_disposition": "reject_untrusted_signer",
+      "seeded_attack": "Use a generated key not present in the configured trust policy."
+    },
+    {
+      "id": "TRUST-N03",
+      "kind": "negative_control_blueprint",
+      "family": "signer_scope",
+      "critical": true,
+      "intent": "Reject a trusted signer whose authorization does not cover the asserted predicate or artifact class.",
+      "expected_disposition": "reject_scope_mismatch",
+      "seeded_attack": "Reuse a build-only signer for an engineering approval predicate."
+    },
+    {
+      "id": "TRUST-N04",
+      "kind": "negative_control_blueprint",
+      "family": "replay",
+      "critical": true,
+      "intent": "Reject a valid signed source-generation artifact replayed against a newer target generation.",
+      "expected_disposition": "reject_stale_generation",
+      "seeded_attack": "Replay signed G0 receipt while the requested target is G1."
+    },
+    {
+      "id": "TRUST-N05",
+      "kind": "negative_control_blueprint",
+      "family": "subject_binding",
+      "critical": true,
+      "intent": "Reject a valid signature bound to a different component, variant, article, lot, characteristic or inspection event.",
+      "expected_disposition": "reject_wrong_subject",
+      "seeded_attack": "Substitute one exact subject reference while keeping display labels unchanged."
+    },
+    {
+      "id": "TRUST-N06",
+      "kind": "negative_control_blueprint",
+      "family": "chain_integrity",
+      "critical": true,
+      "intent": "Reject missing, reordered or spliced provenance edges in a multi-stage artifact chain.",
+      "expected_disposition": "reject_incomplete_chain",
+      "seeded_attack": "Omit or replace one intermediate transformation or execution event."
+    },
+    {
+      "id": "TRUST-N07",
+      "kind": "negative_control_blueprint",
+      "family": "trust_root",
+      "critical": true,
+      "intent": "Reject trust-root or trust-policy material supplied only by the untrusted package.",
+      "expected_disposition": "reject_untrusted_root",
+      "seeded_attack": "Replace verifier root and package signature with attacker-controlled pair."
+    },
+    {
+      "id": "TRUST-N08",
+      "kind": "negative_control_blueprint",
+      "family": "profile_downgrade",
+      "critical": true,
+      "intent": "Reject silent downgrade or incompatible profile reinterpretation.",
+      "expected_disposition": "unknown_or_reject_unsupported_profile",
+      "seeded_attack": "Replace a required profile with a weaker or unsupported version."
+    },
+    {
+      "id": "TRUST-N09",
+      "kind": "negative_control_blueprint",
+      "family": "credential_freshness",
+      "critical": true,
+      "intent": "Reject a signature whose credential is expired or revoked under the independently configured policy.",
+      "expected_disposition": "reject_expired_or_revoked_credential",
+      "seeded_attack": "Use a credential outside its validity or revocation policy."
+    },
+    {
+      "id": "TRUST-N10",
+      "kind": "negative_control_blueprint",
+      "family": "timebase",
+      "critical": true,
+      "intent": "Reject freshness claims built on manipulated timestamps or mismatched clock domains.",
+      "expected_disposition": "unknown_or_reject_timebase",
+      "seeded_attack": "Shift timestamps or change timebase while retaining data bytes."
+    },
+    {
+      "id": "TRUST-N11",
+      "kind": "negative_control_blueprint",
+      "family": "claim_tier",
+      "critical": true,
+      "intent": "Prevent integrity or build provenance from being promoted into evidence admission, verification, approval or release.",
+      "expected_disposition": "reject_claim_tier_escalation",
+      "seeded_attack": "Relabel integrity-only receipt as approved engineering evidence."
+    },
+    {
+      "id": "TRUST-N12",
+      "kind": "negative_control_blueprint",
+      "family": "organization_identity",
+      "critical": true,
+      "intent": "Reject cross-organization or tenant identity collision despite identical friendly names.",
+      "expected_disposition": "reject_organization_subject_mismatch",
+      "seeded_attack": "Use another organization/repository/supplier identity with the same display name."
+    }
+  ],
+  "limitations": [
+    "All cases are public authoring blueprints, not adjudicated gold fixtures.",
+    "Only synthetic keys and trust roots are permitted in this corpus.",
+    "No candidate verifier, key-management system, production trust root or physical system was executed.",
+    "The manifest does not establish in-toto conformance, any SLSA level, product safety, engineering approval or release authority.",
+    "Candidate execution, production keys and physical execution remain unauthorized."
+  ]
+}
