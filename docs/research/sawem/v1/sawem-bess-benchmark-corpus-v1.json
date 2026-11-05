@@ -917,7 +917,7 @@
       "case_id": "FORECAST-VINTAGE-ASOF-001",
       "track": "forecast_and_decision_replay",
       "title": "Leakage-free as-of forecast vintage reconstruction",
-      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate. A target without a model identity must not silently choose among different forecasting engines; the caller must explicitly scope the target by model. Source availability is distinct from issue time: a forecast issued before decision time but published after the decision is excluded. A known realized observation is model-independent, so it may supersede competing forecast engines without requiring a model identity.",
+      "scenario": "For each price/forecast target period and model identity, reconstruct only the forecast vintages and realized observations that were available to the decision workflow at the frozen decision timestamp. Select the latest eligible forecast by issue time, let a realized observation supersede only after the target interval ended and the observation became available, exclude future-known records, report missing coverage, and reject ambiguous latest vintages. Forecast issue time, target valid time and source available-at time are separate. A target without a model identity must not silently choose among different forecasting engines; the caller must explicitly scope the target by model. Source availability is distinct from issue time: a forecast issued before decision time but published after the decision is excluded. A known realized observation is model-independent, so it may supersede competing forecast engines without requiring a model identity. Model scope is the pair of immutable model label and exact model SHA-256; builds sharing a label but not a digest are separate forecasting engines.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -933,7 +933,8 @@
         "ambiguous_latest_forecasts_fail_instead_of_choosing_arbitrarily",
         "invalid_source_and_model_digests_are_rejected",
         "observed_period_cannot_be_known_before_it_has_ended",
-        "duplicate_record_ids_and_duplicate_targets_fail_closed"
+        "duplicate_record_ids_and_duplicate_targets_fail_closed",
+        "same_model_label_with_different_build_digests_requires_exact_scope"
       ],
       "required_evidence": [
         "frozen historical decision timestamp in UTC",
@@ -949,7 +950,8 @@
         "known realized observation takes precedence only after target interval end and source availability",
         "separate source available-at timestamp distinct from issue time",
         "forecast model identity and digest for every forecast-engine vintage",
-        "realized observation interval end, observed-at and available-at timestamps"
+        "realized observation interval end, observed-at and available-at timestamps",
+        "exact immutable forecast-model content digest bound to the decision target"
       ],
       "stress_tags": [
         "forecast-vintage",
