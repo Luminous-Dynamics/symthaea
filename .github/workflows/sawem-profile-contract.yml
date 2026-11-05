@@ -6,6 +6,8 @@ on:
     paths:
       - "docs/research/sawem/**"
       - "tools/sawem-profile-conformance/**"
+      - "tools/sawem-market-reference/**"
+      - "tools/sawem-market-reference/**"
       - ".github/workflows/sawem-profile-contract.yml"
   push:
     paths:
