@@ -92,12 +92,13 @@ pub use checkpoint::{AdamState, BrocaCheckpoint, BrocaCheckpointMetadata};
 pub use consensus_engine::{ChangeProposal, ConsensusEngine, ConsensusResult};
 pub use controller::{LanguageController, LanguageControllerConfig, NetworkSnapshot};
 pub use decoder::{
-    StructuredDecoder, StructuredProseTranslator, StructuredReadout, StructuredRoleFill,
-    StructuredTranslation,
+    EpistemicDisposition, StructuredDecoder, StructuredProseTranslator, StructuredReadout,
+    StructuredRoleFill, StructuredTranslation,
 };
 pub use dreaming::DreamingService;
 pub use encoder::{
-    EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, ThoughtChannels, ThoughtLanguageEncoder,
+    EPISTEMIC_CUBE_BASE, EPISTEMIC_CUBE_CHANNELS, IntentChannel, ThoughtChannels,
+    ThoughtLanguageEncoder,
 };
 pub use epistemic_dashboard::{CognitiveStyle, EpistemicDashboard};
 pub use epistemic_scorers::{compute_epistemic_reward, compute_idiomaticity};
