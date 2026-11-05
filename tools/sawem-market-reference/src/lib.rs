@@ -121,6 +121,8 @@ pub enum Violation {
     ReserveTargetBelowMinimumStableCharge,
     ReserveResponseDeadlineExceeded,
     ReserveSustainInsufficient,
+    ReserveTransitionEvidenceContradiction,
+    ReserveTransitionDeadlineExceeded,
     UnsupportedReserveProductDirection,
     InvalidReserveValue,
     DuplicateReserveProductDirection,
@@ -480,6 +482,53 @@ fn evaluate_reserve_energy_scenario(
     Ok(())
 }
 
+fn assess_reserve_mode_transition(
+    baseline_net_mw: f64,
+    target_net_mw: f64,
+    reserves: &[ReserveCommitment],
+    limits: AssetLimits,
+    indeterminate_reasons: &mut Vec<&'static str>,
+    violations: &mut Vec<Violation>,
+) {
+    let baseline_mode = mode_for(
+        (-baseline_net_mw).max(0.0),
+        baseline_net_mw.max(0.0),
+    );
+    let (target_charge, target_discharge) =
+        match operating_point_for_net_power(target_net_mw, limits.min_stable_charge_mw) {
+            Ok(value) => value,
+            Err(violation) => {
+                violations.push(violation);
+                return;
+            }
+        };
+    let target_mode = mode_for(target_charge, target_discharge);
+    let required_transition =
+        required_transition_seconds(baseline_mode, target_mode, limits.transitions);
+
+    if required_transition <= EPSILON {
+        return;
+    }
+
+    for reserve in reserves {
+        let requirement =
+            match sawem_rev_2_3_reserve_requirement(reserve.product, reserve.direction) {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
+        if let Some(deadline) = requirement.maximum_full_activation_seconds {
+            if required_transition > deadline + EPSILON {
+                violations.push(Violation::ReserveTransitionDeadlineExceeded);
+            }
+        }
+        match reserve.full_activation_seconds {
+            Some(actual) if actual + EPSILON >= required_transition => {}
+            Some(_) => violations.push(Violation::ReserveTransitionEvidenceContradiction),
+            None => indeterminate_reasons.push("missing_full_activation_evidence_for_mode_transition"),
+        }
+    }
+}
+
 fn assess_reserves(
     limits: AssetLimits,
     charge_mw: f64,
@@ -532,15 +581,35 @@ fn assess_reserves(
 
     if committed_up_mw > EPSILON {
         let target = baseline_net + committed_up_mw;
-        if let Err(violation) = operating_point_for_net_power(target, limits.min_stable_charge_mw) {
-            violations.push(violation);
-        }
+        let directional_reserves: Vec<_> = reserves
+            .iter()
+            .filter(|reserve| reserve.direction == ReserveDirection::Up)
+            .copied()
+            .collect();
+        assess_reserve_mode_transition(
+            baseline_net,
+            target,
+            &directional_reserves,
+            limits,
+            &mut indeterminate_reasons,
+            &mut violations,
+        );
     }
     if committed_down_mw > EPSILON {
         let target = baseline_net - committed_down_mw;
-        if let Err(violation) = operating_point_for_net_power(target, limits.min_stable_charge_mw) {
-            violations.push(violation);
-        }
+        let directional_reserves: Vec<_> = reserves
+            .iter()
+            .filter(|reserve| reserve.direction == ReserveDirection::Down)
+            .copied()
+            .collect();
+        assess_reserve_mode_transition(
+            baseline_net,
+            target,
+            &directional_reserves,
+            limits,
+            &mut indeterminate_reasons,
+            &mut violations,
+        );
     }
 
     if !reserves.is_empty() {
@@ -1052,6 +1121,38 @@ mod tests {
     }
 
     #[test]
+    fn reserve_activation_cannot_be_faster_than_registered_mode_transition() {
+        let mut asset = limits();
+        asset.transitions.charging_to_discharging_seconds = 900.0;
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            80.0,
+            Some(5.0),
+            Some(600.0),
+            Some(600.0),
+            Some(600.0),
+        )];
+        let result = evaluate_dispatch(
+            asset,
+            150.0,
+            &[step(30.0, 0.0, 300.0, &RESERVES)],
+        )
+        .expect("fixture inputs are valid");
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::ReserveTransitionDeadlineExceeded)
+        );
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::ReserveTransitionEvidenceContradiction)
+        );
+        assert!(!result.feasible);
+    }
+
+    #[test]
     fn ten_minute_reserve_without_operational_sustain_profile_is_indeterminate() {
         static RESERVES: [ReserveCommitment; 1] = [reserve(
             ReserveProduct::TenMinute,
@@ -1062,7 +1163,7 @@ mod tests {
             None,
             None,
         )];
-        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
+        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 10.0, 900.0, &RESERVES)])
             .expect("fixture inputs are valid");
         let assessment = &result.steps[0].reserve_assessment;
         assert_eq!(
