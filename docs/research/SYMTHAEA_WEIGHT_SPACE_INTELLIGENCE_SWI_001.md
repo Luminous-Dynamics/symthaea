@@ -130,7 +130,7 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - applies validated values only after all checks;
 - reports typed CfCWeightLoadError variants;
 - exposes a versioned CfC parameter manifest with stable typed group IDs, readable names, semantic roles, shapes, offsets, and lengths in get_weights() order;
-- exposes try_replace_parameter_group(), which accepts a typed CfCParameterGroupId, replaces only one declared group, enforces the group length, bounds-checks the manifest range, and routes the full candidate through try_set_weights();
+- exposes transactional single- and multi-group replacement APIs using typed CfCParameterGroupId values, an exact base-model digest precondition, duplicate-target rejection, exact length/range checks, and one full-candidate validation before mutation;
 - exposes a BLAKE3 fingerprint binding serialized architecture configuration, manifest, and exact little-endian f32 parameter bytes into separate and combined digests;
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
@@ -496,7 +496,7 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 - Validate exact length, finite values, tau floor, and contiguous storage before mutation.
 - Preserve existing infallible API as a compatibility wrapper.
 - Add a versioned named parameter manifest matching the flat serialization layout.
-- Add bounded typed named-group replacement through the validated loader.
+- Add bounded typed named-group replacement and digest-bound transactional batches through the validated loader.
 - Add content-addressed architecture, manifest, parameter, and combined model fingerprints.
 - Route asynchronous weight swaps through the fallible API and test both valid and malformed updates.
 - Add regression tests.
@@ -538,6 +538,7 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 ## 12. Safety and release policy
 
 - Production weights are immutable to the editor.
+- An edit proposal must match the exact current model digest; stale proposals are rejected.
 - Every proposal is applied to an isolated candidate copy.
 - Exact base digest is a hard precondition; stale proposals are rejected.
 - All values must be finite and all architecture-specific invariants must pass.
