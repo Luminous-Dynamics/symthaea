@@ -602,3 +602,27 @@ One run is restricted to one shift axis. Every row must carry the complete domai
 This is an evaluator extension, not an OOD-aware production router. It reports descriptive per-domain metrics and cluster-bootstrap intervals for fixed/adaptive calibration, reliability bins and OOD ranking; the intervals remain provisional until repeated-seed coverage simulation, independent review of the declared sampling unit, and locked source-volume/species evaluation pass. The report does not establish dataset label truth, biologic transfer, prospective time savings or a SOTA win.
 
 Protocol: [CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md](CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_PROTOCOL_V1.md). Input schema: [CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json](CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT_INPUT.schema.json). Synthetic regression input: [example JSONL](examples/CONNECTOME_PROOFREADING_DOMAIN_SHIFT_AUDIT.example.jsonl).
+
+
+## Joint-support receipts across proofreading snapshots (2026-11-05)
+
+The 2026 bioRxiv preprint by Martinez et al., *Connectome quality converges predictably to reveal optimal stopping points during proofreading*, uses 15 global graph invariants and longitudinal snapshots to estimate when global graph properties have stabilized. Its own discussion explicitly states that global invariants cannot establish progress toward a specific scientific question and recommends targeted proofreading for individual questions. This is a preprint, not yet peer-reviewed: https://doi.org/10.64898/2026.06.30.735414.
+
+The sequential `connectome_stopping_audit` already keeps graph-invariant tail stability separate from query-metric stability and synaptic-completeness evidence. This extension adds an optional per-snapshot `joint_support_evidence` receipt from `connectome-joint-support-audit`. The receipt binds:
+- exact dataset revision and graph snapshot digest;
+- query ID and query-definition digest;
+- scenario, action and joint-support-set digests;
+- exact planner input and report digests;
+- joint-support scope, search completeness, result status, effort unit, budget and minimum effort.
+
+The sequential report now distinguishes:
+- `NOT_PROVIDED`, `INCOMPLETE_TAIL`, and `INSUFFICIENT_TAIL_HISTORY`;
+- `SEARCH_INCOMPLETE_IN_TAIL`;
+- `NO_ROBUST_PLAN_IN_TAIL`;
+- `PLAN_EXCEEDS_BUDGET_IN_TAIL`;
+- `STATUS_TRANSITION_IN_TAIL`;
+- `RECEIPTS_COMPLETE_NOT_A_STOP_AUTHORIZATION`.
+
+These remain separate observations, not terms in a composite “completeness” score. In particular, stable global invariants do not override a query-level no-plan state, over-budget review plan, incomplete search, missing receipt, or changed query definition. The auditor validates receipt-field consistency and snapshot bindings; it does not re-run/authenticate the joint planner or prove the supplied supports complete. It continues to return `CONTINUE_REVIEW` in every case. A later stopping authorization would require a separately validated residual-error-risk gate, calibrated on held-out data and expert-adjudicated high-impact errors.
+
+The checked-in false-stop receipt fixture demonstrates this directly: global graph invariants are stable in the tail, while the joint-support status transitions from a feasible minimum plan to no robust plan. The audit reports `NO_ROBUST_PLAN_IN_TAIL` and still recommends `CONTINUE_REVIEW`.
