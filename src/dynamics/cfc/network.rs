@@ -96,6 +96,10 @@ impl CfCNetworkConfig {
 pub enum CfCWeightLoadError {
     /// The supplied vector does not exactly match the network's parameter count.
     LengthMismatch { expected: usize, actual: usize },
+    /// A named parameter group does not exist in this network's manifest.
+    UnknownParameterGroup { name: String },
+    /// A replacement group does not exactly match the declared group length.
+    GroupLengthMismatch { name: String, expected: usize, actual: usize },
     /// A parameter contains NaN or infinity.
     NonFiniteValue { index: usize },
     /// A time constant is below the numerical stability floor.
@@ -112,6 +116,13 @@ impl std::fmt::Display for CfCWeightLoadError {
             Self::LengthMismatch { expected, actual } => {
                 write!(f, "CfC weight count mismatch: expected {expected}, received {actual}")
             }
+            Self::UnknownParameterGroup { name } => {
+                write!(f, "unknown CfC parameter group: {name}")
+            }
+            Self::GroupLengthMismatch { name, expected, actual } => write!(
+                f,
+                "CfC parameter group {name} length mismatch: expected {expected}, received {actual}"
+            ),
             Self::NonFiniteValue { index } => {
                 write!(f, "CfC weight at flat index {index} is not finite")
             }
@@ -1243,6 +1254,43 @@ impl CfCNetwork {
         }
     }
 
+    /// Replace exactly one named parameter group from the architecture-aware manifest.
+    ///
+    /// The replacement is applied to a candidate flat vector and passed through
+    /// [`Self::try_set_weights`], so malformed values or invalid time constants
+    /// are rejected before any live parameter is changed.
+    pub fn try_replace_parameter_group(
+        &mut self,
+        name: &str,
+        values: &[f32],
+    ) -> Result<(), CfCWeightLoadError> {
+        let manifest = self.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == name)
+            .cloned()
+            .ok_or_else(|| CfCWeightLoadError::UnknownParameterGroup {
+                name: name.to_string(),
+            })?;
+
+        if values.len() != group.len {
+            return Err(CfCWeightLoadError::GroupLengthMismatch {
+                name: group.name,
+                expected: group.len,
+                actual: values.len(),
+            });
+        }
+
+        let end = group
+            .offset
+            .checked_add(group.len)
+            .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
+        let mut candidate = self.get_weights();
+        candidate[group.offset..end].copy_from_slice(values);
+        self.try_set_weights(&candidate)
+    }
+
     /// Extract all learnable weights into a flat `Vec<f32>`.
     pub fn get_weights(&self) -> Vec<f32> {
         let mut buf = Vec::new();
@@ -1877,6 +1925,60 @@ mod tests {
             manifest.groups.last().unwrap().name,
             "output_bias"
         );
+    }
+
+    // ---------------------------------------------------------------
+    // 15. named parameter-group replacement is bounded and validated
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_named_parameter_group_replacement_changes_only_target_group() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.b_h")
+            .unwrap()
+            .clone();
+        let replacement = vec![0.25; group.len];
+
+        assert!(net
+            .try_replace_parameter_group(&group.name, &replacement)
+            .is_ok());
+
+        let after = net.get_weights();
+        assert_eq!(
+            &after[group.offset..group.offset + group.len],
+            replacement.as_slice()
+        );
+        for index in 0..before.len() {
+            if !(group.offset..group.offset + group.len).contains(&index) {
+                assert_eq!(after[index], before[index], "unexpected change at {index}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_named_parameter_group_replacement_rejects_unknown_or_wrong_length() {
+        let mut net = CfCNetwork::new(small_config());
+        let before = net.get_weights();
+        assert!(matches!(
+            net.try_replace_parameter_group("cells.999.w_h", &[]),
+            Err(CfCWeightLoadError::UnknownParameterGroup { .. })
+        ));
+
+        let manifest = net.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.name == "cells.0.w_h")
+            .unwrap();
+        assert!(matches!(
+            net.try_replace_parameter_group(&group.name, &[]),
+            Err(CfCWeightLoadError::GroupLengthMismatch { .. })
+        ));
+        assert_eq!(net.get_weights(), before);
     }
 
     // ---------------------------------------------------------------
