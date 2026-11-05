@@ -58,6 +58,30 @@ That heuristic is transparent and useful as a baseline. However, the two sides o
 
 Therefore, width × combined tail mass can allocate to an endpoint that is not currently certificate-limiting. This is a limitation to quantify, not grounds to discard the existing implementation before a locked comparison.
 
+### 3.1 Worked counterexample for a regression fixture
+
+Consider two scenarios under Maximin:
+
+| Action | Scenario 1 utility interval | Scenario 2 utility interval | Robust interval |
+|---|---:|---:|---:|
+| A (incumbent) | [0.80, 0.85] | [0.82, 0.92] | [0.80, 0.85] |
+| B (competitor) | [0.20, 0.90] | [0.35, 0.84] | [0.20, 0.84] |
+
+Action A is selected because its robust lower bound is 0.80. The maximum robust upper bound is 0.85, so the current certificate gap is 0.05. With epsilon 0.25, B passes the current competitive-action filter because 0.84 >= 0.80 - 0.25.
+
+However, shrinking B's intervals alone cannot change the current gap under radius-only contraction:
+- B's robust upper bound (0.84) is below A's upper bound (0.85), so reducing it does not change the maximum upper endpoint.
+- B's robust lower bound (0.20) is below A's incumbent lower bound (0.80), so increasing it without overtaking A does not change the incumbent lower endpoint.
+
+The current combined-tail helper assigns B positive contribution to its lower-tail scenario 1 and upper-tail scenario 2. Their widths are 0.70 and 0.49, respectively. A's active lower and upper endpoint both come from scenario 1, whose interval width is 0.05. Under the current width × tail-mass score, B's scenario-1 and scenario-2 cells can therefore outrank A's scenario-1 cell despite having zero radius-only certificate-gap contraction.
+
+Use this exact case as a deterministic negative-control fixture:
+- the current heuristic must reproduce its declared priorities;
+- Policy A must report zero certificate-gap contraction for both B cells;
+- Policy A must report positive contraction for A's active scenario-1 cell when the hypothetical radius is reduced;
+- certification semantics and the actual confidence bounds must remain unchanged.
+
+
 ## 4. Policy A — exact radius-only certificate contraction
 
 Implement a deterministic, interpretable next-batch policy using the production interval and robust-aggregation functions.
