@@ -37,11 +37,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          backup="$(mktemp)"
-          cp Cargo.toml "$backup"
+          manifest_backup="$(mktemp)"
+          lock_backup="$(mktemp)"
+          cp Cargo.toml "$manifest_backup"
+          cp Cargo.lock "$lock_backup"
           cleanup() {
-            cp "$backup" Cargo.toml
-            rm -f "$backup"
+            cp "$manifest_backup" Cargo.toml
+            cp "$lock_backup" Cargo.lock
+            rm -f "$manifest_backup" "$lock_backup"
           }
           trap cleanup EXIT
           python3 - <<'PY'
@@ -78,4 +81,8 @@ jobs:
           print("Temporary workspace-only exclusions:", ", ".join(missing) or "none")
           PY
           cargo +1.96.0 metadata --locked --no-deps --format-version 1 >/dev/null
-          cargo +1.96.0 test --locked -p symthaea-muse --features studio --bin muse_studio keeper_readback_tests
+          # The checked-in root lock is currently stale relative to the workspace
+          # graph after excluding known non-packages. Resolve only from the
+          # runner's cache; the trap restores the repository lock after testing.
+          cargo +1.96.0 test --offline -p symthaea-muse --features studio --bin muse_studio keeper_readback_tests
+          echo "TEMPORARY_OFFLINE_LOCK_SHA256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
