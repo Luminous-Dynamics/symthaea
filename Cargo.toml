@@ -31,6 +31,10 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # This is an examples-only directory with no package manifest. It is not
+    # a workspace member; its examples must be moved into an owning crate
+    # before this path can be reintroduced.
+    "crates/core/symthaea",
 ]
 default-members = [
     "xtask",
