@@ -1172,34 +1172,71 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         &tuples_by_world,
         input.max_total_effort_units,
     )?;
-    let full_world_masks = tuples_by_world
-        .iter()
-        .map(|tuples| {
-            if tuples.len() == 64 {
-                u64::MAX
-            } else {
-                (1_u64 << tuples.len()) - 1
-            }
-        })
-        .collect::<Vec<_>>();
-    let initial_state = PolicyState {
-        remaining_action_mask: (1_u16 << action_ids.len()) - 1,
-        world_row_masks: full_world_masks,
-    };
-    let outcome_masks = build_outcome_masks(&action_ids, &tuples_by_world);
-    let mut solver = Solver {
-        action_ids: &action_ids,
-        action_effort: &action_effort,
-        scenarios: &scenarios,
-        outcome_masks,
-        state_count: 0,
-        memo: BTreeMap::new(),
-    };
-    let solution = solver.solve(initial_state)?;
+    let (solution, state_count) =
+        solve_adaptive_policy(&action_ids, &action_effort, &scenarios, &tuples_by_world)?;
     fixed_non_adaptive_optimum.adaptive_worst_case_savings_units = cost_delta(
         fixed_non_adaptive_optimum.minimum_effort_units,
         solution.as_ref().map(|policy| policy.worst_case_cost),
     );
+
+    let mut challenge_ids = BTreeSet::new();
+    let mut support_challenge_results = Vec::with_capacity(input.support_challenges.len());
+    for challenge in &input.support_challenges {
+        if !challenge_ids.insert(challenge.challenge_id.as_str()) {
+            return Err(format!(
+                "duplicate support challenge ID {}",
+                challenge.challenge_id
+            ));
+        }
+        let (challenge_sha256, expanded_sha256, added_tuple_count, expanded_rows) =
+            expand_joint_support(
+                &input.joint_support_sha256,
+                challenge,
+                &action_ids,
+                &scenarios,
+                &tuples_by_world,
+            )?;
+        let (expanded_solution, _expanded_state_count) = solve_adaptive_policy(
+            &action_ids,
+            &action_effort,
+            &scenarios,
+            &expanded_rows,
+        )?;
+        let expanded_fixed = minimum_fixed_plan(
+            &action_ids,
+            &action_effort,
+            &scenarios,
+            &expanded_rows,
+            input.max_total_effort_units,
+        )?;
+        let adaptive_before = solution.as_ref().map(|policy| policy.worst_case_cost);
+        let adaptive_after = expanded_solution
+            .as_ref()
+            .map(|policy| policy.worst_case_cost);
+        let fixed_before = fixed_non_adaptive_optimum.minimum_effort_units;
+        let fixed_after = expanded_fixed.minimum_effort_units;
+        let adaptive_non_decreasing =
+            effort_is_non_decreasing(adaptive_before, adaptive_after);
+        let fixed_non_decreasing = effort_is_non_decreasing(fixed_before, fixed_after);
+        support_challenge_results.push(SupportChallengeResult {
+            challenge_id: challenge.challenge_id.clone(),
+            challenge_sha256,
+            expanded_joint_support_sha256: expanded_sha256,
+            added_joint_tuple_count,
+            adaptive_worst_case_effort_before: adaptive_before,
+            adaptive_worst_case_effort_after: adaptive_after,
+            adaptive_status_before: adaptive_status(&solution).to_string(),
+            adaptive_status_after: adaptive_status(&expanded_solution).to_string(),
+            adaptive_effort_non_decreasing: adaptive_non_decreasing,
+            fixed_minimum_effort_before: fixed_before,
+            fixed_minimum_effort_after: fixed_after,
+            fixed_status_before: fixed_status(&fixed_non_adaptive_optimum).to_string(),
+            fixed_status_after: fixed_status(&expanded_fixed).to_string(),
+            fixed_effort_non_decreasing: fixed_non_decreasing,
+            monotonicity_passed: adaptive_non_decreasing && fixed_non_decreasing,
+        });
+    }
+
     let (
         worst_case,
         min_path,
@@ -1210,7 +1247,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         policy_branches,
         optimal_policy_count,
         status,
-    ) = match solution {
+    ) = match solution.clone() {
         Some(solution) => {
             validate_policy_tree(&solution.node)?;
             let within = solution.worst_case_cost <= input.max_total_effort_units;
@@ -1261,7 +1298,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         scenario_count: input.scenarios.len(),
         observation_action_count: input.actions.len(),
         joint_support_tuple_count: tuple_count,
-        exact_policy_state_count: solver.state_count,
+        exact_policy_state_count: state_count,
         policy_node_count: policy_nodes,
         policy_branch_count: policy_branches,
         worst_case_effort_units: worst_case,
@@ -1270,13 +1307,15 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         maximum_terminal_path_effort_units: max_path,
         worst_case_policy_within_budget: within_budget,
         fixed_non_adaptive_optimum,
+        support_challenge_count: support_challenge_results.len(),
+        support_challenges: support_challenge_results,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         probability_claim: "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
         status,
         search_complete: true,
-        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     })
 }
 
