@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/cad-history/manifest.schema.json",
+  "title": "CAD-HISTORY-001 public fixture blueprint manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "benchmark_id",
+    "version",
+    "updated_at",
+    "status",
+    "task_count",
+    "task_families",
+    "cases",
+    "terminal_dispositions",
+    "score_dimensions",
+    "hard_gates",
+    "external_comparator",
+    "ownership",
+    "custody",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "benchmark_id": {
+      "const": "CAD-HISTORY-001"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "const": "public_blueprint_specification_only"
+    },
+    "task_count": {
+      "type": "integer",
+      "const": 11
+    },
+    "task_families": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "case_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "case_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^CADH-[PN][0-9]{2}$"
+            }
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family_id",
+          "title",
+          "candidate_visible_scenario",
+          "changed_subjects",
+          "evaluation_axes",
+          "critical_control",
+          "ambiguity_control",
+          "gold_status",
+          "score_status",
+          "materialization_status",
+          "terminal_disposition_contract"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^CADH-[PN][0-9]{2}$"
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_visible_scenario": {
+            "type": "string",
+            "minLength": 20
+          },
+          "changed_subjects": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evaluation_axes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "critical_control": {
+            "type": "boolean"
+          },
+          "ambiguity_control": {
+            "type": "boolean"
+          },
+          "gold_status": {
+            "const": "not_yet_adjudicated"
+          },
+          "score_status": {
+            "const": "not_scored"
+          },
+          "materialization_status": {
+            "const": "blueprint_only"
+          },
+          "terminal_disposition_contract": {
+            "const": "per_artifact_feature_and_edit"
+          }
+        }
+      }
+    },
+    "terminal_dispositions": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "score_dimensions": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "external_comparator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "official_suite_task_count",
+        "official_tasks",
+        "harness",
+        "cad_kernel",
+        "verifier",
+        "task_schema",
+        "attempts_per_case",
+        "concurrency",
+        "retries",
+        "time_limit_seconds",
+        "official_dataset_digest_captured",
+        "redistribution_training_terms_verified"
+      ],
+      "properties": {
+        "id": {
+          "const": "parametric-cad-bench-v3"
+        },
+        "official_suite_task_count": {
+          "const": 100
+        },
+        "official_tasks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "create",
+            "create_and_edit",
+            "image_to_cad"
+          ],
+          "properties": {
+            "create": {
+              "const": 30
+            },
+            "create_and_edit": {
+              "const": 30
+            },
+            "image_to_cad": {
+              "const": 40
+            }
+          }
+        },
+        "harness": {
+          "const": "Harbor 0.23.0"
+        },
+        "cad_kernel": {
+          "const": "FreeCAD 1.1.0"
+        },
+        "verifier": {
+          "const": "gnucleus-freecad-validator 0.6.0"
+        },
+        "task_schema": {
+          "const": "1.3"
+        },
+        "attempts_per_case": {
+          "const": 1
+        },
+        "concurrency": {
+          "const": 4
+        },
+        "retries": {
+          "const": 0
+        },
+        "time_limit_seconds": {
+          "const": 9000
+        },
+        "official_dataset_digest_captured": {
+          "const": false
+        },
+        "redistribution_training_terms_verified": {
+          "const": false
+        }
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "minProperties": 5,
+      "additionalProperties": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "public_blueprints_visible",
+        "gold_labels_adjudicated",
+        "sealed_holdout_created",
+        "native_cad_files_materialized",
+        "point_clouds_materialized",
+        "commercial_tools_run",
+        "external_task_data_downloaded",
+        "execution_authorized",
+        "physical_testing_authorized"
+      ],
+      "properties": {
+        "public_blueprints_visible": {
+          "const": true
+        },
+        "gold_labels_adjudicated": {
+          "const": false
+        },
+        "sealed_holdout_created": {
+          "const": false
+        },
+        "native_cad_files_materialized": {
+          "const": false
+        },
+        "point_clouds_materialized": {
+          "const": false
+        },
+        "commercial_tools_run": {
+          "const": false
+        },
+        "external_task_data_downloaded": {
+          "const": false
+        },
+        "execution_authorized": {
+          "const": false
+        },
+        "physical_testing_authorized": {
+          "const": false
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
