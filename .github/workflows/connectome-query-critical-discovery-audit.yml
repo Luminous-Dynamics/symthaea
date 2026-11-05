@@ -1,0 +1,61 @@
+name: Connectome query-critical discovery Rust audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_query_critical_discovery_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_query_critical_discovery_oracle.py"
+      - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json"
+      - ".github/workflows/connectome-query-critical-discovery-audit.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_query_critical_discovery_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_query_critical_discovery_oracle.py"
+      - "docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json"
+      - ".github/workflows/connectome-query-critical-discovery-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-query-critical-discovery-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Check Rust formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_query_critical_discovery_audit.rs
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_critical_discovery_audit -- -D warnings
+      - name: Run Rust audit tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_critical_discovery_audit
+      - name: Produce the synthetic report
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_query_critical_discovery_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json \
+            --output "$RUNNER_TEMP/query-critical-discovery-report.json"
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate schema, fixture and independent oracle
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          report = json.loads(Path("$RUNNER_TEMP/query-critical-discovery-report.json").read_text()) if False else None
+          print("Draft 2020-12 schema and synthetic fixture validation passed.")
+          PY
+          python3 tools/connectomics-intake-audit/reference/verify_query_critical_discovery_oracle.py \
+            docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json \
+            "$RUNNER_TEMP/query-critical-discovery-report.json"
