@@ -34,14 +34,14 @@ for package in \
     printf '[package]\nname = "fixture-package"\nversion = "0.1.0"\n' > "$package/Cargo.toml"
 done
 
-output="$("$script" "$fixture")"
+output="$(bash "$script" "$fixture")"
 grep -q '^EXCLUDED crates/core/symthaea$' <<< "$output"
 grep -q '^MEMBER crates/core/valid-core$' <<< "$output"
 grep -q '^MEMBER crates/domains/valid-domain$' <<< "$output"
 grep -q '^MEMBER crates/bridges/valid-bridge$' <<< "$output"
 
 mkdir -p "$fixture/crates/domains/missing-manifest"
-if "$script" "$fixture" >"$fixture/stdout" 2>"$fixture/stderr"; then
+if bash "$script" "$fixture" >"$fixture/stdout" 2>"$fixture/stderr"; then
     printf 'workspace preflight test failed: missing manifest was accepted\n' >&2
     exit 1
 fi
