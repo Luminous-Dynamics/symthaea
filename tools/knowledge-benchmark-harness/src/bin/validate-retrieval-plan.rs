@@ -149,6 +149,13 @@ fn validate_plan(plan: &RetrievalPlan) -> ValidationReport {
                 "anchor {:?} has unsupported match_mode {:?}",
                 anchor.anchor_id, anchor.match_mode
             ));
+        } else if has_non_whitespace(&anchor.text)
+            && !contains_anchor(&plan.original_query, anchor)
+        {
+            errors.push(format!(
+                "required anchor {:?} is absent from immutable original_query",
+                anchor.anchor_id
+            ));
         }
     }
 
@@ -550,6 +557,17 @@ mod tests {
             .to_string();
         let report = validate_plan(&plan);
         assert!(report.passed, "{:?}", report.errors);
+    }
+
+    #[test]
+    fn required_anchors_must_be_present_in_immutable_original_query() {
+        let mut plan = sample_plan();
+        plan.original_query = plan.original_query.replace("KineticTrust", "the product");
+        plan.original_query_sha256 = sha256_hex(plan.original_query.as_bytes());
+        plan.fallback_query = plan.original_query.clone();
+        let report = validate_plan(&plan);
+        assert!(!report.passed);
+        assert!(report.errors.iter().any(|error| error.contains("absent from immutable original_query")));
     }
 
     #[test]
