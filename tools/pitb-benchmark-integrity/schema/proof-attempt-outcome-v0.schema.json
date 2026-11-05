@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-attempt-outcome-v0.schema.json",
+  "title": "PITB proof attempt outcome v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "attempt_id",
+    "task_id",
+    "task_record_sha256",
+    "reproduction_receipt_sha256",
+    "prover_id",
+    "prover_version",
+    "checkpoint_sha256",
+    "environment_sha256",
+    "lean_toolchain_sha256",
+    "proof_sha256",
+    "patch_sha256",
+    "verification_receipt_sha256",
+    "result",
+    "exact_target_reproduced",
+    "source_integrity_passed",
+    "target_placeholder_removed",
+    "kernel_passed",
+    "semantic_audit_passed",
+    "no_new_axioms",
+    "no_new_unsafe_declarations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-attempt-outcome.v0"
+    },
+    "attempt_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_record_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reproduction_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "prover_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "prover_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checkpoint_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lean_toolchain_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "patch_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "verification_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "result": {
+      "enum": [
+        "verified_success",
+        "non_solve",
+        "execution_failure",
+        "verification_failure"
+      ]
+    },
+    "exact_target_reproduced": {
+      "type": "boolean"
+    },
+    "source_integrity_passed": {
+      "type": "boolean"
+    },
+    "target_placeholder_removed": {
+      "type": "boolean"
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "semantic_audit_passed": {
+      "type": "boolean"
+    },
+    "no_new_axioms": {
+      "type": "boolean"
+    },
+    "no_new_unsafe_declarations": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
