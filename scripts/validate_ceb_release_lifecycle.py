@@ -264,7 +264,7 @@ def self_test(release: dict, schema: dict) -> None:
     # A verifier-only change requires minor version; regrade only if raw artifacts exist.
     mutant = copy.deepcopy(release)
     mutant.update({
-      "status":"release_candidate","release_id":"ceb-v0.2-test","current_version":"0.2.0",
+      "status":"release_candidate","release_id":"ceb-v0-2-test","current_version":"0.2.0",
       "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"regrade_affected",
       "change_records":[{
         "change_id":"verifier-change-001","change_class":"grader_only","paths":["benchmarks/ceb/verifiers/check.json"],
@@ -293,7 +293,7 @@ def self_test(release: dict, schema: dict) -> None:
     # Metadata-only release may reuse results when evaluation inputs are identical.
     reuse=copy.deepcopy(release)
     reuse.update({
-      "status":"release_candidate","release_id":"ceb-v0.1.1-reuse-test","current_version":"0.1.1",
+      "status":"release_candidate","release_id":"ceb-v0-1-1-reuse-test","current_version":"0.1.1",
       "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"reuse",
       "previous_evaluation_input_sha256":"f"*64,
       "change_records":[{
@@ -309,7 +309,7 @@ def self_test(release: dict, schema: dict) -> None:
     # Metadata changes can reuse results only if evaluation-input digests remain identical.
     mutant=copy.deepcopy(release)
     mutant.update({
-      "status":"release_candidate","release_id":"ceb-v0.1.1-test","current_version":"0.1.1",
+      "status":"release_candidate","release_id":"ceb-v0-1-1-test","current_version":"0.1.1",
       "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"reuse",
       "change_records":[{
         "change_id":"docs-change-001","change_class":"metadata_only","paths":["docs/CEB.md"],
@@ -324,7 +324,7 @@ def self_test(release: dict, schema: dict) -> None:
     # Verifier changes without raw artifacts must rerun affected tasks, not regrade.
     mutant=copy.deepcopy(release)
     mutant.update({
-      "status":"release_candidate","release_id":"ceb-v0.2-test","current_version":"0.2.0",
+      "status":"release_candidate","release_id":"ceb-v0-2-test","current_version":"0.2.0",
       "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"regrade_affected",
       "change_records":[{
         "change_id":"verifier-change-no-raw-001","change_class":"grader_only","paths":["benchmarks/ceb/verifier.json"],
