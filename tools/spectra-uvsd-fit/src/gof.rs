@@ -390,8 +390,8 @@ mod tests {
         let diagnostic = diagnose_uvsd_category_fit(&observed, &estimate).unwrap();
         assert_eq!(diagnostic.noise.observed_total, 20_000);
         assert_eq!(diagnostic.signal.observed_total, 20_000);
-        assert_eq!(diagnostic.noise.expected_total, 20_000.0);
-        assert_eq!(diagnostic.signal.expected_total, 20_000.0);
+        assert!((diagnostic.noise.expected_total - 20_000.0).abs() < 1.0e-6);
+        assert!((diagnostic.signal.expected_total - 20_000.0).abs() < 1.0e-6);
         assert_eq!(diagnostic.category_count, 5);
         assert_eq!(diagnostic.residual_degrees_of_freedom, Some(2));
         assert_eq!(diagnostic.status, GoodnessOfFitStatus::Computed);
@@ -457,7 +457,7 @@ mod tests {
         let estimate = UvsdEstimate::new(10.0, 0.5, vec![-1.0, 0.0, 1.0]).unwrap();
         let observed = table(
             vec![100, 100, 100, 100],
-            vec![1, 1, 1, 397],
+            vec![0, 0, 0, 400],
         );
         let diagnostic = diagnose_uvsd_category_fit(&observed, &estimate).unwrap();
         assert!(diagnostic.signal.expected_cells_below_5 > 0);
