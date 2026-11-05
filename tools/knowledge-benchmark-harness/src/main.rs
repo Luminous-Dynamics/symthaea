@@ -970,6 +970,161 @@ fn validate_run_contract(plan: &Value) -> Vec<String> {
     errors
 }
 
+fn validate_case_catalog_refs(case: &Value) -> Vec<String> {
+    let mut errors = Vec::new();
+    let case_id = string_field(case, "id").unwrap_or("<unknown>");
+    let case_split = string_field(case, "split").unwrap_or("");
+    let mut catalog = std::collections::HashMap::<String, Value>::new();
+    let mut family_splits = std::collections::HashMap::<String, String>::new();
+
+    for (index, raw_line) in
+        include_str!("../../../benchmarks/source-catalog/v0/sources.jsonl")
+            .lines()
+            .enumerate()
+    {
+        let source: Value = match serde_json::from_str(raw_line) {
+            Ok(source) => source,
+            Err(error) => {
+                errors.push(format!(
+                    "bundled source catalog line {} is invalid JSON: {error}",
+                    index + 1
+                ));
+                continue;
+            }
+        };
+
+        let source_id = string_field(&source, "source_id").unwrap_or("");
+        let family_id = string_field(&source, "source_family_id").unwrap_or("");
+        let split = string_field(&source, "split").unwrap_or("");
+
+        if source_id.is_empty() || family_id.is_empty() || split.is_empty() {
+            errors.push(format!(
+                "bundled source catalog line {} lacks source_id, source_family_id, or split",
+                index + 1
+            ));
+            continue;
+        }
+
+        if catalog.insert(source_id.to_string(), source).is_some() {
+            errors.push(format!("duplicate bundled source_id {source_id:?}"));
+        }
+
+        if let Some(previous_split) = family_splits.get(family_id) {
+            if previous_split != split {
+                errors.push(format!(
+                    "source family {family_id:?} spans multiple evaluation splits"
+                ));
+            }
+        } else {
+            family_splits.insert(family_id.to_string(), split.to_string());
+        }
+    }
+
+    let source_refs = case
+        .get("source_refs")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let mut case_source_ids = HashSet::new();
+
+    for source_ref in &source_refs {
+        let source_id = string_field(source_ref, "source_id").unwrap_or("");
+        if source_id.is_empty() {
+            errors.push(format!("case {case_id:?} has a source_ref with no source_id"));
+            continue;
+        }
+        if !case_source_ids.insert(source_id.to_string()) {
+            errors.push(format!(
+                "case {case_id:?} repeats source_ref source_id {source_id:?}"
+            ));
+        }
+
+        let Some(source) = catalog.get(source_id) else {
+            errors.push(format!(
+                "case {case_id:?} references source ID {source_id:?} absent from catalog"
+            ));
+            continue;
+        };
+
+        let catalog_uri = string_field(source, "uri").unwrap_or("");
+        let catalog_split = string_field(source, "split").unwrap_or("");
+        let catalog_rights = string_field(source, "rights_status").unwrap_or("");
+        if string_field(source_ref, "uri") != Some(catalog_uri) {
+            errors.push(format!(
+                "case {case_id:?} source URI differs from catalog for {source_id:?}"
+            ));
+        }
+        if string_field(source_ref, "rights_status") != Some(catalog_rights) {
+            errors.push(format!(
+                "case {case_id:?} rights_status differs from catalog for {source_id:?}"
+            ));
+        }
+        if catalog_split != case_split {
+            errors.push(format!(
+                "case {case_id:?} split {case_split:?} references source {source_id:?} in catalog split {catalog_split:?}"
+            ));
+        }
+    }
+
+    let evidence_items = case
+        .get("evidence_pack")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    for evidence in &evidence_items {
+        let evidence_id = string_field(evidence, "evidence_id").unwrap_or("<missing>");
+        let kind = string_field(evidence, "kind").unwrap_or("");
+
+        // Synthetic controls are not historical evidence and need no source rights.
+        if kind == "synthetic_control" {
+            continue;
+        }
+
+        let source_ids = string_array(evidence, "source_ids");
+        if source_ids.is_empty() {
+            errors.push(format!(
+                "case {case_id:?} non-synthetic evidence {evidence_id:?} must declare source_ids"
+            ));
+            continue;
+        }
+
+        for source_id in source_ids {
+            if !case_source_ids.contains(source_id) {
+                errors.push(format!(
+                    "case {case_id:?} evidence {evidence_id:?} references source {source_id:?} absent from source_refs"
+                ));
+            }
+            let Some(source) = catalog.get(source_id) else {
+                errors.push(format!(
+                    "case {case_id:?} evidence {evidence_id:?} references source ID {source_id:?} absent from catalog"
+                ));
+                continue;
+            };
+            let rights_status = string_field(source, "rights_status").unwrap_or("");
+            let content_access = string_field(source, "content_access").unwrap_or("");
+            let rights_review = string_field(source, "rights_review").unwrap_or("");
+
+            if !matches!(
+                content_access,
+                "verified_open_content" | "permissioned_full_text"
+            ) {
+                errors.push(format!(
+                    "case {case_id:?} evidence {evidence_id:?} source {source_id:?} is metadata-only and cannot support content evidence"
+                ));
+            }
+            if matches!(rights_status, "unknown" | "restricted")
+                || rights_review != "approved_limited_use"
+            {
+                errors.push(format!(
+                    "case {case_id:?} evidence {evidence_id:?} source {source_id:?} lacks approved rights review"
+                ));
+            }
+        }
+    }
+
+    errors
+}
+
 fn validate_annotation_catalog_refs(annotation: &Value) -> Vec<String> {
     if string_field(annotation, "annotation_role") == Some("synthetic_fixture") {
         return Vec::new();
@@ -1380,6 +1535,7 @@ fn validate_domain_contract(
                 "evidence",
                 &mut errors,
             );
+            errors.extend(validate_case_catalog_refs(value));
         }
         Kind::Claim => {
             let source_ids = collect_unique_object_ids(
