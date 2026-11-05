@@ -1,8 +1,10 @@
 use mel_rmi_synthetic::{
-    ActionMechanism, AgentAction, AgentPolicy, Dimension, Feature, FixedResponsePolicy,
-    HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ResponsivePartnerPolicy,
-    RuleBasedPolicy, TaskSpec, TrialRunConfig, UnrelatedFeatureShortcutPolicy,
-    canonical_fixture_replicates_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
+    ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
+    ArtifactPayloadV1, Dimension, Feature, FixedResponsePolicy, HarnessError,
+    ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ResponsivePartnerPolicy, RuleBasedPolicy,
+    TaskSpec, TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy,
+    bind_verified_artifacts, canonical_fixture_replicates_v1, run_policy_suite_v1,
+    run_reciprocal_suite_v1, verify_trial_artifact_bindings,
 };
 use std::error::Error;
 
@@ -46,6 +48,54 @@ impl AgentPolicy for YokedSuitePolicy {
     }
 }
 
+fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(), HarnessError> {
+    let inputs = std::array::from_fn(|index| {
+        let event_id = record.manifest.input_event_ids[index].clone();
+        ArtifactPayloadSetV1 {
+            event_id: event_id.clone(),
+            transaction_receipt_bytes: format!("synthetic-studio-receipt:input:{event_id}")
+                .into_bytes(),
+            artifacts: vec![
+                ArtifactPayloadV1 {
+                    format: ArtifactFormatV1::ScoreJson,
+                    bytes: format!(r#"{{"event":"{event_id}","role":"input"}}"#).into_bytes(),
+                },
+                ArtifactPayloadV1 {
+                    format: ArtifactFormatV1::Midi,
+                    bytes: [b"MThd".as_slice(), event_id.as_bytes()].concat(),
+                },
+            ],
+        }
+    });
+    let outputs = std::array::from_fn(|index| {
+        let event_id = record.manifest.output_event_ids[index].clone();
+        ArtifactPayloadSetV1 {
+            event_id: event_id.clone(),
+            transaction_receipt_bytes: format!("synthetic-studio-receipt:output:{event_id}")
+                .into_bytes(),
+            artifacts: vec![
+                ArtifactPayloadV1 {
+                    format: ArtifactFormatV1::ScoreJson,
+                    bytes: format!(r#"{{"event":"{event_id}","role":"output"}}"#).into_bytes(),
+                },
+                ArtifactPayloadV1 {
+                    format: ArtifactFormatV1::Midi,
+                    bytes: [b"MThd".as_slice(), event_id.as_bytes()].concat(),
+                },
+            ],
+        }
+    });
+
+    bind_verified_artifacts(
+        record,
+        inputs.clone(),
+        outputs.clone(),
+        "synthetic-byte-verifier",
+        "v1",
+    )?;
+    verify_trial_artifact_bindings(record, &inputs, &outputs)
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let code_revision = std::env::var("MEL_RMI_CODE_REVISION")?;
     let config = TrialRunConfig {
@@ -79,9 +129,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         "record_type,task_id,policy_id,dimension,agent_targeted_delta,agent_sham_delta,agent_unrelated_delta,agent_input_sensitive,agent_target_specific,agent_oracle_rule_match,agent_qualified,partner_targeted_delta,partner_sham_delta,partner_unrelated_delta,partner_input_sensitive,partner_target_specific,partner_oracle_rule_match,reciprocal_qualified"
     );
 
+    let mut artifact_bindings_verified = 0usize;
     for policy in policies {
-        let records = run_policy_suite_v1(&fixtures, policy.as_ref(), &config)?;
-        for record in records {
+        let mut records = run_policy_suite_v1(&fixtures, policy.as_ref(), &config)?;
+        for record in &mut records {
+            bind_and_verify_synthetic_artifacts(record)?;
+            artifact_bindings_verified += 1;
             let contrast = record.contrast;
             println!(
                 "trial,{},{},{},{},{},{},{},{},{},{},,,,,,,",
@@ -109,7 +162,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         &config,
     )?;
-    for record in reciprocal {
+    for mut record in reciprocal {
+        bind_and_verify_synthetic_artifacts(&mut record.agent)?;
+        artifact_bindings_verified += 1;
         let agent = record.agent.contrast;
         let partner = record.partner;
         println!(
@@ -134,5 +189,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    println!("artifact_verified,{artifact_bindings_verified}");
     Ok(())
 }
