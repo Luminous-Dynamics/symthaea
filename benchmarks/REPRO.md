@@ -154,3 +154,12 @@ These observations motivate Luminous work on exact assembly datum/pose constrain
 
 The initial registry entry is metadata-only / access-gated. It establishes a comparator and execution plan, not a local score or a qualification result.
 
+
+### Additional vendor-reported result (OpenAI, 2026-11-03)
+
+OpenAI's [engineering research update](https://openai.com/index/accelerating-engineering-for-the-physical-world/) reports an average BenchCAD 2.0 score of **0.875** for a newer internal model and **0.594** for GPT-6 Astra at its highest reasoning setting.
+
+This is recorded in the manifest's separate `reported_results` array as `vendor_report`, not inserted into the pinned v2.0 leaderboard rows. The post does not disclose the internal model ID, BenchCAD harness version, per-task results, repetition count, uncertainty, resource budget, or enough protocol detail for independent reproduction. Do not call the newer model "SOTA" on a reproducible leaderboard basis, and do not infer which internal model it is. The reported 0.594 is not silently substituted for the 0.59 rounded figure in the earlier public v2.0 snapshot.
+
+The same OpenAI post describes a physical prototype workflow in which manufacturing preparation required several review/iteration rounds because production limits, tolerances and assembly details were not consistently accounted for. This is a separate evidence class from BenchCAD scoring. It motivates an additional engineering gate: design/geometry success must not be promoted to manufacturability, assembly readiness or a conforming physical article without exact process-capability, tolerance, assembly and inspection evidence.
+
