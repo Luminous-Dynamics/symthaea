@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "crates/domains/symthaea-muse/src/genealogy.rs"
+      - "crates/domains/symthaea-muse-protocol/src/lib.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - ".github/workflows/mel-013a-artifact-bytes.yml"
   workflow_dispatch:
@@ -34,9 +35,9 @@ jobs:
         run: |
           rustfmt --check --edition 2024 \
             crates/domains/symthaea-muse/src/genealogy.rs \
+            crates/domains/symthaea-muse-protocol/src/lib.rs \
             crates/domains/symthaea-muse/src/bin/muse_studio.rs \
-            tools/mel-genealogy-byte-harness/src/lib.rs \
-            tools/mel-genealogy-byte-harness/protocol-stub/src/lib.rs
+            tools/mel-genealogy-byte-harness/src/lib.rs
       - name: Compile and test production genealogy source in standalone harness
         run: cargo test --manifest-path tools/mel-genealogy-byte-harness/Cargo.toml
       - name: Record unrelated root-workspace compile blocker
