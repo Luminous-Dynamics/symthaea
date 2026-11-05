@@ -670,14 +670,10 @@ pub fn compose_candidate(
                 {
                     return Err(ComposerError::TaskUniverseMismatch);
                 }
-                Some(expected)
-                    if expected.cluster_by_task != pairing_contract.cluster_by_task =>
-                {
+                Some(expected) if expected.cluster_by_task != pairing_contract.cluster_by_task => {
                     return Err(ComposerError::ClusterMapMismatch);
                 }
-                Some(expected)
-                    if expected.input_digests != pairing_contract.input_digests =>
-                {
+                Some(expected) if expected.input_digests != pairing_contract.input_digests => {
                     return Err(ComposerError::TaskInputUniverseMismatch);
                 }
                 Some(_) => {}
