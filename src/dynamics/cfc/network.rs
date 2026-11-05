@@ -129,6 +129,66 @@ impl std::fmt::Display for CfCWeightLoadError {
 
 impl std::error::Error for CfCWeightLoadError {}
 
+/// Semantic role of one contiguous group in a CfC network's serialized parameter vector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CfCParameterRole {
+    InputProjection,
+    RecurrentProjection,
+    HiddenBias,
+    TimeConstant,
+    BackboneWeight { layer: usize },
+    BackboneBias { layer: usize },
+    OutputProjection,
+    OutputBias,
+}
+
+/// One named parameter group in the exact flat order used by CfCNetwork::get_weights().
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CfCParameterGroup {
+    /// Stable dotted path, for example "cells.0.w_h" or "output_bias".
+    pub name: String,
+    /// Mathematical / architectural role of this group.
+    pub role: CfCParameterRole,
+    /// Tensor shape in row-major storage order.
+    pub shape: Vec<usize>,
+    /// Start index in the flat vector returned by get_weights().
+    pub offset: usize,
+    /// Number of scalar parameters in this group.
+    pub len: usize,
+}
+
+/// Versioned, architecture-aware description of a CfCNetwork parameter vector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CfCParameterManifest {
+    /// Increment when the serialized group ordering or schema changes.
+    pub format_version: u32,
+    /// Total number of scalar values in get_weights().
+    pub total_parameters: usize,
+    /// Groups in exact serialization order, with contiguous offsets.
+    pub groups: Vec<CfCParameterGroup>,
+}
+
+fn append_parameter_group(
+    groups: &mut Vec<CfCParameterGroup>,
+    offset: &mut usize,
+    name: String,
+    role: CfCParameterRole,
+    shape: Vec<usize>,
+    len: usize,
+) {
+    let next_offset = (*offset)
+        .checked_add(len)
+        .expect("CfC parameter manifest length overflow");
+    groups.push(CfCParameterGroup {
+        name,
+        role,
+        shape,
+        offset: *offset,
+        len,
+    });
+    *offset = next_offset;
+}
+
 /// A complete CfC neural network
 #[derive(Debug, Clone)]
 pub struct CfCNetwork {
@@ -1093,6 +1153,96 @@ impl CfCNetwork {
     // Weight serialization for async training (background thread weight swap)
     // =========================================================================
 
+    /// Describe the named parameter groups in the exact order returned by get_weights().
+    ///
+    /// The manifest intentionally describes only the learnable serialized vector.
+    /// Reserved per-cell fields that are not included by get_weights() are not
+    /// represented here. Offsets are stable for a fixed network architecture and
+    /// configuration, but consumers must bind them to a model fingerprint.
+    pub fn parameter_manifest(&self) -> CfCParameterManifest {
+        let mut groups = Vec::new();
+        let mut offset = 0usize;
+
+        for (cell_index, cell) in self.cells.iter().enumerate() {
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                format!("cells.{cell_index}.w_in"),
+                CfCParameterRole::InputProjection,
+                cell.w_in.shape().to_vec(),
+                cell.w_in.len(),
+            );
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                format!("cells.{cell_index}.w_h"),
+                CfCParameterRole::RecurrentProjection,
+                cell.w_h.shape().to_vec(),
+                cell.w_h.len(),
+            );
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                format!("cells.{cell_index}.b_h"),
+                CfCParameterRole::HiddenBias,
+                cell.b_h.shape().to_vec(),
+                cell.b_h.len(),
+            );
+            append_parameter_group(
+                &mut groups,
+                &mut offset,
+                format!("cells.{cell_index}.tau"),
+                CfCParameterRole::TimeConstant,
+                cell.tau.shape().to_vec(),
+                cell.tau.len(),
+            );
+
+            for (layer, tensor) in cell.backbone_weights.iter().enumerate() {
+                append_parameter_group(
+                    &mut groups,
+                    &mut offset,
+                    format!("cells.{cell_index}.backbone_weights.{layer}"),
+                    CfCParameterRole::BackboneWeight { layer },
+                    tensor.shape().to_vec(),
+                    tensor.len(),
+                );
+            }
+            for (layer, tensor) in cell.backbone_biases.iter().enumerate() {
+                append_parameter_group(
+                    &mut groups,
+                    &mut offset,
+                    format!("cells.{cell_index}.backbone_biases.{layer}"),
+                    CfCParameterRole::BackboneBias { layer },
+                    tensor.shape().to_vec(),
+                    tensor.len(),
+                );
+            }
+        }
+
+        append_parameter_group(
+            &mut groups,
+            &mut offset,
+            "output_weights".to_string(),
+            CfCParameterRole::OutputProjection,
+            self.output_weights.shape().to_vec(),
+            self.output_weights.len(),
+        );
+        append_parameter_group(
+            &mut groups,
+            &mut offset,
+            "output_bias".to_string(),
+            CfCParameterRole::OutputBias,
+            self.output_bias.shape().to_vec(),
+            self.output_bias.len(),
+        );
+
+        CfCParameterManifest {
+            format_version: 1,
+            total_parameters: offset,
+            groups,
+        }
+    }
+
     /// Extract all learnable weights into a flat `Vec<f32>`.
     pub fn get_weights(&self) -> Vec<f32> {
         let mut buf = Vec::new();
@@ -1696,6 +1846,37 @@ mod tests {
             "condition_number should be finite"
         );
         assert!(diag.state_norm.is_finite(), "state_norm should be finite");
+    }
+
+    // ---------------------------------------------------------------
+    // 14. parameter_manifest() describes get_weights() serialization
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_parameter_manifest_matches_flat_weight_layout() {
+        let net = CfCNetwork::new(small_config());
+        let manifest = net.parameter_manifest();
+        let weights = net.get_weights();
+
+        assert_eq!(manifest.format_version, 1);
+        assert_eq!(manifest.total_parameters, weights.len());
+
+        let mut expected_offset = 0usize;
+        for group in &manifest.groups {
+            assert_eq!(group.offset, expected_offset, "gap before {}", group.name);
+            assert_eq!(
+                group.shape.iter().product::<usize>(),
+                group.len,
+                "shape/length mismatch for {}",
+                group.name
+            );
+            expected_offset += group.len;
+        }
+        assert_eq!(expected_offset, weights.len());
+        assert_eq!(manifest.groups.first().unwrap().name, "cells.0.w_in");
+        assert_eq!(
+            manifest.groups.last().unwrap().name,
+            "output_bias"
+        );
     }
 
     // ---------------------------------------------------------------
