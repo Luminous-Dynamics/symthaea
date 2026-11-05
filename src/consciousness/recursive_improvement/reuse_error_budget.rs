@@ -337,9 +337,16 @@ mod tests {
     #[test]
     fn decision_only_sign_test_uses_the_allocated_error_budget() {
         let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
+        // alpha=0.05, round=1, K=1, rho=0.5 gives a paired-test
+        // threshold of 0.00625. Eight all-win pairs yield p=1/256 and pass;
+        // seven yield p=1/128 and correctly remain above the threshold.
+        assert_eq!(
+            reuse_sign_test_decision(8, 0, allocation).unwrap(),
+            ReuseDecision::Promote
+        );
         assert_eq!(
             reuse_sign_test_decision(7, 0, allocation).unwrap(),
-            ReuseDecision::Promote
+            ReuseDecision::Reject
         );
         assert_eq!(
             reuse_sign_test_decision(6, 0, allocation).unwrap(),
