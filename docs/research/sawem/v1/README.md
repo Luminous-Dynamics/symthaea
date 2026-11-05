@@ -195,13 +195,33 @@ References:
 
 ### SOC-dependent BMS capability envelopes
 
-The new `bms_capability.rs` module replaces a single static power limit with separate, source-bound charge and discharge power curves over an explicit SOC calibration range. Between measured/certified breakpoints it performs exact rational linear interpolation and rounds the available-power result down to the next whole watt. It rejects out-of-range SOC rather than extrapolating. A curve marked synthetic can be used for scenario exploration, but its result is never operationally qualified.
+The new `bms_capability.rs` module replaces a single static power limit with separate, source-bound charge and discharge power curves over an explicit SOC calibration range. Between measured/certified breakpoints it performs exact rational linear interpolation and rounds the available-power result down to the next whole watt. It rejects out-of-range SOC rather than extrapolating. A curve marked synthetic can be used for scenario exploration, but its result is marked as synthetic-basis only. A non-synthetic evidence basis is not by itself a source-authenticity proof, BMS approval or operational authorization.
 
 This directly addresses a limitation identified by the M5BAT field study: its improved scheduling model uses conservative 10–80% SOC limits to avoid BMS power curtailment, while empirical SOC-dependent capability curves are identified as a practical future extension. The study also notes the trade-off: detailed SOC-dependent limits can improve usable energy and reduce curtailment, but require reliable characterization and can increase optimization complexity.
 
 The current implementation is deliberately only a **one-dimensional SOC envelope**. It is not a BMS model and must not be used alone to authorize live power. A deployable envelope needs synchronized evidence for at least SOC and direction, and should ultimately include temperature, SOH/aging, DC voltage, cell imbalance, inverter/transformer loading, thermal derating, and BMS dynamic state. The next research increment is a multi-dimensional conservative lower-envelope fitter over field measurements, with calibration/validation split by operating campaign and an explicit uncertainty margin.
 
 Benchmark case: `BMS-SOC-CAPABILITY-ENVELOPE-001`. No M5BAT capability curves have been fitted from field data yet; field parametrization and improved unfulfilled-delivery metrics remain `not_run`.
+
+### Revenue realization: decomposing the haircut into evidence
+
+The new `revenue_realization.rs` module bridges theoretical gross revenue to realized net cash through explicitly signed, source-bound adjustments. It separates:
+- forecast regret / imperfect foresight;
+- availability loss;
+- execution deviation;
+- booked balancing settlement;
+- market fees;
+- degradation and warranty;
+- financing and collateral; and
+- contract / curtailment effects.
+
+The caller declares which categories are applicable and required for the project. Missing required categories keep the bridge incomplete: only a partial reconstructed net is returned, while the final residual and realization ratio remain unavailable. Every component carries a source reference, content digest and available-at timestamp; reusing one source receipt across two component IDs is rejected. Positive and negative adjustments are both permitted so evidenced contract compensation can offset losses.
+
+**Industry comparator:** Modo Energy's October 2026 GB methodology applies an 82% central realization factor to theoretical modeled BESS merchant revenue, with 77% and 87% low/high cases. Its documentation describes the factor as a calibration to historical fleet realized revenues and notes that it reflects availability, imperfect foresight and market competition. That is a useful practical benchmark, but it combines several mechanisms into one haircut. Symthaea's proposed difference is not to claim a higher realization factor; it is to attribute individual losses and credits to evidence and leave an unexplained residual visible. We must still reproduce Modo's factor on a matched GB dataset before claiming a better calibration or transferability to SAWEM.
+
+The framework is an attribution ledger, not a forecast model, causal-identification method or settlement calculator. A category allocation is only as valid as its evidence and adjudication; overlapping causal effects must not be double-counted. New case: `REVENUE-REALIZATION-BRIDGE-001`. All values currently tested are synthetic, and empirical realization/attribution remains `not_run`.
+
+Reference: https://docs.modoenergy.com/pages/oct-2026/uk-europe/gb/model-calibration/
 
 ### South African market phase as of 5 November 2026
 
