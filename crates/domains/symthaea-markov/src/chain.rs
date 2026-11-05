@@ -16,7 +16,7 @@ pub const DEFAULT_PROBABILITY_TOLERANCE: f64 = 1e-9;
 pub enum MarkovError {
     /// A transition matrix must contain at least one state.
     EmptyMatrix,
-    /// The probability tolerance must be finite and non-negative.
+    /// The probability tolerance must be finite and lie in [0, 1).
     InvalidTolerance { tolerance: f64 },
     /// A transition row has the wrong number of entries.
     NonSquareMatrix {
@@ -124,7 +124,7 @@ impl MarkovChain {
         p: Vec<Vec<f64>>,
         tolerance: f64,
     ) -> Result<Self, MarkovError> {
-        if !tolerance.is_finite() || tolerance < 0.0 {
+        if !tolerance.is_finite() || !(0.0..1.0).contains(&tolerance) {
             return Err(MarkovError::InvalidTolerance { tolerance });
         }
 
@@ -319,6 +319,10 @@ mod tests {
         ));
         assert!(matches!(
             MarkovChain::try_new_with_tolerance(vec![vec![1.0]], f64::NAN),
+            Err(MarkovError::InvalidTolerance { .. })
+        ));
+        assert!(matches!(
+            MarkovChain::try_new_with_tolerance(vec![vec![1.0]], 1.0),
             Err(MarkovError::InvalidTolerance { .. })
         ));
     }
