@@ -2091,7 +2091,8 @@
         "claim": "bounded fuzz agreement on the shared ordinary ZIP subset, not ZIP-spec correctness or broad layout coverage"
       },
       "current_working_head": "b45a02ef6370659b484fc6131fe092411dadf9c0",
-      "current_pending_work": "Deterministic Rust seed generator adds Stored, Deflate, mixed-method, zero-length, directory, UTF-8 and EOCD-signature-in-payload examples; workflow rerun required."
+      "current_pending_work": "Deterministic Rust seed generator adds Stored, Deflate, mixed-method, zero-length, directory, UTF-8 and EOCD-signature-in-payload examples; workflow rerun required.",
+      "engine_portfolio_follow_on": "https://github.com/Luminous-Dynamics/symthaea/issues/10594"
     },
     {
       "id": "sealed_immutable_replay_snapshot",
@@ -2238,6 +2239,116 @@
         "crashes": 0,
         "timeouts": 0,
         "claim": "two bounded 181-second Linux fuzz arms; no crashes/timeouts reported; not sustained fuzz qualification"
+      }
+    },
+    {
+      "id": "multi_engine_fuzz_portfolio",
+      "status": "research_issue_opened",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10594",
+      "objective": "Maximize unique adjudicated parser defects and differential mismatches per equal CPU-hour by evaluating multiple mutation/instrumentation engines against one canonical corpus and an engine-neutral replay harness.",
+      "engines": {
+        "baseline": {
+          "name": "libFuzzer",
+          "integration": "cargo-fuzz / libfuzzer-sys 0.4.13",
+          "status": "qualified_current_baseline"
+        },
+        "next": {
+          "name": "AFL++",
+          "integration": "cargo-afl / afl.rs or thin C ABI adapter",
+          "status": "candidate_not_yet_qualified"
+        },
+        "exploratory": {
+          "name": "Centipede / FuzzTest",
+          "integration": "libFuzzer-compatible target plus documented compiler/linker instrumentation",
+          "status": "experimental; requires Rust toolchain compatibility proof"
+        }
+      },
+      "external_baseline": {
+        "llvm_libfuzzer_status": "Maintained for important bug fixes; original authors shifted active work to Centipede; no major feature work expected.",
+        "oss_fuzz_engines": [
+          "libFuzzer",
+          "AFL++",
+          "Honggfuzz",
+          "Centipede (experimental)"
+        ],
+        "rust_integration": "OSS-Fuzz Rust guide expects cargo-fuzz and libFuzzer today; other engines require a separately qualified build adapter.",
+        "sources": [
+          "https://llvm.org/docs/LibFuzzer.html",
+          "https://google.github.io/oss-fuzz/faq/",
+          "https://google.github.io/oss-fuzz/getting-started/new-project-guide/",
+          "https://google.github.io/oss-fuzz/getting-started/new-project-guide/rust-lang/",
+          "https://github.com/google/fuzztest/tree/main/centipede",
+          "https://rust-fuzz.github.io/book/cargo-fuzz.html"
+        ]
+      },
+      "current_baseline": {
+        "source_commit": "0a0be459e78da42ce2a201db2d4168e543706783",
+        "workflow_run": 42056996386,
+        "libfuzzer_production": {
+          "executions": 3096936,
+          "duration_seconds": 181,
+          "exec_per_second": 17110,
+          "peak_rss_mib": 278
+        },
+        "libfuzzer_differential": {
+          "executions": 3719505,
+          "duration_seconds": 181,
+          "exec_per_second": 20549,
+          "peak_rss_mib": 279
+        },
+        "artifact_id": 13430387200,
+        "artifact_sha256": "sha256:59ebc18993fdae991d26a48b0afae6a24baaa5bb7870ba6cf2753f54e0894c36"
+      },
+      "protocol": [
+        "keep the production and differential harness core engine-neutral; engine adapters must call exactly the same bounded parser/decoder/checker logic",
+        "share byte-identical content-addressed seed archives and minimized regression inputs across all engines; do not copy opaque engine queue metadata",
+        "record input SHA-256, source commit, engine/runtime version, compiler/linker, instrumentation mode, sanitizers, CPU allocation, memory budget, seed manifest digest and command line",
+        "run equal CPU-hour budgets with at least three repeats per engine on the same runner class",
+        "report each engine's own coverage counters separately; do not add raw edge/feature counts from dissimilar instrumentation systems",
+        "compare union coverage with one canonical offline evaluator and report unique semantic predicates, not a fabricated cross-engine percentage",
+        "deduplicate crashes by normalized stack and input digest; preserve one-sided parser accepts and content disagreements as separate outcomes",
+        "require every confirmed crash/disagreement to be minimized, content-addressed, cross-engine replayed and retained as a regression fixture",
+        "qualify AFL++ via cargo-afl/afl.rs or a thin C ABI adapter; benchmark comparison logging, LTO instrumentation and persistent mode only where valid",
+        "Centipede/FuzzTest remains exploratory until a repeatable Rust nightly/LLVM toolchain and replayable corpus path is demonstrated",
+        "do not change reader limits, parser behavior, or acceptance semantics solely to increase fuzzer throughput"
+      ],
+      "cases": [
+        "libfuzzer_and_afl_replay_identical_seed_corpus",
+        "cross_engine_crash_and_disagreement_regression_replay",
+        "same_runner_equal_cpu_hour_repeated_campaigns",
+        "afl_cpp_rust_integration_and_instrumentation_compatibility",
+        "coverage_union_normalized_by_canonical_evaluator",
+        "unique_finding_deduplication_by_input_and_stack",
+        "centipede_fuzztest_rust_compiler_linker_compatibility_spike",
+        "engine_specific_unsupported_and_timeout_denominators"
+      ],
+      "metrics": [
+        "unique_adjudicated_findings_per_cpu_hour",
+        "unique_semantic_predicates_per_cpu_hour",
+        "time_to_first_unique_finding",
+        "time_to_first_new_semantic_predicate",
+        "unique_crash_count_after_stack_and_input_deduplication",
+        "unique_differential_disagreement_count",
+        "engine_specific_edges_and_features",
+        "canonical_union_coverage",
+        "seed_corpus_replay_rate_across_engines",
+        "minimized_finding_reproduction_rate",
+        "executions_per_second_and_input_bytes_per_second",
+        "peak_rss_and_timeout_rate",
+        "corpus_growth_and_minimization_cost",
+        "false_positive_and_unsupported_abstention_rate"
+      ],
+      "targets": {
+        "primary": "Two independently qualified Rust engine adapters (libFuzzer and AFL++) replay the same content-addressed regression corpus.",
+        "stretch": "At least 20_percent more unique semantic predicates or adjudicated defects per equal CPU-hour than libFuzzer alone, measured over three repeat campaigns.",
+        "hard_gate": "Zero loss of confirmed crash or disagreement regressions during corpus synchronization; 100_percent exact replay of minimized findings."
+      },
+      "claim_boundaries": {
+        "throughput": "Raw executions/second is not a measure of bug-finding quality.",
+        "coverage": "Coverage counters from different instrumentation backends are not directly additive or a percent of correctness.",
+        "engine_count": "Multiple engines do not establish correctness or absence of bugs.",
+        "corpus": "Generated valid archives are seeds, not a ground-truth oracle.",
+        "centipede": "Centipede/FuzzTest is experimental for this Rust integration until exact build/replay evidence exists."
       }
     }
   ],
