@@ -2,7 +2,7 @@ use mel_rmi_synthetic::{
     ActionMechanism, AgentAction, AgentPolicy, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ResponsivePartnerPolicy,
     RuleBasedPolicy, TaskSpec, TrialRunConfig, UnrelatedFeatureShortcutPolicy,
-    canonical_fixture_suite_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
+    canonical_fixture_replicates_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
 };
 use std::error::Error;
 
@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         policy_version: "canonical-fixture-policy-v1".to_owned(),
         code_revision,
     };
-    let fixtures = canonical_fixture_suite_v1();
+    let fixtures = canonical_fixture_replicates_v1(32);
     let policies: Vec<Box<dyn AgentPolicy>> = vec![
         Box::new(RuleBasedPolicy {
             id: "rule-positive".to_owned(),
