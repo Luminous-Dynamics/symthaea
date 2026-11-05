@@ -298,7 +298,8 @@
         "psu_id",
         "candidate_world_sha256",
         "source_evidence_sha256",
-        "adjudication_disposition"
+        "adjudication_disposition",
+        "proposal_adjudication_sha256"
       ],
       "properties": {
         "proposal_id": {
@@ -330,6 +331,12 @@
         "matched_alternative_id": {
           "type": "string",
           "minLength": 1
+        },
+        "proposal_adjudication_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "match_adjudication_sha256": {
+          "$ref": "#/$defs/sha64"
         }
       },
       "allOf": [
@@ -346,7 +353,8 @@
           },
           "then": {
             "required": [
-              "matched_alternative_id"
+              "matched_alternative_id",
+              "match_adjudication_sha256"
             ]
           }
         },
@@ -367,8 +375,17 @@
           },
           "then": {
             "not": {
-              "required": [
-                "matched_alternative_id"
+              "anyOf": [
+                {
+                  "required": [
+                    "matched_alternative_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "match_adjudication_sha256"
+                  ]
+                }
               ]
             }
           }
@@ -389,7 +406,10 @@
         "challenge_report_status",
         "before_worst_case_effort_units",
         "after_worst_case_effort_units",
-        "impact_weight"
+        "impact_weight",
+        "alternative_adjudication_sha256",
+        "decision_before_met",
+        "decision_after_met"
       ],
       "properties": {
         "alternative_id": {
@@ -452,6 +472,21 @@
         "impact_weight": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "alternative_adjudication_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_before_met": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "decision_after_met": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       }
     }
