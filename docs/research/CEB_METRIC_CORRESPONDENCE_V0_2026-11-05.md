@@ -65,3 +65,14 @@ The CEB execution/trust requirements remain unchanged: no candidate-controlled e
 ## HiL-Bench selective escalation
 
 The CEB-HUMAN lane now includes three exact-semantic replication candidates against HiL-Bench: Blocker Recall, ASK-F1 and help-enabled Pass@3. These metrics retain separate denominators and meanings. Question Precision has no standalone published scalar observation in the current source snapshot, so it is explicitly `not_comparable`; the 44% ASK-F1 aggregate cannot be used to infer its value. The 24% Pass@3 result is not an ASK-F1 score. The SWE (150 tasks) and SQL (150 tasks) blocker-recall observations are not combined as a single system result.
+
+
+## CEB-CONTINUITY metric correspondence (2026-11-05)
+
+The measurement matrix now includes seven CEB-CONTINUITY primary metrics for sequence-complete rate, evidence-disposition macro-F1, stale-evidence use, false invalidation, revalidation cost per accepted sequence, repair survival and evidence-lineage completeness.
+
+Only sequence_complete_rate has a registered external contextual observation: SWE-Milestone's displayed Resolve result (29.75% for the top listed GLM-5.3 + Claude Code row). It is classified related_but_distinct, not exact semantics. SWE-Milestone scores a sequence of repository milestones using fail-to-pass and pass-to-pass test behavior; CEB's target is sequence-level correctness of evidence dispositions and selective revalidation. The visible row also omits its denominator and uncertainty.
+
+The other six continuity metrics are deliberately not_comparable because no external registered observation measures the same construct and denominator. The existence of the SWE-Milestone benchmark is a strong methodological reference, not permission to equate its overall score or test precision/recall with CEB evidence-validity metrics.
+
+The crosswalk now contains 56 mappings across 14 lanes. All direct superiority flags remain false. A matched test requires a common sequence corpus, event stream, decision unit, agent-visible history, resource budget and independently adjudicated gold evidence transitions.
