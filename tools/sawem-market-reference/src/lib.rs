@@ -1018,7 +1018,8 @@ pub fn calculate_constrained_schedule_adjustment(
                 if overlap_upper <= overlap_lower {
                     continue;
                 }
-                let delta_milli_mwh = i128::from(overlap_upper - overlap_lower);
+                let delta_milli_mwh =
+                    i128::from(overlap_upper) - i128::from(overlap_lower);
                 let price_energy_product = delta_milli_mwh
                     .checked_mul(i128::from(segment.price_minor_zar_per_mwh))
                     .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
@@ -2367,6 +2368,33 @@ mod tests {
                 price_submission: IncrementalPriceSubmission::Submitted(&short_curve),
             }),
             Err(ConstrainedScheduleAdjustmentError::PriceCurveDoesNotCoverScheduleChange)
+        );
+    }
+
+    #[test]
+    fn constrained_schedule_handles_full_signed_schedule_range_without_overflow() {
+        let curve = [IncrementalPriceSegment {
+            lower_schedule_milli_mwh: i32::MIN,
+            upper_schedule_milli_mwh: i32::MAX,
+            price_minor_zar_per_mwh: 1,
+        }];
+        let result = calculate_constrained_schedule_adjustment(
+            ConstrainedScheduleAdjustmentInputs {
+                unconstrained_schedule_milli_mwh: i32::MIN,
+                constrained_schedule_milli_mwh: i32::MAX,
+                price_submission: IncrementalPriceSubmission::Submitted(&curve),
+            },
+        )
+        .expect("full signed schedule interval is represented safely");
+        assert_eq!(
+            result,
+            ConstrainedScheduleAdjustmentResult::Determined {
+                direction: ConstrainedScheduleDirection::PaymentToTradingUnit,
+                cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
+                    numerator_minor_zar: 4_294_967_295,
+                    denominator: 1_000,
+                }
+            }
         );
     }
 
