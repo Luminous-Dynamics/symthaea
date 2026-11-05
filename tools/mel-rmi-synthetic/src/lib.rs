@@ -849,6 +849,80 @@ pub fn canonical_fixture_suite_v1() -> Vec<SyntheticFixtureV1> {
         })
         .collect()
 }
+/// Expand the five canonical dimensions into repeated, deterministic paired
+/// fixtures with varying target and unrelated feature values.
+///
+/// The returned collection is a stress suite for evaluator/control integrity.
+/// Its deterministic seed schedule is not a substitute for randomization in
+/// human-participant research.
+pub fn canonical_fixture_replicates_v1(replicates_per_dimension: usize) -> Vec<SyntheticFixtureV1> {
+    let base_fixtures = canonical_fixture_suite_v1();
+    let mut expanded = Vec::with_capacity(base_fixtures.len() * replicates_per_dimension);
+
+    for (dimension_index, base_fixture) in base_fixtures.into_iter().enumerate() {
+        let modulus = base_fixture.task.expected_response.modulus;
+        if modulus <= 1 {
+            continue;
+        }
+        for replicate in 0..replicates_per_dimension {
+            let replicate = replicate as i64;
+            let dimension_index = dimension_index as i64;
+            let task_seed = 10_000_000 + replicate * 5 + dimension_index;
+            let randomization_seed = 20_000_000 + replicate * 5 + dimension_index;
+            let baseline = (i64::from(
+                base_fixture.interventions.control.current_partner_feature.value,
+            ) + replicate * 7
+                + dimension_index * 11)
+                .rem_euclid(i64::from(modulus)) as i32;
+            let delta = (1 + (replicate * 3 + dimension_index * 2)
+                .rem_euclid(i64::from(modulus - 1))) as i32;
+            let treated = (baseline + delta).rem_euclid(modulus);
+            let unrelated_before =
+                (replicate * 5 + dimension_index * 3).rem_euclid(i64::from(modulus)) as i32;
+            let unrelated_after = unrelated_before + 1;
+
+            let task_id = format!(
+                "{}-rep-{replicate}",
+                base_fixture.task.task_id
+            );
+            let task = base_fixture.task.clone();
+            let observation =
+                |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
+                    event_id: format!("{task_id}-{suffix}"),
+                    session_id: format!("synthetic-session-{dimension_index}-{replicate}"),
+                    history_id: format!("synthetic-history-{dimension_index}-{replicate}"),
+                    task_id: task_id.clone(),
+                    seed: task_seed as u64,
+                    initial_partner_feature: Feature {
+                        dimension: task.target_dimension,
+                        value: baseline,
+                    },
+                    current_partner_feature: Feature {
+                        dimension: task.target_dimension,
+                        value: target_value,
+                    },
+                    unrelated_feature: Feature {
+                        dimension: task.unrelated_dimension,
+                        value: unrelated_value,
+                    },
+                };
+
+            expanded.push(SyntheticFixtureV1 {
+                task,
+                interventions: InterventionSet {
+                    control: observation("control", baseline, unrelated_before),
+                    targeted: observation("targeted", treated, unrelated_before),
+                    sham: observation("sham", baseline, unrelated_before),
+                    unrelated: observation("unrelated", baseline, unrelated_after),
+                    randomization_seed: randomization_seed as u64,
+                    condition_order: condition_order_for_seed(randomization_seed as u64),
+                },
+            });
+        }
+    }
+    expanded
+}
+
 /// Run one policy across a frozen fixture collection in deterministic order.
 pub fn run_policy_suite_v1(
     fixtures: &[SyntheticFixtureV1],
@@ -1609,6 +1683,97 @@ mod tests {
             imitation
                 .iter()
                 .all(|record| !record.contrast.qualified_synthetic_contingency)
+        );
+    }
+
+    #[test]
+    fn repeated_five_dimension_stress_suite_preserves_all_control_gates() {
+        let fixtures = canonical_fixture_replicates_v1(32);
+        assert_eq!(fixtures.len(), 160);
+        for dimension in [
+            Dimension::Motif,
+            Dimension::Rhythm,
+            Dimension::Tempo,
+            Dimension::Role,
+            Dimension::Texture,
+        ] {
+            assert_eq!(
+                fixtures
+                    .iter()
+                    .filter(|fixture| fixture.task.target_dimension == dimension)
+                    .count(),
+                32
+            );
+        }
+
+        let positive = run_policy_suite_v1(
+            &fixtures,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            &config(),
+        )
+        .unwrap();
+        assert_eq!(
+            positive
+                .iter()
+                .filter(|record| record.contrast.qualified_synthetic_contingency)
+                .count(),
+            160
+        );
+
+        for policy in [
+            &FixedResponsePolicy {
+                id: "fixed".to_owned(),
+                value: 0,
+            } as &dyn AgentPolicy,
+            &ImitationOnlyPolicy {
+                id: "imitation".to_owned(),
+            },
+            &OneWayPromptPolicy {
+                id: "one-way".to_owned(),
+            },
+            &YokedReplayPolicy {
+                id: "yoked".to_owned(),
+                source_session_id: "prior-session".to_owned(),
+                replayed_feature: Feature {
+                    dimension: Dimension::Motif,
+                    value: 9,
+                },
+            },
+            &UnrelatedFeatureShortcutPolicy {
+                id: "distractor".to_owned(),
+            },
+        ] {
+            let records = run_policy_suite_v1(&fixtures, policy, &config()).unwrap();
+            assert_eq!(
+                records
+                    .iter()
+                    .filter(|record| record.contrast.qualified_synthetic_contingency)
+                    .count(),
+                0,
+                "negative control {} must never pass",
+                policy.policy_id()
+            );
+        }
+
+        let reciprocal = run_reciprocal_suite_v1(
+            &fixtures,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            &ResponsivePartnerPolicy {
+                id: "responsive-partner".to_owned(),
+            },
+            &config(),
+        )
+        .unwrap();
+        assert_eq!(
+            reciprocal
+                .iter()
+                .filter(|record| record.qualified_synthetic_reciprocity)
+                .count(),
+            160
         );
     }
 
