@@ -446,6 +446,64 @@ pub enum ConstrainedScheduleAdjustmentError {
     ArithmeticOverflow,
 }
 
+/// A source-backed calendar is a sorted list of eligible civil-day ordinals.
+/// The ordinal-to-date and local-timezone mapping is owned by the jurisdiction profile.
+/// A digest and explicit coverage horizon are required; weekends/holidays are never inferred.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BusinessDayCalendarEvidence<'a> {
+    pub business_day_ordinals: &'a [i32],
+    pub complete_through_day: i32,
+    pub source_digest: &'a str,
+}
+
+/// The Code uses "Working Day" separately from "business day" in §15.10.2(2).
+/// Keep its source-backed calendar distinct until an authoritative definition/equivalence
+/// is established; callers must not silently substitute the business-day list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkingDayCalendarEvidence<'a> {
+    pub working_day_ordinals: &'a [i32],
+    pub complete_through_day: i32,
+    pub source_digest: &'a str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreditCoverCalendarError {
+    MissingSourceDigest,
+    UnsortedOrDuplicateDays,
+    DayOutsideCalendarCoverage,
+    RequiredDayIsNotBusinessDay,
+    RequiredDayIsNotWorkingDay,
+    InsufficientFutureCalendarCoverage,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CreditCoverNoticeTimeliness {
+    NotRequired,
+    OnTime,
+    Late,
+    Missing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreditCoverDeadline {
+    pub day_ordinal: i32,
+    /// 17:00 local civil time, represented as minutes after midnight.
+    pub minute_of_day: u16,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreditCoverIncreaseTimeline {
+    pub notice_timeliness: CreditCoverNoticeTimeliness,
+    /// Conditional posting deadline derived from the recalculation day, not a
+    /// later actual notice date. None when no additional cover is required.
+    pub posting_deadline: Option<CreditCoverDeadline>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CreditCallReestablishmentDeadline {
+    pub deadline_day_ordinal: i32,
+}
+
 /// Reserve-capacity categories with separate payment clauses in Code §§9.8.4–9.8.7.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReserveCapacityPaymentProduct {
@@ -1039,6 +1097,137 @@ pub fn calculate_constrained_schedule_adjustment(
             })
         }
     }
+}
+
+fn validate_calendar_days(
+    days: &[i32],
+    complete_through_day: i32,
+    source_digest: &str,
+) -> Result<(), CreditCoverCalendarError> {
+    if source_digest.trim().is_empty() {
+        return Err(CreditCoverCalendarError::MissingSourceDigest);
+    }
+    if days.windows(2).any(|pair| pair[0] >= pair[1])
+        || days.iter().any(|day| *day > complete_through_day)
+    {
+        return Err(CreditCoverCalendarError::UnsortedOrDuplicateDays);
+    }
+    Ok(())
+}
+
+fn second_day_after(
+    days: &[i32],
+    complete_through_day: i32,
+    source_digest: &str,
+    anchor_day: i32,
+) -> Result<i32, CreditCoverCalendarError> {
+    validate_calendar_days(days, complete_through_day, source_digest)?;
+    if complete_through_day <= anchor_day {
+        return Err(CreditCoverCalendarError::InsufficientFutureCalendarCoverage);
+    }
+    let mut count = 0_u8;
+    for day in days.iter().copied().filter(|day| *day > anchor_day) {
+        count += 1;
+        if count == 2 {
+            return Ok(day);
+        }
+    }
+    Err(CreditCoverCalendarError::InsufficientFutureCalendarCoverage)
+}
+
+/// Assess the §15.10.2(1)–(2) daily increase-notice and posting timeline.
+///
+/// The calculation day must be in the supplied Business Day calendar. The notice
+/// must be issued on that same day by 17:00. The participant posting deadline is
+/// the second source-supplied Working Day thereafter, by 17:00. The Working Day
+/// calendar remains separate from the Business Day calendar.
+pub fn calculate_credit_cover_increase_timeline(
+    recalculation_day_ordinal: i32,
+    additional_cover_required: bool,
+    notice_issued_day_ordinal: Option<i32>,
+    notice_issued_minute_of_day: Option<u16>,
+    business_calendar: BusinessDayCalendarEvidence<'_>,
+    working_calendar: WorkingDayCalendarEvidence<'_>,
+) -> Result<CreditCoverIncreaseTimeline, CreditCoverCalendarError> {
+    validate_calendar_days(
+        business_calendar.business_day_ordinals,
+        business_calendar.complete_through_day,
+        business_calendar.source_digest,
+    )?;
+    if recalculation_day_ordinal > business_calendar.complete_through_day {
+        return Err(CreditCoverCalendarError::DayOutsideCalendarCoverage);
+    }
+    if !business_calendar
+        .business_day_ordinals
+        .contains(&recalculation_day_ordinal)
+    {
+        return Err(CreditCoverCalendarError::RequiredDayIsNotBusinessDay);
+    }
+
+    if !additional_cover_required {
+        return Ok(CreditCoverIncreaseTimeline {
+            notice_timeliness: CreditCoverNoticeTimeliness::NotRequired,
+            posting_deadline: None,
+        });
+    }
+
+    let notice_timeliness = match (notice_issued_day_ordinal, notice_issued_minute_of_day) {
+        (Some(day), Some(minute)) => {
+            if day == recalculation_day_ordinal && minute <= 1_020 {
+                CreditCoverNoticeTimeliness::OnTime
+            } else {
+                CreditCoverNoticeTimeliness::Late
+            }
+        }
+        _ => CreditCoverNoticeTimeliness::Missing,
+    };
+
+    let due_day = second_day_after(
+        working_calendar.working_day_ordinals,
+        working_calendar.complete_through_day,
+        working_calendar.source_digest,
+        recalculation_day_ordinal,
+    )?;
+
+    Ok(CreditCoverIncreaseTimeline {
+        notice_timeliness,
+        posting_deadline: Some(CreditCoverDeadline {
+            day_ordinal: due_day,
+            minute_of_day: 1_020,
+        }),
+    })
+}
+
+/// Calculate the §15.10.4(2) replenishment date after a Credit Call drawdown.
+/// The rule says "within two business days"; no intraday cutoff is inferred.
+pub fn calculate_credit_call_reestablishment_deadline(
+    credit_call_day_ordinal: i32,
+    business_calendar: BusinessDayCalendarEvidence<'_>,
+) -> Result<CreditCallReestablishmentDeadline, CreditCoverCalendarError> {
+    validate_calendar_days(
+        business_calendar.business_day_ordinals,
+        business_calendar.complete_through_day,
+        business_calendar.source_digest,
+    )?;
+    if credit_call_day_ordinal > business_calendar.complete_through_day {
+        return Err(CreditCoverCalendarError::DayOutsideCalendarCoverage);
+    }
+    if !business_calendar
+        .business_day_ordinals
+        .contains(&credit_call_day_ordinal)
+    {
+        return Err(CreditCoverCalendarError::RequiredDayIsNotBusinessDay);
+    }
+
+    let due_day = second_day_after(
+        business_calendar.business_day_ordinals,
+        business_calendar.complete_through_day,
+        business_calendar.source_digest,
+        credit_call_day_ordinal,
+    )?;
+    Ok(CreditCallReestablishmentDeadline {
+        deadline_day_ordinal: due_day,
+    })
 }
 
 /// Calculate the product-specific reserve-capacity payment formula in Code §§9.8.4–9.8.7.
@@ -2403,6 +2592,156 @@ mod tests {
                 price_submission: IncrementalPriceSubmission::Submitted(&invalid),
             }),
             Err(ConstrainedScheduleAdjustmentError::InvalidPriceCurveSegment)
+        );
+    }
+
+    fn business_calendar_for_test() -> BusinessDayCalendarEvidence<'static> {
+        BusinessDayCalendarEvidence {
+            business_day_ordinals: &[10, 11, 12, 15, 16, 17],
+            complete_through_day: 17,
+            source_digest: "sha256:business-calendar-test",
+        }
+    }
+
+    fn working_calendar_for_test() -> WorkingDayCalendarEvidence<'static> {
+        // Deliberately differs from the Business Day calendar to prove that
+        // §15.10.2(2)'s Working Day term is not silently aliased to Business Day.
+        WorkingDayCalendarEvidence {
+            working_day_ordinals: &[10, 12, 13, 14, 16, 17],
+            complete_through_day: 17,
+            source_digest: "sha256:working-calendar-test",
+        }
+    }
+
+    #[test]
+    fn credit_cover_increase_notice_and_posting_deadline_use_separate_calendars() {
+        let result = calculate_credit_cover_increase_timeline(
+            10,
+            true,
+            Some(10),
+            Some(1_020),
+            business_calendar_for_test(),
+            working_calendar_for_test(),
+        )
+        .expect("source-backed calendar horizons cover deadline");
+        assert_eq!(
+            result,
+            CreditCoverIncreaseTimeline {
+                notice_timeliness: CreditCoverNoticeTimeliness::OnTime,
+                posting_deadline: Some(CreditCoverDeadline {
+                    // 12 and 13 are the first two Working Days after day 10.
+                    day_ordinal: 13,
+                    minute_of_day: 1_020,
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn credit_cover_notice_late_and_missing_states_are_not_silently_accepted() {
+        let late = calculate_credit_cover_increase_timeline(
+            10,
+            true,
+            Some(11),
+            Some(1_019),
+            business_calendar_for_test(),
+            working_calendar_for_test(),
+        )
+        .expect("late notice still has a conditional posting deadline");
+        assert_eq!(late.notice_timeliness, CreditCoverNoticeTimeliness::Late);
+        assert_eq!(late.posting_deadline.unwrap().day_ordinal, 13);
+
+        let missing = calculate_credit_cover_increase_timeline(
+            10,
+            true,
+            None,
+            None,
+            business_calendar_for_test(),
+            working_calendar_for_test(),
+        )
+        .expect("missing notice remains explicitly represented");
+        assert_eq!(missing.notice_timeliness, CreditCoverNoticeTimeliness::Missing);
+        assert_eq!(missing.posting_deadline.unwrap().day_ordinal, 13);
+    }
+
+    #[test]
+    fn credit_cover_timeline_handles_no_increase_and_requires_business_day_recalculation() {
+        let no_increase = calculate_credit_cover_increase_timeline(
+            10,
+            false,
+            None,
+            None,
+            business_calendar_for_test(),
+            working_calendar_for_test(),
+        )
+        .expect("no increase requires no notice");
+        assert_eq!(
+            no_increase,
+            CreditCoverIncreaseTimeline {
+                notice_timeliness: CreditCoverNoticeTimeliness::NotRequired,
+                posting_deadline: None,
+            }
+        );
+
+        assert_eq!(
+            calculate_credit_cover_increase_timeline(
+                13,
+                true,
+                Some(13),
+                Some(900),
+                business_calendar_for_test(),
+                working_calendar_for_test(),
+            ),
+            Err(CreditCoverCalendarError::RequiredDayIsNotBusinessDay)
+        );
+    }
+
+    #[test]
+    fn credit_call_reestablishment_uses_two_business_days() {
+        let result = calculate_credit_call_reestablishment_deadline(
+            10,
+            business_calendar_for_test(),
+        )
+        .expect("Business Day calendar covers two days after call");
+        assert_eq!(
+            result,
+            CreditCallReestablishmentDeadline {
+                // Business Days after day 10 are 11 and 12, not Working Days 12 and 13.
+                deadline_day_ordinal: 12,
+            }
+        );
+    }
+
+    #[test]
+    fn credit_cover_calendar_requires_authority_order_and_complete_horizon() {
+        let missing_source = BusinessDayCalendarEvidence {
+            business_day_ordinals: &[10, 11, 12],
+            complete_through_day: 12,
+            source_digest: "",
+        };
+        assert_eq!(
+            calculate_credit_call_reestablishment_deadline(10, missing_source),
+            Err(CreditCoverCalendarError::MissingSourceDigest)
+        );
+
+        let unsorted = BusinessDayCalendarEvidence {
+            business_day_ordinals: &[10, 12, 11],
+            complete_through_day: 12,
+            source_digest: "sha256:unordered",
+        };
+        assert_eq!(
+            calculate_credit_call_reestablishment_deadline(10, unsorted),
+            Err(CreditCoverCalendarError::UnsortedOrDuplicateDays)
+        );
+
+        let short_horizon = BusinessDayCalendarEvidence {
+            business_day_ordinals: &[10, 11],
+            complete_through_day: 11,
+            source_digest: "sha256:short-horizon",
+        };
+        assert_eq!(
+            calculate_credit_call_reestablishment_deadline(10, short_horizon),
+            Err(CreditCoverCalendarError::InsufficientFutureCalendarCoverage)
         );
     }
 
