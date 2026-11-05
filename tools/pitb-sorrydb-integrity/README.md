@@ -58,7 +58,7 @@ A task receipt is bound to the exact SorryDB task ID, repository remote and comm
 
 The tool rejects unknown/duplicate tasks, missing receipts, duplicate receipts, source identity drift, an evaluation item absent from the full snapshot, a task record that differs between the full database and evaluation split, invalid source coordinates, a debug URL that does not bind the pinned commit/path, and Git blob byte mismatches.
 
-A task is classified as reproducible only when source location, sorry marker, goal extraction, proposition type and full project build all pass and the extracted goal is not marked mismatched. SorryDB line numbers are 1-based while columns are 0-based character offsets; zero is a valid column and is preserved exactly. Semantic/vacuity/assumption findings are reported independently. A reproduction pass is not a semantic-clean bill of health.
+A task is classified as reproducible only when source location, sorry marker, goal extraction, proposition type and full project build all pass and the extracted goal is not marked mismatched. SorryDB line numbers are 1-based while columns are 0-based character offsets; zero is a valid column and is preserved exactly. Semantic/vacuity/assumption findings are reported independently. A task is assurance-qualified only when source reproduction passes and all three audits are explicitly passed with evidence receipts. A task with any semantic/vacuity/assumption finding is assurance-disqualified; a task with an audit not run or failed source reproduction remains assurance-unreviewed. A reproduction pass is not a semantic-clean bill of health.
 
 ## Critical trust boundary
 
