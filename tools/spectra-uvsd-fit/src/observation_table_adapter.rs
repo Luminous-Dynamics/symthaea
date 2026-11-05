@@ -372,6 +372,7 @@ pub fn adapt_synthetic_dataset_for_uvsd(
     let mut fit_groups = Vec::with_capacity(groups.len());
     for (_, mut group) in groups {
         group.source_action_ids.sort_unstable();
+        group.source_action_ids.dedup();
         let observed_signal_trials = sum_counts(&group.signal_counts)?;
         let observed_noise_trials = sum_counts(&group.noise_counts)?;
         let disposition = if group.missing_signal_categories > 0
