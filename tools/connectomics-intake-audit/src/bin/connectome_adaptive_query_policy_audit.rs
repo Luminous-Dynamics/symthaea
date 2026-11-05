@@ -262,6 +262,7 @@ struct ScenarioExpansionResult {
     fixed_status_after: String,
     fixed_effort_non_decreasing: bool,
     monotonicity_passed: bool,
+    attestation: AttestationSummary,
 }
 
 #[derive(Debug, Serialize)]
@@ -1211,6 +1212,71 @@ fn solve_adaptive_policy(
     };
     let solution = solver.solve(initial_state)?;
     Ok((solution, solver.state_count))
+}
+
+fn verify_challenge_attestation(
+    binding: Option<&EvidenceAttestationBinding>,
+    require_signed_attestations: bool,
+) -> Result<AttestationSummary, String> {
+    let Some(binding) = binding else {
+        if require_signed_attestations {
+            return Err("signed challenge attestation is required but absent".into());
+        }
+        return Ok(AttestationSummary {
+            status: "CONTENT_BOUND_UNAUTHENTICATED".into(),
+            receipt_sha256: None,
+            envelope_sha256: None,
+            payload_sha256: None,
+            trust_policy_sha256: None,
+            verified_signer_roles: Vec::new(),
+        });
+    };
+    let envelope_bytes = STANDARD
+        .decode(&binding.envelope_json_base64)
+        .map_err(|error| format!("challenge attestation envelope Base64 is invalid: {error}"))?;
+    let trust_policy_bytes = STANDARD
+        .decode(&binding.trust_policy_json_base64)
+        .map_err(|error| format!("challenge attestation trust-policy Base64 is invalid: {error}"))?;
+    let receipt = verify_envelope(
+        &envelope_bytes,
+        &trust_policy_bytes,
+        &binding.expected_trust_policy_sha256,
+        binding.verification_time_unix,
+    )
+    .map_err(|error| format!("challenge signed-evidence verification failed: {error}"))?;
+    let receipt_bytes = serde_json::to_vec(&receipt)
+        .map_err(|error| format!("challenge attestation receipt serialization failed: {error}"))?;
+    let mut verified_signer_roles = receipt
+        .verified_signers
+        .iter()
+        .map(|signer| format!("{}:{}", signer.key_id, signer.role))
+        .collect::<Vec<_>>();
+    verified_signer_roles.sort();
+    Ok(AttestationSummary {
+        status: "ATTESTED_UNDER_PINNED_TRUST_POLICY".into(),
+        receipt_sha256: Some(sha256(&receipt_bytes)),
+        envelope_sha256: Some(receipt.envelope_sha256),
+        payload_sha256: Some(receipt.payload_sha256),
+        trust_policy_sha256: Some(receipt.trust_policy_sha256),
+        verified_signer_roles,
+    })
+}
+
+fn bind_challenge_attestation_digest(
+    challenge_digest: &str,
+    attestation: &AttestationSummary,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectome-attested-challenge-digest-v1");
+    hasher.update(challenge_digest.as_bytes());
+    hash_field(&mut hasher, &attestation.status);
+    if let Some(receipt_sha256) = &attestation.receipt_sha256 {
+        hasher.update(b"ATTESTED");
+        hasher.update(receipt_sha256.as_bytes());
+    } else {
+        hasher.update(b"UNAUTHENTICATED");
+    }
+    hex::encode(hasher.finalize())
 }
 
 fn adaptive_status(solution: &Option<PolicySolution>) -> &'static str {
