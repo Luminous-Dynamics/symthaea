@@ -1388,7 +1388,7 @@
         "label": "Unlabeled leaderboard score",
         "definition": "The consolidated leaderboard displays this value but does not identify its metric semantics in the visible row.",
         "value": 79.67,
-        "value_status": "reported",
+        "value_status": "unlabeled",
         "operator": "equal",
         "unit": "unknown_leaderboard_units",
         "direction": "unknown",
@@ -1397,7 +1397,7 @@
           "status": "reported",
           "raw_notation": "±4.17",
           "margin": 4.17,
-          "confidence_level": null,
+          "confidence_level": "not_stated",
           "method": "not_stated",
           "applies_to_metric_id": "unlabeled_leaderboard_score",
           "applies_to_task_count": 300
@@ -1532,6 +1532,74 @@
         }
       },
       "notes": []
+    },
+    {
+      "observation_id": "epoch-terminal-bench-defect-count",
+      "comparator_id": "epoch-terminal-bench-review",
+      "source_locator": "Epoch AI Terminal-Bench 4.0.0 review, verdict/summary section; reviewed 2026-09-04.",
+      "system": {
+        "system_id": "epoch-ai-independent-review",
+        "model": "not_applicable",
+        "harness": "Epoch AI benchmark review process",
+        "configuration": "independent Terminal-Bench 4.0.0 audit"
+      },
+      "metric": {
+        "metric_id": "publicly_noted_defect_tasks",
+        "label": "Tasks with publicly noted scoring defects",
+        "definition": "Count of benchmark tasks among the reviewed 66 with publicly noted scoring defects.",
+        "value": 30,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "tasks",
+        "direction": "minimize",
+        "raw_display": "30 of 66 tasks (45.5%)",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "publicly_noted_defect_tasks",
+          "applies_to_task_count": 66
+        }
+      },
+      "notes": [
+        "This is a benchmark-audit finding, not a model performance score."
+      ]
+    },
+    {
+      "observation_id": "terminalbench-verifier-lifecycle-policy",
+      "comparator_id": "terminal-bench-lifecycle",
+      "source_locator": "Terminal-Bench 4.0 maintainer release notes, versioning/lifecycle and 4.1 verifier roadmap sections.",
+      "system": {
+        "system_id": "terminal-bench-maintainer-policy",
+        "model": "not_applicable",
+        "harness": "Terminal-Bench maintainers",
+        "configuration": "published 4.0 lifecycle policy and 4.1 roadmap"
+      },
+      "metric": {
+        "metric_id": "verifier_lifecycle_policy",
+        "label": "Verifier lifecycle policy",
+        "definition": "Maintainer-described lifecycle policy distinguishes reruns, regrades and reuse; tamper-resistant verifiers are a stated 4.1 focus.",
+        "value": null,
+        "value_status": "qualitative",
+        "operator": "reported_qualitative",
+        "unit": "qualitative finding",
+        "direction": "not_applicable",
+        "raw_display": "Tamper-resistant verifiers named as a 4.1 improvement; rerun/regrade/reuse rules published for version changes.",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not_reported",
+          "margin": null,
+          "confidence_level": "not_stated",
+          "method": "not_stated",
+          "applies_to_metric_id": "verifier_lifecycle_policy",
+          "applies_to_task_count": 66
+        }
+      },
+      "notes": [
+        "Roadmap statement is not evidence that the 4.1 verifier improvements are already released."
+      ]
     }
   ]
 }
