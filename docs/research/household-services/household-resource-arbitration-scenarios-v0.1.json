@@ -384,5 +384,6 @@
       ]
     }
   ],
-  "positive_control_requirement": "All positive controls must remain eligible only with every exact gate satisfied; reject-everything cannot pass."
+  "positive_control_requirement": "All positive controls must remain eligible only with every exact gate satisfied; reject-everything cannot pass.",
+  "execution_issue": 10516
 }
