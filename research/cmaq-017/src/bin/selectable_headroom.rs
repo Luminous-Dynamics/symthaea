@@ -59,21 +59,13 @@ fn rademacher(seed: u64, candidate_id: usize, continuation_id: usize, component:
         ^ (continuation_id as u64).rotate_left(21)
         ^ component.wrapping_mul(0xA076_1D64_78BD_642F);
     let mut rng = SplitMix64::new(mixed_seed);
-    if rng.next_u64() & 1 == 0 {
-        -1.0
-    } else {
-        1.0
-    }
+    if rng.next_u64() & 1 == 0 { -1.0 } else { 1.0 }
 }
 
 /// One realized continuation outcome. The three noise sources are distinct:
 /// a causally shared world factor, a candidate-local residual, and a
 /// candidate-by-continuation interaction term.
-fn continuation_outcome(
-    seed: u64,
-    candidate_id: usize,
-    continuation_id: usize,
-) -> f64 {
+fn continuation_outcome(seed: u64, candidate_id: usize, continuation_id: usize) -> f64 {
     let profile = candidate_profile(candidate_id);
     let shared_world = rademacher(seed, 0, continuation_id, 0);
     let candidate_local = rademacher(seed, candidate_id, continuation_id, 1);
@@ -203,7 +195,10 @@ struct VarianceDecomposition {
 
 fn variance_decomposition(candidate_count: usize) -> VarianceDecomposition {
     let profiles: Vec<_> = (0..candidate_count).map(candidate_profile).collect();
-    let means: Vec<_> = profiles.iter().map(|profile| profile.expected_value).collect();
+    let means: Vec<_> = profiles
+        .iter()
+        .map(|profile| profile.expected_value)
+        .collect();
     let mean_of_means = means.iter().sum::<f64>() / means.len() as f64;
     let candidate_mean_variance = means
         .iter()
