@@ -26,9 +26,10 @@ cargo test --locked
 MEL_RMI_CODE_REVISION="$(git rev-parse HEAD)" cargo run --locked --example canonical_suite
 ```
 
-The example emits a CSV over the five feature dimensions for fixed, imitation,
-one-way, yoked, unrelated-feature-shortcut and rule-based policies, followed by
-four-condition reciprocal controlled-partner trials. The repository workflow
+The example emits a CSV over 160 paired fixtures (32 deterministic seeds per
+feature dimension) for fixed, imitation, one-way, yoked, unrelated-feature-
+shortcut and rule-based policies, followed by 160 four-condition reciprocal
+controlled-partner trials. The repository workflow
 stages this crate outside the root Cargo workspace, tests the exact pull-request
 head, and gates all expected positive/negative-control counts.
 
