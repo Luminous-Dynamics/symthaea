@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "analysis_id": "synthetic-query-critical-discovery-v1",
+  "dataset_revision_commit_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "query": {
+    "query_id": "directed-circuit-decision-is-supported",
+    "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "decision_rule_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "baseline_decision_met": true
+  },
+  "baseline": {
+    "scenario_set_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "joint_support_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "action_set_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "adaptive_policy_report_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "adaptive_policy_status": "POLICY_EXISTS",
+    "adaptive_worst_case_effort_units": 4
+  },
+  "sampling_binding": {
+    "sampling_frame_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "sampling_protocol_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "sample_audit_report_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "psu_population_count": 100,
+    "sampled_psu_count": 4,
+    "design_owner": "9204"
+  },
+  "channels": [
+    {
+      "channel_id": "em-specialist",
+      "channel_kind": "em_specialist",
+      "implementation_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "protocol_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "ancestry_group_ids": [
+        "raw-volume-001",
+        "em-preprocessing-A"
+      ]
+    },
+    {
+      "channel_id": "morphology-review",
+      "channel_kind": "morphology_mesh",
+      "implementation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "protocol_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "ancestry_group_ids": [
+        "raw-volume-001",
+        "mesh-derivation-A"
+      ]
+    },
+    {
+      "channel_id": "skeleton-review",
+      "channel_kind": "skeleton_continuity",
+      "implementation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "protocol_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ancestry_group_ids": [
+        "raw-volume-001",
+        "skeleton-derivation-B"
+      ]
+    }
+  ],
+  "psus": [
+    {
+      "psu_id": "PSU-001",
+      "stratum_id": "axon-high-risk",
+      "search_disposition": "COMPLETE_SEARCH",
+      "proposal_ids": [
+        "P-EM-001",
+        "P-MORPH-001"
+      ],
+      "independent_search_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "psu_id": "PSU-002",
+      "stratum_id": "synapse-standard",
+      "search_disposition": "COMPLETE_SEARCH",
+      "proposal_ids": [
+        "P-SKEL-002"
+      ],
+      "independent_search_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "psu_id": "PSU-003",
+      "stratum_id": "axon-high-risk",
+      "search_disposition": "COMPLETE_SEARCH",
+      "proposal_ids": [],
+      "independent_search_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "psu_id": "PSU-004",
+      "stratum_id": "synapse-standard",
+      "search_disposition": "COMPLETE_SEARCH",
+      "proposal_ids": [],
+      "independent_search_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "proposals": [
+    {
+      "proposal_id": "P-EM-001",
+      "channel_id": "em-specialist",
+      "psu_id": "PSU-001",
+      "candidate_world_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "adjudication_disposition": "CONFIRMED_MATCH",
+      "matched_alternative_id": "ALT-QUERY-FLIP"
+    },
+    {
+      "proposal_id": "P-MORPH-001",
+      "channel_id": "morphology-review",
+      "psu_id": "PSU-001",
+      "candidate_world_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "adjudication_disposition": "CONFIRMED_MATCH",
+      "matched_alternative_id": "ALT-QUERY-FLIP"
+    },
+    {
+      "proposal_id": "P-SKEL-002",
+      "channel_id": "skeleton-review",
+      "psu_id": "PSU-002",
+      "candidate_world_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "adjudication_disposition": "CONFIRMED_MATCH",
+      "matched_alternative_id": "ALT-NONCRITICAL"
+    }
+  ],
+  "alternatives": [
+    {
+      "alternative_id": "ALT-QUERY-FLIP",
+      "psu_id": "PSU-001",
+      "graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "biological_disposition": "ADMISSIBLE",
+      "query_consequence": "QUERY_DECISION_FLIP",
+      "challenge_report_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "challenge_report_status": "POLICY_EXISTS",
+      "before_worst_case_effort_units": 4,
+      "after_worst_case_effort_units": 5,
+      "impact_weight": 10
+    },
+    {
+      "alternative_id": "ALT-NONCRITICAL",
+      "psu_id": "PSU-002",
+      "graph_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "source_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "biological_disposition": "ADMISSIBLE",
+      "query_consequence": "NO_QUERY_EFFECT",
+      "challenge_report_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "challenge_report_status": "POLICY_EXISTS",
+      "before_worst_case_effort_units": 4,
+      "after_worst_case_effort_units": 4,
+      "impact_weight": 1
+    },
+    {
+      "alternative_id": "ALT-OMITTED-HIGH-IMPACT",
+      "psu_id": "PSU-003",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "biological_disposition": "ADMISSIBLE",
+      "query_consequence": "ADAPTIVE_POLICY_INVALIDATED",
+      "challenge_report_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "challenge_report_status": "NO_POLICY",
+      "before_worst_case_effort_units": 4,
+      "after_worst_case_effort_units": null,
+      "impact_weight": 20
+    }
+  ],
+  "adjudication_protocol_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "all_list_missed_sensitivity": {
+    "owner": "9248",
+    "report_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "status": "NOT_RUN"
+  },
+  "claim_scope": "synthetic_known_truth",
+  "notes": [
+    "Synthetic fixture only; no biological performance claim.",
+    "EM and morphology channels share raw-volume ancestry and are not independent confirmations.",
+    "PSU-003 has zero proposals from every candidate channel; independent search discovers a query-critical omitted world."
+  ]
+}
