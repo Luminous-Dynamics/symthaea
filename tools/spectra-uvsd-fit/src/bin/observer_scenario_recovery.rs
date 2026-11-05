@@ -347,13 +347,13 @@ fn csv_option(value: Option<f64>) -> String {
 }
 
 fn emit_csv_row(fields: Vec<String>) {
-    debug_assert_eq!(fields.len(), 39, "CSV row must match the header");
+    assert_eq!(fields.len(), 41, "CSV row must match the header");
     println!("{}", fields.join(","));
 }
 
 fn write_replicate_header() {
     println!(
-        "row_type,scenario_id,scenario_name,estimand_track,replicate,root_seed,prng_version,trials_per_class,requested_total,observed_signal,observed_noise,missing_signal,missing_noise,rt_observed,rt_timeouts,adapter_disposition,fit_status,qualified,truth_mu,truth_sigma,truth_d_a,estimate_mu,estimate_sigma,estimate_d_a,mu_error,sigma_error,d_a_error,mu_rmse,sigma_rmse,d_a_rmse,fit_availability_all,fit_availability_eligible,adapter_ready,adapter_abstentions,boundary,not_identifiable,weakly_identified,not_converged,not_evaluable"
+        "row_type,scenario_id,scenario_name,estimand_track,replicate,root_seed,prng_version,trials_per_class,requested_total,observed_signal,observed_noise,missing_signal,missing_noise,rt_observed,rt_timeouts,rt_out_of_range,rt_not_collected,adapter_disposition,fit_status,qualified,truth_mu,truth_sigma,truth_d_a,estimate_mu,estimate_sigma,estimate_d_a,mu_error,sigma_error,d_a_error,mu_rmse,sigma_rmse,d_a_rmse,fit_availability_all,fit_availability_eligible,adapter_ready,adapter_abstentions,boundary,not_identifiable,weakly_identified,not_converged,not_evaluable"
     );
 }
 
@@ -397,6 +397,8 @@ fn write_replicate_row(
         group.missing_noise_categories.to_string(),
         group.rt_observed.to_string(),
         group.rt_timeouts.to_string(),
+        group.rt_out_of_range.to_string(),
+        group.rt_not_collected.to_string(),
         format!("{:?}", group.disposition),
         fit_status.to_owned(),
         qualified.to_string(),
@@ -438,6 +440,8 @@ fn write_summary_row(case: &ScenarioCase, aggregate: &Accumulator) {
         case.name.to_owned(),
         track.to_owned(),
         "ALL".to_owned(),
+        String::new(),
+        String::new(),
         String::new(),
         String::new(),
         String::new(),
