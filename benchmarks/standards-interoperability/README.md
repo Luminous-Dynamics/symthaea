@@ -29,7 +29,7 @@ A successful import/export is not sufficient. The evaluator must detect when a c
 |---|---|---|
 | Product definition | STEP AP242, ISO 10303-242:2025, Edition 4 | Geometry, product structure, assemblies, semantic PMI, supported electrical/product data |
 | Quality/inspection | QIF, ISO 23952:2020 | Characteristics, inspection plans/results and quality workflow information |
-| Manufacturing devices | MTConnect 2.7 (February 2025) | Device identity, data items, units, time and process context |
+| Manufacturing devices | MTConnect versioned profile (version matrix unresolved) | Device identity, data items, units, time and process context |
 | Traceability principles | NIST IR 8536 (September 2026) | Interoperable product pedigree, verifiable linkage and selective disclosure principles |
 
 References:
@@ -41,7 +41,7 @@ References:
 
 **QIF identifier correction:** use ISO 23952:2020. One NIST project-page sentence currently labels QIF as ISO 23953; the ISO standard record identifies QIF as ISO 23952.
 
-Standards and schemas must be pinned by edition, schema/profile digest, and exact implementation version for every run. “STEP”, “QIF”, or “MTConnect” without a version/profile is not a reproducible test declaration. STEP AP242 Edition 5 is under development (committee draft); the initial AP242 profile remains Edition 4, the latest published edition. MTConnect 2.7 (February 2026) supersedes 2.5 as the current published model baseline; do not silently accept mixed-version payloads.
+Standards and schemas must be pinned by edition, schema/profile digest, and exact implementation version for every run. “STEP”, “QIF”, or “MTConnect” without a version/profile is not a reproducible test declaration. STEP AP242 Edition 5 is under development (committee draft); the initial AP242 profile remains Edition 4, the latest published International Standard. QIF ISO 23952:2020 was reviewed and confirmed current on 14 June 2026. For MTConnect, pin the normative XMI/model revision, generated XSD bundle, agent/server implementation, protocol behavior, and implementer-license/profile separately. The 2.5 / 2.7 / 2.8 public-surface mismatch is an unresolved compatibility question; no MTConnect adapter may be scored until the exact tuple is recorded.
 
 ## Ownership and composition
 
@@ -94,6 +94,8 @@ The first profile must preserve the relationship among:
 A result attached to a friendly feature name but not to the exact feature and generation is not a successful mapping.
 
 ### 3. MTConnect manufacturing context
+
+The version tuple is intentionally unresolved in v0.1. Before execution, freeze: normative XMI digest + version, generated XSD bundle digest + version, exact agent/server build, supported protocol behavior, and the implementer-license/policy state. The public surfaces currently disagree on which version label is the latest release; do not infer compatibility from version numbers alone.
 
 The initial device profile should retain:
 
