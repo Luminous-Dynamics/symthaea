@@ -172,7 +172,7 @@ For R action × scenario records and five metric claims per record, it sets `del
 
 `(upper - lower) * sqrt(log(1 / delta) / (2 * n))`.
 
-Information, model-discrimination, representativeness and utility use lower bounds; participant burden uses an upper bound. The resulting point estimates and bounds map directly into `ScenarioOutcome` and can be passed to `aggregate_scenario_assessments`. The batch preserves every raw replicate vector, declared range, familywise/per-claim alpha, seed, source digest and score-contract digest.
+Information, model-discrimination, representativeness and utility use lower bounds; participant burden uses an upper bound. The resulting point estimates and bounds map directly into `ScenarioOutcome` and can be passed to `aggregate_scenario_assessments`. The batch preserves every raw replicate vector, declared range, familywise/per-claim alpha, seed, source digest, score-contract digest, the frozen action snapshot and the normalized scenario snapshot.
 
 Bonferroni does not require independence across action/metric claims, but Hoeffding does require independent bounded Monte Carlo replications within each score series. This method is intentionally conservative; it is not an empirical Bernstein estimate. It quantifies Monte Carlo uncertainty about the supplied score-generating process only. It cannot repair a biased simulator, an invalid score definition, a wrong estimand or an incomplete scenario bank. A simultaneous bound around a biased point-generating process is still biased.
 
