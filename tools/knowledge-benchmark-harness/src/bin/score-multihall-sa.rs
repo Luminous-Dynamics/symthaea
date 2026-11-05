@@ -1621,6 +1621,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn plan_schema_accepts_zero_retrieval_budget() {
+        let mut plan: Value = serde_json::from_str(include_str!(
+            "../../../../benchmarks/multi-hall-sa/v0/synthetic-plan.json"
+        ))
+        .expect("checked-in synthetic plan is valid JSON");
+        let budget = plan
+            .get_mut("budget")
+            .and_then(Value::as_object_mut)
+            .expect("plan has a budget object");
+        budget.insert("max_evidence_tokens".into(), Value::from(0));
+        budget.insert("max_retrieval_calls".into(), Value::from(0));
+
+        let schema = compile_schema(PLAN_SCHEMA, "plan")
+            .expect("the checked-in plan schema compiles");
+        assert!(
+            validate_value(&plan, &schema, "zero-retrieval plan").is_ok(),
+            "closed-book comparison plans must be admitted by the schema"
+        );
+    }
+
+    #[test]
     fn zero_retrieval_budget_is_a_valid_closed_book_baseline() {
         let budget = BudgetPlan {
             max_evidence_tokens: 0,
