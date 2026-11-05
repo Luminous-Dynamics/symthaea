@@ -762,7 +762,8 @@ fn validate_annotation_contract(annotation: &Value) -> Vec<String> {
                 string_field(claim, "claim_id").unwrap_or("<missing>")
             ));
         }
-        if failure_tags.iter().any(|tag| *tag == "rights_violation") && severity != "release_blocker"
+        if failure_tags.iter().any(|tag| *tag == "rights_violation")
+            && severity != "release_blocker"
         {
             errors.push(format!(
                 "claim {:?}: rights_violation must be a release_blocker",
