@@ -1366,3 +1366,701 @@ mod clustered_tests {
         assert_eq!(coding.holm_adjusted_p_value(), None);
     }
 }
+
+
+/// Terminal or non-terminal outcome for one eligible task. Missing grades remain
+/// explicit and are never silently converted to zero.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum TaskDisposition {
+    Passed, Failed, Refused, Abstained, Unsupported, TimedOut, ToolFailed,
+    Ungraded, NotAttempted, InProgress,
+}
+
+impl TaskDisposition {
+    fn requires_normalized_score(self) -> bool {
+        matches!(self, Self::Passed | Self::Failed)
+    }
+}
+
+/// One metric's normalized grade and disposition for one eligible task.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MetricTaskOutcome {
+    task_id: String,
+    disposition: TaskDisposition,
+    normalized_score: Option<f64>,
+}
+
+impl MetricTaskOutcome {
+    pub fn new(
+        task_id: impl Into<String>,
+        disposition: TaskDisposition,
+        normalized_score: Option<f64>,
+    ) -> Result<Self, CompositeEvaluationError> {
+        let task_id = task_id.into();
+        validate_composite_identifier(&task_id, "task_id")?;
+        if normalized_score.is_some() && !disposition.requires_normalized_score() {
+            return Err(CompositeEvaluationError::ScoreForUnscoredDisposition { task_id, disposition });
+        }
+        if let Some(score) = normalized_score {
+            if !score.is_finite() || !(0.0..=1.0).contains(&score) {
+                return Err(CompositeEvaluationError::InvalidNormalizedScore(task_id));
+            }
+        }
+        if disposition.requires_normalized_score() && normalized_score.is_none() {
+            return Err(CompositeEvaluationError::MissingGradeForScoredDisposition { task_id, disposition });
+        }
+        Ok(Self { task_id, disposition, normalized_score })
+    }
+
+    pub fn task_id(&self) -> &str { &self.task_id }
+    pub fn disposition(&self) -> TaskDisposition { self.disposition }
+    pub fn normalized_score(&self) -> Option<f64> { self.normalized_score }
+}
+
+/// Structural errors for complete task-universe composition. These checks do
+/// not authenticate a caller, receipt, evaluator, or execution environment.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompositeEvaluationError {
+    InvalidIdentifier(&'static str),
+    InvalidDigest(&'static str),
+    EmptyEligibleTaskSet,
+    DuplicateEligibleTask(String),
+    DuplicateMetric(String),
+    DuplicateTaskOutcome { metric_id: String, task_id: String },
+    MissingTaskOutcome { metric_id: String, task_id: String },
+    UnexpectedTaskOutcome { metric_id: String, task_id: String },
+    InvalidNormalizedScore(String),
+    ScoreForUnscoredDisposition { task_id: String, disposition: TaskDisposition },
+    MissingGradeForScoredDisposition { task_id: String, disposition: TaskDisposition },
+    ContextMismatch,
+    CompositeManifestMismatch,
+    EligibleTaskSetMismatch,
+    MetricSchemaMismatch,
+    ParentLineageMismatch,
+    SameCandidate,
+    InvalidTieEpsilon,
+}
+
+impl fmt::Display for CompositeEvaluationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidIdentifier(field) => write!(f, "{field} must be non-empty and contain no control characters"),
+            Self::InvalidDigest(field) => write!(f, "{field} must be 64 lowercase hexadecimal characters"),
+            Self::EmptyEligibleTaskSet => write!(f, "eligible task set must not be empty"),
+            Self::DuplicateEligibleTask(id) => write!(f, "duplicate eligible task ID: {id}"),
+            Self::DuplicateMetric(id) => write!(f, "duplicate metric ID: {id}"),
+            Self::DuplicateTaskOutcome { metric_id, task_id } => write!(f, "duplicate outcome for metric {metric_id}, task {task_id}"),
+            Self::MissingTaskOutcome { metric_id, task_id } => write!(f, "missing outcome for eligible task {task_id} in metric {metric_id}"),
+            Self::UnexpectedTaskOutcome { metric_id, task_id } => write!(f, "unexpected task {task_id} in metric {metric_id}"),
+            Self::InvalidNormalizedScore(id) => write!(f, "normalized score for task {id} must be finite and within [0, 1]"),
+            Self::ScoreForUnscoredDisposition { task_id, disposition } => write!(f, "task {task_id} has a score incompatible with disposition {disposition:?}"),
+            Self::MissingGradeForScoredDisposition { task_id, disposition } => write!(f, "task {task_id} has disposition {disposition:?} but no normalized grade"),
+            Self::ContextMismatch => write!(f, "composite views do not share the same evaluation context"),
+            Self::CompositeManifestMismatch => write!(f, "composite views do not share the same frozen evaluation manifest"),
+            Self::EligibleTaskSetMismatch => write!(f, "composite views do not contain the exact same eligible task universe"),
+            Self::MetricSchemaMismatch => write!(f, "composite views do not contain the exact same metric schema"),
+            Self::ParentLineageMismatch => write!(f, "successor does not declare the compared parent"),
+            Self::SameCandidate => write!(f, "candidate cannot be compared against itself"),
+            Self::InvalidTieEpsilon => write!(f, "tie epsilon must be finite and within [0, 1]"),
+        }
+    }
+}
+impl std::error::Error for CompositeEvaluationError {}
+
+fn validate_composite_identifier(value: &str, field: &'static str) -> Result<(), CompositeEvaluationError> {
+    if value.trim().is_empty() || value.chars().any(char::is_control) {
+        return Err(CompositeEvaluationError::InvalidIdentifier(field));
+    }
+    Ok(())
+}
+
+fn validate_composite_digest(value: &str, field: &'static str) -> Result<(), CompositeEvaluationError> {
+    let valid = value.len() == 64
+        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b));
+    if !valid { return Err(CompositeEvaluationError::InvalidDigest(field)); }
+    Ok(())
+}
+
+/// Per-metric summary. Mean is calculated only over observed grades; coverage
+/// and disposition counts disclose how much of the eligible universe was scored.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositeMetricSummary {
+    metric_id: String,
+    eligible_count: usize,
+    scored_count: usize,
+    mean_scored_score: Option<f64>,
+    disposition_counts: BTreeMap<TaskDisposition, usize>,
+}
+
+impl CompositeMetricSummary {
+    pub fn metric_id(&self) -> &str { &self.metric_id }
+    pub fn eligible_count(&self) -> usize { self.eligible_count }
+    pub fn scored_count(&self) -> usize { self.scored_count }
+    pub fn score_coverage(&self) -> f64 { self.scored_count as f64 / self.eligible_count as f64 }
+    pub fn mean_scored_score(&self) -> Option<f64> { self.mean_scored_score }
+    pub fn disposition_count(&self, d: TaskDisposition) -> usize {
+        self.disposition_counts.get(&d).copied().unwrap_or(0)
+    }
+    pub fn disposition_counts(&self) -> impl Iterator<Item = (TaskDisposition, usize)> + '_ {
+        self.disposition_counts.iter().map(|(kind, count)| (*kind, *count))
+    }
+}
+
+/// Complete in-memory composition of metric-specific runs for one candidate.
+///
+/// Every metric run must contain exactly one row for every task in the frozen
+/// eligible universe. This prevents parent and successor from silently dropping
+/// the same difficult tasks. Non-scored dispositions remain in the denominator.
+///
+/// composite_manifest_digest identifies the frozen plan (task universe, metrics,
+/// normalization, budgets, split and seed policy). run_set_digest identifies this
+/// candidate's component run-receipt set. They are identity commitments only:
+/// this constructor does not authenticate them, verify receipts or signatures,
+/// or enforce sealed-holdout access. Inputs must come from the independently
+/// qualified shared evidence pipeline.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositeCandidateEvaluationView {
+    context: EvaluationContext,
+    candidate_id: String,
+    parent_ids: Vec<String>,
+    source_tree_digest: String,
+    composite_manifest_digest: String,
+    run_set_digest: String,
+    eligible_task_ids: std::collections::BTreeSet<String>,
+    outcomes: BTreeMap<String, BTreeMap<String, MetricTaskOutcome>>,
+    summaries: BTreeMap<String, CompositeMetricSummary>,
+}
+
+impl CompositeCandidateEvaluationView {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        context: EvaluationContext,
+        candidate_id: impl Into<String>,
+        parent_ids: Vec<String>,
+        source_tree_digest: impl Into<String>,
+        composite_manifest_digest: impl Into<String>,
+        run_set_digest: impl Into<String>,
+        eligible_task_ids: impl IntoIterator<Item = String>,
+        metric_outcomes: impl IntoIterator<Item = (String, Vec<MetricTaskOutcome>)>,
+    ) -> Result<Self, CompositeEvaluationError> {
+        let candidate_id = candidate_id.into();
+        validate_composite_identifier(&candidate_id, "candidate_id")?;
+
+        let mut parents = std::collections::BTreeSet::new();
+        for parent_id in parent_ids {
+            validate_composite_identifier(&parent_id, "parent_id")?;
+            if parent_id == candidate_id || !parents.insert(parent_id.clone()) {
+                return Err(CompositeEvaluationError::ParentLineageMismatch);
+            }
+        }
+
+        let source_tree_digest = source_tree_digest.into();
+        let composite_manifest_digest = composite_manifest_digest.into();
+        let run_set_digest = run_set_digest.into();
+        validate_composite_digest(&source_tree_digest, "source_tree_digest")?;
+        validate_composite_digest(&composite_manifest_digest, "composite_manifest_digest")?;
+        validate_composite_digest(&run_set_digest, "run_set_digest")?;
+
+        let mut eligible = std::collections::BTreeSet::new();
+        for task_id in eligible_task_ids {
+            validate_composite_identifier(&task_id, "eligible_task_id")?;
+            if !eligible.insert(task_id.clone()) {
+                return Err(CompositeEvaluationError::DuplicateEligibleTask(task_id));
+            }
+        }
+        if eligible.is_empty() { return Err(CompositeEvaluationError::EmptyEligibleTaskSet); }
+
+        let mut outcomes_by_metric = BTreeMap::new();
+        let mut summaries = BTreeMap::new();
+        for (metric_id, rows) in metric_outcomes {
+            validate_composite_identifier(&metric_id, "metric_id")?;
+            let mut indexed = BTreeMap::new();
+            let mut disposition_counts = BTreeMap::new();
+            let mut score_sum = 0.0_f64;
+            let mut scored_count = 0usize;
+
+            for row in rows {
+                let task_id = row.task_id.clone();
+                if !eligible.contains(&task_id) {
+                    return Err(CompositeEvaluationError::UnexpectedTaskOutcome { metric_id: metric_id.clone(), task_id });
+                }
+                if indexed.insert(task_id.clone(), row.clone()).is_some() {
+                    return Err(CompositeEvaluationError::DuplicateTaskOutcome { metric_id: metric_id.clone(), task_id });
+                }
+                *disposition_counts.entry(row.disposition).or_insert(0usize) += 1;
+                if let Some(score) = row.normalized_score { score_sum += score; scored_count += 1; }
+            }
+
+            for task_id in &eligible {
+                if !indexed.contains_key(task_id) {
+                    return Err(CompositeEvaluationError::MissingTaskOutcome { metric_id: metric_id.clone(), task_id: task_id.clone() });
+                }
+            }
+
+            let mean_scored_score = (scored_count > 0).then_some(score_sum / scored_count as f64);
+            summaries.insert(metric_id.clone(), CompositeMetricSummary {
+                metric_id: metric_id.clone(),
+                eligible_count: eligible.len(),
+                scored_count,
+                mean_scored_score,
+                disposition_counts,
+            });
+            if outcomes_by_metric.insert(metric_id.clone(), indexed).is_some() {
+                return Err(CompositeEvaluationError::DuplicateMetric(metric_id));
+            }
+        }
+        if outcomes_by_metric.is_empty() { return Err(CompositeEvaluationError::MetricSchemaMismatch); }
+
+        Ok(Self {
+            context, candidate_id, parent_ids: parents.into_iter().collect(),
+            source_tree_digest, composite_manifest_digest, run_set_digest,
+            eligible_task_ids: eligible, outcomes: outcomes_by_metric, summaries,
+        })
+    }
+
+    pub fn candidate_id(&self) -> &str { &self.candidate_id }
+    pub fn parent_ids(&self) -> impl Iterator<Item = &str> { self.parent_ids.iter().map(String::as_str) }
+    pub fn source_tree_digest(&self) -> &str { &self.source_tree_digest }
+    pub fn composite_manifest_digest(&self) -> &str { &self.composite_manifest_digest }
+    pub fn run_set_digest(&self) -> &str { &self.run_set_digest }
+    pub fn context(&self) -> &EvaluationContext { &self.context }
+    pub fn eligible_task_count(&self) -> usize { self.eligible_task_ids.len() }
+    pub fn eligible_task_ids(&self) -> impl Iterator<Item = &str> { self.eligible_task_ids.iter().map(String::as_str) }
+    pub fn metric_ids(&self) -> impl Iterator<Item = &str> { self.outcomes.keys().map(String::as_str) }
+    pub fn summary(&self, id: &str) -> Option<&CompositeMetricSummary> { self.summaries.get(id) }
+    pub fn outcome(&self, metric_id: &str, task_id: &str) -> Option<&MetricTaskOutcome> {
+        self.outcomes.get(metric_id)?.get(task_id)
+    }
+}
+
+/// Descriptive paired result retaining the full eligible denominator and
+/// outcome transitions. Mean delta uses only jointly graded tasks; the number
+/// of paired grades and each side's coverage are shown separately. No p-value
+/// is emitted; inference remains with #8438 and #9433.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositeMetricPairedResult {
+    metric_id: String,
+    eligible_count: usize,
+    parent_scored_count: usize,
+    candidate_scored_count: usize,
+    paired_scored_count: usize,
+    parent_only_scored_count: usize,
+    candidate_only_scored_count: usize,
+    both_unscored_count: usize,
+    wins: usize,
+    losses: usize,
+    ties: usize,
+    mean_paired_delta: Option<f64>,
+    parent_coverage: f64,
+    candidate_coverage: f64,
+    coverage_delta: f64,
+    disposition_transitions: BTreeMap<(TaskDisposition, TaskDisposition), usize>,
+}
+
+impl CompositeMetricPairedResult {
+    pub fn metric_id(&self) -> &str { &self.metric_id }
+    pub fn eligible_count(&self) -> usize { self.eligible_count }
+    pub fn parent_scored_count(&self) -> usize { self.parent_scored_count }
+    pub fn candidate_scored_count(&self) -> usize { self.candidate_scored_count }
+    pub fn paired_scored_count(&self) -> usize { self.paired_scored_count }
+    pub fn parent_only_scored_count(&self) -> usize { self.parent_only_scored_count }
+    pub fn candidate_only_scored_count(&self) -> usize { self.candidate_only_scored_count }
+    pub fn both_unscored_count(&self) -> usize { self.both_unscored_count }
+    pub fn wins(&self) -> usize { self.wins }
+    pub fn losses(&self) -> usize { self.losses }
+    pub fn ties(&self) -> usize { self.ties }
+    pub fn mean_paired_delta(&self) -> Option<f64> { self.mean_paired_delta }
+    pub fn parent_coverage(&self) -> f64 { self.parent_coverage }
+    pub fn candidate_coverage(&self) -> f64 { self.candidate_coverage }
+    pub fn coverage_delta(&self) -> f64 { self.coverage_delta }
+    pub fn disposition_transitions(&self) -> impl Iterator<Item = ((TaskDisposition, TaskDisposition), usize)> + '_ {
+        self.disposition_transitions.iter().map(|(transition, count)| (*transition, *count))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CompositePairedComparison {
+    parent_candidate_id: String,
+    candidate_id: String,
+    eligible_count: usize,
+    metrics: BTreeMap<String, CompositeMetricPairedResult>,
+}
+
+impl CompositePairedComparison {
+    pub fn compare(
+        parent: &CompositeCandidateEvaluationView,
+        candidate: &CompositeCandidateEvaluationView,
+        tie_epsilon: f64,
+    ) -> Result<Self, CompositeEvaluationError> {
+        if !tie_epsilon.is_finite() || !(0.0..=1.0).contains(&tie_epsilon) {
+            return Err(CompositeEvaluationError::InvalidTieEpsilon);
+        }
+        if parent.context != candidate.context { return Err(CompositeEvaluationError::ContextMismatch); }
+        if parent.composite_manifest_digest != candidate.composite_manifest_digest {
+            return Err(CompositeEvaluationError::CompositeManifestMismatch);
+        }
+        if parent.eligible_task_ids != candidate.eligible_task_ids {
+            return Err(CompositeEvaluationError::EligibleTaskSetMismatch);
+        }
+        if parent.candidate_id == candidate.candidate_id { return Err(CompositeEvaluationError::SameCandidate); }
+        if !candidate.parent_ids.iter().any(|id| id == &parent.candidate_id) {
+            return Err(CompositeEvaluationError::ParentLineageMismatch);
+        }
+        if parent.outcomes.keys().ne(candidate.outcomes.keys()) {
+            return Err(CompositeEvaluationError::MetricSchemaMismatch);
+        }
+
+        let eligible_count = parent.eligible_task_ids.len();
+        let mut metrics = BTreeMap::new();
+        for metric_id in parent.outcomes.keys() {
+            let parent_rows = parent.outcomes.get(metric_id).expect("metric keys checked");
+            let candidate_rows = candidate.outcomes.get(metric_id).expect("metric keys checked");
+            let (mut parent_scored, mut candidate_scored, mut paired_scored) = (0, 0, 0);
+            let (mut parent_only, mut candidate_only, mut both_unscored) = (0, 0, 0);
+            let (mut wins, mut losses, mut ties) = (0, 0, 0);
+            let mut delta_sum = 0.0_f64;
+            let mut transitions = BTreeMap::new();
+
+            for task_id in &parent.eligible_task_ids {
+                let p = parent_rows.get(task_id).expect("complete universe validated");
+                let c = candidate_rows.get(task_id).expect("complete universe validated");
+                *transitions.entry((p.disposition, c.disposition)).or_insert(0usize) += 1;
+                parent_scored += usize::from(p.normalized_score.is_some());
+                candidate_scored += usize::from(c.normalized_score.is_some());
+                match (p.normalized_score, c.normalized_score) {
+                    (Some(p_score), Some(c_score)) => {
+                        paired_scored += 1;
+                        let delta = c_score - p_score;
+                        delta_sum += delta;
+                        if delta > tie_epsilon { wins += 1; }
+                        else if delta < -tie_epsilon { losses += 1; }
+                        else { ties += 1; }
+                    }
+                    (Some(_), None) => parent_only += 1,
+                    (None, Some(_)) => candidate_only += 1,
+                    (None, None) => both_unscored += 1,
+                }
+            }
+
+            let parent_coverage = parent_scored as f64 / eligible_count as f64;
+            let candidate_coverage = candidate_scored as f64 / eligible_count as f64;
+            metrics.insert(metric_id.clone(), CompositeMetricPairedResult {
+                metric_id: metric_id.clone(),
+                eligible_count,
+                parent_scored_count: parent_scored,
+                candidate_scored_count: candidate_scored,
+                paired_scored_count: paired_scored,
+                parent_only_scored_count: parent_only,
+                candidate_only_scored_count: candidate_only,
+                both_unscored_count: both_unscored,
+                wins, losses, ties,
+                mean_paired_delta: if paired_scored > 0 {
+                    Some(delta_sum / paired_scored as f64)
+                } else {
+                    None
+                },
+                parent_coverage,
+                candidate_coverage,
+                coverage_delta: candidate_coverage - parent_coverage,
+                disposition_transitions: transitions,
+            });
+        }
+
+        Ok(Self {
+            parent_candidate_id: parent.candidate_id.clone(),
+            candidate_id: candidate.candidate_id.clone(),
+            eligible_count,
+            metrics,
+        })
+    }
+
+    pub fn parent_candidate_id(&self) -> &str { &self.parent_candidate_id }
+    pub fn candidate_id(&self) -> &str { &self.candidate_id }
+    pub fn eligible_count(&self) -> usize { self.eligible_count }
+    pub fn metric(&self, id: &str) -> Option<&CompositeMetricPairedResult> { self.metrics.get(id) }
+    pub fn metrics(&self) -> impl Iterator<Item = (&str, &CompositeMetricPairedResult)> {
+        self.metrics.iter().map(|(id, result)| (id.as_str(), result))
+    }
+}
+
+#[cfg(test)]
+mod composite_evaluation_tests {
+    use super::*;
+    use crate::consciousness::recursive_improvement::candidate_archive::EvaluationPartition;
+
+    fn digest(byte: char) -> String { std::iter::repeat_n(byte, 64).collect() }
+
+    fn context() -> EvaluationContext {
+        EvaluationContext::new(
+            "sym-rsi-composite-v1", "v1", EvaluationPartition::Validation,
+            "composite-split", digest('a'), digest('b'), digest('c'), digest('d'), digest('e'),
+        ).unwrap()
+    }
+
+    fn rows(entries: &[(&str, TaskDisposition, Option<f64>)]) -> Vec<MetricTaskOutcome> {
+        entries.iter().map(|(task, disposition, score)| {
+            MetricTaskOutcome::new(*task, *disposition, *score).unwrap()
+        }).collect()
+    }
+
+    fn view(candidate: &str, parents: &[&str], source: char, run: char,
+            entries: &[(&str, TaskDisposition, Option<f64>)]) -> CompositeCandidateEvaluationView {
+        CompositeCandidateEvaluationView::new(
+            context(), candidate, parents.iter().map(|id| (*id).to_owned()).collect(),
+            digest(source), digest('f'), digest(run),
+            ["task-a", "task-b", "task-c", "task-d"].map(str::to_owned),
+            [("quality".to_owned(), rows(entries))],
+        ).unwrap()
+    }
+
+    #[test]
+    fn full_eligible_universe_preserves_terminal_dispositions() {
+        let candidate = view("candidate", &[], '1', 'a', &[
+            ("task-a", TaskDisposition::Passed, Some(0.9)),
+            ("task-b", TaskDisposition::Failed, Some(0.2)),
+            ("task-c", TaskDisposition::Refused, None),
+            ("task-d", TaskDisposition::TimedOut, None),
+        ]);
+        assert_eq!(candidate.eligible_task_count(), 4);
+        let summary = candidate.summary("quality").unwrap();
+        assert_eq!(summary.scored_count(), 2);
+        assert_eq!(summary.disposition_count(TaskDisposition::Passed), 1);
+        assert_eq!(summary.disposition_count(TaskDisposition::Failed), 1);
+        assert_eq!(summary.disposition_count(TaskDisposition::Refused), 1);
+        assert_eq!(summary.disposition_count(TaskDisposition::TimedOut), 1);
+        assert_eq!(summary.score_coverage(), 0.5);
+        assert!((summary.mean_scored_score().unwrap() - 0.55).abs() < 1e-12);
+        assert!(candidate.outcome("quality", "task-c").unwrap().normalized_score().is_none());
+    }
+
+    #[test]
+    fn rejects_dropped_task_even_when_both_candidates_would_omit_it() {
+        let result = CompositeCandidateEvaluationView::new(
+            context(), "candidate", vec![], digest('1'), digest('f'), digest('a'),
+            ["task-a", "task-b", "task-c"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+                ("task-b", TaskDisposition::Passed, Some(0.8)),
+            ]))],
+        );
+        assert_eq!(result.unwrap_err(), CompositeEvaluationError::MissingTaskOutcome {
+            metric_id: "quality".into(), task_id: "task-c".into(),
+        });
+    }
+
+    #[test]
+    fn rejects_duplicate_unexpected_and_duplicate_metric_rows() {
+        let duplicate = CompositeCandidateEvaluationView::new(
+            context(), "candidate", vec![], digest('1'), digest('f'), digest('a'),
+            ["task-a", "task-b"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+                ("task-a", TaskDisposition::Passed, Some(0.8)),
+                ("task-b", TaskDisposition::Passed, Some(0.7)),
+            ]))],
+        );
+        assert!(matches!(duplicate, Err(CompositeEvaluationError::DuplicateTaskOutcome { .. })));
+
+        let extra = CompositeCandidateEvaluationView::new(
+            context(), "candidate", vec![], digest('1'), digest('f'), digest('a'),
+            ["task-a", "task-b"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+                ("task-b", TaskDisposition::Passed, Some(0.8)),
+                ("task-extra", TaskDisposition::Passed, Some(0.7)),
+            ]))],
+        );
+        assert!(matches!(extra, Err(CompositeEvaluationError::UnexpectedTaskOutcome { .. })));
+
+        let duplicate_metric = CompositeCandidateEvaluationView::new(
+            context(), "candidate", vec![], digest('1'), digest('f'), digest('a'),
+            ["task-a"].map(str::to_owned),
+            [
+                ("quality".to_owned(), rows(&[("task-a", TaskDisposition::Passed, Some(0.9))])),
+                ("quality".to_owned(), rows(&[("task-a", TaskDisposition::Passed, Some(0.8))])),
+            ],
+        );
+        assert_eq!(duplicate_metric.unwrap_err(), CompositeEvaluationError::DuplicateMetric("quality".into()));
+    }
+
+    #[test]
+    fn comparison_retains_coverage_and_disposition_transitions() {
+        let parent = view("parent", &[], '1', 'a', &[
+            ("task-a", TaskDisposition::Passed, Some(0.5)),
+            ("task-b", TaskDisposition::Passed, Some(0.6)),
+            ("task-c", TaskDisposition::Refused, None),
+            ("task-d", TaskDisposition::Unsupported, None),
+        ]);
+        let candidate = view("candidate", &["parent"], '2', 'b', &[
+            ("task-a", TaskDisposition::Passed, Some(0.7)),
+            ("task-b", TaskDisposition::Failed, Some(0.4)),
+            ("task-c", TaskDisposition::Passed, Some(0.8)),
+            ("task-d", TaskDisposition::Unsupported, None),
+        ]);
+        let result = CompositePairedComparison::compare(&parent, &candidate, 0.0).unwrap();
+        let metric = result.metric("quality").unwrap();
+        assert_eq!(result.eligible_count(), 4);
+        assert_eq!(metric.parent_scored_count(), 2);
+        assert_eq!(metric.candidate_scored_count(), 3);
+        assert_eq!(metric.paired_scored_count(), 2);
+        assert_eq!(metric.parent_only_scored_count(), 0);
+        assert_eq!(metric.candidate_only_scored_count(), 1);
+        assert_eq!(metric.both_unscored_count(), 1);
+        assert_eq!(metric.wins(), 1);
+        assert_eq!(metric.losses(), 1);
+        assert_eq!(metric.ties(), 0);
+        assert!((metric.mean_paired_delta().unwrap() - 0.0).abs() < 1e-12);
+        assert!((metric.parent_coverage() - 0.5).abs() < 1e-12);
+        assert!((metric.candidate_coverage() - 0.75).abs() < 1e-12);
+        assert!((metric.coverage_delta() - 0.25).abs() < 1e-12);
+        assert_eq!(
+            metric.disposition_transitions().find(|((from, to), _)| *from == TaskDisposition::Refused && *to == TaskDisposition::Passed),
+            Some(((TaskDisposition::Refused, TaskDisposition::Passed), 1))
+        );
+    }
+
+    #[test]
+    fn comparison_rejects_context_manifest_and_task_set_mismatch() {
+        let parent = view("parent", &[], '1', 'a', &[
+            ("task-a", TaskDisposition::Passed, Some(0.5)),
+            ("task-b", TaskDisposition::Passed, Some(0.5)),
+            ("task-c", TaskDisposition::Passed, Some(0.5)),
+            ("task-d", TaskDisposition::Passed, Some(0.5)),
+        ]);
+        let mut wrong_manifest = view("child", &["parent"], '2', 'b', &[
+            ("task-a", TaskDisposition::Passed, Some(0.6)),
+            ("task-b", TaskDisposition::Passed, Some(0.6)),
+            ("task-c", TaskDisposition::Passed, Some(0.6)),
+            ("task-d", TaskDisposition::Passed, Some(0.6)),
+        ]);
+        wrong_manifest.composite_manifest_digest = digest('e');
+        assert_eq!(CompositePairedComparison::compare(&parent, &wrong_manifest, 0.0),
+            Err(CompositeEvaluationError::CompositeManifestMismatch));
+
+        let mut wrong_context = view("child", &["parent"], '2', 'b', &[
+            ("task-a", TaskDisposition::Passed, Some(0.6)),
+            ("task-b", TaskDisposition::Passed, Some(0.6)),
+            ("task-c", TaskDisposition::Passed, Some(0.6)),
+            ("task-d", TaskDisposition::Passed, Some(0.6)),
+        ]);
+        wrong_context.context = EvaluationContext::new(
+            "sym-rsi-other", "v1", EvaluationPartition::Validation, "composite-split",
+            digest('a'), digest('b'), digest('c'), digest('d'), digest('e'),
+        ).unwrap();
+        assert_eq!(CompositePairedComparison::compare(&parent, &wrong_context, 0.0),
+            Err(CompositeEvaluationError::ContextMismatch));
+
+        let wrong_tasks = CompositeCandidateEvaluationView::new(
+            context(), "child", vec!["parent".into()], digest('2'), digest('f'), digest('b'),
+            ["task-a", "task-b", "task-c"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.6)),
+                ("task-b", TaskDisposition::Passed, Some(0.6)),
+                ("task-c", TaskDisposition::Passed, Some(0.6)),
+            ]))],
+        ).unwrap();
+        assert_eq!(CompositePairedComparison::compare(&parent, &wrong_tasks, 0.0),
+            Err(CompositeEvaluationError::EligibleTaskSetMismatch));
+    }
+
+    #[test]
+    fn rejects_invalid_scores_and_disposition_mismatches() {
+        assert_eq!(MetricTaskOutcome::new("task-a", TaskDisposition::Refused, Some(0.5)),
+            Err(CompositeEvaluationError::ScoreForUnscoredDisposition {
+                task_id: "task-a".into(), disposition: TaskDisposition::Refused,
+            }));
+        assert_eq!(MetricTaskOutcome::new("task-a", TaskDisposition::Passed, Some(1.5)),
+            Err(CompositeEvaluationError::InvalidNormalizedScore("task-a".into())));
+        assert_eq!(MetricTaskOutcome::new("task-a", TaskDisposition::Failed, None),
+            Err(CompositeEvaluationError::MissingGradeForScoredDisposition {
+                task_id: "task-a".into(), disposition: TaskDisposition::Failed,
+            }));
+    }
+}
+
+
+#[cfg(test)]
+mod composite_disposition_tests {
+    use super::*;
+    use crate::consciousness::recursive_improvement::candidate_archive::EvaluationPartition;
+
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn context() -> EvaluationContext {
+        EvaluationContext::new(
+            "sym-rsi-composite-dispositions-v1",
+            "v1",
+            EvaluationPartition::Validation,
+            "disposition-split",
+            digest('a'), digest('b'), digest('c'), digest('d'), digest('e'),
+        ).unwrap()
+    }
+
+    fn rows(entries: &[(&str, TaskDisposition, Option<f64>)]) -> Vec<MetricTaskOutcome> {
+        entries.iter().map(|(id, disposition, score)| {
+            MetricTaskOutcome::new(*id, *disposition, *score).unwrap()
+        }).collect()
+    }
+
+    #[test]
+    fn preserves_all_supported_dispositions_in_the_eligible_denominator() {
+        let dispositions = [
+            ("passed", TaskDisposition::Passed, Some(0.9)),
+            ("failed", TaskDisposition::Failed, Some(0.1)),
+            ("refused", TaskDisposition::Refused, None),
+            ("abstained", TaskDisposition::Abstained, None),
+            ("unsupported", TaskDisposition::Unsupported, None),
+            ("timed-out", TaskDisposition::TimedOut, None),
+            ("tool-failed", TaskDisposition::ToolFailed, None),
+            ("ungraded", TaskDisposition::Ungraded, None),
+            ("not-attempted", TaskDisposition::NotAttempted, None),
+            ("in-progress", TaskDisposition::InProgress, None),
+        ];
+        let candidate = CompositeCandidateEvaluationView::new(
+            context(),
+            "candidate",
+            vec![],
+            digest('1'),
+            digest('f'),
+            digest('a'),
+            dispositions.iter().map(|(id, _, _)| (*id).to_owned()),
+            [("quality".to_owned(), rows(&dispositions))],
+        ).unwrap();
+        let summary = candidate.summary("quality").unwrap();
+        assert_eq!(candidate.eligible_task_count(), 10);
+        assert_eq!(summary.scored_count(), 2);
+        for (_, disposition, _) in dispositions {
+            assert_eq!(summary.disposition_count(disposition), 1);
+        }
+        assert_eq!(summary.score_coverage(), 0.2);
+    }
+
+    #[test]
+    fn rejects_duplicate_eligible_ids_and_invalid_composite_digests() {
+        let duplicate_ids = CompositeCandidateEvaluationView::new(
+            context(), "candidate", vec![], digest('1'), digest('f'), digest('a'),
+            ["task-a", "task-a"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+            ]))],
+        );
+        assert_eq!(
+            duplicate_ids.unwrap_err(),
+            CompositeEvaluationError::DuplicateEligibleTask("task-a".into())
+        );
+
+        let invalid_digest = CompositeCandidateEvaluationView::new(
+            context(), "candidate", vec![], "not-a-digest", digest('f'), digest('a'),
+            ["task-a"].map(str::to_owned),
+            [("quality".to_owned(), rows(&[
+                ("task-a", TaskDisposition::Passed, Some(0.9)),
+            ]))],
+        );
+        assert_eq!(
+            invalid_digest.unwrap_err(),
+            CompositeEvaluationError::InvalidDigest("source_tree_digest")
+        );
+    }
+}
