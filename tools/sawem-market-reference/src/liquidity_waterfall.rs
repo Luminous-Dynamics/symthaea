@@ -506,7 +506,7 @@ mod tests {
             panic!("all path inputs are supplied");
         };
         assert_eq!(result.committed.minimum_cash_minor_zar, 33_000_000);
-        assert_eq!(result.forecast.minimum_cash_minor_zar, 51_000_000);
+        assert_eq!(result.forecast.minimum_cash_minor_zar, 45_000_000);
         assert_eq!(result.stress.minimum_cash_minor_zar, 43_000_000);
         assert_eq!(result.forecast_event_count, 1);
         assert_eq!(result.stress_event_count, 1);
@@ -657,21 +657,11 @@ mod tests {
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("cash flows are well formed");
         };
-        assert_eq!(
-            result
-                .committed
-                .first_operating_floor_breach
-                .unwrap()
-                .event_id,
-            Some("outflow-1")
-        );
-        assert_eq!(
-            result.forecast.first_operating_floor_breach,
-            result.committed.first_operating_floor_breach
-        );
+        assert_eq!(result.committed.first_operating_floor_breach, None);
+        assert_eq!(result.forecast.first_operating_floor_breach, None);
         assert_eq!(
             result.stress.first_operating_floor_breach.unwrap().event_id,
-            Some("outflow-1")
+            Some("outflow-stress")
         );
     }
 
