@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env;
@@ -1061,7 +1063,6 @@ fn compute_system_metrics(
         let n = items.len();
         let relation = items.iter().filter(|i| i.0).count();
         let preserve = items.iter().filter(|i| i.1).count();
-        let change = items.iter().filter(|i| i.2).count();
         let citation = items.iter().filter(|i| i.3).count();
         let forbidden_behavior_rows = items.iter().filter(|i| !i.4).count();
         let fidelity = items.iter().filter(|i| i.5).count();
