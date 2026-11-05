@@ -169,6 +169,8 @@ SRE-Bench remains a separate optional source-free reverse-engineering capability
 - **CEB-SECURE:** secure code-change correctness, CWE coverage, false-accept rate and functional/security non-inferiority.
 - **CEB-RUST:** Rust-specific issue reproduction, trait/type correctness, configuration scope and repository comprehension.
 - **CEB-CONTEXT:** context retrieval precision/recall/F1, sufficiency, token cost and downstream task success.
+- **CEB-EVAL / CEB-VERIFY:** evaluator integrity, benchmark admission, answer-leakage resistance, receipt binding, independent regrading and false-accept/false-reject behavior.
+- **CEB-DOCS:** static evidence that documented Cargo manifest/package/binary commands refer to tracked sources in the selected workspace; this is a documentation-integrity control, not proof that commands build or pass.
 
 ### Matched baseline design
 
