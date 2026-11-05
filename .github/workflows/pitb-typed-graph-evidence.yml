@@ -704,3 +704,152 @@ jobs:
             ${{ runner.temp }}/pitb-sorrydb-integrity/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
+
+
+  benchmark-integrity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-integrity-venv"
+          "$RUNNER_TEMP/pitb-integrity-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated benchmark integrity validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-benchmark-integrity"
+          mkdir -p "$staged/src" "$staged/schema"
+          cp tools/pitb-benchmark-integrity/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-benchmark-integrity/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-benchmark-integrity/src/main.rs "$staged/src/main.rs"
+          cp tools/pitb-benchmark-integrity/schema/*.json "$staged/schema/"
+          echo "PITB_INTEGRITY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_INTEGRITY_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test Rust benchmark integrity validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_INTEGRITY_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_INTEGRITY_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_INTEGRITY_MANIFEST"
+
+      - name: Generate complete synthetic benchmark input ledgers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_INTEGRITY_MANIFEST" -- \
+            --self-test-fixture-dir "$RUNNER_TEMP/pitb-benchmark-integrity-inputs"
+
+      - name: Run end-to-end task admission and proof scoring
+        shell: bash
+        run: |
+          set -euo pipefail
+          input="$RUNNER_TEMP/pitb-benchmark-integrity-inputs"
+          cargo run --locked --manifest-path "$PITB_INTEGRITY_MANIFEST" -- \
+            --verify \
+            "$input/snapshot.json" \
+            "$input/tasks.jsonl" \
+            "$input/reproductions.jsonl" \
+            "$input/attempts.jsonl" \
+            "$input/report.json"
+
+      - name: Validate all schemas, source pins and report denominators
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-integrity-venv/bin/python" - \
+            "$RUNNER_TEMP/pitb-benchmark-integrity-inputs" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          fixture_dir = Path(sys.argv[1])
+          schema_root = Path("tools/pitb-benchmark-integrity/schema")
+          schemas = {
+              "snapshot": json.loads((schema_root / "benchmark-snapshot-v0.schema.json").read_text()),
+              "task": json.loads((schema_root / "benchmark-task-v0.schema.json").read_text()),
+              "reproduction": json.loads((schema_root / "task-reproduction-receipt-v0.schema.json").read_text()),
+              "attempt": json.loads((schema_root / "proof-attempt-outcome-v0.schema.json").read_text()),
+              "report": json.loads((schema_root / "benchmark-integrity-report-v0.schema.json").read_text()),
+          }
+          for name, schema in schemas.items():
+              Draft202012Validator.check_schema(schema)
+
+          def validate_one(name, value):
+              errors = list(Draft202012Validator(schemas[name]).iter_errors(value))
+              if errors:
+                  raise SystemExit(f"{name} schema errors: " + "; ".join(e.message for e in errors))
+
+          snapshot = json.loads((fixture_dir / "snapshot.json").read_text())
+          validate_one("snapshot", snapshot)
+          task_lines = [x for x in (fixture_dir / "tasks.jsonl").read_text().splitlines() if x.strip()]
+          reproduction_lines = [x for x in (fixture_dir / "reproductions.jsonl").read_text().splitlines() if x.strip()]
+          attempt_lines = [x for x in (fixture_dir / "attempts.jsonl").read_text().splitlines() if x.strip()]
+          tasks = [json.loads(x) for x in task_lines]
+          reproductions = [json.loads(x) for x in reproduction_lines]
+          attempts = [json.loads(x) for x in attempt_lines]
+          for item in tasks:
+              validate_one("task", item)
+          for item in reproductions:
+              validate_one("reproduction", item)
+          for item in attempts:
+              validate_one("attempt", item)
+
+          report = json.loads((fixture_dir / "report.json").read_text())
+          validate_one("report", report)
+          pin = json.loads(Path("tools/pitb-benchmark-integrity/fixtures/sorrydb-2601-upstream-pin.json").read_text())
+          if pin["upstream"]["repository_commit"] != "74b3b63f8ba890d675f362924b21ac55db410383":
+              raise SystemExit("SorryDB upstream repository commit pin changed")
+          if pin["evaluation_split"]["git_blob_sha1"] != "af3b663429dc4689ee728d2fb5c7d8d5034476f7":
+              raise SystemExit("SorryDB evaluation split Git blob pin changed")
+          if pin["evaluation_split"]["declared_task_count"] != 1000:
+              raise SystemExit("SorryDB evaluation split task count changed")
+          if snapshot["task_records_jsonl_sha256"] != report["task_records_jsonl_sha256"]:
+              raise SystemExit("task manifest digest changed between envelope and report")
+          if report["task_count"] != 2 or report["admitted_task_count"] != 1 or report["quarantined_task_count"] != 1:
+              raise SystemExit("synthetic admitted/quarantined task counts changed")
+          if report["verified_success_attempt_count"] != 1 or report["verified_success_task_count"] != 1:
+              raise SystemExit("synthetic verified proof count changed")
+          if report["verified_success_rate_over_admitted_tasks"] != 1.0:
+              raise SystemExit("admitted-task verified success rate changed")
+          if report["verified_success_rate_over_all_tasks"] != 0.5:
+              raise SystemExit("all-listed-task success denominator changed")
+          reasons = [reason for task in report["task_admissions"] for reason in task["quarantine_reasons"]]
+          if "live_goal_differs_from_database_goal" not in reasons:
+              raise SystemExit("goal-mismatch quarantine negative control missing")
+          print("PITB_BENCHMARK_INTEGRITY_SCHEMAS_AND_REPORT_PASS")
+          print(json.dumps({
+              "task_count": report["task_count"],
+              "admitted_task_count": report["admitted_task_count"],
+              "quarantined_task_count": report["quarantined_task_count"],
+              "verified_success_attempt_count": report["verified_success_attempt_count"],
+              "verified_success_rate_over_all_tasks": report["verified_success_rate_over_all_tasks"]
+          }, sort_keys=True))
+          PY
+
+      - name: Retain synthetic benchmark integrity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-benchmark-integrity-synthetic
+          path: |
+            ${{ runner.temp }}/pitb-benchmark-integrity-inputs
+            ${{ runner.temp }}/pitb-benchmark-integrity/src/main.rs
+            ${{ runner.temp }}/pitb-benchmark-integrity/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 30
