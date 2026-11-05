@@ -111,7 +111,10 @@ These counts are finite fixture-control results, not benchmark accuracy estimate
 ## Verification history
 
 - The **42-test** artifact-binding revision passed its exact-head dedicated workflow on commit `618fa4d719b68c6fe0b401c072e7177e2a2cd3ed`, run `42025215684`: 42 passed, 0 failed; the five-dimension positive/negative-control gates passed; 1,120 synthetic byte sets were re-verified; the workflow checked 17,920 digest rows, 30 agent summaries, and five partner summaries. Repository-wide CI, governance, benchmark, and showroom workflows were skipped, not passed.
-- The **63-test** revision added multi-valid response negotiation, the 3,464-state finite model check, and scoped authority events; it passed on exact head `95bb88bdf7b41223d564f6af19686e41db93bf3c`. The current **64-test** revision additionally isolates controlled-partner counterfactual forks and checks their order/seed/state; it requires a fresh exact-head pass. Earlier 42- and 63-test results do not prove the 64-test revision passed.
+- The **63-test** revision added multi-valid response negotiation, the 3,464-state finite model check, and scoped authority events; it passed on exact head `95bb88bdf7b41223d564f6af19686e41db93bf3c`.
+- The **64-test** revision added symmetric controlled-partner counterfactual forks and passed on exact head `19f4386580a7548b09788094dd6abbb97f394e71`: fresh per-condition partner state, identical common seed, and registered invocation order were verified.
+- The event-ledger revision passed the dedicated exact-head workflow on `55ce85fbab8e5477a28540c697a5dd222b8293fd`: 64/64 tests, the existing 160-case causal and interaction/authority gates, 17,920 artifact-digest rows, and the new 4,480-row / 40-column condition-level event ledger with zero malformed rows. The evidence bundle uploaded as artifact `13443490488`.
+- These are dedicated synthetic-harness workflow results. Repository-wide CI, governance, benchmark, and showroom workflows remain skipped, not passed.
 - No musician pilot, human-partner study, hardware/device loopback, real Studio read-back, receipt-signature verification, or external commercial benchmark run has been performed.
 
 ## Next integration steps
