@@ -1820,7 +1820,7 @@ mod tests {
     fn instrumentation_rejects_a_source_range_that_is_not_sorry() {
         let source = "theorem sample : True := by trivial\n";
         let start = source.find("trivial").unwrap() as u64;
-        assert!(instrument_sorry_span(source, 1, start, 1, start + 7, "PITB_BEGIN", "PITB_END").is_err());
+        assert!(instrument_sorry_span(source, 1, start, 1, start + 7, "pitbCaptureInvalid", "PITB_BEGIN", "PITB_END").is_err());
     }
 
     #[test]
@@ -1846,7 +1846,7 @@ mod tests {
     fn goal_instrumentation_rejects_marker_collisions_with_source() {
         let source = "theorem sample : True := by sorry -- PITB_BEGIN\n";
         let start = source.find("sorry").unwrap() as u64;
-        assert!(instrument_sorry_span(source, 1, start, 1, start + 5, "PITB_BEGIN", "PITB_END").is_err());
+        assert!(instrument_sorry_span(source, 1, start, 1, start + 5, "pitbCaptureCollision", "PITB_BEGIN", "PITB_END").is_err());
     }
 
     #[test]
