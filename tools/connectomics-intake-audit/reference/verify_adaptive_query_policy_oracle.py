@@ -112,6 +112,67 @@ def build_outcome_masks(
     return masks
 
 
+def fixed_plan_summary(
+    actions: list[dict],
+    scenarios: list[dict],
+    tuple_rows: list[list[tuple[str, ...]]],
+    budget: int,
+) -> dict:
+    conflicts = [
+        (left, right)
+        for i, left in enumerate(scenarios)
+        for right in scenarios[i + 1 :]
+        if left["decision_met"] != right["decision_met"]
+    ]
+    if not conflicts:
+        return {
+            "minimum_effort_units": 0,
+            "minimum_action_ids": [],
+            "minimum_plan_count": 1,
+            "within_declared_budget": True,
+            "adaptive_worst_case_savings_units": None,
+        }
+    best_cost = None
+    best_ids: list[str] = []
+    best_count = 0
+    for size in range(1, len(actions) + 1):
+        for selected in itertools.combinations(range(len(actions)), size):
+            valid = True
+            for left, right in conflicts:
+                left_index = scenarios.index(left)
+                right_index = scenarios.index(right)
+                left_projection = {
+                    tuple(row[index] for index in selected)
+                    for row in tuple_rows[left_index]
+                }
+                right_projection = {
+                    tuple(row[index] for index in selected)
+                    for row in tuple_rows[right_index]
+                }
+                if not left_projection.isdisjoint(right_projection):
+                    valid = False
+                    break
+            if not valid:
+                continue
+            cost = sum(actions[index]["effort_units"] for index in selected)
+            candidate_ids = sorted(actions[index]["action_id"] for index in selected)
+            if best_cost is None or cost < best_cost:
+                best_cost = cost
+                best_ids = candidate_ids
+                best_count = 1
+            elif cost == best_cost:
+                best_count += 1
+                if candidate_ids < best_ids:
+                    best_ids = candidate_ids
+    return {
+        "minimum_effort_units": best_cost,
+        "minimum_action_ids": best_ids,
+        "minimum_plan_count": best_count,
+        "within_declared_budget": None if best_cost is None else best_cost <= budget,
+        "adaptive_worst_case_savings_units": None,
+    }
+
+
 def run(data: dict, input_bytes: bytes) -> dict:
     assert scenario_digest(data["scenarios"]) == data["scenario_set_sha256"]
     assert action_digest(data["actions"]) == data["action_set_sha256"]
@@ -230,6 +291,11 @@ def run(data: dict, input_bytes: bytes) -> dict:
     initial_remaining = (1 << len(action_ids)) - 1
     solution = solve(initial_remaining, initial_masks)
     tuple_count = sum(len(rows) for rows in tuple_rows)
+    fixed_summary = fixed_plan_summary(actions, scenarios, tuple_rows, data["max_total_effort_units"])
+    if fixed_summary["minimum_effort_units"] is not None and solution is not None:
+        fixed_summary["adaptive_worst_case_savings_units"] = (
+            fixed_summary["minimum_effort_units"] - solution["worst_case_cost"]
+        )
 
     def count_tree(node: dict) -> tuple[int, int]:
         nodes = 1
@@ -280,6 +346,7 @@ def run(data: dict, input_bytes: bytes) -> dict:
         "minimum_terminal_path_effort_units": minimum_path,
         "maximum_terminal_path_effort_units": maximum_path,
         "worst_case_policy_within_budget": within,
+        "fixed_non_adaptive_optimum": fixed_summary,
         "policy": policy,
         "out_of_model_observation_disposition": "FAIL_CLOSED_NO_QUERY_DECISION",
         "expected_cost_claim": "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
