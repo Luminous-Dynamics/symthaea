@@ -438,6 +438,11 @@ def run(data: dict, input_bytes: bytes) -> dict:
             else "MINIMUM_WORST_CASE_ADAPTIVE_POLICY_EXCEEDS_BUDGET"
         )
 
+    support_expansion_monotonicity_passed = all(
+        challenge["monotonicity_passed"] for challenge in support_challenges
+    )
+    reported_status = status if support_expansion_monotonicity_passed else "SUPPORT_EXPANSION_MONOTONICITY_VIOLATION"
+
     return {
         "schema_version": 1,
         "tool": "connectome-adaptive-query-policy-audit",
@@ -465,11 +470,12 @@ def run(data: dict, input_bytes: bytes) -> dict:
         "fixed_non_adaptive_optimum": fixed_summary,
         "support_challenge_count": len(support_challenges),
         "support_challenges": support_challenges,
+        "support_expansion_monotonicity_passed": support_expansion_monotonicity_passed,
         "policy": policy,
         "out_of_model_observation_disposition": "FAIL_CLOSED_NO_QUERY_DECISION",
         "expected_cost_claim": "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         "probability_claim": "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
-        "status": status,
+        "status": reported_status,
         "search_complete": True,
         "scope_note": "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. An observation category outside every declared compatible tuple is out-of-model and must fail closed. Optional support challenges are additive-only sensitivity checks; a monotonicity pass does not prove challenge completeness.",
     }
