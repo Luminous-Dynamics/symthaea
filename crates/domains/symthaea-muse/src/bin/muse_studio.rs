@@ -5537,6 +5537,10 @@ mod keeper_readback_tests {
         assert_eq!(receipt.schema_version, 1);
         assert_eq!(receipt.audio_key, "keeper-v1");
         assert_eq!(receipt.artifact_layout, "keeper-directory-v1");
+        assert_eq!(
+            receipt.digest_scope,
+            "sha256-exact-persisted-file-bytes-v1"
+        );
         assert_eq!(receipt.artifacts.len(), 4);
         assert_eq!(
             receipt
