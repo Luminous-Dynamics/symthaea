@@ -80,6 +80,7 @@ The vocal board adds Eleven Music v2.5 1016±18 (3,220 samples), Eleven Music v2
 
 - **TAG-Bench:** 1,750 human-verified query/recording pairs over 149.5 hours; 22.1% have multiple ground-truth intervals. The leading reported model reaches 31.2 mIoU and 21.5% recall at IoU ≥ 0.7; reported one-to-many occurrence-count accuracy does not exceed 13.2%. Melothaea must enumerate all relevant occurrences and preserve parsing failures in denominators.
 - **InteractionBench (2 November 2026):** evaluates timing, spoken-task accuracy, whisper/volume and long-conversation groundedness over the same seven real-time voice systems: 221 items per system, 13 scenarios and 1,519 graded runs. Timing is measured at the client-heard boundary; one server-clock correction materially changed a reported timing score. This is a speech/voice benchmark, not a music result. Its reusable lesson is to score the same input stream across timing, action correctness and grounding while keeping server, client, network and device clocks distinct. https://arxiv.org/abs/2611.02430
+- **InteractionBench (5 October 2026, streaming video):** evaluates 1,060 interactions over 812 videos, including 69 negative streams and 53 suites pairing counted events with look-alike near misses. It reports a costly timing/silence trade-off: a polled model reaches 77.8% timing accuracy but 10.9% silence compliance; a native real-time system emits on 89.9% of negative streams. Offline metrics miss important online restraint failures. This is video interaction research, not music evidence, but its negative-stream/near-miss protocol is directly reusable for musical WAIT decisions. https://arxiv.org/abs/2610.05775
 - **HEARTBEAT 2027:** as of the 5 November official-site snapshot, 132,571 samples (127,371 train / 5,200 development) across roughly 3,103 hours; it evaluates reciprocal audio turn-taking (WAIT/RESPOND/CONTINUE/YIELD) and streaming proactive understanding. Track I has separate offline and online settings. Online scoring covers behavior, response quality and speech onset/offset; the protocol requires only current/previously received input, per-chunk logging including no-response chunks, and no backdated response timestamps. This is a human-centered audio-agent challenge, not a music leaderboard.
 - **JAM_BOT (NIME 2026):** already demonstrates relevant work on expressive velocity, higher throughput, free-form call-and-response across varying tempi and external MIDI latency compensation. These concepts are prior art; Melothaea's contribution must be their integration with permission, recovery and evidence.
 - **Agents in Concert (IUI 2026):** a two-month co-design process with three jazz musicians culminated in a public performance with 97 attendees. It motivates performer-accessible controls and previews, but is not proof that preview alone improves agency in every context.
@@ -185,6 +186,19 @@ A fast wrong response is failure. A recovery that repeats or overwrites collabor
 ### F. From personalization to relational memory without assimilation
 
 Reuse #10133. Store context-specific collaborator constraints, permissions, corrections, accepted/rejected proposals and musical conventions with attribution and revocation. Measure relationship-specific transfer on new material against session-only, generic-profile, full-history and yoked-memory baselines. Require zero cross-collaborator leakage and explicit revocation behavior. Do not make one collaborator's preferences Melothaea's universal musical identity.
+
+### Rest as a first-class action: test restraint on negative streams
+
+Musical turn-taking benchmarks must score not only whether the system responds well when invited, but whether it correctly refrains from acting when no invitation or musically relevant event occurred. The streaming-video InteractionBench shows why: near-miss negative streams expose false triggers that ordinary positive examples and offline averages can hide. Translate this carefully into music rather than treating video scores as musical baselines.
+
+Add a sealed music-specific negative-stream suite:
+- true non-invitation passages (sustained listening / partner owns the floor);
+- near-miss cues (pickup notes, cadence-like fragments, breath/noise, repeated motif without a handoff);
+- ambiguous invitations where ASK/WAIT/ABSTAIN is the acceptable outcome;
+- delayed or withdrawn invitations, including veto before and after callback admission;
+- silence and sparse/ambient contexts where silence itself is musically meaningful.
+
+Report false responses per musical minute and per negative stream, silence compliance, near-miss false-activation rate, missed-invitation rate, premature-yield rate, and response timing separately. Preserve every no-response chunk in the denominator. Pair false-trigger scores with musical quality and human workload: a system that never responds can trivially maximize silence compliance, while one that responds to everything can maximize apparent responsiveness. The goal is calibrated engagement, not maximal activity.
 
 ### G. From dyadic turn-taking to polycentric ensemble agency
 
