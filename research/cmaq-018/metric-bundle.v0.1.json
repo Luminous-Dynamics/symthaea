@@ -34,5 +34,40 @@
   },
   "sample_unit": "episode_history",
   "pair_count_per_history": 21,
-  "denominator_policy": "emit per-metric defined episode count; null metric count=0; no confidence interval below two independent histories; report branch-outcome and branch-state defined episode counts separately; pairwise-effect-only predictor has no absolute branch-error denominator"
+  "denominator_policy": "emit per-metric defined episode count; null metric count=0; no confidence interval below two independent histories; report branch-outcome and branch-state defined episode counts separately; pairwise-effect-only predictor has no absolute branch-error denominator",
+  "action_controllability": {
+    "schema_version": "dacs-0.1",
+    "estimand": "same-initial-history, deterministic zero-disturbance action-to-state response under the declared analytic transition profile",
+    "horizon_steps": 4,
+    "reference_transition": {
+      "next_x": "x + 0.12*force + 0.03*grip",
+      "next_v": "0.75*v + 0.08*force - 0.04*grip"
+    },
+    "metrics": {
+      "action_pair_separation_rate": "fraction of covered action pairs with distinct reference transitions that remain distinguishable in predicted (x,v) response space",
+      "action_response_sign_accuracy": "fraction of nonzero action-vs-neutral state-response components with the correct sign",
+      "action_response_vector_mae": "mean absolute error of predicted versus reference action-vs-neutral (delta_x, delta_v) response components",
+      "neutral_input_drift_energy": "squared state residual from the analytic passive transition under the canonical zero-force/zero-grip command",
+      "multi_step_response_mae": "mean state-component error over four autoregressive repeated-action steps, comparing predicted and analytic trajectories",
+      "prediction_coverage": "fraction of the canonical action bank with a candidate branch-state prediction",
+      "multi_step_action_coverage": "fraction of the canonical action bank with a complete four-step predicted trajectory"
+    },
+    "reporting": {
+      "separate_from_counterfactual_utility_metrics": true,
+      "separate_from_absolute_branch_outcome_metrics": true,
+      "statistical_unit": "episode_history",
+      "intervals": "2000-resample episode-history percentile bootstrap 95% intervals",
+      "unsupported_actions": "report coverage and abstention; do not treat missing action predictions as zero error",
+      "oracle_role": "evaluator-only exact analytic control; not a deployable model"
+    },
+    "adversarial_controls": [
+      "action-insensitive predictor",
+      "wrong-sign action response",
+      "neutral-input drift",
+      "correct-sign impossible-magnitude response",
+      "first-step-only action response",
+      "support-aware action abstention"
+    ],
+    "claim_ceiling": "A pass validates these diagnostics against the declared analytic synthetic transition only. It does not establish physical vehicle dynamics, real-world action controllability, safety or SOTA."
+  }
 }
