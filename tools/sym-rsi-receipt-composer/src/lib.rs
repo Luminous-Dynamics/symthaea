@@ -789,12 +789,12 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
         });
     }
 
-    let comparison = required_object(value, "comparison", "receipt")?;
-    let _group_id = required_string(comparison, "group_id", "comparison")?;
-    let _protocol_digest = required_string(comparison, "protocol_sha256", "comparison")?;
+    let budget_caps = required_value_from_value(value, "budget_caps", "receipt")?;
+    if budget_caps != projection.budget_caps {
+        return Err(ComposerError::BudgetCapsMismatch);
+    }
 
     let candidate_identity = candidate_identity(value)?;
-    let compatibility_context = compatibility_context(value)?;
     let metric_context = metric_context(value)?;
 
     let task_universe = required_array(value, "task_universe", "receipt")?;
@@ -807,8 +807,15 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
         }
     }
     eligible_task_ids.sort();
-    if eligible_task_ids.windows(2).any(|pair| pair[0] == pair[1]) {
+    if eligible_task_ids.is_empty()
+        || eligible_task_ids.windows(2).any(|pair| pair[0] == pair[1])
+    {
         return Err(ComposerError::TaskUniverseMismatch);
+    }
+    let eligible_set: BTreeSet<String> = eligible_task_ids.iter().cloned().collect();
+    let cluster_set: BTreeSet<String> = projection.cluster_by_task.keys().cloned().collect();
+    if eligible_set != cluster_set {
+        return Err(ComposerError::ClusterMapMismatch);
     }
 
     let universe_digest =
@@ -876,7 +883,6 @@ fn parse_run(bytes: &[u8], projection: &MetricProjection) -> Result<ParsedRun, C
         universe_digest,
         eligible_digest,
         candidate_identity,
-        compatibility_context,
         metric_context,
         tasks,
     })
@@ -922,26 +928,9 @@ fn candidate_identity(receipt: &Value) -> Result<Value, ComposerError> {
     }))
 }
 
-fn compatibility_context(receipt: &Value) -> Result<Value, ComposerError> {
-    let system = required_object(receipt, "system", "receipt")?;
-    let comparison = required_object(receipt, "comparison", "receipt")?;
-    Ok(json!({
-        "system_arm": required_value(system, "arm", "system")?,
-        "target_scope": required_value_from_value(receipt, "target_scope", "receipt")?,
-        "runner": required_value_from_value(receipt, "runner", "receipt")?,
-        "comparison": {
-            "group_id": required_value(comparison, "group_id", "comparison")?,
-            "protocol_sha256": required_value(comparison, "protocol_sha256", "comparison")?,
-            "eligible_task_set_sha256": required_value(comparison, "eligible_task_set_sha256", "comparison")?
-        },
-        "task_universe_sha256": required_value_from_value(receipt, "task_universe_sha256", "receipt")?,
-        "eligible_task_set_sha256": required_value_from_value(receipt, "eligible_task_set_sha256", "receipt")?,
-        "budget_caps": required_value_from_value(receipt, "budget_caps", "receipt")?
-    }))
-}
-
 fn metric_context(receipt: &Value) -> Result<Value, ComposerError> {
     let benchmark = required_object(receipt, "benchmark", "receipt")?;
+    let comparison = required_object(receipt, "comparison", "receipt")?;
     Ok(json!({
         "benchmark_id": required_value(benchmark, "id", "benchmark")?,
         "benchmark_version": required_value(benchmark, "version", "benchmark")?,
@@ -950,7 +939,14 @@ fn metric_context(receipt: &Value) -> Result<Value, ComposerError> {
         "access_class": required_value(benchmark, "access_class", "benchmark")?,
         "scoring_formula_id": required_value(benchmark, "scoring_formula_id", "benchmark")?,
         "grader_version": required_value(benchmark, "grader_version", "benchmark")?,
-        "grading_mode": required_value_from_value(receipt, "grading_mode", "receipt")?
+        "grading_mode": required_value_from_value(receipt, "grading_mode", "receipt")?,
+        "target_scope": required_value_from_value(receipt, "target_scope", "receipt")?,
+        "runner": required_value_from_value(receipt, "runner", "receipt")?,
+        "comparison_group_id": required_value(comparison, "group_id", "comparison")?,
+        "protocol_sha256": required_value(comparison, "protocol_sha256", "comparison")?,
+        "eligible_task_set_sha256": required_value_from_value(receipt, "eligible_task_set_sha256", "receipt")?,
+        "task_universe_sha256": required_value_from_value(receipt, "task_universe_sha256", "receipt")?,
+        "budget_caps": required_value_from_value(receipt, "budget_caps", "receipt")?
     }))
 }
 
@@ -1086,7 +1082,7 @@ pub enum ComposerError {
     },
     UnmappedCategory(String),
     CandidateIdentityMismatch,
-    IncompatibleMetricRunContext,
+    BudgetCapsMismatch,
     TaskUniverseMismatch,
     TaskInputUniverseMismatch,
     ClusterMapMismatch,
@@ -1147,11 +1143,8 @@ impl fmt::Display for ComposerError {
                     "metric receipts do not share one candidate system identity"
                 )
             }
-            Self::IncompatibleMetricRunContext => {
-                write!(
-                    f,
-                    "metric receipts have incompatible cohort, runner, protocol or budget context"
-                )
+            Self::BudgetCapsMismatch => {
+                write!(f, "receipt budget caps differ from the frozen metric projection")
             }
             Self::TaskUniverseMismatch => {
                 write!(
