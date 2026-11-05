@@ -6,7 +6,9 @@ on:
       - "tools/connectomics-intake-audit/src/bin/connectome_adaptive_query_policy_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY_V1.md"
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_*.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION*.example.json"
       - ".github/workflows/connectome-adaptive-query-policy.yml"
   push:
     branches: [main, "research/**"]
@@ -14,7 +16,9 @@ on:
       - "tools/connectomics-intake-audit/src/bin/connectome_adaptive_query_policy_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY_V1.md"
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_*.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION*.example.json"
       - ".github/workflows/connectome-adaptive-query-policy.yml"
   workflow_dispatch:
 
@@ -45,5 +49,13 @@ jobs:
         run: |
           cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_NO_POLICY.example.json --output "$RUNNER_TEMP/adaptive-policy-no-policy.json"
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_QUERY_POLICY_NO_POLICY.example.json --report "$RUNNER_TEMP/adaptive-policy-no-policy.json"
+      - name: Evaluate additive support expansion monotonicity
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION.example.json --output "$RUNNER_TEMP/adaptive-support-expansion.json"
+          python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION.example.json --report "$RUNNER_TEMP/adaptive-support-expansion.json"
+      - name: Evaluate no-policy support expansion control
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION_NO_POLICY.example.json --output "$RUNNER_TEMP/adaptive-support-no-policy.json"
+          python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_SUPPORT_EXPANSION_NO_POLICY.example.json --report "$RUNNER_TEMP/adaptive-support-no-policy.json"
       - name: Verify independent oracle syntax
         run: python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py
