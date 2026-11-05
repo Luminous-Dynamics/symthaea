@@ -146,6 +146,101 @@ pub struct PartnerAuthorityV1 {
     pub vetoed_values: BTreeSet<i32>,
 }
 
+/// Session- and event-scoped partner authority evidence.
+///
+/// The opaque receipt reference must be authenticated by the MEL-013A /
+/// identity trust boundary before this structural validator is used in a
+/// production adapter. This type does not authenticate actors or signatures.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PartnerAuthorityEventV1 {
+    /// Event identity for this authority update.
+    pub event_id: String,
+    /// Pseudonymous session identity.
+    pub session_id: String,
+    /// Task identity.
+    pub task_id: String,
+    /// Exact partner observation event to which this authority applies.
+    pub source_event_id: String,
+    /// Monotonic session-control sequence for replay protection.
+    pub control_sequence: u64,
+    /// Clock-origin identifier for all timestamps in this event.
+    pub clock_origin_id: String,
+    /// Monotonic effective time.
+    pub issued_at_ns: u64,
+    /// Exclusive expiry time.
+    pub expires_at_ns: u64,
+    /// Opaque reference to the separately authenticated authority receipt.
+    pub authority_receipt_ref: String,
+    /// Selection and veto state carried by this event.
+    pub authority: PartnerAuthorityV1,
+}
+
+/// Validate scope, sequence, clock origin and time window for one observation.
+///
+/// This is structural evidence validation only. It requires the caller to
+/// authenticate the authority receipt reference independently before invoking it.
+pub fn validate_partner_authority_event(
+    event: &PartnerAuthorityEventV1,
+    observation: &Observation,
+    expected_control_sequence: u64,
+    expected_clock_origin_id: &str,
+    now_ns: u64,
+) -> Result<(), HarnessError> {
+    if event.event_id.trim().is_empty()
+        || event.authority_receipt_ref.trim().is_empty()
+        || event.session_id != observation.session_id
+        || event.task_id != observation.task_id
+        || event.source_event_id != observation.event_id
+    {
+        return Err(HarnessError::InvalidAuthorityScope);
+    }
+    if event.control_sequence != expected_control_sequence {
+        return Err(HarnessError::InvalidAuthoritySequence);
+    }
+    if expected_clock_origin_id.trim().is_empty()
+        || event.clock_origin_id.trim().is_empty()
+        || event.clock_origin_id != expected_clock_origin_id
+    {
+        return Err(HarnessError::InvalidAuthorityClockOrigin);
+    }
+    if event.issued_at_ns >= event.expires_at_ns {
+        return Err(HarnessError::InvalidAuthorityTimeWindow);
+    }
+    if now_ns < event.issued_at_ns {
+        return Err(HarnessError::AuthorityNotYetEffective);
+    }
+    if now_ns >= event.expires_at_ns {
+        return Err(HarnessError::AuthorityExpired);
+    }
+    Ok(())
+}
+
+/// Assess a negotiation against authority bound to the exact observed event.
+/// Authentication of the opaque authority receipt remains an external prerequisite.
+pub fn assess_scoped_negotiation(
+    contract: &NegotiatedResponseContractV1,
+    observation: &Observation,
+    authority_event: &PartnerAuthorityEventV1,
+    expected_control_sequence: u64,
+    expected_clock_origin_id: &str,
+    now_ns: u64,
+    choice: &NegotiationChoiceV1,
+) -> Result<NegotiationAssessmentV1, HarnessError> {
+    validate_partner_authority_event(
+        authority_event,
+        observation,
+        expected_control_sequence,
+        expected_clock_origin_id,
+        now_ns,
+    )?;
+    assess_negotiation(
+        contract,
+        observation.current_partner_feature,
+        &authority_event.authority,
+        choice,
+    )
+}
+
 /// A candidate action in a negotiated response.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NegotiationChoiceV1 {
@@ -1726,6 +1821,18 @@ pub enum HarnessError {
     InvalidResponseContract,
     /// Partner preference conflicts with the response contract or a partner veto.
     InvalidPartnerAuthority,
+    /// Authority event is missing scope identity or refers to a different observation.
+    InvalidAuthorityScope,
+    /// Authority event control sequence is stale or out of order.
+    InvalidAuthoritySequence,
+    /// Authority event uses a different monotonic clock origin.
+    InvalidAuthorityClockOrigin,
+    /// Authority event has an empty or reversed validity interval.
+    InvalidAuthorityTimeWindow,
+    /// Authority event is not yet effective at the observation time.
+    AuthorityNotYetEffective,
+    /// Authority event is expired at the observation time.
+    AuthorityExpired,
     /// Artifact evidence has already been committed to this trial.
     ArtifactAlreadyBound,
 }
