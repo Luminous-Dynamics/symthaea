@@ -118,13 +118,47 @@ Scalability comparison:
 - For larger sets, compare greedy weighted set cover, branch-and-bound, ILP/SMT and bounded local search against exact subsets on sampled small instances. Approximate plans must never be represented as exact minima.
 - Runtime and memory are separate from evidence validity: a fast plan using incomplete outcome supports is still unsound.
 
-## 8. Comparison with connectomics industry benchmarks
+## 8. Comparison with the current connectomics frontier
 
-ConnectomeBench (NeurIPS 2025) evaluates segment-type identification, split-error correction and merge-error detection. Its reported model ranges are task-specific predictive metrics; it does not by itself establish support-set completeness or decision stability under new plausible measurement outcomes.
+The assurance stack is complementary to, not a replacement for, state-of-the-art segmentation and proofreading systems.
 
-Autoproof reports major reductions in guided proofreading effort on a Drosophila reconstruction. Those are workflow-automation and cost-efficiency results, not a substitute for independent evidence provenance or query-level robustness certificates.
+### Prediction and proofreading systems
 
-This tool does not claim better segmentation or proofreading accuracy. It adds a complementary assurance capability: *show exactly which conclusions cease to be robust when the measurement model is challenged*. The proper comparison is therefore a paired evaluation on the same datasets and expert reviews: predictive quality and labor savings from the proofreading systems, plus plan survival, query-critical error recall, and support-expansion sensitivity from this assurance layer.
+- **ConnectomeBench2 (arXiv:2606.21116, submitted 19 June 2026)** releases more than 716,485 expert-labelled proofreading decisions and over 4.5 million associated images across mouse, human, zebrafish and fly connectomes. Its shared-encoder Vision Transformer reports human-level accuracy for split-error correction and merge-error identification across species, good in-distribution calibration, and distribution-distance signals that predict degradation on unseen data. This is the current primary predictive benchmark to reproduce. Its paper description does not claim exhaustive query-specific support-set completeness or certificates that remain valid after admissible measurement outcomes are added. [Paper](https://arxiv.org/abs/2606.21116)
+- **ConnectomeBench (NeurIPS 2025)** measures segment-type identification, split-error correction and merge-error detection. Its tested multimodal LLMs achieved 52–82% balanced accuracy for segment identification and 75–85% split correction accuracy, while merge detection remained difficult. That result is useful historical context, but ConnectomeBench2 is the stronger 2026 predictive baseline. [Proceedings](https://proceedings.neurips.cc/paper_files/paper/2025/hash/4a70f0c8443593ca59a88ebc8a937ed6-Abstract-Datasets_and_Benchmarks_Track.html)
+- **NEURD (Nature, 2025)** uses graph and morphology filters to detect merge errors and automate proofreading. The paper reports 99% agreement for a high-confidence axon-on-axon split subset and 95% for axon-on-dendrite, nearly 150,000 high-confidence automatic edits in MICrONS, and more than threefold speedup for a difficult multi-soma splitting workflow. It also documents a precision/recall trade-off; its high-confidence result is not equivalent to perfect reconstruction. [Paper](https://www.nature.com/articles/s41586-025-08660-5)
+- **Autoproof (2025 preprint)** reports obtaining 90% of the value of guided proofreading with 80% lower required cost, and automatically attaching 200,000 fragments (estimated as four proofreader-years), increasing connectivity completion by 1.3 percentage points in its Drosophila male central nervous system evaluation. These are important operational results on that dataset and workflow, not universal cross-species guarantees. [Paper](https://arxiv.org/abs/2509.26585)
+
+### What this stack should do differently
+
+We should not claim to surpass ConnectomeBench2 on split/merge classification until a frozen, same-split experiment demonstrates it. The intended contribution is a layer beyond classification:
+
+1. **Version-bound scientific claims.** Each query-level result binds the dataset revision, reconstruction/proofreading lineage, query definition, relevant evidence, reviewer actions and exact report digests. Historical versions must remain materializable rather than silently overwritten.
+2. **Question-specific stopping.** Do not stop because a global graph statistic, aggregate confidence score or proofreading queue looks stable. Stop only when the decision for a stated scientific query is invariant across the declared plausible reconstruction set, or report precisely which counterfactual worlds still change it.
+3. **Adversarial measurement-model challenge.** Treat observation supports as hypotheses. Independent review, changed resolution/preprocessing, alternative pipelines or orthogonal acquisition can add plausible outcomes; the claim certificate records which separations and minimum review plans survive those additions.
+4. **Evidence ancestry before independence.** A different model, file, reviewer or pipeline is not automatically an independent measurement. Preserve shared volume, segmentation, preprocessing, annotator and model ancestry; only a predeclared and scientifically justified dependence model may support independence claims.
+5. **Precision and completeness as separate dimensions.** A workflow that removes false positives but also discards real synapses may be suitable for one query and harmful for another. Report query-specific consequences, false-positive and false-negative costs, and the evidence needed to justify the intended analysis.
+
+The product direction is therefore a **claim-assurance layer for connectomics**: every scientific claim carries a reproducible evidence receipt and explicit conditions under which it would cease to hold. It is not another proofreading classifier, and no current synthetic test establishes biological validity.
+
+### Benchmark targets (proposed, not achieved)
+
+| Dimension | Benchmark target | Comparison discipline |
+|---|---:|---|
+| Predictive parity | Reproduce ConnectomeBench2 V2 split/merge results within 1 percentage point on its official held-out protocol | Same labels, species, spatial holdouts and aggregation; do not mix dataset-card row counts with expert-decision counts |
+| OOD transfer | Improve query-critical error recall by at least 15 percentage points at matched expert-review minutes | Blinded spatial, acquisition, species and region shifts; report per-domain intervals |
+| Review efficiency | At least 25% fewer expert minutes at matched adjudicated query quality | Prospective randomized or matched review cohorts; count rework and downstream correction |
+| Calibration | Nominal 90% and 95% prediction-set coverage within ±3 percentage points on held-out domains | Cluster-level intervals; calibration and OOD detection remain separate |
+| Query witness correctness | 100% exact minimum-witness recovery for finite cases within the declared 20-atom/action bound | Independent algorithm/oracle, mutation controls and exhaustive synthetic cases |
+| Robust support challenge | Zero monotonicity violations; 100% detection of synthetic lost separations | Add-only support expansion, independent challenge corpus, adversarial shared outcomes |
+| Provenance closure | 100% of promoted claims bind exact source bytes, dataset revision, query digest and review/measurement lineage | Fail closed on missing or stale bindings |
+| Unsupported scientific promotion | Zero false claims of support completeness, measurement independence or biological truth | Blinded independent scientific adjudication and negative controls |
+
+For any metric involving a target gain, report confidence intervals and absolute counts; a point estimate alone is not sufficient. The 15-point recall and 25% time-saving goals are research targets, not demonstrated results. A benchmark cannot be passed by improving aggregate accuracy while worsening a query-critical subgroup.
+
+### Scaling beyond exact bounded search
+
+The exact planners are bounded oracles, not the eventual production optimizer. For action universes above 20, compare weighted greedy set cover, branch-and-bound, ILP/SMT and bounded local search against exact solutions on matched small instances. Report approximation gap, optimality certificate availability, runtime, memory, and review effort separately. Never label an approximate plan an exact minimum.
 
 ## 9. Claim boundary
 
