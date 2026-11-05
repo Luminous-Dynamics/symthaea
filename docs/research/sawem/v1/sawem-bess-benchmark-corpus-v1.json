@@ -1,0 +1,567 @@
+{
+  "corpus_version": "1.0",
+  "corpus_state": "draft_case_register",
+  "benchmark_id": "SAWEM-BESS-MATCHED-001",
+  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result.",
+  "cases": [
+    {
+      "case_id": "BASE-001",
+      "track": "physical_feasibility",
+      "title": "Standalone BESS feasible discharge",
+      "scenario": "A synthetic BESS dispatches from an admissible initial SOC with transition downtime and reserve commitments inside its operating envelope.",
+      "owner": "Symtropy",
+      "expected_disposition": "feasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "feasible_discharge_reserve_and_energy_balance"
+      ],
+      "required_evidence": [
+        "asset power and energy limits",
+        "initial SOC",
+        "transition profile",
+        "reserve response/sustain profile"
+      ],
+      "stress_tags": [
+        "base",
+        "standalone-bess"
+      ]
+    },
+    {
+      "case_id": "PVHYBRID-001",
+      "track": "physical_feasibility",
+      "title": "PV+BESS shared point-of-connection",
+      "scenario": "PV and BESS jointly use a capped point of connection; charging source and export allocation must reconcile by interval.",
+      "owner": "cross-system",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "PV production profile",
+        "BESS operating envelope",
+        "POC import/export limit",
+        "metering boundary"
+      ],
+      "stress_tags": [
+        "hybrid",
+        "shared-export"
+      ]
+    },
+    {
+      "case_id": "SOC-FLOOR-001",
+      "track": "physical_feasibility",
+      "title": "SOC floor protection",
+      "scenario": "A discharge request would move stored energy below the minimum usable-energy boundary.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "rejects_soc_floor_and_ceiling_violations"
+      ],
+      "required_evidence": [
+        "initial SOC",
+        "minimum usable energy",
+        "discharge schedule"
+      ],
+      "stress_tags": [
+        "soc-floor"
+      ]
+    },
+    {
+      "case_id": "SOC-CEILING-001",
+      "track": "physical_feasibility",
+      "title": "SOC ceiling protection",
+      "scenario": "A charge request would move stored energy above the maximum usable-energy boundary.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "rejects_soc_floor_and_ceiling_violations"
+      ],
+      "required_evidence": [
+        "initial SOC",
+        "maximum usable energy",
+        "charge schedule"
+      ],
+      "stress_tags": [
+        "soc-ceiling"
+      ]
+    },
+    {
+      "case_id": "POWER-HEADROOM-001",
+      "track": "physical_feasibility",
+      "title": "Energy and reserve power overlap",
+      "scenario": "Scheduled discharge plus upward reserve exceeds the declared continuous discharge rating.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "rejects_energy_plus_reserve_double_counting"
+      ],
+      "required_evidence": [
+        "scheduled MW",
+        "reserve MW",
+        "continuous discharge rating"
+      ],
+      "stress_tags": [
+        "reserve-double-count"
+      ]
+    },
+    {
+      "case_id": "MODE-TRANSITION-001",
+      "track": "physical_feasibility",
+      "title": "Insufficient operating-mode transition",
+      "scenario": "A dispatch requests a mode change before the registered directional transition time has elapsed.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "rejects_insufficient_mode_transition_time",
+        "failed_transition_does_not_promote_internal_mode"
+      ],
+      "required_evidence": [
+        "prior operating mode",
+        "requested operating mode",
+        "six directed transition times"
+      ],
+      "stress_tags": [
+        "mode-switch"
+      ]
+    },
+    {
+      "case_id": "DAILY-LIMIT-001",
+      "track": "market_rule_conformance",
+      "title": "Daily energy declaration cap",
+      "scenario": "One or more daily declared energy values exceed the daily Trading Unit limit.",
+      "owner": "Symthaea",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "validates_daily_and_rolling_week_energy_caps"
+      ],
+      "required_evidence": [
+        "seven daily declarations",
+        "daily MWh limit",
+        "applicable Code revision"
+      ],
+      "stress_tags": [
+        "energy-limits"
+      ]
+    },
+    {
+      "case_id": "ROLLING-WEEK-001",
+      "track": "market_rule_conformance",
+      "title": "Next-six-day and seven-day aggregate caps",
+      "scenario": "The six-day forward sum or seven-day total exceeds its own independent MWh limit.",
+      "owner": "Symthaea",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "validates_daily_and_rolling_week_energy_caps"
+      ],
+      "required_evidence": [
+        "seven daily declarations",
+        "next-six-days limit",
+        "seven-day total limit"
+      ],
+      "stress_tags": [
+        "rolling-window"
+      ]
+    },
+    {
+      "case_id": "NETWORK-CHARGE-001",
+      "track": "physical_feasibility",
+      "title": "Network-constrained charging",
+      "scenario": "Charging is curtailed or rescheduled when the POC import constraint binds despite local surplus energy.",
+      "owner": "Sol-Atlas",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "POC import limit",
+        "network topology",
+        "local surplus profile",
+        "BESS charge capability"
+      ],
+      "stress_tags": [
+        "network-import",
+        "locational-surplus"
+      ]
+    },
+    {
+      "case_id": "NETWORK-DISCHARGE-001",
+      "track": "physical_feasibility",
+      "title": "Network-constrained discharge",
+      "scenario": "A discharge exceeds the POC export cap; the invalid candidate energy state must not be committed.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "rejects_network_export_violation"
+      ],
+      "required_evidence": [
+        "POC export limit",
+        "scheduled discharge",
+        "asset energy state"
+      ],
+      "stress_tags": [
+        "network-export"
+      ]
+    },
+    {
+      "case_id": "INTRADAY-GATE-001",
+      "track": "market_rule_conformance",
+      "title": "Intra-day re-declaration gate",
+      "scenario": "A revised schedule arrives after the relevant market gate closure for the frozen rule version.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "market rule version",
+        "local gate-closure timestamp",
+        "order/re-declaration receipt time"
+      ],
+      "stress_tags": [
+        "intraday",
+        "gate-closure"
+      ]
+    },
+    {
+      "case_id": "INSTRUCTION-METER-001",
+      "track": "market_rule_conformance",
+      "title": "Instruction-to-meter reconciliation",
+      "scenario": "Authenticated instructed and metered outcomes differ at a correctly identified Trading Period and boundary.",
+      "owner": "Mycelix",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "authenticated dispatch instruction",
+        "authenticated meter record",
+        "Trading Period identity",
+        "metering boundary"
+      ],
+      "stress_tags": [
+        "instruction-meter"
+      ]
+    },
+    {
+      "case_id": "CUMULATIVE-BALANCING-001",
+      "track": "settlement_and_liquidity",
+      "title": "Cumulative balancing components",
+      "scenario": "Multiple signed balancing-payment components are summed with checked arithmetic without collapsing their identities.",
+      "owner": "Symthaea",
+      "expected_disposition": "feasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "credit_cover_and_multiple_balancing_components_use_checked_arithmetic"
+      ],
+      "required_evidence": [
+        "component identifiers",
+        "sign convention",
+        "Trading Period",
+        "settlement status"
+      ],
+      "stress_tags": [
+        "balancing",
+        "checked-arithmetic"
+      ]
+    },
+    {
+      "case_id": "SETTLEMENT-RERUN-001",
+      "track": "settlement_and_liquidity",
+      "title": "Settlement statement rerun",
+      "scenario": "A later settlement statement revision changes a prior liability or cash-flow assumption and invalidates the earlier underwriting state.",
+      "owner": "Mycelix",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "original settlement statement",
+        "rerun statement",
+        "revision chain",
+        "issue and receipt times"
+      ],
+      "stress_tags": [
+        "settlement-revision",
+        "continuous-underwriting"
+      ]
+    },
+    {
+      "case_id": "CREDIT-COVER-001",
+      "track": "settlement_and_liquidity",
+      "title": "Credit-cover arithmetic and overflow",
+      "scenario": "Actual exposure plus undefined-potential exposure is reconciled using integer minor units and checked overflow.",
+      "owner": "Symthaea",
+      "expected_disposition": "feasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "credit_cover_and_multiple_balancing_components_use_checked_arithmetic"
+      ],
+      "required_evidence": [
+        "actual exposure",
+        "undefined-potential exposure",
+        "currency minor-unit convention"
+      ],
+      "stress_tags": [
+        "collateral",
+        "liquidity"
+      ]
+    },
+    {
+      "case_id": "WARRANTY-001",
+      "track": "physical_feasibility",
+      "title": "Warranty-envelope breach",
+      "scenario": "A high-revenue dispatch policy breaches a warranty operating envelope or excluded operating condition.",
+      "owner": "Symtropy",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "warranty document and revision",
+        "temperature/throughput/SOC envelope",
+        "augmentation and replacement terms"
+      ],
+      "stress_tags": [
+        "warranty",
+        "lifecycle-cost"
+      ]
+    },
+    {
+      "case_id": "PRICE-SPIKE-001",
+      "track": "dispatch_and_forecast",
+      "title": "Rare price spike and negative-price stress",
+      "scenario": "A forecast-informed policy is evaluated on an unseen price-spike or negative-price scenario without future information leakage.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "forecast issue vintage",
+        "market price series",
+        "decision frontier",
+        "realized outcome series"
+      ],
+      "stress_tags": [
+        "price-spike",
+        "tail-risk"
+      ]
+    },
+    {
+      "case_id": "FORECAST-SHIFT-001",
+      "track": "dispatch_and_forecast",
+      "title": "Forecast regime shift",
+      "scenario": "Forecast calibration degrades after a structural shift; confidence and policy must update without look-ahead.",
+      "owner": "Symthaea",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "frozen training data",
+        "forecast vintage",
+        "shift regime labels",
+        "independent holdout"
+      ],
+      "stress_tags": [
+        "distribution-shift",
+        "calibration"
+      ]
+    },
+    {
+      "case_id": "AVAILABILITY-001",
+      "track": "physical_feasibility",
+      "title": "Forced outage invalidates declared capability",
+      "scenario": "A forced outage removes previously declared or certified availability and invalidates reserve and revenue assumptions.",
+      "owner": "Symtropy",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "outage event",
+        "availability register",
+        "SO certification state",
+        "effective timestamps"
+      ],
+      "stress_tags": [
+        "forced-outage",
+        "stale-capability"
+      ]
+    },
+    {
+      "case_id": "RULE-SUPERSESSION-001",
+      "track": "evidence_and_lifecycle",
+      "title": "Rule supersession invalidates prior eligibility",
+      "scenario": "A new or superseding rule profile invalidates a prior product eligibility conclusion at its effective-time frontier.",
+      "owner": "Mycelix",
+      "expected_disposition": "not_run",
+      "implementation_state": "declared_not_implemented",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [],
+      "required_evidence": [
+        "old rule artifact",
+        "new rule artifact",
+        "effective date",
+        "participant/product admission evidence"
+      ],
+      "stress_tags": [
+        "rule-supersession",
+        "temporal-validity"
+      ]
+    },
+    {
+      "case_id": "RESERVE-UP-CHARGE-REDUCTION-001",
+      "track": "physical_feasibility",
+      "title": "Upward reserve from reducing charging",
+      "scenario": "A charging BESS provides upward reserve by reducing net import before increasing discharge; the target remains physically admissible.",
+      "owner": "Symtropy",
+      "expected_disposition": "feasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "upward_reserve_includes_reducing_existing_charge"
+      ],
+      "required_evidence": [
+        "scheduled charge",
+        "up reserve obligation",
+        "mode transition",
+        "response/sustain evidence"
+      ],
+      "stress_tags": [
+        "reserve-up",
+        "charge-reduction"
+      ]
+    },
+    {
+      "case_id": "RESERVE-DOWN-DISCHARGE-REDUCTION-001",
+      "track": "physical_feasibility",
+      "title": "Downward reserve from reducing discharge",
+      "scenario": "A discharging BESS provides downward reserve by reducing export and, if needed, increasing charging.",
+      "owner": "Symtropy",
+      "expected_disposition": "feasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "downward_reserve_includes_reducing_discharge_and_increasing_charge"
+      ],
+      "required_evidence": [
+        "scheduled discharge",
+        "down reserve obligation",
+        "mode transition",
+        "response/sustain evidence"
+      ],
+      "stress_tags": [
+        "reserve-down",
+        "discharge-reduction"
+      ]
+    },
+    {
+      "case_id": "RESERVE-DEADBAND-001",
+      "track": "physical_feasibility",
+      "title": "Reserve setpoint in minimum-charge deadband",
+      "scenario": "The requested reserve activation leaves the asset at a charging setpoint below minimum stable charging power.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "reserve_target_cannot_land_inside_minimum_charging_deadband"
+      ],
+      "required_evidence": [
+        "minimum stable charge",
+        "baseline net injection",
+        "reserve MW"
+      ],
+      "stress_tags": [
+        "minimum-charge-deadband"
+      ]
+    },
+    {
+      "case_id": "RESERVE-PRODUCT-DURATION-001",
+      "track": "market_rule_conformance",
+      "title": "Product-specific reserve response and sustain",
+      "scenario": "Regulating, instantaneous and ten-minute reserve use their own SAWEM response definitions; no unspecified sustain duration is invented.",
+      "owner": "Symthaea",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "sawem_rev_2_3_reserve_response_and_sustain_requirements_are_product_specific",
+        "instantaneous_reserve_enforces_ten_second_activation_and_ten_minute_sustain"
+      ],
+      "required_evidence": [
+        "Code revision",
+        "reserve product and direction",
+        "start/full activation evidence",
+        "operational sustain obligation",
+        "asset proven sustain"
+      ],
+      "stress_tags": [
+        "product-specific",
+        "reserve-timing"
+      ]
+    },
+    {
+      "case_id": "RESERVE-UNKNOWN-SUSTAIN-001",
+      "track": "evidence_and_lifecycle",
+      "title": "Missing sustain obligation remains indeterminate",
+      "scenario": "A product whose Code definition has no minimum sustain duration lacks a separate operator/contract sustain obligation and must remain indeterminate.",
+      "owner": "Symthaea",
+      "expected_disposition": "indeterminate",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "ten_minute_reserve_without_operational_sustain_profile_is_indeterminate"
+      ],
+      "required_evidence": [
+        "product-specific Code definition",
+        "operator/contract sustain requirement",
+        "asset sustain evidence"
+      ],
+      "stress_tags": [
+        "indeterminate",
+        "no-silent-default"
+      ]
+    },
+    {
+      "case_id": "RESERVE-TRANSITION-001",
+      "track": "physical_feasibility",
+      "title": "Reserve response conflicts with mode-transition time",
+      "scenario": "Asset full-activation evidence is faster than its registered transition path, or the registered transition exceeds the product activation deadline.",
+      "owner": "Symtropy",
+      "expected_disposition": "infeasible",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "reserve_activation_cannot_be_faster_than_registered_mode_transition"
+      ],
+      "required_evidence": [
+        "six directed mode transitions",
+        "reserve product deadline",
+        "asset response evidence"
+      ],
+      "stress_tags": [
+        "transition-consistency",
+        "reserve-response"
+      ]
+    }
+  ]
+}
