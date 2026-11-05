@@ -56,7 +56,9 @@
       "standstill_to_charging": 300,
       "charging_to_discharging": 600,
       "discharging_to_charging": 600,
-      "standstill_to_discharging": 900
+      "standstill_to_discharging": 900,
+      "charging_to_standstill": 300,
+      "discharging_to_standstill": 300
     },
     "capability_status": "synthetic_only",
     "max_continuous_discharging_mw": 60
