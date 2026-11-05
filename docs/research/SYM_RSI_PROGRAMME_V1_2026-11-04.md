@@ -420,3 +420,36 @@ The local Symthaea development target includes a single RTX 2070 Laptop GPU (~8 
 Under a frozen, repeated-run research task suite, the combined system should yield more **independently confirmed generalizing improvements per fixed total compute budget** than both a synchronous interactive baseline and an asynchronous fixed-operator baseline, with no protected capability regression. In the equal-wall-clock track it should improve time-to-first-confirmed-gain without hiding increased compute, energy or cost. No numeric superiority threshold should be frozen until the baseline variance and practical effect are measured on a development set; the confirmatory threshold and power plan must then be preregistered.
 
 This complements #10497 (meta-RSI comparison), #8438 (paired/cluster uncertainty), #9433 (population generalization), and #10521/#10533 (validated receipt composition). It does not create a second scheduler, receipt format, evaluator or runner-isolation boundary.
+
+
+## 14. Complete task-universe composition and RSIGym comparison
+
+The RSI paired adapter now has a second, additive in-memory layer: `CompositeCandidateEvaluationView` and `CompositePairedComparison`.
+
+This layer addresses a denominator failure the original matched-case adapter cannot detect: if both parent and successor omit the same eligible task, the two remaining case sets still match. The composite view therefore requires every metric-specific run to contain exactly one outcome for every task in the frozen eligible set. It rejects duplicate, missing and unexpected rows, mismatched composite manifests, and mismatched parent/successor task universes.
+
+Each task retains an explicit disposition: passed, failed, refused, abstained, unsupported, timed out, tool failed, ungraded, not attempted, or in progress. Numeric normalized grades are optional only for non-scored dispositions; they are never imputed as zero by this adapter. Per-metric output reports eligible count, scored count, score coverage, mean among scored cases, disposition counts, paired scored count, one-sided score counts, both-unscored count, paired wins/losses/ties, mean paired delta and the full disposition-transition table.
+
+The paired mean is calculated only on tasks with grades on both arms. It is therefore a descriptive pairwise-observed estimand, not a complete-population effect. Coverage and unmatched grades are displayed separately. The new view emits no p-value; #8438 owns paired cluster-bootstrap uncertainty and Pareto-frontier stability, while #9433 owns population and task-family inference.
+
+**Claim boundary:** this constructor checks task-universe completeness and numeric/disposition consistency, but it still accepts caller-projected rows. It does not invoke #10314's canonical receipt verifier, authenticate component run digests, verify DSSE/regrade, enforce isolation, or grant sealed-holdout access. The next integration step is a narrow adapter that projects validated receipt outputs into these types under #10521 / #10370. Until then, the type is a fail-closed structural analysis boundary, not proof of provenance.
+
+### RSIGym: a necessary new comparator
+
+RSIGym (arXiv:2610.10310, 2026-10-07) is another important 2026 comparator that should be in the R4/R5 test matrix. It provides reusable services for training, inference, rollout, evaluation and sandbox execution, with shared budget and permission control. Its Data, Harness and Joint tracks separate data changes, execution-harness changes and their combination. It defines RSI-Index as the mean fraction of remaining performance gap closed across five benchmarks spanning software engineering, terminal interaction, mathematics, scientific reasoning and skill tasks.
+
+The authors report a best RSI-Index of 0.4809 for Opus 5 in independent Joint runs under a $500 platform-service budget per benchmark run. They report selected systems improving SWE-bench Verified from 17.67% to 50.33% and AIME from 31.67% to 97.78%. These are author-reported preprint results, not independently reproduced measurements. Its RSI-Index uses its own task set, ceiling definitions and budget accounting; it is not directly comparable with AI4AI-Bench's algorithm-only normalized score, RSI-Env's seven-task experiments, or SelfImprove-Bench's G0–G4 transfer levels.
+
+RSIGym gives us a useful experimental factorization: Data-only, Harness-only, Joint, plus a frozen control. Symthaea should add a distinct Algorithm track to separate learning-rule changes from data/harness changes. All four should share total resource caps, exact model identity, task permissions, independent evaluator, clean-start successor training where required, and the same external controller. Report each benchmark lane and cost separately; never rank the systems only by an averaged RSI-Index.
+
+### Immediate experimental design consequence
+
+The next complete-evidence experiment should cross these factors rather than run a single undifferentiated self-improvement loop:
+
+- **Edit surface:** Data, Harness, Learning Algorithm, Meta-Improvement Procedure, and Joint combinations.
+- **Autonomy:** Benchmark-Guided, Capability-Directed, Open-General.
+- **Transfer:** SelfImprove-Bench G0–G4, with real software/science families for G3/G4.
+- **Inheritance:** one update, repeated inherited updates, and successor changes to the improvement procedure.
+- **Evidence:** complete eligible task universe, all dispositions, matched total budget, external evaluator, qualified regrade, cluster uncertainty and non-inferiority floors.
+
+Source: Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310, 2026-10-07. https://arxiv.org/abs/2610.10310
