@@ -422,6 +422,10 @@ Under a frozen, repeated-run research task suite, the combined system should yie
 This complements #10497 (meta-RSI comparison), #8438 (paired/cluster uncertainty), #9433 (population generalization), and #10521/#10533 (validated receipt composition). It does not create a second scheduler, receipt format, evaluator or runner-isolation boundary.
 
 
+
+
+**Versioned AIRA₂ score note:** Meta's April 16, 2026 publication page reports 81.5% mean percentile rank on MLE-bench-30 at 24 hours and 83.1% at 72 hours, with the strongest baseline at 72.7%. The earlier arXiv v1 record (March 27, 2026) reports 71.8% at 24 hours and 76.0% at 72 hours versus a 69.9% prior best. Do not combine these numbers as though they came from one unchanged result table. Pin the publication/preprint version, benchmark subset, run protocol and scoring definition for any comparison; use the latest publication-page numbers only when explicitly citing that publication version.
+
 ## 14. Claim-indexed RSI evidence and same-start improver identification
 
 Chen, Zhu and Zheng, *Auditing the Product, Not the Recursion: The Evaluation Evidence Behind Recursive Self-Improvement Claims*, arXiv:2610.27610 (2026-10-20), provides a useful empirical audit of RSI evaluation practice. In an October 2026 search frame of 114 eligible studies, including 90 RSI-labelled studies, 60% reported evaluation on tasks unused for selection, but only 22% audited at least two independent reruns of the full loop. Of 26 studies claiming a better improver, only four compared earlier and later improvers from identical starting artifacts at a matched budget. The study distinguishes the resulting system's performance (a product claim) from repeatability/accumulation and a better improvement procedure (process claims). These are meta-research findings for its defined search frame, not universal estimates of all RSI work.
