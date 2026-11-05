@@ -1471,7 +1471,11 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                 challenge.challenge_id
             ));
         }
-        let (challenge_sha256, expanded_sha256, added_tuple_count, expanded_rows) =
+        let attestation = verify_challenge_attestation(
+            challenge.attestation.as_ref(),
+            input.require_signed_attestations,
+        )?;
+        let (base_challenge_sha256, expanded_sha256, added_tuple_count, expanded_rows) =
             expand_joint_support(
                 &input.joint_support_sha256,
                 challenge,
@@ -1479,6 +1483,8 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                 &scenarios,
                 &tuples_by_world,
             )?;
+        let challenge_sha256 =
+            bind_challenge_attestation_digest(&base_challenge_sha256, &attestation);
         let (expanded_solution, _expanded_state_count) =
             solve_adaptive_policy(&action_ids, &action_effort, &scenarios, &expanded_rows)?;
         let expanded_fixed = minimum_fixed_plan(
@@ -1512,6 +1518,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             fixed_status_after: fixed_status(&expanded_fixed).to_string(),
             fixed_effort_non_decreasing: fixed_non_decreasing,
             monotonicity_passed: adaptive_non_decreasing && fixed_non_decreasing,
+            attestation,
         });
     }
 
@@ -1524,8 +1531,14 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                 challenge.challenge_id
             ));
         }
-        let (challenge_sha256, expanded_input, added_scenario_count) =
+        let attestation = verify_challenge_attestation(
+            challenge.attestation.as_ref(),
+            input.require_signed_attestations,
+        )?;
+        let (base_challenge_sha256, expanded_input, added_scenario_count) =
             expand_scenario_space(input, challenge, &action_ids)?;
+        let challenge_sha256 =
+            bind_challenge_attestation_digest(&base_challenge_sha256, &attestation);
         let (expanded_action_ids, expanded_tuples) = validate(&expanded_input)?;
         let expanded_scenarios = sorted_scenarios(&expanded_input.scenarios);
         let expanded_actions = sorted_actions(&expanded_input.actions);
@@ -1571,6 +1584,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             fixed_status_after: fixed_status(&expanded_fixed).to_string(),
             fixed_effort_non_decreasing: fixed_non_decreasing,
             monotonicity_passed: adaptive_non_decreasing && fixed_non_decreasing,
+            attestation,
         });
     }
 
@@ -1633,6 +1647,19 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         status
     };
 
+    let support_challenges_authenticated = support_challenge_results
+        .iter()
+        .filter(|challenge| challenge.attestation.status == "ATTESTED_UNDER_PINNED_TRUST_POLICY")
+        .count();
+    let support_challenges_unauthenticated =
+        support_challenge_results.len() - support_challenges_authenticated;
+    let scenario_challenges_authenticated = scenario_challenge_results
+        .iter()
+        .filter(|challenge| challenge.attestation.status == "ATTESTED_UNDER_PINNED_TRUST_POLICY")
+        .count();
+    let scenario_challenges_unauthenticated =
+        scenario_challenge_results.len() - scenario_challenges_authenticated;
+
     Ok(Report {
         schema_version: 1,
         tool: "connectome-adaptive-query-policy-audit",
@@ -1664,13 +1691,18 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         scenario_challenge_count: scenario_challenge_results.len(),
         scenario_challenges: scenario_challenge_results,
         hypothesis_expansion_monotonicity_passed,
+        require_signed_attestations: input.require_signed_attestations,
+        support_challenges_authenticated,
+        support_challenges_unauthenticated,
+        scenario_challenges_authenticated,
+        scenario_challenges_unauthenticated,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
         probability_claim: "NONE_FINITE_SET_VALUED_CORRELATED_SUPPORT_ONLY",
         status: reported_status,
         search_complete: true,
-        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; scenario challenges append new worlds without altering the base universe. A monotonicity pass does not prove scenario-space completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
+        scope_note: "The policy conditions the original joint tuple relations after each observed action outcome. It stops only when all compatible worlds agree on the frozen query decision, not when the exact world is identified. It does not factorize marginals, infer independence, assign probabilities, prove joint-support completeness, validate measurement models, or establish biological truth. Optional support challenges are additive-only sensitivity checks; scenario challenges append new worlds without altering the base universe. Challenges without a verified DSSE bundle remain CONTENT_BOUND_UNAUTHENTICATED; they are not promoted by their SHA-256 fields. A monotonicity pass does not prove scenario-space completeness. An observation category outside every declared compatible tuple is out-of-model and must fail closed.",
     })
 }
 
