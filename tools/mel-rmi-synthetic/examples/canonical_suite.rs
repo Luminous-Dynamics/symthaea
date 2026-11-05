@@ -3,8 +3,10 @@ use mel_rmi_synthetic::{
     ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ReciprocalTrialRecordV1,
     ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1, TrialRunConfig,
-    UnrelatedFeatureShortcutPolicy, bind_verified_artifacts, canonical_fixture_replicates_v1,
-    run_policy_suite_v1, run_reciprocal_suite_v1, verify_trial_artifact_bindings,
+    UnrelatedFeatureShortcutPolicy, NegotiatedResponseContractV1, PartnerAuthorityV1,
+    NegotiationChoiceV1, assess_negotiation, bind_verified_artifacts,
+    canonical_fixture_replicates_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
+    verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -323,6 +325,116 @@ fn report_reciprocal_aggregates(records: &[ReciprocalTrialRecordV1]) {
     }
 }
 
+fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
+    let contract = NegotiatedResponseContractV1 {
+        target_dimension: Dimension::Motif,
+        modulus: 12,
+        accepted_offsets: [3, 5, 7].into_iter().collect(),
+    };
+    let input = Feature {
+        dimension: Dimension::Motif,
+        value: 2,
+    };
+    let cases = [
+        (
+            "branch_all",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: Default::default(),
+            },
+            NegotiationChoiceV1::Branch(vec![5, 7, 9]),
+        ),
+        (
+            "ask_unresolved",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: Default::default(),
+            },
+            NegotiationChoiceV1::AskClarification,
+        ),
+        (
+            "premature_commit",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: Default::default(),
+            },
+            NegotiationChoiceV1::Commit(7),
+        ),
+        (
+            "branch_after_veto",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: [7].into_iter().collect(),
+            },
+            NegotiationChoiceV1::Branch(vec![5, 9]),
+        ),
+        (
+            "branch_violates_veto",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: [7].into_iter().collect(),
+            },
+            NegotiationChoiceV1::Branch(vec![5, 7, 9]),
+        ),
+        (
+            "follow_selected",
+            PartnerAuthorityV1 {
+                selected_value: Some(9),
+                vetoed_values: Default::default(),
+            },
+            NegotiationChoiceV1::Commit(9),
+        ),
+        (
+            "abstain_empty",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: [5, 7, 9].into_iter().collect(),
+            },
+            NegotiationChoiceV1::Abstain,
+        ),
+        (
+            "commit_after_all_vetoed",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: [5, 7, 9].into_iter().collect(),
+            },
+            NegotiationChoiceV1::Commit(5),
+        ),
+        (
+            "incomplete_branch",
+            PartnerAuthorityV1 {
+                selected_value: None,
+                vetoed_values: Default::default(),
+            },
+            NegotiationChoiceV1::Branch(vec![5, 9]),
+        ),
+    ];
+    let mut qualified = 0usize;
+    let mut rejected = 0usize;
+    for (name, authority, choice) in cases {
+        let assessment = assess_negotiation(&contract, input, &authority, &choice)?;
+        if assessment.qualified {
+            qualified += 1;
+        } else {
+            rejected += 1;
+        }
+        println!(
+            "negotiation,{name},{},{},{},{},{},{},{},{}",
+            assessment.available_option_count,
+            assessment.proposed_option_count,
+            assessment.contract_valid,
+            assessment.veto_respected,
+            assessment.preference_respected,
+            assessment.ambiguity_preserved,
+            assessment.action_well_formed,
+            assessment.qualified,
+        );
+    }
+    println!("negotiation_qualified,{qualified}");
+    println!("negotiation_rejected,{rejected}");
+    Ok((qualified, rejected))
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let code_revision = std::env::var("MEL_RMI_CODE_REVISION")?;
     let config = TrialRunConfig {
@@ -428,6 +540,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
     report_reciprocal_aggregates(&reciprocal);
+
+    let (negotiation_qualified, negotiation_rejected) = run_negotiation_conformance()?;
+    if negotiation_qualified != 5 || negotiation_rejected != 4 {
+        return Err("negotiation conformance count mismatch".into());
+    }
 
     artifact_report.flush()?;
     println!("artifact_verified,{artifact_bindings_verified}");
