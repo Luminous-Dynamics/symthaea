@@ -745,6 +745,49 @@ mod tests {
     }
 
     #[test]
+    fn common_random_number_trial_streams_are_paired_across_actions() {
+        let actions = action_set();
+        let scenario = scenario();
+        let shared_participant = 23;
+        let shared_trial = 7;
+        let requests = vec![
+            TrialRequest {
+                action_id: 1,
+                participant_id: shared_participant,
+                within_participant_trial: shared_trial,
+            },
+            TrialRequest {
+                action_id: 2,
+                participant_id: shared_participant,
+                within_participant_trial: shared_trial,
+            },
+            TrialRequest {
+                action_id: 3,
+                participant_id: shared_participant,
+                within_participant_trial: shared_trial + 1,
+            },
+        ];
+        let dataset = generate_synthetic_dataset(
+            &actions,
+            &scenario,
+            &requests,
+            "sha256:paired-crn-scenario",
+            42,
+        )
+        .unwrap();
+
+        let noise = dataset.trials.iter().find(|trial| trial.action_id == 1).unwrap();
+        let signal = dataset.trials.iter().find(|trial| trial.action_id == 2).unwrap();
+        let standardized_signal_evidence =
+            (signal.oracle_evidence - signal.oracle_signal_mean) / signal.oracle_signal_sigma;
+        assert!(
+            (noise.oracle_evidence - standardized_signal_evidence).abs() < 1.0e-12,
+            "paired actions must reuse the same standardized evidence draw"
+        );
+        assert_eq!(noise.oracle_lapse, signal.oracle_lapse);
+    }
+
+    #[test]
     fn generation_is_exactly_replayable() {
         let actions = action_set();
         let scenario = scenario();
