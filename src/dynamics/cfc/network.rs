@@ -100,6 +100,8 @@ pub enum CfCWeightLoadError {
     UnknownParameterGroup { name: String },
     /// A replacement group does not exactly match the declared group length.
     GroupLengthMismatch { name: String, expected: usize, actual: usize },
+    /// A manifest range does not fit within the serialized parameter vector.
+    ManifestRangeOutOfBounds { name: String },
     /// A parameter contains NaN or infinity.
     NonFiniteValue { index: usize },
     /// A time constant is below the numerical stability floor.
@@ -123,6 +125,9 @@ impl std::fmt::Display for CfCWeightLoadError {
                 f,
                 "CfC parameter group {name} length mismatch: expected {expected}, received {actual}"
             ),
+            Self::ManifestRangeOutOfBounds { name } => {
+                write!(f, "CfC parameter group {name} is outside the serialized weight vector")
+            },
             Self::NonFiniteValue { index } => {
                 write!(f, "CfC weight at flat index {index} is not finite")
             }
@@ -1287,7 +1292,12 @@ impl CfCNetwork {
             .checked_add(group.len)
             .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
         let mut candidate = self.get_weights();
-        candidate[group.offset..end].copy_from_slice(values);
+        let target = candidate
+            .get_mut(group.offset..end)
+            .ok_or_else(|| CfCWeightLoadError::ManifestRangeOutOfBounds {
+                name: group.name.clone(),
+            })?;
+        target.copy_from_slice(values);
         self.try_set_weights(&candidate)
     }
 
