@@ -1,9 +1,48 @@
 use mel_rmi_synthetic::{
     canonical_fixture_suite_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
-    AgentPolicy, FixedResponsePolicy, ImitationOnlyPolicy, OneWayPromptPolicy,
-    ResponsivePartnerPolicy, RuleBasedPolicy, TrialRunConfig, YokedReplayPolicy,
+    ActionMechanism, AgentAction, AgentPolicy, Dimension, Feature, FixedResponsePolicy,
+    HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ResponsivePartnerPolicy,
+    RuleBasedPolicy, TaskSpec, TrialRunConfig,
 };
 use std::error::Error;
+
+struct YokedSuitePolicy {
+    source_session_id: String,
+}
+
+impl AgentPolicy for YokedSuitePolicy {
+    fn policy_id(&self) -> &str {
+        "yoked"
+    }
+
+    fn act(
+        &self,
+        observation: &Observation,
+        task: &TaskSpec,
+    ) -> Result<AgentAction, HarnessError> {
+        if self.source_session_id.trim().is_empty()
+            || self.source_session_id == observation.session_id
+        {
+            return Err(HarnessError::InvalidYoke);
+        }
+        let value = match task.target_dimension {
+            Dimension::Motif => 9,
+            Dimension::Rhythm => 3,
+            Dimension::Tempo => 8,
+            Dimension::Role => 2,
+            Dimension::Texture => 4,
+        };
+        Ok(AgentAction {
+            event_id: format!("{}::yoked::action", observation.event_id),
+            source_event_id: observation.event_id.clone(),
+            feature: Feature {
+                dimension: task.target_dimension,
+                value,
+            },
+            mechanism: ActionMechanism::Yoked,
+        })
+    }
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let code_revision = std::env::var("MEL_RMI_CODE_REVISION")?;
@@ -26,13 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         Box::new(OneWayPromptPolicy {
             id: "one-way".to_owned(),
         }),
-        Box::new(YokedReplayPolicy {
-            id: "yoked".to_owned(),
+        Box::new(YokedSuitePolicy {
             source_session_id: "prior-session".to_owned(),
-            replayed_feature: mel_rmi_synthetic::Feature {
-                dimension: mel_rmi_synthetic::Dimension::Motif,
-                value: 9,
-            },
         }),
     ];
 
