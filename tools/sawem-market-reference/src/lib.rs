@@ -2725,11 +2725,9 @@ mod tests {
 
     #[test]
     fn credit_call_on_non_business_day_starts_count_on_next_business_day() {
-        let result = calculate_credit_call_reestablishment_deadline(
-            13,
-            business_calendar_for_test(),
-        )
-        .expect("calendar covers the two Business Days after a weekend/holiday call");
+        let result =
+            calculate_credit_call_reestablishment_deadline(13, business_calendar_for_test())
+                .expect("calendar covers the two Business Days after a weekend/holiday call");
         assert_eq!(
             result,
             CreditCallReestablishmentDeadline {
