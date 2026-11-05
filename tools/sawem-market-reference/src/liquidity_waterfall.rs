@@ -239,7 +239,7 @@ fn assess_path<'a>(
                 first_breach = Some(LiquidityBreachPoint {
                     day_ordinal: event.day_ordinal,
                     minute_of_day: event.minute_of_day,
-                    event_id: event.event_id,
+                    event_id: Some(event.event_id),
                     cash_balance_minor_zar: cash,
                 });
             }
