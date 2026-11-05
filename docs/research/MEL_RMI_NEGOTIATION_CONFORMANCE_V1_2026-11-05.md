@@ -61,7 +61,7 @@ The Rust unit suite also exhaustively enumerates 3,464 dispositions across every
 
 ## Adversarial unit-test coverage
 
-Thirteen new Rust tests cover multiple valid witnesses; full branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after an already explicit partner selection; bounded branch fan-out; clarification instead of excessive branching; an exhaustive small-state model check of 3,464 dispositions, and six scoped authority-event tests.
+The expanded crate has 61 authored Rust tests in total. The negotiation layer covers multiple valid witnesses; complete branching; clarification; premature single commitment; veto handling; explicit selection; empty-set abstention; duplicate/incomplete branches; no-op/wrong-dimension contracts; clarification after explicit selection; bounded branch fan-out; and an exhaustive small-state model check of 3,464 dispositions. Six dedicated tests exercise scoped authority event binding and rejection.
 
 ## Relationship to existing work
 
