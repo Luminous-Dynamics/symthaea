@@ -530,8 +530,7 @@ mod tests {
 
     #[test]
     fn wrong_payload_type_is_rejected() {
-        let mut envelope: DsseEnvelope =
-            serde_json::from_slice(&fixture_envelope()).unwrap();
+        let mut envelope: DsseEnvelope = serde_json::from_slice(&fixture_envelope()).unwrap();
         envelope.payload_type = "application/json".into();
         let envelope = serde_json::to_vec(&envelope).unwrap();
         assert!(verify(&envelope, &fixture_policy()).is_err());
@@ -539,8 +538,7 @@ mod tests {
 
     #[test]
     fn duplicate_signer_is_rejected() {
-        let mut envelope: DsseEnvelope =
-            serde_json::from_slice(&fixture_envelope()).unwrap();
+        let mut envelope: DsseEnvelope = serde_json::from_slice(&fixture_envelope()).unwrap();
         envelope.signatures.push(envelope.signatures[0].clone());
         let envelope = serde_json::to_vec(&envelope).unwrap();
         assert!(verify(&envelope, &fixture_policy()).is_err());
@@ -568,8 +566,7 @@ mod tests {
     #[test]
     fn revoked_trust_key_is_rejected_even_for_previously_issued_statement() {
         let envelope = fixture_envelope();
-        let mut policy: TrustPolicy =
-            serde_json::from_slice(&fixture_policy()).unwrap();
+        let mut policy: TrustPolicy = serde_json::from_slice(&fixture_policy()).unwrap();
         policy.trusted_keys[0].revoked_at_unix = Some(1_700_000_000);
         let policy = serde_json::to_vec(&policy).unwrap();
         assert!(verify(&envelope, &policy).is_err());
@@ -578,8 +575,7 @@ mod tests {
     #[test]
     fn expired_trust_key_is_rejected() {
         let envelope = fixture_envelope();
-        let mut policy: TrustPolicy =
-            serde_json::from_slice(&fixture_policy()).unwrap();
+        let mut policy: TrustPolicy = serde_json::from_slice(&fixture_policy()).unwrap();
         policy.trusted_keys[0].valid_until_unix = Some(1_700_000_000);
         let policy = serde_json::to_vec(&policy).unwrap();
         assert!(verify(&envelope, &policy).is_err());
@@ -587,8 +583,7 @@ mod tests {
 
     #[test]
     fn future_issued_statement_is_rejected() {
-        let mut envelope: DsseEnvelope =
-            serde_json::from_slice(&fixture_envelope()).unwrap();
+        let mut envelope: DsseEnvelope = serde_json::from_slice(&fixture_envelope()).unwrap();
         // Changing the signed JSON without regenerating signatures must be rejected
         // during signature verification, irrespective of the claimed timestamp.
         let mut payload: EvidenceStatement =
