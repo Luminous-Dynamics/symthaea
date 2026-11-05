@@ -1089,6 +1089,115 @@
         "no Cargo command is executed by the checker"
       ],
       "holdout_design": "Fixture workspaces with globs, excludes, nested workspaces, quoted shell operators, placeholders, multiple commands and misleading nearest manifests."
+    },
+    {
+      "lane_id": "CEB-CONTINUITY",
+      "capability": "Evidence continuity and selective revalidation across repository evolution",
+      "decision_question": "Can an engineering system preserve justified claims as a codebase and its operating context evolve, invalidate stale evidence, revalidate only what changed, and preserve unaffected knowledge without hiding uncertainty?",
+      "primary_metrics": [
+        {
+          "metric_id": "sequence_complete_rate",
+          "definition": "Fraction of repository-evolution sequences for which every required milestone decision is correct and all protected invariants remain satisfied through the final milestone.",
+          "unit": "proportion of complete sequences",
+          "direction": "maximize",
+          "prospective_target": "Calibrate in the feasibility pilot; confirmatory improvement over matched stateless and persistent-history baselines must satisfy #10619 paired, cluster-aware claim rules. Do not borrow SWE-Milestone percentages."
+        },
+        {
+          "metric_id": "evidence_disposition_macro_f1",
+          "definition": "Macro-averaged F1 across retain, revalidate, invalidate, supersede and unresolved claim dispositions, with each class also reported separately.",
+          "unit": "macro F1",
+          "direction": "maximize",
+          "prospective_target": "At least 0.90 after blinded pilot calibration and at least 0.95 on a sealed holdout, with per-class precision/recall and repository/event-family strata."
+        },
+        {
+          "metric_id": "stale_evidence_use_rate",
+          "definition": "Fraction of consequential engineering decisions that rely on evidence already invalidated, revoked, stale or outside its declared applicability scope.",
+          "unit": "proportion of consequential decisions",
+          "direction": "minimize",
+          "prospective_target": "Zero critical stale-evidence uses in the preregistered challenge suite; report total rate, exact denominator, attack-family clustering and uncertainty. Critical cases are non-compensable hard gates."
+        },
+        {
+          "metric_id": "false_invalidation_rate",
+          "definition": "Fraction of independently adjudicated still-valid claims incorrectly invalidated or unnecessarily forced into revalidation by the agent.",
+          "unit": "proportion of still-valid claims",
+          "direction": "minimize",
+          "prospective_target": "At most 0.05 in the feasibility pilot and 0.02 on a sealed holdout after reviewer agreement and label reliability are established; invalidate-everything must fail."
+        },
+        {
+          "metric_id": "revalidation_cost_per_accepted_sequence",
+          "definition": "Total inference, retrieval, tool, execution, revalidation, human-review and rework cost divided by independently accepted complete sequences.",
+          "unit": "USD per accepted sequence",
+          "direction": "minimize",
+          "prospective_target": "At least 20% lower lifecycle cost than reset-and-recheck, without increased critical stale-evidence use, false acceptance or protected-invariant regression."
+        },
+        {
+          "metric_id": "repair_survival_rate",
+          "definition": "Fraction of independently accepted repairs that remain behaviorally and operationally valid through all later milestones in the declared sequence without recurrence or protected-invariant regression.",
+          "unit": "proportion of accepted repairs",
+          "direction": "maximize",
+          "prospective_target": "At least 0.90 on a sealed holdout after the sequence depth and fault-family mix are calibrated; report survival by event stratum and horizon."
+        },
+        {
+          "metric_id": "evidence_lineage_completeness",
+          "definition": "Fraction of decision-governing claims whose evidence lineage includes exact source/configuration identity, applicability scope, authority level, temporal validity and invalidation dependencies.",
+          "unit": "proportion of decision-governing claims",
+          "direction": "maximize",
+          "prospective_target": "At least 0.98 on a sealed holdout, with missing, unresolved, revoked and out-of-domain evidence kept as distinct states."
+        }
+      ],
+      "comparators": [
+        {
+          "name": "SWE-Milestone v1.0.2",
+          "version": "Live leaderboard snapshot accessed 2026-11-05; preserve the selected score revision and recheck before every comparison.",
+          "sample_scope": "Continuous repository release-range sequences represented as milestone DAGs; the displayed leaderboard row does not state its task/sequence denominator.",
+          "published_reference": "Top listed GLM-5.3 + Claude Code row: Resolve 29.75%, Precision 60.30%, Recall 75.07%. The same visible row reports Score 58.75, cost $42.76, 886K output tokens, 10.61 wall-clock hours and 2,193 turns; this lane registers only the explicitly labeled Resolve/Precision/Recall values.",
+          "source_url": "https://swe-milestone.com/",
+          "comparison_class": "contextual_reference_until_exact_protocol_match",
+          "caveats": [
+            "SWE-Milestone evaluates unbroken milestone-DAG execution across real repository release histories; it is not a CEB evidence-validity benchmark.",
+            "Its displayed Resolve percentage is not established as equivalent to CEB sequence_complete_rate; aggregation and denominator are not stated in the visible table.",
+            "Its precision/recall measure fail-to-pass and pass-to-pass test behavior, not CEB claim-disposition classification.",
+            "The live table's score revision, prompt, full system budget and task-level denominators must be recorded before any replication attempt.",
+            "SWE-Milestone's wall-clock time varies with prompts and API response latency; its site labels it a rough indicator, not an exact efficiency measure."
+          ]
+        }
+      ],
+      "baseline_arms": [
+        "stateless_reset_and_retrieve_each_milestone",
+        "persistent_untyped_repository_history",
+        "repository_twin_change_impact_only_10173",
+        "decision_use_validity_only_9112",
+        "causal_forecast_and_intervention_10366_10387",
+        "full_evidence_continuity_pipeline",
+        "expert_maintainer_reference",
+        "human_plus_agent"
+      ],
+      "evidence_contract": {
+        "required_artifacts": [
+          "frozen_sequence_and_event_stream_digest",
+          "agent_visible_milestone_state_digest",
+          "decision_claim_and_evidence_lineage_digest",
+          "grader_only_expected_disposition_registry_digest",
+          "source_configuration_and_policy_identity",
+          "prospective_revalidation_forecast_before_action",
+          "per_milestone_decision_and_disposition_records",
+          "canonical_benchmark_run_receipt",
+          "task_level_outcomes_and_missingness"
+        ],
+        "independent_adjudication": true,
+        "unresolved_state_required": true,
+        "evidence_authority": "Independent human/adjudicator gold transitions plus the canonical receipt and qualified source/graph/authority evidence; no new receipt or DSSE format.",
+        "execution_gate": "#10064 and #10369 remain hard prerequisites for candidate-controlled execution and independent-regrade claims."
+      },
+      "hard_gates": [
+        "zero critical stale-evidence consequential actions",
+        "false invalidation and missed invalidation reported separately",
+        "always_abstain and invalidate_everything baselines must fail useful-coverage and retention requirements",
+        "benchmark task/grader/release changes follow #10610 rerun_regrade_reuse rules",
+        "comparative claims follow #10619 paired cluster-aware power and multiplicity rules",
+        "no admitted tasks or sealed holdout claims without #10607 #10436 custody and admission"
+      ],
+      "holdout_design": "Use at least 13 independent repository clusters for confirmatory superiority under the conservative #10619 policy; the six-repository/48-task Rust pilot is exploratory only. Hold out repository families and event-generation templates, not random milestones from familiar templates. Freeze difficulty and sequence allocation before candidate outcomes."
     }
   ],
   "sources": [
@@ -1189,6 +1298,18 @@
       "source_url": "https://labs.scale.com/leaderboard/hil",
       "supports": [
         "CEB-HUMAN"
+      ]
+    },
+    {
+      "source_url": "https://swe-milestone.com/",
+      "supports": [
+        "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_url": "https://proceedings.mlr.press/v306/deng26d.html",
+      "supports": [
+        "CEB-CONTINUITY"
       ]
     }
   ]
