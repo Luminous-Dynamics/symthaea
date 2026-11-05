@@ -385,9 +385,13 @@ pub enum DsuQualificationResult {
 /// energy-price curve. The signed schedule axis uses milli-MW: negative means
 /// consumption and positive means generation. Segment boundaries are [lower, upper).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A single piecewise-constant segment of a Trading Unit's day-ahead incremental
+/// energy-price curve. The signed schedule axis uses milli-MWh per Trading Period:
+/// negative means consumption and positive means generation. Segments are [lower, upper).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IncrementalPriceSegment {
-    pub lower_schedule_milli_mw: i32,
-    pub upper_schedule_milli_mw: i32,
+    pub lower_schedule_milli_mwh: i32,
+    pub upper_schedule_milli_mwh: i32,
     pub price_minor_zar_per_mwh: i64,
 }
 
@@ -403,9 +407,8 @@ pub enum IncrementalPriceSubmission<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConstrainedScheduleAdjustmentInputs<'a> {
-    pub unconstrained_schedule_milli_mw: i32,
-    pub constrained_schedule_milli_mw: i32,
-    pub trading_period_duration_minutes: u32,
+    pub unconstrained_schedule_milli_mwh: i32,
+    pub constrained_schedule_milli_mwh: i32,
     pub price_submission: IncrementalPriceSubmission<'a>,
 }
 
@@ -437,7 +440,6 @@ pub enum ConstrainedScheduleAdjustmentResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstrainedScheduleAdjustmentError {
-    InvalidTradingPeriodDuration,
     EmptySubmittedPriceCurve,
     InvalidPriceCurveSegment,
     PriceCurveGapOrOverlap,
@@ -939,14 +941,8 @@ pub fn qualifying_dsu_capacity_for_payment(
 pub fn calculate_constrained_schedule_adjustment(
     inputs: ConstrainedScheduleAdjustmentInputs<'_>,
 ) -> Result<ConstrainedScheduleAdjustmentResult, ConstrainedScheduleAdjustmentError> {
-    if inputs.trading_period_duration_minutes == 0
-        || inputs.trading_period_duration_minutes > 1_440
-    {
-        return Err(ConstrainedScheduleAdjustmentError::InvalidTradingPeriodDuration);
-    }
-
-    let sg = inputs.unconstrained_schedule_milli_mw;
-    let cg = inputs.constrained_schedule_milli_mw;
+    let sg = inputs.unconstrained_schedule_milli_mwh;
+    let cg = inputs.constrained_schedule_milli_mwh;
     if sg == cg {
         return Ok(ConstrainedScheduleAdjustmentResult::Determined {
             direction: ConstrainedScheduleDirection::NoChange,
@@ -994,42 +990,40 @@ pub fn calculate_constrained_schedule_adjustment(
             }
 
             for segment in segments {
-                if segment.lower_schedule_milli_mw >= segment.upper_schedule_milli_mw {
+                if segment.lower_schedule_milli_mwh >= segment.upper_schedule_milli_mwh {
                     return Err(ConstrainedScheduleAdjustmentError::InvalidPriceCurveSegment);
                 }
             }
             for pair in segments.windows(2) {
-                if pair[0].upper_schedule_milli_mw != pair[1].lower_schedule_mw {
+                if pair[0].upper_schedule_milli_mwh != pair[1].lower_schedule_milli_mwh {
                     return Err(ConstrainedScheduleAdjustmentError::PriceCurveGapOrOverlap);
                 }
             }
-            if segments[0].lower_schedule_milli_mw > lower
-                || segments[segments.len() - 1].upper_schedule_milli_mw < upper
+            if segments[0].lower_schedule_milli_mwh > lower
+                || segments[segments.len() - 1].upper_schedule_milli_mwh < upper
             {
                 return Err(
                     ConstrainedScheduleAdjustmentError::PriceCurveDoesNotCoverScheduleChange,
                 );
             }
 
-            // Integral units:
-            // (milli-MW / 1000) * (minutes / 60) * (minor-ZAR / MWh)
-            // = minor-ZAR, so use the exact common denominator 60,000.
+            // SG and CG are scheduled energy per Trading Period. The same
+            // quantity is multiplied by SMP [ZAR/MWh] in §9.8.1, so integrate
+            // milli-MWh × minor-ZAR/MWh and divide by 1,000. Do not multiply
+            // by Trading Period duration a second time.
             let mut integral_numerator: i128 = 0;
             for segment in segments {
-                let overlap_lower = lower.max(segment.lower_schedule_milli_mw);
-                let overlap_upper = upper.min(segment.upper_schedule_milli_mw);
+                let overlap_lower = lower.max(segment.lower_schedule_milli_mwh);
+                let overlap_upper = upper.min(segment.upper_schedule_milli_mwh);
                 if overlap_upper <= overlap_lower {
                     continue;
                 }
-                let delta_milli_mw = i128::from(overlap_upper - overlap_lower);
-                let price_duration_product = delta_milli_mw
-                    .checked_mul(i128::from(inputs.trading_period_duration_minutes))
-                    .and_then(|value| {
-                        value.checked_mul(i128::from(segment.price_minor_zar_per_mwh))
-                    })
+                let delta_milli_mwh = i128::from(overlap_upper - overlap_lower);
+                let price_energy_product = delta_milli_mwh
+                    .checked_mul(i128::from(segment.price_minor_zar_per_mwh))
                     .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
                 integral_numerator = integral_numerator
-                    .checked_add(price_duration_product)
+                    .checked_add(price_energy_product)
                     .ok_or(ConstrainedScheduleAdjustmentError::ArithmeticOverflow)?;
             }
 
@@ -1041,7 +1035,7 @@ pub fn calculate_constrained_schedule_adjustment(
                 direction,
                 cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
                     numerator_minor_zar: signed_numerator,
-                    denominator: 60_000,
+                    denominator: 1_000,
                 },
             })
         }
@@ -2196,13 +2190,13 @@ mod tests {
     fn constrained_price_curve() -> [IncrementalPriceSegment; 2] {
         [
             IncrementalPriceSegment {
-                lower_schedule_milli_mw: 10_000,
-                upper_schedule_milli_mw: 12_000,
+                lower_schedule_milli_mwh: 10_000,
+                upper_schedule_milli_mwh: 12_000,
                 price_minor_zar_per_mwh: 30,
             },
             IncrementalPriceSegment {
-                lower_schedule_milli_mw: 12_000,
-                upper_schedule_milli_mw: 15_000,
+                lower_schedule_milli_mwh: 12_000,
+                upper_schedule_milli_mwh: 15_000,
                 price_minor_zar_per_mwh: 50,
             },
         ]
@@ -2213,9 +2207,8 @@ mod tests {
         let curve = constrained_price_curve();
         let result = calculate_constrained_schedule_adjustment(
             ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 10_000,
+                constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
             },
         )
@@ -2225,9 +2218,9 @@ mod tests {
             ConstrainedScheduleAdjustmentResult::Determined {
                 direction: ConstrainedScheduleDirection::PaymentToTradingUnit,
                 cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
-                    // 2 MW × 0.5 h × 30 + 3 MW × 0.5 h × 50 = 105 minor ZAR.
-                    numerator_minor_zar: 6_300_000,
-                    denominator: 60_000,
+                    // 2 MWh × 30 + 3 MWh × 50 = 210 minor ZAR.
+                    numerator_minor_zar: 210_000,
+                    denominator: 1_000,
                 }
             }
         );
@@ -2238,9 +2231,8 @@ mod tests {
         let curve = constrained_price_curve();
         let result = calculate_constrained_schedule_adjustment(
             ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 15_000,
-                constrained_schedule_milli_mw: 10_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 15_000,
+                constrained_schedule_milli_mwh: 10_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
             },
         )
@@ -2250,8 +2242,8 @@ mod tests {
             ConstrainedScheduleAdjustmentResult::Determined {
                 direction: ConstrainedScheduleDirection::ChargeToTradingUnit,
                 cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
-                    numerator_minor_zar: -6_300_000,
-                    denominator: 60_000,
+                    numerator_minor_zar: -210_000,
+                    denominator: 1_000,
                 }
             }
         );
@@ -2259,18 +2251,15 @@ mod tests {
 
     #[test]
     fn constrained_schedule_handles_signed_consumption_axis() {
-        let curve = [
-            IncrementalPriceSegment {
-                lower_schedule_milli_mw: -5_000,
-                upper_schedule_milli_mw: -2_000,
-                price_minor_zar_per_mwh: 40,
-            },
-        ];
+        let curve = [IncrementalPriceSegment {
+            lower_schedule_milli_mwh: -5_000,
+            upper_schedule_milli_mwh: -2_000,
+            price_minor_zar_per_mwh: 40,
+        }];
         let result = calculate_constrained_schedule_adjustment(
             ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: -5_000,
-                constrained_schedule_milli_mw: -2_000,
-                trading_period_duration_minutes: 60,
+                unconstrained_schedule_milli_mwh: -5_000,
+                constrained_schedule_milli_mwh: -2_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&curve),
             },
         )
@@ -2280,8 +2269,8 @@ mod tests {
             ConstrainedScheduleAdjustmentResult::Determined {
                 direction: ConstrainedScheduleDirection::PaymentToTradingUnit,
                 cashflow_to_trading_unit: ExactConstrainedScheduleCashflow {
-                    numerator_minor_zar: 7_200_000,
-                    denominator: 60_000,
+                    numerator_minor_zar: 120_000,
+                    denominator: 1_000,
                 }
             }
         );
@@ -2291,9 +2280,8 @@ mod tests {
     fn constrained_schedule_zero_submission_and_no_change_are_distinct() {
         let no_price = calculate_constrained_schedule_adjustment(
             ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 10_000,
+                constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::NotSubmitted,
             },
         )
@@ -2311,9 +2299,8 @@ mod tests {
 
         let unchanged = calculate_constrained_schedule_adjustment(
             ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: -10_000,
-                constrained_schedule_milli_mw: -10_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: -10_000,
+                constrained_schedule_milli_mwh: -10_000,
                 price_submission: IncrementalPriceSubmission::Unknown,
             },
         )
@@ -2334,9 +2321,8 @@ mod tests {
     fn constrained_schedule_rejects_unknown_and_incomplete_price_evidence() {
         let unknown = calculate_constrained_schedule_adjustment(
             ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 10_000,
+                constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Unknown,
             },
         )
@@ -2350,36 +2336,34 @@ mod tests {
 
         let gap = [
             IncrementalPriceSegment {
-                lower_schedule_milli_mw: 10_000,
-                upper_schedule_milli_mw: 12_000,
+                lower_schedule_milli_mwh: 10_000,
+                upper_schedule_milli_mwh: 12_000,
                 price_minor_zar_per_mwh: 30,
             },
             IncrementalPriceSegment {
-                lower_schedule_milli_mw: 13_000,
-                upper_schedule_milli_mw: 15_000,
+                lower_schedule_milli_mwh: 13_000,
+                upper_schedule_milli_mwh: 15_000,
                 price_minor_zar_per_mwh: 50,
             },
         ];
         assert_eq!(
             calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 10_000,
+                constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&gap),
             }),
             Err(ConstrainedScheduleAdjustmentError::PriceCurveGapOrOverlap)
         );
 
         let short_curve = [IncrementalPriceSegment {
-            lower_schedule_milli_mw: 10_000,
-            upper_schedule_milli_mw: 12_000,
+            lower_schedule_milli_mwh: 10_000,
+            upper_schedule_milli_mwh: 12_000,
             price_minor_zar_per_mwh: 30,
         }];
         assert_eq!(
             calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 10_000,
+                constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&short_curve),
             }),
             Err(ConstrainedScheduleAdjustmentError::PriceCurveDoesNotCoverScheduleChange)
@@ -2387,28 +2371,16 @@ mod tests {
     }
 
     #[test]
-    fn constrained_schedule_rejects_zero_duration_and_invalid_segments() {
-        let curve = constrained_price_curve();
-        assert_eq!(
-            calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 0,
-                price_submission: IncrementalPriceSubmission::Submitted(&curve),
-            }),
-            Err(ConstrainedScheduleAdjustmentError::InvalidTradingPeriodDuration)
-        );
-
+    fn constrained_schedule_rejects_invalid_segments() {
         let invalid = [IncrementalPriceSegment {
-            lower_schedule_milli_mw: 12_000,
-            upper_schedule_milli_mw: 10_000,
+            lower_schedule_milli_mwh: 12_000,
+            upper_schedule_milli_mwh: 10_000,
             price_minor_zar_per_mwh: 30,
         }];
         assert_eq!(
             calculate_constrained_schedule_adjustment(ConstrainedScheduleAdjustmentInputs {
-                unconstrained_schedule_milli_mw: 10_000,
-                constrained_schedule_milli_mw: 15_000,
-                trading_period_duration_minutes: 30,
+                unconstrained_schedule_milli_mwh: 10_000,
+                constrained_schedule_milli_mwh: 15_000,
                 price_submission: IncrementalPriceSubmission::Submitted(&invalid),
             }),
             Err(ConstrainedScheduleAdjustmentError::InvalidPriceCurveSegment)
