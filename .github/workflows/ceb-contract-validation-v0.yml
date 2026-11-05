@@ -616,3 +616,8 @@ jobs:
           set -euo pipefail
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_observations.py --self-test --repo-root .
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_observations.py --repo-root .
+      - name: Validate CEB metric correspondence crosswalk
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_metric_correspondence.py --self-test --repo-root .
