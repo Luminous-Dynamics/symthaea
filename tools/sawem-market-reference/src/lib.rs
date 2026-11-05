@@ -871,6 +871,26 @@ mod tests {
         }
     }
 
+    const fn reserve(
+        product: ReserveProduct,
+        direction: ReserveDirection,
+        mw: f64,
+        start_response_seconds: Option<f64>,
+        full_activation_seconds: Option<f64>,
+        sustain_duration_seconds: Option<f64>,
+        proven_sustain_seconds: Option<f64>,
+    ) -> ReserveCommitment {
+        ReserveCommitment {
+            product,
+            direction,
+            mw,
+            start_response_seconds,
+            full_activation_seconds,
+            sustain_duration_seconds,
+            proven_sustain_seconds,
+        }
+    }
+
     fn empty_reserves() -> &'static [ReserveCommitment] {
         &[]
     }
@@ -886,7 +906,6 @@ mod tests {
             charge_mw,
             discharge_mw,
             transition_seconds_before_action: transition_seconds,
-            reserve_duration_hours: 0.25,
             reserves,
             network_export_limit_mw: 60.0,
             network_import_limit_mw: 50.0,
@@ -896,16 +915,24 @@ mod tests {
     #[test]
     fn feasible_discharge_reserve_and_energy_balance() {
         static RESERVES: [ReserveCommitment; 2] = [
-            ReserveCommitment {
-                product: ReserveProduct::Regulating,
-                direction: ReserveDirection::Up,
-                mw: 5.0,
-            },
-            ReserveCommitment {
-                product: ReserveProduct::TenMinute,
-                direction: ReserveDirection::Up,
-                mw: 5.0,
-            },
+            reserve(
+                ReserveProduct::Regulating,
+                ReserveDirection::Up,
+                5.0,
+                Some(5.0),
+                Some(580.0),
+                Some(600.0),
+                Some(600.0),
+            ),
+            reserve(
+                ReserveProduct::TenMinute,
+                ReserveDirection::Up,
+                5.0,
+                None,
+                Some(600.0),
+                Some(600.0),
+                Some(600.0),
+            ),
         ];
         let result = evaluate_dispatch(limits(), 150.0, &[step(0.0, 30.0, 900.0, &RESERVES)])
             .expect("fixture inputs are valid");
@@ -916,11 +943,15 @@ mod tests {
 
     #[test]
     fn rejects_energy_plus_reserve_double_counting() {
-        static RESERVES: [ReserveCommitment; 1] = [ReserveCommitment {
-            product: ReserveProduct::Instantaneous,
-            direction: ReserveDirection::Up,
-            mw: 10.0,
-        }];
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Instantaneous,
+            ReserveDirection::Up,
+            10.0,
+            None,
+            Some(8.0),
+            None,
+            Some(600.0),
+        )];
         let result = evaluate_dispatch(limits(), 150.0, &[step(0.0, 55.0, 900.0, &RESERVES)])
             .expect("fixture inputs are valid");
         assert!(!result.feasible);
@@ -933,12 +964,16 @@ mod tests {
 
     #[test]
     fn rejects_reserve_without_soc_energy_headroom() {
-        static RESERVES: [ReserveCommitment; 1] = [ReserveCommitment {
-            product: ReserveProduct::Regulating,
-            direction: ReserveDirection::Up,
-            mw: 20.0,
-        }];
-        let result = evaluate_dispatch(limits(), 25.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
+        static RESERVES: [ReserveCommitment; 1] = [reserve(
+            ReserveProduct::Regulating,
+            ReserveDirection::Up,
+            20.0,
+            Some(5.0),
+            Some(600.0),
+            Some(600.0),
+            Some(600.0),
+        )];
+        let result = evaluate_dispatch(limits(), 20.5, &[step(0.0, 0.0, 0.0, &RESERVES)])
             .expect("fixture inputs are valid");
         assert!(!result.feasible);
         assert!(
@@ -1040,16 +1075,24 @@ mod tests {
     #[test]
     fn rejects_duplicate_reserve_product_direction() {
         static RESERVES: [ReserveCommitment; 2] = [
-            ReserveCommitment {
-                product: ReserveProduct::Regulating,
-                direction: ReserveDirection::Up,
-                mw: 2.0,
-            },
-            ReserveCommitment {
-                product: ReserveProduct::Regulating,
-                direction: ReserveDirection::Up,
-                mw: 3.0,
-            },
+            reserve(
+                ReserveProduct::Regulating,
+                ReserveDirection::Up,
+                2.0,
+                Some(5.0),
+                Some(500.0),
+                Some(600.0),
+                Some(600.0),
+            ),
+            reserve(
+                ReserveProduct::Regulating,
+                ReserveDirection::Up,
+                3.0,
+                Some(5.0),
+                Some(500.0),
+                Some(600.0),
+                Some(600.0),
+            ),
         ];
         let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
             .expect("fixture inputs are valid");
