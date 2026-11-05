@@ -50,7 +50,10 @@ impl fmt::Display for ReuseBudgetError {
             Self::InvalidRound => write!(f, "round is one-based and must be at least 1"),
             Self::InvalidCandidateLimit => write!(f, "candidate limit K must be at least 1"),
             Self::PromotionCountExceedsHistory => {
-                write!(f, "prior promotions cannot exceed the number of completed rounds")
+                write!(
+                    f,
+                    "prior promotions cannot exceed the number of completed rounds"
+                )
             }
             Self::HistoryTooLarge => write!(
                 f,
@@ -198,8 +201,7 @@ pub fn allocate_reuse_error_budget(
     let log_round_weight = -((round as f64).ln() + ((round + 1) as f64).ln());
     let log_promotion_weight =
         -(((prior_promotions + 1) as f64).ln() + ((prior_promotions + 2) as f64).ln());
-    let log_candidate_factor =
-        (prior_promotions + 1) as f64 * (candidates_per_round as f64).ln();
+    let log_candidate_factor = (prior_promotions + 1) as f64 * (candidates_per_round as f64).ln();
     let log_total =
         log_alpha + log_round_weight + log_promotion_weight - log_choose - log_candidate_factor;
 
@@ -249,11 +251,12 @@ mod tests {
         assert!((allocation.total_error_budget() - 0.0015625).abs() < 1e-15);
         assert!((allocation.paired_test_error_budget() - 0.00078125).abs() < 1e-15);
         assert!((allocation.lower_bound_error_budget() - 0.00078125).abs() < 1e-15);
-        assert!((allocation.paired_test_error_budget()
-            + allocation.lower_bound_error_budget()
-            - allocation.total_error_budget())
-            .abs()
-            < 1e-15);
+        assert!(
+            (allocation.paired_test_error_budget() + allocation.lower_bound_error_budget()
+                - allocation.total_error_budget())
+                .abs()
+                < 1e-15
+        );
     }
 
     #[test]
@@ -365,14 +368,12 @@ mod tests {
         );
     }
 
-
     #[test]
-    fn rejects_overflowing_paired_comparison_counts() {
+    fn rejects_overflowing_paired_comparison_counts {
         let allocation = allocate_reuse_error_budget(0.05, 1, 0, 1, 0.5).unwrap();
         assert_eq!(
             reuse_sign_test_decision(usize::MAX, 1, allocation),
             Err(ReuseBudgetError::ComparisonCountOverflow)
         );
     }
-
 }
