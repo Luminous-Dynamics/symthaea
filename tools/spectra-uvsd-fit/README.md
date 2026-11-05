@@ -205,7 +205,7 @@ cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin obse
   --outer 100 --trials-per-class 500 --seed-root 0x5350454354524101 > spectra-recovery.csv
 ```
 
-The defaults (10 outer campaigns × 250 signal + 250 noise trials) are a smoke setting. The command above is a larger research campaign, not a coverage certification. The binary emits one `REPLICATE` CSV row for every scenario/seed and one `SUMMARY` row per scenario. It records all adapter abstentions and fit statuses, and computes mu/sigma/d_a bias and RMSE only for `FitStatus::Converged` fits. It reports fit availability both over all campaigns and conditional on adapter-ready campaigns.
+The defaults (10 outer campaigns × 250 signal + 250 noise trials) are a smoke setting. The command above is a larger research campaign, not a coverage certification. The binary emits one `REPLICATE` CSV row for every scenario/seed and one `SUMMARY` row per scenario. It records the DGP and schedule PRNG versions, all adapter abstentions, fit statuses and RT outcomes, and computes mu/sigma/d_a bias and RMSE only for `FitStatus::Converged` fits. It reports fit availability both over all campaigns and conditional on adapter-ready campaigns.
 
 The scenario ladder includes:
 - Gaussian equal-variance null and Gaussian UVSD alternatives on both sides of sigma=1;
@@ -216,6 +216,6 @@ The scenario ladder includes:
 - evidence-independent missing-category abstention;
 - a quantized response-time channel (the current fitter uses category outcomes only).
 
-Signal/noise trials are interleaved and balanced at the same experimenter-controlled stimulus level, condition and response scale. Each generated dataset contains one participant-session. The adapter keeps that participant as the fit unit; it never pools participants. Oracle mu/sigma are extracted only after fitting (or after a missingness abstention) for known-truth scoring and are never input to the adapter or fitter.
+Signal/noise trials are exactly balanced and their order is shuffled by a second deterministic SplitMix64/Fisher–Yates schedule stream keyed by the campaign seed. The same balanced action schedule is reused across DGP scenarios for each replicate, so class is not tied to trial parity or a fixed block order. The action set keeps the same experimenter-controlled stimulus level, condition and response scale. Each generated dataset contains one participant-session. The adapter keeps that participant as the fit unit; it never pools participants. Oracle mu/sigma are extracted only after fitting (or after a missingness abstention) for known-truth scoring and are never input to the adapter or fitter.
 
 This runner is a first recovery/smoke harness. It does not calibrate Wald intervals, equal-vs-unequal likelihood-ratio tests, familywise false-positive rates or sequential stopping. Heavy tails, lapses and criterion drift are explicit misspecification tracks; their RMSE must not be mixed into the correctly specified Gaussian recovery aggregate. Missing-category scenarios are expected to abstain, not to fit a complete-case subset. All results remain synthetic and exploratory until exact-head Rust verification and larger held-out campaigns are run.
