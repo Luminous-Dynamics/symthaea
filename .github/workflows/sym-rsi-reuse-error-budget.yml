@@ -1,0 +1,58 @@
+name: SYM-RSI REUSE Error Budget
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "src/consciousness/recursive_improvement/reuse_error_budget.rs"
+      - "src/consciousness/recursive_improvement/paired_evaluation.rs"
+      - "src/consciousness/recursive_improvement/mod.rs"
+      - ".github/workflows/sym-rsi-reuse-error-budget.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/consciousness/recursive_improvement/reuse_error_budget.rs"
+      - "src/consciousness/recursive_improvement/paired_evaluation.rs"
+      - "src/consciousness/recursive_improvement/mod.rs"
+      - ".github/workflows/sym-rsi-reuse-error-budget.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-rsi-reuse-error-budget-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reuse:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+          # Rustfmt and Clippy are provided by the pinned toolchain action.
+      - name: Assert Rust toolchain
+        run: |
+          test "$(rustc --version | cut -d ' ' -f 2)" = "1.96.0"
+          cargo --version
+
+      - name: Validate root workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/sym-rsi-reuse-metadata.json"
+
+      - name: Format changed Rust modules
+        run: |
+          rustfmt --edition 2024 --check --config skip_children=true             src/consciousness/recursive_improvement/reuse_error_budget.rs             src/consciousness/recursive_improvement/paired_evaluation.rs             src/consciousness/recursive_improvement/mod.rs
+
+      - name: Test REUSE allocation and decision gate
+        run: cargo test -p symthaea --lib reuse_error_budget::tests -- --test-threads=1
+
+      - name: Clippy library
+        run: cargo clippy -p symthaea --lib -- -D warnings
