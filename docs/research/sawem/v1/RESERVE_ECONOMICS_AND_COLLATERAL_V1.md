@@ -115,7 +115,7 @@ The machine-readable benchmark corpus includes:
 - CONSTRAINED-SCHEDULE-COMPENSATION-001: schedule revision changes a payment or charge;
 - CREDIT-COVER-LIQUIDITY-TIMELINE-001: daily calculation, notice and post-by deadline.
 
-All four remain not_run until an implementation and independent oracle exist. The current 18 passing Rust tests concern physical/reference reserve feasibility and generic checked arithmetic; they do not execute these economic rules.
+RESERVE-LOST-OPPORTUNITY-001 now maps to the dependency-free Rust generating-price-curve oracle and its known-answer tests. That slice implements the four product-specific formula directions, distinct up/down elbow rules, MCR/EL1 boundaries, unsupported-direction rejection and checked signed arithmetic. It does not yet support Demand Side Unit consumption-price curves, qualifying-capacity/payment calculations, performance adjustments or live/authorized price-curve evidence. The remaining three cases (RESERVE-PAYMENT-QUALIFICATION-001, CONSTRAINED-SCHEDULE-COMPENSATION-001 and CREDIT-COVER-LIQUIDITY-TIMELINE-001) remain not_run. All price-curve examples are synthetic; no actual reserve revenue or settlement is computed.
 
 ## 8. Nonclaims
 
