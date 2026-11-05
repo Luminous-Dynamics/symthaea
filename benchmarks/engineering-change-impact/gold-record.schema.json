@@ -210,7 +210,7 @@
     },
     "assessor_records": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 2,
       "items": {
         "$ref": "#/$defs/assessorRecord"
       }
@@ -469,5 +469,121 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "expected_disposition": {
+            "const": "PreservedByQualifiedEquivalence"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "equivalence_witness"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "criticality": {
+            "properties": {
+              "class": {
+                "const": "critical_noncompensatory"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "criticality": {
+            "properties": {
+              "hard_gate": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "seal_state": {
+            "properties": {
+              "state": {
+                "const": "sealed"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "seal_state": {
+            "required": [
+              "sealed_digest",
+              "sealed_at",
+              "seal_profile"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "state": {
+                "const": "third_party_resolved"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "required": [
+              "adjudicator_ref",
+              "resolution_rationale"
+            ],
+            "properties": {
+              "initial_agreement": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "state": {
+                "const": "consensus"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "initial_agreement": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }
