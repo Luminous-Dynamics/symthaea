@@ -1,0 +1,496 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/comparative-claim-v0.schema.json",
+  "title": "CEB Comparative Claim Qualification V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "claim_id",
+    "claim_type",
+    "claim_status",
+    "comparison_scope",
+    "benchmark_identity",
+    "metric_identity",
+    "arms",
+    "design",
+    "statistics",
+    "hard_gates",
+    "pareto_vector",
+    "claim_statement",
+    "disposition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "claim_id": {
+      "type": "string",
+      "pattern": "^ceb-claim-[a-z0-9-]+$"
+    },
+    "claim_type": {
+      "enum": [
+        "descriptive",
+        "exploratory",
+        "matched_comparison",
+        "noninferiority",
+        "superiority",
+        "pareto_dominance"
+      ]
+    },
+    "claim_status": {
+      "enum": [
+        "design_only",
+        "descriptive",
+        "exploratory",
+        "matched_only",
+        "qualified_noninferiority",
+        "qualified_superiority",
+        "qualified_pareto",
+        "rejected"
+      ]
+    },
+    "comparison_scope": {
+      "enum": [
+        "internal_component_ablation",
+        "external_benchmark_comparison",
+        "longitudinal"
+      ]
+    },
+    "benchmark_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "benchmark_id",
+        "version",
+        "split",
+        "task_count",
+        "task_set_sha256"
+      ],
+      "properties": {
+        "benchmark_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "task_set_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "metric_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "correspondence_class",
+        "comparison_use",
+        "external_observation_ids"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "correspondence_class": {
+          "enum": [
+            "exact_semantics",
+            "close_semantics",
+            "related_but_distinct",
+            "not_comparable"
+          ]
+        },
+        "comparison_use": {
+          "enum": [
+            "replication_candidate",
+            "context_only",
+            "methodology_only",
+            "not_comparable"
+          ]
+        },
+        "external_observation_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          }
+        }
+      }
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "system_id",
+          "model",
+          "harness",
+          "configuration",
+          "task_set_sha256",
+          "prompt_set_sha256",
+          "source_set_sha256",
+          "environment_sha256",
+          "tool_policy_sha256",
+          "resource_policy_sha256",
+          "grader_sha256",
+          "rubric_sha256"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "treatment",
+              "control"
+            ]
+          },
+          "system_id": {
+            "type": "string",
+            "minLength": 2
+          },
+          "model": {
+            "type": "string",
+            "minLength": 2
+          },
+          "harness": {
+            "type": "string",
+            "minLength": 2
+          },
+          "configuration": {
+            "type": "string",
+            "minLength": 2
+          },
+          "task_set_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "prompt_set_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_set_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "environment_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "tool_policy_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "resource_policy_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "grader_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "rubric_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_tasks",
+        "same_task_set",
+        "unit_of_analysis",
+        "task_count",
+        "effective_task_count",
+        "repository_cluster_count",
+        "root_cause_cluster_count",
+        "seeds_per_task",
+        "primary_endpoint_preregistered",
+        "one_primary_endpoint",
+        "primary_contrast_preregistered",
+        "heldout_access_frozen",
+        "preregistration_sha256"
+      ],
+      "properties": {
+        "paired_tasks": {
+          "type": "boolean"
+        },
+        "same_task_set": {
+          "type": "boolean"
+        },
+        "unit_of_analysis": {
+          "const": "task_id"
+        },
+        "task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "effective_task_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repository_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "root_cause_cluster_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seeds_per_task": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "primary_endpoint_preregistered": {
+          "type": "boolean"
+        },
+        "one_primary_endpoint": {
+          "type": "boolean"
+        },
+        "primary_contrast_preregistered": {
+          "type": "boolean"
+        },
+        "heldout_access_frozen": {
+          "type": "boolean"
+        },
+        "preregistration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "statistics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_type",
+        "binary_test",
+        "discordant_pairs",
+        "cluster_uncertainty_method",
+        "effect_estimate",
+        "ci_level",
+        "ci_lower",
+        "ci_upper",
+        "practical_margin",
+        "noninferiority_margin",
+        "power_target",
+        "estimated_power",
+        "power_analysis_sha256",
+        "secondary_metrics",
+        "multiple_testing_adjustment"
+      ],
+      "properties": {
+        "outcome_type": {
+          "enum": [
+            "binary",
+            "continuous",
+            "count",
+            "rate"
+          ]
+        },
+        "binary_test": {
+          "enum": [
+            "mcnemar_exact",
+            "mcnemar_asymptotic",
+            "not_applicable"
+          ]
+        },
+        "discordant_pairs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cluster_uncertainty_method": {
+          "enum": [
+            "exploratory_descriptive",
+            "pairs_cluster_bootstrap",
+            "wild_cluster_restricted_bootstrap",
+            "randomization_inference",
+            "asymptotic_only"
+          ]
+        },
+        "effect_estimate": {
+          "type": "number"
+        },
+        "ci_level": {
+          "const": 0.95
+        },
+        "ci_lower": {
+          "type": "number"
+        },
+        "ci_upper": {
+          "type": "number"
+        },
+        "practical_margin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "noninferiority_margin": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "power_target": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "estimated_power": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "power_analysis_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "secondary_metrics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "multiple_testing_adjustment": {
+          "enum": [
+            "none",
+            "holm"
+          ]
+        }
+      }
+    },
+    "hard_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "isolation_qualified",
+        "trust_qualified",
+        "independent_regrade_qualified",
+        "reference_patch_control",
+        "empty_patch_control",
+        "critical_security_failures",
+        "critical_evaluator_failures"
+      ],
+      "properties": {
+        "isolation_qualified": {
+          "type": "boolean"
+        },
+        "trust_qualified": {
+          "type": "boolean"
+        },
+        "independent_regrade_qualified": {
+          "type": "boolean"
+        },
+        "reference_patch_control": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_run_blocked"
+          ]
+        },
+        "empty_patch_control": {
+          "enum": [
+            "pass",
+            "fail",
+            "not_run_blocked"
+          ]
+        },
+        "critical_security_failures": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_evaluator_failures": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "pareto_vector": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "direction",
+          "normalized_effect",
+          "ci_lower",
+          "noninferiority_margin"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "direction": {
+            "enum": [
+              "maximize",
+              "minimize"
+            ]
+          },
+          "normalized_effect": {
+            "type": "number"
+          },
+          "ci_lower": {
+            "type": "number"
+          },
+          "noninferiority_margin": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "claim_statement": {
+      "type": "string",
+      "minLength": 20
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "reason"
+      ],
+      "properties": {
+        "outcome": {
+          "enum": [
+            "design_only",
+            "descriptive_only",
+            "exploratory",
+            "matched_only",
+            "noninferior",
+            "superior",
+            "pareto_dominant",
+            "rejected"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    }
+  }
+}
