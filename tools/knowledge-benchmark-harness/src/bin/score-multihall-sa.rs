@@ -28,7 +28,18 @@ struct Plan {
     candidate_system_id: String,
     dataset: Dataset,
     systems: Vec<SystemPlan>,
+    budget: BudgetPlan,
     bootstrap: BootstrapPlan,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct BudgetPlan {
+    max_evidence_tokens: u64,
+    max_input_tokens: u64,
+    max_output_tokens: u64,
+    max_retrieval_calls: u64,
+    max_latency_ms: u64,
+    max_cost_microusd: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,10 +99,12 @@ struct Prediction {
     statement_kind: String,
     predicted_label: String,
     p_hallucinated: Option<f64>,
-    latency_ms: Option<u64>,
-    input_tokens: Option<u64>,
-    output_tokens: Option<u64>,
-    retrieval_calls: Option<u64>,
+    evidence_tokens: u64,
+    latency_ms: u64,
+    input_tokens: u64,
+    output_tokens: u64,
+    retrieval_calls: u64,
+    cost_microusd: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -137,9 +150,11 @@ struct SliceMetrics {
     average_precision: Option<f64>,
     expected_calibration_error_10_bins: Option<f64>,
     mean_latency_ms: Option<f64>,
+    mean_evidence_tokens: Option<f64>,
     mean_input_tokens: Option<f64>,
     mean_output_tokens: Option<f64>,
     mean_retrieval_calls: Option<f64>,
+    mean_cost_microusd: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -193,6 +208,7 @@ struct Report {
     dataset_id: String,
     dataset_revision: String,
     dataset_license: String,
+    budget: BudgetPlan,
     plan_sha256: String,
     pair_manifest_sha256: String,
     results_sha256: String,
@@ -324,6 +340,18 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
     if plan.dataset.dataset_id != "Multi-Hall-SA" && !plan.synthetic_only {
         return Err("non-synthetic plans must identify dataset_id=Multi-Hall-SA".into());
     }
+    if plan.budget.max_evidence_tokens == 0
+        || plan.budget.max_input_tokens == 0
+        || plan.budget.max_output_tokens == 0
+        || plan.budget.max_retrieval_calls == 0
+        || plan.budget.max_latency_ms == 0
+    {
+        return Err("all token, retrieval-call and latency budgets must be positive".into());
+    }
+    if plan.budget.max_evidence_tokens > plan.budget.max_input_tokens {
+        return Err("max_evidence_tokens cannot exceed max_input_tokens".into());
+    }
+
     if plan.bootstrap.replicates < 1_000 || plan.bootstrap.replicates > 100_000 {
         return Err("bootstrap replicates must be between 1000 and 100000".into());
     }
@@ -512,6 +540,25 @@ fn validate_predictions(
                 return Err(format!("result {:?} has p_hallucinated outside [0,1]", result.result_id));
             }
         }
+        if result.evidence_tokens > plan.budget.max_evidence_tokens
+            || result.input_tokens > plan.budget.max_input_tokens
+            || result.output_tokens > plan.budget.max_output_tokens
+            || result.retrieval_calls > plan.budget.max_retrieval_calls
+            || result.latency_ms > plan.budget.max_latency_ms
+        {
+            return Err(format!(
+                "result {:?} exceeds shared budget (evidence={}, input={}, output={}, retrieval_calls={}, latency_ms={})",
+                result.result_id, result.evidence_tokens, result.input_tokens,
+                result.output_tokens, result.retrieval_calls, result.latency_ms
+            ));
+        }
+        if let Some(max_cost) = plan.budget.max_cost_microusd {
+            match result.cost_microusd {
+                Some(cost) if cost <= max_cost => {}
+                Some(cost) => return Err(format!("result {:?} exceeds max_cost_microusd: {} > {}", result.result_id, cost, max_cost)),
+                None => return Err(format!("result {:?} omits cost_microusd required by the shared budget plan", result.result_id)),
+            }
+        }
 
         let key = (
             result.system_id.clone(),
@@ -657,9 +704,11 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
     let mut factual_count = 0usize;
     let mut hallucinated_count = 0usize;
     let mut latency = Vec::new();
+    let mut evidence_tokens = Vec::new();
     let mut input_tokens = Vec::new();
     let mut output_tokens = Vec::new();
     let mut retrieval_calls = Vec::new();
+    let mut cost_microusd = Vec::new();
 
     for row in rows {
         let actual_hallucinated = row.prediction.statement_kind == "hallucinated";
@@ -677,10 +726,12 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
             _ => unreachable!("predicted_label is validated before scoring"),
         }
 
-        if let Some(value) = row.prediction.latency_ms { latency.push(value as f64); }
-        if let Some(value) = row.prediction.input_tokens { input_tokens.push(value as f64); }
-        if let Some(value) = row.prediction.output_tokens { output_tokens.push(value as f64); }
-        if let Some(value) = row.prediction.retrieval_calls { retrieval_calls.push(value as f64); }
+        latency.push(row.prediction.latency_ms as f64);
+        evidence_tokens.push(row.prediction.evidence_tokens as f64);
+        input_tokens.push(row.prediction.input_tokens as f64);
+        output_tokens.push(row.prediction.output_tokens as f64);
+        retrieval_calls.push(row.prediction.retrieval_calls as f64);
+        if let Some(value) = row.prediction.cost_microusd { cost_microusd.push(value as f64); }
     }
 
     let covered = tp + fp + tn + fn_count;
@@ -725,9 +776,11 @@ fn metric_slice(rows: &[&Observed], language: &str, hallucination_type: Option<S
         average_precision,
         expected_calibration_error_10_bins: ece,
         mean_latency_ms: safe_mean(&latency),
+        mean_evidence_tokens: safe_mean(&evidence_tokens),
         mean_input_tokens: safe_mean(&input_tokens),
         mean_output_tokens: safe_mean(&output_tokens),
         mean_retrieval_calls: safe_mean(&retrieval_calls),
+        mean_cost_microusd: safe_mean(&cost_microusd),
     }
 }
 
@@ -1151,6 +1204,7 @@ fn run() -> Result<(), String> {
         dataset_id: plan.dataset.dataset_id.clone(),
         dataset_revision: plan.dataset.revision.clone(),
         dataset_license: plan.dataset.license.clone(),
+        budget: plan.budget.clone(),
         plan_sha256: sha256_hex(&plan_bytes),
         pair_manifest_sha256: actual_pair_digest,
         results_sha256: sha256_hex(&result_bytes),
@@ -1291,10 +1345,12 @@ mod tests {
             statement_kind: "factual".into(),
             predicted_label: "factual".into(),
             p_hallucinated: Some(0.05),
-            latency_ms: Some(10),
-            input_tokens: Some(20),
-            output_tokens: Some(5),
-            retrieval_calls: Some(1),
+            evidence_tokens: 10,
+            latency_ms: 10,
+            input_tokens: 20,
+            output_tokens: 5,
+            retrieval_calls: 1,
+            cost_microusd: Some(1),
         };
         let hallucinated = Prediction {
             schema_version: "multi-hall-sa-result-v0".into(),
@@ -1310,10 +1366,12 @@ mod tests {
             statement_kind: "hallucinated".into(),
             predicted_label: "abstain".into(),
             p_hallucinated: Some(0.50),
-            latency_ms: Some(11),
-            input_tokens: Some(21),
-            output_tokens: Some(6),
-            retrieval_calls: Some(1),
+            evidence_tokens: 10,
+            latency_ms: 11,
+            input_tokens: 21,
+            output_tokens: 6,
+            retrieval_calls: 1,
+            cost_microusd: Some(1),
         };
         let rows = vec![
             Observed { pair: pair.clone(), prediction: factual },
@@ -1382,10 +1440,12 @@ mod tests {
                 statement_kind: kind.into(),
                 predicted_label: "factual".into(),
                 p_hallucinated: Some(probability),
-                latency_ms: None,
-                input_tokens: None,
-                output_tokens: None,
-                retrieval_calls: None,
+                evidence_tokens: 10,
+                latency_ms: 10,
+                input_tokens: 20,
+                output_tokens: 5,
+                retrieval_calls: 1,
+                cost_microusd: Some(1),
             };
             Observed { pair, prediction }
         };
