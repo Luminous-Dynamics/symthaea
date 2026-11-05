@@ -115,9 +115,16 @@ impl AsyncTrainerHandle {
             latest = Some(w);
         }
         if let Some(w) = latest {
-            network.set_weights(&w);
-            self.updates_applied += 1;
-            true
+            match network.try_set_weights(&w) {
+                Ok(()) => {
+                    self.updates_applied += 1;
+                    true
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "Rejected invalid asynchronous CfC weight update");
+                    false
+                }
+            }
         } else {
             false
         }
