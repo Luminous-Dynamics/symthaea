@@ -80,6 +80,10 @@ struct Prediction {
     plan_id: String,
     system_id: String,
     pair_id: String,
+    file_id: String,
+    fact_index: u64,
+    language: String,
+    hallucination_type: String,
     statement_language: String,
     statement_kind: String,
     predicted_label: String,
@@ -398,11 +402,42 @@ fn validate_plan(plan: &Plan) -> Result<(), String> {
     Ok(())
 }
 
+fn pair_key_from_fields(
+    file_id: &str,
+    pair_id: &str,
+    fact_index: u64,
+    language: &str,
+    hallucination_type: &str,
+) -> String {
+    serde_json::to_string(&(file_id, pair_id, fact_index, language, hallucination_type))
+        .expect("serializing a tuple of strings and an integer cannot fail")
+}
+
+fn pair_key(pair: &PairMeta) -> String {
+    pair_key_from_fields(
+        &pair.file_id,
+        &pair.pair_id,
+        pair.fact_index,
+        &pair.language,
+        &pair.hallucination_type,
+    )
+}
+
+fn result_pair_key(result: &Prediction) -> String {
+    pair_key_from_fields(
+        &result.file_id,
+        &result.pair_id,
+        result.fact_index,
+        &result.language,
+        &result.hallucination_type,
+    )
+}
+
 fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, String> {
     let allowed_languages = ["isiZulu", "isiXhosa", "Sepedi", "Sesotho"];
     let allowed_types = ["temporal shift", "entity error", "numerical inaccuracy", "location mistake"];
     let mut by_id = BTreeMap::new();
-    let mut file_language_fact = HashSet::new();
+    let mut composite_keys = HashSet::new();
 
     for pair in pairs {
         if pair.schema_version != "multi-hall-sa-pair-v0" {
@@ -417,16 +452,17 @@ fn validate_pairs(pairs: &[PairMeta]) -> Result<BTreeMap<String, PairMeta>, Stri
         if !allowed_types.contains(&pair.hallucination_type.as_str()) {
             return Err(format!("pair {:?} has unsupported hallucination_type {:?}", pair.pair_id, pair.hallucination_type));
         }
-        let fact_key = (pair.file_id.clone(), pair.language.clone(), pair.fact_index);
-        if !file_language_fact.insert(fact_key) {
+        // pair_id is not globally unique in the released builder: fact_index is
+        // reset for each source document, while file_id is assigned per document.
+        // Keep the complete source/fact/language/type tuple as the identity.
+        let key = pair_key(pair);
+        if !composite_keys.insert(key.clone()) {
             return Err(format!(
-                "duplicate fact_index {} for source file {:?} and language {:?}",
-                pair.fact_index, pair.file_id, pair.language
+                "duplicate composite pair identity for file_id={:?}, pair_id={:?}, fact_index={}, language={:?}, type={:?}",
+                pair.file_id, pair.pair_id, pair.fact_index, pair.language, pair.hallucination_type
             ));
         }
-        if by_id.insert(pair.pair_id.clone(), pair.clone()).is_some() {
-            return Err(format!("duplicate pair_id {:?}", pair.pair_id));
-        }
+        by_id.insert(key, pair.clone());
     }
     Ok(by_id)
 }
@@ -450,8 +486,12 @@ fn validate_predictions(
         if !systems.contains(result.system_id.as_str()) {
             return Err(format!("result {:?} references unknown system {:?}", result.result_id, result.system_id));
         }
-        if !pairs.contains_key(&result.pair_id) {
-            return Err(format!("result {:?} references unknown pair_id {:?}", result.result_id, result.pair_id));
+        let pair_key = result_pair_key(result);
+        if !pairs.contains_key(&pair_key) {
+            return Err(format!(
+                "result {:?} references unknown composite pair identity (file_id={:?}, pair_id={:?}, fact_index={}, language={:?}, type={:?})",
+                result.result_id, result.file_id, result.pair_id, result.fact_index, result.language, result.hallucination_type
+            ));
         }
         if result.result_id.trim().is_empty() || !result_ids.insert(result.result_id.clone()) {
             return Err(format!("empty or duplicate result_id {:?}", result.result_id));
@@ -473,7 +513,7 @@ fn validate_predictions(
 
         let key = (
             result.system_id.clone(),
-            result.pair_id.clone(),
+            pair_key,
             result.statement_language.clone(),
             result.statement_kind.clone(),
         );
@@ -640,11 +680,12 @@ fn paired_misses(
 ) -> BTreeMap<String, Vec<PairedMiss>> {
     let mut clusters: BTreeMap<String, Vec<PairedMiss>> = BTreeMap::new();
     for pair in pairs.values().filter(|pair| pair.language == target_language) {
+        let composite_pair_key = pair_key(pair);
         let english_key = (
-            system_id.to_string(), pair.pair_id.clone(), "english".to_string(), "hallucinated".to_string()
+            system_id.to_string(), composite_pair_key.clone(), "english".to_string(), "hallucinated".to_string()
         );
         let target_key = (
-            system_id.to_string(), pair.pair_id.clone(), "target".to_string(), "hallucinated".to_string()
+            system_id.to_string(), composite_pair_key, "target".to_string(), "hallucinated".to_string()
         );
         let english = predictions.get(&english_key).expect("complete result matrix validated");
         let target = predictions.get(&target_key).expect("complete result matrix validated");
@@ -783,7 +824,7 @@ fn bootstrap_mean_ci(
 
 fn pair_balanced_accuracy(
     system_id: &str,
-    pair_id: &str,
+    pair: &PairMeta,
     statement_language: &str,
     predictions: &HashMap<(String, String, String, String), Prediction>,
 ) -> f64 {
@@ -791,7 +832,7 @@ fn pair_balanced_accuracy(
     for kind in ["factual", "hallucinated"] {
         let key = (
             system_id.to_string(),
-            pair_id.to_string(),
+            pair_key(pair),
             statement_language.to_string(),
             kind.to_string(),
         );
@@ -832,10 +873,10 @@ fn build_system_comparisons(
             for pair in &selected_pairs {
                 let language = if condition == "english" { "english" } else { "target" };
                 let baseline_accuracy = pair_balanced_accuracy(
-                    &baseline.system_id, &pair.pair_id, language, predictions
+                    &baseline.system_id, pair, language, predictions
                 );
                 let candidate_accuracy = pair_balanced_accuracy(
-                    candidate, &pair.pair_id, language, predictions
+                    candidate, pair, language, predictions
                 );
                 baseline_values.push(baseline_accuracy);
                 candidate_values.push(candidate_accuracy);
@@ -986,8 +1027,8 @@ fn run() -> Result<(), String> {
 
     let mut observed = Vec::with_capacity(result_rows.len());
     for result in &result_rows {
-        let pair = pair_map.get(&result.pair_id)
-            .ok_or_else(|| format!("validated pair {:?} disappeared", result.pair_id))?;
+        let pair = pair_map.get(&result_pair_key(result))
+            .ok_or_else(|| format!("validated composite pair for result {:?} disappeared", result.result_id))?;
         observed.push(Observed { pair: pair.clone(), prediction: result.clone() });
     }
 
