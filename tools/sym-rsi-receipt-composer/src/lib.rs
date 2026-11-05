@@ -183,10 +183,10 @@ impl MetricProjection {
         validate_identifier(&self.metric_id, "metric_id")?;
         validate_identifier(&self.benchmark_id, "benchmark_id")?;
         validate_identifier(&self.benchmark_version, "benchmark_version")?;
-        validate_identifier(&self.benchmark_revision, "benchmark_revision")?;
+        validate_label(&self.benchmark_revision, "benchmark_revision")?;
         validate_sha256(&self.dataset_manifest_sha256, "dataset_manifest_sha256")?;
-        validate_identifier(&self.scoring_formula_id, "scoring_formula_id")?;
-        validate_identifier(&self.grader_version, "grader_version")?;
+        validate_label(&self.scoring_formula_id, "scoring_formula_id")?;
+        validate_label(&self.grader_version, "grader_version")?;
         self.transform.validate()?;
         if !self.minimum_graded_coverage.is_finite()
             || !(0.0..=1.0).contains(&self.minimum_graded_coverage)
@@ -955,6 +955,15 @@ fn validate_identifier(value: &str, label: &str) -> Result<(), ComposerError> {
     if !valid {
         return Err(ComposerError::InvalidPlan(format!(
             "{label} must use only ASCII letters, digits, '.', '-' or '_' and cannot start/end with a dot"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_label(value: &str, label: &str) -> Result<(), ComposerError> {
+    if value.trim().is_empty() || value.chars().any(char::is_control) {
+        return Err(ComposerError::InvalidPlan(format!(
+            "{label} must be non-empty and contain no control characters"
         )));
     }
     Ok(())
