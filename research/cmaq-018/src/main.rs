@@ -125,8 +125,20 @@ struct BranchPrediction {
     terminal: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct DacsMetrics {
+    prediction_coverage: f64,
+    action_pair_separation_rate: Option<f64>,
+    action_response_sign_accuracy: Option<f64>,
+    action_response_vector_mae: Option<f64>,
+    neutral_input_drift_energy: Option<f64>,
+    multi_step_response_mae: Option<f64>,
+    multi_step_action_coverage: f64,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct PairMetrics {
+    dacs: DacsMetrics,
     pair_coverage: f64,
     sign_accuracy: Option<f64>,
     effect_magnitude_mae: Option<f64>,
@@ -143,8 +155,36 @@ struct PairMetrics {
 }
 
 #[derive(Clone, Copy, Debug)]
+struct DacsSummary {
+    mean_prediction_coverage: f64,
+    mean_action_pair_separation_rate: Option<f64>,
+    action_pair_separation_episode_count: usize,
+    action_pair_separation_ci95_lower: Option<f64>,
+    action_pair_separation_ci95_upper: Option<f64>,
+    mean_action_response_sign_accuracy: Option<f64>,
+    action_response_sign_episode_count: usize,
+    action_response_sign_ci95_lower: Option<f64>,
+    action_response_sign_ci95_upper: Option<f64>,
+    mean_action_response_vector_mae: Option<f64>,
+    action_response_vector_episode_count: usize,
+    action_response_vector_ci95_lower: Option<f64>,
+    action_response_vector_ci95_upper: Option<f64>,
+    mean_neutral_input_drift_energy: Option<f64>,
+    neutral_input_drift_episode_count: usize,
+    neutral_input_drift_ci95_lower: Option<f64>,
+    neutral_input_drift_ci95_upper: Option<f64>,
+    mean_multi_step_response_mae: Option<f64>,
+    multi_step_response_episode_count: usize,
+    multi_step_response_ci95_lower: Option<f64>,
+    multi_step_response_ci95_upper: Option<f64>,
+    mean_multi_step_action_coverage: f64,
+}
+
+#[derive(Clone, Copy, Debug)]
 struct Summary {
-    scenario: &'static str,
+    scenario: &'static str;
+    model: &'static str;
+    dacs: DacsSummary,
     model: &'static str,
     mean_pair_coverage: f64,
     mean_effect_sign_accuracy: Option<f64>,
@@ -422,6 +462,208 @@ fn branch_predictions(
         .collect()
 }
 
+
+const DACS_HORIZON: usize = 4;
+
+#[derive(Clone, Copy, Debug)]
+struct DacsOraclePredictor {
+    scenario: Scenario,
+    case: EpisodeCase,
+}
+
+impl CandidateBranchPredictor for DacsOraclePredictor {
+    fn predict(
+        &self,
+        _observed_history: &ObservedHistory,
+        hypothetical_action: Intervention,
+        forecast_kind: ForecastKind,
+    ) -> Option<CandidateForecast> {
+        // DACS isolates action response in a deterministic zero-disturbance
+        // analytic profile. Exogenous disturbance/coupling is tested elsewhere.
+        let deterministic_case = EpisodeCase {
+            common_disturbance: 0.0,
+            ..self.case
+        };
+        let outcome = true_outcome(deterministic_case, self.scenario, hypothetical_action);
+        Some(CandidateForecast {
+            outcome: BranchPrediction {
+                utility: outcome.utility,
+                next_x: outcome.next_x,
+                next_v: outcome.next_v,
+                terminal: outcome.terminal,
+            },
+            kind: forecast_kind,
+        })
+    }
+}
+
+fn analytic_action_transition(
+    history: ObservedHistory,
+    action: Intervention,
+) -> ObservedHistory {
+    ObservedHistory {
+        x: history.x + 0.12 * action.force + 0.03 * action.grip,
+        v: 0.75 * history.v + 0.08 * action.force - 0.04 * action.grip,
+    }
+}
+
+fn dacs_metrics_with_predictor(
+    predictor: &dyn CandidateBranchPredictor,
+    history: ObservedHistory,
+) -> DacsMetrics {
+    let predicted: Vec<Option<BranchPrediction>> = ACTIONS
+        .iter()
+        .map(|action| {
+            predictor
+                .predict(&history, *action, ForecastKind::Counterfactual)
+                .map(|forecast| {
+                    debug_assert_eq!(forecast.kind, ForecastKind::Counterfactual);
+                    forecast.outcome
+                })
+        })
+        .collect();
+    let prediction_coverage =
+        predicted.iter().filter(|item| item.is_some()).count() as f64 / ACTION_COUNT as f64;
+
+    let reference: Vec<ObservedHistory> = ACTIONS
+        .iter()
+        .map(|action| analytic_action_transition(history, *action))
+        .collect();
+
+    let neutral_prediction = predicted[0];
+    let neutral_reference = reference[0];
+    let neutral_input_drift_energy = neutral_prediction.map(|forecast| {
+        (forecast.next_x - neutral_reference.x).powi(2)
+            + (forecast.next_v - neutral_reference.v).powi(2)
+    });
+
+    let mut response_error_sum = 0.0;
+    let mut response_error_count = 0usize;
+    let mut sign_correct = 0usize;
+    let mut sign_count = 0usize;
+    if let Some(neutral) = neutral_prediction {
+        for index in 1..ACTION_COUNT {
+            let Some(action_prediction) = predicted[index] else {
+                continue;
+            };
+            let expected_dx = reference[index].x - neutral_reference.x;
+            let expected_dv = reference[index].v - neutral_reference.v;
+            let predicted_dx = action_prediction.next_x - neutral.next_x;
+            let predicted_dv = action_prediction.next_v - neutral.next_v;
+
+            response_error_sum += (predicted_dx - expected_dx).abs()
+                + (predicted_dv - expected_dv).abs();
+            response_error_count += 2;
+
+            if expected_dx.abs() > SIGN_EPSILON {
+                sign_count += 1;
+                if predicted_dx * expected_dx > 0.0 {
+                    sign_correct += 1;
+                }
+            }
+            if expected_dv.abs() > SIGN_EPSILON {
+                sign_count += 1;
+                if predicted_dv * expected_dv > 0.0 {
+                    sign_correct += 1;
+                }
+            }
+        }
+    }
+
+    let mut distinct_reference_pairs = 0usize;
+    let mut distinguished_pairs = 0usize;
+    for left in 0..ACTION_COUNT {
+        for right in (left + 1)..ACTION_COUNT {
+            let expected_distance = (reference[left].x - reference[right].x)
+                .hypot(reference[left].v - reference[right].v);
+            if expected_distance <= SIGN_EPSILON {
+                continue;
+            }
+            if let (Some(left_prediction), Some(right_prediction)) =
+                (predicted[left], predicted[right])
+            {
+                distinct_reference_pairs += 1;
+                let predicted_distance = (left_prediction.next_x - right_prediction.next_x)
+                    .hypot(left_prediction.next_v - right_prediction.next_v);
+                if predicted_distance > SIGN_EPSILON {
+                    distinguished_pairs += 1;
+                }
+            }
+        }
+    }
+
+    let mut multi_step_error_sum = 0.0;
+    let mut multi_step_error_count = 0usize;
+    let mut multi_step_action_count = 0usize;
+    for action in ACTIONS {
+        let mut predicted_state = history;
+        let mut reference_state = history;
+        let mut action_error_sum = 0.0;
+        let mut complete = true;
+        for _ in 0..DACS_HORIZON {
+            let Some(forecast) = predictor.predict(
+                &predicted_state,
+                action,
+                ForecastKind::Counterfactual,
+            ) else {
+                complete = false;
+                break;
+            };
+            let predicted_next = ObservedHistory {
+                x: forecast.outcome.next_x,
+                v: forecast.outcome.next_v,
+            };
+            let reference_next = analytic_action_transition(reference_state, action);
+            action_error_sum += (predicted_next.x - reference_next.x).abs()
+                + (predicted_next.v - reference_next.v).abs();
+            predicted_state = predicted_next;
+            reference_state = reference_next;
+        }
+        if complete {
+            multi_step_action_count += 1;
+            multi_step_error_sum += action_error_sum;
+            multi_step_error_count += DACS_HORIZON * 2;
+        }
+    }
+
+    DacsMetrics {
+        prediction_coverage,
+        action_pair_separation_rate: (distinct_reference_pairs > 0).then_some(
+            distinguished_pairs as f64 / distinct_reference_pairs as f64,
+        ),
+        action_response_sign_accuracy: (sign_count > 0)
+            .then_some(sign_correct as f64 / sign_count as f64),
+        action_response_vector_mae: (response_error_count > 0)
+            .then_some(response_error_sum / response_error_count as f64),
+        neutral_input_drift_energy,
+        multi_step_response_mae: (multi_step_error_count > 0)
+            .then_some(multi_step_error_sum / multi_step_error_count as f64),
+        multi_step_action_coverage: multi_step_action_count as f64 / ACTION_COUNT as f64,
+    }
+}
+
+fn dacs_metrics_for_model(
+    model: Model,
+    scenario: Scenario,
+    case: EpisodeCase,
+) -> DacsMetrics {
+    match model {
+        Model::PointOutcome => dacs_metrics_with_predictor(&PointOutcomePredictor, case.history),
+        Model::ShuffledActionLabels => {
+            dacs_metrics_with_predictor(&ShuffledActionLabelsPredictor, case.history)
+        }
+        Model::SupportAwarePoint => {
+            dacs_metrics_with_predictor(&SupportAwarePointPredictor, case.history)
+        }
+        Model::Oracle => dacs_metrics_with_predictor(
+            &DacsOraclePredictor { scenario, case },
+            case.history,
+        ),
+        Model::ExplicitEffectHead => DacsMetrics::default(),
+    }
+}
+
+
 fn oracle_branch_predictions(
     scenario: Scenario,
     case: EpisodeCase,
@@ -638,6 +880,7 @@ fn evaluate_episode(
     );
 
     PairMetrics {
+        dacs: dacs_metrics_for_model(model, scenario, case),
         pair_coverage: covered_pairs as f64 / total_pairs.max(1) as f64,
         sign_accuracy: (sign_count > 0).then_some(sign_correct as f64 / sign_count as f64),
         effect_magnitude_mae: (effect_error_count > 0)
@@ -711,6 +954,107 @@ fn metric_bootstrap_seed(scenario: Scenario, model: Model, salt: u64) -> u64 {
     BASE_SEED ^ scenario_hash.rotate_left(13) ^ model_hash.rotate_left(29) ^ salt
 }
 
+fn summarize_dacs(rows: &[PairMetrics], scenario: Scenario, model: Model) -> DacsSummary {
+    let separation: Vec<Option<f64>> = rows
+        .iter()
+        .map(|row| row.dacs.action_pair_separation_rate)
+        .collect();
+    let sign: Vec<Option<f64>> = rows
+        .iter()
+        .map(|row| row.dacs.action_response_sign_accuracy)
+        .collect();
+    let response: Vec<Option<f64>> = rows
+        .iter()
+        .map(|row| row.dacs.action_response_vector_mae)
+        .collect();
+    let drift: Vec<Option<f64>> = rows
+        .iter()
+        .map(|row| row.dacs.neutral_input_drift_energy)
+        .collect();
+    let multi_step: Vec<Option<f64>> = rows
+        .iter()
+        .map(|row| row.dacs.multi_step_response_mae)
+        .collect();
+
+    let separation_ci = bootstrap_mean_ci(&separation, metric_bootstrap_seed(scenario, model, 7));
+    let sign_ci = bootstrap_mean_ci(&sign, metric_bootstrap_seed(scenario, model, 8));
+    let response_ci = bootstrap_mean_ci(&response, metric_bootstrap_seed(scenario, model, 9));
+    let drift_ci = bootstrap_mean_ci(&drift, metric_bootstrap_seed(scenario, model, 10));
+    let multi_step_ci = bootstrap_mean_ci(&multi_step, metric_bootstrap_seed(scenario, model, 11));
+
+    DacsSummary {
+        mean_prediction_coverage: rows
+            .iter()
+            .map(|row| row.dacs.prediction_coverage)
+            .sum::<f64>()
+            / rows.len() as f64,
+        mean_action_pair_separation_rate: mean_optional(&separation),
+        action_pair_separation_episode_count: optional_sample_count(&separation),
+        action_pair_separation_ci95_lower: separation_ci.map(|interval| interval.0),
+        action_pair_separation_ci95_upper: separation_ci.map(|interval| interval.1),
+        mean_action_response_sign_accuracy: mean_optional(&sign),
+        action_response_sign_episode_count: optional_sample_count(&sign),
+        action_response_sign_ci95_lower: sign_ci.map(|interval| interval.0),
+        action_response_sign_ci95_upper: sign_ci.map(|interval| interval.1),
+        mean_action_response_vector_mae: mean_optional(&response),
+        action_response_vector_episode_count: optional_sample_count(&response),
+        action_response_vector_ci95_lower: response_ci.map(|interval| interval.0),
+        action_response_vector_ci95_upper: response_ci.map(|interval| interval.1),
+        mean_neutral_input_drift_energy: mean_optional(&drift),
+        neutral_input_drift_episode_count: optional_sample_count(&drift),
+        neutral_input_drift_ci95_lower: drift_ci.map(|interval| interval.0),
+        neutral_input_drift_ci95_upper: drift_ci.map(|interval| interval.1),
+        mean_multi_step_response_mae: mean_optional(&multi_step),
+        multi_step_response_episode_count: optional_sample_count(&multi_step),
+        multi_step_response_ci95_lower: multi_step_ci.map(|interval| interval.0),
+        multi_step_response_ci95_upper: multi_step_ci.map(|interval| interval.1),
+        mean_multi_step_action_coverage: rows
+            .iter()
+            .map(|row| row.dacs.multi_step_action_coverage)
+            .sum::<f64>()
+            / rows.len() as f64,
+    }
+}
+
+fn summarize_dacs(rows: &[PairMetrics], scenario: Scenario, model: Model) -> DacsSummary {
+    let separation: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.action_pair_separation_rate).collect();
+    let sign: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.action_response_sign_accuracy).collect();
+    let response: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.action_response_vector_mae).collect();
+    let drift: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.neutral_input_drift_energy).collect();
+    let multi_step: Vec<Option<f64>> = rows.iter().map(|row| row.dacs.multi_step_response_mae).collect();
+
+    let separation_ci = bootstrap_mean_ci(&separation, metric_bootstrap_seed(scenario, model, 7));
+    let sign_ci = bootstrap_mean_ci(&sign, metric_bootstrap_seed(scenario, model, 8));
+    let response_ci = bootstrap_mean_ci(&response, metric_bootstrap_seed(scenario, model, 9));
+    let drift_ci = bootstrap_mean_ci(&drift, metric_bootstrap_seed(scenario, model, 10));
+    let multi_step_ci = bootstrap_mean_ci(&multi_step, metric_bootstrap_seed(scenario, model, 11));
+
+    DacsSummary {
+        mean_prediction_coverage: rows.iter().map(|row| row.dacs.prediction_coverage).sum::<f64>() / rows.len() as f64,
+        mean_action_pair_separation_rate: mean_optional(&separation),
+        action_pair_separation_episode_count: optional_sample_count(&separation),
+        action_pair_separation_ci95_lower: separation_ci.map(|interval| interval.0),
+        action_pair_separation_ci95_upper: separation_ci.map(|interval| interval.1),
+        mean_action_response_sign_accuracy: mean_optional(&sign),
+        action_response_sign_episode_count: optional_sample_count(&sign),
+        action_response_sign_ci95_lower: sign_ci.map(|interval| interval.0),
+        action_response_sign_ci95_upper: sign_ci.map(|interval| interval.1),
+        mean_action_response_vector_mae: mean_optional(&response),
+        action_response_vector_episode_count: optional_sample_count(&response),
+        action_response_vector_ci95_lower: response_ci.map(|interval| interval.0),
+        action_response_vector_ci95_upper: response_ci.map(|interval| interval.1),
+        mean_neutral_input_drift_energy: mean_optional(&drift),
+        neutral_input_drift_episode_count: optional_sample_count(&drift),
+        neutral_input_drift_ci95_lower: drift_ci.map(|interval| interval.0),
+        neutral_input_drift_ci95_upper: drift_ci.map(|interval| interval.1),
+        mean_multi_step_response_mae: mean_optional(&multi_step),
+        multi_step_response_episode_count: optional_sample_count(&multi_step),
+        multi_step_response_ci95_lower: multi_step_ci.map(|interval| interval.0),
+        multi_step_response_ci95_upper: multi_step_ci.map(|interval| interval.1),
+        mean_multi_step_action_coverage: rows.iter().map(|row| row.dacs.multi_step_action_coverage).sum::<f64>() / rows.len() as f64,
+    }
+}
+
 fn summarize(scenario: Scenario, model: Model) -> Summary {
     let mut rows = Vec::with_capacity(EPISODES);
     for episode in 0..EPISODES {
@@ -753,6 +1097,8 @@ fn summarize(scenario: Scenario, model: Model) -> Summary {
     Summary {
         scenario: scenario.name(),
         model: model.name(),
+        dacs: summarize_dacs(&rows, scenario, model),
+        dacs: summarize_dacs(&rows, scenario, model),
         mean_pair_coverage: rows.iter().map(|row| row.pair_coverage).sum::<f64>() / denominator,
         mean_effect_sign_accuracy: mean_optional(
             &rows.iter().map(|row| row.sign_accuracy).collect::<Vec<_>>(),
@@ -984,10 +1330,86 @@ fn render_report() -> String {
             write_optional(&mut output, row.terminal_false_safe_rate_ci95_upper);
             write!(
                 &mut output,
-                ",\"mean_branch_prediction_evaluations\":{:.3},\"mean_pair_effect_evaluations\":{:.3},\"mean_oracle_branch_evaluations\":{:.3}}}",
+                ",\"mean_branch_prediction_evaluations\":{:.3},\"mean_pair_effect_evaluations\":{:.3},\"mean_oracle_branch_evaluations\":{:.3},\"dacs\":{{",
                 row.mean_branch_prediction_evaluations,
                 row.mean_pair_effect_evaluations,
                 row.mean_oracle_branch_evaluations
+            )
+            .expect("writing to String cannot fail");
+            write!(
+                &mut output,
+                "\"mean_prediction_coverage\":{:.9},",
+                row.dacs.mean_prediction_coverage
+            )
+            .expect("writing to String cannot fail");
+            output.push_str("\"mean_action_pair_separation_rate\":");
+            write_optional(&mut output, row.dacs.mean_action_pair_separation_rate);
+            write!(
+                &mut output,
+                ",\"action_pair_separation_episode_count\":{},",
+                row.dacs.action_pair_separation_episode_count
+            )
+            .expect("writing to String cannot fail");
+            output.push_str("\"action_pair_separation_ci95_lower\":");
+            write_optional(&mut output, row.dacs.action_pair_separation_ci95_lower);
+            output.push_str(",\"action_pair_separation_ci95_upper\":");
+            write_optional(&mut output, row.dacs.action_pair_separation_ci95_upper);
+
+            output.push_str(",\"mean_action_response_sign_accuracy\":");
+            write_optional(&mut output, row.dacs.mean_action_response_sign_accuracy);
+            write!(
+                &mut output,
+                ",\"action_response_sign_episode_count\":{},",
+                row.dacs.action_response_sign_episode_count
+            )
+            .expect("writing to String cannot fail");
+            output.push_str("\"action_response_sign_ci95_lower\":");
+            write_optional(&mut output, row.dacs.action_response_sign_ci95_lower);
+            output.push_str(",\"action_response_sign_ci95_upper\":");
+            write_optional(&mut output, row.dacs.action_response_sign_ci95_upper);
+
+            output.push_str(",\"mean_action_response_vector_mae\":");
+            write_optional(&mut output, row.dacs.mean_action_response_vector_mae);
+            write!(
+                &mut output,
+                ",\"action_response_vector_episode_count\":{},",
+                row.dacs.action_response_vector_episode_count
+            )
+            .expect("writing to String cannot fail");
+            output.push_str("\"action_response_vector_ci95_lower\":");
+            write_optional(&mut output, row.dacs.action_response_vector_ci95_lower);
+            output.push_str(",\"action_response_vector_ci95_upper\":");
+            write_optional(&mut output, row.dacs.action_response_vector_ci95_upper);
+
+            output.push_str(",\"mean_neutral_input_drift_energy\":");
+            write_optional(&mut output, row.dacs.mean_neutral_input_drift_energy);
+            write!(
+                &mut output,
+                ",\"neutral_input_drift_episode_count\":{},",
+                row.dacs.neutral_input_drift_episode_count
+            )
+            .expect("writing to String cannot fail");
+            output.push_str("\"neutral_input_drift_ci95_lower\":");
+            write_optional(&mut output, row.dacs.neutral_input_drift_ci95_lower);
+            output.push_str(",\"neutral_input_drift_ci95_upper\":");
+            write_optional(&mut output, row.dacs.neutral_input_drift_ci95_upper);
+
+            output.push_str(",\"mean_multi_step_response_mae\":");
+            write_optional(&mut output, row.dacs.mean_multi_step_response_mae);
+            write!(
+                &mut output,
+                ",\"multi_step_response_episode_count\":{},",
+                row.dacs.multi_step_response_episode_count
+            )
+            .expect("writing to String cannot fail");
+            output.push_str("\"multi_step_response_ci95_lower\":");
+            write_optional(&mut output, row.dacs.multi_step_response_ci95_lower);
+            output.push_str(",\"multi_step_response_ci95_upper\":");
+            write_optional(&mut output, row.dacs.multi_step_response_ci95_upper);
+            write!(
+                &mut output,
+                ",\"mean_multi_step_action_coverage\":{:.9}}}}}",
+                row.dacs.mean_multi_step_action_coverage
             )
             .expect("writing to String cannot fail");
         }
@@ -1293,6 +1715,230 @@ mod tests {
         );
         assert_eq!(metrics.branch_outcome_mae, None);
         assert_eq!(metrics.branch_state_mae, None);
+    }
+
+    #[derive(Clone, Copy)]
+    struct ActionInsensitivePredictor;
+
+    impl CandidateBranchPredictor for ActionInsensitivePredictor {
+        fn predict(
+            &self,
+            history: &ObservedHistory,
+            _action: Intervention,
+            forecast_kind: ForecastKind,
+        ) -> Option<CandidateForecast> {
+            let outcome = analytic_action_transition(*history, ACTIONS[0]);
+            Some(CandidateForecast {
+                outcome: BranchPrediction {
+                    utility: 0.0,
+                    next_x: outcome.x,
+                    next_v: outcome.v,
+                    terminal: false,
+                },
+                kind: forecast_kind,
+            })
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct WrongSignPredictor;
+
+    impl CandidateBranchPredictor for WrongSignPredictor {
+        fn predict(
+            &self,
+            history: &ObservedHistory,
+            action: Intervention,
+            forecast_kind: ForecastKind,
+        ) -> Option<CandidateForecast> {
+            let outcome = ObservedHistory {
+                x: history.x - 0.12 * action.force - 0.03 * action.grip,
+                v: 0.75 * history.v - 0.08 * action.force + 0.04 * action.grip,
+            };
+            Some(CandidateForecast {
+                outcome: BranchPrediction {
+                    utility: 0.0,
+                    next_x: outcome.x,
+                    next_v: outcome.v,
+                    terminal: false,
+                },
+                kind: forecast_kind,
+            })
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct NeutralDriftPredictor;
+
+    impl CandidateBranchPredictor for NeutralDriftPredictor {
+        fn predict(
+            &self,
+            history: &ObservedHistory,
+            action: Intervention,
+            forecast_kind: ForecastKind,
+        ) -> Option<CandidateForecast> {
+            let mut outcome = analytic_action_transition(*history, action);
+            if action.force == 0.0 && action.grip == 0.0 {
+                outcome.x += 0.25;
+                outcome.v -= 0.15;
+            }
+            Some(CandidateForecast {
+                outcome: BranchPrediction {
+                    utility: 0.0,
+                    next_x: outcome.x,
+                    next_v: outcome.v,
+                    terminal: false,
+                },
+                kind: forecast_kind,
+            })
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct ImpossibleMagnitudePredictor;
+
+    impl CandidateBranchPredictor for ImpossibleMagnitudePredictor {
+        fn predict(
+            &self,
+            history: &ObservedHistory,
+            action: Intervention,
+            forecast_kind: ForecastKind,
+        ) -> Option<CandidateForecast> {
+            let outcome = ObservedHistory {
+                x: history.x + 10.0 * (0.12 * action.force + 0.03 * action.grip),
+                v: 0.75 * history.v + 10.0 * (0.08 * action.force - 0.04 * action.grip),
+            };
+            Some(CandidateForecast {
+                outcome: BranchPrediction {
+                    utility: 0.0,
+                    next_x: outcome.x,
+                    next_v: outcome.v,
+                    terminal: false,
+                },
+                kind: forecast_kind,
+            })
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    struct FirstStepOnlyPredictor {
+        initial: ObservedHistory,
+    }
+
+    impl CandidateBranchPredictor for FirstStepOnlyPredictor {
+        fn predict(
+            &self,
+            history: &ObservedHistory,
+            action: Intervention,
+            forecast_kind: ForecastKind,
+        ) -> Option<CandidateForecast> {
+            let action_applies = history.x.to_bits() == self.initial.x.to_bits()
+                && history.v.to_bits() == self.initial.v.to_bits();
+            let applied = if action_applies { action } else { ACTIONS[0] };
+            let outcome = analytic_action_transition(*history, applied);
+            Some(CandidateForecast {
+                outcome: BranchPrediction {
+                    utility: 0.0,
+                    next_x: outcome.x,
+                    next_v: outcome.v,
+                    terminal: false,
+                },
+                kind: forecast_kind,
+            })
+        }
+    }
+
+    #[test]
+    fn dacs_oracle_matches_analytic_action_response_and_horizon() {
+        let case = make_episode_case(BASE_SEED);
+        let metrics = dacs_metrics_for_model(Model::Oracle, Scenario::Monotone, case);
+        assert_eq!(metrics.prediction_coverage, 1.0);
+        assert_eq!(metrics.action_pair_separation_rate, Some(1.0));
+        assert_eq!(metrics.action_response_sign_accuracy, Some(1.0));
+        assert_eq!(metrics.action_response_vector_mae, Some(0.0));
+        assert_eq!(metrics.neutral_input_drift_energy, Some(0.0));
+        assert_eq!(metrics.multi_step_response_mae, Some(0.0));
+        assert_eq!(metrics.multi_step_action_coverage, 1.0);
+    }
+
+    #[test]
+    fn dacs_point_predictor_is_action_controllable_on_analytic_profile() {
+        let history = ObservedHistory { x: -0.2, v: 0.15 };
+        let metrics = dacs_metrics_with_predictor(&PointOutcomePredictor, history);
+        assert_eq!(metrics.prediction_coverage, 1.0);
+        assert_eq!(metrics.action_pair_separation_rate, Some(1.0));
+        assert_eq!(metrics.action_response_sign_accuracy, Some(1.0));
+        assert_eq!(metrics.action_response_vector_mae, Some(0.0));
+        assert_eq!(metrics.neutral_input_drift_energy, Some(0.0));
+        assert_eq!(metrics.multi_step_response_mae, Some(0.0));
+    }
+
+    #[test]
+    fn dacs_detects_action_insensitive_world_model() {
+        let history = ObservedHistory { x: 0.1, v: -0.1 };
+        let metrics = dacs_metrics_with_predictor(&ActionInsensitivePredictor, history);
+        assert_eq!(metrics.action_pair_separation_rate, Some(0.0));
+        assert_eq!(metrics.action_response_sign_accuracy, Some(0.0));
+        assert!(metrics.action_response_vector_mae.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn dacs_detects_wrong_sign_even_when_actions_remain_distinguishable() {
+        let history = ObservedHistory { x: 0.1, v: -0.1 };
+        let metrics = dacs_metrics_with_predictor(&WrongSignPredictor, history);
+        assert_eq!(metrics.action_pair_separation_rate, Some(1.0));
+        assert_eq!(metrics.action_response_sign_accuracy, Some(0.0));
+        assert!(metrics.action_response_vector_mae.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn dacs_neutral_input_drift_is_not_hidden_by_good_action_separation() {
+        let history = ObservedHistory { x: -0.1, v: 0.2 };
+        let metrics = dacs_metrics_with_predictor(&NeutralDriftPredictor, history);
+        assert_eq!(metrics.action_pair_separation_rate, Some(1.0));
+        assert!(metrics.neutral_input_drift_energy.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn dacs_detects_correct_sign_with_impossible_response_magnitude() {
+        let history = ObservedHistory { x: 0.05, v: 0.1 };
+        let metrics = dacs_metrics_with_predictor(&ImpossibleMagnitudePredictor, history);
+        assert_eq!(metrics.action_response_sign_accuracy, Some(1.0));
+        assert!(metrics.action_response_vector_mae.unwrap() > 0.1);
+    }
+
+    #[test]
+    fn dacs_multistep_probe_detects_action_response_that_disappears_after_first_step() {
+        let history = ObservedHistory { x: -0.15, v: 0.12 };
+        let predictor = FirstStepOnlyPredictor { initial: history };
+        let metrics = dacs_metrics_with_predictor(&predictor, history);
+        assert_eq!(metrics.action_response_sign_accuracy, Some(1.0));
+        assert!(metrics.multi_step_response_mae.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn dacs_support_coverage_is_separate_from_action_controllability() {
+        let case = make_episode_case(BASE_SEED);
+        let metrics =
+            dacs_metrics_with_predictor(&SupportAwarePointPredictor, case.history);
+        assert!((metrics.prediction_coverage - 4.0 / 7.0).abs() < 1e-12);
+        assert_eq!(metrics.action_pair_separation_rate, Some(1.0));
+        assert_eq!(metrics.action_response_sign_accuracy, Some(1.0));
+        assert_eq!(metrics.multi_step_action_coverage, 4.0 / 7.0);
+    }
+
+    #[test]
+    fn effect_only_predictor_has_no_physical_action_controllability_claim() {
+        let case = make_episode_case(BASE_SEED);
+        let metrics = evaluate_episode(
+            Scenario::Monotone,
+            Model::ExplicitEffectHead,
+            case,
+            &ACTIONS,
+        );
+        assert_eq!(metrics.dacs.prediction_coverage, 0.0);
+        assert_eq!(metrics.dacs.action_pair_separation_rate, None);
+        assert_eq!(metrics.dacs.neutral_input_drift_energy, None);
+        assert_eq!(metrics.dacs.multi_step_response_mae, None);
     }
 
     #[test]
