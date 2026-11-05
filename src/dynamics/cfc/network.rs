@@ -145,6 +145,21 @@ impl std::fmt::Display for CfCWeightLoadError {
 
 impl std::error::Error for CfCWeightLoadError {}
 
+/// Content-addressed identity for one CfC network instance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CfCNetworkFingerprint {
+    /// Fingerprint schema version.
+    pub format_version: u32,
+    /// Hash of serialized architecture configuration and parameter manifest.
+    pub architecture_digest: String,
+    /// Hash of the versioned parameter manifest alone.
+    pub manifest_digest: String,
+    /// Hash of the exact serialized parameter values (little-endian f32 bytes).
+    pub parameter_digest: String,
+    /// Hash binding architecture, manifest, and parameter values together.
+    pub model_digest: String,
+}
+
 /// Semantic role of one contiguous group in a CfC network's serialized parameter vector.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CfCParameterRole {
@@ -1186,6 +1201,48 @@ impl CfCNetwork {
     // Weight serialization for async training (background thread weight swap)
     // =========================================================================
 
+    /// Compute content-addressed fingerprints for architecture, manifest, and weights.
+    ///
+    /// Parameter values are hashed as little-endian IEEE-754 f32 bytes, making the
+    /// value digest independent of host endianness. The architecture digest binds
+    /// the serialized network configuration to the versioned manifest. The model
+    /// digest binds all three identities and is the precondition to use for an edit.
+    pub fn fingerprint(&self) -> Result<CfCNetworkFingerprint, String> {
+        let manifest = self.parameter_manifest();
+        let manifest_bytes = bincode::serialize(&manifest)
+            .map_err(|error| format!("failed to serialize CfC parameter manifest: {error}"))?;
+        let config_bytes = bincode::serialize(&self.config)
+            .map_err(|error| format!("failed to serialize CfC network config: {error}"))?;
+
+        let manifest_digest = blake3::hash(&manifest_bytes).to_hex().to_string();
+
+        let mut architecture_hasher = blake3::Hasher::new();
+        architecture_hasher.update(b"symthaea-cfc-architecture-v1\\0");
+        architecture_hasher.update(&config_bytes);
+        architecture_hasher.update(&manifest_bytes);
+        let architecture_digest = architecture_hasher.finalize().to_hex().to_string();
+
+        let mut parameter_hasher = blake3::Hasher::new();
+        for value in self.get_weights() {
+            parameter_hasher.update(&value.to_le_bytes());
+        }
+        let parameter_digest = parameter_hasher.finalize().to_hex().to_string();
+
+        let mut model_hasher = blake3::Hasher::new();
+        model_hasher.update(b"symthaea-cfc-model-v1\\0");
+        model_hasher.update(architecture_digest.as_bytes());
+        model_hasher.update(manifest_digest.as_bytes());
+        model_hasher.update(parameter_digest.as_bytes());
+
+        Ok(CfCNetworkFingerprint {
+            format_version: 1,
+            architecture_digest,
+            manifest_digest,
+            parameter_digest,
+            model_digest: model_hasher.finalize().to_hex().to_string(),
+        })
+    }
+
     /// Describe the named parameter groups in the exact order returned by get_weights().
     ///
     /// The manifest intentionally describes only the learnable serialized vector.
@@ -2020,6 +2077,37 @@ mod tests {
             Err(CfCWeightLoadError::GroupLengthMismatch { .. })
         ));
         assert_eq!(net.get_weights(), before);
+    }
+
+    // ---------------------------------------------------------------
+    // 15. fingerprint binds architecture and exact parameter values
+    // ---------------------------------------------------------------
+    #[test]
+    fn test_fingerprint_separates_architecture_and_parameter_identity() {
+        let mut original = CfCNetwork::new(small_config());
+        let original_fingerprint = original.fingerprint().unwrap();
+        let weights = original.get_weights();
+        let mut changed_weights = weights.clone();
+        changed_weights[0] += 0.125;
+        original.try_set_weights(&changed_weights).unwrap();
+        let changed_fingerprint = original.fingerprint().unwrap();
+
+        assert_eq!(
+            original_fingerprint.architecture_digest,
+            changed_fingerprint.architecture_digest
+        );
+        assert_eq!(
+            original_fingerprint.manifest_digest,
+            changed_fingerprint.manifest_digest
+        );
+        assert_ne!(
+            original_fingerprint.parameter_digest,
+            changed_fingerprint.parameter_digest
+        );
+        assert_ne!(
+            original_fingerprint.model_digest,
+            changed_fingerprint.model_digest
+        );
     }
 
     // ---------------------------------------------------------------
