@@ -921,7 +921,7 @@ fn compatibility_context(receipt: &Value) -> Result<Value, ComposerError> {
         },
         "task_universe_sha256": required_value_from_value(receipt, "task_universe_sha256", "receipt")?,
         "eligible_task_set_sha256": required_value_from_value(receipt, "eligible_task_set_sha256", "receipt")?,
-        "budget_caps": required_value_from_value(receipt, "budget_caps", "receipt")
+        "budget_caps": required_value_from_value(receipt, "budget_caps", "receipt")?
     }))
 }
 
