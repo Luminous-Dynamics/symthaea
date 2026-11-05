@@ -355,13 +355,6 @@ pub fn evaluate_dispatch(
         let transition_valid = step.transition_seconds_before_action + EPSILON
             >= required_transition
             && step.transition_seconds_before_action <= interval_seconds + EPSILON;
-        let action_valid = mode_request_valid && transition_valid && network_valid;
-        let active_hours = if action_valid {
-            step.duration_hours - step.transition_seconds_before_action / 3_600.0
-        } else {
-            0.0
-        };
-
         let net_export = step.discharge_mw - step.charge_mw;
         let export_valid = net_export <= step.network_export_limit_mw + EPSILON;
         if !export_valid {
@@ -372,6 +365,13 @@ pub fn evaluate_dispatch(
             violations.push(Violation::ImportLimitExceeded);
         }
         let network_valid = export_valid && import_valid;
+
+        let action_valid = mode_request_valid && transition_valid && network_valid;
+        let active_hours = if action_valid {
+            step.duration_hours - step.transition_seconds_before_action / 3_600.0
+        } else {
+            0.0
+        };
 
         let (reserve_up, reserve_down) = match sum_reserves(step.reserves) {
             Ok(values) => values,
