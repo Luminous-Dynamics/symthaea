@@ -128,7 +128,10 @@ impl fmt::Display for InputError {
             Self::NonFiniteValue(field) => write!(f, "{field} must be finite"),
             Self::NegativeValue(field) => write!(f, "{field} must be nonnegative"),
             Self::InvalidEnergyBounds => write!(f, "minimum energy must be below maximum energy"),
-            Self::InvalidChargingBounds => write!(f, "minimum stable charge must not exceed maximum charge power"),
+            Self::InvalidChargingBounds => write!(
+                f,
+                "minimum stable charge must not exceed maximum charge power"
+            ),
             Self::InvalidEfficiency => write!(f, "round-trip efficiency must be in (0, 1]"),
             Self::InvalidInitialEnergy => write!(f, "initial energy is outside asset limits"),
             Self::InvalidSevenDayDeclarationCount => {
@@ -234,9 +237,7 @@ fn required_transition_seconds(
     }
 }
 
-fn sum_reserves(
-    reserves: &[ReserveCommitment],
-) -> Result<(f64, f64), Vec<Violation>> {
+fn sum_reserves(reserves: &[ReserveCommitment]) -> Result<(f64, f64), Vec<Violation>> {
     let mut seen = BTreeSet::new();
     let mut upward = 0.0;
     let mut downward = 0.0;
@@ -294,14 +295,8 @@ pub fn evaluate_dispatch(
                 step.transition_seconds_before_action,
             ),
             ("reserve_duration_hours", step.reserve_duration_hours),
-            (
-                "network_export_limit_mw",
-                step.network_export_limit_mw,
-            ),
-            (
-                "network_import_limit_mw",
-                step.network_import_limit_mw,
-            ),
+            ("network_export_limit_mw", step.network_export_limit_mw),
+            ("network_import_limit_mw", step.network_import_limit_mw),
         ];
         for (field, value) in finite_values {
             if !value.is_finite() {
@@ -326,20 +321,15 @@ pub fn evaluate_dispatch(
         if step.charge_mw > limits.max_charge_mw + EPSILON {
             violations.push(Violation::ChargePowerExceeded);
         }
-        if step.charge_mw > EPSILON
-            && step.charge_mw + EPSILON < limits.min_stable_charge_mw
-        {
+        if step.charge_mw > EPSILON && step.charge_mw + EPSILON < limits.min_stable_charge_mw {
             violations.push(Violation::BelowMinimumStableCharging);
         }
         if step.discharge_mw > limits.max_discharge_mw + EPSILON {
             violations.push(Violation::DischargePowerExceeded);
         }
 
-        let required_transition = required_transition_seconds(
-            previous_mode,
-            mode,
-            limits.transitions,
-        );
+        let required_transition =
+            required_transition_seconds(previous_mode, mode, limits.transitions);
         if step.transition_seconds_before_action + EPSILON < required_transition {
             violations.push(Violation::TransitionTimeInsufficient);
         }
@@ -457,7 +447,10 @@ pub fn validate_seven_day_energy_declarations(
     let caps = [
         ("daily_limit_mwh", limits.daily_limit_mwh),
         ("next_six_days_limit_mwh", limits.next_six_days_limit_mwh),
-        ("seven_day_total_limit_mwh", limits.seven_day_total_limit_mwh),
+        (
+            "seven_day_total_limit_mwh",
+            limits.seven_day_total_limit_mwh,
+        ),
     ];
     for (name, value) in caps {
         if !value.is_finite() {
@@ -472,7 +465,10 @@ pub fn validate_seven_day_energy_declarations(
     let next_six_total: f64 = declarations_mwh[1..].iter().sum();
     let seven_day_total: f64 = declarations_mwh.iter().sum();
     let mut violations = Vec::new();
-    if declarations_mwh.iter().any(|value| *value > limits.daily_limit_mwh + EPSILON) {
+    if declarations_mwh
+        .iter()
+        .any(|value| *value > limits.daily_limit_mwh + EPSILON)
+    {
         violations.push("daily_limit_exceeded");
     }
     if next_six_total > limits.next_six_days_limit_mwh + EPSILON {
@@ -500,11 +496,11 @@ pub fn required_credit_cover_minor_units(
         .ok_or(InputError::IntegerOverflow)
 }
 
-pub fn sum_balancing_payment_components_minor_units(
-    components: &[i64],
-) -> Result<i64, InputError> {
+pub fn sum_balancing_payment_components_minor_units(components: &[i64]) -> Result<i64, InputError> {
     components.iter().try_fold(0_i64, |total, component| {
-        total.checked_add(*component).ok_or(InputError::IntegerOverflow)
+        total
+            .checked_add(*component)
+            .ok_or(InputError::IntegerOverflow)
     })
 }
 
@@ -554,15 +550,19 @@ mod tests {
     #[test]
     fn feasible_discharge_reserve_and_energy_balance() {
         static RESERVES: [ReserveCommitment; 2] = [
-            ReserveCommitment { product: ReserveProduct::Regulating, direction: ReserveDirection::Up, mw: 5.0 },
-            ReserveCommitment { product: ReserveProduct::TenMinute, direction: ReserveDirection::Up, mw: 5.0 },
+            ReserveCommitment {
+                product: ReserveProduct::Regulating,
+                direction: ReserveDirection::Up,
+                mw: 5.0,
+            },
+            ReserveCommitment {
+                product: ReserveProduct::TenMinute,
+                direction: ReserveDirection::Up,
+                mw: 5.0,
+            },
         ];
-        let result = evaluate_dispatch(
-            limits(),
-            150.0,
-            &[step(0.0, 30.0, 900.0, &RESERVES)],
-        )
-        .expect("fixture inputs are valid");
+        let result = evaluate_dispatch(limits(), 150.0, &[step(0.0, 30.0, 900.0, &RESERVES)])
+            .expect("fixture inputs are valid");
         assert!(result.feasible);
         assert!((result.final_energy_mwh - (150.0 - 30.0 / 0.9_f64.sqrt() * 0.75)).abs() < 1.0e-8);
         assert_eq!(result.steps[0].reserve_up_mw, 10.0);
@@ -570,56 +570,60 @@ mod tests {
 
     #[test]
     fn rejects_energy_plus_reserve_double_counting() {
-        static RESERVES: [ReserveCommitment; 1] = [
-            ReserveCommitment { product: ReserveProduct::Instantaneous, direction: ReserveDirection::Up, mw: 10.0 },
-        ];
-        let result = evaluate_dispatch(
-            limits(),
-            150.0,
-            &[step(0.0, 55.0, 900.0, &RESERVES)],
-        )
-        .expect("fixture inputs are valid");
+        static RESERVES: [ReserveCommitment; 1] = [ReserveCommitment {
+            product: ReserveProduct::Instantaneous,
+            direction: ReserveDirection::Up,
+            mw: 10.0,
+        }];
+        let result = evaluate_dispatch(limits(), 150.0, &[step(0.0, 55.0, 900.0, &RESERVES)])
+            .expect("fixture inputs are valid");
         assert!(!result.feasible);
-        assert!(result.steps[0].violations.contains(&Violation::ReservePowerHeadroomExceeded));
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::ReservePowerHeadroomExceeded)
+        );
     }
 
     #[test]
     fn rejects_reserve_without_soc_energy_headroom() {
-        static RESERVES: [ReserveCommitment; 1] = [
-            ReserveCommitment { product: ReserveProduct::Regulating, direction: ReserveDirection::Up, mw: 20.0 },
-        ];
-        let result = evaluate_dispatch(
-            limits(),
-            25.0,
-            &[step(0.0, 0.0, 0.0, &RESERVES)],
-        )
-        .expect("fixture inputs are valid");
+        static RESERVES: [ReserveCommitment; 1] = [ReserveCommitment {
+            product: ReserveProduct::Regulating,
+            direction: ReserveDirection::Up,
+            mw: 20.0,
+        }];
+        let result = evaluate_dispatch(limits(), 25.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
+            .expect("fixture inputs are valid");
         assert!(!result.feasible);
-        assert!(result.steps[0].violations.contains(&Violation::ReserveEnergyHeadroomExceeded));
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::ReserveEnergyHeadroomExceeded)
+        );
     }
 
     #[test]
     fn rejects_minimum_stable_charge_violation() {
-        let result = evaluate_dispatch(
-            limits(),
-            100.0,
-            &[step(2.0, 0.0, 300.0, empty_reserves())],
-        )
-        .expect("fixture inputs are valid");
+        let result = evaluate_dispatch(limits(), 100.0, &[step(2.0, 0.0, 300.0, empty_reserves())])
+            .expect("fixture inputs are valid");
         assert!(!result.feasible);
-        assert!(result.steps[0].violations.contains(&Violation::BelowMinimumStableCharging));
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::BelowMinimumStableCharging)
+        );
     }
 
     #[test]
     fn rejects_insufficient_mode_transition_time() {
-        let result = evaluate_dispatch(
-            limits(),
-            100.0,
-            &[step(0.0, 10.0, 60.0, empty_reserves())],
-        )
-        .expect("fixture inputs are valid");
+        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 10.0, 60.0, empty_reserves())])
+            .expect("fixture inputs are valid");
         assert!(!result.feasible);
-        assert!(result.steps[0].violations.contains(&Violation::TransitionTimeInsufficient));
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::TransitionTimeInsufficient)
+        );
     }
 
     #[test]
@@ -628,42 +632,58 @@ mod tests {
         s.network_export_limit_mw = 30.0;
         let result = evaluate_dispatch(limits(), 100.0, &[s]).expect("fixture inputs are valid");
         assert!(!result.feasible);
-        assert!(result.steps[0].violations.contains(&Violation::ExportLimitExceeded));
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::ExportLimitExceeded)
+        );
     }
 
     #[test]
     fn rejects_soc_floor_and_ceiling_violations() {
-        let discharge = evaluate_dispatch(
-            limits(),
-            25.0,
-            &[step(0.0, 10.0, 900.0, empty_reserves())],
-        ).expect("fixture inputs are valid");
+        let discharge =
+            evaluate_dispatch(limits(), 25.0, &[step(0.0, 10.0, 900.0, empty_reserves())])
+                .expect("fixture inputs are valid");
         assert!(!discharge.feasible);
-        assert!(discharge.steps[0].violations.contains(&Violation::EnergyBelowMinimum));
+        assert!(
+            discharge.steps[0]
+                .violations
+                .contains(&Violation::EnergyBelowMinimum)
+        );
 
-        let charge = evaluate_dispatch(
-            limits(),
-            195.0,
-            &[step(10.0, 0.0, 300.0, empty_reserves())],
-        ).expect("fixture inputs are valid");
+        let charge =
+            evaluate_dispatch(limits(), 195.0, &[step(10.0, 0.0, 300.0, empty_reserves())])
+                .expect("fixture inputs are valid");
         assert!(!charge.feasible);
-        assert!(charge.steps[0].violations.contains(&Violation::EnergyAboveMaximum));
+        assert!(
+            charge.steps[0]
+                .violations
+                .contains(&Violation::EnergyAboveMaximum)
+        );
     }
 
     #[test]
     fn rejects_duplicate_reserve_product_direction() {
         static RESERVES: [ReserveCommitment; 2] = [
-            ReserveCommitment { product: ReserveProduct::Regulating, direction: ReserveDirection::Up, mw: 2.0 },
-            ReserveCommitment { product: ReserveProduct::Regulating, direction: ReserveDirection::Up, mw: 3.0 },
+            ReserveCommitment {
+                product: ReserveProduct::Regulating,
+                direction: ReserveDirection::Up,
+                mw: 2.0,
+            },
+            ReserveCommitment {
+                product: ReserveProduct::Regulating,
+                direction: ReserveDirection::Up,
+                mw: 3.0,
+            },
         ];
-        let result = evaluate_dispatch(
-            limits(),
-            100.0,
-            &[step(0.0, 0.0, 0.0, &RESERVES)],
-        )
-        .expect("fixture inputs are valid");
+        let result = evaluate_dispatch(limits(), 100.0, &[step(0.0, 0.0, 0.0, &RESERVES)])
+            .expect("fixture inputs are valid");
         assert!(!result.feasible);
-        assert!(result.steps[0].violations.contains(&Violation::DuplicateReserveProductDirection));
+        assert!(
+            result.steps[0]
+                .violations
+                .contains(&Violation::DuplicateReserveProductDirection)
+        );
     }
 
     #[test]
@@ -684,14 +704,31 @@ mod tests {
         let rejected = validate_seven_day_energy_declarations(&invalid, limits)
             .expect("fixture inputs are valid");
         assert!(!rejected.feasible);
-        assert!(rejected.violations.contains(&"next_six_days_limit_exceeded"));
-        assert!(rejected.violations.contains(&"seven_day_total_limit_exceeded"));
+        assert!(
+            rejected
+                .violations
+                .contains(&"next_six_days_limit_exceeded")
+        );
+        assert!(
+            rejected
+                .violations
+                .contains(&"seven_day_total_limit_exceeded")
+        );
     }
 
     #[test]
     fn credit_cover_and_multiple_balancing_components_use_checked_arithmetic() {
-        assert_eq!(required_credit_cover_minor_units(25_000_000, 10_000_000), Ok(35_000_000));
-        assert_eq!(sum_balancing_payment_components_minor_units(&[-4_500_000, 1_000_000]), Ok(-3_500_000));
-        assert_eq!(required_credit_cover_minor_units(u64::MAX, 1), Err(InputError::IntegerOverflow));
+        assert_eq!(
+            required_credit_cover_minor_units(25_000_000, 10_000_000),
+            Ok(35_000_000)
+        );
+        assert_eq!(
+            sum_balancing_payment_components_minor_units(&[-4_500_000, 1_000_000]),
+            Ok(-3_500_000)
+        );
+        assert_eq!(
+            required_credit_cover_minor_units(u64::MAX, 1),
+            Err(InputError::IntegerOverflow)
+        );
     }
 }
