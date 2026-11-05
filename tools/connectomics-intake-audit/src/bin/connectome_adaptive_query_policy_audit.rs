@@ -996,6 +996,154 @@ fn expand_joint_support(
     ))
 }
 
+fn canonical_scenario_expansion_challenge_sha256(
+    base_scenario_sha256: &str,
+    base_joint_support_sha256: &str,
+    challenge: &ScenarioExpansionChallenge,
+    action_ids: &[String],
+) -> Result<String, String> {
+    let mut additions = challenge.additions.iter().collect::<Vec<_>>();
+    additions.sort_by(|left, right| {
+        left.scenario
+            .scenario_id
+            .cmp(&right.scenario.scenario_id)
+    });
+    let mut hasher = Sha256::new();
+    hasher.update(b"connectome-adaptive-hypothesis-space-expansion-v1");
+    hasher.update(base_scenario_sha256.as_bytes());
+    hasher.update(base_joint_support_sha256.as_bytes());
+    hash_field(&mut hasher, &challenge.challenge_id);
+    hasher.update(challenge.challenger_evidence_sha256.as_bytes());
+    hasher.update(challenge.challenger_model_sha256.as_bytes());
+    hasher.update((additions.len() as u64).to_be_bytes());
+    for addition in additions {
+        if addition.scenario.scenario_id != addition.support.scenario_id {
+            return Err(format!(
+                "scenario/support identity mismatch for {}",
+                addition.scenario.scenario_id
+            ));
+        }
+        hasher.update(b"NEW-WORLD");
+        hash_field(&mut hasher, &addition.scenario.scenario_id);
+        hasher.update(addition.scenario.graph_sha256.as_bytes());
+        hasher.update([u8::from(addition.scenario.decision_met)]);
+        hasher.update(addition.support.source_evidence_sha256.as_bytes());
+        hasher.update(addition.support.joint_observation_model_sha256.as_bytes());
+        let mut groups = addition.support.dependence_groups.clone();
+        groups.sort();
+        hasher.update((groups.len() as u64).to_be_bytes());
+        for group in groups {
+            hasher.update(b"DEPENDENCE");
+            hash_field(&mut hasher, &group);
+        }
+        let rows = normalized_joint_rows(&addition.support, action_ids)?;
+        hasher.update((rows.len() as u64).to_be_bytes());
+        for row in rows {
+            hasher.update(b"JOINT-TUPLE");
+            for (action_id, outcome) in action_ids.iter().zip(row) {
+                hash_field(&mut hasher, action_id);
+                hash_field(&mut hasher, &outcome);
+            }
+        }
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn expand_scenario_space(
+    base_input: &Input,
+    challenge: &ScenarioExpansionChallenge,
+    action_ids: &[String],
+) -> Result<(String, Input, usize), String> {
+    if !nonempty(&challenge.challenge_id) {
+        return Err("scenario challenge ID must be non-empty".into());
+    }
+    if !valid_hex(&challenge.challenger_evidence_sha256, 64)
+        || !valid_hex(&challenge.challenger_model_sha256, 64)
+    {
+        return Err(format!(
+            "scenario challenge {} challenger evidence/model digests must be SHA-256",
+            challenge.challenge_id
+        ));
+    }
+    let remaining_capacity = MAX_SCENARIOS.saturating_sub(base_input.scenarios.len());
+    if challenge.additions.is_empty() || challenge.additions.len() > remaining_capacity {
+        return Err(format!(
+            "scenario challenge {} must append 1..={remaining_capacity} worlds",
+            challenge.challenge_id
+        ));
+    }
+    let base_ids = base_input
+        .scenarios
+        .iter()
+        .map(|world| world.scenario_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut added_ids = BTreeSet::new();
+    let mut expanded = base_input.clone();
+    for addition in &challenge.additions {
+        let scenario = &addition.scenario;
+        let support = &addition.support;
+        if !nonempty(&scenario.scenario_id)
+            || !valid_hex(&scenario.graph_sha256, 64)
+            || base_ids.contains(scenario.scenario_id.as_str())
+            || !added_ids.insert(scenario.scenario_id.as_str())
+        {
+            return Err(format!(
+                "scenario challenge {} has a duplicate/invalid new world {}",
+                challenge.challenge_id, scenario.scenario_id
+            ));
+        }
+        if support.scenario_id != scenario.scenario_id
+            || !valid_hex(&support.source_evidence_sha256, 64)
+            || !valid_hex(&support.joint_observation_model_sha256, 64)
+        {
+            return Err(format!(
+                "scenario challenge {} world {} has mismatched identity or invalid support provenance",
+                challenge.challenge_id, scenario.scenario_id
+            ));
+        }
+        let mut groups = BTreeSet::new();
+        for group in &support.dependence_groups {
+            if !nonempty(group) || !groups.insert(group) {
+                return Err(format!(
+                    "scenario challenge {} world {} has duplicate/empty dependence group",
+                    challenge.challenge_id, scenario.scenario_id
+                ));
+            }
+        }
+        let rows = normalized_joint_rows(support, action_ids)?;
+        if rows.is_empty() || rows.len() > MAX_JOINT_TUPLES_PER_WORLD {
+            return Err(format!(
+                "scenario challenge {} world {} has invalid joint support size",
+                challenge.challenge_id, scenario.scenario_id
+            ));
+        }
+        expanded.scenarios.push(scenario.clone());
+        expanded.joint_world_supports.push(support.clone());
+    }
+
+    expanded.scenario_set_scope = "sampled_sensitivity_set".into();
+    expanded.joint_support_scope = "sampled_sensitivity_support".into();
+    expanded.scenario_set_sha256 = canonical_scenario_set_sha256(&expanded.scenarios);
+    expanded.joint_support_sha256 = canonical_joint_support_sha256(
+        &expanded.scenarios,
+        &expanded.actions,
+        &expanded.joint_world_supports,
+    )?;
+    // Re-run the same strict base validator against the appended universe.
+    validate(&expanded)?;
+    let challenge_sha256 = canonical_scenario_expansion_challenge_sha256(
+        &base_input.scenario_set_sha256,
+        &base_input.joint_support_sha256,
+        challenge,
+        action_ids,
+    )?;
+    Ok((
+        challenge_sha256,
+        expanded,
+        challenge.additions.len(),
+    ))
+}
+
 fn effort_is_non_decreasing(before: Option<u64>, after: Option<u64>) -> bool {
     match (before, after) {
         (Some(before), Some(after)) => after >= before,
