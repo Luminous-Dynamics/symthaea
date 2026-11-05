@@ -177,6 +177,8 @@ pub enum ScoreBoundError {
     NonFiniteScoreSample,
     ScoreSampleOutsideDeclaredRange,
     BoundComputationNonFinite,
+    InvalidReceiptSnapshot,
+    ReceiptRecomputationMismatch,
 }
 
 impl fmt::Display for ScoreBoundError {
@@ -198,6 +200,8 @@ impl fmt::Display for ScoreBoundError {
             Self::NonFiniteScoreSample => "score samples must be finite",
             Self::ScoreSampleOutsideDeclaredRange => "score sample lies outside its frozen range",
             Self::BoundComputationNonFinite => "finite-sample score bound was not representable",
+            Self::InvalidReceiptSnapshot => "score-bound receipt contains an invalid action or scenario snapshot",
+            Self::ReceiptRecomputationMismatch => "score-bound receipt outputs do not reproduce from its raw samples and frozen configuration",
         };
         f.write_str(message)
     }
@@ -422,6 +426,77 @@ fn bound_candidate_score_samples_with_schedule(
         metrics,
         scenario_outcomes,
     })
+}
+
+/// Independently reconstruct and validate a public score-bound receipt.
+///
+/// This verifies that every stored bound, metric row, scenario outcome and
+/// multiplicity value is exactly reproduced from the receipt's raw samples,
+/// frozen action/scenario snapshots and declared configuration. Caller-supplied
+/// digests remain opaque commitments; this function does not authenticate them.
+pub fn verify_score_bounds_receipt(
+    receipt: &ScoreBoundsReceipt,
+) -> Result<(), ScoreBoundError> {
+    if receipt.action_snapshot.is_empty() || receipt.scenarios.is_empty() {
+        return Err(ScoreBoundError::InvalidReceiptSnapshot);
+    }
+    let action_set = OperationalActionSet::new(
+        receipt.action_snapshot.clone(),
+        receipt.action_set_digest.clone(),
+    )
+    .map_err(|_| ScoreBoundError::InvalidReceiptSnapshot)?;
+    if action_set.actions() != receipt.action_snapshot.as_slice() {
+        return Err(ScoreBoundError::InvalidReceiptSnapshot);
+    }
+    let scenario_set = ScenarioSet::new(
+        receipt.scenarios.clone(),
+        receipt.scenario_set_digest.clone(),
+    )
+    .map_err(|_| ScoreBoundError::InvalidReceiptSnapshot)?;
+    if scenario_set.scenarios().len() != receipt.scenarios.len()
+        || scenario_set
+            .scenarios()
+            .iter()
+            .zip(&receipt.scenarios)
+            .any(|(normalized, stored)| {
+                normalized.scenario_id != stored.scenario_id
+                    || (normalized.weight - stored.weight).abs() > 1.0e-12
+            })
+    {
+        return Err(ScoreBoundError::InvalidReceiptSnapshot);
+    }
+
+    let schedule = match receipt.method_id {
+        SCORE_BOUND_METHOD_ID if !receipt.time_uniform && receipt.alpha_spending_rule == "none" => {
+            BoundSchedule::FixedLook
+        }
+        ANYTIME_SCORE_BOUND_METHOD_ID
+            if receipt.time_uniform
+                && receipt.alpha_spending_rule == ANYTIME_ALPHA_SPENDING_RULE_ID =>
+        {
+            BoundSchedule::Anytime
+        }
+        _ => return Err(ScoreBoundError::InvalidReceiptSnapshot),
+    };
+    let config = ScoreBoundsConfig {
+        familywise_alpha: receipt.familywise_alpha,
+        minimum_replicates: receipt.minimum_replicates,
+        ranges: receipt.ranges,
+        score_contract_digest: receipt.score_contract_digest.clone(),
+        source_digest: receipt.source_digest.clone(),
+        root_seed: receipt.root_seed,
+    };
+    let reproduced = bound_candidate_score_samples_with_schedule(
+        &action_set,
+        &scenario_set,
+        &receipt.samples,
+        &config,
+        schedule,
+    )?;
+    if &reproduced != receipt {
+        return Err(ScoreBoundError::ReceiptRecomputationMismatch);
+    }
+    Ok(())
 }
 
 fn validate_config(config: &ScoreBoundsConfig) -> Result<(), ScoreBoundError> {
@@ -652,6 +727,52 @@ mod tests {
             record(2, 10, 0.2),
             record(2, 20, 0.3),
         ]
+    }
+
+    #[test]
+    fn fixed_and_anytime_receipts_verify_from_frozen_raw_samples() {
+        let actions = action_set();
+        let scenarios = scenario_set();
+        let fixed = bound_candidate_score_samples(&actions, &scenarios, &records(), &config())
+            .unwrap();
+        let anytime = bound_candidate_score_samples_anytime(&actions, &scenarios, &records(), &config())
+            .unwrap();
+        assert_eq!(verify_score_bounds_receipt(&fixed), Ok(()));
+        assert_eq!(verify_score_bounds_receipt(&anytime), Ok(()));
+    }
+
+    #[test]
+    fn receipt_verifier_rejects_tampered_metric_bounds_and_provenance() {
+        let actions = action_set();
+        let scenarios = scenario_set();
+        let receipt = bound_candidate_score_samples_anytime(
+            &actions,
+            &scenarios,
+            &records(),
+            &config(),
+        )
+        .unwrap();
+
+        let mut bad_metric = receipt.clone();
+        bad_metric.metrics[0].target_utility.lower_bound += 0.01;
+        assert_eq!(
+            verify_score_bounds_receipt(&bad_metric),
+            Err(ScoreBoundError::ReceiptRecomputationMismatch)
+        );
+
+        let mut bad_schedule = receipt.clone();
+        bad_schedule.alpha_spending_rule = "wrong-schedule";
+        assert_eq!(
+            verify_score_bounds_receipt(&bad_schedule),
+            Err(ScoreBoundError::InvalidReceiptSnapshot)
+        );
+
+        let mut bad_sample = receipt.clone();
+        bad_sample.samples[0].target_utility[0] = 9_999.0;
+        assert_eq!(
+            verify_score_bounds_receipt(&bad_sample),
+            Err(ScoreBoundError::ScoreSampleOutsideDeclaredRange)
+        );
     }
 
     #[test]
