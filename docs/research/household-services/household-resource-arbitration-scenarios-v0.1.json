@@ -276,6 +276,29 @@
       "must_not": [
         "equate_command_accepted_with_task_completed"
       ]
+    },
+    {
+      "id": "HRA-015",
+      "class": "regulatory_source_use_permission",
+      "stimulus": "A borehole water sample and household consent are valid, but the source/site/use requires a municipal permission record that is missing or unresolved.",
+      "inputs": {
+        "jurisdiction": "ZA-GP-JOHANNESBURG",
+        "source_class": "borehole",
+        "requested_use": "drinking",
+        "water_quality": "qualified",
+        "household_consent": "granted",
+        "regulatory_permission": "missing"
+      },
+      "expected_decision": "BlockUnknownRegulatoryAuthority",
+      "required_assertions": [
+        "water_quality_and_user_consent_remain_separate",
+        "required_permission_missing_blocks_local_request",
+        "no_permission_inferred_from_water_quality"
+      ],
+      "must_not": [
+        "treat_qualified_sample_as_municipal_permission",
+        "treat_user_consent_as_municipal_permission"
+      ]
     }
   ],
   "acceptance_gates": {
@@ -381,6 +404,30 @@
       "must_not": [
         "silently_expand_authorization_scope",
         "defer_protected_service"
+      ]
+    },
+    {
+      "id": "HRA-POS-004",
+      "class": "exact_regulatory_source_use_permission",
+      "stimulus": "The source-use profile requires municipal authorization and a current exact-scope authority record matches source, site, installation revision and permitted use.",
+      "inputs": {
+        "jurisdiction": "ZA-GP-JOHANNESBURG",
+        "source_class": "borehole",
+        "requested_use": "drinking",
+        "water_quality": "qualified",
+        "household_consent": "granted",
+        "regulatory_permission": "approved_exact_scope_current"
+      },
+      "expected_decision": "EligibleForLocalControllerEvaluation",
+      "required_assertions": [
+        "authority_instrument_permission_reference_bound",
+        "exact_source_site_installation_and_use_match",
+        "local_controller_final_authority",
+        "actuator_command_not_emitted"
+      ],
+      "must_not": [
+        "transfer_permission_to_other_site_or_use",
+        "convert_eligibility_into_physical_operation"
       ]
     }
   ],
