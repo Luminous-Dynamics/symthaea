@@ -46,6 +46,30 @@ Artificial Analysis currently exposes separate AA-Music-Instrumental v1.1 and AA
 
 Treat these as dated snapshots, not timeless targets. Re-fetch the leaderboard and freeze its exact version/date before each comparison. The September 2 v1.0-era instrumental numbers in earlier notes must not be carried forward as the current baseline.
 
+**Expanded competitor field on the 5 November capture:**
+
+| Instrumental model | Elo | 95% interval | Samples |
+| --- | ---: | ---: | ---: |
+| Eleven Music | 1021 | 1000–1042 | 2,213 |
+| Stable Audio 3 Large | 1014 | 993–1035 | 2,291 |
+| Eleven Music v2 | 1011 | 990–1032 | 2,262 |
+| MiniMax Music 2.5+ | 1007 | 986–1028 | 2,263 |
+| Eleven Music v2.5 | 1001 | 980–1022 | 2,236 |
+| MiniMax Music 2.6 | 1001 | 980–1022 | 2,261 |
+| MiniMax Music 3.0 | 1000 anchor | — | 2,269 |
+| Stable Audio 3 Medium | 996 | 975–1017 | 2,241 |
+| Melodia v3 | 986 | 965–1007 | 2,202 |
+| Stable Audio 2.5 | 984 | 963–1005 | 2,205 |
+| Stable Audio 3 Small | 946 | 925–967 | 2,222 |
+| Lyria 2 | 926 | 904–948 | 2,145 |
+| MusicGen | 868 | 845–891 | 2,130 |
+
+The vocal board adds Eleven Music v2.5 1016±18 (3,220 samples), Eleven Music v2 1002±18 (3,259), MiniMax Music 3.0 anchored at 1000 (3,299), Eleven Music 999±18 (3,214), MiniMax Music 2.6 998±18 (3,206), MiniMax Music 2.5+ 990±18 (3,337), and Melodia v3 964±18 (3,293). These entries broaden the matched baseline set; they do not imply equivalent access to all model APIs or matched controls.
+
+**What a fair independent replication must pin:** AA compares blind pairs generated from the same prompt and modality; one track per prompt; approximately three-minute duration (or nearest provider-supported duration); seed 42 when exposed; and no supplied lyrics on the vocal board (models write their own). Audio is normalized to -16 LUFS integrated with a -1 dBTP true-peak ceiling, without compression/limiting/EQ, then encoded as 320 kbps MP3 at 44.1 kHz. The October 2026 update changed the Elo/CI method to account for uncertainty in all competitors. Keep instrumental and vocal datasets separate; do not collapse them to one Elo. Cite the version/date and preserve all matched output bytes.
+
+
+
 ### 1.2 Editing and controllability
 
 - **MMAE:** 2,000 public examples, 17,741 atomic rubrics, seven audio modalities, six task-complexity levels and multi-round editing. The paper reports current systems below 5% exact-match rate overall, with 0% on complex mixed-modality tasks. The official challenge ranks primarily by exact-match rate (EMR), then instruction-following rate (IFR), then consistency rate (CR). A plausible edit is not a successful edit if unrelated content is damaged.
@@ -192,6 +216,14 @@ Targets below are qualification objectives, not current results. Run the publish
 | Exact artifact/provenance | #10051 / #10421 | 100% pinned inputs, model versions, scorers, outputs, failure denominators and replay manifests |
 
 The numeric targets on synthetic controlled cohorts must not be presented as real-musician or physical-device achievements. For human collaboration, determine non-inferiority margins and sample sizes from a blinded pilot, inter-musician agreement and participant/ensemble variance. For physical timing, report p50/p95/p99 only when the mapping is valid; distinguish decision time, queue admission, callback admission, predicted playback and loopback.
+
+## 4A. Independent AA replication protocol
+
+Use a single pinned prompt-set release with a minimum genre-stratified sample, and submit the **same exact prompt text** to every accessible system in each modality. Record one output per prompt in the primary run; additional best-of-N or human-curated selection belongs in a clearly separate secondary arm. Capture API/model version, prompt, parameters, seed exposure, duration, cost, latency, failure, and exact output SHA-256. Where a provider cannot expose the nominal duration or seed, record the actual value and mark the deviation instead of silently substituting.
+
+Use the AA normalization pipeline for a direct-comparability arm: target -16 LUFS integrated, cap at -1 dBTP, do not compress/limit/EQ, convert to 320 kbps MP3 / 44.1 kHz, strip metadata and artwork, preserve original channel layout. Add a separate native-delivery arm because normalization/MP3 conversion may obscure details relevant to production workflows. Blind and randomize A/B order, pair by prompt/modality/genre, collect enough independent listener votes for intervals to narrow meaningfully, and fit a Bradley–Terry/paired preference model with listener/item uncertainty. A raw Elo point-estimate lead is not a statistically defensible win if the paired interval overlaps zero or if prompt/model access is unbalanced.
+
+This is a production-quality evaluation only. Add separate tracks for controllability, preservation, temporal grounding, edit success, collaboration, agency and cost. Never infer any of those from AA preference.
 
 ## 5. How to beat SOTA credibly
 
