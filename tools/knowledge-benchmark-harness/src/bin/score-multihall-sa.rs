@@ -150,6 +150,21 @@ struct LanguageGap {
 }
 
 #[derive(Debug, Serialize)]
+struct SystemComparison {
+    baseline_system_id: String,
+    candidate_system_id: String,
+    language: String,
+    pair_count: usize,
+    cluster_count: usize,
+    baseline_pair_balanced_accuracy: Option<f64>,
+    candidate_pair_balanced_accuracy: Option<f64>,
+    paired_accuracy_difference: Option<f64>,
+    bootstrap_ci: Option<BootstrapCi>,
+    inference_eligible: bool,
+    note: String,
+}
+
+#[derive(Debug, Serialize)]
 struct SystemReport {
     system_id: String,
     baseline_family: String,
@@ -184,6 +199,7 @@ struct Report {
     confidence_level: f64,
     multiple_comparison_correction: String,
     systems: Vec<SystemReport>,
+    system_comparisons: Vec<SystemComparison>,
     nonclaims: Vec<&'static str>,
 }
 
@@ -718,6 +734,154 @@ fn bootstrap_gap_ci(
     })
 }
 
+fn bootstrap_mean_ci(
+    clusters: &BTreeMap<String, Vec<f64>>,
+    plan: &BootstrapPlan,
+    comparison_count: usize,
+) -> Option<BootstrapCi> {
+    if clusters.len() < plan.minimum_independent_clusters || clusters.is_empty() {
+        return None;
+    }
+    let cluster_values: Vec<&Vec<f64>> = clusters.values().collect();
+    let mut rng = SplitMix64::new(plan.seed);
+    let familywise_adjusted = plan.multiple_comparison_correction == "bonferroni";
+    let alpha = 1.0 - plan.confidence_level;
+    let tail = if familywise_adjusted {
+        alpha / (2.0 * comparison_count.max(1) as f64)
+    } else {
+        alpha / 2.0
+    };
+    let mut means = Vec::with_capacity(plan.replicates);
+
+    for _ in 0..plan.replicates {
+        let mut sum = 0.0;
+        let mut count = 0usize;
+        for _ in 0..cluster_values.len() {
+            let selected = cluster_values[rng.index(cluster_values.len())];
+            for value in selected {
+                sum += value;
+                count += 1;
+            }
+        }
+        if count > 0 {
+            means.push(sum / count as f64);
+        }
+    }
+
+    means.sort_by(|left, right| left.total_cmp(right));
+    Some(BootstrapCi {
+        lower: percentile(&means, tail)?,
+        upper: percentile(&means, 1.0 - tail)?,
+        confidence_level: plan.confidence_level,
+        familywise_adjusted,
+        comparison_count,
+        replicates: plan.replicates,
+        seed: plan.seed,
+        cluster_count: clusters.len(),
+    })
+}
+
+fn pair_balanced_accuracy(
+    system_id: &str,
+    pair_id: &str,
+    statement_language: &str,
+    predictions: &HashMap<(String, String, String, String), Prediction>,
+) -> f64 {
+    let mut correct = 0usize;
+    for kind in ["factual", "hallucinated"] {
+        let key = (
+            system_id.to_string(),
+            pair_id.to_string(),
+            statement_language.to_string(),
+            kind.to_string(),
+        );
+        let prediction = predictions.get(&key).expect("complete prediction matrix validated");
+        let is_correct = if kind == "factual" {
+            prediction.predicted_label == "factual"
+        } else {
+            prediction.predicted_label == "hallucinated"
+        };
+        if is_correct {
+            correct += 1;
+        }
+    }
+    correct as f64 / 2.0
+}
+
+fn build_system_comparisons(
+    plan: &Plan,
+    pairs: &BTreeMap<String, PairMeta>,
+    predictions: &HashMap<(String, String, String, String), Prediction>,
+    target_languages: &[String],
+    comparison_count: usize,
+) -> Vec<SystemComparison> {
+    let candidate = &plan.candidate_system_id;
+    let mut comparisons = Vec::new();
+    let mut conditions = vec!["english".to_string()];
+    conditions.extend(target_languages.iter().map(|language| format!("target:{language}")));
+
+    for baseline in plan.systems.iter().filter(|system| system.system_id != *candidate) {
+        for condition in &conditions {
+            let selected_pairs: Vec<&PairMeta> = pairs.values()
+                .filter(|pair| condition == "english" || condition == &format!("target:{}", pair.language))
+                .collect();
+            let mut clusters: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+            let mut baseline_values = Vec::new();
+            let mut candidate_values = Vec::new();
+
+            for pair in &selected_pairs {
+                let language = if condition == "english" { "english" } else { "target" };
+                let baseline_accuracy = pair_balanced_accuracy(
+                    &baseline.system_id, &pair.pair_id, language, predictions
+                );
+                let candidate_accuracy = pair_balanced_accuracy(
+                    candidate, &pair.pair_id, language, predictions
+                );
+                baseline_values.push(baseline_accuracy);
+                candidate_values.push(candidate_accuracy);
+                clusters.entry(pair.file_id.clone())
+                    .or_default()
+                    .push(candidate_accuracy - baseline_accuracy);
+            }
+
+            let mean = |values: &[f64]| {
+                if values.is_empty() { None } else {
+                    Some(values.iter().sum::<f64>() / values.len() as f64)
+                }
+            };
+            let differences: Vec<f64> = clusters.values().flatten().copied().collect();
+            let paired_difference = mean(&differences);
+            let cluster_count = clusters.len();
+            let inference_eligible = plan.phase == "preregistered_held_out"
+                && cluster_count >= plan.bootstrap.minimum_independent_clusters;
+            let ci = if inference_eligible {
+                bootstrap_mean_ci(&clusters, &plan.bootstrap, comparison_count)
+            } else {
+                None
+            };
+
+            comparisons.push(SystemComparison {
+                baseline_system_id: baseline.system_id.clone(),
+                candidate_system_id: candidate.clone(),
+                language: condition.clone(),
+                pair_count: selected_pairs.len(),
+                cluster_count,
+                baseline_pair_balanced_accuracy: mean(&baseline_values),
+                candidate_pair_balanced_accuracy: mean(&candidate_values),
+                paired_accuracy_difference: paired_difference,
+                bootstrap_ci: ci,
+                inference_eligible,
+                note: if inference_eligible {
+                    "Paired candidate-minus-baseline accuracy over factual and hallucinated statements, with source-cluster bootstrap; this does not prove external SOTA superiority.".into()
+                } else {
+                    "Exploratory paired point estimate only; held-out phase and reviewed independent source clusters are required for a qualifying interval.".into()
+                },
+            });
+        }
+    }
+    comparisons
+}
+
 fn build_system_report(
     system: &SystemPlan,
     plan: &Plan,
@@ -762,7 +926,11 @@ fn build_system_report(
         let (count, english_rate, target_rate, gap) = paired_rates(&clusters);
         let inference_eligible = plan.phase == "preregistered_held_out"
             && clusters.len() >= plan.bootstrap.minimum_independent_clusters;
-        let ci = bootstrap_gap_ci(&clusters, &plan.bootstrap, comparison_count);
+        let ci = if inference_eligible {
+            bootstrap_gap_ci(&clusters, &plan.bootstrap, comparison_count)
+        } else {
+            None
+        };
         gaps.push(LanguageGap {
             target_language: target_language.clone(),
             paired_pair_count: count,
@@ -834,7 +1002,13 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    let comparison_count = plan.systems.len().saturating_mul(target_languages.len()).max(1);
+    let baseline_count = plan.systems.iter()
+        .filter(|system| system.system_id != plan.candidate_system_id)
+        .count();
+    let comparison_count = (
+        plan.systems.len().saturating_mul(target_languages.len())
+        + baseline_count.saturating_mul(target_languages.len() + 1)
+    ).max(1);
     if plan.phase == "preregistered_held_out"
         && comparison_count > 1
         && plan.bootstrap.multiple_comparison_correction != "bonferroni"
@@ -853,6 +1027,14 @@ fn run() -> Result<(), String> {
             comparison_count,
         ))
         .collect();
+
+    let system_comparisons = build_system_comparisons(
+        &plan,
+        &pair_map,
+        &prediction_map,
+        &target_languages,
+        comparison_count,
+    );
 
     let report = Report {
         schema_version: "multi-hall-sa-score-report-v0",
@@ -875,6 +1057,7 @@ fn run() -> Result<(), String> {
         confidence_level: plan.bootstrap.confidence_level,
         multiple_comparison_correction: plan.bootstrap.multiple_comparison_correction.clone(),
         systems: system_reports,
+        system_comparisons,
         nonclaims: vec![
             "The scorer does not execute models or retrieve evidence.",
             "The scorer trusts the pinned pair manifest for statement-kind labels and does not independently establish factual truth.",
