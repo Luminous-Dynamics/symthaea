@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/CONNECTOME_SIGNED_EVIDENCE_ENVELOPE.schema.json",
+  "title": "Connectome evidence DSSE envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "payload",
+    "payload_type",
+    "signatures"
+  ],
+  "properties": {
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "minLength": 1
+    },
+    "payload_type": {
+      "const": "application/vnd.luminous.connectome-evidence+json;version=1"
+    },
+    "signatures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyid",
+          "sig"
+        ],
+        "properties": {
+          "keyid": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sig": {
+            "type": "string",
+            "contentEncoding": "base64",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
