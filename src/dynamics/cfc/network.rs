@@ -158,9 +158,24 @@ pub enum CfCParameterRole {
     OutputBias,
 }
 
+/// Stable typed identity for one serialized CfC parameter group.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CfCParameterGroupId {
+    CellInputProjection { cell: usize },
+    CellRecurrentProjection { cell: usize },
+    CellHiddenBias { cell: usize },
+    CellTimeConstant { cell: usize },
+    CellBackboneWeight { cell: usize, layer: usize },
+    CellBackboneBias { cell: usize, layer: usize },
+    OutputProjection,
+    OutputBias,
+}
+
 /// One named parameter group in the exact flat order used by CfCNetwork::get_weights().
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CfCParameterGroup {
+    /// Stable typed identity suitable for edit APIs and matching.
+    pub id: CfCParameterGroupId,
     /// Stable dotted path, for example "cells.0.w_h" or "output_bias".
     pub name: String,
     /// Mathematical / architectural role of this group.
@@ -187,6 +202,7 @@ pub struct CfCParameterManifest {
 fn append_parameter_group(
     groups: &mut Vec<CfCParameterGroup>,
     offset: &mut usize,
+    id: CfCParameterGroupId,
     name: String,
     role: CfCParameterRole,
     shape: Vec<usize>,
@@ -196,6 +212,7 @@ fn append_parameter_group(
         .checked_add(len)
         .expect("CfC parameter manifest length overflow");
     groups.push(CfCParameterGroup {
+        id,
         name,
         role,
         shape,
@@ -1183,6 +1200,7 @@ impl CfCNetwork {
             append_parameter_group(
                 &mut groups,
                 &mut offset,
+                CfCParameterGroupId::CellInputProjection { cell: cell_index },
                 format!("cells.{cell_index}.w_in"),
                 CfCParameterRole::InputProjection,
                 cell.w_in.shape().to_vec(),
@@ -1191,6 +1209,7 @@ impl CfCNetwork {
             append_parameter_group(
                 &mut groups,
                 &mut offset,
+                CfCParameterGroupId::CellRecurrentProjection { cell: cell_index },
                 format!("cells.{cell_index}.w_h"),
                 CfCParameterRole::RecurrentProjection,
                 cell.w_h.shape().to_vec(),
@@ -1199,6 +1218,7 @@ impl CfCNetwork {
             append_parameter_group(
                 &mut groups,
                 &mut offset,
+                CfCParameterGroupId::CellHiddenBias { cell: cell_index },
                 format!("cells.{cell_index}.b_h"),
                 CfCParameterRole::HiddenBias,
                 cell.b_h.shape().to_vec(),
@@ -1207,6 +1227,7 @@ impl CfCNetwork {
             append_parameter_group(
                 &mut groups,
                 &mut offset,
+                CfCParameterGroupId::CellTimeConstant { cell: cell_index },
                 format!("cells.{cell_index}.tau"),
                 CfCParameterRole::TimeConstant,
                 cell.tau.shape().to_vec(),
@@ -1217,6 +1238,10 @@ impl CfCNetwork {
                 append_parameter_group(
                     &mut groups,
                     &mut offset,
+                    CfCParameterGroupId::CellBackboneWeight {
+                        cell: cell_index,
+                        layer,
+                    },
                     format!("cells.{cell_index}.backbone_weights.{layer}"),
                     CfCParameterRole::BackboneWeight { layer },
                     tensor.shape().to_vec(),
@@ -1227,6 +1252,10 @@ impl CfCNetwork {
                 append_parameter_group(
                     &mut groups,
                     &mut offset,
+                    CfCParameterGroupId::CellBackboneBias {
+                        cell: cell_index,
+                        layer,
+                    },
                     format!("cells.{cell_index}.backbone_biases.{layer}"),
                     CfCParameterRole::BackboneBias { layer },
                     tensor.shape().to_vec(),
@@ -1238,6 +1267,7 @@ impl CfCNetwork {
         append_parameter_group(
             &mut groups,
             &mut offset,
+            CfCParameterGroupId::OutputProjection,
             "output_weights".to_string(),
             CfCParameterRole::OutputProjection,
             self.output_weights.shape().to_vec(),
@@ -1246,6 +1276,7 @@ impl CfCNetwork {
         append_parameter_group(
             &mut groups,
             &mut offset,
+            CfCParameterGroupId::OutputBias,
             "output_bias".to_string(),
             CfCParameterRole::OutputBias,
             self.output_bias.shape().to_vec(),
@@ -1266,17 +1297,17 @@ impl CfCNetwork {
     /// are rejected before any live parameter is changed.
     pub fn try_replace_parameter_group(
         &mut self,
-        name: &str,
+        id: &CfCParameterGroupId,
         values: &[f32],
     ) -> Result<(), CfCWeightLoadError> {
         let manifest = self.parameter_manifest();
         let group = manifest
             .groups
             .iter()
-            .find(|group| group.name == name)
+            .find(|group| &group.id == id)
             .cloned()
             .ok_or_else(|| CfCWeightLoadError::UnknownParameterGroup {
-                name: name.to_string(),
+                name: format!("{id:?}"),
             })?;
 
         if values.len() != group.len {
@@ -1974,7 +2005,7 @@ mod tests {
         let mut net = CfCNetwork::new(small_config());
         let before = net.get_weights();
         assert!(matches!(
-            net.try_replace_parameter_group("cells.999.w_h", &[]),
+            net.try_replace_parameter_group(&CfCParameterGroupId::CellRecurrentProjection { cell: 999 }, &[]),
             Err(CfCWeightLoadError::UnknownParameterGroup { .. })
         ));
 
@@ -1985,7 +2016,7 @@ mod tests {
             .find(|group| group.name == "cells.0.w_h")
             .unwrap();
         assert!(matches!(
-            net.try_replace_parameter_group(&group.name, &[]),
+            net.try_replace_parameter_group(&group.id, &[]),
             Err(CfCWeightLoadError::GroupLengthMismatch { .. })
         ));
         assert_eq!(net.get_weights(), before);
