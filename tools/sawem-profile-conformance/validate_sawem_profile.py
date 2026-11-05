@@ -198,7 +198,7 @@ def validate_case_corpus(
             if case["expected_disposition"] == "not_run" or not case["test_names"]:
                 raise ValueError(f"kernel-tested case lacks an expected disposition or test mapping: {case['case_id']}")
             for test_name in case["test_names"]:
-                pattern = r"\\#\\[test\\]\\s+fn\\s+" + re.escape(test_name) + r"\\s*\\("
+                pattern = r"\#\[test\]\s+fn\s+" + re.escape(test_name) + r"\s*\("
                 if re.search(pattern, kernel_source) is None:
                     raise ValueError(f"Rust test mapping is missing from kernel: {case['case_id']} -> {test_name}")
                 referenced_tests.add(test_name)
