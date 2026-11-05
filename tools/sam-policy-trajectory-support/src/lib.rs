@@ -191,9 +191,7 @@ fn canonicalize_path(steps: &[DecisionStep]) -> Result<CanonicalPath, SupportErr
 
         for pair in actions.windows(2) {
             if pair[0].actor_id == pair[1].actor_id {
-                return Err(SupportError::DuplicateActorAction(
-                    pair[0].actor_id.clone(),
-                ));
+                return Err(SupportError::DuplicateActorAction(pair[0].actor_id.clone()));
             }
         }
 
@@ -322,14 +320,8 @@ mod tests {
     }
 
     fn manifest(paths: Vec<Vec<DecisionStep>>, exhaustive: bool) -> SupportManifest {
-        SupportManifest::new(
-            "evidence-v1",
-            "policy-v1",
-            "context-v1",
-            exhaustive,
-            paths,
-        )
-        .expect("valid manifest")
+        SupportManifest::new("evidence-v1", "policy-v1", "context-v1", exhaustive, paths)
+            .expect("valid manifest")
     }
 
     #[test]
@@ -341,8 +333,7 @@ mod tests {
         // corpus, so a marginal-only test would incorrectly accept the path.
         for (tick, target_step) in target.iter().enumerate() {
             assert!(corpus.iter().any(|observed| {
-                observed[tick].joint_actions[0].action_id
-                    == target_step.joint_actions[0].action_id
+                observed[tick].joint_actions[0].action_id == target_step.joint_actions[0].action_id
             }));
         }
 
@@ -402,11 +393,7 @@ mod tests {
             "full-history-A",
             vec![action("ego", "yield")],
         )]];
-        let target = vec![step(
-            0,
-            "full-history-B",
-            vec![action("ego", "yield")],
-        )];
+        let target = vec![step(0, "full-history-B", vec![action("ego", "yield")])];
 
         let result = assess(
             &manifest(observed, true),
@@ -430,8 +417,8 @@ mod tests {
     fn incomplete_or_censored_trajectory_never_passes() {
         let mut incomplete = query("policy-v1", "context-v1", path(&["continue"]));
         incomplete.complete = false;
-        let result = assess(&manifest(vec![path(&["continue"])], true), &incomplete)
-            .expect("assessment");
+        let result =
+            assess(&manifest(vec![path(&["continue"])], true), &incomplete).expect("assessment");
         assert_eq!(result.disposition, Disposition::Incomplete);
     }
 
@@ -515,7 +502,10 @@ mod tests {
         };
         assert_eq!(
             one.checked_mul(one).expect("reduces first"),
-            Rational { numerator: 1, denominator: 1 }
+            Rational {
+                numerator: 1,
+                denominator: 1
+            }
         );
     }
 
