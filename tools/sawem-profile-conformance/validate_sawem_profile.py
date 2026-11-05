@@ -11,7 +11,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, FormatChecker
 
 
 def fail(message: str) -> None:
@@ -46,7 +46,7 @@ def main() -> None:
     except Exception as exc:
         fail(f"schema meta-validation failed: {exc}")
 
-    validator = Draft202012Validator(schema)
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     errors = sorted(validator.iter_errors(fixture), key=lambda error: list(error.absolute_path))
     if errors:
         first = errors[0]
