@@ -12,6 +12,13 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
+use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use zipcore::error::Kind as ZipErrorKind;
+#[cfg(unix)]
+use zipcore::{Archive as DecoderArchive, ReadOptions as DecoderReadOptions};
+
 const EOCD_SIGNATURE: u32 = 0x0605_4b50;
 const ZIP64_LOCATOR_SIGNATURE: u32 = 0x0706_4b50;
 const ZIP64_EOCD_SIGNATURE: u32 = 0x0606_4b50;
@@ -33,6 +40,8 @@ const ENCRYPTED_FLAG: u16 = 1;
 const UNIX_FILE_TYPE_MASK: u32 = 0o170000;
 const UNIX_DIRECTORY: u32 = 0o040000;
 const UNIX_SYMLINK: u32 = 0o120000;
+#[cfg(unix)]
+const MAX_CONTENT_READ_BUFFER_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReaderErrorKind {
@@ -70,6 +79,17 @@ impl std::fmt::Display for ReaderError {
 }
 
 impl std::error::Error for ReaderError {}
+
+#[cfg(unix)]
+fn map_zipcore_error(context: &str, error: zipcore::Error) -> ReaderError {
+    let kind = match error.kind() {
+        ZipErrorKind::LimitExceeded => ReaderErrorKind::LimitExceeded,
+        ZipErrorKind::IntegrityFailure | ZipErrorKind::Malformed => ReaderErrorKind::InvalidArchive,
+        ZipErrorKind::Unsupported | ZipErrorKind::Password => ReaderErrorKind::Unsupported,
+        _ => ReaderErrorKind::Io,
+    };
+    ReaderError::new(kind, format!("{context}: {error}"))
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReaderLimits {
@@ -140,6 +160,40 @@ pub struct ArtifactEntry {
     pub data_descriptor_end: Option<u64>,
     pub data_descriptor_has_signature: Option<bool>,
     pub limitations: Vec<String>,
+}
+
+/// Limits for verifying one admitted member occurrence without extracting it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContentVerificationLimits {
+    /// Hard ceiling on decompressed bytes. Verification fails rather than returning a partial hash.
+    pub max_uncompressed_bytes: u64,
+    /// Fixed streaming buffer, constrained to 1..=1 MiB.
+    pub read_buffer_bytes: usize,
+}
+
+impl Default for ContentVerificationLimits {
+    fn default() -> Self {
+        Self {
+            max_uncompressed_bytes: 128 * 1024 * 1024,
+            read_buffer_bytes: 64 * 1024,
+        }
+    }
+}
+
+/// A per-occurrence result. declared_compressed_bytes is archive metadata, not a measured
+/// count of bytes read from the compressed stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedEntryContent {
+    pub occurrence_index: u64,
+    pub sha256: String,
+    pub declared_compressed_bytes: u64,
+    pub declared_uncompressed_bytes: u64,
+    pub observed_uncompressed_bytes: u64,
+    /// CRC-32/ISO-HDLC computed independently over the observed decompressed bytes.
+    pub observed_crc32: u32,
+    /// True only after both the secondary decoder and independent CRC routine accept EOF.
+    pub verified_crc32: bool,
+    pub compression_method: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,6 +360,299 @@ impl ZipArtifactReader {
         &self.inventory
     }
 
+    #[cfg(unix)]
+    /// Stream and hash one central-directory occurrence without extracting or writing it.
+    ///
+    /// The custom inventory remains the policy authority. A separately implemented decoder is
+    /// used only for bounded streaming and CRC verification; its metadata must match our
+    /// occurrence by index and exact fields before any bytes are consumed.
+    pub fn verify_entry_content(
+        &self,
+        occurrence_index: u64,
+        limits: ContentVerificationLimits,
+    ) -> Result<VerifiedEntryContent, ReaderError> {
+        self.verify_source()?;
+
+        if limits.read_buffer_bytes == 0 || limits.read_buffer_bytes > MAX_CONTENT_READ_BUFFER_BYTES
+        {
+            return Err(ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                format!(
+                    "content read buffer must be between 1 and {MAX_CONTENT_READ_BUFFER_BYTES} bytes"
+                ),
+            ));
+        }
+
+        let index = usize::try_from(occurrence_index).map_err(|_| {
+            ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                "member occurrence index does not fit this platform",
+            )
+        })?;
+        let expected = self.inventory.entries.get(index).ok_or_else(|| {
+            ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                format!("member occurrence {occurrence_index} is not present in this inventory"),
+            )
+        })?;
+        if expected.occurrence_index != occurrence_index {
+            return Err(ReaderError::new(
+                ReaderErrorKind::InvalidArchive,
+                "inventory occurrence index does not match its central-directory position",
+            ));
+        }
+        if expected.encrypted {
+            return Err(ReaderError::new(
+                ReaderErrorKind::Unsupported,
+                "encrypted members are not eligible for content verification",
+            ));
+        }
+        if expected.kind != EntryKind::File {
+            return Err(ReaderError::new(
+                ReaderErrorKind::Unsupported,
+                "directory and symbolic-link members are not eligible for content verification",
+            ));
+        }
+        if !matches!(expected.compression_method, 0 | 8) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::Unsupported,
+                format!(
+                    "compression method {} is not enabled for content verification",
+                    expected.compression_method
+                ),
+            ));
+        }
+        if expected.declared_uncompressed_size > limits.max_uncompressed_bytes {
+            return Err(ReaderError::new(
+                ReaderErrorKind::LimitExceeded,
+                format!(
+                    "member declares {} uncompressed bytes; verification limit is {}",
+                    expected.declared_uncompressed_size, limits.max_uncompressed_bytes
+                ),
+            ));
+        }
+
+        // Each call opens two independent descriptors: one for the decoder and one retained
+        // solely as an identity witness. Do not use File::try_clone here; it can share a seek
+        // cursor on Unix, and parallel verifications must never share file positions.
+        let identity_witness = OpenOptions::new()
+            .read(true)
+            .open(&self.path)
+            .map_err(|error| ReaderError::io("cannot open archive identity witness", error))?;
+        let witness_identity = identity_witness
+            .metadata()
+            .map_err(|error| ReaderError::io("cannot stat archive identity witness", error))?;
+        if !self.initial_identity.matches(&witness_identity) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::SourceChanged,
+                "identity witness does not identify the admitted archive source",
+            ));
+        }
+        let decoder_file = OpenOptions::new()
+            .read(true)
+            .open(&self.path)
+            .map_err(|error| {
+                ReaderError::io(
+                    "cannot open archive for independent content verification",
+                    error,
+                )
+            })?;
+        let decoder_identity = decoder_file.metadata().map_err(|error| {
+            ReaderError::io("cannot stat content-verification descriptor", error)
+        })?;
+        if !self.initial_identity.matches(&decoder_identity) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::SourceChanged,
+                "content-verification descriptor does not identify the admitted archive source",
+            ));
+        }
+        self.verify_source()?;
+
+        let decoder_limit = limits
+            .max_uncompressed_bytes
+            .min(expected.declared_uncompressed_size);
+        let archive_start = self.inventory.regions.leading_bytes;
+        let normalized_central_directory_offset = self
+            .inventory
+            .regions
+            .central_directory_offset
+            .checked_sub(archive_start)
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "central-directory offset precedes the admitted ZIP structure",
+                )
+            })?;
+        let archive_length = self
+            .inventory
+            .source_bytes
+            .checked_sub(archive_start)
+            .ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "admitted ZIP structure begins beyond the selected source length",
+                )
+            })?;
+        let options = DecoderReadOptions {
+            verify_crc: true,
+            verify_size: true,
+            max_entry_size: Some(decoder_limit),
+            // The secondary decoder sees a virtual archive beginning at the ZIP structure,
+            // so its stored relative offsets must match exactly; no heuristic correction.
+            offset_correction: false,
+            password: None,
+        };
+
+        // Keep all decoder setup and streaming in one result scope so the descriptors and
+        // selected path are revalidated even when the secondary parser rejects metadata.
+        let stream_result = (move || {
+            let virtual_archive = ArchiveSlice::new(decoder_file, archive_start, archive_length)
+                .map_err(|error| {
+                    ReaderError::io("cannot create bounded ZIP-relative view", error)
+                })?;
+            let mut archive =
+                DecoderArchive::new_with_options(virtual_archive, options).map_err(|error| {
+                    map_zipcore_error("secondary ZIP parser rejected archive", error)
+                })?;
+
+            if archive.len() != self.inventory.entries.len()
+                || archive.central_directory_offset() != normalized_central_directory_offset
+                || archive.is_zip64() != self.inventory.regions.zip64
+            {
+                return Err(ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "secondary ZIP parser archive-level metadata differs from the admitted inventory",
+                ));
+            }
+
+            let decoder_entry = archive.entries().get(index).ok_or_else(|| {
+                ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "secondary ZIP parser omitted the selected member occurrence",
+                )
+            })?;
+            let corrected_header_offset = decoder_entry.header_offset().checked_add(archive_start);
+            let decoder_kind_matches = match expected.kind {
+                EntryKind::File => !decoder_entry.is_dir() && !decoder_entry.is_symlink(),
+                EntryKind::Directory => decoder_entry.is_dir() && !decoder_entry.is_symlink(),
+                EntryKind::Symlink => decoder_entry.is_symlink(),
+            };
+            if decoder_entry.name_raw() != expected.raw_name
+                || corrected_header_offset != Some(expected.local_header_offset)
+                || decoder_entry.flags() != expected.general_purpose_flags
+                || decoder_entry.method() != expected.compression_method
+                || decoder_entry.compressed_size() != expected.declared_compressed_size
+                || decoder_entry.uncompressed_size() != expected.declared_uncompressed_size
+                || decoder_entry.crc32() != expected.declared_crc32
+                || decoder_entry.has_data_descriptor() != expected.uses_data_descriptor
+                || decoder_entry.is_encrypted() != expected.encrypted
+                || !decoder_kind_matches
+            {
+                return Err(ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "secondary ZIP parser metadata differs from the selected custom inventory occurrence",
+                ));
+            }
+
+            let mut member = archive.by_index(index).map_err(|error| {
+                map_zipcore_error("cannot open selected ZIP member stream", error)
+            })?;
+            let mut buffer = vec![0u8; limits.read_buffer_bytes];
+            let mut hasher = Sha256::new();
+            let mut observed_crc32 = Crc32State::new();
+            let mut observed_uncompressed_bytes = 0u64;
+
+            loop {
+                let read = match member.read(&mut buffer) {
+                    Ok(read) => read,
+                    Err(io_error) => {
+                        return Err(match member.take_terminal_error() {
+                            Some(error) => {
+                                map_zipcore_error("ZIP member stream verification failed", error)
+                            }
+                            None => ReaderError::io("cannot read ZIP member stream", io_error),
+                        });
+                    }
+                };
+                if read == 0 {
+                    break;
+                }
+                observed_uncompressed_bytes = observed_uncompressed_bytes
+                    .checked_add(read as u64)
+                    .ok_or_else(|| {
+                        ReaderError::new(
+                            ReaderErrorKind::LimitExceeded,
+                            "observed uncompressed byte count overflow",
+                        )
+                    })?;
+                if observed_uncompressed_bytes > expected.declared_uncompressed_size
+                    || observed_uncompressed_bytes > limits.max_uncompressed_bytes
+                {
+                    return Err(ReaderError::new(
+                        ReaderErrorKind::LimitExceeded,
+                        "member stream exceeded its declared size or caller byte budget",
+                    ));
+                }
+                hasher.update(&buffer[..read]);
+                observed_crc32.update(&buffer[..read]);
+            }
+
+            member.verify_to_end().map_err(|error| {
+                map_zipcore_error("ZIP member did not reach a verified end state", error)
+            })?;
+            let observed_crc32 = observed_crc32.finish();
+            if observed_crc32 != expected.declared_crc32 {
+                return Err(ReaderError::new(
+                    ReaderErrorKind::InvalidArchive,
+                    "independent streaming CRC-32 differs from the central-directory declaration",
+                ));
+            }
+            Ok((
+                format!("{:x}", hasher.finalize()),
+                observed_uncompressed_bytes,
+                observed_crc32,
+            ))
+        })();
+
+        let final_witness_identity = identity_witness.metadata().map_err(|error| {
+            ReaderError::io("cannot revalidate archive identity witness", error)
+        })?;
+        if !self.initial_identity.matches(&final_witness_identity) {
+            return Err(ReaderError::new(
+                ReaderErrorKind::SourceChanged,
+                "archive source identity changed during the member stream",
+            ));
+        }
+        self.verify_source()?;
+        let (sha256, observed_uncompressed_bytes, observed_crc32) = stream_result?;
+
+        Ok(VerifiedEntryContent {
+            occurrence_index,
+            sha256,
+            declared_compressed_bytes: expected.declared_compressed_size,
+            declared_uncompressed_bytes: expected.declared_uncompressed_size,
+            observed_uncompressed_bytes,
+            observed_crc32,
+            verified_crc32: true,
+            compression_method: expected.compression_method,
+        })
+    }
+
+    #[cfg(not(unix))]
+    /// Refuse content verification when the platform identity fallback cannot bind the held
+    /// descriptor to the originally admitted filesystem object.
+    pub fn verify_entry_content(
+        &self,
+        _occurrence_index: u64,
+        _limits: ContentVerificationLimits,
+    ) -> Result<VerifiedEntryContent, ReaderError> {
+        self.verify_source()?;
+        Err(ReaderError::new(
+            ReaderErrorKind::Unsupported,
+            "content verification requires a qualified held-file identity; non-Unix identity is currently best-effort (see REA-RUST-023)",
+        ))
+    }
+
     /// Revalidate both the held descriptor and the currently selected path.
     pub fn verify_source(&self) -> Result<(), ReaderError> {
         let opened = self
@@ -344,6 +691,112 @@ struct EndRecord {
 struct EntryRange {
     start: u64,
     end: u64,
+}
+
+/// A virtual ZIP-relative view over the admitted carrier file.
+///
+/// The ZIP64 EOCD locator stores offsets relative to the beginning of the ZIP structure, not
+/// necessarily the beginning of an APK/IPA/self-extractor carrier. Exposing a bounded view that
+/// starts at the custom parser's admitted archive offset lets the secondary decoder consume
+/// those offsets without heuristic offset correction or access to prefix bytes.
+struct ArchiveSlice<R> {
+    inner: R,
+    start: u64,
+    length: u64,
+    position: u64,
+}
+
+impl<R: Read + Seek> ArchiveSlice<R> {
+    fn new(mut inner: R, start: u64, length: u64) -> io::Result<Self> {
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive slice overflow"))?;
+        let physical_length = inner.seek(SeekFrom::End(0))?;
+        if end != physical_length {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "archive slice must end at the admitted source boundary",
+            ));
+        }
+        inner.seek(SeekFrom::Start(start))?;
+        Ok(Self {
+            inner,
+            start,
+            length,
+            position: 0,
+        })
+    }
+
+    fn set_position(&mut self, position: u64) -> io::Result<u64> {
+        if position > self.length {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "seek would escape the admitted ZIP-relative view",
+            ));
+        }
+        let physical_position = self
+            .start
+            .checked_add(position)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive seek overflow"))?;
+        self.inner.seek(SeekFrom::Start(physical_position))?;
+        self.position = position;
+        Ok(position)
+    }
+}
+
+impl<R: Read + Seek> Read for ArchiveSlice<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let remaining = self.length.saturating_sub(self.position);
+        if remaining == 0 || buffer.is_empty() {
+            return Ok(0);
+        }
+        let physical_position = self
+            .start
+            .checked_add(self.position)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "archive read overflow"))?;
+        self.inner.seek(SeekFrom::Start(physical_position))?;
+        let allowed = buffer
+            .len()
+            .min(usize::try_from(remaining).unwrap_or(usize::MAX));
+        let read = self.inner.read(&mut buffer[..allowed])?;
+        self.position = self.position.checked_add(read as u64).ok_or_else(|| {
+            io::Error::new(io::ErrorKind::InvalidData, "archive position overflow")
+        })?;
+        Ok(read)
+    }
+}
+
+impl<R: Read + Seek> Seek for ArchiveSlice<R> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let target = match position {
+            SeekFrom::Start(offset) => offset,
+            SeekFrom::Current(offset) => {
+                let target = i128::from(self.position) + i128::from(offset);
+                if target < 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "seek would precede the admitted ZIP-relative view",
+                    ));
+                }
+                u64::try_from(target).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "archive seek overflow")
+                })?
+            }
+            SeekFrom::End(offset) => {
+                let target = i128::from(self.length) + i128::from(offset);
+                if target < 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "seek would precede the admitted ZIP-relative view",
+                    ));
+                }
+                u64::try_from(target).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "archive seek overflow")
+                })?
+            }
+        };
+        self.set_position(target)
+    }
 }
 
 #[derive(Debug)]
@@ -1517,19 +1970,38 @@ fn read_u64(bytes: &[u8]) -> u64 {
     ])
 }
 
-fn crc32(bytes: &[u8]) -> u32 {
-    let mut crc = u32::MAX;
-    for byte in bytes {
-        crc ^= *byte as u32;
-        for _ in 0..8 {
-            crc = if crc & 1 == 1 {
-                (crc >> 1) ^ 0xEDB8_8320
-            } else {
-                crc >> 1
-            };
+#[derive(Debug, Clone, Copy)]
+struct Crc32State {
+    value: u32,
+}
+
+impl Crc32State {
+    fn new() -> Self {
+        Self { value: u32::MAX }
+    }
+
+    fn update(&mut self, bytes: &[u8]) {
+        for byte in bytes {
+            self.value ^= *byte as u32;
+            for _ in 0..8 {
+                self.value = if self.value & 1 == 1 {
+                    (self.value >> 1) ^ 0xEDB8_8320
+                } else {
+                    self.value >> 1
+                };
+            }
         }
     }
-    !crc
+
+    fn finish(self) -> u32 {
+        !self.value
+    }
+}
+
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut state = Crc32State::new();
+    state.update(bytes);
+    state.finish()
 }
 
 #[cfg(test)]
@@ -1692,6 +2164,582 @@ mod tests {
             }],
             &[],
         )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verifies_stored_member_content_and_sha256_to_eof() {
+        let path = write_temp(&single_entry(b"asset.bin", b"hello world"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let verified = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+
+        assert_eq!(
+            verified.sha256,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+        assert_eq!(verified.observed_uncompressed_bytes, 11);
+        assert_eq!(verified.declared_uncompressed_bytes, 11);
+        assert_eq!(verified.declared_compressed_bytes, 11);
+        assert_eq!(verified.observed_crc32, 0x0d4a_1185);
+        assert!(verified.verified_crc32);
+        assert_eq!(verified.compression_method, 0);
+        assert_eq!(reader.inventory().coverage.status, TraversalStatus::Partial);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verifies_duplicate_names_by_distinct_central_directory_occurrence() {
+        let path = write_temp(&build_zip(
+            &[
+                TestEntry {
+                    name: b"same.bin",
+                    data: b"first occurrence",
+                    flags: 0,
+                    method: 0,
+                    external_attributes: 0,
+                },
+                TestEntry {
+                    name: b"same.bin",
+                    data: b"second occurrence",
+                    flags: 0,
+                    method: 0,
+                    external_attributes: 0,
+                },
+            ],
+            &[],
+        ));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        assert!(reader.inventory().duplicate_raw_names_present);
+
+        let first = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        let second = reader
+            .verify_entry_content(1, ContentVerificationLimits::default())
+            .unwrap();
+        assert_ne!(first.sha256, second.sha256);
+        assert_eq!(first.occurrence_index, 0);
+        assert_eq!(second.occurrence_index, 1);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_crc_mismatch_in_member_payload() {
+        let mut bytes = single_entry(b"asset.bin", b"hello world");
+        let payload_offset = LOCAL_HEADER_FIXED_BYTES as usize + b"asset.bin".len();
+        bytes[payload_offset] ^= 0x01;
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::InvalidArchive);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn enforces_content_budget_before_decompression() {
+        let path = write_temp(&single_entry(b"asset.bin", b"hello world"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let error = reader
+            .verify_entry_content(
+                0,
+                ContentVerificationLimits {
+                    max_uncompressed_bytes: 10,
+                    read_buffer_bytes: 64,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::LimitExceeded);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_encrypted_and_unsupported_compression_members() {
+        let encrypted_path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"encrypted.bin",
+                data: b"ciphertext",
+                flags: ENCRYPTED_FLAG,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let encrypted_reader =
+            ZipArtifactReader::open(&encrypted_path, ReaderLimits::default()).unwrap();
+        let encrypted_error = encrypted_reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(encrypted_error.kind, ReaderErrorKind::Unsupported);
+        fs::remove_file(encrypted_path).unwrap();
+
+        let unsupported_path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"unsupported.bin",
+                data: b"opaque",
+                flags: 0,
+                method: 99,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let unsupported_reader =
+            ZipArtifactReader::open(&unsupported_path, ReaderLimits::default()).unwrap();
+        let unsupported_error = unsupported_reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(unsupported_error.kind, ReaderErrorKind::Unsupported);
+        fs::remove_file(unsupported_path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verifies_data_descriptor_member_to_eof() {
+        let path = write_temp(&build_zip(
+            &[TestEntry {
+                name: b"streamed.bin",
+                data: b"data descriptor payload",
+                flags: DATA_DESCRIPTOR_FLAG,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        ));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let verified = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(verified.observed_uncompressed_bytes, 23);
+        assert!(verified.verified_crc32);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verifies_zip64_member_with_prepended_stub_through_relative_view() {
+        let archive = build_zip64(
+            &[TestEntry {
+                name: b"Payload/App",
+                data: b"zip64 payload",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            }],
+            &[],
+        );
+        let mut bytes = b"binary-stub".to_vec();
+        bytes.extend_from_slice(&archive);
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+
+        assert!(reader.inventory().regions.zip64);
+        assert_eq!(reader.inventory().regions.leading_bytes, 11);
+        let verified = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(
+            verified.sha256,
+            format!("{:x}", Sha256::digest(b"zip64 payload"))
+        );
+        assert_eq!(verified.observed_uncompressed_bytes, 13);
+        assert_eq!(verified.observed_crc32, crc32(b"zip64 payload"));
+        assert!(verified.verified_crc32);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn zip_rs_zlib_rs_deflate_decoder_agrees_with_symthaea_verifier() {
+        let payload = b"independent deflate decoder corpus: ".repeat(4096);
+        let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
+        writer
+            .add_file(
+                "independent-deflate.bin",
+                &payload,
+                &zipcore::FileOptions::deflate(6),
+            )
+            .unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+        let path = write_temp(&bytes);
+
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let symthaea = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(symthaea.observed_uncompressed_bytes, payload.len() as u64);
+        assert_eq!(symthaea.observed_crc32, crc32(&payload));
+        assert!(symthaea.verified_crc32);
+
+        // The harness enables zip 9.3.0's flate2/zlib-rs backend. This independently
+        // decodes the exact same raw Deflate stream produced by zipcore/miniz_oxide.
+        let mut oracle =
+            zip::ZipArchive::new(std::io::Cursor::new(bytes)).expect("zip-rs parses the archive");
+        let mut entry = oracle.by_index(0).expect("zip-rs opens occurrence zero");
+        let mut observed = Vec::new();
+        entry.read_to_end(&mut observed).unwrap();
+        assert_eq!(observed, payload);
+        assert_eq!(observed.len() as u64, symthaea.observed_uncompressed_bytes);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verifies_deflate_member_stream() {
+        let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
+        writer
+            .add_file(
+                "asset.bin",
+                b"hello world",
+                &zipcore::FileOptions::deflate(6),
+            )
+            .unwrap();
+        let bytes = writer.finish().unwrap().into_inner();
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        assert_eq!(reader.inventory().entries[0].compression_method, 8);
+        let verified = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(
+            verified.sha256,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+        assert_eq!(verified.observed_uncompressed_bytes, 11);
+        assert_eq!(verified.observed_crc32, 0x0d4a_1185);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_invalid_content_buffer_and_missing_occurrence() {
+        let path = write_temp(&single_entry(b"asset.bin", b"hello"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let bad_buffer = reader
+            .verify_entry_content(
+                0,
+                ContentVerificationLimits {
+                    max_uncompressed_bytes: 16,
+                    read_buffer_bytes: 0,
+                },
+            )
+            .unwrap_err();
+        assert_eq!(bad_buffer.kind, ReaderErrorKind::LimitExceeded);
+        let missing = reader
+            .verify_entry_content(1, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(missing.kind, ReaderErrorKind::InvalidArchive);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn content_verification_fails_closed_without_qualified_source_identity() {
+        let path = write_temp(&single_entry(b"asset.bin", b"payload"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::Unsupported);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn crc32_matches_standard_123456789_check_value_and_incremental_chunks() {
+        assert_eq!(crc32(b"123456789"), 0xcbf4_3926);
+        assert_eq!(crc32(b""), 0);
+
+        let mut incremental = Crc32State::new();
+        incremental.update(b"1234");
+        incremental.update(b"5");
+        incremental.update(b"6789");
+        assert_eq!(incremental.finish(), 0xcbf4_3926);
+    }
+
+    #[test]
+    fn differential_zip_rs_93_metadata_and_stream_match_unique_occurrences() {
+        let fixtures = [
+            TestEntry {
+                name: b"first.bin",
+                data: b"first archive occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"second.bin",
+                data: b"second archive occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"nested/asset.dat",
+                data: b"third independent payload",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+        ];
+        let bytes = build_zip(&fixtures, &[]);
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let mut oracle = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+
+        assert_eq!(oracle.len(), reader.inventory().entries.len());
+        assert!(!oracle.has_duplicate_names());
+        oracle.validate_header_consistency().unwrap();
+        assert!(!oracle.has_overlapping_entries().unwrap());
+
+        for (index, expected) in reader.inventory().entries.iter().enumerate() {
+            {
+                let metadata = oracle.by_index_data(index).unwrap();
+                assert_eq!(metadata.name_raw(), expected.raw_name);
+                assert_eq!(metadata.header_start(), expected.local_header_offset);
+                assert_eq!(
+                    metadata.compressed_size(),
+                    expected.declared_compressed_size
+                );
+                assert_eq!(metadata.size(), expected.declared_uncompressed_size);
+                assert_eq!(metadata.crc32(), expected.declared_crc32);
+            }
+
+            let mut file = oracle.by_index(index).unwrap();
+            let mut observed = Vec::new();
+            file.read_to_end(&mut observed).unwrap();
+            assert_eq!(file.name_raw(), expected.raw_name);
+            assert_eq!(file.header_start(), expected.local_header_offset);
+            assert_eq!(file.compressed_size(), expected.declared_compressed_size);
+            assert_eq!(file.size(), expected.declared_uncompressed_size);
+            assert_eq!(file.crc32(), expected.declared_crc32);
+            assert_eq!(observed, fixtures[index].data);
+        }
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn zip_rs_reports_duplicate_names_but_is_not_occurrence_preserving() {
+        let fixtures = [
+            TestEntry {
+                name: b"same.bin",
+                data: b"first occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"same.bin",
+                data: b"second occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+            TestEntry {
+                name: b"unique.bin",
+                data: b"third occurrence",
+                flags: 0,
+                method: 0,
+                external_attributes: 0,
+            },
+        ];
+        let bytes = build_zip(&fixtures, &[]);
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let oracle = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+
+        assert_eq!(reader.inventory().entries.len(), 3);
+        assert_eq!(oracle.len(), 2);
+        assert!(oracle.has_duplicate_names());
+        assert_eq!(reader.inventory().entries[0].raw_name, b"same.bin");
+        assert_eq!(reader.inventory().entries[1].raw_name, b"same.bin");
+        // zip-rs deliberately stores entries in a name-keyed IndexMap; it exposes the
+        // duplicate condition but its indexed view is unique-name-oriented. Preserve this
+        // disagreement and never use zip-rs indexes as the authoritative occurrence map.
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn archive_slice_translates_seeks_and_never_escapes_its_range() {
+        let bytes = b"prefixPAYLOAD".to_vec();
+        let mut view = ArchiveSlice::new(std::io::Cursor::new(bytes), 6, 7).unwrap();
+
+        let mut observed = Vec::new();
+        view.read_to_end(&mut observed).unwrap();
+        assert_eq!(observed, b"PAYLOAD");
+        assert_eq!(view.seek(SeekFrom::Start(0)).unwrap(), 0);
+        let mut first = [0u8; 2];
+        assert_eq!(view.read(&mut first).unwrap(), 2);
+        assert_eq!(&first, b"PA");
+        assert!(view.seek(SeekFrom::Current(-3)).is_err());
+        assert!(view.seek(SeekFrom::Start(8)).is_err());
+        assert!(view.seek(SeekFrom::End(1)).is_err());
+        assert_eq!(view.seek(SeekFrom::End(0)).unwrap(), 7);
+        assert_eq!(view.read(&mut first).unwrap(), 0);
+    }
+
+    #[test]
+    fn deterministic_archive_mutations_never_panic_inventory_or_content_read() {
+        let baseline = single_entry(
+            b"mutation-target.bin",
+            b"known payload for deterministic mutation",
+        );
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+
+        for sample in 0..256u64 {
+            let mut mutated = baseline.clone();
+            for _ in 0..3 {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                let offset = (state as usize) % mutated.len();
+                let bit = ((state >> 32) & 7) as u8;
+                mutated[offset] ^= 1u8 << bit;
+            }
+
+            let path = write_temp(&mutated);
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if let Ok(reader) = ZipArtifactReader::open(&path, ReaderLimits::default()) {
+                    let _ = reader.verify_entry_content(0, ContentVerificationLimits::default());
+                }
+            }));
+            fs::remove_file(path).unwrap();
+            assert!(outcome.is_ok(), "archive mutation sample {sample} panicked");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn concurrent_content_verification_uses_independent_file_cursors() {
+        let payload = vec![0x5au8; 2 * 1024 * 1024];
+        let path = write_temp(&single_entry(b"concurrent.bin", &payload));
+        let reader =
+            std::sync::Arc::new(ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap());
+        let workers: Vec<_> = (0..8)
+            .map(|_| {
+                let reader = std::sync::Arc::clone(&reader);
+                std::thread::spawn(move || {
+                    reader
+                        .verify_entry_content(0, ContentVerificationLimits::default())
+                        .unwrap()
+                })
+            })
+            .collect();
+        let results: Vec<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect();
+
+        assert_eq!(results.len(), 8);
+        assert!(
+            results
+                .windows(2)
+                .all(|pair| pair[0].sha256 == pair[1].sha256)
+        );
+        assert!(results.iter().all(|result| {
+            result.observed_uncompressed_bytes == 2 * 1024 * 1024 && result.verified_crc32
+        }));
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn verifies_empty_stored_member() {
+        let path = write_temp(&single_entry(b"empty.bin", b""));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let verified = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap();
+        assert_eq!(
+            verified.sha256,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(verified.observed_uncompressed_bytes, 0);
+        assert_eq!(verified.observed_crc32, 0);
+        assert!(verified.verified_crc32);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_directory_and_symlink_content_verification() {
+        let path = write_temp(&build_zip(
+            &[
+                TestEntry {
+                    name: b"folder/",
+                    data: b"",
+                    flags: 0,
+                    method: 0,
+                    external_attributes: (UNIX_DIRECTORY | 0o755) << 16,
+                },
+                TestEntry {
+                    name: b"link",
+                    data: b"target",
+                    flags: 0,
+                    method: 0,
+                    external_attributes: (UNIX_SYMLINK | 0o777) << 16,
+                },
+            ],
+            &[],
+        ));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let directory = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        let symlink = reader
+            .verify_entry_content(1, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(directory.kind, ReaderErrorKind::Unsupported);
+        assert_eq!(symlink.kind, ReaderErrorKind::Unsupported);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_deflate_output_that_exceeds_declared_uncompressed_size() {
+        let payload = vec![0u8; 4096];
+        let mut writer = zipcore::ZipWriter::new(std::io::Cursor::new(Vec::new())).unwrap();
+        writer
+            .add_file("bomb.bin", &payload, &zipcore::FileOptions::deflate(6))
+            .unwrap();
+        let mut bytes = writer.finish().unwrap().into_inner();
+
+        let local_size = 10u32.to_le_bytes();
+        bytes[22..26].copy_from_slice(&local_size);
+        let central_start = bytes
+            .windows(4)
+            .position(|window| window == CENTRAL_HEADER_SIGNATURE.to_le_bytes())
+            .unwrap();
+        bytes[central_start + 24..central_start + 28].copy_from_slice(&local_size);
+
+        let path = write_temp(&bytes);
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::LimitExceeded);
+        fs::remove_file(path).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn content_verification_refuses_a_source_changed_after_inventory() {
+        let path = write_temp(&single_entry(b"asset.bin", b"payload"));
+        let reader = ZipArtifactReader::open(&path, ReaderLimits::default()).unwrap();
+        let mut changed = OpenOptions::new().append(true).open(&path).unwrap();
+        changed.write_all(b"mutated").unwrap();
+        changed.sync_all().unwrap();
+
+        let error = reader
+            .verify_entry_content(0, ContentVerificationLimits::default())
+            .unwrap_err();
+        assert_eq!(error.kind, ReaderErrorKind::SourceChanged);
+        fs::remove_file(path).unwrap();
     }
 
     #[test]

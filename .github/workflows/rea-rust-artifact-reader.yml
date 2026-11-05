@@ -29,19 +29,47 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
     steps:
-      - name: Checkout exact triggering revision
+      - name: Checkout exact PR head or dispatched revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Record exact source revision
+        run: |
+          expected_source_commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$expected_source_commit"
+          {
+            echo "tested_source_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$expected_source_commit"
+            rustc --version --verbose
+            cargo --version
+            sha256sum tools/rea-artifact-reader-harness/Cargo.lock
+          } | tee tools/rea-artifact-reader-harness/run-context.txt
       - name: Set up pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy
+      - name: Validate committed test-only decoder oracle lockfile
+        run: test -f tools/rea-artifact-reader-harness/Cargo.lock
+      - name: Show resolved direct dependency graph
+        run: cargo tree --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked -e normal,dev
       - name: Validate isolated harness metadata
         run: cargo metadata --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked --no-deps --format-version 1 > "$RUNNER_TEMP/rea-reader-metadata.json"
       - name: Format check
         run: cargo fmt --manifest-path tools/rea-artifact-reader-harness/Cargo.toml -- --check
       - name: ZIP reader adversarial unit tests
         run: cargo test --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked
+      - name: Archive committed isolated harness lockfile
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-artifact-reader-cargo-lock
+          path: |
+            tools/rea-artifact-reader-harness/Cargo.lock
+            tools/rea-artifact-reader-harness/run-context.txt
+          if-no-files-found: error
+          retention-days: 14
       - name: Clippy with warnings denied
         run: cargo clippy --manifest-path tools/rea-artifact-reader-harness/Cargo.toml --locked --all-targets -- -D warnings
