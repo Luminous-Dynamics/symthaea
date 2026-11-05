@@ -1,13 +1,16 @@
 use mel_rmi_synthetic::{
     ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
-    ArtifactPayloadV1, Dimension, Feature, FixedResponsePolicy, HarnessError, ImitationOnlyPolicy,
-    Observation, OneWayPromptPolicy, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec,
-    TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, bind_verified_artifacts,
+    ArtifactPayloadV1, ArtifactSetEvidenceV1, Dimension, Feature, FixedResponsePolicy,
+    HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ReciprocalTrialRecordV1,
+    ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1, TrialRunConfig,
+    UnrelatedFeatureShortcutPolicy, bind_verified_artifacts,
     canonical_fixture_replicates_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
     verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 
 struct YokedSuitePolicy {
     source_session_id: String,
@@ -105,6 +108,79 @@ fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(),
         "v1",
     )?;
     verify_trial_artifact_bindings(record, &inputs, &outputs)
+}
+
+fn csv_cell(value: &str) -> String {
+    format!("\"{}\"", value.replace('"', "\"\""))
+}
+
+fn write_artifact_set_evidence<W: Write>(
+    writer: &mut W,
+    task_id: &str,
+    policy_id: &str,
+    dimension: Dimension,
+    direction: &str,
+    condition: &str,
+    evidence: &ArtifactSetEvidenceV1,
+) -> std::io::Result<usize> {
+    let mut rows = 0;
+    for artifact in &evidence.artifacts {
+        let format = match artifact.format {
+            ArtifactFormatV1::ScoreJson => "score_json",
+            ArtifactFormatV1::Midi => "midi",
+            ArtifactFormatV1::Wav => "wav",
+            ArtifactFormatV1::PcmF32Le => "pcm_f32_le",
+        };
+        writeln!(
+            writer,
+            "{},{},{},{},{},{},{},{},{},{}",
+            csv_cell(task_id),
+            csv_cell(policy_id),
+            dimension.as_str(),
+            direction,
+            condition,
+            csv_cell(&evidence.event_id),
+            evidence.transaction_receipt_sha256,
+            format,
+            artifact.sha256_hex,
+            artifact.byte_len,
+        )?;
+        rows += 1;
+    }
+    Ok(rows)
+}
+
+fn write_record_artifact_evidence<W: Write>(
+    writer: &mut W,
+    record: &TrialRecordV1,
+) -> Result<usize, Box<dyn Error>> {
+    let bindings = record
+        .artifact_bindings
+        .as_ref()
+        .ok_or("artifact bindings missing after verifier returned success")?;
+    let conditions = ["control", "targeted", "sham", "unrelated"];
+    let mut rows = 0;
+    for (index, condition) in conditions.iter().enumerate() {
+        rows += write_artifact_set_evidence(
+            writer,
+            &record.task.task_id,
+            &record.manifest.policy_id,
+            record.task.target_dimension,
+            "input",
+            condition,
+            &bindings.inputs[index],
+        )?;
+        rows += write_artifact_set_evidence(
+            writer,
+            &record.task.task_id,
+            &record.manifest.policy_id,
+            record.task.target_dimension,
+            "output",
+            condition,
+            &bindings.outputs[index],
+        )?;
+    }
+    Ok(rows)
 }
 
 fn report_policy_aggregates(records: &[TrialRecordV1]) {
@@ -235,6 +311,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         code_revision,
     };
     let fixtures = canonical_fixture_replicates_v1(32);
+    let artifact_report_path = std::env::var("MEL_RMI_ARTIFACT_REPORT")?;
+    let artifact_report_file = File::create(artifact_report_path)?;
+    let mut artifact_report = BufWriter::new(artifact_report_file);
+    writeln!(
+        artifact_report,
+        "task_id,policy_id,dimension,direction,condition,event_id,transaction_receipt_sha256,artifact_format,artifact_sha256,byte_len"
+    )?;
+    let mut artifact_report_rows = 0usize;
     let policies: Vec<Box<dyn AgentPolicy>> = vec![
         Box::new(RuleBasedPolicy {
             id: "rule-positive".to_owned(),
@@ -267,6 +351,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         for record in &mut records {
             bind_and_verify_synthetic_artifacts(record)?;
             artifact_bindings_verified += 1;
+            artifact_report_rows += write_record_artifact_evidence(&mut artifact_report, record)?;
             let contrast = record.contrast;
             println!(
                 "trial,{},{},{},{},{},{},{},{},{},{},,,,,,,",
@@ -298,6 +383,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     for mut record in reciprocal {
         bind_and_verify_synthetic_artifacts(&mut record.agent)?;
         artifact_bindings_verified += 1;
+        artifact_report_rows +=
+            write_record_artifact_evidence(&mut artifact_report, &record.agent)?;
         let agent = record.agent.contrast;
         let partner = record.partner;
         println!(
@@ -323,6 +410,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     report_reciprocal_aggregates(&reciprocal);
 
+    artifact_report.flush()?;
     println!("artifact_verified,{artifact_bindings_verified}");
+    println!("artifact_digest_rows,{artifact_report_rows}");
     Ok(())
 }
