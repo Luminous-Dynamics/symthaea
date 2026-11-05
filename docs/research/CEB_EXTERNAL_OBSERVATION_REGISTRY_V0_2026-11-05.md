@@ -11,7 +11,7 @@ The measurement matrix is useful for selecting external comparators, but its `pu
 
 The registry currently contains:
 - **15 external source records** (the parent measurement matrix has 16 registered URLs because it also registers one internal documentation-audit implementation reference).
-- **16 comparator records**, including the 15 comparator records present in the previous matrix plus AgentAbstain.
+- **18 comparator records**, including the 15 comparator records present in the previous matrix plus AgentAbstain.
 - One observation for each reported metric/configuration pair; metric values, displayed uncertainty, denominators and source locators remain separately inspectable.
 
 ## Data semantics
@@ -58,3 +58,14 @@ The source URLs and retrieval date are encoded in the JSON. The key methodologic
 - AgentAbstain: https://agentabstain.github.io/
 
 All source dates and metric definitions should be refreshed before every formal replication. The registry does not establish that the current Symthaea system is competitive.
+
+
+## HiL-Bench normalized observations (2026-11-05)
+
+The combined HiL comparator retains the 300-task population. Two additional comparator entries retain the 150-task SWE and 150-task SQL domain populations separately. Four new atomic observations are recorded:
+- 44% highest combined ASK-F1; winning system identity is not stated in the overview.
+- 24% combined Pass@3 for Claude Opus 4.6.
+- 36% highest SWE-domain blocker recall; winning identity and exact blocker denominator are not stated.
+- 61% highest SQL-domain blocker recall; winning identity and exact blocker denominator are not stated.
+
+ASK-F1 is the harmonic mean of Question Precision and Blocker Recall. Pass@3 is task success in at least one of three independent assisted runs. These are distinct measures. The consolidated Muse Wonder 1.0 score of 79.67 ± 4.17 remains unlabeled and cannot be assigned either metric. Source: https://labs.scale.com/leaderboard/hil
