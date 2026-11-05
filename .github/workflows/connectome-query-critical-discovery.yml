@@ -22,29 +22,82 @@ permissions:
 jobs:
   validate-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Validate JSON syntax and fixture invariants
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and synthetic fixture
         run: |
           python3 - <<'PY'
           import json
+          import re
           from pathlib import Path
+          from jsonschema import Draft202012Validator
 
           schema = json.loads(Path("docs/neuroscience/CONNECTOME_QUERY_CRITICAL_DISCOVERY.schema.json").read_text())
           fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_CRITICAL_DISCOVERY.example.json").read_text())
 
-          assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          def unique(rows, field):
+              values = [row[field] for row in rows]
+              assert len(values) == len(set(values)), f"duplicate {field}"
+
           assert fixture["schema_version"] == 1
           assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert re.fullmatch(r"[0-9a-f]{40}", fixture["dataset_revision_commit_sha"])
+          unique(fixture["channels"], "channel_id")
+          unique(fixture["psus"], "psu_id")
+          unique(fixture["proposals"], "proposal_id")
+          unique(fixture["alternatives"], "alternative_id")
+
+          channels = {row["channel_id"] for row in fixture["channels"]}
+          psus = {row["psu_id"]: row for row in fixture["psus"]}
+          alternatives = {row["alternative_id"]: row for row in fixture["alternatives"]}
+          proposals_by_psu = {psu_id: set() for psu_id in psus}
+          confirmed_by_alternative = {alternative_id: set() for alternative_id in alternatives}
+
+          for proposal in fixture["proposals"]:
+              assert proposal["channel_id"] in channels
+              assert proposal["psu_id"] in psus
+              proposals_by_psu[proposal["psu_id"]].add(proposal["proposal_id"])
+              if proposal["adjudication_disposition"] == "CONFIRMED_MATCH":
+                  alt = alternatives[proposal["matched_alternative_id"]]
+                  assert alt["psu_id"] == proposal["psu_id"]
+                  assert alt["graph_sha256"] == proposal["candidate_world_sha256"]
+                  confirmed_by_alternative[alt["alternative_id"]].add(proposal["channel_id"])
+
+          for psu_id, psu in psus.items():
+              assert set(psu["proposal_ids"]) == proposals_by_psu[psu_id], f"PSU proposal ledger mismatch: {psu_id}"
+
+          critical = {
+              "QUERY_DECISION_FLIP",
+              "ADAPTIVE_POLICY_INVALIDATED",
+              "ADAPTIVE_COST_INCREASED",
+          }
+          critical_ids = {
+              alt_id for alt_id, alt in alternatives.items()
+              if alt["biological_disposition"] == "ADMISSIBLE" and alt["query_consequence"] in critical
+          }
+          captured_critical_ids = {
+              alt_id for alt_id in critical_ids if confirmed_by_alternative[alt_id]
+          }
+          all_list_missed_ids = critical_ids - captured_critical_ids
           assert len(fixture["psus"]) == 4
           assert len(fixture["channels"]) == 3
-          assert len(fixture["alternatives"]) == 3
-          assert len(fixture["proposals"]) == 3
+          assert len(alternatives) == 3
+          assert len(critical_ids) == 2
+          assert len(captured_critical_ids) == 1
+          assert len(all_list_missed_ids) == 1
           assert any(not psu["proposal_ids"] for psu in fixture["psus"])
-          omitted = next(a for a in fixture["alternatives"] if a["alternative_id"] == "ALT-OMITTED-HIGH-IMPACT")
-          assert omitted["query_consequence"] == "ADAPTIVE_POLICY_INVALIDATED"
-          assert omitted["challenge_report_status"] == "NO_POLICY"
-          assert all(len(x) in (40, 64) for x in [fixture["dataset_revision_commit_sha"], fixture["query"]["query_spec_sha256"]])
-          print("validated synthetic query-critical discovery fixture structure")
+          assert alternatives["ALT-OMITTED-HIGH-IMPACT"]["psu_id"] == "PSU-003"
+          assert alternatives["ALT-OMITTED-HIGH-IMPACT"]["challenge_report_status"] == "NO_POLICY"
+          assert fixture["all_list_missed_sensitivity"]["status"] == "NOT_RUN"
+
+          ancestry = [set(row["ancestry_group_ids"]) for row in fixture["channels"]]
+          assert any(ancestry[i] & ancestry[j] for i in range(len(ancestry)) for j in range(i + 1, len(ancestry)))
+          print("Draft 2020-12 schema and synthetic query-critical discovery contract passed.")
+          print(f"alternatives={len(alternatives)} critical={len(critical_ids)} captured={len(captured_critical_ids)} all_list_missed={len(all_list_missed_ids)}")
           PY
