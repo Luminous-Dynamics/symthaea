@@ -336,3 +336,39 @@ The new portfolio should compare independent channels:
 - calibration, selective prediction and explicit abstention.
 
 A detector that flags an answer as suspicious has not established the correct answer. A source verifier that finds a matching passage has not established its relevance or authenticity. The research question is whether the channels complement each other under matched compute/context budgets and preserve failure explanations.
+
+
+## 9. African evidence retrieval and safety tracks
+
+### AfrIFact — end-to-end African-language fact checking
+
+Paper: https://aclanthology.org/2026.emnlp-main.133/
+
+AfrIFact covers ten African languages plus English and includes the full automated fact-checking chain: information retrieval, evidence extraction and fact checking. The paper reports that current embedding systems struggle with cross-lingual retrieval and that cultural/news documents are easier to retrieve than healthcare material. It reports up to 43% gain from few-shot prompting in AfriqueQwen-14B and up to 26% from task-specific fine-tuning under the paper's settings.
+
+**Use:** the end-to-end evidence-retrieval track for Mycelix evidence-plane + Symthaea. Measure retrieval Recall@k / MRR / nDCG; source-family recall; evidence-span precision/recall; claim-evidence relation macro-F1; verdict macro-F1; calibration and selective coverage. Report healthcare separately from culture/news.
+
+**Admission:** exact language list, overlap with South African language targets, dataset revision, file digests, license, source rights, and split lineage remain to be checked before use. Do not infer South African coverage from the aggregate “ten African languages” description. Do not use the paper's reported gains as Symthaea/Mycelix results. Issue: [AFR-FACT-001 / #10544](https://github.com/Luminous-Dynamics/symthaea/issues/10544).
+
+### TukaBench — multilingual safety and comprehension
+
+Paper: https://aclanthology.org/2026.emnlp-main.692/  
+Code: https://github.com/McGill-NLP/tukabench  
+Dataset: https://huggingface.co/datasets/Victor-Akinode/tukabench
+
+TukaBench evaluates seven African languages plus English. Paper prompt settings include human translation, culturally adapted translation, locally curated prompts and code-switching. Labels separate **Jailbroken**, **Refused** and **Deflected** (off-target/incoherent comprehension failure).
+
+The currently visible Hugging Face release declares **CC BY-NC 4.0** (non-commercial research use only) and exposes three configs—`afri-jbb-harm`, `afri-jbb-benign`, `afri-jbb-culture`—with 100 prompts per config/language split. Visible splits include English, Amharic, Hausa, Igbo, Nyanja, Swahili, isiXhosa and Yoruba. The code repo says prompt data is not included in the repo and refers users to separate data access. Verify exact access and whether all paper settings are released before reproducing.
+
+**Use:** safety/comprehension qualification, not truth evaluation. Measure harmful compliance, appropriate refusal, false refusal on benign prompts, deflection/comprehension failure, safe helpfulness and human-vs-judge agreement per language/prompt origin. Do not maximize refusal at the expense of allowed-task usefulness. Native-speaker annotation is critical because the paper finds judge-human agreement degrades for lower-resource languages/scripts. Keep harmful prompts in restricted evaluation assets, not general source fixtures. Issue: [AFR-SAFE-001 / #10545](https://github.com/Luminous-Dynamics/symthaea/issues/10545).
+
+### How these tracks fit together
+
+| Track | Primary capability | Must not be confused with |
+|---|---|---|
+| Multi-Hall-SA | Detect controlled factual perturbations in parallel source-native statements | Full evidence retrieval / real-world fact-checking |
+| AfrIFact | Retrieve evidence, extract spans and verify a claim | A pure detector or refusal benchmark |
+| TukaBench | Resist jailbreaks while preserving benign helpfulness and comprehension | Factual truth or evidence support |
+| MzansiBench / Uhura / AFROBENCH | Broad language/task and scientific QA coverage | One universal South African score |
+
+Use shared run receipts and identity/provenance fields, but preserve separate labels, metrics, rights and safety thresholds.
