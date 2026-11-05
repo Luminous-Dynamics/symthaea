@@ -973,31 +973,28 @@ mod tests {
             1,
             false,
         );
-        let low_action = model_step(
-            state,
-            0.10,
-            2,
-            Scenario::StateActionPocket,
-            1,
-            false,
-        );
+        let low_action = model_step(state, 0.10, 2, Scenario::StateActionPocket, 1, false);
         let actual = true_step(state, 0.85, 2, Scenario::StateActionPocket, BASE_SEED);
         assert!(optimistic.reward - actual.reward > 0.30);
-        assert!((outside_state.reward
-            - true_step(
-                State { x: -0.45, v: 0.0 },
-                0.85,
-                2,
-                Scenario::StateActionPocket,
-                BASE_SEED,
-            )
-            .reward)
-            .abs()
-            < 0.01);
-        assert!((low_action.reward
-            - true_step(state, 0.10, 2, Scenario::StateActionPocket, BASE_SEED).reward)
-            .abs()
-            < 0.01);
+        assert!(
+            (outside_state.reward
+                - true_step(
+                    State { x: -0.45, v: 0.0 },
+                    0.85,
+                    2,
+                    Scenario::StateActionPocket,
+                    BASE_SEED,
+                )
+                .reward)
+                .abs()
+                < 0.01
+        );
+        assert!(
+            (low_action.reward
+                - true_step(state, 0.10, 2, Scenario::StateActionPocket, BASE_SEED).reward)
+                .abs()
+                < 0.01
+        );
     }
 
     #[test]
