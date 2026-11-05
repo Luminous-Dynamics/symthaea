@@ -366,8 +366,9 @@ fn aggregate_robust_utility(
 mod tests {
     use super::*;
     use super::super::score_bounds::{
-        bound_candidate_score_samples, BoundedScoreSamples, ScoreBoundsConfig, ScoreRange,
-        ScoreRanges, ScoreBoundsReceipt,
+        bound_candidate_score_samples, bound_candidate_score_samples_anytime,
+        BoundedScoreSamples, ScoreBoundsConfig, ScoreRange, ScoreRanges, ScoreBoundsReceipt,
+        ANYTIME_SCORE_BOUND_METHOD_ID,
     };
     use super::super::scenario::ScenarioSet;
     use super::super::sequential::{
@@ -557,6 +558,48 @@ mod tests {
         )
         .unwrap();
         assert_eq!(certificate.selected_action_id, 2);
+    }
+
+    #[test]
+    fn accepts_time_uniform_receipt_for_data_dependent_robust_stopping() {
+        let (fixed_receipt, scenarios) = bounded_receipt(
+            &[
+                (1, 10, 0.9),
+                (1, 20, 0.9),
+                (2, 10, 0.1),
+                (2, 20, 0.1),
+            ],
+            500,
+        );
+        let actions = action_set();
+        let config = ScoreBoundsConfig {
+            familywise_alpha: fixed_receipt.familywise_alpha,
+            minimum_replicates: fixed_receipt.minimum_replicates,
+            ranges: fixed_receipt.ranges,
+            score_contract_digest: fixed_receipt.score_contract_digest.clone(),
+            source_digest: fixed_receipt.source_digest.clone(),
+            root_seed: fixed_receipt.root_seed,
+        };
+        let anytime = bound_candidate_score_samples_anytime(
+            &actions,
+            &scenarios,
+            &fixed_receipt.samples,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(anytime.method_id, ANYTIME_SCORE_BOUND_METHOD_ID);
+        assert!(anytime.time_uniform);
+        let certificate = certify_epsilon_optimal_action(
+            &anytime,
+            RobustUtility::Maximin,
+            0.25,
+        )
+        .unwrap();
+        assert_eq!(certificate.selected_action_id, 1);
+        assert_eq!(
+            certificate.status,
+            RobustSelectionStatus::CertifiedWithinIndifferenceZone
+        );
     }
 
     #[test]
