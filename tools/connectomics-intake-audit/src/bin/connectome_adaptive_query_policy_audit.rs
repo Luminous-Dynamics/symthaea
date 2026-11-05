@@ -145,6 +145,15 @@ struct PolicySolution {
     node: PolicyNode,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct FixedPlanSummary {
+    minimum_effort_units: Option<u64>,
+    minimum_action_ids: Vec<String>,
+    minimum_plan_count: u64,
+    within_declared_budget: Option<bool>,
+    adaptive_worst_case_savings_units: Option<i64>,
+}
+
 #[derive(Debug, Serialize)]
 struct Report {
     schema_version: u32,
@@ -169,6 +178,7 @@ struct Report {
     minimum_terminal_path_effort_units: Option<u64>,
     maximum_terminal_path_effort_units: Option<u64>,
     worst_case_policy_within_budget: Option<bool>,
+    fixed_non_adaptive_optimum: FixedPlanSummary,
     policy: Option<PolicyNode>,
     out_of_model_observation_disposition: &'static str,
     expected_cost_claim: &'static str,
@@ -720,6 +730,139 @@ fn validate_policy_tree(node: &PolicyNode) -> Result<(), String> {
     Ok(())
 }
 
+fn decision_conflict_pairs(scenarios: &[Scenario]) -> Vec<(usize, usize)> {
+    let mut pairs = Vec::new();
+    for left in 0..scenarios.len() {
+        for right in (left + 1)..scenarios.len() {
+            if scenarios[left].decision_met != scenarios[right].decision_met {
+                pairs.push((left, right));
+            }
+        }
+    }
+    pairs
+}
+
+/// overlap[mask] is true when some cross-world tuple pair agrees on every
+/// selected action in mask. The superset-OR transform fills all subsets of
+/// each equality mask, so exact fixed-bundle separation is the negation.
+fn pair_overlap_table(
+    left_tuples: &[Vec<String>],
+    right_tuples: &[Vec<String>],
+    action_count: usize,
+) -> Vec<bool> {
+    let subset_count = 1_usize << action_count;
+    let mut overlap = vec![false; subset_count];
+    for left in left_tuples {
+        for right in right_tuples {
+            let mut equal_mask = 0_usize;
+            for action_index in 0..action_count {
+                if left[action_index] == right[action_index] {
+                    equal_mask |= 1_usize << action_index;
+                }
+            }
+            overlap[equal_mask] = true;
+        }
+    }
+    for bit_index in 0..action_count {
+        let bit = 1_usize << bit_index;
+        for mask in 0..subset_count {
+            if mask & bit == 0 && overlap[mask | bit] {
+                overlap[mask] = true;
+            }
+        }
+    }
+    overlap
+}
+
+fn selected_action_ids(mask: usize, action_ids: &[String]) -> Vec<String> {
+    action_ids
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| mask & (1_usize << index) != 0)
+        .map(|(_, action_id)| action_id.clone())
+        .collect()
+}
+
+fn minimum_fixed_plan(
+    action_ids: &[String],
+    action_effort: &[u64],
+    scenarios: &[Scenario],
+    tuple_rows: &[Vec<Vec<String>>],
+    budget: u64,
+) -> Result<FixedPlanSummary, String> {
+    let pairs = decision_conflict_pairs(scenarios);
+    if pairs.is_empty() {
+        return Ok(FixedPlanSummary {
+            minimum_effort_units: Some(0),
+            minimum_action_ids: Vec::new(),
+            minimum_plan_count: 1,
+            within_declared_budget: Some(true),
+            adaptive_worst_case_savings_units: None,
+        });
+    }
+    let overlap_tables = pairs
+        .iter()
+        .map(|(left, right)| {
+            pair_overlap_table(&tuple_rows[*left], &tuple_rows[*right], action_ids.len())
+        })
+        .collect::<Vec<_>>();
+    let full_mask = (1_usize << action_ids.len()) - 1;
+    if overlap_tables.iter().any(|table| table[full_mask]) {
+        return Ok(FixedPlanSummary {
+            minimum_effort_units: None,
+            minimum_action_ids: Vec::new(),
+            minimum_plan_count: 0,
+            within_declared_budget: None,
+            adaptive_worst_case_savings_units: None,
+        });
+    }
+
+    let subset_count = 1_usize << action_ids.len();
+    let mut best_cost: Option<u64> = None;
+    let mut best_ids = Vec::new();
+    let mut best_count = 0_u64;
+    for mask in 1..subset_count {
+        let mut cost = 0_u64;
+        for (index, effort) in action_effort.iter().enumerate() {
+            if mask & (1_usize << index) != 0 {
+                cost = cost
+                    .checked_add(*effort)
+                    .ok_or_else(|| "fixed action-bundle effort overflows u64".to_string())?;
+            }
+        }
+        if best_cost.is_some_and(|best| cost > best) {
+            continue;
+        }
+        if overlap_tables.iter().any(|table| table[mask]) {
+            continue;
+        }
+        let candidate_ids = selected_action_ids(mask, action_ids);
+        if best_cost.is_none_or(|best| cost < best) {
+            best_cost = Some(cost);
+            best_ids = candidate_ids;
+            best_count = 1;
+        } else if best_cost == Some(cost) {
+            best_count += 1;
+            if candidate_ids < best_ids {
+                best_ids = candidate_ids;
+            }
+        }
+    }
+    Ok(FixedPlanSummary {
+        minimum_effort_units: best_cost,
+        minimum_action_ids: best_ids,
+        minimum_plan_count: best_count,
+        within_declared_budget: best_cost.map(|cost| cost <= budget),
+        adaptive_worst_case_savings_units: None,
+    })
+}
+
+fn cost_delta(fixed: Option<u64>, adaptive: Option<u64>) -> Option<i64> {
+    let fixed = i64::try_from(fixed?).ok()?;
+    let adaptive = i64::try_from(adaptive?).ok()?;
+    fixed.checked_sub(adaptive)
+}
+
 fn count_policy_nodes(node: &PolicyNode) -> (usize, usize) {
     let mut nodes = 1_usize;
     let mut branches = node.branches.len();
@@ -740,6 +883,13 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         .map(|action| action.effort_units)
         .collect::<Vec<_>>();
     let tuple_count = tuples_by_world.iter().map(Vec::len).sum::<usize>();
+    let mut fixed_non_adaptive_optimum = minimum_fixed_plan(
+        &action_ids,
+        &action_effort,
+        &scenarios,
+        &tuples_by_world,
+        input.max_total_effort_units,
+    )?;
     let full_world_masks = tuples_by_world
         .iter()
         .map(|tuples| {
@@ -764,6 +914,10 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         memo: BTreeMap::new(),
     };
     let solution = solver.solve(initial_state)?;
+    fixed_non_adaptive_optimum.adaptive_worst_case_savings_units = cost_delta(
+        fixed_non_adaptive_optimum.minimum_effort_units,
+        solution.as_ref().map(|policy| policy.worst_case_cost),
+    );
     let (
         worst_case,
         min_path,
@@ -829,6 +983,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         minimum_terminal_path_effort_units: min_path,
         maximum_terminal_path_effort_units: max_path,
         worst_case_policy_within_budget: within_budget,
+        fixed_non_adaptive_optimum,
         policy,
         out_of_model_observation_disposition: "FAIL_CLOSED_NO_QUERY_DECISION",
         expected_cost_claim: "NONE_NO_PRIOR_OR_EXPECTED_COST_COMPUTED",
