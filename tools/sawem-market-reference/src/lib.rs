@@ -2651,6 +2651,20 @@ mod tests {
         assert_eq!(late.notice_timeliness, CreditCoverNoticeTimeliness::Late);
         assert_eq!(late.posting_deadline.unwrap().day_ordinal, 13);
 
+        let after_cutoff = calculate_credit_cover_increase_timeline(
+            10,
+            true,
+            Some(10),
+            Some(1_021),
+            business_calendar_for_test(),
+            working_calendar_for_test(),
+        )
+        .expect("notice after 17:00 is explicitly late");
+        assert_eq!(
+            after_cutoff.notice_timeliness,
+            CreditCoverNoticeTimeliness::Late
+        );
+
         let missing = calculate_credit_cover_increase_timeline(
             10,
             true,
