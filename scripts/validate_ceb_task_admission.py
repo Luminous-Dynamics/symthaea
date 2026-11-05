@@ -18,7 +18,7 @@ def load(path: Path):
         raise ValueError(f"cannot load {path}: {error}") from error
 
 
-def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> list[str]:
+def validate_task(task: dict, schema: dict, format_checker: FormatChecker, contamination_cards: dict[str, dict]) -> list[str]:
     validator = Draft202012Validator(schema, format_checker=format_checker)
     errors = sorted(validator.iter_errors(task), key=lambda error: list(error.absolute_path))
     if errors:
@@ -72,6 +72,47 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
         semantic.append("static review/admission requires a complete solution-leakage review")
     if task["source"]["solution_leakage_review"]["status"] in ("suspected_leakage", "confirmed_leakage"):
         semantic.append("suspected or confirmed solution leakage blocks admission")
+
+    card_id = task["source"]["contamination_card_id"]
+    card_digest = task["source"]["contamination_card_sha256"]
+    if (card_id is None) != (card_digest is None):
+        semantic.append("contamination card ID and digest must be supplied together")
+    if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if not card_id or not card_digest:
+            semantic.append("static review requires a linked contamination transparency card")
+        else:
+            card = contamination_cards.get(card_id)
+            if card is None:
+                semantic.append("linked contamination transparency card is absent from the registry")
+            else:
+                if card["card_record_sha256"] != card_digest:
+                    semantic.append("task manifest contamination-card digest does not match registry card")
+                if card["task_id"] != task["task_id"]:
+                    semantic.append("contamination card belongs to a different task")
+                if card["assessment_status"] in ("not_assessed", "suspected_leakage", "confirmed_leakage"):
+                    semantic.append("unassessed or contaminated task cannot be statically reviewed")
+                if card["reviewer_disposition"] in ("pending", "blocked", "reject"):
+                    semantic.append("contamination reviewer disposition blocks static task review")
+                if task["custody"]["partition"] == "holdout":
+                    if card["reviewer_disposition"] != "eligible_for_holdout_review":
+                        semantic.append("holdout requires eligible_for_holdout_review disposition")
+                    if card["source_visibility"]["fix_visibility"] not in ("private", "not_published"):
+                        semantic.append("public or unknown fix visibility cannot enter holdout")
+                if task["custody"]["partition"] == "development" and card["source_visibility"]["fix_visibility"] == "public":
+                    if card["reviewer_disposition"] != "development_only":
+                        semantic.append("publicly exposed task must be explicitly classified development_only")
+                if task["task_status"] in ("execution_qualified", "admitted"):
+                    expected_egress = {
+                        "disabled": "disabled",
+                        "endpoint_only": "endpoint_only",
+                        "allowlisted": "allowlisted",
+                        "unqualified": "unqualified",
+                    }.get(task["environment"]["network_policy"])
+                    if card["agent_access"]["egress_policy"] != expected_egress:
+                        semantic.append("contamination card egress policy differs from task environment policy")
+                    if card["agent_access"]["trajectory_logging"] != "enabled":
+                        semantic.append("execution-qualified task requires trajectory logging to be enabled")
+
     if task["task_spec"]["blind_solve_review"]["status"] != "passed" and task["task_status"] != "proposed":
         semantic.append("static review/admission requires a passed blind-solve instruction review")
     if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
@@ -142,7 +183,7 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
     return semantic
 
 
-def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker) -> list[str]:
+def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker, contamination_cards: dict[str, dict]) -> list[str]:
     errors = []
     validator = Draft202012Validator(registry_schema, format_checker=format_checker)
     schema_errors = sorted(validator.iter_errors(registry), key=lambda error: list(error.absolute_path))
@@ -171,7 +212,7 @@ def validate_registry(registry: dict, registry_schema: dict, task_schema: dict, 
     if registry["actual_task_count"] == 0 and registry["status"] != "intake_contract_only_no_tasks_admitted":
         errors.append("zero task records must remain explicitly intake-only")
     for task in registry["tasks"]:
-        for error in validate_task(task, task_schema, format_checker):
+        for error in validate_task(task, task_schema, format_checker, contamination_cards):
             errors.append(f"{task.get('task_id','<unknown>')}: {error}")
     return errors
 
@@ -182,7 +223,7 @@ def valid_fixture() -> dict:
       "schema_version":0,"task_id":"ceb-rust-fixture-001","task_status":"proposed","family_id":"rust-types-traits",
       "repository":{"repo_full_name":"example/project","url":"https://github.com/example/project","source_revision":"b"*40,
        "license":{"spdx_expression":"Apache-2.0","license_file_path":"LICENSE","license_file_sha256":digest,"review_status":"compatible","license_review_record_sha256":digest,"license_reviewer_id":"license-reviewer-01"}},
-      "source":{"source_kind":"issue","source_url":"https://github.com/example/project/issues/1","source_id":"1","opened_at":"2026-01-01T00:00:00Z","fix_commit_sha":"c"*40,"fix_visibility":"public",
+      "source":{"source_kind":"issue","source_url":"https://github.com/example/project/issues/1","source_id":"1","opened_at":"2026-01-01T00:00:00Z","fix_commit_sha":"c"*40,"fix_visibility":"public","contamination_card_id":None,"contamination_card_sha256":None,
        "solution_leakage_review":{"status":"complete","reviewed_on":"2026-11-05","search_protocol_id":"CEB-LEAKAGE-SEARCH-001","search_record_sha256":digest,"searched_surfaces":["source-host","commit-history","benchmark-datasets"],"reviewer_id":"leakage-reviewer-01"}},
       "task_spec":{"prompt_sha256":digest,"acceptance_spec_sha256":"d"*64,"authoring_protocol_version":"0.1.0",
        "blind_solve_review":{"status":"passed","reviewer_id":"blind-reviewer-01","review_record_sha256":digest,"instruction_only_sufficient":True}},
@@ -198,7 +239,7 @@ def valid_fixture() -> dict:
 
 def self_test(registry: dict, registry_schema: dict, task_schema: dict, format_checker: FormatChecker) -> None:
     fixture = valid_fixture()
-    if validate_task(fixture, task_schema, format_checker):
+    if validate_task(fixture, task_schema, format_checker, {}):
         raise SystemExit("valid synthetic task-manifest fixture unexpectedly failed")
 
     def must_reject(mutant: dict, label: str) -> None:
@@ -286,13 +327,17 @@ def main() -> int:
         registry = load(base / "task-admission-registry.v0.json")
         registry_schema = load(base / "task-admission-registry.schema.json")
         task_schema = load(base / "task-admission.schema.json")
+        contamination_registry = load(base / "contamination-transparency-registry.v0.json")
+        contamination_cards = {row["card_id"]: row for row in contamination_registry["cards"]}
+        if contamination_registry["actual_card_count"] != len(contamination_cards):
+            raise ValueError("contamination registry card count/identity mismatch")
         Draft202012Validator.check_schema(registry_schema)
         Draft202012Validator.check_schema(task_schema)
     except Exception as error:
         print(f"CEB_TASK_ADMISSION_ERROR: {error}", file=sys.stderr)
         return 2
     format_checker = FormatChecker()
-    errors = validate_registry(registry, registry_schema, task_schema, format_checker)
+    errors = validate_registry(registry, registry_schema, task_schema, format_checker, contamination_cards)
     if errors:
         for error in errors:
             print(f"CEB_TASK_ADMISSION_FAIL: {error}", file=sys.stderr)
