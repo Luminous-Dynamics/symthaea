@@ -5,7 +5,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "src/consciousness/recursive_improvement/reuse_error_budget.rs"
+      - "src/consciousness/recursive_improvement/reuse_confidence_certificate.rs"
       - "src/consciousness/recursive_improvement/paired_sign_test.rs"
+      - "src/consciousness/recursive_improvement/reuse_confidence_certificate.rs"
       - "src/consciousness/recursive_improvement/paired_evaluation.rs"
       - "src/consciousness/recursive_improvement/mod.rs"
       - "tools/sym-rsi-reuse-gate/**"
@@ -62,6 +64,7 @@ jobs:
           rustfmt --edition 2024 --check --config skip_children=true \
             src/consciousness/recursive_improvement/reuse_error_budget.rs \
             src/consciousness/recursive_improvement/paired_sign_test.rs \
+            src/consciousness/recursive_improvement/reuse_confidence_certificate.rs \
             tools/sym-rsi-reuse-gate/src/lib.rs
 
       - name: Test REUSE allocation and decision gate
