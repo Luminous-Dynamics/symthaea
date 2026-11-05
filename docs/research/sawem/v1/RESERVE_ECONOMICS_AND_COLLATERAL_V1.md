@@ -190,6 +190,20 @@ The new `liquidity_stress.rs` module consumes a source-referenced Market Operato
 
 The output field `potentially_fundable_cover_minor_zar` is deliberately not added to Posted Credit Cover. Cash must still be transferred to the Collateral Reserve Account and evidenced with a separate receipt. The model assumes neither instant transfer nor Market Operator acceptance. Missing MO Required Credit Cover remains indeterminate; the module does not calculate UEF or §15.10.3 exposure. All money fields are explicitly minor ZAR, and source-reference collisions are rejected to reduce accidental double-counting.
 
-This is a point-in-time stress snapshot, not a chronological cashflow forecast. It does not infer future receipts, settlement reruns, bank drawdowns, transfer latency or cure periods. A future extension should consume a dated sequence of MO Required Cover, posted collateral, cash inflows/outflows and confirmed release/posting receipts, then report peak funding gap, duration, deadline misses and liquidity-at-risk across separately declared scenarios.
+This is a point-in-time stress snapshot, not a chronological cashflow forecast.
+
+#### Event-ordered treasury liquidity waterfall
+
+The new `liquidity_waterfall.rs` module extends the static snapshot into a dated, ordered cash projection with three separate paths:
+
+- **Committed:** committed receipts, payments, collateral cash lock-ups and early invoice payments.
+- **Forecast:** committed flows plus separately labelled forecast events.
+- **Stress:** committed and forecast flows plus adverse stress adjustments.
+
+Each path reports minimum unrestricted cash, minimum cash before the Credit Cover deadline, cash at that deadline, the first operating-floor breach, peak Required-Credit-Cover shortfall observed through the deadline, shortfall at the deadline, potential funding from above-floor cash and the remaining external gap. Source-backed Required Credit Cover reassessments are applied in timestamp order; a later downward reassessment does not erase an earlier peak shortfall. The input calendar is source-digested and covers the complete projection horizon; events are ordered by civil day, local minute and deterministic sequence.
+
+Planned Collateral Reserve Account deposits and early invoice payments reduce projected unrestricted cash but do not increase Posted Credit Cover. The latter remains the separately evidenced current balance throughout this treasury projection; receipt-backed posting and release events belong in the credit-cover evidence ledger. Forecast receipts do not become confirmed cash, and no projection proves bank transferability or cash availability.
+
+The waterfall is a scenario projection, not an executed treasury ledger, insolvency forecast or live Market Operator settlement. It does not model probabilistic payment default, intraday bank cut-off distributions, collateral-provider failure, tax, interest accrual, settlement rerun probabilities or portfolio optimization. The new benchmark case `CREDIT-COVER-LIQUIDITY-WATERFALL-001` maps nine synthetic test cases; no independent ground-truth adjudication has been performed.
 
 References: NTCSA Market Code Rev 2.3 §§2.3(a), 15.2, 15.2.1, 15.10.2–15.10.4 and Annexure 2.
