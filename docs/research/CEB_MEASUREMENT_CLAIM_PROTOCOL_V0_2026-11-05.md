@@ -27,7 +27,11 @@ These results are not directly rankable. Their exact sources, metrics, task scop
 
 The machine-readable matrix defines 13 lanes: repository resolution, repository comprehension, context retrieval, test generation, refactoring, precise debugging, pre-merge review, secure correctness, Rust engineering, optimization, human-agent complementarity, evaluator integrity and documentation executability.
 
-Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 41 primary metrics, 15 comparator records and 14 registered source URLs. The matrix is design-only and contains no CEB performance score.
+Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 41 primary metrics, 16 comparator records and 16 registered source URLs. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
+
+### Selective autonomy comparator — AgentAbstain
+
+The external-observation registry now includes AgentAbstain as a second comparator for CEB-HUMAN. Its benchmark contains 263 near-identical should-act/should-abstain task pairs across 42 executable environments. The live leaderboard reports Gemini 3.1 Pro + Google ADK at 90.5% act-side accuracy, 65.4% abstain-side accuracy, 59.5% paired accuracy and 65.7% conditioned abstention rate (CAR). Paired accuracy is the primary measure because both variants must be correct; the component metrics must remain separate. Source: https://agentabstain.github.io/ . This is contextual evidence, not a matched CEB comparison.
 
 ## 3. Claim levels
 
