@@ -1,0 +1,14 @@
+[package]
+name = "sym-rsi-receipt-composer"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "In-memory composition of semantically validated benchmark receipts for RSI capability evidence"
+
+[workspace]
+members = ["."]
+resolver = "2"
+
+[dependencies]
+benchmark-run-receipt-validator = { path = "../benchmark-run-receipt-harness" }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
