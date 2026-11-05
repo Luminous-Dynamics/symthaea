@@ -136,7 +136,10 @@ struct Eocd {
 }
 
 /// Open the source once; hash, inspect and re-hash this same opened file object.
-pub fn scan_apk(path: impl AsRef<Path>, limits: ScanLimits) -> Result<ApkSigningBlockReport, ScanError> {
+pub fn scan_apk(
+    path: impl AsRef<Path>,
+    limits: ScanLimits,
+) -> Result<ApkSigningBlockReport, ScanError> {
     validate_limits(limits)?;
     let mut file = File::open(path.as_ref()).map_err(io_error)?;
     scan_open_file(&mut file, limits)
@@ -150,7 +153,9 @@ pub fn scan_open_file<R: Read + Seek>(
     validate_limits(limits)?;
     let source_length = file.seek(SeekFrom::End(0)).map_err(io_error)?;
     if source_length > limits.max_archive_bytes {
-        return Err(ScanError::Rejected("archive exceeds configured byte limit".into()));
+        return Err(ScanError::Rejected(
+            "archive exceeds configured byte limit".into(),
+        ));
     }
 
     let (source_sha256, observed_length) = hash_source(file, limits.max_archive_bytes)?;
@@ -163,8 +168,7 @@ pub fn scan_open_file<R: Read + Seek>(
 
     let signing_block = locate_signing_block(file, eocd, limits)?;
 
-    let (source_sha256_after, observed_length_after) =
-        hash_source(file, limits.max_archive_bytes)?;
+    let (source_sha256_after, observed_length_after) = hash_source(file, limits.max_archive_bytes)?;
     if observed_length_after != source_length || source_sha256_after != source_sha256 {
         return Err(ScanError::SourceChanged);
     }
@@ -190,19 +194,24 @@ fn validate_limits(limits: ScanLimits) -> Result<(), ScanError> {
         || limits.max_pairs > HARD_MAX_PAIRS
         || limits.max_total_pair_value_bytes > limits.max_signing_block_bytes
     {
-        return Err(ScanError::Rejected("configured scan limits exceed hard safety bounds".into()));
+        return Err(ScanError::Rejected(
+            "configured scan limits exceed hard safety bounds".into(),
+        ));
     }
     Ok(())
 }
 
 fn locate_eocd<R: Read + Seek>(file: &mut R, source_length: u64) -> Result<Eocd, ScanError> {
     let tail_length = source_length.min((EOCD_FIXED_BYTES + EOCD_MAX_COMMENT_BYTES) as u64);
-    let tail_start = source_length.checked_sub(tail_length).ok_or_else(|| {
-        ScanError::Rejected("EOCD search window underflow".into())
-    })?;
-    let mut tail = vec![0u8; usize::try_from(tail_length).map_err(|_| {
-        ScanError::Rejected("EOCD search window does not fit address space".into())
-    })?];
+    let tail_start = source_length
+        .checked_sub(tail_length)
+        .ok_or_else(|| ScanError::Rejected("EOCD search window underflow".into()))?;
+    let mut tail = vec![
+        0u8;
+        usize::try_from(tail_length).map_err(|_| {
+            ScanError::Rejected("EOCD search window does not fit address space".into())
+        })?
+    ];
     read_exact_at(file, tail_start, &mut tail)?;
 
     let mut candidates = Vec::new();
@@ -218,7 +227,9 @@ fn locate_eocd<R: Read + Seek>(file: &mut R, source_length: u64) -> Result<Eocd,
         }
     }
     if candidates.is_empty() {
-        return Err(ScanError::Rejected("no EOCD candidate terminates at source EOF".into()));
+        return Err(ScanError::Rejected(
+            "no EOCD candidate terminates at source EOF".into(),
+        ));
     }
     if candidates.len() != 1 {
         return Err(ScanError::Rejected("EOCD candidate is ambiguous".into()));
@@ -233,13 +244,17 @@ fn locate_eocd<R: Read + Seek>(file: &mut R, source_length: u64) -> Result<Eocd,
     let central_directory_offset = u64::from(read_u32(&tail, offset + 16));
 
     if disk_number != 0 || central_disk != 0 || entries_on_disk != entries_total {
-        return Err(ScanError::Unsupported("multi-disk/split ZIP is outside the APK scanner subset".into()));
+        return Err(ScanError::Unsupported(
+            "multi-disk/split ZIP is outside the APK scanner subset".into(),
+        ));
     }
     if entries_total == u16::MAX
         || central_directory_size == u64::from(u32::MAX)
         || central_directory_offset == u64::from(u32::MAX)
     {
-        return Err(ScanError::Unsupported("ZIP64 APK layout is outside this first scanner subset".into()));
+        return Err(ScanError::Unsupported(
+            "ZIP64 APK layout is outside this first scanner subset".into(),
+        ));
     }
 
     Ok(Eocd {
@@ -256,46 +271,65 @@ fn validate_central_directory<R: Read + Seek>(
     limits: ScanLimits,
 ) -> Result<(), ScanError> {
     if eocd.central_directory_size > limits.max_central_directory_bytes {
-        return Err(ScanError::Rejected("central directory exceeds configured byte limit".into()));
+        return Err(ScanError::Rejected(
+            "central directory exceeds configured byte limit".into(),
+        ));
     }
     if eocd.entries > limits.max_entries {
-        return Err(ScanError::Rejected("central directory exceeds configured entry-count limit".into()));
+        return Err(ScanError::Rejected(
+            "central directory exceeds configured entry-count limit".into(),
+        ));
     }
-    let central_end = eocd.central_directory_offset
+    let central_end = eocd
+        .central_directory_offset
         .checked_add(eocd.central_directory_size)
         .ok_or_else(|| ScanError::Rejected("central directory range overflows".into()))?;
     if central_end != eocd.absolute_offset {
         return Err(ScanError::Rejected(
-            "central directory is not immediately adjacent to EOCD or EOCD has trailing records".into(),
+            "central directory is not immediately adjacent to EOCD or EOCD has trailing records"
+                .into(),
         ));
     }
 
     let mut cursor = eocd.central_directory_offset;
     for _ in 0..eocd.entries {
-        let fixed_end = cursor.checked_add(46)
-            .ok_or_else(|| ScanError::Rejected("central-directory record offset overflows".into()))?;
+        let fixed_end = cursor.checked_add(46).ok_or_else(|| {
+            ScanError::Rejected("central-directory record offset overflows".into())
+        })?;
         if fixed_end > central_end {
-            return Err(ScanError::Rejected("truncated central-directory file header".into()));
+            return Err(ScanError::Rejected(
+                "truncated central-directory file header".into(),
+            ));
         }
         let mut fixed = [0u8; 46];
         read_exact_at(file, cursor, &mut fixed)?;
         if read_u32(&fixed, 0) != CENTRAL_DIRECTORY_SIGNATURE {
-            return Err(ScanError::Rejected("invalid central-directory file-header signature".into()));
+            return Err(ScanError::Rejected(
+                "invalid central-directory file-header signature".into(),
+            ));
         }
         let name_length = u64::from(read_u16(&fixed, 28));
         let extra_length = u64::from(read_u16(&fixed, 30));
         let comment_length = u64::from(read_u16(&fixed, 32));
         let disk_start = read_u16(&fixed, 34);
         if disk_start != 0 {
-            return Err(ScanError::Unsupported("central-directory record references another disk".into()));
+            return Err(ScanError::Unsupported(
+                "central-directory record references another disk".into(),
+            ));
         }
-        let variable_length = name_length.checked_add(extra_length)
+        let variable_length = name_length
+            .checked_add(extra_length)
             .and_then(|v| v.checked_add(comment_length))
-            .ok_or_else(|| ScanError::Rejected("central-directory variable lengths overflow".into()))?;
-        cursor = fixed_end.checked_add(variable_length)
-            .ok_or_else(|| ScanError::Rejected("central-directory record range overflows".into()))?;
+            .ok_or_else(|| {
+                ScanError::Rejected("central-directory variable lengths overflow".into())
+            })?;
+        cursor = fixed_end.checked_add(variable_length).ok_or_else(|| {
+            ScanError::Rejected("central-directory record range overflows".into())
+        })?;
         if cursor > central_end {
-            return Err(ScanError::Rejected("central-directory variable fields exceed declared directory".into()));
+            return Err(ScanError::Rejected(
+                "central-directory variable fields exceed declared directory".into(),
+            ));
         }
     }
     if cursor != central_end {
@@ -321,39 +355,55 @@ fn locate_signing_block<R: Read + Seek>(
         return Ok(None);
     }
 
-    let trailing_size_offset = magic_offset.checked_sub(8)
+    let trailing_size_offset = magic_offset
+        .checked_sub(8)
         .ok_or_else(|| ScanError::Rejected("signing-block footer underflows source".into()))?;
     let mut trailing_size_bytes = [0u8; 8];
     read_exact_at(file, trailing_size_offset, &mut trailing_size_bytes)?;
     let encoded_size = u64::from_le_bytes(trailing_size_bytes);
     if encoded_size < 24 {
-        return Err(ScanError::Rejected("APK Signing Block size is smaller than its footer".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block size is smaller than its footer".into(),
+        ));
     }
     if encoded_size > limits.max_signing_block_bytes {
-        return Err(ScanError::Rejected("APK Signing Block exceeds configured byte limit".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block exceeds configured byte limit".into(),
+        ));
     }
-    let total_length = encoded_size.checked_add(8)
+    let total_length = encoded_size
+        .checked_add(8)
         .ok_or_else(|| ScanError::Rejected("APK Signing Block total length overflows".into()))?;
-    let block_start = eocd.central_directory_offset.checked_sub(total_length)
+    let block_start = eocd
+        .central_directory_offset
+        .checked_sub(total_length)
         .ok_or_else(|| ScanError::Rejected("APK Signing Block start underflows source".into()))?;
-    let block_end = block_start.checked_add(total_length)
+    let block_end = block_start
+        .checked_add(total_length)
         .ok_or_else(|| ScanError::Rejected("APK Signing Block end overflows".into()))?;
     if block_end != eocd.central_directory_offset {
-        return Err(ScanError::Rejected("APK Signing Block does not end at central-directory start".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block does not end at central-directory start".into(),
+        ));
     }
 
     let mut leading_size_bytes = [0u8; 8];
     read_exact_at(file, block_start, &mut leading_size_bytes)?;
     let leading_size = u64::from_le_bytes(leading_size_bytes);
     if leading_size != encoded_size {
-        return Err(ScanError::Rejected("APK Signing Block leading/trailing size fields differ".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block leading/trailing size fields differ".into(),
+        ));
     }
 
-    let pairs_start = block_start.checked_add(8)
+    let pairs_start = block_start
+        .checked_add(8)
         .ok_or_else(|| ScanError::Rejected("APK Signing Block pair start overflows".into()))?;
     let pairs_end = trailing_size_offset;
     if pairs_start > pairs_end {
-        return Err(ScanError::Rejected("APK Signing Block has an inverted pair region".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block has an inverted pair region".into(),
+        ));
     }
 
     let mut cursor = pairs_start;
@@ -361,23 +411,33 @@ fn locate_signing_block<R: Read + Seek>(
     let mut pairs = Vec::new();
     while cursor < pairs_end {
         if pairs.len() >= limits.max_pairs {
-            return Err(ScanError::Rejected("APK Signing Block pair count exceeds configured limit".into()));
+            return Err(ScanError::Rejected(
+                "APK Signing Block pair count exceeds configured limit".into(),
+            ));
         }
-        let length_end = cursor.checked_add(8)
+        let length_end = cursor
+            .checked_add(8)
             .ok_or_else(|| ScanError::Rejected("APK pair length field overflows".into()))?;
         if length_end > pairs_end {
-            return Err(ScanError::Rejected("truncated APK Signing Block pair length".into()));
+            return Err(ScanError::Rejected(
+                "truncated APK Signing Block pair length".into(),
+            ));
         }
         let mut pair_length_bytes = [0u8; 8];
         read_exact_at(file, cursor, &mut pair_length_bytes)?;
         let pair_length = u64::from_le_bytes(pair_length_bytes);
         if pair_length < 4 {
-            return Err(ScanError::Rejected("APK Signing Block pair length is smaller than its ID".into()));
+            return Err(ScanError::Rejected(
+                "APK Signing Block pair length is smaller than its ID".into(),
+            ));
         }
-        let pair_end = length_end.checked_add(pair_length)
+        let pair_end = length_end
+            .checked_add(pair_length)
             .ok_or_else(|| ScanError::Rejected("APK Signing Block pair end overflows".into()))?;
         if pair_end > pairs_end {
-            return Err(ScanError::Rejected("APK Signing Block pair extends beyond pair region".into()));
+            return Err(ScanError::Rejected(
+                "APK Signing Block pair extends beyond pair region".into(),
+            ));
         }
 
         let mut id_bytes = [0u8; 4];
@@ -385,10 +445,13 @@ fn locate_signing_block<R: Read + Seek>(
         let id = u32::from_le_bytes(id_bytes);
         let value_offset = length_end + 4;
         let value_length = pair_length - 4;
-        total_value_bytes = total_value_bytes.checked_add(value_length)
-            .ok_or_else(|| ScanError::Rejected("APK Signing Block aggregate value length overflows".into()))?;
+        total_value_bytes = total_value_bytes.checked_add(value_length).ok_or_else(|| {
+            ScanError::Rejected("APK Signing Block aggregate value length overflows".into())
+        })?;
         if total_value_bytes > limits.max_total_pair_value_bytes {
-            return Err(ScanError::Rejected("APK Signing Block aggregate pair values exceed configured limit".into()));
+            return Err(ScanError::Rejected(
+                "APK Signing Block aggregate pair values exceed configured limit".into(),
+            ));
         }
 
         let value_sha256 = hash_range(file, value_offset, value_length)?;
@@ -404,10 +467,14 @@ fn locate_signing_block<R: Read + Seek>(
         cursor = pair_end;
     }
     if cursor != pairs_end {
-        return Err(ScanError::Rejected("APK Signing Block pair parser did not end at footer".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block pair parser did not end at footer".into(),
+        ));
     }
     if pairs.is_empty() {
-        return Err(ScanError::Rejected("APK Signing Block contains no ID/value pairs".into()));
+        return Err(ScanError::Rejected(
+            "APK Signing Block contains no ID/value pairs".into(),
+        ));
     }
 
     let block_sha256 = hash_range(file, block_start, total_length)?;
@@ -431,11 +498,16 @@ fn hash_source<R: Read + Seek>(file: &mut R, limit: u64) -> Result<(String, u64)
     let mut total = 0u64;
     loop {
         let read = file.read(&mut buffer).map_err(io_error)?;
-        if read == 0 { break; }
-        total = total.checked_add(read as u64)
+        if read == 0 {
+            break;
+        }
+        total = total
+            .checked_add(read as u64)
             .ok_or_else(|| ScanError::Rejected("source byte count overflows".into()))?;
         if total > limit {
-            return Err(ScanError::Rejected("source read exceeded byte limit".into()));
+            return Err(ScanError::Rejected(
+                "source read exceeded byte limit".into(),
+            ));
         }
         hasher.update(&buffer[..read]);
     }
@@ -447,11 +519,14 @@ fn hash_source<R: Read + Seek>(file: &mut R, limit: u64) -> Result<(String, u64)
 }
 
 fn hash_range<R: Read + Seek>(file: &mut R, offset: u64, length: u64) -> Result<String, ScanError> {
-    let end = offset.checked_add(length)
+    let end = offset
+        .checked_add(length)
         .ok_or_else(|| ScanError::Rejected("hash range overflows".into()))?;
     let source_length = file.seek(SeekFrom::End(0)).map_err(io_error)?;
     if end > source_length {
-        return Err(ScanError::Rejected("hash range extends beyond source".into()));
+        return Err(ScanError::Rejected(
+            "hash range extends beyond source".into(),
+        ));
     }
     file.seek(SeekFrom::Start(offset)).map_err(io_error)?;
     let mut remaining = length;
@@ -466,8 +541,13 @@ fn hash_range<R: Read + Seek>(file: &mut R, offset: u64, length: u64) -> Result<
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn read_exact_at<R: Read + Seek>(file: &mut R, offset: u64, buffer: &mut [u8]) -> Result<(), ScanError> {
-    let end = offset.checked_add(buffer.len() as u64)
+fn read_exact_at<R: Read + Seek>(
+    file: &mut R,
+    offset: u64,
+    buffer: &mut [u8],
+) -> Result<(), ScanError> {
+    let end = offset
+        .checked_add(buffer.len() as u64)
         .ok_or_else(|| ScanError::Rejected("read range overflows".into()))?;
     let length = file.seek(SeekFrom::End(0)).map_err(io_error)?;
     if end > length {
@@ -585,7 +665,10 @@ mod tests {
         assert_eq!(block.pairs[0].recognized_scheme, Some(SchemeKind::V2));
         assert_eq!(block.pairs[1].recognized_scheme, None);
         assert_eq!(block.pairs[2].recognized_scheme, Some(SchemeKind::V3));
-        assert_eq!(block.pairs[3].recognized_scheme, Some(SchemeKind::V3_2HybridPqc));
+        assert_eq!(
+            block.pairs[3].recognized_scheme,
+            Some(SchemeKind::V3_2HybridPqc)
+        );
         assert_eq!(block.pairs[4].id, 0xdead_beef);
         assert_eq!(block.pairs[4].occurrence_index, 4);
         assert_ne!(block.pairs[1].value_sha256, block.pairs[4].value_sha256);
@@ -612,7 +695,9 @@ mod tests {
     #[test]
     fn leading_and_trailing_sizes_must_match() {
         let mut bytes = apk_with_pairs(&[(APK_V2_BLOCK_ID, b"v2")]);
-        let cd_offset = u32::from_le_bytes(bytes[bytes.len() - 6..bytes.len() - 2].try_into().unwrap()) as usize;
+        let cd_offset =
+            u32::from_le_bytes(bytes[bytes.len() - 6..bytes.len() - 2].try_into().unwrap())
+                as usize;
         bytes[cd_offset - 24..cd_offset - 16].copy_from_slice(&0u64.to_le_bytes());
         assert!(matches!(scan_bytes(bytes), Err(ScanError::Rejected(_))));
     }
@@ -663,13 +748,17 @@ mod tests {
         let bytes = apk_without_block();
         let mut comment_wrapped = bytes[..bytes.len() - 22].to_vec();
         comment_wrapped.extend_from_slice(&eocd(1, 46, 64, &fake));
-        assert!(matches!(scan_bytes(comment_wrapped), Err(ScanError::Rejected(_))));
+        assert!(matches!(
+            scan_bytes(comment_wrapped),
+            Err(ScanError::Rejected(_))
+        ));
     }
 
     #[test]
     fn zip64_sentinel_is_explicitly_unsupported() {
         let mut bytes = apk_without_block();
         let offset = bytes.len() - 22;
+        bytes[offset + 8..offset + 10].copy_from_slice(&u16::MAX.to_le_bytes());
         bytes[offset + 10..offset + 12].copy_from_slice(&u16::MAX.to_le_bytes());
         assert!(matches!(scan_bytes(bytes), Err(ScanError::Unsupported(_))));
     }
@@ -677,12 +766,25 @@ mod tests {
     #[test]
     fn pair_and_block_byte_budgets_fail_closed() {
         let bytes = apk_with_pairs(&[(APK_V2_BLOCK_ID, b"large")]);
-        let limits = ScanLimits { max_pairs: 1, max_total_pair_value_bytes: 2, ..ScanLimits::default() };
-        assert!(matches!(scan_open_file(&mut Cursor::new(bytes), limits), Err(ScanError::Rejected(_))));
+        let limits = ScanLimits {
+            max_pairs: 1,
+            max_total_pair_value_bytes: 2,
+            ..ScanLimits::default()
+        };
+        assert!(matches!(
+            scan_open_file(&mut Cursor::new(bytes), limits),
+            Err(ScanError::Rejected(_))
+        ));
 
         let bytes = apk_with_pairs(&[(APK_V2_BLOCK_ID, b"v2"), (APK_V3_BLOCK_ID, b"v3")]);
-        let limits = ScanLimits { max_pairs: 1, ..ScanLimits::default() };
-        assert!(matches!(scan_open_file(&mut Cursor::new(bytes), limits), Err(ScanError::Rejected(_))));
+        let limits = ScanLimits {
+            max_pairs: 1,
+            ..ScanLimits::default()
+        };
+        assert!(matches!(
+            scan_open_file(&mut Cursor::new(bytes), limits),
+            Err(ScanError::Rejected(_))
+        ));
     }
 
     #[test]
