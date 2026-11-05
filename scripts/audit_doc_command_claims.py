@@ -589,12 +589,12 @@ def self_test():
     assert has_unavailable_note(target_note, "tools/missing/Cargo.toml", "example_audit")
     assert not has_unavailable_note(target_note, "tools/missing/Cargo.toml", "different_target")
     unrelated_note = (
-        "The command names tools/missing/Cargo.toml.\\n\\n"
+        "The command names tools/missing/Cargo.toml.\n\n"
         "A separate optional interface is not currently runnable."
     )
     assert not has_unavailable_note(unrelated_note, "tools/missing/Cargo.toml")
     split_target_note = (
-        "tools/missing/Cargo.toml is documented here.\\n"
+        "tools/missing/Cargo.toml is documented here.\n"
         "The unrelated example_audit binary is not currently runnable."
     )
     assert not has_unavailable_note(
