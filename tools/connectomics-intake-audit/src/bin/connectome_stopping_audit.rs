@@ -1408,6 +1408,31 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn checked_in_joint_support_receipt_fixture_exposes_query_no_plan_without_stopping() {
+        let bytes = include_str!(
+            "../../../../docs/neuroscience/examples/CONNECTOME_STOPPING_JOINT_SUPPORT_RECEIPTS.example.jsonl"
+        )
+        .as_bytes();
+        let snapshots = parse_jsonl(bytes).expect("joint-support receipt fixture should parse");
+        let report = build_report(bytes, &snapshots, &args(3));
+        assert_eq!(report.status, "VALIDATED_NOT_STOPPED", "{:?}", report.errors);
+        assert_eq!(report.graph_invariants_stable_in_tail, Some(true));
+        assert_eq!(report.joint_support_evidence.status, "NO_ROBUST_PLAN_IN_TAIL");
+        assert_eq!(report.joint_support_evidence.observed_snapshot_count, 3);
+        assert_eq!(report.joint_support_evidence.tail_receipt_count, 3);
+        assert_eq!(
+            report.joint_support_evidence.no_plan_snapshot_count,
+            1
+        );
+        assert_eq!(
+            report.joint_support_evidence.status_stable_in_tail,
+            Some(false)
+        );
+        assert_eq!(report.recommendation, "CONTINUE_REVIEW");
+    }
+
     #[test]
     fn joint_support_receipt_status_transition_is_not_hidden_by_stable_global_metrics() {
         let mut snapshots = vec![
