@@ -1191,7 +1191,8 @@ mod tests {
                     || direct_projection_separates(left, right, 0b10);
                 let full_projection_separates = direct_projection_separates(left, right, 0b11);
 
-                assert_eq!(report.minimum_joint_disambiguation_effort_units, expected_minimum,
+                assert_eq!(
+                    report.minimum_joint_disambiguation_effort_units, expected_minimum,
                     "wrong minimum for alpha={alpha_mask:04b}, beta={beta_mask:04b}"
                 );
                 assert_eq!(
