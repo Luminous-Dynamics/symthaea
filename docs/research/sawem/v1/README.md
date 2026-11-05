@@ -203,6 +203,16 @@ The current implementation is deliberately only a **one-dimensional SOC envelope
 
 Benchmark case: `BMS-SOC-CAPABILITY-ENVELOPE-001`. No M5BAT capability curves have been fitted from field data yet; field parametrization and improved unfulfilled-delivery metrics remain `not_run`.
 
+### Multi-dimensional capability surface: SOC × temperature × SOH
+
+The new `bms_capability_surface.rs` module extends the SOC-only curve into a complete three-axis grid. Each cell is explicitly indexed by SOC, temperature and SOH bins, and carries separate conservative charge/discharge power limits plus its own evidence reference and SHA-256. A field-measured surface additionally declares the lower-quantile rule used to construct the cell bounds and a minimum observation count per cell.
+
+The evaluator does **not** interpolate between cell limits. It selects the containing half-open cell, includes the final axis endpoint in the last cell, and rejects any state outside the calibrated range. An incomplete Cartesian grid, duplicate coordinate or source reference, malformed axis, missing digest or insufficient field sample count fails closed. This sacrifices smoothness for a clearer evidence boundary: no measurement cell, no inferred operating authority.
+
+The surface evaluator validates and selects precomputed conservative limits; it does not fit them from raw samples. The next empirical step is to build cells from the M5BAT Test 1 calibration campaign using a frozen lower-quantile method, then validate the envelope on Test 2 without refitting. We must report per-cell sample counts, false-safe/false-derate rates and delivered-energy impact. The surface is not a BMS or electrochemical safety model and does not authorize dispatch.
+
+Benchmark case: `BMS-MULTIDIM-CAPABILITY-SURFACE-001`. No field-derived grid has yet been fitted; surface validation against M5BAT remains `not_run`.
+
 ### Revenue realization: decomposing the haircut into evidence
 
 The new `revenue_realization.rs` module bridges theoretical gross revenue to realized net cash through explicitly signed, source-bound adjustments. It separates:
