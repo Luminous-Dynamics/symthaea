@@ -646,7 +646,7 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
     let mut channel_summaries = Vec::new();
     for channel_id in channels.keys() {
         let alternatives_for_channel = captured_alternatives_by_channel
-            .get(channel_id)
+            .get(*channel_id)
             .cloned()
             .unwrap_or_default();
         let channel_critical = alternatives_for_channel
@@ -656,8 +656,8 @@ fn validate_input(input: &Input, input_bytes: &[u8]) -> Result<Value, String> {
             .collect::<Vec<_>>();
         channel_summaries.push(ChannelSummary {
             channel_id: (*channel_id).to_string(),
-            proposal_count: *channel_proposal_counts.get(channel_id).unwrap_or(&0),
-            confirmed_match_count: *confirmed_matches_by_channel.get(channel_id).unwrap_or(&0),
+            proposal_count: *channel_proposal_counts.get(*channel_id).unwrap_or(&0),
+            confirmed_match_count: *confirmed_matches_by_channel.get(*channel_id).unwrap_or(&0),
             unique_alternative_ids: alternatives_for_channel
                 .iter()
                 .map(|value| (*value).to_string())
