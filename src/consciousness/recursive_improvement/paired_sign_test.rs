@@ -53,7 +53,6 @@ pub(crate) fn exact_sign_test_upper_tail(wins: usize, losses: usize) -> Option<f
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::exact_sign_test_upper_tail;
