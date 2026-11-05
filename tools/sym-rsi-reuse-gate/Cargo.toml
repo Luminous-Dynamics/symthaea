@@ -1,0 +1,11 @@
+[package]
+name = "sym-rsi-reuse-gate"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Standalone qualification harness for Symthaea's shared exact sign-test and REUSE decision kernel"
+
+[workspace]
+members = ["."]
+resolver = "2"
