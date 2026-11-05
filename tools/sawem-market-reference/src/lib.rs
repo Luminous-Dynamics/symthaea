@@ -775,6 +775,52 @@ pub fn qualifying_dsu_capacity_for_payment(
 
     match inputs.product {
         DsuUpwardReserveProduct::RegulatingUp | DsuUpwardReserveProduct::Instantaneous => {
+            match inputs.was_utilized_for_reserve_or_balancing {
+                None => {
+                    return Ok(DsuQualificationResult::Indeterminate {
+                        reason: "missing reserve/balancing utilization state",
+                    });
+                }
+                Some(true) => {
+                    if inputs.acceptable_performance != Some(true) {
+                        return Ok(DsuQualificationResult::Indeterminate {
+                            reason: "utilized reserve lacks acceptable-performance evidence",
+                        });
+                    }
+                    // §9.8.3(3), subject to the effective-availability ceiling in (6).
+                    return Ok(DsuQualificationResult::Determined {
+                        qualifying_capacity_mw: contracted_mw.min(effective_available_mw),
+                    });
+                }
+                Some(false) => {}
+            }
+
+            match inputs.energy_instruction_differed_from_contract {
+                None => {
+                    return Ok(DsuQualificationResult::Indeterminate {
+                        reason: "missing not-utilized instruction comparison",
+                    });
+                }
+                Some(true) => {
+                    if inputs.acceptable_performance != Some(true) {
+                        return Ok(DsuQualificationResult::Indeterminate {
+                            reason: "changed-instruction branch lacks acceptable-performance evidence",
+                        });
+                    }
+                    // §9.8.3(4), subject to the effective-availability ceiling in (6).
+                    return Ok(DsuQualificationResult::Determined {
+                        qualifying_capacity_mw: contracted_mw.min(effective_available_mw),
+                    });
+                }
+                Some(false) => {
+                    if inputs.acceptable_performance != Some(true) {
+                        return Ok(DsuQualificationResult::Indeterminate {
+                            reason: "non-utilized unchanged-instruction branch lacks SO capability assessment",
+                        });
+                    }
+                }
+            }
+
             let Some(consumption_mw) = inputs.official_energy_consumption_mw else {
                 return Ok(DsuQualificationResult::Indeterminate {
                     reason: "missing official energy consumption",
@@ -796,52 +842,7 @@ pub fn qualifying_dsu_capacity_for_payment(
                 });
             }
 
-            match inputs.was_utilized_for_reserve_or_balancing {
-                None => {
-                    return Ok(DsuQualificationResult::Indeterminate {
-                        reason: "missing reserve/balancing utilization state",
-                    });
-                }
-                Some(true) => {
-                    if inputs.acceptable_performance != Some(true) {
-                        return Ok(DsuQualificationResult::Indeterminate {
-                            reason: "utilized reserve lacks acceptable-performance evidence",
-                        });
-                    }
-                    return Ok(DsuQualificationResult::Determined {
-                        qualifying_capacity_mw: contracted_mw.min(effective_available_mw),
-                    });
-                }
-                Some(false) => {}
-            }
-
-            match inputs.energy_instruction_differed_from_contract {
-                None => {
-                    return Ok(DsuQualificationResult::Indeterminate {
-                        reason: "missing not-utilized instruction comparison",
-                    });
-                }
-                Some(true) => {
-                    if inputs.acceptable_performance != Some(true) {
-                        return Ok(DsuQualificationResult::Indeterminate {
-                            reason: "changed-instruction branch lacks acceptable-performance evidence",
-                        });
-                    }
-                    return Ok(DsuQualificationResult::Determined {
-                        qualifying_capacity_mw: contracted_mw.min(effective_available_mw),
-                    });
-                }
-                Some(false) => {
-                    if inputs.acceptable_performance != Some(true) {
-                        return Ok(DsuQualificationResult::Indeterminate {
-                            reason: "non-utilized unchanged-instruction branch lacks SO capability assessment",
-                        });
-                    }
-                }
-            }
-
-            // The no-utilization / no-changed-instruction DSU formula in §§9.8.4(3)
-            // and 9.8.6(4), additionally capped by §9.8.3(6) effective availability.
+            // §§9.8.4(3) / 9.8.6(4), with §9.8.3(6)'s availability ceiling.
             let reducible_mw = (consumption_mw - curve.third_elbow_mw).max(0.0);
             Ok(DsuQualificationResult::Determined {
                 qualifying_capacity_mw: contracted_mw
@@ -1801,7 +1802,7 @@ mod tests {
                 product: DsuUpwardReserveProduct::Instantaneous,
                 contracted_capacity_mw: Some(60.0),
                 official_energy_consumption_mw: Some(35.0),
-                effective_available_capacity_mw: Some(10.0),
+                effective_available_capacity_mw: Some(80.0),
                 was_utilized_for_reserve_or_balancing: Some(false),
                 energy_instruction_differed_from_contract: Some(false),
                 acceptable_performance: Some(true),
@@ -1953,7 +1954,7 @@ mod tests {
         assert_eq!(
             qualifying_dsu_capacity_for_payment(utilized, curve),
             Ok(DsuQualificationResult::Indeterminate {
-                reason: "utilized reserve/balancing qualification branch is not modeled"
+                reason: "utilized reserve lacks acceptable-performance evidence"
             })
         );
 
