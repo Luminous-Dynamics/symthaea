@@ -2,7 +2,7 @@
   "corpus_version": "1.0",
   "corpus_state": "draft_case_register",
   "benchmark_id": "SAWEM-BESS-MATCHED-001",
-  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements. The credit-cover increment computes only source-calendar-backed deadlines and notice timeliness; it does not calculate Actual Exposure, Undefined Potential Exposure, UEF, Required Credit Cover, collateral sufficiency or project liquidity. Credit-cover exposure arithmetic counts unpaid invoices and uninvoiced Settlement Statement amounts without double counting, but accepts Undefined Potential Exposure as an externally supplied value and does not calculate the Market Operator UEF or annual Required Credit Cover parameters. Remediation only counts receipt-backed early invoice payments and collateral posted by the explicit deadline; it does not model bank-provider creditworthiness or guarantee cash availability. Credit-cover remediation validates unique receipt references and source-digested civil-date coverage; it still does not authenticate the real bank/Market Operator source or model provider creditworthiness.",
+  "claim_ceiling": "This file is a case register and test-to-case traceability index. Rust unit tests listed here are synthetic reference tests, not independently adjudicated benchmark outcomes, vendor comparisons, SAWEM operator verification or investment-performance results. Cases marked not_run have no measured result. The DSU price-curve unit tests remain synthetic price-lookup conformance, not evidence of DSU product admission, reserve qualification, settlement or revenue. DSU qualifying-capacity tests cover only the named synthetic Code arithmetic branches; they do not authenticate source records, implement utilized-service alternatives, calculate performance-adjusted payments or establish market qualification. Reserve-capacity payment tests are exact formula checks over synthetic or prequalified inputs; they do not establish reserve-category prices, real qualifying capacity, operator performance factors, market admission, settlement or received cash. DSU capacity-path tests distinguish utilized, changed-instruction and unchanged-instruction cases and apply the effective-availability ceiling; acceptable-performance decisions are still supplied as prequalified inputs. The reserve payment formula rejects a reserve-category price labeled for a different reserve product. The constrained-schedule oracle integrates a synthetic piecewise-constant curve over signed schedule values with explicit Trading Period duration; it is not a Market Operator settlement reproduction and does not authenticate schedules, price submissions or market statements. The credit-cover increment computes only source-calendar-backed deadlines and notice timeliness; it does not calculate Actual Exposure, Undefined Potential Exposure, UEF, Required Credit Cover, collateral sufficiency or project liquidity. Credit-cover exposure arithmetic counts unpaid invoices and uninvoiced Settlement Statement amounts without double counting, but accepts Undefined Potential Exposure as an externally supplied value and does not calculate the Market Operator UEF or annual Required Credit Cover parameters. Remediation only counts receipt-backed early invoice payments and collateral posted by the explicit deadline; it does not model bank-provider creditworthiness or guarantee cash availability. Credit-cover remediation validates unique receipt references and source-digested civil-date coverage; it still does not authenticate the real bank/Market Operator source or model provider creditworthiness. Funding-option economics are simple-interest scenario calculations using externally supplied participant funding cost and Collateral Reserve Account yield. They compare only the two paths listed in §15.10.2(3); they do not prove bank or account eligibility, live availability of funds, actual interest credited, or optimal investment funding. Rev 2.3's acceptable Credit Cover form is a cash-held deposit in a Collateral Reserve Account; generic bank guarantees and letters of credit are not modeled as permitted alternatives.",
   "cases": [
     {
       "case_id": "BASE-001",
@@ -737,7 +737,7 @@
       "case_id": "CREDIT-COVER-LIQUIDITY-TIMELINE-001",
       "track": "settlement_and_liquidity",
       "title": "Daily credit-cover recalculation and posting deadline",
-      "scenario": "The kernel reconciles unpaid invoices and statement amounts not yet invoiced into Actual Exposure, adds a separately supplied provenance-bound Undefined Potential Exposure amount, computes required cover and the warning buffer, then evaluates receipt-backed early invoice payments and additional collateral against the source-backed posting deadline. Expected funding is not posted cover; late receipts do not satisfy the earlier deadline. The UEF and live Market Operator exposure calculation remain external. The remediation evaluator also requires each funding action date to resolve inside a source-digested civil calendar, rejects UPE/Actual Exposure source-reference collisions, and rejects reuse of one posting receipt to inflate cover.",
+      "scenario": "The kernel reconciles unpaid invoices and statement amounts not yet invoiced into Actual Exposure, adds a separately supplied provenance-bound Undefined Potential Exposure amount, computes required cover and the warning buffer, then evaluates receipt-backed early invoice payments and additional collateral against the source-backed posting deadline. Expected funding is not posted cover; late receipts do not satisfy the earlier deadline. The UEF and live Market Operator exposure calculation remain external. The remediation evaluator also requires each funding action date to resolve inside a source-digested civil calendar, rejects UPE/Actual Exposure source-reference collisions, and rejects reuse of one posting receipt to inflate cover. The calendar oracle also enforces the ten-Business-Day provider-replacement period after the Cover Provider ceases to qualify, and the one-Business-Day advance notice before a Posted Credit Cover change; the provider replacement period is excluded from the Settlement Risk Period.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -755,7 +755,9 @@
         "expected_cover_does_not_count_and_late_cover_is_excluded",
         "remediation_rejects_overpayment_and_confirmed_actions_without_receipts",
         "exposure_rejects_upe_reference_collision_with_actual_exposure",
-        "remediation_rejects_reused_posting_receipt_and_unmapped_action_date"
+        "remediation_rejects_reused_posting_receipt_and_unmapped_action_date",
+        "provider_replacement_deadline_is_ten_business_days_after_cessation",
+        "change_to_posted_cover_requires_one_business_day_advance_notice"
       ],
       "required_evidence": [
         "unpaid issued invoices with outstanding balances and stable invoice references",
@@ -769,7 +771,10 @@
         "separate Working Day calendar, source digest and coverage horizon",
         "early invoice payment receipts and additional collateral posting receipts",
         "Credit Call / drawdown date and amount and re-establishment receipt",
-        "source-digested civil-date ordinal coverage for funding action timestamps and posting deadline"
+        "source-digested civil-date ordinal coverage for funding action timestamps and posting deadline",
+        "provider cessation / loss-of-eligibility date and effective status",
+        "replacement qualifying bank evidence and re-post receipt",
+        "advance notice to the Market Operator before a Posted Credit Cover change"
       ],
       "stress_tags": [
         "collateral",
@@ -778,6 +783,45 @@
         "business-day-vs-working-day",
         "calendar-provenance",
         "no-silent-deadline"
+      ]
+    },
+    {
+      "case_id": "CREDIT-COVER-FUNDING-OPTION-ECONOMICS-001",
+      "track": "settlement_and_liquidity",
+      "title": "Compare cash collateral carry against early-invoice payment",
+      "scenario": "For an equal Required Credit Cover relief amount, compare the simple-interest cost of a cash deposit in the Market Bank Collateral Reserve Account (participant funding cost less account interest, across an explicit lock-up horizon) with advancing an issued outstanding invoice (participant funding cost across the days advanced). Return cash use, restricted cash, invoice liability reduction and exact rational cost separately. Missing rates, provider/account/invoice evidence remain indeterminate; the model must not admit generic bank guarantees or letters of credit as an alternative under Rev 2.3.",
+      "owner": "Symthaea",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
+      "oracle_state": "draft_expected_disposition",
+      "test_names": [
+        "cash_collateral_cost_nets_funding_cost_against_account_interest",
+        "early_invoice_payment_has_no_collateral_lockup_but_uses_advance_cost",
+        "cash_collateral_cost_increases_with_lockup_horizon",
+        "funding_option_comparison_requires_equal_relief_and_ranks_exactly",
+        "unknown_bank_account_or_interest_inputs_remain_indeterminate",
+        "rejected_provider_evidence_does_not_qualify_cash_collateral",
+        "verified_status_without_a_source_reference_is_rejected",
+        "early_invoice_payment_rejects_unissued_or_overpaid_invoice_inputs"
+      ],
+      "required_evidence": [
+        "source-referenced qualifying Credit Cover Provider bank eligibility",
+        "source-referenced Collateral Reserve Account establishment at the Market Bank",
+        "participant marginal funding/opportunity-cost rate and its source/version",
+        "actual Collateral Reserve Account interest rate and bank source/version",
+        "expected cash lock-up / release horizon",
+        "issued invoice identity, outstanding balance and issue-status evidence",
+        "invoice due date and early-payment date",
+        "funding fees and assumptions for the selected horizon"
+      ],
+      "stress_tags": [
+        "credit-cover",
+        "liquidity",
+        "collateral-carry",
+        "early-settlement",
+        "opportunity-cost",
+        "exact-rational-cost",
+        "no-instrument-assumption"
       ]
     }
   ]
