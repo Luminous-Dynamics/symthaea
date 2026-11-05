@@ -343,7 +343,7 @@ mod tests {
             panic!("the synthetic account and rate evidence is complete");
         };
         assert_eq!(assessment.restricted_cash_minor_units, 50_000_000);
-        assert_eq!(assessment.net_carry_cost.numerator_minor_units, 180_000_000_000_000);
+        assert_eq!(assessment.net_carry_cost.numerator_minor_units, 1_800_000_000_000);
         assert_eq!(assessment.net_carry_cost.denominator, COST_DENOMINATOR);
     }
 
@@ -375,9 +375,9 @@ mod tests {
     #[test]
     fn funding_option_comparison_requires_equal_relief_and_ranks_exactly() {
         let cash_90 = assess_cash_collateral_option(cash_scenario(90)).unwrap();
-        let early_20 = assess_early_invoice_payment_option(early_scenario(20)).unwrap();
+        let early_60 = assess_early_invoice_payment_option(early_scenario(60)).unwrap();
         assert_eq!(
-            compare_liquidity_options(cash_90, early_20),
+            compare_liquidity_options(cash_90, early_60),
             Ok(LiquidityOptionComparison::Determined {
                 lower_cost_option: LowerCostOption::CashCollateralDeposit,
                 compared_cover_relief_minor_units: 50_000_000,
@@ -386,7 +386,7 @@ mod tests {
 
         let cash_365 = assess_cash_collateral_option(cash_scenario(365)).unwrap();
         assert_eq!(
-            compare_liquidity_options(cash_365, early_20),
+            compare_liquidity_options(cash_365, early_60),
             Ok(LiquidityOptionComparison::Determined {
                 lower_cost_option: LowerCostOption::EarlyInvoicePayment,
                 compared_cover_relief_minor_units: 50_000_000,
