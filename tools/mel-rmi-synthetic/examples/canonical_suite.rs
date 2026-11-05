@@ -15,6 +15,12 @@ impl AgentPolicy for YokedSuitePolicy {
         "yoked"
     }
 
+    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+        Box::new(Self {
+            source_session_id: self.source_session_id.clone(),
+        })
+    }
+
     fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         if self.source_session_id.trim().is_empty()
             || self.source_session_id == observation.session_id
