@@ -68,6 +68,8 @@ jobs:
           reciprocal_oracle_count="$(awk -F, '$1 == "reciprocal" && $17 == "true" { count++ } END { print count + 0 }' "$report")"
           negotiation_qualified="$(awk -F, '$1 == "negotiation_qualified" { value=$2 } END { print value + 0 }' "$report")"
           negotiation_rejected="$(awk -F, '$1 == "negotiation_rejected" { value=$2 } END { print value + 0 }' "$report")"
+          authority_scope_qualified="$(awk -F, '$1 == "authority_scope_qualified" { value=$2 } END { print value + 0 }' "$report")"
+          authority_scope_rejected="$(awk -F, '$1 == "authority_scope_rejected" { value=$2 } END { print value + 0 }' "$report")"
           artifact_count="$(awk -F, '$1 == "artifact_verified" { count=$2 } END { print count + 0 }' "$report")"
           artifact_digest_rows="$(awk -F, '$1 == "artifact_digest_rows" { count=$2 } END { print count + 0 }' "$report")"
           artifact_report_rows="$(awk 'END { print NR - 1 }' "$artifact_report")"
@@ -83,6 +85,8 @@ jobs:
           test "$reciprocal_count" -eq 160
           test "$negotiation_qualified" -eq 6
           test "$negotiation_rejected" -eq 5
+          test "$authority_scope_qualified" -eq 1
+          test "$authority_scope_rejected" -eq 6
           test "$artifact_count" -eq 1120
           test "$artifact_digest_rows" -eq 17920
           test "$artifact_report_rows" -eq 17920
