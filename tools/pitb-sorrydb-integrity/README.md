@@ -15,12 +15,13 @@ The checked-in provenance manifest pins:
 - source repository commit: `74b3b63f8ba890d675f362924b21ac55db410383`
 - full dataset Git blob: `5fafddac467af6d30d8f5c8731d6edec9c273a47`
 - 1,000-task evaluation split Git blob: `af3b663429dc4689ee728d2fb5c7d8d5034476f7`
-- full database task count: 2,601
+- README-documented full database task count: 2,601
+- observed full dataset task count at the pinned blob: 5,663
 - held-out evaluation task count: 1,000
 - source license: Apache-2.0
 - evaluation role: test
 
-The data files are not duplicated in this crate. Supply the exact upstream JSON files when running the validator; it recomputes Git blob IDs with `git hash-object --stdin` and rejects mismatched bytes. The manifest is an identity record, not a claim that the tasks were reproduced.
+The data files are not duplicated in this crate. Supply the exact upstream JSON files when running the validator; it recomputes Git blob IDs with `git hash-object --stdin` and rejects mismatched bytes. The pinned blob contains 5,663 records even though the README says 2,601; the report records this documentation drift explicitly rather than silently changing either value. The manifest is an identity record, not a claim that the tasks were reproduced.
 
 ## Run
 
@@ -53,7 +54,7 @@ A task receipt is bound to the exact SorryDB task ID, repository remote and comm
 
 The tool rejects unknown/duplicate tasks, missing receipts, duplicate receipts, source identity drift, an evaluation item absent from the full snapshot, a task record that differs between the full database and evaluation split, invalid source coordinates, a debug URL that does not bind the pinned commit/path, and Git blob byte mismatches.
 
-A task is classified as reproducible only when source location, sorry marker, goal extraction, proposition type and full project build all pass and the extracted goal is not marked mismatched. Semantic/vacuity/assumption findings are reported independently. A reproduction pass is not a semantic-clean bill of health.
+A task is classified as reproducible only when source location, sorry marker, goal extraction, proposition type and full project build all pass and the extracted goal is not marked mismatched. SorryDB line numbers are 1-based while columns are 0-based character offsets; zero is a valid column and is preserved exactly. Semantic/vacuity/assumption findings are reported independently. A reproduction pass is not a semantic-clean bill of health.
 
 ## Critical trust boundary
 
