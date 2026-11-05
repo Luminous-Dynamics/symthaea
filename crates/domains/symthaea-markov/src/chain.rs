@@ -345,9 +345,10 @@ mod tests {
 
         assert!(matches!(
             chain.try_step(&[1.0]),
-            Err(MarkovError::InvalidDistribution(
-                DistributionError::NotNormalized { .. }
-            ))
+            Err(MarkovError::DistributionDimensionMismatch {
+                actual: 1,
+                expected: 2
+            })
         ));
         assert!(matches!(
             chain.try_step(&[0.0, 0.0]),
