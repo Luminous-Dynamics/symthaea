@@ -470,3 +470,56 @@ For Symthaea, reproduce the Data-only, Harness-only and Joint tracks, add an exp
 Sources:
 - Chen, Zhu & Zheng, *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
 - Meng et al., *RSIGym: A Flexible Environment for Recursive Self-Improvement*, arXiv:2610.10310 (2026-10-07): https://arxiv.org/abs/2610.10310
+
+
+## 15. Adaptive holdout reuse and decision-only feedback — issue #10573
+
+A new failure mode remains even after receipt verification, exact task accounting, source identity and cluster-aware statistics: the proposer can overfit to a reused audit set if it sees the scores. A cryptographically valid evaluation result can still become statistically invalid evidence after enough adaptive reuse.
+
+Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27), formalizes this as adaptive overfitting. REUSE allocates a global error budget over round t and prior promotion count p, and requires the proposer to receive only the promotion decision. It reports zero false promotions in its Covertype experiments versus 75 / 71 for empirical best-of-K at evaluation pool sizes 2,000 / 10,000, while retaining comparable final population performance. These are author-reported results for one tabular binary-classification setting, with 30 seeds, 200 rounds and up to eight proposals per round; they are not proof that the exact procedure transfers to coding, scientific research, multi-metric capability retention or every benchmark distribution.
+
+### New Rust arithmetic primitive
+
+The branch adds `reuse_error_budget.rs` with `allocate_reuse_error_budget`. It implements the per-round/per-promotion allocation
+
+[
+\delta_{t,p} =
+\frac{\alpha w_t v_p}
+{\binom{t-1}{p} K^{p+1}},
+\qquad
+w_t=\frac{1}{t(t+1)},\quad
+v_p=\frac{1}{(p+1)(p+2)}.
+]
+
+It computes the binomial term and candidate factor in log space, then splits the allocation into a paired-test budget `rho * delta` and a cumulative lower-bound budget `(1-rho) * delta`. It rejects invalid parameters, impossible promotion histories, histories beyond the reviewed maximum, and binary64 underflow; zero is never silently treated as a valid error allowance. Seven tests are authored for hand-calculated allocations, monotonicity, invalid histories, history bounds, underflow and small exact binomial coefficients.
+
+This is only a deterministic arithmetic helper. It does **not** implement the REUSE sequential test, prove the simultaneous guarantee, retain promotion history, protect a holdout, hide scores, create a certificate, or authorize promotion. The implementation's convention for `rho` must be reviewed against the exact theorem/proof before any decision service uses it.
+
+### Required external evaluation boundary
+
+Tracked in [#10573 — adaptive evaluation and holdout-feedback firewall](https://github.com/Luminous-Dynamics/symthaea/issues/10573). The proposer may inspect development results, but its only active-search feedback from the independent audit service is a predeclared coarse decision such as promoted / not promoted / insufficient evidence. The detailed task results, scores, cluster means and certificates remain private to the independent service and authorized auditors until search is complete or a separate disclosure rule permits release.
+
+The service must persist every proposal and every attempted comparison, bind the current incumbent and full promotion history, freeze the global error budget, and prevent resets across restarts or experiment-ID changes. A new experiment name cannot mint a fresh alpha budget. The proposer cannot change the audit corpus, grader, error allocation, service, trust roots or signer keys.
+
+### What is needed before claiming an adaptive guarantee
+
+1. Review the REUSE theorem and code line-by-line, including the exact hypotheses for the paired test, cumulative lower-bound certificate and candidate-history accounting.
+2. Implement the private decision service and a canary-tested feedback firewall. A Rust enum or instruction not to reveal scores is not access control.
+3. Verify the audit sample is independent of proposer randomness, development data and the initial system; preserve task-family/project clusters and task-input identity.
+4. Simulate known-null adaptive histories with varying noise, K, promotion histories, correlated task clusters and multi-metric guardrails. Report empirical coverage and Monte Carlo uncertainty.
+5. Keep #8438 cluster-bootstrap intervals and #9433 population inference separate from the sequential promotion theorem. The theorem does not automatically solve multi-metric non-inferiority.
+6. Audit the final selected system on a fresh independent population after the adaptive sequence. Report product quality, false-promotion rate, capability regressions and resource cost separately.
+7. Run independent full-loop replications from identical initial artifacts and use the R4 same-start improver swap test. A single successful long chain is not evidence that the improvement process itself improved.
+
+### Benchmark comparison
+
+The closest comparison is not a raw accuracy leaderboard. Run best-of-K, Bonferroni/fixed non-adaptive testing, REUSE-style decision-only adaptation and frozen/evolved improver arms on the same candidate pool, resource budget, task distribution and private audit. Compare:
+- false-promotion rate and simultaneous error control;
+- true population improvement and final capability-retention vector;
+- number of accepted improvements and time/resource cost per accepted improvement;
+- sensitivity to evaluation-pool size, K, round count, promotion history and cluster correlation;
+- audit leakage under process, credential, filesystem and network canaries.
+
+REUSE's result is a strong methodological comparator, not a performance target to copy uncritically. The Symthaea target is to retain the statistical guarantee while supporting multiple independently measured capability dimensions and real engineering/science tasks, without exposing their audit scores to the evolving proposer.
+
+Source: Sun et al., *Which Self-Improvements Should We Trust? Reliable Self-Improvement When Agents Reuse Their Benchmarks*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
