@@ -21,7 +21,16 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Research Roadmap](#research-roadmap) | Future research directions |
 | [Evidence-Driven Invention](INVENTOR_LOOP_001_PROGRAM_V0_1.md) | Engineering intelligence, physical validation and human learning |
 | [Bridge / Truss Learner Packet](INVENTOR_LOOP_001_BRIDGE_TRUSS_LEARNER_PACKET_V0_1.md) | Design-only first learner project using existing Symtropy truss analysis |
-| [Bridge / Truss Instructor Key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) | Analytical reference for the paper-only symmetric two-bar exercise |\n| [CAD-HISTORY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10510) | Edit-preserving parametric feature-history reconstruction benchmark |\n| [PLE external benchmark registry](../../benchmarks/manifest.json) | Versioned metadata, evaluation pathways and reproduction constraints |
+| [Bridge / Truss Instructor Key](INVENTOR_LOOP_001_BRIDGE_TRUSS_INSTRUCTOR_KEY_V0_1.md) | Analytical reference for the paper-only symmetric two-bar exercise |
+| [CAD-HISTORY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10510) | Parametric and scan-to-CAD reconstruction benchmark |
+| [CAD-HISTORY-001 Fixture Corpus](https://github.com/Luminous-Dynamics/symthaea/pull/10529) | Synthetic editable-history and scan-to-CAD fixture specification |
+| [HARDWARE-TOPOLOGY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10530) | Assembly pose, mating and ECAD connectivity benchmark |
+| [HARDWARE-TOPOLOGY-001 Fixture Corpus](https://github.com/Luminous-Dynamics/symthaea/pull/10532) | Assembly, netlist and buildability synthetic fixtures |
+| [ENG-DESIGN-CHANGE-QUAL-001](https://github.com/Luminous-Dynamics/symthaea/issues/10543) | Engineering change impact and evidence applicability benchmark |
+| [ENG-DESIGN-CHANGE-QUAL-001 Fixture Bank](https://github.com/Luminous-Dynamics/symthaea/pull/10546) | Public 24-scenario blueprint bank |
+| [PLE and BenchCAD external benchmark registry](../../benchmarks/manifest.json) | Versioned metadata, evaluation pathways and reproduction constraints |
+| [CAD-HISTORY-001](https://github.com/Luminous-Dynamics/symthaea/issues/10510) | Edit-preserving parametric feature-history reconstruction benchmark |
+| [PLE external benchmark registry](../../benchmarks/manifest.json) | Versioned metadata, evaluation pathways and reproduction constraints |
 
 ---
 
