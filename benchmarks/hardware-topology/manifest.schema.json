@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/hardware-topology/manifest.schema.json",
+  "title": "HARDWARE-TOPOLOGY-001 public fixture blueprint manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "benchmark_id",
+    "version",
+    "updated_at",
+    "status",
+    "task_count",
+    "task_families",
+    "cases",
+    "terminal_dispositions",
+    "score_dimensions",
+    "hard_gates",
+    "external_comparator",
+    "ownership",
+    "custody",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "benchmark_id": {
+      "const": "HARDWARE-TOPOLOGY-001"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "const": "public_blueprint_specification_only"
+    },
+    "task_count": {
+      "type": "integer",
+      "const": 20
+    },
+    "task_families": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "case_ids"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "case_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(ASM|ECAD|MFG)-[PN][0-9]{2}$"
+            }
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family_id",
+          "title",
+          "candidate_visible_scenario",
+          "changed_subjects",
+          "evaluation_axes",
+          "critical_control",
+          "ambiguity_control",
+          "gold_status",
+          "score_status",
+          "materialization_status",
+          "terminal_disposition_contract"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(ASM|ECAD|MFG)-[PN][0-9]{2}$"
+          },
+          "family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_visible_scenario": {
+            "type": "string",
+            "minLength": 20
+          },
+          "changed_subjects": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evaluation_axes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "critical_control": {
+            "type": "boolean"
+          },
+          "ambiguity_control": {
+            "type": "boolean"
+          },
+          "gold_status": {
+            "const": "not_yet_adjudicated"
+          },
+          "score_status": {
+            "const": "not_scored"
+          },
+          "materialization_status": {
+            "const": "blueprint_only"
+          },
+          "terminal_disposition_contract": {
+            "const": "per_subject_and_claim"
+          }
+        }
+      }
+    },
+    "terminal_dispositions": {
+      "type": "array",
+      "minItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "score_dimensions": {
+      "type": "array",
+      "minItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "external_comparator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "official_protocol_version",
+        "published_reference_harness_v2_1_not_comparable",
+        "core_access_agreement_required",
+        "public_cases_not_reportable",
+        "metadata_registry"
+      ],
+      "properties": {
+        "id": {
+          "const": "benchcad-2.0"
+        },
+        "official_protocol_version": {
+          "const": "v2.0"
+        },
+        "published_reference_harness_v2_1_not_comparable": {
+          "const": true
+        },
+        "core_access_agreement_required": {
+          "const": true
+        },
+        "public_cases_not_reportable": {
+          "const": true
+        },
+        "metadata_registry": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "minProperties": 8,
+      "additionalProperties": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_visible_blueprints",
+        "gold_labels_adjudicated",
+        "sealed_holdout_created",
+        "external_public_task_material_downloaded",
+        "core_task_material_downloaded",
+        "execution_authorized",
+        "physical_testing_authorized"
+      ],
+      "properties": {
+        "candidate_visible_blueprints": {
+          "const": true
+        },
+        "gold_labels_adjudicated": {
+          "const": false
+        },
+        "sealed_holdout_created": {
+          "const": false
+        },
+        "external_public_task_material_downloaded": {
+          "const": false
+        },
+        "core_task_material_downloaded": {
+          "const": false
+        },
+        "execution_authorized": {
+          "const": false
+        },
+        "physical_testing_authorized": {
+          "const": false
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
