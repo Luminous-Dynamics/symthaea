@@ -249,3 +249,70 @@ This document is accepted as a research coordination artifact only when:
 - rights and expert-review requirements are explicit.
 
 It is **not** an implementation-completion, scientific-validity, deployment-readiness or benchmark-performance claim.
+
+
+## 11. External benchmark and data-license update — 2026-11-05
+
+This update records a more precise check of the current public benchmark sources. Freeze the exact paper version, dataset repository revision, subset manifests and license alongside any run. Paper abstracts and mutable dataset cards can describe different snapshots.
+
+### 11.1 Narrative benchmarks
+
+- **NarraBench (EACL 2026)** surveys 78 narrative benchmarks and estimates that only 27% of narrative task types are well covered by existing evaluations. It identifies narrative events, style, perspective and revelation as underrepresented, and explicitly notes that some narrative judgments are perspectival rather than single-answer tasks. This 27% is the authors' coverage estimate, not a model accuracy score.
+  - https://aclanthology.org/2026.eacl-long.176/
+- **LitVISTA (ACL 2026)** evaluates narrative orchestration in literary text, including function and structure. Its reported experiments with frontier LLMs found difficulty forming an integrated global view; end-to-end failures were dominated by event-anchor identification/localization errors. This motivates two separate measurements:
+  1. an oracle-anchor condition, which isolates downstream narrative-function/structure reasoning;
+  2. an end-to-end condition, which includes event-anchor discovery/localization.
+  Do not report the oracle result as end-to-end literary understanding.
+  - https://aclanthology.org/2026.acl-long.1024/
+
+The existing MythologyBench work should add task tags and annotation fields for anchor identity, exact source locator, event/character/place relations, viewpoint/focalization, narrative function, temporal order, causal-vs-sequential relation, revelation and multi-perspective interpretation. It should not duplicate LitVISTA's corpus; it should test source-witness, cultural-context, variation and historical-provenance dimensions that are specific to our research target.
+
+### 11.2 African-language benchmark coverage and licensing
+
+- **AFROBENCH (Findings ACL 2025)** reports aggregate coverage of 64 African languages, 15 tasks and 22 datasets across NLU, generation, knowledge/question answering and mathematical reasoning. That aggregate does not mean every language appears in every task; build a language × dataset × task × split manifest before selecting comparisons.
+  - https://aclanthology.org/2025.findings-acl.976/
+  - Dataset repository: https://github.com/McGill-NLP/AfroBench
+- **Afri-MCQA (ACL 2026)** paper metadata reports 7.5k Q&A pairs across 15 African languages and 12 countries, with text and speech modalities and native-speaker creation. The currently visible Hugging Face dataset card / associated released index has evolved: the Hugging Face card declares `cc-by-nc-4.0`; the African Research Collective index lists 16 language subsets, including Sesotho, Setswana and a `Zulu`-labelled subset, with different per-language dev/test counts. Treat this as dataset-version drift, not as one timeless count.
+  - Paper: https://aclanthology.org/2026.acl-long.1869/
+  - Current card: https://huggingface.co/datasets/Atnafu/Afri-MCQA
+  - Language/split index: https://github.com/The-African-Research-Collective/african-llm-datasets
+
+**Licensing consequence:** the current Afri-MCQA dataset card identifies CC BY-NC 4.0. Do not copy its examples, audio or images into commercial training, product fixtures, or a commercial corpus without separate permission/legal review. Research use also requires compliance with attribution, non-commercial restrictions and the actual license text. A paper citation is not a dataset license. If used for a non-commercial evaluation, keep the licensed corpus external and record the exact dataset revision, allowed use, access restrictions and evaluation-only status.
+
+**South African language coverage (current released index snapshot):**
+- Sesotho: listed, with 132 dev and 198 test rows in the index.
+- Setswana: listed, with 200 dev and 302 test rows.
+- Zulu: listed under the dataset's `Zulu` label, with 99 dev and 150 test rows.
+- isiXhosa: not listed in the current 16-language index reviewed for this update.
+
+These subset counts are too small to support broad language-competence claims by themselves. The dataset label `Zulu` should not silently be rewritten as a guaranteed dialect/orthography/variety specification. Confirm the language identity, orthographic conventions, speaker provenance, and suitability with native speakers before making claims about isiZulu coverage. No isiXhosa benchmark coverage is currently established by this source.
+
+### 11.3 Incomplete knowledge graph evaluation
+
+**BRINK (EACL 2026)** explicitly identifies a benchmark shortcut: questions that can be answered by an existing triple do not establish multi-hop reasoning. Its empirical findings report limitations of current KG-RAG under missing knowledge and note reliance on internal model memorization. Add controlled critical-edge removal, distractor triples, near-miss relations and unanswerable cases. Report:
+- graph-supported answer rate;
+- direct-lookup versus genuine multi-hop task performance;
+- performance before and after critical-edge removal;
+- memorization-sensitive no-graph controls;
+- abstention precision/recall and selective risk.
+
+Source: https://aclanthology.org/2026.eacl-long.114/
+
+**KGHaluBench (Findings EACL 2026)** provides a complementary graph-derived hallucination evaluation with dynamic question generation and conceptual/correctness checks. Reuse its problem framing and compare on permitted released data; do not treat a graph-generated question as independent ground truth without validating its source graph and question-generation process.
+
+Source: https://aclanthology.org/2026.findings-eacl.206/
+
+### 11.4 Required benchmark manifest additions
+
+Before any external benchmark is run, bind:
+- paper/benchmark version and citation;
+- dataset repository and immutable commit/revision;
+- language, task, subset, split and sample-count manifest;
+- license identifier and permitted purpose;
+- raw asset availability (text/audio/image) and access constraints;
+- preprocessing/translation/transcription lineage;
+- evaluator version, prompt/model version and scoring protocol;
+- whether the task is oracle-input or end-to-end;
+- known overlap, contamination and source-family leakage checks.
+
+The programme's immediate data priority is now more specific: evaluate licensed/public AFROBENCH components for task-language fit; treat Afri-MCQA as non-commercial evaluation material unless a separate license is obtained; use its Sesotho, Setswana and Zulu-labelled subsets as possible pilot inputs subject to native-speaker review; and commission a separately governed isiXhosa cohort rather than pretending it is covered.
