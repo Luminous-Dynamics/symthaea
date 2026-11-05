@@ -226,7 +226,7 @@ fn cost_non_decreasing(before: Option<u64>, after: Option<u64>) -> bool {
 }
 
 fn evaluate() -> Report {
-    let masks_per_world = WORLD_SUPPORT_MASKS.count_ones() as usize;
+    let masks_per_world = WORLD_SUPPORT_MASKS as usize;
     let mut report = Report {
         schema_version: 1,
         tool: "connectome-support-expansion-lattice-audit",
@@ -388,7 +388,7 @@ mod tests {
     fn exhaustive_lattice_checks_every_ordered_inclusion_pair() {
         let report = evaluate();
         assert_eq!(report.ordered_support_inclusion_pairs_checked, 4_225);
-        assert_eq!(report.monotonicity_passed, true);
+        assert!(report.monotonicity_passed);
         assert_eq!(report.adaptive_monotonicity_violations, 0);
         assert_eq!(report.fixed_monotonicity_violations, 0);
         assert_eq!(report.adaptive_policy_resurrections, 0);
