@@ -1,0 +1,307 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ceb/rust-balanced-sampling-v0.schema.json",
+  "title": "CEB Rust Pilot Balanced Repository-by-Fault-Family Sampling Plan V0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "plan_id",
+    "version",
+    "status",
+    "created_on",
+    "pilot_protocol_id",
+    "target_task_count",
+    "actual_task_count",
+    "repository_slot_count",
+    "family_slot_count",
+    "base_cell_count",
+    "extra_slot_count",
+    "development_slot_count",
+    "heldout_slot_count",
+    "repository_slots",
+    "family_ids",
+    "slot_assignments",
+    "difficulty_strata",
+    "difficulty_assessment_policy",
+    "balancing_policy",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 0
+    },
+    "plan_id": {
+      "const": "CEB-RUST-BALANCED-SAMPLING-V0"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^0\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "const": "design_only_no_actual_task_assignments"
+    },
+    "created_on": {
+      "type": "string",
+      "format": "date"
+    },
+    "pilot_protocol_id": {
+      "const": "CEB-RUST-PILOT-001"
+    },
+    "target_task_count": {
+      "const": 48
+    },
+    "actual_task_count": {
+      "const": 0
+    },
+    "repository_slot_count": {
+      "const": 6
+    },
+    "family_slot_count": {
+      "const": 6
+    },
+    "base_cell_count": {
+      "const": 36
+    },
+    "extra_slot_count": {
+      "const": 12
+    },
+    "development_slot_count": {
+      "const": 32
+    },
+    "heldout_slot_count": {
+      "const": 16
+    },
+    "repository_slots": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "repository_slot_id",
+          "actual_repository_full_name",
+          "actual_source_revision",
+          "status"
+        ],
+        "properties": {
+          "repository_slot_id": {
+            "type": "string",
+            "pattern": "^repo-slot-0[1-6]$"
+          },
+          "actual_repository_full_name": {
+            "type": "null"
+          },
+          "actual_source_revision": {
+            "type": "null"
+          },
+          "status": {
+            "const": "unassigned"
+          }
+        }
+      }
+    },
+    "family_ids": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "rust-types-traits",
+          "multi-crate-api-regression",
+          "feature-target-configuration",
+          "issue-reproduction-debugging",
+          "security-correctness",
+          "performance-correctness"
+        ]
+      }
+    },
+    "slot_assignments": {
+      "type": "array",
+      "minItems": 48,
+      "maxItems": 48,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot_id",
+          "repository_slot_id",
+          "family_id",
+          "slot_kind",
+          "partition",
+          "planned_difficulty_stratum",
+          "actual_difficulty_label",
+          "difficulty_record_sha256",
+          "task_id",
+          "task_manifest_sha256",
+          "actual_repository_full_name"
+        ],
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "pattern": "^repo0[1-6]-family0[1-6]-(base|extra)$"
+          },
+          "repository_slot_id": {
+            "type": "string",
+            "pattern": "^repo-slot-0[1-6]$"
+          },
+          "family_id": {
+            "enum": [
+              "rust-types-traits",
+              "multi-crate-api-regression",
+              "feature-target-configuration",
+              "issue-reproduction-debugging",
+              "security-correctness",
+              "performance-correctness"
+            ]
+          },
+          "slot_kind": {
+            "enum": [
+              "base",
+              "extra"
+            ]
+          },
+          "partition": {
+            "enum": [
+              "development",
+              "holdout"
+            ]
+          },
+          "planned_difficulty_stratum": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "actual_difficulty_label": {
+            "type": "null"
+          },
+          "difficulty_record_sha256": {
+            "type": "null"
+          },
+          "task_id": {
+            "type": "null"
+          },
+          "task_manifest_sha256": {
+            "type": "null"
+          },
+          "actual_repository_full_name": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    "difficulty_strata": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "stratum_id",
+          "target_slots"
+        ],
+        "properties": {
+          "stratum_id": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "target_slots": {
+            "const": 16
+          }
+        }
+      }
+    },
+    "difficulty_assessment_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimensions",
+        "assessment_timing",
+        "reviewers",
+        "outcome_blindness",
+        "actual_label_status"
+      ],
+      "properties": {
+        "dimensions": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "assessment_timing": {
+          "type": "string",
+          "minLength": 30
+        },
+        "reviewers": {
+          "type": "string",
+          "minLength": 20
+        },
+        "outcome_blindness": {
+          "type": "string",
+          "minLength": 40
+        },
+        "actual_label_status": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "balancing_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_quota",
+        "fault_family_quota",
+        "cell_design",
+        "holdout_balance",
+        "complexity_balance",
+        "no_post_score_exclusion",
+        "attrition_reporting"
+      ],
+      "properties": {
+        "repository_quota": {
+          "type": "string",
+          "minLength": 20
+        },
+        "fault_family_quota": {
+          "type": "string",
+          "minLength": 20
+        },
+        "cell_design": {
+          "type": "string",
+          "minLength": 30
+        },
+        "holdout_balance": {
+          "type": "string",
+          "minLength": 20
+        },
+        "complexity_balance": {
+          "type": "string",
+          "minLength": 20
+        },
+        "no_post_score_exclusion": {
+          "const": true
+        },
+        "attrition_reporting": {
+          "type": "string",
+          "minLength": 30
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "string",
+      "minLength": 50
+    }
+  }
+}
