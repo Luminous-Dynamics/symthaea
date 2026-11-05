@@ -320,22 +320,70 @@ fn scenario_cases() -> Vec<ScenarioCase> {
     cases
 }
 
-fn trial_schedule(trials_per_class: u32) -> Result<Vec<TrialRequest>, Box<dyn Error>> {
+fn trial_schedule(
+    trials_per_class: u32,
+    schedule_seed: u64,
+) -> Result<Vec<TrialRequest>, Box<dyn Error>> {
     let total = trials_per_class.checked_mul(2).ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "requested trial count overflow")
     })?;
     let capacity = usize::try_from(total).map_err(|_| {
         io::Error::new(io::ErrorKind::InvalidInput, "requested trial count exceeds platform capacity")
     })?;
-    let mut requests = Vec::with_capacity(capacity);
-    for trial in 0..total {
-        requests.push(TrialRequest {
-            action_id: if trial % 2 == 0 { 1 } else { 2 },
-            participant_id: 0,
-            within_participant_trial: trial,
-        });
+    let half = usize::try_from(trials_per_class).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidInput, "class trial count exceeds platform capacity")
+    })?;
+    let mut action_ids = Vec::with_capacity(capacity);
+    action_ids.extend(std::iter::repeat_n(1u32, half));
+    action_ids.extend(std::iter::repeat_n(2u32, half));
+
+    // Deterministic Fisher-Yates shuffle. The schedule is balanced by
+    // construction, but neither class is tied to trial parity or block order.
+    let mut rng = ScheduleRng::new(schedule_seed);
+    for index in (1..action_ids.len()).rev() {
+        let selected = rng.uniform_index(index + 1);
+        action_ids.swap(index, selected);
     }
-    Ok(requests)
+
+    Ok(action_ids
+        .into_iter()
+        .enumerate()
+        .map(|(trial_index, action_id)| TrialRequest {
+            action_id,
+            participant_id: 0,
+            within_participant_trial: trial_index as u32,
+        })
+        .collect())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ScheduleRng {
+    state: u64,
+}
+
+impl ScheduleRng {
+    fn new(seed: u64) -> Self {
+        Self { state: seed ^ 0x5343_4845_4455_4C45 }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^ (value >> 31)
+    }
+
+    fn uniform_index(&mut self, upper_exclusive: usize) -> usize {
+        let upper = upper_exclusive as u64;
+        let threshold = upper.wrapping_neg() % upper;
+        loop {
+            let draw = self.next_u64();
+            if draw >= threshold {
+                return (draw % upper) as usize;
+            }
+        }
+    }
 }
 
 fn csv_number(value: f64) -> String {
@@ -353,7 +401,7 @@ fn emit_csv_row(fields: Vec<String>) {
 
 fn write_replicate_header() {
     println!(
-        "row_type,scenario_id,scenario_name,estimand_track,replicate,root_seed,prng_version,trials_per_class,requested_total,observed_signal,observed_noise,missing_signal,missing_noise,rt_observed,rt_timeouts,rt_out_of_range,rt_not_collected,adapter_disposition,fit_status,qualified,truth_mu,truth_sigma,truth_d_a,estimate_mu,estimate_sigma,estimate_d_a,mu_error,sigma_error,d_a_error,mu_rmse,sigma_rmse,d_a_rmse,fit_availability_all,fit_availability_eligible,adapter_ready,adapter_abstentions,boundary,not_identifiable,weakly_identified,not_converged,not_evaluable"
+        "row_type,scenario_id,scenario_name,estimand_track,replicate,root_seed,dgp_prng_version,schedule_prng_version,trials_per_class,requested_total,observed_signal,observed_noise,missing_signal,missing_noise,rt_observed,rt_timeouts,rt_out_of_range,rt_not_collected,adapter_disposition,fit_status,qualified,truth_mu,truth_sigma,truth_d_a,estimate_mu,estimate_sigma,estimate_d_a,mu_error,sigma_error,d_a_error,mu_rmse,sigma_rmse,d_a_rmse,fit_availability_all,fit_availability_eligible,adapter_ready,adapter_abstentions,boundary,not_identifiable,weakly_identified,not_converged,not_evaluable"
     );
 }
 
@@ -389,6 +437,7 @@ fn write_replicate_row(
         replicate.to_string(),
         seed.to_string(),
         dataset.prng_version.to_owned(),
+        "splitmix64-balanced-fisher-yates-v1".to_owned(),
         trials_per_class.to_string(),
         trials_per_class.saturating_mul(2).to_string(),
         group.observed_signal_trials.to_string(),
@@ -498,7 +547,6 @@ fn known_truth_after_fit(dataset: &SyntheticDataset) -> io::Result<(f64, f64, f6
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = parse_cli()?;
     let action_set = action_set()?;
-    let requests = trial_schedule(cli.trials_per_class)?;
     let fit_options = FitOptions::default();
 
     write_replicate_header();
@@ -509,6 +557,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         for replicate in 0..cli.outer {
             aggregate.record_campaign();
             let seed = cli.seed_root.wrapping_add(replicate as u64);
+            // Reuse exactly the same balanced schedule across DGP families
+            // for this replicate, while randomizing class order by seed.
+            let requests = trial_schedule(cli.trials_per_class, seed)?;
             let dataset = generate_synthetic_dataset(
                 &action_set,
                 &case.spec,
@@ -589,12 +640,20 @@ mod tests {
 
     #[test]
     fn schedule_is_balanced_and_uses_one_participant_session() {
-        let schedule = trial_schedule(101).unwrap();
+        let schedule = trial_schedule(101, 77).unwrap();
+        let repeated = trial_schedule(101, 77).unwrap();
+        let next_seed = trial_schedule(101, 78).unwrap();
+        assert_eq!(schedule, repeated);
+        assert_ne!(schedule, next_seed);
         assert_eq!(schedule.len(), 202);
         assert_eq!(schedule.iter().filter(|request| request.action_id == 1).count(), 101);
         assert_eq!(schedule.iter().filter(|request| request.action_id == 2).count(), 101);
         assert!(schedule.iter().all(|request| request.participant_id == 0));
         assert!(schedule.iter().all(|request| request.within_participant_trial < 202));
+        assert_ne!(
+            schedule.iter().map(|request| request.action_id).collect::<Vec<_>>(),
+            (0..202).map(|trial| if trial % 2 == 0 { 1 } else { 2 }).collect::<Vec<_>>()
+        );
     }
 
     #[test]
