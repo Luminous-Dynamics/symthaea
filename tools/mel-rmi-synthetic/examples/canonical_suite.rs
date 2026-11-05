@@ -15,7 +15,7 @@ impl AgentPolicy for YokedSuitePolicy {
         "yoked"
     }
 
-    fn fork_from_frozen_state(&self) -> Box<dyn AgentPolicy> {
+    fn fork_from_frozen_state(&self, _common_random_seed: u64) -> Box<dyn AgentPolicy> {
         Box::new(Self {
             source_session_id: self.source_session_id.clone(),
         })
