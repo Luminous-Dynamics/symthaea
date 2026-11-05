@@ -481,6 +481,27 @@ def self_test():
     manifests, packages, errors = cargo_references(after_separator)
     assert not errors and manifests == [("tools/a/Cargo.toml", [])]
 
+    quoted_operators = (
+        'cargo run --manifest-path tools/a/Cargo.toml -- --message "x|y; z" && '
+        'cargo test -p symthaea-core --bin core_audit'
+    )
+    manifests, packages, errors = cargo_references(quoted_operators)
+    assert not errors
+    assert manifests == [("tools/a/Cargo.toml", [])]
+    assert packages == [("symthaea-core", ["core_audit"], None)]
+
+    nix_fragment = (
+        'nix-shell -p "python313.withPackages(ps: with ps; [numpy torch])" '
+        '--run "python3 scripts/example.py"'
+    )
+    manifests, packages, errors = cargo_references(nix_fragment)
+    assert not errors and manifests == [] and packages == []
+
+    placeholder = "cargo test -p <crate>"
+    manifests, packages, errors = cargo_references(placeholder)
+    assert not errors and packages == [("<crate>", [], None)]
+    assert is_dynamic(packages[0][0])
+
     refs, packages, errors = cargo_references('cargo test --manifest-path "$TOOLS_DIR/Cargo.toml"')
     assert not errors and is_dynamic(refs[0][0])
 
@@ -516,6 +537,32 @@ def self_test():
         assert "core-pkg" in actual_index
         assert "excluded-pkg" not in actual_index
         assert "not-a-member" not in actual_index
+        nested_readme = fixture_root / "vendor" / "pkg" / "crates" / "one" / "README.md"
+        nested_readme.parent.mkdir(parents=True, exist_ok=True)
+        nested_readme.write_text("Cargo docs", encoding="utf-8")
+        vendor_manifest = fixture_root / "vendor" / "pkg" / "Cargo.toml"
+        vendor_manifest.parent.mkdir(parents=True, exist_ok=True)
+        vendor_manifest.write_text(
+            '[workspace]\nmembers = ["crates/*"]\n',
+            encoding="utf-8",
+        )
+        vendor_member = vendor_manifest.parent / "crates" / "one" / "Cargo.toml"
+        vendor_member.parent.mkdir(parents=True, exist_ok=True)
+        vendor_member.write_text(
+            '[package]\nname = "vendor-one"\nversion = "0.1.0"\n',
+            encoding="utf-8",
+        )
+        nearest = nearest_manifest_for_document(
+            fixture_root,
+            nested_readme,
+            manifest_paths + [vendor_manifest, vendor_member],
+        )
+        assert nearest == vendor_manifest.resolve()
+        vendor_index = workspace_package_index(
+            fixture_root, manifest_paths + [vendor_manifest, vendor_member], nearest
+        )
+        assert "vendor-one" in vendor_index
+        assert "root-workspace" not in vendor_index
 
     fixture = {
         "symthaea-core": [Path("crates/core/symthaea-core/Cargo.toml")],
