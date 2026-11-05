@@ -589,12 +589,17 @@
       "case_id": "RESERVE-LOST-OPPORTUNITY-001",
       "track": "settlement_and_liquidity",
       "title": "Product-specific reserve lost-opportunity pricing",
-      "scenario": "Regulating-up, regulating-down, instantaneous and ten-minute reserve use different price equations and price-curve elbow selection rules at the contracted operating point.",
+      "scenario": "Four SAWEM reserve opportunity-price rules are evaluated against a synthetic generating incremental price curve; product-specific elbow selection, formula sign, MCR/Emergency Level 1 boundaries, unsupported directions and checked arithmetic are covered.",
       "owner": "Symthaea",
-      "expected_disposition": "not_run",
-      "implementation_state": "declared_not_implemented",
+      "expected_disposition": "mixed_by_subcase",
+      "implementation_state": "kernel_unit_tested",
       "oracle_state": "draft_expected_disposition",
-      "test_names": [],
+      "test_names": [
+        "reserve_opportunity_price_uses_product_specific_elbow_rules_and_signs",
+        "reserve_opportunity_price_uses_mingen_mcr_and_emergency_boundaries",
+        "reserve_opportunity_price_selects_lower_regulating_down_elbow_two",
+        "reserve_opportunity_price_rejects_bad_curves_and_unsupported_directions"
+      ],
       "required_evidence": [
         "SMP per Trading Period",
         "unit-specific incremental price curve",
