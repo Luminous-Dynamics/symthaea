@@ -302,12 +302,12 @@ mod tests {
         actions
             .iter()
             .enumerate()
-            .flat_map(|(index, action_name)| {
-                vec![step(
+            .map(|(index, action_name)| {
+                step(
                     index as u64,
                     &format!("history-{index}"),
                     vec![action("ego", action_name)],
-                )]
+                )
             })
             .collect()
     }
