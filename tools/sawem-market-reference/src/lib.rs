@@ -741,8 +741,7 @@ pub fn qualifying_dsu_capacity_for_payment(
                 ));
             }
 
-            let reducible_mw =
-                (effective_available_mw - curve.third_elbow_mw).max(0.0);
+            let reducible_mw = (effective_available_mw - curve.third_elbow_mw).max(0.0);
             Ok(DsuQualificationResult::Determined {
                 qualifying_capacity_mw: contracted_mw.min(reducible_mw),
             })
