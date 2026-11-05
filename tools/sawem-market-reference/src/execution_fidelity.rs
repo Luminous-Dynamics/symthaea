@@ -412,6 +412,15 @@ mod tests {
         metered: Option<MeteredEnergyEvidence<'static>>,
         settlement: Option<BalancingSettlementEvidence<'static>>,
     ) -> ExecutionInterval<'static> {
+        let meter = metered.map(|mut evidence| {
+            evidence.observed_at_utc = end;
+            evidence.available_at_utc = end + 10;
+            evidence
+        });
+        let settlement = settlement.map(|mut evidence| {
+            evidence.available_at_utc = end + 20;
+            evidence
+        });
         ExecutionInterval {
             interval_id: id,
             schedule_source_ref: "schedule/source",
@@ -421,7 +430,7 @@ mod tests {
             interval_start_utc: start,
             interval_end_utc: end,
             scheduled_energy_milli_wh: scheduled,
-            meter: metered,
+            meter,
             settlement,
         }
     }
@@ -429,7 +438,7 @@ mod tests {
     fn inputs<'a>(intervals: &'a [ExecutionInterval<'a>]) -> ExecutionFidelityInputs<'a> {
         ExecutionFidelityInputs {
             scenario_id: "battery-001/execution",
-            evaluation_as_of_utc: 300,
+            evaluation_as_of_utc: 500,
             horizon_start_utc: 100,
             horizon_end_utc: 300,
             intervals,
@@ -564,17 +573,19 @@ mod tests {
             Err(ExecutionFidelityError::OverlappingIntervals)
         );
 
-        let future_meter = [interval(
+        let mut future_interval = interval(
             "future",
             100,
             300,
             10_000,
-            Some(MeteredEnergyEvidence {
-                available_at_utc: 301,
-                ..meter("future-meter", 10_000)
-            }),
+            Some(meter("future-meter", 10_000)),
             None,
-        )];
+        );
+        future_interval.meter = Some(MeteredEnergyEvidence {
+            available_at_utc: 501,
+            ..future_interval.meter.unwrap()
+        });
+        let future_meter = [future_interval];
         assert_eq!(
             evaluate_execution_fidelity(inputs(&future_meter)),
             Err(ExecutionFidelityError::MeterNotAvailableAtEvaluation)
