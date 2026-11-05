@@ -349,11 +349,7 @@ mod tests {
     #[test]
     fn initial_action_support_does_not_imply_support_after_branch_feedback() {
         let observed_continue = vec![
-            step(
-                0,
-                "crossing-start",
-                vec![action("ego", "continue")],
-            ),
+            step(0, "crossing-start", vec![action("ego", "continue")]),
             step(
                 1,
                 "after-continue-delivery",
@@ -361,16 +357,8 @@ mod tests {
             ),
         ];
         let observed_yield = vec![
-            step(
-                0,
-                "crossing-start",
-                vec![action("ego", "yield")],
-            ),
-            step(
-                1,
-                "after-yield-delivery",
-                vec![action("ego", "yield")],
-            ),
+            step(0, "crossing-start", vec![action("ego", "yield")]),
+            step(1, "after-yield-delivery", vec![action("ego", "yield")]),
         ];
         let evidence = vec![observed_continue.clone(), observed_yield.clone()];
 
@@ -381,17 +369,15 @@ mod tests {
             episode[0].history_digest == "crossing-start"
                 && episode[0].joint_actions[0].action_id == "yield"
         }));
-        assert!(evidence.iter().any(|episode| {
-            episode[1].joint_actions[0].action_id == "continue"
-        }));
+        assert!(
+            evidence
+                .iter()
+                .any(|episode| { episode[1].joint_actions[0].action_id == "continue" })
+        );
 
         let supported_branch = assess(
             &manifest(evidence.clone(), true),
-            &query(
-                "policy-v1",
-                "context-v1",
-                observed_continue,
-            ),
+            &query("policy-v1", "context-v1", observed_continue),
         )
         .expect("supported branch assessment");
         assert_eq!(
@@ -400,11 +386,7 @@ mod tests {
         );
 
         let branch_after_feedback = vec![
-            step(
-                0,
-                "crossing-start",
-                vec![action("ego", "yield")],
-            ),
+            step(0, "crossing-start", vec![action("ego", "yield")]),
             step(
                 1,
                 "after-yield-new-actor-response",
@@ -413,11 +395,7 @@ mod tests {
         ];
         let unsupported_branch = assess(
             &manifest(evidence, true),
-            &query(
-                "policy-v1",
-                "context-v1",
-                branch_after_feedback,
-            ),
+            &query("policy-v1", "context-v1", branch_after_feedback),
         )
         .expect("branch feedback assessment");
         assert_eq!(
