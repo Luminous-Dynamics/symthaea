@@ -41,6 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo run --release --locked > /tmp/cmaq-017-report.json
+          cargo run --release --locked --bin selectable_headroom > /tmp/cmaq-017-selectable-headroom-report.json
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -130,6 +131,44 @@ jobs:
               condition_counts[condition] = condition_counts.get(condition, 0) + 1
           assert len(condition_counts) == 75
           assert set(condition_counts.values()) == {8}
+
+          headroom = json.loads(
+              Path("/tmp/cmaq-017-selectable-headroom-report.json").read_text()
+          )
+          headroom_schema = json.loads(Path("selectable-headroom.schema.json").read_text())
+          validate(instance=headroom, schema=headroom_schema)
+          assert headroom["schema_version"] == "cmaq-017-selectable-headroom-v0.1"
+          assert headroom["candidate_counts"] == [1, 2, 4, 8, 16, 32]
+          assert headroom["selection_continuation_counts"] == [1, 2, 4, 8, 16]
+          assert headroom["replicates"] == 64
+          assert len(headroom["conditions"]) == 30
+          for row in headroom["conditions"]:
+              assert row["heldout_continuations"] == row["selection_continuations"]
+              assert row["replicate_count"] == 64
+              assert row["candidate_continuation_runs"] == (
+                  64 * row["candidate_count"] * row["selection_continuations"]
+              )
+              assert row["heldout_continuation_runs"] == (
+                  64 * row["selection_continuations"]
+              )
+              assert 0 <= row["mean_selected_candidate_id"] < row["candidate_count"]
+
+          one_shot = next(r for r in headroom["conditions"]
+                          if r["candidate_count"] == 32 and r["selection_continuations"] == 1)
+          repeated = next(r for r in headroom["conditions"]
+                          if r["candidate_count"] == 32 and r["selection_continuations"] == 16)
+          assert one_shot["naive_optimism_gap"] > 0.0
+          assert repeated["naive_optimism_gap"] < one_shot["naive_optimism_gap"]
+          assert repeated["selection_regret"] < one_shot["selection_regret"]
+          assert abs(one_shot["heldout_score_bias"]) < 0.04
+
+          crn = headroom["coupling_variance"]
+          assert crn["shared_invariant_same_sensitivity_variance"] < (
+              crn["independent_pair_difference_variance"]
+          )
+          assert crn["shared_invariant_opposite_sensitivity_variance"] > (
+              crn["independent_pair_difference_variance"]
+          )
           PY
 
       - name: Create run receipt
@@ -173,5 +212,6 @@ jobs:
           name: cmaq-017-report-and-run-receipt
           path: |
             /tmp/cmaq-017-report.json
+            /tmp/cmaq-017-selectable-headroom-report.json
             /tmp/cmaq-017-run-receipt.json
           retention-days: 30
