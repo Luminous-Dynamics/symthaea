@@ -745,7 +745,7 @@ mod tests {
         let link_path = std::env::temp_dir().join(format!(
             "rea-replay-symlink-{}-{}.zip",
             std::process::id(),
-            NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed)
+            NEXT_TEMP.fetch_add(1, Ordering::Relaxed)
         ));
         std::os::unix::fs::symlink(&temp.0, &link_path).unwrap();
         let result = sealed_snapshot(&link_path, HARD_ARCHIVE_LIMIT);
