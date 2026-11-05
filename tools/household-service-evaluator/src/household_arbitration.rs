@@ -650,6 +650,8 @@ pub struct ArbitrationScenario {
 pub struct ArbitrationManifest {
     pub schema_version: String,
     pub corpus_id: String,
+    pub owner_issue: u64,
+    pub execution_issue: u64,
     pub evidence_class: String,
     pub fixture_status: String,
     pub decision_authority: String,
@@ -686,6 +688,12 @@ pub fn validate_arbitration_manifest(
         return Err(invalid(
             "arbitration_manifest.header",
             "unsupported corpus, schema, evidence class or fixture status",
+        ));
+    }
+    if manifest.owner_issue != 10342 || manifest.execution_issue != 10516 {
+        return Err(invalid(
+            "arbitration_manifest.issue_references",
+            "manifest owner or execution issue reference does not match the tracked work",
         ));
     }
     if manifest.decision_authority != "none_this_manifest_does_not_authorize_live_actuation" {
