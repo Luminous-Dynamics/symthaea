@@ -217,6 +217,7 @@ fn validate_trust_policy(policy: &TrustPolicy) -> Result<BTreeMap<&str, &Trusted
         }
     }
     let mut keys = BTreeMap::new();
+    let mut public_key_material = BTreeSet::new();
     for key in &policy.trusted_keys {
         if !nonempty(&key.key_id)
             || !nonempty(&key.role)
@@ -231,6 +232,12 @@ fn validate_trust_policy(policy: &TrustPolicy) -> Result<BTreeMap<&str, &Trusted
         {
             return Err(format!(
                 "trust key {} has malformed identity, role, key, or validity",
+                key.key_id
+            ));
+        }
+        if !public_key_material.insert(key.public_key_hex.as_str()) {
+            return Err(format!(
+                "trust policy reuses Ed25519 public-key material under key ID {}",
                 key.key_id
             ));
         }
@@ -546,6 +553,16 @@ mod tests {
         policy.required_roles.push("functional_validator".into());
         let policy = serde_json::to_vec(&policy).unwrap();
         assert!(verify(&envelope, &policy).is_err());
+    }
+
+    #[test]
+    fn same_public_key_cannot_be_relabelled_as_a_second_role() {
+        let envelope = fixture_envelope();
+        let mut policy: TrustPolicy = serde_json::from_slice(&fixture_policy()).unwrap();
+        policy.trusted_keys[1].public_key_hex = policy.trusted_keys[0].public_key_hex.clone();
+        let policy = serde_json::to_vec(&policy).unwrap();
+        let error = verify(&envelope, &policy).unwrap_err();
+        assert!(error.contains("reuses Ed25519 public-key material"));
     }
 
     #[test]
