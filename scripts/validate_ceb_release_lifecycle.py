@@ -54,6 +54,9 @@ def saturation_errors(record: dict, registered_families: list[str], minimum_tria
             errors.append(f"{row['model_family_id']}/{row['configuration_id']}: trial result digest count mismatch")
         if row["successes"] > row["trials"]:
             errors.append(f"{row['model_family_id']}/{row['configuration_id']}: successes exceed trials")
+    configuration_keys = [(row["model_family_id"], row["configuration_id"]) for row in results]
+    if len(configuration_keys) != len(set(configuration_keys)):
+        errors.append("duplicate model-family/configuration saturation cohort")
     all_saturated = bool(results) and observed == expected and all(
         row["trials"] >= minimum_trials
         and row["successes"] == row["trials"]
@@ -64,6 +67,8 @@ def saturation_errors(record: dict, registered_families: list[str], minimum_tria
         errors.append("confirmed saturation requires every registered family/configuration to succeed on every trial")
     if record["decision"] == "saturated_candidate" and all_saturated:
         errors.append("fully satisfied saturation evidence must be confirmed_saturated, not candidate")
+    if record["decision"] == "not_saturated" and all_saturated:
+        errors.append("complete 5/5 success across all registered cohorts cannot be labeled not_saturated")
     return errors
 
 
@@ -85,7 +90,7 @@ def release_semantic_errors(release: dict) -> list[str]:
             errors.append("initial design-only release cannot contain unqualified changes, lifecycle decisions or saturation observations")
         if release["resource_calibration"]["status"] != "not_run_blocked" or release["resource_calibration"]["actual_independent_runs"] != 0:
             errors.append("initial design-only release cannot claim resource calibration")
-        if any(value is not None for value in digests.values()):
+        if any(value is not None for value in digests.values()) or release["previous_evaluation_input_sha256"] is not None:
             errors.append("initial design-only release cannot invent qualified artifact digests")
     else:
         if previous is None:
@@ -106,14 +111,14 @@ def release_semantic_errors(release: dict) -> list[str]:
                 expected_action = "reuse"
                 if any(not row["evaluation_inputs_unchanged"] for row in changes):
                     errors.append("metadata-only change cannot alter evaluation inputs")
-                if release["artifact_digests"]["evaluation_input_sha256"] is None:
-                    errors.append("metadata reuse requires a current evaluation-input digest")
+                if release["artifact_digests"]["evaluation_input_sha256"] is None or release["previous_evaluation_input_sha256"] is None:
+                    errors.append("metadata reuse requires previous and current evaluation-input digests")
             if current != expected_version:
                 errors.append(f"version bump mismatch; expected {expected_version[0]}.{expected_version[1]}.{expected_version[2]}")
             if action != expected_action:
                 errors.append(f"release action mismatch; expected {expected_action}")
             if expected_action == "reuse":
-                if release["artifact_digests"]["evaluation_input_sha256"] != release.get("previous_evaluation_input_sha256"):
+                if release["artifact_digests"]["evaluation_input_sha256"] != release["previous_evaluation_input_sha256"]:
                     errors.append("result reuse requires identical previous/current evaluation-input digests")
 
     if release["status"] == "design_only_no_qualified_results" and (
@@ -240,16 +245,44 @@ def self_test(release: dict, schema: dict) -> None:
         raise SystemExit("valid verifier-only regrade fixture unexpectedly failed")
 
     # Metadata changes can reuse results only if evaluation-input digests remain identical.
-    mutant["release_id"]="ceb-v0.1.1-test"
-    mutant["current_version"]="0.1.1"
-    mutant["release_action"]="reuse"
+    mutant=copy.deepcopy(release)
+    mutant.update({
+      "status":"release_candidate","release_id":"ceb-v0.1.1-test","current_version":"0.1.1",
+      "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"reuse",
+      "change_records":[{
+        "change_id":"docs-change-001","change_class":"metadata_only","paths":["docs/CEB.md"],
+        "old_sha256":"a"*64,"new_sha256":"b"*64,"affected_task_ids":[],
+        "raw_execution_artifacts_available":False,"evaluation_inputs_unchanged":True
+      }],
+      "previous_evaluation_input_sha256":"e"*64
+    })
     mutant["artifact_digests"]["evaluation_input_sha256"]="d"*64
-    mutant["previous_evaluation_input_sha256"]="e"*64
     must_reject(mutant, "metadata-only result reuse with changed evaluation digest")
+
+    # Verifier changes without raw artifacts must rerun affected tasks, not regrade.
+    mutant=copy.deepcopy(release)
+    mutant.update({
+      "status":"release_candidate","release_id":"ceb-v0.2-test","current_version":"0.2.0",
+      "previous_release_id":"ceb-v0-design","previous_version":"0.1.0","release_action":"regrade_affected",
+      "change_records":[{
+        "change_id":"verifier-change-no-raw-001","change_class":"grader_only","paths":["benchmarks/ceb/verifier.json"],
+        "old_sha256":"a"*64,"new_sha256":"b"*64,"affected_task_ids":["task-001"],
+        "raw_execution_artifacts_available":False,"evaluation_inputs_unchanged":True
+      }]
+    })
+    must_reject(mutant, "regrade requested without raw execution artifacts")
 
     # The positive saturation fixture and its 4/5 negative counterpart define the boundary.
     if saturation_errors(saturation_fixture(),["family-a","family-b"],5):
         raise SystemExit("5/5 saturation fixture unexpectedly failed")
+    partial=saturation_fixture()
+    partial["configuration_results"][1]["successes"]=4
+    if not saturation_errors(partial,["family-a","family-b"],5):
+        raise SystemExit("4/5 family fixture incorrectly met saturation")
+    incomplete=saturation_fixture()
+    incomplete["configuration_results"].pop()
+    if not saturation_errors(incomplete,["family-a","family-b"],5):
+        raise SystemExit("missing model-family fixture incorrectly met saturation")
     print("CEB_SATURATION_POLICY_SELF_TEST_PASS")
     print("CEB_RELEASE_LIFECYCLE_SELF_TEST_PASS")
 
