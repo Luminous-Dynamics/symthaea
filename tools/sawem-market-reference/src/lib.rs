@@ -297,6 +297,221 @@ fn required_transition_seconds(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PriceIncrement {
+    Zero,
+    One,
+    Two,
+    Three,
+    EmergencyLevelOne,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GeneratingPriceCurve {
+    pub minimum_stable_generation_mw: f64,
+    pub elbow_one_mw: f64,
+    pub elbow_two_mw: f64,
+    pub maximum_continuous_rating_mw: f64,
+    pub emergency_level_one_mw: f64,
+    /// Price values use signed integer minor currency units per MWh.
+    pub increment_zero_minor_per_mwh: i64,
+    pub increment_one_minor_per_mwh: i64,
+    pub increment_two_minor_per_mwh: i64,
+    pub increment_three_minor_per_mwh: i64,
+    pub emergency_level_one_minor_per_mwh: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReservePriceError {
+    NonFiniteOperatingPoint,
+    ContractedPointOutsideCurve,
+    InvalidPriceCurve,
+    NegativeIncrementalPrice,
+    NonMonotonicIncrementalPrice,
+    AmbiguousCoincidentElbows,
+    UnsupportedProductDirection,
+    ArithmeticOverflow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReserveOpportunityPrice {
+    pub selected_increment: PriceIncrement,
+    /// Difference in the same minor-currency-per-MWh price basis as SMP and IP.
+    /// This is not a cash payment and is not multiplied by reserve MW here.
+    pub price_difference_minor_per_mwh: i64,
+}
+
+impl GeneratingPriceCurve {
+    pub fn validate(self) -> Result<(), ReservePriceError> {
+        let points = [
+            self.minimum_stable_generation_mw,
+            self.elbow_one_mw,
+            self.elbow_two_mw,
+            self.maximum_continuous_rating_mw,
+            self.emergency_level_one_mw,
+        ];
+        if points.iter().any(|value| !value.is_finite()) {
+            return Err(ReservePriceError::NonFiniteOperatingPoint);
+        }
+        if self.minimum_stable_generation_mw < 0.0
+            || self.elbow_one_mw < self.minimum_stable_generation_mw
+            || self.elbow_two_mw < self.elbow_one_mw
+            || self.maximum_continuous_rating_mw < self.elbow_two_mw
+            || self.emergency_level_one_mw < self.maximum_continuous_rating_mw
+        {
+            return Err(ReservePriceError::InvalidPriceCurve);
+        }
+        if (self.elbow_one_mw - self.elbow_two_mw).abs() <= EPSILON {
+            return Err(ReservePriceError::AmbiguousCoincidentElbows);
+        }
+
+        let prices = [
+            self.increment_zero_minor_per_mwh,
+            self.increment_one_minor_per_mwh,
+            self.increment_two_minor_per_mwh,
+            self.increment_three_minor_per_mwh,
+            self.emergency_level_one_minor_per_mwh,
+        ];
+        if prices.iter().any(|value| *value < 0) {
+            return Err(ReservePriceError::NegativeIncrementalPrice);
+        }
+        if self.increment_two_minor_per_mwh < self.increment_one_minor_per_mwh
+            || self.increment_three_minor_per_mwh < self.increment_two_minor_per_mwh
+            || self.emergency_level_one_minor_per_mwh < self.increment_three_minor_per_mwh
+        {
+            return Err(ReservePriceError::NonMonotonicIncrementalPrice);
+        }
+        Ok(())
+    }
+
+    fn price_at(
+        self,
+        product: ReserveProduct,
+        direction: ReserveDirection,
+        contracted_operating_point_mw: f64,
+    ) -> Result<(PriceIncrement, i64), ReservePriceError> {
+        self.validate()?;
+        if !contracted_operating_point_mw.is_finite() {
+            return Err(ReservePriceError::NonFiniteOperatingPoint);
+        }
+        if contracted_operating_point_mw < -EPSILON
+            || contracted_operating_point_mw > self.emergency_level_one_mw + EPSILON
+        {
+            return Err(ReservePriceError::ContractedPointOutsideCurve);
+        }
+
+        // A single contracted operating point exactly on an elbow is subject to
+        // the product-specific selection convention in §§9.6.1–9.6.4.
+        let is_regulating_down =
+            product == ReserveProduct::Regulating && direction == ReserveDirection::Down;
+
+        if (contracted_operating_point_mw - self.maximum_continuous_rating_mw).abs()
+            <= EPSILON
+        {
+            return Ok((
+                PriceIncrement::Three,
+                self.increment_three_minor_per_mwh,
+            ));
+        }
+        if (contracted_operating_point_mw - self.elbow_two_mw).abs() <= EPSILON {
+            return if is_regulating_down {
+                Ok((
+                    PriceIncrement::Two,
+                    self.increment_two_minor_per_mwh,
+                ))
+            } else {
+                Ok((
+                    PriceIncrement::Three,
+                    self.increment_three_minor_per_mwh,
+                ))
+            };
+        }
+        if (contracted_operating_point_mw - self.elbow_one_mw).abs() <= EPSILON {
+            return if is_regulating_down {
+                Ok((
+                    PriceIncrement::One,
+                    self.increment_one_minor_per_mwh,
+                ))
+            } else {
+                Ok((
+                    PriceIncrement::Two,
+                    self.increment_two_minor_per_mwh,
+                ))
+            };
+        }
+        if (contracted_operating_point_mw - self.minimum_stable_generation_mw).abs()
+            <= EPSILON
+        {
+            return Ok((
+                PriceIncrement::One,
+                self.increment_one_minor_per_mwh,
+            ));
+        }
+
+        if contracted_operating_point_mw < self.minimum_stable_generation_mw {
+            return Ok((
+                PriceIncrement::Zero,
+                self.increment_zero_minor_per_mwh,
+            ));
+        }
+        if contracted_operating_point_mw < self.elbow_one_mw {
+            return Ok((
+                PriceIncrement::One,
+                self.increment_one_minor_per_mwh,
+            ));
+        }
+        if contracted_operating_point_mw < self.elbow_two_mw {
+            return Ok((
+                PriceIncrement::Two,
+                self.increment_two_minor_per_mwh,
+            ));
+        }
+        if contracted_operating_point_mw <= self.maximum_continuous_rating_mw {
+            return Ok((
+                PriceIncrement::Three,
+                self.increment_three_minor_per_mwh,
+            ));
+        }
+        Ok((
+            PriceIncrement::EmergencyLevelOne,
+            self.emergency_level_one_minor_per_mwh,
+        ))
+    }
+}
+
+/// Calculate the §9.6 Trading Unit opportunity-price differential for a
+/// generating price curve. This does not calculate contracted MW, qualifying
+/// capacity, reserve-capacity payments, performance adjustment or settlement.
+pub fn reserve_opportunity_price(
+    product: ReserveProduct,
+    direction: ReserveDirection,
+    system_marginal_price_minor_per_mwh: i64,
+    contracted_operating_point_mw: f64,
+    curve: GeneratingPriceCurve,
+) -> Result<ReserveOpportunityPrice, ReservePriceError> {
+    sawem_rev_2_3_reserve_requirement(product, direction)
+        .map_err(|_| ReservePriceError::UnsupportedProductDirection)?;
+    let (selected_increment, unit_incremental_price) =
+        curve.price_at(product, direction, contracted_operating_point_mw)?;
+    let difference = match (product, direction) {
+        (ReserveProduct::Regulating, ReserveDirection::Down) => {
+            unit_incremental_price.checked_sub(system_marginal_price_minor_per_mwh)
+        }
+        (ReserveProduct::Regulating, ReserveDirection::Up)
+        | (ReserveProduct::Instantaneous, ReserveDirection::Up)
+        | (ReserveProduct::TenMinute, ReserveDirection::Up) => {
+            system_marginal_price_minor_per_mwh.checked_sub(unit_incremental_price)
+        }
+        _ => return Err(ReservePriceError::UnsupportedProductDirection),
+    }
+    .ok_or(ReservePriceError::ArithmeticOverflow)?;
+
+    Ok(ReserveOpportunityPrice {
+        selected_increment,
+        price_difference_minor_per_mwh: difference.max(0),
+    })
+}
+
 /// SAWEM Market Code Rev 2.3 product response requirements.
 ///
 /// The Code specifies no minimum sustain duration for regulating or ten-minute
