@@ -93,3 +93,18 @@ The synthetic plan and output are scorer-contract fixtures only. They are not mo
 - It does not turn confidence scores into calibrated probabilities; calibration metrics are reported only when the submitting system supplies probabilities.
 - A reduction in cross-language disparity alone is not success if absolute accuracy deteriorates.
 - No SOTA or deployment claim follows from synthetic fixtures or schema validation.
+
+
+## Matched inference budget and usage receipt
+
+Every plan contains one shared `budget` envelope for all candidate and baseline systems:
+- `max_evidence_tokens`;
+- `max_input_tokens`;
+- `max_output_tokens`;
+- `max_retrieval_calls`;
+- `max_latency_ms`;
+- optional `max_cost_microusd` (micro-USD; when set, every result must report cost).
+
+Each statement-level prediction reports `evidence_tokens`, `input_tokens`, `output_tokens`, `retrieval_calls`, `latency_ms` and optional `cost_microusd`. The scorer rejects any row that exceeds the declared envelope and reports mean observed usage/cost per slice. Cost is only comparable when providers report it consistently; record the provider pricing snapshot and distinguish metered API cost from amortized hardware cost in the run notes.
+
+Use the same evidence/context/token/call/latency envelope for every system in a comparison. The scorer does not itself enforce identical prompt quality, source access or retrieval implementation; those are part of the frozen run plan and external runner receipt. Synthetic fixture usage values are invented solely to test contract behavior and do not represent real inference.
