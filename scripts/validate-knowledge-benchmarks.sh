@@ -16,7 +16,7 @@ run_validator() {
   local output="$4"
 
   echo "==> Validating kind=$kind input=$input"
-  cargo run --locked --manifest-path "$manifest" -- \
+  cargo run --locked --manifest-path "$manifest" --bin knowledge-benchmark-harness -- \
     --kind "$kind" \
     --schema "$schema" \
     --input "$input" \
