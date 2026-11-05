@@ -1,8 +1,8 @@
 use mel_rmi_synthetic::{
     ActionMechanism, AgentAction, AgentPolicy, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ResponsivePartnerPolicy,
-    RuleBasedPolicy, TaskSpec, TrialRunConfig, canonical_fixture_suite_v1, run_policy_suite_v1,
-    run_reciprocal_suite_v1,
+    RuleBasedPolicy, TaskSpec, TrialRunConfig, UnrelatedFeatureShortcutPolicy,
+    canonical_fixture_suite_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
 };
 use std::error::Error;
 
@@ -64,10 +64,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         Box::new(YokedSuitePolicy {
             source_session_id: "prior-session".to_owned(),
         }),
+        Box::new(UnrelatedFeatureShortcutPolicy {
+            id: "distractor-shortcut".to_owned(),
+        }),
     ];
 
     println!(
-        "record_type,task_id,policy_id,dimension,agent_targeted_delta,agent_sham_delta,agent_unrelated_delta,agent_input_sensitive,agent_target_specific,agent_oracle_rule_match,agent_qualified,partner_targeted_delta,partner_sham_delta,partner_unrelated_delta,partner_input_sensitive,partner_target_specific,reciprocal_qualified"
+        "record_type,task_id,policy_id,dimension,agent_targeted_delta,agent_sham_delta,agent_unrelated_delta,agent_input_sensitive,agent_target_specific,agent_oracle_rule_match,agent_qualified,partner_targeted_delta,partner_sham_delta,partner_unrelated_delta,partner_input_sensitive,partner_target_specific,partner_oracle_rule_match,reciprocal_qualified"
     );
 
     for policy in policies {
@@ -75,7 +78,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         for record in records {
             let contrast = record.contrast;
             println!(
-                "trial,{},{},{},{},{},{},{},{},{},{},,,,,,",
+                "trial,{},{},{},{},{},{},{},{},{},{},,,,,,,",
                 record.task.task_id,
                 policy.policy_id(),
                 record.task.target_dimension.as_str(),
@@ -104,7 +107,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let agent = record.agent.contrast;
         let partner = record.partner;
         println!(
-            "reciprocal,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "reciprocal,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             record.agent.task.task_id,
             record.agent.manifest.policy_id,
             record.agent.task.target_dimension.as_str(),
@@ -120,6 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             partner.unrelated_delta,
             partner.input_sensitive,
             partner.target_specific,
+            partner.oracle_rule_match,
             record.qualified_synthetic_reciprocity,
         );
     }
