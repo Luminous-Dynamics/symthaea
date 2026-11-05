@@ -719,7 +719,7 @@ pub fn compose_candidate(
     });
     let evidence_manifest = Value::Object(evidence_digests);
     let lineage_manifest = json!({
-        "parent_system_identity_digests": plan.parent_system_identity_digests
+        "parent_system_identity_digests": plan.parent_system_identity_digests.clone()
     });
     let context_digest = digest_value(&context_manifest)?;
     let evidence_set_digest = digest_value(&evidence_manifest)?;
@@ -1349,11 +1349,19 @@ mod tests {
         let parent =
             compose_candidate(&plan, &receipt_set("parent-rev", 'a', "parent", "disabled"))
                 .unwrap();
+        let mut candidate_plan = plan.clone();
+        candidate_plan
+            .parent_system_identity_digests
+            .insert(parent.candidate_system_identity_digest().to_owned());
         let candidate = compose_candidate(
-            &plan,
+            &candidate_plan,
             &receipt_set("candidate-rev", 'b', "candidate", "disabled"),
         )
         .unwrap();
+        assert_eq!(
+            candidate.parent_system_identity_digests().len(),
+            1
+        );
         let summaries = compare_candidates(&parent, &candidate).unwrap();
 
         let quality = summaries.get("quality").unwrap();
@@ -1372,6 +1380,80 @@ mod tests {
                 .unwrap()
                 .paired_task_count,
             2
+        );
+    }
+
+    #[test]
+    fn rejects_comparison_with_an_undeclared_parent() {
+        let plan = plan(vec![metric("quality", "synthetic-quality", 0.0)]);
+        let parent = compose_candidate(
+            &plan,
+            &BTreeMap::from([(
+                "quality".into(),
+                make_receipt("synthetic-quality", "parent", 'a', "run-parent", "disabled"),
+            )]),
+        )
+        .unwrap();
+        let candidate = compose_candidate(
+            &plan,
+            &BTreeMap::from([(
+                "quality".into(),
+                make_receipt("synthetic-quality", "candidate", 'b', "run-child", "disabled"),
+            )]),
+        )
+        .unwrap();
+
+        assert_eq!(
+            compare_candidates(&parent, &candidate),
+            Err(ComposerError::ParentLineageMismatch)
+        );
+    }
+
+    #[test]
+    fn hybrid_declares_and_compares_against_each_parent() {
+        let plan = plan(vec![metric("quality", "synthetic-quality", 0.0)]);
+        let parent_left = compose_candidate(
+            &plan,
+            &BTreeMap::from([(
+                "quality".into(),
+                make_receipt("synthetic-quality", "parent-left", 'a', "run-left", "disabled"),
+            )]),
+        )
+        .unwrap();
+        let parent_right = compose_candidate(
+            &plan,
+            &BTreeMap::from([(
+                "quality".into(),
+                make_receipt("synthetic-quality", "parent-right", 'b', "run-right", "disabled"),
+            )]),
+        )
+        .unwrap();
+        let mut hybrid_plan = plan.clone();
+        hybrid_plan.parent_system_identity_digests.insert(
+            parent_left.candidate_system_identity_digest().to_owned(),
+        );
+        hybrid_plan.parent_system_identity_digests.insert(
+            parent_right.candidate_system_identity_digest().to_owned(),
+        );
+        let hybrid = compose_candidate(
+            &hybrid_plan,
+            &BTreeMap::from([(
+                "quality".into(),
+                make_receipt("synthetic-quality", "hybrid", 'c', "run-hybrid", "disabled"),
+            )]),
+        )
+        .unwrap();
+
+        assert_eq!(hybrid.parent_system_identity_digests().len(), 2);
+        assert_ne!(
+            hybrid.lineage_manifest_digest(),
+            parent_left.lineage_manifest_digest()
+        );
+        assert!(compare_candidates(&parent_left, &hybrid).is_ok());
+        assert!(compare_candidates(&parent_right, &hybrid).is_ok());
+        assert_eq!(
+            compare_candidates(&hybrid, &parent_left),
+            Err(ComposerError::ParentLineageMismatch)
         );
     }
 
