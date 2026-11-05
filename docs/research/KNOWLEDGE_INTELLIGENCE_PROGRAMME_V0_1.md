@@ -689,3 +689,51 @@ Recalibrate targets after rights review and pilot power analysis. These are prop
 ### 15.6 Implementation and rights boundary
 
 Reuse #8245/#8252/#8253/#7365 and the existing Rust harness. Admit content-bearing materials only when public-domain, explicitly licensed or permissioned. Use metadata-only records when full text cannot lawfully be used. Treat oral/community narrative as consent- and purpose-bound. Rights review, attribution, source lineage and expert review are separate gates.
+
+
+## 15. New cross-lingual and literary evaluation developments (November 2026)
+
+### 15.1 Poly-FEVER — broad multilingual factuality comparison
+
+[Poly-FEVER (Findings EMNLP 2026)](https://aclanthology.org/2026.findings-emnlp.540/) extends FEVER, Climate-FEVER and SciFact to **77,973 Supported/Refuted claims aligned across 11 languages**. The authors use Google Cloud Translation with targeted human audit, GEMBA and COMETKiwi checks; they evaluate multiple prompt families, model-generated rephrasing and DPR retrieval over Wikipedia.
+
+Use it as a *translated-claim, broad multilingual factuality comparator*. It is complementary to Multi-Hall-SA's parallel English/target-language facts from government documents; do not pool their scores or assume translation artifacts/coverage are equivalent. The paper reports that retrieval and topic-aware prompting produce language-dependent, selective gains, which motivates per-language retrieval ablations rather than a single global RAG uplift assumption.
+
+Admission requirements: pin the exact Hugging Face dataset revision/file digests, validate split and language manifests, inspect license/attribution and upstream FEVER/Climate-FEVER/SciFact rights, and identify whether claims/source passages leak across splits. Paper citation is not a dataset license.
+
+Dataset: https://huggingface.co/datasets/HanzhiZhang/Poly-FEVER
+
+### 15.2 MultiHaluDet — white-box hidden-state detector baseline
+
+[MultiHaluDet (MeLLM 2026)](https://aclanthology.org/2026.mellm-1.6/) probes multi-layer hidden-state trajectories from frozen LLMs, then uses a stacked ensemble with out-of-fold representations and a calibrated classifier. The paper reports up to **98.55% AUROC** on English HaluEval and TriviaQA with Mistral-7B / LLaMA2-7B, and tests transfer across French, Bangla and Amharic.
+
+This is a valuable method comparator for Symthaea's internal temporal/HDC signals, but it is **white-box**: it requires access to the probed model's internal hidden states. It cannot be directly compared to black-box frontier APIs or treated as source-grounded factual verification. The English AUROC is not a result on Multi-Hall-SA, not a South African-language result, and not directly comparable to accuracy/F1.
+
+Add an optional reproducible probe track:
+- same exact open-weight model/revision, tokenization and outputs;
+- frozen backbone, fixed layer/position selection;
+- train/dev/test split by source/document family, no response leakage;
+- linear probe, single-layer probe, full-trajectory MultiHaluDet-style probe, output-confidence baseline, Symthaea HDC/CfC internal signal and evidence-grounded verifier;
+- report AUROC/AUPRC, macro-F1, Brier/ECE, cross-language transfer and latency/VRAM;
+- compare detector performance with and without evidence retrieval separately.
+
+### 15.3 LitBench — literary evaluation is not only interpretation QA
+
+[LitBench (EACL 2026)](https://aclanthology.org/2026.eacl-long.362/) introduces 43,827 story-pair training examples and a 2,480-pair held-out comparison set for creative-writing evaluation. Its analysis reports 73% human-preference agreement for the strongest tested off-the-shelf judge (Claude-3.7-Sonnet), versus 78% for specialized reward models.
+
+Use it only for a separate literary-evaluation/reward-model lane: it evaluates human preference between generated stories, not source-grounded literary knowledge, authorship, historical attribution or interpretation validity. A preference model trained on it must not become the adjudicator of cultural/literary truth.
+
+### 15.4 Why this changes the competitive plan
+
+The updated baseline portfolio now spans:
+1. source-native cross-lingual factuality (Multi-Hall-SA);
+2. broad translated multilingual claim verification (Poly-FEVER);
+3. white-box hidden-state hallucination detection (MultiHaluDet);
+4. South African task breadth (MzansiBench);
+5. scientific QA and truthfulness (Uhura);
+6. literary narrative orchestration (NarraBench / LitVISTA);
+7. creative-writing preference measurement (LitBench).
+
+The paradigm shift should be **complementary independent evidence channels**, not one universal detector: source-evidence/lineage verification, model-internal uncertainty/anomaly signals, and controlled cross-view/counterfactual consistency. The verifier should return an inspectable assessment with evidence links, uncertainty and a reason to abstain. A hidden-state probe can indicate likely unreliability; it cannot establish why a claim is false or prove a source supports the alternative.
+
+Track these benchmarks separately and compare on matched model revisions and resource budgets. No result is transferable across tracks without a direct experiment.
