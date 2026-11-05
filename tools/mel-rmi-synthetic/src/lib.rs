@@ -689,8 +689,7 @@ pub fn canonical_fixture_suite_v1() -> Vec<SyntheticFixtureV1> {
                     unrelated_dimension,
                     expected_response: ResponseRule { modulus, offset },
                 };
-                let observation = |suffix: &str, target_value: i32, unrelated_value: i32| {
-                    Observation {
+                let observation = |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
                         event_id: format!("{task_id}-{suffix}"),
                         session_id: format!("synthetic-session-{index}"),
                         history_id: format!("synthetic-history-{index}"),
@@ -708,8 +707,7 @@ pub fn canonical_fixture_suite_v1() -> Vec<SyntheticFixtureV1> {
                             dimension: unrelated_dimension,
                             value: unrelated_value,
                         },
-                    }
-                };
+                    };
                 let randomization_seed = 20_000 + index as u64;
                 SyntheticFixtureV1 {
                     task,
@@ -1418,8 +1416,10 @@ mod tests {
     fn canonical_fixture_suite_covers_all_five_declared_dimensions() {
         let fixtures = canonical_fixture_suite_v1();
         assert_eq!(fixtures.len(), 5);
-        let dimensions: BTreeSet<Dimension> =
-            fixtures.iter().map(|fixture| fixture.task.target_dimension).collect();
+        let dimensions: BTreeSet<Dimension> = fixtures
+            .iter()
+            .map(|fixture| fixture.task.target_dimension)
+            .collect();
         assert_eq!(
             dimensions,
             [
@@ -1441,7 +1441,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(records.len(), 5);
-        assert!(records.iter().all(|record| record.contrast.qualified_synthetic_contingency));
+        assert!(
+            records
+                .iter()
+                .all(|record| record.contrast.qualified_synthetic_contingency)
+        );
     }
 
     #[test]
@@ -1464,8 +1468,16 @@ mod tests {
             &config(),
         )
         .unwrap();
-        assert!(fixed.iter().all(|record| !record.contrast.qualified_synthetic_contingency));
-        assert!(imitation.iter().all(|record| !record.contrast.qualified_synthetic_contingency));
+        assert!(
+            fixed
+                .iter()
+                .all(|record| !record.contrast.qualified_synthetic_contingency)
+        );
+        assert!(
+            imitation
+                .iter()
+                .all(|record| !record.contrast.qualified_synthetic_contingency)
+        );
     }
 
     #[test]
