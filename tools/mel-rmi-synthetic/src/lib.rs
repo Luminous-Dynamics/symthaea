@@ -1806,6 +1806,168 @@ mod tests {
         (inputs, outputs)
     }
 
+    fn negotiated_contract() -> NegotiatedResponseContractV1 {
+        NegotiatedResponseContractV1 {
+            target_dimension: Dimension::Motif,
+            modulus: 12,
+            accepted_offsets: [3, 5, 7].into_iter().collect(),
+        }
+    }
+
+    fn unresolved_authority() -> PartnerAuthorityV1 {
+        PartnerAuthorityV1 {
+            selected_value: None,
+            vetoed_values: BTreeSet::new(),
+        }
+    }
+
+    fn motif_input() -> Feature {
+        Feature {
+            dimension: Dimension::Motif,
+            value: 2,
+        }
+    }
+
+    #[test]
+    fn negotiated_contract_accepts_multiple_valid_response_witnesses() {
+        let contract = negotiated_contract();
+        assert_eq!(contract.valid_values(motif_input()).unwrap(), [5, 7, 9].into_iter().collect());
+        for valid_alternative in [5, 7, 9] {
+            let assessment = assess_negotiation(
+                &contract,
+                motif_input(),
+                &PartnerAuthorityV1 { selected_value: Some(valid_alternative), vetoed_values: BTreeSet::new() },
+                &NegotiationChoiceV1::Commit(valid_alternative),
+            ).unwrap();
+            assert!(assessment.contract_valid);
+            assert!(assessment.preference_respected);
+            assert!(assessment.qualified);
+        }
+    }
+
+    #[test]
+    fn unresolved_preference_can_be_preserved_by_branching_all_valid_options() {
+        let assessment = assess_negotiation(
+            &negotiated_contract(), motif_input(), &unresolved_authority(),
+            &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
+        ).unwrap();
+        assert_eq!(assessment.available_option_count, 3);
+        assert_eq!(assessment.proposed_option_count, 3);
+        assert!(assessment.contract_valid);
+        assert!(assessment.ambiguity_preserved);
+        assert!(assessment.qualified);
+    }
+
+    #[test]
+    fn unresolved_preference_can_be_preserved_by_asking_for_clarification() {
+        let assessment = assess_negotiation(
+            &negotiated_contract(), motif_input(), &unresolved_authority(),
+            &NegotiationChoiceV1::AskClarification,
+        ).unwrap();
+        assert_eq!(assessment.proposed_option_count, 0);
+        assert!(assessment.ambiguity_preserved);
+        assert!(assessment.qualified);
+    }
+
+    #[test]
+    fn silent_single_choice_is_not_qualified_when_multiple_options_remain() {
+        let assessment = assess_negotiation(
+            &negotiated_contract(), motif_input(), &unresolved_authority(),
+            &NegotiationChoiceV1::Commit(7),
+        ).unwrap();
+        assert!(assessment.contract_valid);
+        assert!(assessment.veto_respected);
+        assert!(!assessment.ambiguity_preserved);
+        assert!(!assessment.qualified);
+    }
+
+    #[test]
+    fn partner_veto_removes_an_option_and_must_be_respected_by_every_branch() {
+        let authority = PartnerAuthorityV1 { selected_value: None, vetoed_values: [7].into_iter().collect() };
+        let accepted = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority,
+            &NegotiationChoiceV1::Branch(vec![5, 9]),
+        ).unwrap();
+        assert_eq!(accepted.available_option_count, 2);
+        assert!(accepted.veto_respected);
+        assert!(accepted.ambiguity_preserved);
+        assert!(accepted.qualified);
+        let rejected = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority,
+            &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
+        ).unwrap();
+        assert!(rejected.contract_valid);
+        assert!(!rejected.veto_respected);
+        assert!(!rejected.qualified);
+    }
+
+    #[test]
+    fn explicit_partner_choice_is_followed_even_when_other_alternatives_are_valid() {
+        let authority = PartnerAuthorityV1 { selected_value: Some(9), vetoed_values: BTreeSet::new() };
+        let accepted = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority, &NegotiationChoiceV1::Commit(9),
+        ).unwrap();
+        assert!(accepted.preference_respected);
+        assert!(accepted.qualified);
+        let rejected = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority, &NegotiationChoiceV1::Commit(5),
+        ).unwrap();
+        assert!(rejected.contract_valid);
+        assert!(!rejected.preference_respected);
+        assert!(!rejected.qualified);
+    }
+
+    #[test]
+    fn no_available_response_requires_abstention_not_silent_fabrication() {
+        let authority = PartnerAuthorityV1 { selected_value: None, vetoed_values: [5, 7, 9].into_iter().collect() };
+        let accepted = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority, &NegotiationChoiceV1::Abstain,
+        ).unwrap();
+        assert_eq!(accepted.available_option_count, 0);
+        assert!(accepted.qualified);
+        let rejected = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority, &NegotiationChoiceV1::Commit(5),
+        ).unwrap();
+        assert!(!rejected.veto_respected);
+        assert!(!rejected.qualified);
+    }
+
+    #[test]
+    fn malformed_duplicate_or_incomplete_branches_fail_closed() {
+        let duplicate = assess_negotiation(
+            &negotiated_contract(), motif_input(), &unresolved_authority(),
+            &NegotiationChoiceV1::Branch(vec![5, 7, 7, 9]),
+        ).unwrap();
+        assert!(!duplicate.action_well_formed);
+        assert!(!duplicate.qualified);
+        let incomplete = assess_negotiation(
+            &negotiated_contract(), motif_input(), &unresolved_authority(),
+            &NegotiationChoiceV1::Branch(vec![5, 9]),
+        ).unwrap();
+        assert!(!incomplete.ambiguity_preserved);
+        assert!(!incomplete.qualified);
+    }
+
+    #[test]
+    fn negotiated_contract_rejects_noop_only_and_wrong_dimension_rules() {
+        let noop = NegotiatedResponseContractV1 { target_dimension: Dimension::Motif, modulus: 12, accepted_offsets: [0].into_iter().collect() };
+        assert_eq!(noop.valid_values(motif_input()), Err(HarnessError::InvalidResponseContract));
+        assert_eq!(
+            negotiated_contract().valid_values(Feature { dimension: Dimension::Texture, value: 2 }),
+            Err(HarnessError::InvalidResponseContract),
+        );
+    }
+
+    #[test]
+    fn clarification_is_not_a_substitute_for_an_explicit_partner_selection() {
+        let authority = PartnerAuthorityV1 { selected_value: Some(7), vetoed_values: BTreeSet::new() };
+        let assessment = assess_negotiation(
+            &negotiated_contract(), motif_input(), &authority, &NegotiationChoiceV1::AskClarification,
+        ).unwrap();
+        assert!(!assessment.preference_respected);
+        assert!(!assessment.qualified);
+    }
+
     #[test]
     fn rule_based_positive_control_passes_all_synthetic_gates() {
         let (task, interventions) = fixture();
