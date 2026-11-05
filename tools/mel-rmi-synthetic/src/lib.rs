@@ -870,24 +870,25 @@ pub fn canonical_fixture_replicates_v1(replicates_per_dimension: usize) -> Vec<S
             let task_seed = 10_000_000 + replicate * 5 + dimension_index;
             let randomization_seed = 20_000_000 + replicate * 5 + dimension_index;
             let baseline = (i64::from(
-                base_fixture.interventions.control.current_partner_feature.value,
+                base_fixture
+                    .interventions
+                    .control
+                    .current_partner_feature
+                    .value,
             ) + replicate * 7
                 + dimension_index * 11)
                 .rem_euclid(i64::from(modulus)) as i32;
-            let delta = (1 + (replicate * 3 + dimension_index * 2)
-                .rem_euclid(i64::from(modulus - 1))) as i32;
+            let delta = (1
+                + (replicate * 3 + dimension_index * 2).rem_euclid(i64::from(modulus - 1)))
+                as i32;
             let treated = (baseline + delta).rem_euclid(modulus);
             let unrelated_before =
                 (replicate * 5 + dimension_index * 3).rem_euclid(i64::from(modulus)) as i32;
             let unrelated_after = unrelated_before + 1;
 
-            let task_id = format!(
-                "{}-rep-{replicate}",
-                base_fixture.task.task_id
-            );
+            let task_id = format!("{}-rep-{replicate}", base_fixture.task.task_id);
             let task = base_fixture.task.clone();
-            let observation =
-                |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
+            let observation = |suffix: &str, target_value: i32, unrelated_value: i32| Observation {
                     event_id: format!("{task_id}-{suffix}"),
                     session_id: format!("synthetic-session-{dimension_index}-{replicate}"),
                     history_id: format!("synthetic-history-{dimension_index}-{replicate}"),
