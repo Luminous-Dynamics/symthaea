@@ -303,5 +303,86 @@
     "Missing evidence remains Unknown; it is not converted to zero demand or full reserve.",
     "Electric and useful thermal energy remain separate carriers.",
     "No scalar score may compensate for hard-gate violations."
-  ]
+  ],
+  "positive_controls": [
+    {
+      "id": "HRA-POS-001",
+      "class": "valid_nonwater_action",
+      "stimulus": "A declared non-water action passes safety and critical-service gates, has current matching user authorization, and is supported by the current local controller capability.",
+      "inputs": {
+        "safety_gate": "pass",
+        "critical_service_floor": "pass",
+        "water_use": "not_applicable",
+        "authorization_state": "granted",
+        "authorization_scope_matches": true,
+        "coordinator_state": "available",
+        "local_controller_state": "ready",
+        "capability_revision_matches": true
+      },
+      "expected_decision": "EligibleForLocalControllerEvaluation",
+      "required_assertions": [
+        "local_request_eligibility=true",
+        "actuator_command_emitted=false",
+        "local_manual_control_preserved=true"
+      ],
+      "must_not": [
+        "issue_actuator_command",
+        "bypass_local_controller"
+      ]
+    },
+    {
+      "id": "HRA-POS-002",
+      "class": "valid_qualified_water_action",
+      "stimulus": "A water-use request matches current source-to-use qualification, declared use, exact sample point and current programme; all other gates pass.",
+      "inputs": {
+        "safety_gate": "pass",
+        "critical_service_floor": "pass",
+        "water_use": "drinking",
+        "qualification_state": "QualifiedForDeclaredUse",
+        "qualified_use": "drinking",
+        "authorization_state": "granted",
+        "authorization_scope_matches": true,
+        "coordinator_state": "available",
+        "local_controller_state": "ready",
+        "capability_revision_matches": true
+      },
+      "expected_decision": "EligibleForLocalControllerEvaluation",
+      "required_assertions": [
+        "qualified_use_matches_exactly",
+        "local_request_eligibility=true",
+        "actuator_command_emitted=false"
+      ],
+      "must_not": [
+        "infer_authorization_from_quality",
+        "convert_nonpotable_use"
+      ]
+    },
+    {
+      "id": "HRA-POS-003",
+      "class": "valid_authorized_deferral",
+      "stimulus": "An optional load deferral is inside the current user-approved scope and misses no declared deadline or critical service floor.",
+      "inputs": {
+        "safety_gate": "pass",
+        "critical_service_floor": "pass",
+        "water_use": "not_applicable",
+        "authorization_state": "granted",
+        "authorization_scope_matches": true,
+        "coordinator_state": "available",
+        "local_controller_state": "ready",
+        "capability_revision_matches": true,
+        "deadline_conflict": false
+      },
+      "expected_decision": "EligibleForLocalControllerEvaluation",
+      "required_assertions": [
+        "authorization_revision_retained",
+        "deadline_preserved",
+        "actuator_command_emitted=false"
+      ],
+      "must_not": [
+        "silently_expand_authorization_scope",
+        "defer_protected_service"
+      ]
+    }
+  ],
+  "positive_control_requirement": "All positive controls must remain eligible only with every exact gate satisfied; reject-everything cannot pass."
 }
