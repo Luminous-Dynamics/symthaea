@@ -826,6 +826,118 @@ pub fn measure_partner_influence(
     })
 }
 
+/// Reverse-direction causal contrast against the controlled partner policy.
+/// This is synthetic simulator evidence, not evidence about human musicians.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PartnerCausalContrast {
+    /// Partner's next feature under the control agent action.
+    pub control_next: Feature,
+    /// Partner's next feature under the targeted agent action.
+    pub targeted_next: Feature,
+    /// Partner's next feature under the sham agent action.
+    pub sham_next: Feature,
+    /// Partner's next feature under the unrelated-feature agent action.
+    pub unrelated_next: Feature,
+    /// Circular difference between targeted and control partner actions.
+    pub targeted_delta: u32,
+    /// Circular difference between sham and control partner actions.
+    pub sham_delta: u32,
+    /// Circular difference caused by the unrelated-feature intervention.
+    pub unrelated_delta: u32,
+    /// Whether the targeted agent intervention changes the partner action.
+    pub input_sensitive: bool,
+    /// Whether sham and unrelated conditions leave the partner target stable.
+    pub target_specific: bool,
+}
+
+/// Measure the reverse causal direction under all four paired conditions.
+/// The shared pre-intervention partner state is frozen across conditions.
+pub fn measure_partner_contrast(
+    partner: &dyn ControlledPartner,
+    prior_partner_feature: Feature,
+    actions: &[AgentAction; 4],
+    task: &TaskSpec,
+    interventions: &InterventionSet,
+) -> Result<PartnerCausalContrast, HarnessError> {
+    calculate_contrast(task, interventions, actions)?;
+    if prior_partner_feature.dimension != task.target_dimension {
+        return Err(HarnessError::InvalidPolicy);
+    }
+
+    let mut next = Vec::with_capacity(4);
+    for action in actions {
+        let result = partner.respond(
+            prior_partner_feature,
+            action,
+            task.target_dimension,
+            task.expected_response,
+        )?;
+        if result.dimension != task.target_dimension {
+            return Err(HarnessError::InvalidPolicy);
+        }
+        next.push(result);
+    }
+    let next: [Feature; 4] = next
+        .try_into()
+        .map_err(|_| HarnessError::InvalidPolicy)?;
+    let rule = task.expected_response;
+    let targeted_delta = rule.distance(next[0].value, next[1].value)?;
+    let sham_delta = rule.distance(next[0].value, next[2].value)?;
+    let unrelated_delta = rule.distance(next[0].value, next[3].value)?;
+
+    Ok(PartnerCausalContrast {
+        control_next: next[0],
+        targeted_next: next[1],
+        sham_next: next[2],
+        unrelated_next: next[3],
+        targeted_delta,
+        sham_delta,
+        unrelated_delta,
+        input_sensitive: targeted_delta > 0,
+        target_specific: sham_delta == 0 && unrelated_delta == 0,
+    })
+}
+
+/// Two-direction synthetic trial. Its joint flag is only a finite-oracle
+/// result: human musical relevance and collaborator-valued outcomes remain
+/// outside this record.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReciprocalTrialRecordV1 {
+    /// Partner-to-agent synthetic contrast and artifact/event record.
+    pub agent: TrialRecordV1,
+    /// Agent-to-controlled-partner synthetic contrast.
+    pub partner: PartnerCausalContrast,
+    /// True only when both directional synthetic gates pass.
+    pub qualified_synthetic_reciprocity: bool,
+}
+
+/// Run both causal directions over one paired synthetic intervention set.
+pub fn run_reciprocal_trial(
+    task: TaskSpec,
+    interventions: InterventionSet,
+    agent_policy: &dyn AgentPolicy,
+    partner_policy: &dyn ControlledPartner,
+    prior_partner_feature: Feature,
+    config: TrialRunConfig,
+) -> Result<ReciprocalTrialRecordV1, HarnessError> {
+    let agent = run_trial(task.clone(), interventions.clone(), agent_policy, config)?;
+    let partner = measure_partner_contrast(
+        partner_policy,
+        prior_partner_feature,
+        &agent.actions,
+        &task,
+        &interventions,
+    )?;
+    let qualified_synthetic_reciprocity = agent.contrast.qualified_synthetic_contingency
+        && partner.input_sensitive
+        && partner.target_specific;
+    Ok(ReciprocalTrialRecordV1 {
+        agent,
+        partner,
+        qualified_synthetic_reciprocity,
+    })
+}
+
 /// A measurement that is either supported by the adapter or explicitly
 /// unavailable. Unsupported modalities must not be imputed.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1419,5 +1531,97 @@ mod tests {
             ),
             Err(HarnessError::InvalidPolicy)
         );
+    }
+
+    #[test]
+    fn four_condition_partner_contrast_separates_response_from_sham_and_unrelated() {
+        let (task, interventions) = fixture();
+        let record = run_trial(
+            task.clone(),
+            interventions.clone(),
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let prior = Feature {
+            dimension: Dimension::Motif,
+            value: 1,
+        };
+
+        let responsive = measure_partner_contrast(
+            &ResponsivePartnerPolicy {
+                id: "responsive".to_owned(),
+            },
+            prior,
+            &record.actions,
+            &task,
+            &interventions,
+        )
+        .unwrap();
+        assert_eq!(responsive.targeted_delta, 3);
+        assert_eq!(responsive.sham_delta, 0);
+        assert_eq!(responsive.unrelated_delta, 0);
+        assert!(responsive.input_sensitive);
+        assert!(responsive.target_specific);
+
+        let fixed = measure_partner_contrast(
+            &FixedPartnerPolicy {
+                id: "fixed".to_owned(),
+                value: 6,
+            },
+            prior,
+            &record.actions,
+            &task,
+            &interventions,
+        )
+        .unwrap();
+        assert_eq!(fixed.targeted_delta, 0);
+        assert!(!fixed.input_sensitive);
+        assert!(fixed.target_specific);
+    }
+
+    #[test]
+    fn reciprocal_trial_requires_agent_and_partner_directional_gates() {
+        let (task, interventions) = fixture();
+        let prior = Feature {
+            dimension: Dimension::Motif,
+            value: 1,
+        };
+        let reciprocal = run_reciprocal_trial(
+            task.clone(),
+            interventions.clone(),
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            &ResponsivePartnerPolicy {
+                id: "responsive".to_owned(),
+            },
+            prior,
+            config(),
+        )
+        .unwrap();
+        assert!(reciprocal.agent.contrast.qualified_synthetic_contingency);
+        assert!(reciprocal.partner.input_sensitive);
+        assert!(reciprocal.partner.target_specific);
+        assert!(reciprocal.qualified_synthetic_reciprocity);
+
+        let imitation = run_reciprocal_trial(
+            task,
+            interventions,
+            &ImitationOnlyPolicy {
+                id: "imitation".to_owned(),
+            },
+            &ResponsivePartnerPolicy {
+                id: "responsive".to_owned(),
+            },
+            prior,
+            config(),
+        )
+        .unwrap();
+        assert!(imitation.partner.input_sensitive);
+        assert!(!imitation.agent.contrast.qualified_synthetic_contingency);
+        assert!(!imitation.qualified_synthetic_reciprocity);
     }
 }
