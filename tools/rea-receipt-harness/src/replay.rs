@@ -538,7 +538,7 @@ mod tests {
 
     fn make_receipt(bytes: &[u8], index: usize, payload: &[u8]) -> Value {
         let mut oracle = zip::ZipArchive::new(Cursor::new(bytes.to_vec())).unwrap();
-        let mut member = oracle.by_index(index).unwrap();
+        let member = oracle.by_index(index).unwrap();
         let raw_name = member.name_raw().to_vec();
         let decoded_name = member.name().ok().map(|name| name.into_owned());
         let local_header_offset = member.header_start();
