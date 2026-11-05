@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -600,7 +599,15 @@ fn load_snapshot(path: &PathBuf) -> Result<Snapshot, String> {
     serde_json::from_slice(&bytes).map_err(|e| format!("parse snapshot JSON: {e}"))
 }
 
-fn build_synthetic() -> Result<Report, String> {
+struct SyntheticInputs {
+    snapshot: Snapshot,
+    task_bytes: Vec<u8>,
+    reproduction_bytes: Vec<u8>,
+    attempt_bytes: Vec<u8>,
+    report: Report,
+}
+
+fn build_synthetic_inputs() -> Result<SyntheticInputs, String> {
     let sha = |s: &str| sha256(s.as_bytes());
     let mut tasks = vec![
         Task {
@@ -635,15 +642,12 @@ fn build_synthetic() -> Result<Report, String> {
         },
     ];
     tasks.sort_by_key(task_id);
-    let task_lines: Vec<Vec<u8>> = tasks.iter()
-        .map(|task| serde_json::to_vec(task).map_err(|e| e.to_string()))
-        .collect::<Result<_, _>>()?;
     let mut task_bytes = Vec::new();
-    for line in &task_lines {
-        task_bytes.extend_from_slice(line);
+    for task in &tasks {
+        task_bytes.extend_from_slice(&serde_json::to_vec(task).map_err(|e| e.to_string())?);
         task_bytes.push(b'\n');
     }
-    let mut snapshot = Snapshot {
+    let snapshot = Snapshot {
         schema_version: SNAPSHOT_SCHEMA.into(),
         benchmark_id: "sorrydb".into(),
         benchmark_version: "SorryDB_2601".into(),
@@ -656,15 +660,13 @@ fn build_synthetic() -> Result<Report, String> {
         task_count: tasks.len(),
         task_records_jsonl_sha256: sha256(&task_bytes),
     };
-    let mut receipts = Vec::new();
+
+    let mut reproductions = Vec::new();
     for (index, task) in tasks.iter().enumerate() {
-        let id = task_id(task)?;
-        let record_digest = task_record_sha256(task)?;
-        let success = index == 0;
-        receipts.push(ReproductionReceipt {
+        reproductions.push(ReproductionReceipt {
             schema_version: REPRO_SCHEMA.into(),
-            task_id: id,
-            task_record_sha256: record_digest,
+            task_id: task_id(task)?,
+            task_record_sha256: task_record_sha256(task)?,
             checkout_commit: task.repo_commit.clone(),
             lean_toolchain: task.lean_version.clone(),
             lean_toolchain_sha256: sha("lean-toolchain"),
@@ -675,59 +677,87 @@ fn build_synthetic() -> Result<Report, String> {
             goal_capture_receipt_sha256: sha(&format!("goal-capture-{index}")),
             build_passed: true,
             sorry_anchor_found: true,
-            observed_goal_sha256: if success { task.debug_goal_sha256.clone() } else { sha("different-live-goal") },
+            observed_goal_sha256: if index == 0 {
+                task.debug_goal_sha256.clone()
+            } else {
+                sha("different-live-goal")
+            },
         });
     }
-    let contexts: Vec<(String, String, String, bool)> = tasks.iter().zip(receipts.iter()).map(|(task, receipt)| {
-        let id = task_id(task).unwrap();
-        let task_digest = task_record_sha256(task).unwrap();
-        let receipt_digest = receipt_sha256(receipt).unwrap();
-        let admitted = receipt.observed_goal_sha256 == task.debug_goal_sha256;
-        (id, task_digest, receipt_digest, admitted)
-    }).collect();
-    let mut attempts = Vec::new();
-    let (task_id_one, task_hash_one, receipt_hash_one, admitted_one) = contexts.iter()
-        .find(|x| x.3).cloned().ok_or("synthetic admitted task missing")?;
-    if admitted_one {
-        attempts.push(AttemptOutcome {
-            schema_version: ATTEMPT_SCHEMA.into(),
-            attempt_id: sha("attempt-success"),
-            task_id: task_id_one,
-            task_record_sha256: task_hash_one,
-            reproduction_receipt_sha256: receipt_hash_one,
-            prover_id: "synthetic-prover".into(),
-            prover_version: "contract-test".into(),
-            checkpoint_sha256: Some(sha("synthetic-checkpoint")),
-            environment_sha256: sha("lean-environment"),
-            lean_toolchain_sha256: sha("lean-toolchain"),
-            proof_sha256: Some(sha("proof")),
-            patch_sha256: Some(sha("patch")),
-            verification_receipt_sha256: sha("verification"),
-            result: "verified_success".into(),
-            exact_target_reproduced: true,
-            source_integrity_passed: true,
-            target_placeholder_removed: true,
-            kernel_passed: true,
-            semantic_audit_passed: true,
-            no_new_axioms: true,
-            no_new_unsafe_declarations: true,
-        });
+    let mut reproduction_bytes = Vec::new();
+    for receipt in &reproductions {
+        reproduction_bytes.extend_from_slice(&serde_json::to_vec(receipt).map_err(|e| e.to_string())?);
+        reproduction_bytes.push(b'\n');
     }
-    snapshot.task_count = tasks.len();
-    let task_jsonl_sha = sha256(&task_bytes);
-    let repro_bytes = receipts.iter().map(serde_json::to_vec).collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?.into_iter().flat_map(|mut x| { x.push(b'\n'); x }).collect::<Vec<_>>();
-    let attempt_bytes = attempts.iter().map(serde_json::to_vec).collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?.into_iter().flat_map(|mut x| { x.push(b'\n'); x }).collect::<Vec<_>>();
-    analyze(
+
+    let admitted = tasks.iter().zip(reproductions.iter())
+        .find(|(task, receipt)| task.debug_goal_sha256 == receipt.observed_goal_sha256)
+        .ok_or("synthetic admitted task missing")?;
+    let (task, reproduction) = admitted;
+    let attempt = AttemptOutcome {
+        schema_version: ATTEMPT_SCHEMA.into(),
+        attempt_id: sha("attempt-success"),
+        task_id: task_id(task)?,
+        task_record_sha256: task_record_sha256(task)?,
+        reproduction_receipt_sha256: receipt_sha256(reproduction)?,
+        prover_id: "synthetic-prover".into(),
+        prover_version: "contract-test".into(),
+        checkpoint_sha256: Some(sha("synthetic-checkpoint")),
+        environment_sha256: reproduction.environment_sha256.clone(),
+        lean_toolchain_sha256: reproduction.lean_toolchain_sha256.clone(),
+        proof_sha256: Some(sha("proof")),
+        patch_sha256: Some(sha("patch")),
+        verification_receipt_sha256: sha("verification"),
+        result: "verified_success".into(),
+        exact_target_reproduced: true,
+        source_integrity_passed: true,
+        target_placeholder_removed: true,
+        kernel_passed: true,
+        semantic_audit_passed: true,
+        no_new_axioms: true,
+        no_new_unsafe_declarations: true,
+    };
+    let attempts = vec![attempt];
+    let mut attempt_bytes = Vec::new();
+    for attempt in &attempts {
+        attempt_bytes.extend_from_slice(&serde_json::to_vec(attempt).map_err(|e| e.to_string())?);
+        attempt_bytes.push(b'\n');
+    }
+
+    let report = analyze(
         &snapshot,
         &tasks,
-        &task_jsonl_sha,
-        &receipts,
-        &sha256(&repro_bytes),
+        &sha256(&task_bytes),
+        &reproductions,
+        &sha256(&reproduction_bytes),
         &attempts,
         &sha256(&attempt_bytes),
-    )
+    )?;
+    Ok(SyntheticInputs {
+        snapshot,
+        task_bytes,
+        reproduction_bytes,
+        attempt_bytes,
+        report,
+    })
+}
+
+fn build_synthetic() -> Result<Report, String> {
+    Ok(build_synthetic_inputs()?.report)
+}
+
+fn write_synthetic_fixture_dir(directory: &PathBuf) -> Result<(), String> {
+    let inputs = build_synthetic_inputs()?;
+    fs::create_dir_all(directory).map_err(|e| format!("create synthetic fixture directory: {e}"))?;
+    write_json(&directory.join("snapshot.json"), &inputs.snapshot)?;
+    fs::write(directory.join("tasks.jsonl"), inputs.task_bytes)
+        .map_err(|e| format!("write synthetic tasks: {e}"))?;
+    fs::write(directory.join("reproductions.jsonl"), inputs.reproduction_bytes)
+        .map_err(|e| format!("write synthetic reproduction receipts: {e}"))?;
+    fs::write(directory.join("attempts.jsonl"), inputs.attempt_bytes)
+        .map_err(|e| format!("write synthetic attempt outcomes: {e}"))?;
+    write_json(&directory.join("report.expected.json"), &inputs.report)?;
+    Ok(())
 }
 
 fn run_self_tests() -> Result<(), String> {
@@ -821,16 +851,15 @@ fn execute() -> Result<(), String> {
         println!("PITB_BENCHMARK_INTEGRITY_SELF_TEST_PASS");
         return Ok(());
     }
-    if args.len() == 3 && args[1] == "--self-test-report" {
+    if args.len() == 3 && args[1] == "--self-test-fixture-dir" {
         run_self_tests()?;
-        let report = build_synthetic()?;
-        write_json(&PathBuf::from(&args[2]), &report)?;
-        println!("PITB_BENCHMARK_INTEGRITY_SYNTHETIC_REPORT_OK");
+        write_synthetic_fixture_dir(&PathBuf::from(&args[2]))?;
+        println!("PITB_BENCHMARK_INTEGRITY_SYNTHETIC_FIXTURES_OK");
         return Ok(());
     }
     if args.len() != 7 || args[1] != "--verify" {
         return Err(format!(
-            "usage: {} --verify <snapshot.json> <tasks.jsonl> <reproductions.jsonl> <attempts.jsonl> <report.json> OR --self-test [--self-test-report report.json]",
+            "usage: {} --verify <snapshot.json> <tasks.jsonl> <reproductions.jsonl> <attempts.jsonl> <report.json> OR --self-test OR --self-test-fixture-dir directory",
             args.first().map(String::as_str).unwrap_or("pitb-benchmark-integrity")
         ));
     }
