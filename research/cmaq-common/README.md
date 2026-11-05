@@ -66,7 +66,7 @@ Visual fidelity (WorldOracle/WBench/WorldSimProbe), interventional branch rankin
 | --- | --- | --- |
 | CMAQ-011 | External baseline locks, native-vs-normalized wrapper mode, task/action cadence and reward semantics | A pinned baseline is not a reproduction |
 | CMAQ-017 | Scenario/horizon/execution block/candidate budget, candidate-count-only control, transition call counts | No true measured-compute D1 yet; hardware cost not measured |
-| CMAQ-018 | Same-history action bank, evaluator-only branch identity, per-episode metrics and episode-cluster bootstrap | Synthetic predictor arms only; no physical counterfactual |
+| CMAQ-018 | Same-history action bank, evaluator-only branch identity, episode-cluster bootstrap, and DACS-0 analytic action-response/neutral-drift/four-step probes | Synthetic predictor arms and analytic action dynamics only; no physical counterfactual or actuator validation |
 | CMAQ-019 | WorldOracle code/dataset revision, CC BY-NC-SA 4.0 use constraints, judge version and per-episode identity | Public validation is non-commercial/share-alike; test inputs remain private and test GT withheld |
 | CMAQ-015 | Post-run evidence receipt and signature/purpose/freshness/replay verification | Receipt validity is not empirical validity |
 
