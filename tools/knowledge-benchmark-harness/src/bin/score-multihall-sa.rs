@@ -1660,7 +1660,8 @@ mod tests {
                 prediction: hallucinated,
             },
         ];
-        let metrics = metric_slice(&rows, "isiZulu", None);
+        let row_refs: Vec<&Observed> = rows.iter().collect();
+        let metrics = metric_slice(&row_refs, "isiZulu", None);
 
         assert_eq!(metrics.abstained, 1);
         assert_eq!(metrics.coverage, Some(0.5));
