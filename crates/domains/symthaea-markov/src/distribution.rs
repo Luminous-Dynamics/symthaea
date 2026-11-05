@@ -19,7 +19,7 @@ use std::fmt;
 pub enum DistributionError {
     /// A probability vector must contain at least one state.
     Empty,
-    /// The requested normalization tolerance must be finite and non-negative.
+    /// The requested normalization tolerance must be finite and lie in [0, 1).
     InvalidTolerance { tolerance: f64 },
     /// A probability or weight is not finite.
     NonFiniteEntry { index: usize, value: f64 },
@@ -150,7 +150,7 @@ impl FiniteDistribution {
 }
 
 fn validate_tolerance(tolerance: f64) -> Result<(), DistributionError> {
-    if !tolerance.is_finite() || tolerance < 0.0 {
+    if !tolerance.is_finite() || !(0.0..1.0).contains(&tolerance) {
         return Err(DistributionError::InvalidTolerance { tolerance });
     }
     Ok(())
@@ -220,6 +220,10 @@ mod tests {
         ));
         assert!(matches!(
             FiniteDistribution::new(vec![1.0], -1.0),
+            Err(DistributionError::InvalidTolerance { .. })
+        ));
+        assert!(matches!(
+            FiniteDistribution::new(vec![1.0], 1.0),
             Err(DistributionError::InvalidTolerance { .. })
         ));
     }
