@@ -197,6 +197,16 @@ Start with a small, exact, hand-auditable corpus before scaling to thousands of 
 - **FORECAST-SHIFT-001:** forecast regime shifts after model selection.
 - **AVAILABILITY-001:** forced outage removes a previously declared service.
 - **RULE-SUPERSESSION-001:** new rule or effective date invalidates prior eligibility assumptions.
+- **RESERVE-UP-CHARGE-REDUCTION-001:** upward reserve is provided by reducing charging before increasing discharge.
+- **RESERVE-DOWN-DISCHARGE-REDUCTION-001:** downward reserve is provided by reducing discharge before increasing charging.
+- **RESERVE-DEADBAND-001:** reserve target falls into the minimum-stable-charge deadband.
+- **RESERVE-PRODUCT-DURATION-001:** regulating, instantaneous and ten-minute products use separate response/sustain requirements.
+- **RESERVE-UNKNOWN-SUSTAIN-001:** missing operator/contract sustain profile remains indeterminate when the Code definition is silent.
+- **RESERVE-TRANSITION-001:** claimed full activation conflicts with the registered mode-transition path.
+- **RESERVE-PAYMENT-QUALIFICATION-001:** contracted MW, effective available MW and capacity qualifying for payment differ.
+- **RESERVE-LOST-OPPORTUNITY-001:** product-specific reserve price uses the correct piecewise price-curve elbow selection.
+- **CONSTRAINED-SCHEDULE-COMPENSATION-001:** unconstrained-to-constrained schedule adjustment changes the constrained purchase/sales payment.
+- **CREDIT-COVER-LIQUIDITY-TIMELINE-001:** daily credit-cover recalculation triggers a working-day-specific posting deadline and liquidity need.
 
 For each case, freeze expected feasible/infeasible state, violated constraint IDs, settlement direction, exposure and evidence disposition. Independent reviewers adjudicate the golden expected outcome.
 
