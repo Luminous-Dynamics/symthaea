@@ -42,3 +42,28 @@ cargo clippy --manifest-path tools/rea-receipt-harness/Cargo.toml --locked --all
 The test suite includes schema meta-validation, verified/rejected receipt outcomes, CRC/size/source/offset/archive-budget/claim-ceiling negative controls, canonical-base64 checks, duplicate raw-property rejection at root and nested levels, decimal-string precision through `u64::MAX`, and RFC 8785 Section 3.2.2 number/string plus UTF-16 property-order vectors.
 
 A green harness run is evidence only for this receipt schema, implementation revision, dependency lock and fixtures. An independent replay tool against original content-addressed archive bytes remains a separate gate.
+
+## Independent replay executable
+
+The branch also adds `rea-receipt-replay`, a read-only command-line verifier:
+
+```bash
+cargo run --locked --manifest-path tools/rea-receipt-harness/Cargo.toml --bin rea-receipt-replay -- artifact.zip member-receipt.json
+```
+
+The CLI embeds the pinned receipt schema, rejects duplicate JSON properties, validates schema and semantic claim ceilings, canonicalizes the receipt through RFC 8785, then replays the member through `zip 9.3.0` using `flate2 / zlib-rs`. The production member verifier uses `zipcore / miniz_oxide`, so this is a separate parser/Deflate path.
+
+Both the CLI and the public replay API validate the schema and semantic claim ceiling before reading archive bytes. On Linux, the replayer streams the input file once into a `memfd_create` snapshot, computes SHA-256 during the copy, applies and verifies `F_SEAL_WRITE | F_SEAL_GROW | F_SEAL_SHRINK | F_SEAL_SEAL`, then performs preflight, parsing, decompression, CRC and a final digest check exclusively against that sealed snapshot. Replacing or modifying the source pathname cannot mutate the bytes being parsed. If the kernel cannot provide the required seals, the replayer returns `unsupported`; other platforms remain unsupported until an equivalent immutable snapshot backend exists. It preflights EOCD, central-directory byte size and entry count before constructing the independent index, rejects aggregate declared output beyond the receipt budget, and requires canonical base64 for raw filename bytes. It compares the raw filename bytes, occurrence index, local-header/data offsets, flags, method, declared sizes and CRC, and streams output through the receipt's bounded buffer while recomputing SHA-256 and bitwise CRC-32. It performs no extraction or archive-member writes.
+
+The current independent replay subset is deliberately narrower:
+- Stored and Deflate regular-file entries only.
+- Unique raw filename only. If zip-rs reports duplicate names, the replayer returns `unsupported`; its indexed map is not occurrence-preserving.
+- ZIP64 / unsupported carrier layouts may be rejected by the independent parser and must return `unsupported`, not a guessed offset correction.
+- Archive, output, count and buffer limits are checked; the whole-archive re-hash must match after parsing.
+
+Exit codes: `0` replayed, `1` rejected, `2` unsupported, `3` input/schema/I/O error. A successful replay supports only the member-content integrity claim. It does not establish producer authenticity, package signature validity, archive completeness, installability, runtime behaviour or MASVS control pass.
+
+The replay test suite uses generated Stored and Deflate packages, wrong-source-digest and metadata controls, and a duplicate-name abstention case. The second implementation is a valuable independent oracle, but it shares zip-rs's stated dependency graph and must still be version/lockfile-bound in every run receipt.
+
+The sealed-snapshot workflow generated a 922-line Cargo lockfile at tested tree `d43bb7bfbaa28a65f555188dcf64d3180b0206a8`, with SHA-256 `3ee6650c71cec05aed87e36fab66734412b5043f8660b89afb17c16bbab14a75` (artifact `13399069495`, workflow `41994293575`). The workflow now fails closed unless a fresh resolution reproduces this exact digest. It also records both the checked-out tested tree SHA and the PR head SHA, since GitHub pull-request workflows test a synthetic merge tree. The lockfile remains generated and digest-pinned rather than source-committed; committing the exact file is still preferred before release promotion.
+

@@ -10,6 +10,8 @@ use serde_json::{Map, Number, Value};
 use sha2::{Digest, Sha256};
 use std::fmt;
 
+pub mod replay;
+
 const PROHIBITED_INFERENCES: &[&str] = &[
     "producer_authenticity",
     "producer_identity",
