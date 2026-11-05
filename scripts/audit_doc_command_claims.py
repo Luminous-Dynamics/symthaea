@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 UNAVAILABLE = re.compile(
     r"\b(?:not currently runnable|not runnable|not executable|"
@@ -413,6 +414,34 @@ def self_test():
     assert not _path_pattern_matches("crates/core/nested/symthaea-core", "crates/core/*")
     assert _path_pattern_matches("crates/core/nested/symthaea-core", "crates/**")
     assert not _path_pattern_matches("crates/domains/spark-engine", "crates/domains/*/src")
+
+    with TemporaryDirectory() as temporary:
+        fixture_root = Path(temporary)
+        (fixture_root / "Cargo.toml").write_text(
+            '[package]\nname = "root-workspace"\nversion = "0.1.0"\n'
+            '[workspace]\nmembers = ["xtask", "crates/core/*", "crates/domains/*"]\n'
+            'exclude = ["crates/domains/excluded"]\n',
+            encoding="utf-8",
+        )
+        package_rows = {
+            "xtask/Cargo.toml": '[package]\nname = "xtask"\nversion = "0.1.0"\n',
+            "crates/core/core-pkg/Cargo.toml": '[package]\nname = "core-pkg"\nversion = "0.1.0"\n',
+            "crates/domains/excluded/Cargo.toml": '[package]\nname = "excluded-pkg"\nversion = "0.1.0"\n',
+            "crates/elsewhere/not-a-member/Cargo.toml": '[package]\nname = "not-a-member"\nversion = "0.1.0"\n',
+        }
+        manifest_paths = [fixture_root / "Cargo.toml"]
+        for relative, manifest_text in package_rows.items():
+            manifest_path = fixture_root / relative
+            manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            manifest_path.write_text(manifest_text, encoding="utf-8")
+            manifest_paths.append(manifest_path)
+
+        actual_index = workspace_package_index(fixture_root, manifest_paths)
+        assert "root-workspace" in actual_index
+        assert "xtask" in actual_index
+        assert "core-pkg" in actual_index
+        assert "excluded-pkg" not in actual_index
+        assert "not-a-member" not in actual_index
 
     fixture = {
         "symthaea-core": [Path("crates/core/symthaea-core/Cargo.toml")],
