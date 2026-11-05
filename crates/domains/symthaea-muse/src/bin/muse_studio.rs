@@ -3074,8 +3074,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
 
     let recipe_bytes =
         serde_json::to_vec_pretty(&recipe).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let score_bytes =
-        serde_json::to_vec(&score).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let score_bytes = serde_json::to_vec(&score).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let (bundle_path, midi_available) = persist_keeper_bundle(
         &audio_key,
         &wav,
