@@ -1009,7 +1009,7 @@
       "case_id": "DISPATCH-EXECUTION-FIDELITY-001",
       "track": "physical_execution_and_settlement",
       "title": "Evidence-bound schedule-to-meter execution fidelity",
-      "scenario": "Compare signed scheduled export/import energy against signed meter energy over a frozen horizon. Report schedule, meter and settlement time coverage separately; absolute deviation, unfulfilled scheduled energy and overdelivery; and fulfilment only when the full schedule horizon is covered by meter evidence. Reconcile actual booked balancing charges only when source-bound settlement evidence exists for every interval. Future-known meter/settlement records, duplicate record IDs, overlapping intervals and schedule revisions published after delivery start are rejected.",
+      "scenario": "Compare signed scheduled export/import energy against signed meter energy over a frozen horizon. Report schedule, meter and settlement time coverage separately; absolute deviation, unfulfilled scheduled energy and overdelivery; and fulfilment only when the full schedule horizon is covered by meter evidence. Reconcile actual booked balancing charges only when source-bound settlement evidence exists for every interval. Future-known meter/settlement records, duplicate record IDs, overlapping intervals and schedule revisions published after delivery start are rejected. Intervals must be ordered by start timestamp, then must not overlap. A schedule revision published after delivery start and a meter observation before the interval has ended are invalid; settlement evidence cannot exist without matching meter evidence.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1020,7 +1020,10 @@
         "opposite_direction_delivery_is_not_credit_for_the_schedule",
         "missing_meter_or_settlement_is_not_silently_zero",
         "schedule_gaps_reduce_time_coverage_and_withhold_complete_fulfilment",
-        "duplicate_records_overlapping_intervals_and_future_meter_data_fail_closed"
+        "duplicate_records_overlapping_intervals_and_future_meter_data_fail_closed",
+        "schedule_revision_published_after_delivery_start_is_rejected",
+        "settlement_without_meter_and_meter_before_interval_end_are_rejected",
+        "out_of_order_intervals_are_distinguished_from_overlapping_intervals"
       ],
       "required_evidence": [
         "frozen optimized/market schedule interval and schedule content digest",
