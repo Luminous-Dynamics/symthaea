@@ -1,7 +1,7 @@
 {
   "schema": "luminous.rea-rust-migration-benchmark.v0",
   "status": "proposal_not_results",
-  "as_of": "2026-11-04",
+  "as_of": "2026-11-05",
   "upstream": {
     "repository": "https://github.com/morluto/rea",
     "source_commit": "8250bf2320ea57aab4e664db4b4d44b8abd2004e",
@@ -2350,6 +2350,103 @@
         "corpus": "Generated valid archives are seeds, not a ground-truth oracle.",
         "centipede": "Centipede/FuzzTest is experimental for this Rust integration until exact build/replay evidence exists."
       }
+    },
+    {
+      "id": "typed_claim_entailment_and_falsification",
+      "status": "research_issue_opened",
+      "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10629",
+      "related_owners": [
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10347",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10353",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10477",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10591",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10410",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/6283"
+      ],
+      "objective": "Qualify whether an investigator's typed conclusion is entailed by exact, scoped, dependency-aware evidence; preserve contradictions, missing evidence, inapplicability and unknown provenance instead of turning them into confidence or majority votes.",
+      "principle": "Evidence does not vote; claims must be entailed within declared scope. Receipt validity, cryptographic validity, signer trust, package authorization, completeness, runtime behavior and semantic truth are distinct propositions.",
+      "claim_dimensions": [
+        "subject_artifact_build_member_occurrence",
+        "predicate_and_typed_value",
+        "platform_version_environment_time_scope",
+        "supporting_contradicting_and_prerequisite_evidence_refs",
+        "assumptions_and_applicability_conditions",
+        "provider_dependency_ancestry_known_declared_inferred_unknown",
+        "uncertainty_limitations_and_falsification_condition"
+      ],
+      "outcome_algebra": [
+        "supported_within_scope",
+        "refuted_within_scope",
+        "underdetermined",
+        "conflicted",
+        "inapplicable",
+        "unverified"
+      ],
+      "cases": [
+        "same_member_bytes_repacked_different_archive_digest",
+        "duplicate_raw_filename_distinct_occurrence_and_payload",
+        "single_verified_member_does_not_imply_archive_completeness",
+        "crc32_recomputed_after_payload_change_does_not_imply_authenticity",
+        "receipt_self_digest_without_trusted_issuer",
+        "valid_dsse_signature_from_issuer_outside_trust_policy",
+        "valid_signature_from_unexpected_signer",
+        "trusted_signer_with_planted_malicious_runtime_behavior",
+        "different_provider_names_same_parser_or_upstream_report",
+        "shared_rules_database_model_or_acquisition_common_mode_false_fact",
+        "unknown_provider_ancestry_receives_no_independence_credit",
+        "independent_parser_replay_does_not_imply_producer_authenticity",
+        "source_mutation_during_capture_separate_from_post_seal_immutability",
+        "partial_or_truncated_stream_does_not_support_member_integrity",
+        "declared_size_output_budget_and_unsupported_codec_abstention",
+        "platform_sdk_scope_mismatch_android_api_36_vs_37",
+        "apk_v32_structural_presence_does_not_imply_hybrid_signature_validity",
+        "signature_crypto_validity_separate_from_signer_trust_and_package_authorization",
+        "evidence_from_wrong_build_device_time_or_artifact_scope_rejected",
+        "contradictory_provider_result_not_hidden_by_majority_vote",
+        "stale_unknown_resolution_or_missing_history_predecessor",
+        "high_eig_probe_without_terminal_action_change",
+        "low_eig_probe_preventing_high_consequence_decision_error",
+        "raw_scanner_finding_does_not_imply_named_masvs_control_pass"
+      ],
+      "metrics": [
+        "claim_disposition_accuracy_by_predicate_and_fault_family",
+        "false_entailment_rate_by_non_implication_control",
+        "false_refutation_rate",
+        "unsupported_and_inapplicable_disposition_accuracy",
+        "scope_leakage_rate_by_artifact_build_platform_sdk_device_time_operation",
+        "evidence_reference_completeness",
+        "derivation_replay_success_rate",
+        "contradiction_preservation_rate",
+        "false_independence_and_confidence_uplift_rate",
+        "selective_risk_vs_claim_coverage",
+        "investigator_time_and_calls_to_expose_seeded_overclaim",
+        "evaluator_latency_memory_and_derivation_size"
+      ],
+      "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.",
+      "protocol": [
+        "reuse upstream Evidence, EvidenceBundle and receipt identities; do not mutate pinned REA Evidence ID semantics",
+        "freeze claim vocabulary, scope dimensions, dispositions and rule version before evaluation",
+        "require exact immutable premise references and explicit assumptions for every supported claim",
+        "preserve supports, contradictions, unknowns, unsupported and inapplicable premises; do not majority-vote",
+        "derive provider dependence only from #10410 lineage evidence; unknown ancestry is not independence",
+        "keep member integrity, archive identity, producer authenticity, signature validity, signer identity, signer trust, package authorization, platform acceptance and runtime semantics as separate claims",
+        "bind derivation receipts to evaluator commit, rule-set digest, schema digest and exact premise digests",
+        "use independent expected dispositions and rationale; generator outputs are not their own oracle",
+        "freeze a held-out adversarial suite before model evaluation and use blinded independent adjudication",
+        "compare raw synthesis, synthesis with evidence/lineage context, and synthesis gated by the typed evaluator",
+        "connect next-experiment decisions to #9911 while preserving its distinct EVSI/regret metrics",
+        "report per-predicate denominators, abstentions, missing evidence, unsupported cases and confidence intervals; no composite score"
+      ],
+      "claim_boundaries": {
+        "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
+        "archive_identity": "A member digest is not a whole-archive digest; a whole-archive digest is not producer authenticity.",
+        "authenticity": "A receipt digest or signature alone does not establish producer identity or trust; a separate attestation and trust policy are required.",
+        "signature": "Cryptographic validity, signer identity, trust, package authorization and platform acceptance are separate claims.",
+        "completeness": "One verified member does not establish complete archive/package traversal.",
+        "independence": "Provider-name diversity or unknown ancestry does not prove independent corroboration.",
+        "semantics": "Byte integrity or package signature does not establish benignness, installability, runtime behavior or control compliance."
+      }
     }
   ],
   "promotion_policy": {
@@ -2397,7 +2494,8 @@
     "https://github.com/Luminous-Dynamics/symthaea/issues/10207",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10208",
     "https://github.com/Luminous-Dynamics/symthaea/issues/10298",
-    "https://github.com/Luminous-Dynamics/symthaea/pull/10304"
+    "https://github.com/Luminous-Dynamics/symthaea/pull/10304",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10629"
   ],
   "claim_ceiling": {
     "rust_port_completed": false,
