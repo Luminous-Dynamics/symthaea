@@ -18,6 +18,7 @@ path = "src/bin/rea-receipt-replay.rs"
 
 [dependencies]
 base64 = "=0.22.1"
+libc = "=0.2.191"
 serde = "=1.0.229"
 serde_json = "=1.0.151"
 jsonschema = { version = "=0.60.2", default-features = false }
