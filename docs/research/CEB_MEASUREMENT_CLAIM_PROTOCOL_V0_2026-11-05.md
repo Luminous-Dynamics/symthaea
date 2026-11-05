@@ -1,8 +1,8 @@
 # CEB Measurement and Comparative Claim Protocol V0 — 2026-11-05
 
 **Status:** Design-only. No CEB performance result is claimed.  
-**Machine-readable matrix:** [\`benchmarks/ceb/measurement-matrix.v0.json\`](../../benchmarks/ceb/measurement-matrix.v0.json)  
-**Schema:** [\`benchmarks/ceb/measurement-matrix.schema.json\`](../../benchmarks/ceb/measurement-matrix.schema.json)  
+**Machine-readable matrix:** [`benchmarks/ceb/measurement-matrix.v0.json`](../../benchmarks/ceb/measurement-matrix.v0.json)  
+**Schema:** [`benchmarks/ceb/measurement-matrix.schema.json`](../../benchmarks/ceb/measurement-matrix.schema.json)  
 **Execution gates:** [#10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064), [#10369](https://github.com/Luminous-Dynamics/symthaea/issues/10369)
 
 ## 1. Paradigm shift: engineering quality is a vector
