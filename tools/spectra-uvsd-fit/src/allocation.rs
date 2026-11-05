@@ -75,6 +75,7 @@ pub struct SimulationBatchRequest {
 pub enum AllocationDisposition {
     CertifiedStop,
     BudgetExhaustedWithoutCertificate,
+    BudgetInsufficientForAtomicBatch,
     AllocateMore,
 }
 
@@ -125,7 +126,6 @@ pub enum AdaptiveAllocationError {
     InvalidScenarioWeights,
     InvalidCvarTailMass,
     CommonRandomNumberCountMismatch,
-    BudgetInsufficientForAtomicBatch,
     NonFinitePriority,
     SeedIndexOverflow,
 }
@@ -146,7 +146,6 @@ impl fmt::Display for AdaptiveAllocationError {
             Self::InvalidScenarioWeights => "scenario weights must be finite, positive and normalized",
             Self::InvalidCvarTailMass => "CVaR tail mass must be finite and in (0, 1]",
             Self::CommonRandomNumberCountMismatch => "common-random-number mode requires equal replication counts across actions within the selected scenario",
-            Self::BudgetInsufficientForAtomicBatch => "remaining budget cannot fund one complete common-random-number batch",
             Self::NonFinitePriority => "adaptive allocation priority is not finite",
             Self::SeedIndexOverflow => "requested replication index exceeds u32 capacity",
         };
