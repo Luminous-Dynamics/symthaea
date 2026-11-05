@@ -51,25 +51,45 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
     if task["oracle"]["disagreement_status"] == "unresolved":
         if task["task_status"] != "proposed" or task["oracle"]["adjudication_decision"] != "unresolved":
             semantic.append("unresolved disagreement remains proposed and cannot be qualified")
+    if task["oracle"]["disagreement_status"] == "none" and task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if any(row["decision"] != "accept" for row in reviewers):
+            semantic.append("without adjudication, both gold reviewers must accept")
+    if task["oracle"]["disagreement_status"] == "resolved_by_adjudicator":
+        if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted") and task["oracle"]["adjudication_decision"] != "accept":
+            semantic.append("adjudicator must accept a task before it can qualify")
+        if task["oracle"]["adjudication_decision"] == "reject" and task["task_status"] != "rejected":
+            semantic.append("rejected adjudication cannot be advanced to a qualifying task state")
+        if all(row["decision"] == "accept" for row in reviewers):
+            semantic.append("adjudication record is unexpected when both gold reviewers already agree")
     if not task["oracle"]["blinded_to_candidate_output"]:
         semantic.append("gold review must be blinded to candidate output")
     if task["repository"]["license"]["review_status"] != "compatible" and task["task_status"] != "proposed":
         semantic.append("static review/admission requires compatible license review")
+    if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if not task["repository"]["license"]["license_review_record_sha256"] or not task["repository"]["license"]["license_reviewer_id"]:
+            semantic.append("compatible license decision requires a named reviewer and review-record digest")
     if task["source"]["solution_leakage_review"]["status"] != "complete" and task["task_status"] != "proposed":
         semantic.append("static review/admission requires a complete solution-leakage review")
     if task["source"]["solution_leakage_review"]["status"] in ("suspected_leakage", "confirmed_leakage"):
         semantic.append("suspected or confirmed solution leakage blocks admission")
     if task["task_spec"]["blind_solve_review"]["status"] != "passed" and task["task_status"] != "proposed":
         semantic.append("static review/admission requires a passed blind-solve instruction review")
+    if task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if task["task_spec"]["blind_solve_review"]["reviewer_id"] in reviewer_ids:
+            semantic.append("blind-solve reviewer must be distinct from gold reviewers")
+        if task["source"]["solution_leakage_review"]["reviewer_id"] in reviewer_ids:
+            semantic.append("solution-leakage reviewer must be distinct from gold reviewers")
+        if task["source"]["fix_visibility"] == "unknown":
+            semantic.append("unknown fix visibility blocks static task qualification")
     if not task["task_spec"]["blind_solve_review"]["instruction_only_sufficient"] and task["task_status"] != "proposed":
         semantic.append("task instructions must be sufficient without access to the fix diff")
+    if task["custody"]["agent_access_before_freeze"]:
+        semantic.append("task material cannot be exposed to the agent before the task freeze")
     if task["custody"]["partition"] == "holdout":
         if task["source"]["fix_visibility"] not in ("private", "not_published"):
             semantic.append("holdout requires private or not-published fix visibility; unknown is not sealed")
         if task["source"]["fix_visibility"] == "public":
             semantic.append("publicly visible fix cannot be admitted as sealed holdout")
-        if task["custody"]["agent_access_before_freeze"]:
-            semantic.append("holdout was exposed to agent before freeze")
         if not task["custody"]["holdout_material_outside_agent_workspace"]:
             semantic.append("holdout material must remain outside candidate workspace")
         if task["custody"]["public_fix_exposure_accepted"]:
@@ -80,6 +100,9 @@ def validate_task(task: dict, schema: dict, format_checker: FormatChecker) -> li
         semantic.append("performance task requires a pinned workload digest")
     if task["acceptance_contract"]["security_review_status"] == "failed":
         semantic.append("failed security review blocks task admission")
+    if task["acceptance_contract"]["security_review_status"] == "passed" and task["task_status"] in ("static_reviewed", "execution_qualified", "admitted"):
+        if not task["acceptance_contract"]["security_review_record_sha256"] or not task["acceptance_contract"]["security_reviewer_id"]:
+            semantic.append("passed security review requires reviewer identity and record digest")
     if task["acceptance_contract"]["destructive_side_effects"]:
         semantic.append("tasks with destructive external side effects are excluded from the pilot")
     if task["execution_qualification"]["candidate_code_executed"]:
@@ -158,15 +181,15 @@ def valid_fixture() -> dict:
     return {
       "schema_version":0,"task_id":"ceb-rust-fixture-001","task_status":"proposed","family_id":"rust-types-traits",
       "repository":{"repo_full_name":"example/project","url":"https://github.com/example/project","source_revision":"b"*40,
-       "license":{"spdx_expression":"Apache-2.0","license_file_path":"LICENSE","license_file_sha256":digest,"review_status":"compatible"}},
+       "license":{"spdx_expression":"Apache-2.0","license_file_path":"LICENSE","license_file_sha256":digest,"review_status":"compatible","license_review_record_sha256":digest,"license_reviewer_id":"license-reviewer-01"}},
       "source":{"source_kind":"issue","source_url":"https://github.com/example/project/issues/1","source_id":"1","opened_at":"2026-01-01T00:00:00Z","fix_commit_sha":"c"*40,"fix_visibility":"public",
        "solution_leakage_review":{"status":"complete","reviewed_on":"2026-11-05","search_protocol_id":"CEB-LEAKAGE-SEARCH-001","search_record_sha256":digest,"searched_surfaces":["source-host","commit-history","benchmark-datasets"],"reviewer_id":"leakage-reviewer-01"}},
       "task_spec":{"prompt_sha256":digest,"acceptance_spec_sha256":"d"*64,"authoring_protocol_version":"0.1.0",
        "blind_solve_review":{"status":"passed","reviewer_id":"blind-reviewer-01","review_record_sha256":digest,"instruction_only_sufficient":True}},
       "environment":{"rust_toolchain":"1.96.0","cargo_lock_sha256":digest,"target_triple":"x86_64-unknown-linux-gnu","feature_set":["default"],"environment_image_digest":"sha256:"+"e"*64,"resource_policy_sha256":digest,"network_policy":"disabled","replay_manifest_sha256":digest,"workload_sha256":None},
-      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","destructive_side_effects":False},
+      "acceptance_contract":{"contract_sha256":digest,"fail_to_pass_check_ids":["issue-acceptance-001"],"pass_to_pass_check_ids":["existing-regression-001"],"critical_invariants":["trait contract remains sound"],"security_review_status":"passed","destructive_side_effects":False,"security_review_record_sha256":digest,"security_reviewer_id":"security-reviewer-01"},
       "oracle":{"reviewers":[{"reviewer_id":"gold-reviewer-01","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"},{"reviewer_id":"gold-reviewer-02","role":"gold_reviewer","review_record_sha256":digest,"decision":"accept"}],"blinded_to_candidate_output":True,"llm_only_oracle":False,"disagreement_status":"none","adjudicator_id":None,"adjudication_record_sha256":None,"adjudication_decision":"not_needed","gold_patch_sha256":digest,"semantically_equivalent_repairs_allowed":True,"reference_patch_control":"not_run_blocked","empty_patch_control":"not_run_blocked","oracle_record_sha256":digest},
-      "custody":{"partition":"development","custody_domain_id":"dev-custody-01","custody_manifest_sha256":digest,"holdout_material_outside_agent_workspace":False,"agent_access_before_freeze":False,"public_fix_exposure_accepted":True},
+      "custody":{"partition":"development","custody_domain_id":"dev-custody-01","custodian_id":"custodian-01","custody_manifest_sha256":digest,"holdout_material_outside_agent_workspace":False,"agent_access_before_freeze":False,"public_fix_exposure_accepted":True},
       "execution_qualification":{"candidate_code_executed":False,"isolation_status":"blocked_issue_10064","isolation_profile_sha256":None,"trust_status":"blocked_issue_10369","trust_policy_sha256":None,"independent_regrade_claimed":False},
       "dispositions":{"timeouts_counted":True,"abstentions_counted":True,"escalations_counted":True,"ungraded_counted":True,"denominator_policy_sha256":digest},
       "claim_boundary":"Synthetic validator fixture only; not a real benchmark task and not admitted."
