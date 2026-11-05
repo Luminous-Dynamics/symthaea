@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
 from importlib.metadata import version
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +24,120 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+
+def parse_utc(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def validate_comparator_invariants(manifest: dict[str, Any]) -> None:
+    frontier = manifest["decision_information"]
+    decision_time = parse_utc(frontier["decision_time_utc"])
+    forecast_cutoff = parse_utc(frontier["forecast_vintage_cutoff_utc"])
+    outcome_end = parse_utc(frontier["actual_outcome_window_end_utc"])
+    if forecast_cutoff > decision_time:
+        raise ValueError("forecast vintage cutoff is after the decision information frontier")
+    if decision_time >= outcome_end:
+        raise ValueError("actual outcome window must extend beyond the decision timestamp")
+    if frontier["no_lookahead_enforced"] is not True:
+        raise ValueError("the comparator protocol must enforce no-lookahead")
+
+    scenario = manifest["scenario"]
+    if parse_utc(scenario["horizon_end_utc"]) <= parse_utc(scenario["horizon_start_utc"]):
+        raise ValueError("scenario horizon end must follow its start")
+    if scenario["interval_basis"] == "synthetic_not_market_default" and scenario["interval_minutes"] <= 0:
+        raise ValueError("synthetic interval duration must be positive")
+
+    for package in manifest["input_packages"]:
+        if parse_utc(package["source_vintage_utc"]) > forecast_cutoff:
+            raise ValueError(f"input package {package['package_id']} leaks a future source vintage")
+        if package["data_class"] == "synthetic":
+            if package["content_sha256"] is not None:
+                raise ValueError("synthetic package must not invent a frozen content digest")
+            if package["licence_state"] != "not_applicable_synthetic":
+                raise ValueError("synthetic package licence state is inconsistent")
+
+    asset = manifest["asset_model"]
+    if asset["min_soc_fraction"] >= asset["max_soc_fraction"]:
+        raise ValueError("asset SOC interval is empty or inverted")
+    if asset["charge_power_mw"] <= 0 or asset["discharge_power_mw"] <= 0:
+        raise ValueError("charge and discharge power must be positive")
+
+    engines = manifest["engine_roster"]
+    engine_ids = [engine["engine_id"] for engine in engines]
+    if len(engine_ids) != len(set(engine_ids)):
+        raise ValueError("engine roster contains duplicate engine identifiers")
+    if len(engines) < 2:
+        raise ValueError("at least two engine/comparator entries are required")
+
+    policy = manifest["policy_baseline"]
+    if policy["policy_class"] == "perfect_information_oracle":
+        if policy["implementable"] is not False:
+            raise ValueError("perfect-information oracle must be non-implementable")
+        if policy["forecast_policy"] != "realized_future_not_allowed":
+            raise ValueError("oracle must be isolated from implementable forecast policies")
+        if policy["oracle_use"] not in {"lower_bound_only", "upper_bound_only"}:
+            raise ValueError("oracle must only be reported as a mathematical bound")
+    elif policy["implementable"] is False:
+        raise ValueError("only the explicitly designated perfect-information oracle may be non-implementable")
+
+    matching = manifest["matching_contract"]
+    required_dimensions = {
+        "market_rule_version", "information_frontier", "price_vintage", "scenario_seed",
+        "topology", "asset_constraints", "warranty", "time_resolution", "objective_function",
+        "risk_measure", "settlement_rules", "participant_eligibility"
+    }
+    observed = {item["dimension"] for item in matching["dimensions"]}
+    if observed != required_dimensions:
+        raise ValueError("matching contract must enumerate every required comparability dimension")
+    if matching["oracle_separation_required"] is not True:
+        raise ValueError("perfect-information oracle must remain a separate comparison class")
+
+    if manifest["run_state"] == "not_run":
+        if manifest.get("execution_receipt") is not None:
+            raise ValueError("not_run manifest must not include an execution receipt")
+        if any(engine["execution_state"] != "not_run" for engine in engines):
+            raise ValueError("not_run manifest contains an engine claimed as executed")
+        if any(metric["comparison_status"] != "not_run" or metric["value"] is not None
+               for metric in manifest["reported_metrics"]):
+            raise ValueError("not_run manifest must have null metrics marked not_run")
+    elif manifest["run_state"] == "completed":
+        if manifest.get("execution_receipt") is None:
+            raise ValueError("completed manifest must include an execution receipt")
+        if any(engine["execution_state"] != "executed" for engine in engines):
+            raise ValueError("completed comparison contains an engine without execution evidence")
+
+    if manifest["manifest_state"] == "synthetic_protocol_example":
+        if manifest["run_state"] != "not_run":
+            raise ValueError("synthetic protocol example must not claim an executed run")
+        if manifest["execution_receipt"] is not None:
+            raise ValueError("synthetic protocol example cannot contain an execution receipt")
+
+
+def assert_comparator_negative_controls(manifest: dict[str, Any]) -> int:
+    controls = [
+        ("future-vintage", lambda value: value["input_packages"][0].update(
+            source_vintage_utc="2026-10-02T00:00:00Z")),
+        ("oracle-marked-implementable", lambda value: value["policy_baseline"].update(
+            policy_class="perfect_information_oracle", implementable=True)),
+        ("duplicate-engine", lambda value: value["engine_roster"].append(
+            copy.deepcopy(value["engine_roster"][0]))),
+        ("not-run-with-result", lambda value: value["reported_metrics"][0].update(
+            value=1.0)),
+        ("missing-comparability-dimension", lambda value: value["matching_contract"]["dimensions"].pop()),
+        ("oracle-not-separated", lambda value: value["matching_contract"].update(
+            oracle_separation_required=False)),
+    ]
+    for name, mutate in controls:
+        changed = copy.deepcopy(manifest)
+        mutate(changed)
+        try:
+            validate_comparator_invariants(changed)
+        except (ValueError, KeyError, TypeError):
+            continue
+        raise ValueError(f"negative control did not fail closed: {name}")
+    validate_comparator_invariants(manifest)
+    return len(controls)
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -30,12 +146,18 @@ def main() -> None:
     root = Path(__file__).resolve().parents[2]
     schema_path = root / "docs/research/sawem/v1/sawem-bess-underwriting-profile-v1.schema.json"
     fixture_path = root / "docs/research/sawem/v1/sawem-bess-underwriting-profile-v1.synthetic.json"
+    comparator_schema_path = root / "docs/research/sawem/v1/sawem-bess-comparator-manifest-v1.schema.json"
+    comparator_fixture_path = root / "docs/research/sawem/v1/sawem-bess-comparator-manifest-v1.synthetic.json"
 
     try:
         schema_bytes = schema_path.read_bytes()
         fixture_bytes = fixture_path.read_bytes()
+        comparator_schema_bytes = comparator_schema_path.read_bytes()
+        comparator_fixture_bytes = comparator_fixture_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
+        comparator_schema = json.loads(comparator_schema_bytes)
+        comparator_fixture = json.loads(comparator_fixture_bytes)
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
 
@@ -51,6 +173,30 @@ def main() -> None:
     if errors:
         first = errors[0]
         fail(f"synthetic fixture violates schema at {list(first.absolute_path)}: {first.message}")
+
+    if comparator_schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
+        fail("comparator schema must declare JSON Schema Draft 2020-12")
+    try:
+        Draft202012Validator.check_schema(comparator_schema)
+    except Exception as exc:
+        fail(f"comparator schema meta-validation failed: {exc}")
+    comparator_validator = Draft202012Validator(
+        comparator_schema, format_checker=FormatChecker()
+    )
+    comparator_errors = sorted(
+        comparator_validator.iter_errors(comparator_fixture),
+        key=lambda error: list(error.absolute_path),
+    )
+    if comparator_errors:
+        first = comparator_errors[0]
+        fail(
+            "synthetic comparator manifest violates schema at "
+            f"{list(first.absolute_path)}: {first.message}"
+        )
+    try:
+        negative_control_count = assert_comparator_negative_controls(comparator_fixture)
+    except (ValueError, KeyError, TypeError) as exc:
+        fail(f"comparator invariants or negative controls failed: {exc}")
 
     # Status is intentionally non-authoritative in the first public profile.
     if fixture["profile_state"] != "research_profile_not_authoritative":
@@ -157,7 +303,14 @@ def main() -> None:
         "validator_version": version("jsonschema"),
         "schema_sha256": sha256(schema_bytes),
         "fixture_sha256": sha256(fixture_bytes),
+        "comparator_schema_sha256": sha256(comparator_schema_bytes),
+        "comparator_fixture_sha256": sha256(comparator_fixture_bytes),
         "profile_state": fixture["profile_state"],
+        "comparator_manifest_state": comparator_fixture["manifest_state"],
+        "comparator_run_state": comparator_fixture["run_state"],
+        "comparator_engine_count": len(comparator_fixture["engine_roster"]),
+        "comparator_negative_control_count": negative_control_count,
+        "comparator_reported_metric_count": len(comparator_fixture["reported_metrics"]),
         "market_code_publication_state": market["publication_state"],
         "market_code_effective_status": market["effective_status"],
         "participant_admission_state": operations["participant_admission_state"],
