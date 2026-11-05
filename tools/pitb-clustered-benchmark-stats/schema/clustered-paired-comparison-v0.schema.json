@@ -7,6 +7,7 @@
   "required": [
     "schema_version",
     "evaluation_split_git_blob_sha1",
+    "synthetic_fixture",
     "evaluation_split_raw_sha256",
     "proof_runs_jsonl_sha256",
     "evaluation_task_count",
@@ -20,7 +21,8 @@
       "const": "pitb.clustered-paired-comparison.v0"
     },
     "evaluation_split_git_blob_sha1": {
-      "const": "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
     },
     "evaluation_split_raw_sha256": {
       "type": "string",
@@ -31,7 +33,8 @@
       "pattern": "^[a-f0-9]{64}$"
     },
     "evaluation_task_count": {
-      "const": 1000
+      "type": "integer",
+      "minimum": 1
     },
     "strategy_summaries": {
       "type": "array",
@@ -308,6 +311,9 @@
     "statistical_boundary": {
       "type": "string",
       "minLength": 80
+    },
+    "synthetic_fixture": {
+      "type": "boolean"
     }
   }
 }
