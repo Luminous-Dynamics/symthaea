@@ -2141,6 +2141,35 @@ mod tests {
     }
 
     #[test]
+    fn artifact_verifier_detects_mutated_input_bytes() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let (inputs, outputs) = artifact_payloads(&record);
+        bind_verified_artifacts(
+            &mut record,
+            inputs.clone(),
+            outputs.clone(),
+            "independent-sha256-verifier",
+            "v1",
+        )
+        .unwrap();
+        let mut altered_inputs = inputs;
+        altered_inputs[0].artifacts[0].bytes.push(0xff);
+        assert_eq!(
+            verify_trial_artifact_bindings(&record, &altered_inputs, &outputs),
+            Err(HarnessError::ArtifactDigestMismatch)
+        );
+    }
+
+    #[test]
     fn artifact_verifier_detects_mutated_output_bytes() {
         let (task, interventions) = fixture();
         let mut record = run_trial(
