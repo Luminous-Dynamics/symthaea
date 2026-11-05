@@ -558,3 +558,66 @@ The priority order is an engineering sequence, not a claim that lower-ranked dom
 - GitHub issues: #10531, #10544 and #10545 track separate benchmark tracks.
 
 All scorer code and tests are authored but **not compiled or executed** in this session. The synthetic fixture is not model evaluation. No expert annotation, corpus ingestion, held-out run, commercial rights clearance, SOTA result or production readiness is claimed.
+
+
+## 19. Industry comparison baseline: DataLens Africa and MzansiBench
+
+### 19.1 DataLens Africa Version 1.5 snapshot
+
+The [DataLens Africa LLM leaderboard](https://www.datalens.africa/llm-leaderboard) currently displays a Version 1.5 snapshot last updated **16 October 2026**. The four visible columns and scores are:
+- **AfriMCQA** — multilingual cultural MCQ, accuracy;
+- **AfriMMLU** — human-translated MMLU, accuracy;
+- **MasakhaNEWS** — news topic classification, macro-F1;
+- **AfriMedQA v2** — clinical QA, macro-accuracy.
+
+The displayed overall snapshot ranks Gemini 3.8 Flash at **85.32%**, Gemini 3.6 Flash at **83.66%**, GPT-6.1 Sol at **81.56%**, GPT-5.6 Sol at **80.33%**, Grok 4.6 at **77.27%**, Claude Opus 4.6 at **77.19%**, and DeepSeek-V4-Pro at **76.26%**.
+
+These are publisher-displayed scores and should be cited as a market snapshot, not as independently reproduced SOTA. The page explicitly says it ranks selected models and that these four benchmark columns form **one of seven dimensions**. The other dimensions are token efficiency/cost, cultural appropriateness, factuality/hallucination, safety, instruction following/reasoning, and dialect/code-switch robustness. The visible page does not itself expose enough exact per-model revisions, prompt identities, raw predictions and run receipts to reconstruct every result independently.
+
+Also, the four columns do not share one common metric: accuracy, macro-F1 and macro-accuracy are averaged in the overview. Such a composite is useful as a dashboard but cannot replace per-task/per-language comparisons or high-stakes safety gates.
+
+Source: https://www.datalens.africa/llm-leaderboard
+
+### 19.2 MzansiBench implementation maturity
+
+The [UCT showcase description](https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36) describes MzansiBench as:
+- a modular evaluation library, centralized dataset repository and public leaderboard;
+- 13 tasks across 16 datasets spanning 11 official written languages, with particular attention to nine low-resource Niger-Congo B languages;
+- a prompt pipeline validated against AfroBench that closely reproduces published results in a matched environment;
+- a separate encoder-only fine-tuning pipeline for sequence classification, paired-text classification and token classification, validated with published baselines, functional tests and repeated seeds.
+
+The project reports substantial gaps between English/Afrikaans and low-resource Niger-Congo B languages, as well as coverage gaps for Tshivenda and isiNdebele. This makes MzansiBench a highly relevant shared evaluation/leaderboard reference. Its task × dataset × language matrix still needs exact inspection; 13 tasks and 11 languages does not mean every task exists in every language.
+
+References:
+- https://showcase.sit.uct.ac.za/event/showcase-2026/mzansibench-36
+- https://projects.cs.uct.ac.za/honsproj/cgi-bin/view/2026/karriem_vondoorze.zip/index.html
+
+### 19.3 Our industry comparison protocol
+
+Compare Symthaea/Mycelix with:
+- one current frontier API model per task (exact model label, dated API identity, decoding/config, access mode and pricing snapshot);
+- one strong open-weight multilingual baseline pinned by exact model/tokenizer revision;
+- one locally relevant South African model such as MzansiLM where the task matches;
+- published baselines from the corresponding benchmark paper;
+- human/native-speaker or domain-expert references where the task requires adjudication.
+
+Freeze for every run: data/split/revision, prompt digest, model identity, tokenizer, retrieval/embedding/index/reranker, source pack, context/evidence token limits, output tokens, calls, retries, timeouts, hardware/API price snapshot and scoring version. Keep cost-to-serve and quality separate and report the Pareto frontier rather than hiding trade-offs in one score.
+
+The competitive thesis has five components:
+1. **Quality parity:** lower worst-language and worst-domain error without degrading high-resource-language absolute quality.
+2. **Evidence-grounded factuality:** better retrieval recall, evidence span support, source-family independence, temporal applicability, calibrated verdicts and useful abstention.
+3. **Safety parity:** lower harmful compliance in African languages without confusing comprehension failure or blanket refusal for safe helpfulness.
+4. **Cultural/narrative competence:** source-native, locally authored and expert-adjudicated data, preserving legitimate interpretive plurality.
+5. **Efficiency and governance:** accuracy/calibration/safety against tokens, calls, latency, memory, energy/cost, and hard rights/authority/consent constraints.
+
+A superiority claim is valid only for the exact task, split, language and matched budget measured. A smaller cross-language gap is not an improvement if absolute performance is poor; a high pooled average does not offset a rights violation or a high-severity safety failure.
+
+### 19.4 Practical first leaderboard submission
+
+The first external-facing result should not be a universal Symthaea score. Publish a narrow per-language report across:
+- Multi-Hall-SA (controlled factual perturbation detection);
+- AfrIFact (retrieval → evidence extraction → claim checking);
+- one compatible MzansiBench task;
+- TukaBench (safety, refusal, deflection and harmful compliance as separate outcomes).
+
+Include raw per-case receipts under the dataset license, exact model/data/scoring revisions, worst-group slices, uncertainty intervals, calibration, usage and cost. Keep all four as separate task tracks. Ask MzansiBench/DataLens for their data manifests and reproducibility receipts before describing scores as apples-to-apples.
