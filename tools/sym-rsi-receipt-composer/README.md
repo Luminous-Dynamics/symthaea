@@ -10,7 +10,7 @@ digest. It is **not** a source-tree digest and must not be substituted for one.
 ## Contract
 
 - Every input byte string is passed through `verify_receipt_json` before projection.
-- Every metric has a frozen source benchmark identity and a score transform.
+- Every metric pins benchmark ID/version/revision, dataset-manifest digest, scoring-formula ID, grader version and a frozen score transform.
 - All metric runs for one candidate must cover the exact same eligible task universe,
   share the same candidate system identity, and use compatible cohort, runner, comparison,
   protocol and budget context.
