@@ -122,3 +122,51 @@ The focused GitHub Actions workflow runs formatting, tests, Clippy, JSON Schema 
 ## Claim ceiling
 
 A synthetic pass demonstrates only the branch identity, known-answer intervention and metric contracts implemented by this generator. It does not establish real-world counterfactual correctness, physical safety, learned Symthaea world-model reliability, or SOTA. No physical robot intervention or actuator-control authority is enabled.
+
+
+## DACS-0 action-controllability diagnostics (stacked v0.2 extension)
+
+CMAQ-018 now carries a separate Driving Action Controllability Suite (DACS-0) diagnostic tier. It uses the same canonical action bank and candidate/evaluator boundary, but measures action-to-state control fidelity rather than utility-effect ranking or absolute branch-outcome error.
+
+The DACS reference profile is explicitly synthetic and deterministic:
+- initial observed state is cloned;
+- the disturbance is zero for the DACS probe;
+- the analytic state transition is x' = x + 0.12 force + 0.03 grip, v' = 0.75 v + 0.08 force - 0.04 grip;
+- each action is applied repeatedly for a four-step horizon;
+- only candidate-facing predicted state and the evaluator-owned analytic reference are compared.
+
+Reported metrics remain non-collapsible:
+- **Action-pair separation rate:** distinct analytic action responses must remain distinguishable in predicted state space.
+- **Action-response sign accuracy:** each nonzero action-vs-neutral delta_x / delta_v component must have the correct sign.
+- **Action-response vector MAE:** error in the predicted two-component action response relative to neutral input.
+- **Neutral-input drift energy:** squared residual from the analytic passive state transition under zero-force/zero-grip.
+- **Multi-step response MAE:** autoregressive state error over four repeated-action steps; first-step obedience does not earn a multi-step pass.
+- **Prediction and horizon coverage:** abstention is reported as missing support, never scored as zero error.
+
+Hostile predictor controls are executable unit fixtures: action-insensitive output; wrong-sign response while actions remain distinguishable; neutral-input drift; correct-sign but impossible response magnitude; first-step-only action following; and support-aware abstention. The point predictor and evaluator-only analytic oracle are positive controls. An effect-only predictor has no branch-state interface and therefore cannot claim physical action controllability.
+
+### Why this is a paradigm shift
+
+A standard action-conditioned prediction score can reward a model that mostly continues its learned motion prior. DACS asks whether the same initial state responds to changes in the action command, whether the response has the right direction and scale, whether a neutral command introduces unexplained motion, and whether control remains effective after feedback. It separates:
+
+1. predictive plausibility;
+2. action controllability;
+3. causal effect fidelity;
+4. intervention support;
+5. decision value and regret.
+
+A model must not trade one of these dimensions against another in one aggregate score.
+
+DACS-0 is not CoCo/Mini-SSMB, DrivingGen, WorldOracle or an external leaderboard reproduction. It is a driving-domain analytic conformance layer that makes action-response semantics testable before connecting learned predictors and external simulator/vehicle evidence. Later extensions must add actuator-specific contracts (brake/steer/throttle, gear, delay, saturation, friction, grade, tire/load state), physical units, uncertainty calibration, OOD support and metamorphic transforms with proven domain equivariance. Do not interpret a zero numerical command as zero force unless the actuator contract says so.
+
+### Prospective acceptance targets (not empirical results)
+
+- 100% exact analytic response on the reference point predictor and evaluator oracle.
+- Zero accepted action-insensitive controls when the analytic action bank contains nonzero distinct responses.
+- Correct response sign in every nonzero analytic component for a conformant predictor.
+- Zero neutral-input drift energy on the deterministic neutral fixture.
+- Four-step action-response fidelity, not just one-step action separation.
+- Explicit action/horizon coverage with abstention for unsupported action regions.
+- Zero promotion from synthetic DACS conformance to vehicle safety, real-world causal counterfactual correctness, SAE automation level or SOTA claims.
+
+External comparison should keep CoCo/Mini-SSMB ARC/Drift Energy, DrivingGen controllability/temporal plausibility, WorldOracle fixed-action real-execution fidelity, CMAQ-018 alternative-action effects, and closed-loop Bench2Drive/nuPlan/ReactSim comparisons in distinct tracks with matched input/action/compute contracts.
