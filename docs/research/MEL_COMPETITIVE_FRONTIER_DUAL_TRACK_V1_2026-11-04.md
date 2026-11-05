@@ -64,16 +64,18 @@ Treat these as dated snapshots, not timeless targets. Re-fetch the leaderboard a
 
 ### HEARTBEAT 2027
 
-The official dedicated challenge page was opened and re-checked on **5 November 2026**. Its current schedule reads:
+The official dedicated challenge page was opened and re-checked on **5 November 2026**. It states that all deadlines are 23:59 UTC unless otherwise noted. Its current schedule reads:
 
 - 16 November 2026: development leaderboard opens.
 - 2 December: team membership and resource declarations freeze.
 - 16 December: development leaderboard closes.
-- 23 December: final container submission.
+- 23 December: final container submission deadline.
+- 30 December: rankings and paper invitations.
+- 7 January 2027: invited two-page papers due; 28 January: camera-ready two-page papers due.
 
-The current page describes 132,571 samples (127,371 train / 5,200 development) across approximately 3,103 hours and ~599.83 GB, with reciprocal audio turn-taking and streaming proactive-understanding tracks. Offline Track I asks for WAIT/RESPOND/CONTINUE/YIELD; Online Track I requires generated audio plus timestamped interaction logs. The online protocol requires current/past input only and response timestamps at the end of the producing chunk; Track II logs every chunk, including no-response chunks, and does not permit backdating.
+The current page describes 132,571 samples (127,371 train / 5,200 development) across approximately 3,103 hours and ~599.83 GB, with reciprocal audio turn-taking and streaming proactive-understanding tracks. Offline Track I asks for WAIT/RESPOND/CONTINUE/YIELD; Online Track I requires generated audio plus timestamped interaction logs. Track I online scoring covers behavior, response quality and speech onset/offset timing. Track II online scoring uses precision, recall and joint F1; its protocol requires current/past input only, logs every chunk including no-response chunks, and response timestamps at the end of the producing chunk (no backdating).
 
-This page has returned multiple conflicting schedule snapshots during this research session (including 11 November/27 November/11 December/18 December and 16 November/27 November/11 December/18 December). The currently opened page now explicitly shows 16 November/2 December/16 December/23 December. Re-check the official page before every submission milestone and archive the page content with the run manifest. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
+The page has returned multiple conflicting schedule snapshots during this research session. The current opened page explicitly shows 16 November/2 December/16 December/23 December/30 December. Re-check the official page before every submission milestone and archive the page content with the run manifest. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
 ### MMAE
 
 The official challenge site lists:
