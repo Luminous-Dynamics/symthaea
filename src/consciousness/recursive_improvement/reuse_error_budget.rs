@@ -254,7 +254,7 @@ mod tests {
         assert!(
             (allocation.paired_test_error_budget() + allocation.lower_bound_error_budget()
                 - allocation.total_error_budget())
-                .abs()
+            .abs()
                 < 1e-15
         );
     }
