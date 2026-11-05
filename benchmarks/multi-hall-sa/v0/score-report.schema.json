@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/multi-hall-sa-score-report-v0.schema.json",
+  "title": "Multi-Hall-SA deterministic score report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "plan_id", "phase", "synthetic_only", "plan_sha256", "pair_manifest_sha256", "results_sha256", "cluster_count", "systems", "language_gaps", "nonclaims"],
+  "properties": {
+    "schema_version": {"const": "multi-hall-sa-score-report-v0"},
+    "plan_id": {"type": "string"},
+    "phase": {"type": "string"},
+    "synthetic_only": {"type": "boolean"},
+    "plan_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "pair_manifest_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "results_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "cluster_count": {"type": "integer", "minimum": 0},
+    "systems": {"type": "array"},
+    "language_gaps": {"type": "array"},
+    "nonclaims": {"type": "array", "items": {"type": "string"}}
+  }
+}
