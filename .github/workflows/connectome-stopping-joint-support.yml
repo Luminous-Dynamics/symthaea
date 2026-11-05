@@ -1,0 +1,54 @@
+name: Connectome stopping audit with joint-support receipts
+
+on:
+  pull_request:
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_stopping_audit.rs"
+      - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_STOPPING_JOINT_SUPPORT_RECEIPTS.example.jsonl"
+      - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
+      - ".github/workflows/connectome-stopping-joint-support.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectomics-intake-audit/src/bin/connectome_stopping_audit.rs"
+      - "docs/neuroscience/CONNECTOME_STOPPING_SNAPSHOT.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_STOPPING_JOINT_SUPPORT_RECEIPTS.example.jsonl"
+      - "docs/neuroscience/CONNECTOMICS_AUTOPILOT_BENCHMARK_V1.md"
+      - ".github/workflows/connectome-stopping-joint-support.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stopping-joint-support-receipts:
+    name: Validate longitudinal joint-support receipts without stopping
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Check stopping audit formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_stopping_audit.rs
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_stopping_audit -- -D warnings
+      - name: Run stopping audit tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_stopping_audit
+      - name: Evaluate longitudinal joint-support receipt fixture
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_stopping_audit -- --input docs/neuroscience/examples/CONNECTOME_STOPPING_JOINT_SUPPORT_RECEIPTS.example.jsonl --tail-window 3 --output "$RUNNER_TEMP/stopping-joint-support-report.json"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("$RUNNER_TEMP/stopping-joint-support-report.json").read_text())
+          assert report["status"] == "VALIDATED_NOT_STOPPED", report
+          assert report["recommendation"] == "CONTINUE_REVIEW", report
+          assert report["graph_invariants_stable_in_tail"] is True, report
+          assert report["joint_support_evidence"]["status"] == "NO_ROBUST_PLAN_IN_TAIL", report
+          assert report["joint_support_evidence"]["no_plan_snapshot_count"] == 1, report
+          print("verified stable global invariants with a joint-support no-plan transition; stopping remains CONTINUE_REVIEW")
+          PY
