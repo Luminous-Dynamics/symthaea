@@ -1,8 +1,8 @@
 use mel_rmi_synthetic::{
-    canonical_fixture_suite_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
     ActionMechanism, AgentAction, AgentPolicy, Dimension, Feature, FixedResponsePolicy,
     HarnessError, ImitationOnlyPolicy, Observation, OneWayPromptPolicy, ResponsivePartnerPolicy,
-    RuleBasedPolicy, TaskSpec, TrialRunConfig,
+    RuleBasedPolicy, TaskSpec, TrialRunConfig, canonical_fixture_suite_v1, run_policy_suite_v1,
+    run_reciprocal_suite_v1,
 };
 use std::error::Error;
 
@@ -15,11 +15,7 @@ impl AgentPolicy for YokedSuitePolicy {
         "yoked"
     }
 
-    fn act(
-        &self,
-        observation: &Observation,
-        task: &TaskSpec,
-    ) -> Result<AgentAction, HarnessError> {
+    fn act(&self, observation: &Observation, task: &TaskSpec) -> Result<AgentAction, HarnessError> {
         if self.source_session_id.trim().is_empty()
             || self.source_session_id == observation.session_id
         {
