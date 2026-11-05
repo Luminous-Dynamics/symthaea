@@ -25,7 +25,7 @@ The helper:
 4. Resolves package selectors against the nearest Cargo workspace above the Markdown document, or the workspace containing an explicit manifest. It reads the workspace's declared `members` and `exclude` patterns rather than searching every Cargo package name indiscriminately.
 5. For `--bin NAME`, parses the manifest and checks explicit `[[bin]]` source paths or Cargo's conventional binary source locations.
 6. Splits shell commands only on control operators outside quotes and ignores flags following Cargo's `--` separator.
-7. Allows a missing manifest/package/binary only when the same document names the exact path or selector and clearly labels it unavailable, not runnable or design-only.
+7. Allows a missing manifest/package/binary only when the same Markdown line names the exact path or selector (and binary target, when applicable) and clearly labels it unavailable, not runnable or design-only. An unrelated status note elsewhere in the document cannot waive the command.
 8. Reports placeholders and unsupported/dynamic selectors separately; they are not counted as verified.
 
 The checker is deliberately offline and static. It does not invoke Cargo, build scripts, proc macros, tests, candidate code, graders or referenced commands. It does not modify files or produce benchmark scores.
@@ -62,6 +62,7 @@ This is a guard against a specific class of documentation error, not a complete 
 - Binary source checks cover explicit `[[bin]]` paths and Cargo's conventional `src/main.rs`, `src/bin/NAME.rs` and `src/bin/NAME/main.rs` layouts. Generated or build-script-selected targets require manual review.
 - It does not validate arbitrary shell scripts, Nix commands, container images, network endpoints, benchmark datasets, test semantics, executable permissions or runtime outcomes.
 - A manifest, package or binary existing is not proof that it builds, passes tests, is secure, or has been run on the exact source head.
+- Unavailable exceptions must keep the exact path/selector, optional binary target and unavailable reason on one Markdown line; wrapped notes should be rewritten as a single explicit annotation.
 
 The next strengthening step is a typed command registry for script/Nix/container invocations, command-working-directory annotations, version-qualified package matching and a reviewer-owned exception file bound to exact commits. Do not infer that scope from this V0 helper.
 
