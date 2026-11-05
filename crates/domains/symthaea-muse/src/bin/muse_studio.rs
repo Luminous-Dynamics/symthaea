@@ -2868,11 +2868,7 @@ fn verify_keeper_bundle_readback(
     expected_score_sha256: &str,
     expected_midi_sha256: Option<&str>,
 ) -> std::io::Result<KeeperArtifactReadbackReceiptV1> {
-    let mut expected_files = vec![
-        "audio.wav",
-        "recipe.json",
-        "score.json",
-    ];
+    let mut expected_files = vec!["audio.wav", "recipe.json", "score.json"];
     if expected_midi_sha256.is_some() {
         expected_files.push("performance.mid");
     }
@@ -2896,9 +2892,7 @@ fn verify_keeper_bundle_readback(
         })
         .collect::<std::io::Result<Vec<_>>>()?;
     actual_files.sort_unstable();
-    if actual_files.iter().map(String::as_str).collect::<Vec<_>>()
-        != expected_files
-    {
+    if actual_files.iter().map(String::as_str).collect::<Vec<_>>() != expected_files {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("keeper bundle file set mismatch: {actual_files:?}"),
