@@ -48,6 +48,7 @@
 // Core infrastructure for MAGI Loop
 pub mod candidate_archive;
 pub mod paired_evaluation;
+pub mod reuse_error_budget;
 pub mod core;
 pub mod types;
 
@@ -76,6 +77,9 @@ pub use candidate_archive::{
 pub use paired_evaluation::{
     CandidateEvaluationView, CaseScore, MetricPairedResult, PairedComparison,
     PairedEvaluationError,
+};
+pub use reuse_error_budget::{
+    MAX_REUSE_ROUND, ReuseBudgetError, ReuseErrorAllocation, allocate_reuse_error_budget,
 };
 
 pub use core::{
