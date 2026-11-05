@@ -1,5 +1,7 @@
 # Tools
 
+**Execution status (2026-11-05):** The `symthaea-inspect` Cargo package and its source tree are not in the current checkout. The `cargo build -p symthaea-inspect` command below is an intended interface only, not a runnable command or evidence of an implemented tool.
+
 Debugging and inspection tools for development.
 
 ## symthaea-inspect
