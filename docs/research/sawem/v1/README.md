@@ -62,7 +62,7 @@ The raw source digest is intentionally null and the source freeze state is not_f
 - [Comparator run-manifest schema](sawem-bess-comparator-manifest-v1.schema.json)
 - [Synthetic comparator roster](sawem-bess-comparator-manifest-v1.synthetic.json)
 - [Matched-engine benchmark protocol](COMPARATOR_PROTOCOL_V1.md)
-- [Machine-readable 26-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
+- [Machine-readable 30-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
 - [Benchmark corpus JSON Schema](sawem-bess-benchmark-corpus-v1.schema.json)
 
 The JSON Schema uses Draft 2020-12. The synthetic fixture contains fictional project identifiers, ratings, energy declarations, dispatch, metered response, balancing components and credit-cover amounts. It is only a schema and interface example.
@@ -136,7 +136,7 @@ It currently implements and tests:
 
 The reserve mapping is grounded in NTCSA Market Code Rev 2.3 §§2.1(107), 2.1(167), 2.1(199), 9.1(4), 9.5(2)(b) and 7.4: https://www.ntcsa.co.za/wp-content/uploads/2026/02/Market-Code-v2.3.pdf. Regulating and Ten-Minute reserve definitions do not themselves specify a minimum sustain duration. The reference therefore requires an explicit contract/operator sustain profile for energy qualification and reports indeterminate when absent; it does not assume that all products need 10 minutes. Section 7.4 records mode-change times in all directions; the reduced BESS abstraction now stores all six directed transitions among standstill, charging and discharging. The full Code's four-state SCO/pumping/generating vocabulary must be mapped separately before representing pumped-storage units.\n\nThe kernel is a deterministic feasibility auditor, not a market optimizer. Its simplified symmetric efficiency assumption must be replaced by boundary-specific measured charge/discharge/auxiliary-loss models before engineering performance claims. It does not model temperature, electrochemical dynamics, degradation, warranty, power flow, market price formation, unit commitment, stochastic policies, SAWEM legal interpretation, authenticated dispatch/meter data or settlement integration.
 
-The first CI run executes its formatting and dependency-locked unit tests in isolation from the repository root workspace. The open reference is intended to become the hand-auditable feasibility oracle for the 20-case benchmark corpus, not a replacement for PLEXOS, Chronos or EnCompass.
+The first CI run executes its formatting and dependency-locked unit tests in isolation from the repository root workspace. The open reference is intended to become the hand-auditable feasibility oracle for the finite benchmark corpus, not a replacement for PLEXOS, Chronos or EnCompass.
 
 ## 6. Required next conformance work
 
