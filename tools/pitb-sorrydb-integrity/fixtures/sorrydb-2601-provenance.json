@@ -1,0 +1,13 @@
+{
+  "schema_version": "pitb.sorrydb-snapshot-provenance.v0",
+  "snapshot_id": "SorryDB_2601",
+  "upstream_repository": "https://github.com/SorryDB/SorryDB",
+  "upstream_repository_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+  "database_git_blob_sha1": "5fafddac467af6d30d8f5c8731d6edec9c273a47",
+  "evaluation_split_git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7",
+  "expected_database_task_count": 2601,
+  "expected_evaluation_task_count": 1000,
+  "evaluation_split_role": "test",
+  "license": "Apache-2.0",
+  "paper_url": "https://proceedings.mlr.press/v306/letson26a.html"
+}
