@@ -331,10 +331,9 @@ fn build_report() -> String {
 
     write!(
         output,
-        "],\"variance_decomposition\":{{\"candidate_mean_variance\":{:.12},\"shared_continuation_variance\":{:.12},\"candidate_local_variance\":{:.12},\"candidate_continuation_interaction_variance\":{:.12}}},\"coupling_variance\":{{\"independent_pair_difference_variance\":{:.12},\"shared_invariant_same_sensitivity_variance\":{:.12},\"shared_invariant_opposite_sensitivity_variance\":{:.12}}},\"claim_ceiling\":\"Finite synthetic continuation-selection protocol only; no trained WAM, driving performance, causal validity, CRN variance guarantee or vehicle safety claim.\"}}",
+        "],\"variance_decomposition\":{{\"candidate_mean_variance\":{:.12},\"shared_continuation_variance\":{:.12},\"candidate_continuation_interaction_variance\":{:.12}}},\"coupling_variance\":{{\"independent_pair_difference_variance\":{:.12},\"shared_invariant_same_sensitivity_variance\":{:.12},\"shared_invariant_opposite_sensitivity_variance\":{:.12}}},\"claim_ceiling\":\"Finite synthetic continuation-selection protocol only; no trained WAM, driving performance, causal validity, CRN variance guarantee or vehicle safety claim.\"}}",
         decomp.candidate_mean_variance,
         decomp.shared_continuation_variance,
-        decomp.candidate_local_variance,
         decomp.candidate_continuation_interaction_variance,
         coupling.independent_pair_difference_variance,
         coupling.shared_invariant_same_sensitivity_variance,
