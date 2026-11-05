@@ -205,10 +205,10 @@ cargo run --release --manifest-path tools/spectra-uvsd-fit/Cargo.toml --bin obse
   --outer 100 --trials-per-class 500 --seed-root 0x5350454354524101 > spectra-recovery.csv
 ```
 
-The defaults (10 outer campaigns × 250 signal + 250 noise trials) are a smoke setting. The command above is a larger research campaign, not a coverage certification. The binary emits one `REPLICATE` CSV row for every scenario/seed and one `SUMMARY` row per scenario. It records the DGP and schedule PRNG versions, all adapter abstentions, fit statuses and RT outcomes, and computes mu/sigma/d_a bias and RMSE only for `FitStatus::Converged` fits. It reports fit availability both over all campaigns and conditional on adapter-ready campaigns.
+The defaults (10 outer campaigns × 250 signal + 250 noise trials) are a smoke setting. The command above is a larger research campaign, not a coverage certification. The binary emits one `REPLICATE` CSV row for every scenario/seed and one `SUMMARY` row per scenario. It records scenario/action commitments, DGP and schedule PRNG versions, all adapter abstentions, fit statuses and RT outcomes, and computes mu/sigma/d_a bias and RMSE only for `FitStatus::Converged` fits. Fit availability is reported both over all campaigns and conditional on adapter-ready campaigns, with 95% Wilson score intervals. RMSE and bias remain point summaries in this first runner.
 
 The scenario ladder includes:
-- Gaussian equal-variance null and Gaussian UVSD alternatives on both sides of sigma=1;
+- Gaussian equal-variance null, near-null alternatives (sigma=0.9 and 1.1), and larger Gaussian UVSD alternatives (sigma=0.7 and 1.3);
 - variance-standardized Student-t heavy-tail stress;
 - uniform lapse contamination;
 - criterion drift;
