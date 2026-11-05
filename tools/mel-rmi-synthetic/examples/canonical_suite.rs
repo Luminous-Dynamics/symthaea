@@ -369,7 +369,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         report_policy_aggregates(&records);
     }
 
-    let reciprocal = run_reciprocal_suite_v1(
+    let mut reciprocal = run_reciprocal_suite_v1(
         &fixtures,
         &RuleBasedPolicy {
             id: "rule-positive".to_owned(),
