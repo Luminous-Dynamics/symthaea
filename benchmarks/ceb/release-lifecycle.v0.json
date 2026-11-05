@@ -1,0 +1,56 @@
+{
+  "schema_version": 0,
+  "registry_id": "CEB-RELEASE-LIFECYCLE-V0",
+  "status": "design_only_no_qualified_results",
+  "release_id": "ceb-v0-design",
+  "current_version": "0.1.0",
+  "previous_release_id": null,
+  "previous_version": null,
+  "release_action": "initial_design_no_qualified_results",
+  "created_on": "2026-11-05",
+  "artifact_digests": {
+    "task_set_sha256": null,
+    "prompt_set_sha256": null,
+    "source_set_sha256": null,
+    "environment_set_sha256": null,
+    "agent_tool_policy_sha256": null,
+    "resource_policy_sha256": null,
+    "grader_sha256": null,
+    "rubric_sha256": null,
+    "reference_control_set_sha256": null,
+    "metadata_sha256": null,
+    "evaluation_input_sha256": null
+  },
+  "change_records": [],
+  "task_lifecycle_entries": [],
+  "saturation_policy": {
+    "minimum_trials_per_configuration": 5,
+    "require_all_registered_current_generation_families": true,
+    "require_all_trials_successful": true,
+    "model_family_registry": [],
+    "saturation_disposition": "remove_from_active_aggregate_but_retain_in_longitudinal_panel",
+    "longitudinal_policy": "A saturated task leaves the active discriminative aggregate only after every preregistered current-generation model family/configuration satisfies 5/5. Its task identity, outcomes, denominator and historical release memberships remain immutable in the longitudinal panel."
+  },
+  "saturation_observations": [],
+  "resource_calibration": {
+    "status": "not_run_blocked",
+    "planned_independent_runs_per_reference_task": 10,
+    "actual_independent_runs": 0,
+    "infrastructure_failure_rate_target": 0.01,
+    "observed_infrastructure_failure_rate": null,
+    "p95_runtime_seconds": null,
+    "resource_policy_sha256": null,
+    "calibration_record_sha256": null,
+    "agent_and_infrastructure_failures_separated": true,
+    "agent_timeout_policy_sha256": null,
+    "claim_boundary": "No runner calibration has been executed; this is a planned protocol only."
+  },
+  "historical_policy": {
+    "immutable_release_records": true,
+    "preserve_superseded_task_denominators": true,
+    "no_silent_task_deletion": true,
+    "invalid_and_saturated_tasks_retained": true,
+    "release_comparison_rule": "Compare results only within compatible release inputs. Major agent-visible input changes require a new full rerun; minor verifier changes require regrade if raw artifacts are complete or affected-task rerun otherwise; patch metadata changes permit reuse only when evaluation-input digests are identical."
+  },
+  "claim_boundary": "Design-only initial CEB release policy. No benchmark task, grader, resource envelope, saturation state or runner has been qualified."
+}
