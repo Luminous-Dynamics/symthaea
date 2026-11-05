@@ -8,6 +8,8 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
+pub mod credit_cover;
+
 const EPSILON: f64 = 1.0e-9;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
