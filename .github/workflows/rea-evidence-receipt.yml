@@ -45,7 +45,7 @@ jobs:
           fi
 
   verifier:
-    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && needs.rea-target.outputs.present == 'true')
+    if: needs.rea-target.outputs.present == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     needs: rea-target
     name: REA evidence receipt verifier (only when package exists)
     runs-on: ubuntu-24.04
