@@ -3101,11 +3101,12 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
             seed,
             style_name: spec.name.clone(),
         };
-        match store.allocate_root_from_bytes(
+        match store.allocate_root_from_bundle(
             &origin,
             &audio_key,
+            &bundle_path,
             &recipe_bytes,
-            Some(&score_bytes),
+            &score_bytes,
             &wav,
             unix_time_ms(),
         ) {
