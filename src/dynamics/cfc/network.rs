@@ -91,6 +91,44 @@ impl CfCNetworkConfig {
     }
 }
 
+/// Validation failure when restoring a CfC network's flat parameter vector.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CfCWeightLoadError {
+    /// The supplied vector does not exactly match the network's parameter count.
+    LengthMismatch { expected: usize, actual: usize },
+    /// A parameter contains NaN or infinity.
+    NonFiniteValue { index: usize },
+    /// A time constant is below the numerical stability floor.
+    TimeConstantBelowMinimum { cell_index: usize, neuron_index: usize },
+    /// A destination ndarray does not expose contiguous storage.
+    NonContiguousParameter { parameter: String },
+    /// Computing the expected parameter count overflowed usize.
+    ParameterCountOverflow,
+}
+
+impl std::fmt::Display for CfCWeightLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LengthMismatch { expected, actual } => {
+                write!(f, "CfC weight count mismatch: expected {expected}, received {actual}")
+            }
+            Self::NonFiniteValue { index } => {
+                write!(f, "CfC weight at flat index {index} is not finite")
+            }
+            Self::TimeConstantBelowMinimum { cell_index, neuron_index } => write!(
+                f,
+                "CfC tau at cell {cell_index}, neuron {neuron_index} is below MIN_TAU"
+            ),
+            Self::NonContiguousParameter { parameter } => {
+                write!(f, "CfC parameter array {parameter} is non-contiguous")
+            }
+            Self::ParameterCountOverflow => write!(f, "CfC weight count overflow"),
+        }
+    }
+}
+
+impl std::error::Error for CfCWeightLoadError {}
+
 /// A complete CfC neural network
 #[derive(Debug, Clone)]
 pub struct CfCNetwork {
@@ -1097,12 +1135,12 @@ impl CfCNetwork {
     /// The existing infallible [`Self::set_weights`] method remains available for
     /// compatibility, but this method is the required boundary for proposed,
     /// loaded, federated, or otherwise untrusted parameter edits.
-    pub fn try_set_weights(&mut self, weights: &[f32]) -> Result<(), String> {
+    pub fn try_set_weights(&mut self, weights: &[f32]) -> Result<(), CfCWeightLoadError> {
         let mut expected = self
             .output_weights
             .len()
             .checked_add(self.output_bias.len())
-            .ok_or_else(|| "CfC weight count overflow".to_string())?;
+            .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
 
         for cell in &self.cells {
             for count in [
@@ -1113,7 +1151,7 @@ impl CfCNetwork {
             ] {
                 expected = expected
                     .checked_add(count)
-                    .ok_or_else(|| "CfC weight count overflow".to_string())?;
+                    .ok_or(CfCWeightLoadError::ParameterCountOverflow)?;
             }
             for tensor in &cell.backbone_weights {
                 expected = expected
@@ -1128,10 +1166,10 @@ impl CfCNetwork {
         }
 
         if weights.len() != expected {
-            return Err(format!(
-                "CfC weight count mismatch: expected {expected}, received {}",
-                weights.len()
-            ));
+            return Err(CfCWeightLoadError::LengthMismatch {
+                expected,
+                actual: weights.len(),
+            });
         }
 
         if let Some((index, value)) = weights
@@ -1140,9 +1178,7 @@ impl CfCNetwork {
             .enumerate()
             .find(|(_, value)| !value.is_finite())
         {
-            return Err(format!(
-                "CfC weight at flat index {index} is not finite: {value}"
-            ));
+            return Err(CfCWeightLoadError::NonFiniteValue { index });
         }
 
         // Check temporal constants using the same flat layout as get_weights().
@@ -1156,9 +1192,10 @@ impl CfCNetwork {
                 .enumerate()
             {
                 if tau < MIN_TAU {
-                    return Err(format!(
-                        "CfC tau at cell {cell_index}, neuron {neuron_index} is below MIN_TAU ({MIN_TAU}): {tau}"
-                    ));
+                    return Err(CfCWeightLoadError::TimeConstantBelowMinimum {
+                        cell_index,
+                        neuron_index,
+                    });
                 }
             }
             offset += cell.tau.len();
@@ -1179,27 +1216,29 @@ impl CfCNetwork {
                 || cell.b_h.as_slice().is_none()
                 || cell.tau.as_slice().is_none()
             {
-                return Err(format!(
-                    "CfC cell {cell_index} contains a non-contiguous parameter array"
-                ));
+                return Err(CfCWeightLoadError::NonContiguousParameter {
+                    parameter: format!("cell {cell_index}"),
+                });
             }
             for (tensor_index, tensor) in cell.backbone_weights.iter().enumerate() {
                 if tensor.as_slice().is_none() {
-                    return Err(format!(
-                        "CfC cell {cell_index} backbone weight {tensor_index} is non-contiguous"
-                    ));
+                    return Err(CfCWeightLoadError::NonContiguousParameter {
+                        parameter: format!("cell {cell_index} backbone weight {tensor_index}"),
+                    });
                 }
             }
             for (tensor_index, tensor) in cell.backbone_biases.iter().enumerate() {
                 if tensor.as_slice().is_none() {
-                    return Err(format!(
-                        "CfC cell {cell_index} backbone bias {tensor_index} is non-contiguous"
-                    ));
+                    return Err(CfCWeightLoadError::NonContiguousParameter {
+                        parameter: format!("cell {cell_index} backbone bias {tensor_index}"),
+                    });
                 }
             }
         }
         if self.output_weights.as_slice().is_none() || self.output_bias.as_slice().is_none() {
-            return Err("CfC output parameters are non-contiguous".to_string());
+            return Err(CfCWeightLoadError::NonContiguousParameter {
+                parameter: "output projection".to_string(),
+            });
         }
 
         // All error conditions are checked above. The following copies therefore
