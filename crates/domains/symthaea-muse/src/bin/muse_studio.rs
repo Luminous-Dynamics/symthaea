@@ -2767,6 +2767,7 @@ fn persist_keeper_bundle(
     ));
     let destination = root.join(audio_key);
     std::fs::create_dir(&staging)?;
+    let mut published = false;
 
     let result = (|| {
         write_synced(&staging.join("audio.wav"), wav)?;
@@ -2790,6 +2791,7 @@ fn persist_keeper_bundle(
         // in one filesystem operation. Existing flat-file keepers remain
         // readable through the compatibility paths below.
         std::fs::rename(&staging, &destination)?;
+        published = true;
         // Persist the directory entry itself where the platform supports
         // directory fsync. File bytes were individually synced above.
         #[cfg(unix)]
@@ -2799,6 +2801,11 @@ fn persist_keeper_bundle(
 
     if result.is_err() {
         let _ = std::fs::remove_dir_all(&staging);
+        if published {
+            if let Err(error) = std::fs::remove_dir_all(&destination) {
+                eprintln!("[muse_studio] failed to roll back unpublished keeper bundle: {error}");
+            }
+        }
     }
     result
 }
@@ -3247,9 +3254,10 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         "artifact_layout": "keeper-directory-v1",
         "midi_available": midi_available,
         "genealogy_id": genealogy.as_ref().map(|m| m.id),
+        "recipe_sha256": recipe_sha256.clone(),
         "score_sha256": score_sha256.clone(),
-        "artifact_readback": artifact_readback,
-        "artifact_readback_sha256": artifact_readback_sha256,
+        "artifact_readback": artifact_readback.clone(),
+        "artifact_readback_sha256": artifact_readback_sha256.clone(),
         // Persisted so future Atlas reads don't depend on recompose
         // determinism across engine versions (MUSE_DIVERSITY_TRUTH_PLAN
         // Phase 3's "persist fingerprints at keep time"). Dimension count
@@ -5484,9 +5492,7 @@ mod artifact_key_tests {
 /// Tests for exact keeper artifact read-back after the staging-directory publish.
 #[cfg(test)]
 mod keeper_readback_tests {
-    use super::{
-        KeeperArtifactReadbackReceiptV1, sha256_hex, verify_keeper_bundle_readback,
-    };
+    use super::{sha256_hex, verify_keeper_bundle_readback};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
