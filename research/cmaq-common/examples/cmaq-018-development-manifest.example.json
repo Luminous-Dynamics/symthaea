@@ -34,7 +34,7 @@
   },
   "evaluator": {
     "name": "CMAQ-018 branch-fidelity and DACS-0 evaluator",
-    "source_commit": "04f81a90bcc6e32d22855d6204c482e447a278d7",
+    "source_commit": "be5658fbb31edb305b2216ed55f420cf8e51f055",
     "metric_bundle_sha256": "43125d0c001eb26a9ad0d8068d0cf2ab9f0f0532b709e87a60a3936efb770cc0",
     "version": "0.2.0",
     "external_judge": null,
