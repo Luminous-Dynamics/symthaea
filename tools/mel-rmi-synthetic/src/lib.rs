@@ -2264,7 +2264,7 @@ mod tests {
                 }
             }
         }
-        assert!(explored > 1_000, "model check explored only {explored} dispositions");
+        assert_eq!(explored, 3_464, "unexpected exhaustive negotiation state-space coverage");
     }
 
     #[test]
