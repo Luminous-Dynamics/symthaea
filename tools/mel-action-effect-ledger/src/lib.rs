@@ -568,18 +568,32 @@ impl ActionEffectLedger {
                 }
             }
             TurnAction::Respond => {
-                let plan = receipt.plan_sha256.as_deref().ok_or(LedgerError::InvalidActionPayload)?;
-                let commitment = receipt.commitment_id.as_deref().ok_or(LedgerError::InvalidActionPayload)?;
-                let window = receipt.effect_window.ok_or(LedgerError::InvalidActionPayload)?;
+                let plan = receipt
+                    .plan_sha256
+                    .as_deref()
+                    .ok_or(LedgerError::InvalidActionPayload)?;
+                let commitment = receipt
+                    .commitment_id
+                    .as_deref()
+                    .ok_or(LedgerError::InvalidActionPayload)?;
+                let window = receipt
+                    .effect_window
+                    .ok_or(LedgerError::InvalidActionPayload)?;
                 if !valid_sha256(plan) || commitment.trim().is_empty() || !window.is_valid() {
                     return Err(LedgerError::InvalidActionPayload);
                 }
             }
             TurnAction::Continue => {
-                if receipt.commitment_id.as_deref().unwrap_or("").trim().is_empty()
+                if receipt
+                    .commitment_id
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .is_empty()
                     || receipt.plan_sha256.is_some()
                     || receipt.effect_window.is_some()
-                    || self.state.active_commitment_id.as_deref() != receipt.commitment_id.as_deref()
+                    || self.state.active_commitment_id.as_deref()
+                        != receipt.commitment_id.as_deref()
                 {
                     return Err(LedgerError::ContinueMutatedState);
                 }
@@ -589,10 +603,14 @@ impl ActionEffectLedger {
         self.last_chunk_end_frame = Some(receipt.chunk_end_frame);
         self.last_runner_time_ns = Some(receipt.decision_at_ns);
         self.clock_times.insert(
-            (ClockDomain::RunnerMonotonic, self.runner_clock_origin_id.clone()),
+            (
+                ClockDomain::RunnerMonotonic,
+                self.runner_clock_origin_id.clone(),
+            ),
             receipt.decision_at_ns,
         );
-        self.chunk_decisions.insert(receipt.chunk_index, receipt.decision_id.clone());
+        self.chunk_decisions
+            .insert(receipt.chunk_index, receipt.decision_id.clone());
         self.decisions.insert(
             receipt.decision_id.clone(),
             DecisionState {
@@ -617,7 +635,10 @@ impl ActionEffectLedger {
         runner_clock_origin_id: &str,
         output_epoch: u64,
     ) -> Result<(), LedgerError> {
-        let state = self.decisions.get_mut(decision_id).ok_or(LedgerError::UnknownDecision)?;
+        let state = self
+            .decisions
+            .get_mut(decision_id)
+            .ok_or(LedgerError::UnknownDecision)?;
         if state.revoked {
             return Err(LedgerError::RevokedDecision);
         }
@@ -636,12 +657,17 @@ impl ActionEffectLedger {
         if runner_clock_origin_id != self.runner_clock_origin_id {
             return Err(LedgerError::ClockOriginMismatch);
         }
-        if applied_at_ns < state.receipt.decision_at_ns || applied_at_ns > state.receipt.expires_at_ns {
+        if applied_at_ns < state.receipt.decision_at_ns
+            || applied_at_ns > state.receipt.expires_at_ns
+        {
             return Err(LedgerError::AuthorizationExpired);
         }
         let expected_plan = state.receipt.plan_sha256.as_deref().unwrap_or("");
         let expected_commitment = state.receipt.commitment_id.as_deref().unwrap_or("");
-        let window = state.receipt.effect_window.ok_or(LedgerError::InvalidActionPayload)?;
+        let window = state
+            .receipt
+            .effect_window
+            .ok_or(LedgerError::InvalidActionPayload)?;
         if !valid_sha256(plan_sha256) || !valid_sha256(artifact_sha256) {
             return Err(LedgerError::InvalidDigest);
         }
@@ -651,8 +677,15 @@ impl ActionEffectLedger {
         if !window.contains(effect_frame) {
             return Err(LedgerError::EffectOutsideAuthorizedWindow);
         }
-        let key = (ClockDomain::RunnerMonotonic, self.runner_clock_origin_id.clone());
-        if self.clock_times.get(&key).is_some_and(|previous| applied_at_ns < *previous) {
+        let key = (
+            ClockDomain::RunnerMonotonic,
+            self.runner_clock_origin_id.clone(),
+        );
+        if self
+            .clock_times
+            .get(&key)
+            .is_some_and(|previous| applied_at_ns < *previous)
+        {
             return Err(LedgerError::ClockRegression);
         }
         self.clock_times.insert(key, applied_at_ns);
@@ -665,7 +698,10 @@ impl ActionEffectLedger {
     }
 
     fn apply_continue(&self, receipt: &ContinueReceipt) -> Result<(), LedgerError> {
-        let state = self.decisions.get(&receipt.decision_id).ok_or(LedgerError::UnknownDecision)?;
+        let state = self
+            .decisions
+            .get(&receipt.decision_id)
+            .ok_or(LedgerError::UnknownDecision)?;
         if state.revoked {
             return Err(LedgerError::RevokedDecision);
         }
@@ -676,7 +712,8 @@ impl ActionEffectLedger {
             || receipt.before != self.state
             || receipt.after != receipt.before
             || receipt.commitment_id != state.receipt.commitment_id.as_deref().unwrap_or("")
-            || receipt.before.active_commitment_id.as_deref() != Some(receipt.commitment_id.as_str())
+            || receipt.before.active_commitment_id.as_deref()
+                != Some(receipt.commitment_id.as_str())
         {
             return Err(LedgerError::ContinueMutatedState);
         }
@@ -684,7 +721,10 @@ impl ActionEffectLedger {
     }
 
     fn apply_yield(&mut self, receipt: &YieldReceipt) -> Result<(), LedgerError> {
-        let state = self.decisions.get(&receipt.decision_id).ok_or(LedgerError::UnknownDecision)?;
+        let state = self
+            .decisions
+            .get(&receipt.decision_id)
+            .ok_or(LedgerError::UnknownDecision)?;
         if state.revoked {
             return Err(LedgerError::RevokedDecision);
         }
@@ -752,8 +792,12 @@ impl ActionEffectLedger {
         if receipt.receipt_id.trim().is_empty() || receipt.clock_origin_id.trim().is_empty() {
             return Err(LedgerError::EmptyIdentity);
         }
-        let state = self.decisions.get_mut(&receipt.decision_id).ok_or(LedgerError::UnknownDecision)?;
-        if state.revoked && state.current_stage != Some(EffectStage::CallbackObserved)
+        let state = self
+            .decisions
+            .get_mut(&receipt.decision_id)
+            .ok_or(LedgerError::UnknownDecision)?;
+        if state.revoked
+            && state.current_stage != Some(EffectStage::CallbackObserved)
             && state.current_stage != Some(EffectStage::CpalPredictedPlayback)
         {
             return Err(LedgerError::RevokedDecision);
@@ -793,7 +837,11 @@ impl ActionEffectLedger {
                 if state.current_stage != Some(EffectStage::CallbackObserved) {
                     return Err(LedgerError::InvalidStageTransition);
                 }
-                if receipt.clock_bridge_sha256.as_deref().is_none_or(|digest| !valid_sha256(digest)) {
+                if receipt
+                    .clock_bridge_sha256
+                    .as_deref()
+                    .is_none_or(|digest| !valid_sha256(digest))
+                {
                     return Err(LedgerError::MissingEvidenceDigest);
                 }
             }
@@ -804,18 +852,28 @@ impl ActionEffectLedger {
                 ) {
                     return Err(LedgerError::InvalidStageTransition);
                 }
-                if receipt.loopback_evidence_sha256.as_deref().is_none_or(|digest| !valid_sha256(digest)) {
+                if receipt
+                    .loopback_evidence_sha256
+                    .as_deref()
+                    .is_none_or(|digest| !valid_sha256(digest))
+                {
                     return Err(LedgerError::MissingEvidenceDigest);
                 }
             }
         }
-        if (receipt.stage != EffectStage::CpalPredictedPlayback && receipt.clock_bridge_sha256.is_some())
-            || (receipt.stage != EffectStage::LoopbackObserved && receipt.loopback_evidence_sha256.is_some())
+        if (receipt.stage != EffectStage::CpalPredictedPlayback
+            && receipt.clock_bridge_sha256.is_some())
+            || (receipt.stage != EffectStage::LoopbackObserved
+                && receipt.loopback_evidence_sha256.is_some())
         {
             return Err(LedgerError::MissingEvidenceDigest);
         }
         let key = (receipt.clock_domain, receipt.clock_origin_id.clone());
-        if self.clock_times.get(&key).is_some_and(|previous| receipt.observed_at < *previous) {
+        if self
+            .clock_times
+            .get(&key)
+            .is_some_and(|previous| receipt.observed_at < *previous)
+        {
             return Err(LedgerError::ClockRegression);
         }
         self.clock_times.insert(key, receipt.observed_at);
@@ -876,13 +934,51 @@ impl ActionEffectLedger {
                 Some(EffectStage::AppliedAtNoteQueue) | None => {}
             }
         }
-        summary.vetoes = self.events.values().filter(|event| matches!(event.kind, EventKind::VetoApplied(_))).count();
-        summary.yield_applied = self.events.values().filter(|event| matches!(event.kind, EventKind::YieldApplied(_))).count();
-        summary.continue_preserved = self.events.values().filter(|event| matches!(event.kind, EventKind::ContinueApplied(_))).count();
-        summary.enqueued = self.decisions.values().filter(|decision| decision.current_stage.map(|stage| stage >= EffectStage::EnqueuedToApplicationOutput).unwrap_or(false)).count();
-        summary.callback_observed = self.decisions.values().filter(|decision| decision.current_stage.map(|stage| stage >= EffectStage::CallbackObserved).unwrap_or(false)).count();
-        summary.cpal_predicted = self.decisions.values().filter(|decision| decision.current_stage == Some(EffectStage::CpalPredictedPlayback)).count();
-        summary.loopback_observed = self.decisions.values().filter(|decision| decision.current_stage == Some(EffectStage::LoopbackObserved)).count();
+        summary.vetoes = self
+            .events
+            .values()
+            .filter(|event| matches!(event.kind, EventKind::VetoApplied(_)))
+            .count();
+        summary.yield_applied = self
+            .events
+            .values()
+            .filter(|event| matches!(event.kind, EventKind::YieldApplied(_)))
+            .count();
+        summary.continue_preserved = self
+            .events
+            .values()
+            .filter(|event| matches!(event.kind, EventKind::ContinueApplied(_)))
+            .count();
+        summary.enqueued = self
+            .decisions
+            .values()
+            .filter(|decision| {
+                decision
+                    .current_stage
+                    .map(|stage| stage >= EffectStage::EnqueuedToApplicationOutput)
+                    .unwrap_or(false)
+            })
+            .count();
+        summary.callback_observed = self
+            .decisions
+            .values()
+            .filter(|decision| {
+                decision
+                    .current_stage
+                    .map(|stage| stage >= EffectStage::CallbackObserved)
+                    .unwrap_or(false)
+            })
+            .count();
+        summary.cpal_predicted = self
+            .decisions
+            .values()
+            .filter(|decision| decision.current_stage == Some(EffectStage::CpalPredictedPlayback))
+            .count();
+        summary.loopback_observed = self
+            .decisions
+            .values()
+            .filter(|decision| decision.current_stage == Some(EffectStage::LoopbackObserved))
+            .count();
         summary
     }
 
@@ -893,7 +989,9 @@ impl ActionEffectLedger {
 
     /// Highest accepted output evidence stage for a decision.
     pub fn effect_stage(&self, decision_id: &str) -> Option<EffectStage> {
-        self.decisions.get(decision_id).and_then(|state| state.current_stage)
+        self.decisions
+            .get(decision_id)
+            .and_then(|state| state.current_stage)
     }
 }
 
@@ -903,7 +1001,10 @@ fn validate_invalidation(
     discarded_notes: u64,
     discarded_frames: u64,
 ) -> Result<(), LedgerError> {
-    let expected_epoch = before.epoch.checked_add(1).ok_or(LedgerError::InvalidVetoTransition)?;
+    let expected_epoch = before
+        .epoch
+        .checked_add(1)
+        .ok_or(LedgerError::InvalidVetoTransition)?;
     let note_delta = before
         .queued_unconsumed_notes
         .checked_sub(after.queued_unconsumed_notes)
@@ -928,7 +1029,9 @@ fn validate_invalidation(
 
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 #[cfg(test)]
@@ -958,7 +1061,10 @@ mod tests {
             TurnAction::Respond => (
                 Some(PLAN.into()),
                 Some("commit-respond".into()),
-                Some(FrameWindow { start: 100, end: 200 }),
+                Some(FrameWindow {
+                    start: 100,
+                    end: 200,
+                }),
             ),
             TurnAction::Continue => (None, Some("active-0".into()), None),
         };
@@ -998,7 +1104,11 @@ mod tests {
     fn commit(ledger: &mut ActionEffectLedger, order: u64, receipt: DecisionReceipt) {
         let event_id = format!("commit-{}", receipt.decision_id);
         ledger
-            .apply(event(order, &event_id, EventKind::DecisionCommitted(receipt)))
+            .apply(event(
+                order,
+                &event_id,
+                EventKind::DecisionCommitted(receipt),
+            ))
             .unwrap();
     }
 
@@ -1040,8 +1150,10 @@ mod tests {
                 clock_origin_id: origin.into(),
                 observed_at: at,
                 output_epoch: 0,
-                clock_bridge_sha256: (stage == EffectStage::CpalPredictedPlayback).then_some(BRIDGE.into()),
-                loopback_evidence_sha256: (stage == EffectStage::LoopbackObserved).then_some(LOOPBACK.into()),
+                clock_bridge_sha256: (stage == EffectStage::CpalPredictedPlayback)
+                    .then_some(BRIDGE.into()),
+                loopback_evidence_sha256: (stage == EffectStage::LoopbackObserved)
+                    .then_some(LOOPBACK.into()),
             }),
         )
     }
@@ -1061,11 +1173,17 @@ mod tests {
     fn wait_is_explicit_and_has_no_output_effect() {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Wait, 0, 1));
-        ledger.apply(event(2, "close", EventKind::FinalizeTurn {
-            session_id: "session-1".into(),
-            turn_id: "turn-1".into(),
-            chunk_count: 1,
-        })).unwrap();
+        ledger
+            .apply(event(
+                2,
+                "close",
+                EventKind::FinalizeTurn {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    chunk_count: 1,
+                },
+            ))
+            .unwrap();
         assert_eq!(ledger.summary().wait_chunks, 1);
         assert_eq!(ledger.summary().enqueued, 0);
     }
@@ -1075,12 +1193,19 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Wait, 1, 1));
         assert_eq!(
-            ledger.apply(event(2, "close", EventKind::FinalizeTurn {
-                session_id: "session-1".into(),
-                turn_id: "turn-1".into(),
-                chunk_count: 2,
-            })),
-            Err(LedgerError::IncompleteTurn { expected: 2, observed: 1 })
+            ledger.apply(event(
+                2,
+                "close",
+                EventKind::FinalizeTurn {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    chunk_count: 2,
+                }
+            )),
+            Err(LedgerError::IncompleteTurn {
+                expected: 2,
+                observed: 1
+            })
         );
     }
 
@@ -1090,7 +1215,10 @@ mod tests {
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
         assert_eq!(ledger.summary().respond_applied, 1);
-        assert_eq!(ledger.state().active_commitment_id.as_deref(), Some("commit-respond"));
+        assert_eq!(
+            ledger.state().active_commitment_id.as_deref(),
+            Some("commit-respond")
+        );
     }
 
     #[test]
@@ -1099,14 +1227,21 @@ mod tests {
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         let mut bad_plan = respond_event("decision-0", 2);
         if let EventKind::RespondApplied { plan_sha256, .. } = &mut bad_plan.kind {
-            *plan_sha256 = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
+            *plan_sha256 =
+                "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".into();
         }
-        assert_eq!(ledger.apply(bad_plan), Err(LedgerError::ResponseBindingMismatch));
+        assert_eq!(
+            ledger.apply(bad_plan),
+            Err(LedgerError::ResponseBindingMismatch)
+        );
         let mut bad_frame = respond_event("decision-0", 2);
         if let EventKind::RespondApplied { effect_frame, .. } = &mut bad_frame.kind {
             *effect_frame = 250;
         }
-        assert_eq!(ledger.apply(bad_frame), Err(LedgerError::EffectOutsideAuthorizedWindow));
+        assert_eq!(
+            ledger.apply(bad_frame),
+            Err(LedgerError::EffectOutsideAuthorizedWindow)
+        );
     }
 
     #[test]
@@ -1117,12 +1252,22 @@ mod tests {
         if let EventKind::RespondApplied { applied_at_ns, .. } = &mut expired.kind {
             *applied_at_ns = 9_000;
         }
-        assert_eq!(ledger.apply(expired), Err(LedgerError::AuthorizationExpired));
+        assert_eq!(
+            ledger.apply(expired),
+            Err(LedgerError::AuthorizationExpired)
+        );
         let mut wrong_origin = respond_event("decision-0", 2);
-        if let EventKind::RespondApplied { runner_clock_origin_id, .. } = &mut wrong_origin.kind {
+        if let EventKind::RespondApplied {
+            runner_clock_origin_id,
+            ..
+        } = &mut wrong_origin.kind
+        {
             *runner_clock_origin_id = "other-origin".into();
         }
-        assert_eq!(ledger.apply(wrong_origin), Err(LedgerError::ClockOriginMismatch));
+        assert_eq!(
+            ledger.apply(wrong_origin),
+            Err(LedgerError::ClockOriginMismatch)
+        );
     }
 
     #[test]
@@ -1133,12 +1278,16 @@ mod tests {
         let mut after = before.clone();
         after.note_cursor += 1;
         assert_eq!(
-            ledger.apply(event(2, "continue", EventKind::ContinueApplied(ContinueReceipt {
-                decision_id: "decision-0".into(),
-                commitment_id: "active-0".into(),
-                before,
-                after,
-            }))),
+            ledger.apply(event(
+                2,
+                "continue",
+                EventKind::ContinueApplied(ContinueReceipt {
+                    decision_id: "decision-0".into(),
+                    commitment_id: "active-0".into(),
+                    before,
+                    after,
+                })
+            )),
             Err(LedgerError::ContinueMutatedState)
         );
     }
@@ -1148,12 +1297,18 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Continue, 0, 1));
         let before = initial_state();
-        ledger.apply(event(2, "continue", EventKind::ContinueApplied(ContinueReceipt {
-            decision_id: "decision-0".into(),
-            commitment_id: "active-0".into(),
-            after: before.clone(),
-            before,
-        }))).unwrap();
+        ledger
+            .apply(event(
+                2,
+                "continue",
+                EventKind::ContinueApplied(ContinueReceipt {
+                    decision_id: "decision-0".into(),
+                    commitment_id: "active-0".into(),
+                    after: before.clone(),
+                    before,
+                }),
+            ))
+            .unwrap();
         assert_eq!(ledger.summary().continue_preserved, 1);
     }
 
@@ -1163,13 +1318,19 @@ mod tests {
         commit(&mut ledger, 1, decision(TurnAction::Yield, 0, 1));
         let before = initial_state();
         let after = invalidate_state(&before);
-        ledger.apply(event(2, "yield", EventKind::YieldApplied(YieldReceipt {
-            decision_id: "decision-0".into(),
-            before,
-            after,
-            discarded_unconsumed_notes: 5,
-            discarded_application_frames: 480,
-        }))).unwrap();
+        ledger
+            .apply(event(
+                2,
+                "yield",
+                EventKind::YieldApplied(YieldReceipt {
+                    decision_id: "decision-0".into(),
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 480,
+                }),
+            ))
+            .unwrap();
         assert_eq!(ledger.state().epoch, 1);
         assert_eq!(ledger.summary().yield_applied, 1);
     }
@@ -1180,13 +1341,19 @@ mod tests {
         commit(&mut ledger, 1, decision(TurnAction::Yield, 0, 1));
         let before = initial_state();
         let after = invalidate_state(&before);
-        ledger.apply(event(2, "yield", EventKind::YieldApplied(YieldReceipt {
-            decision_id: "decision-0".into(),
-            before,
-            after,
-            discarded_unconsumed_notes: 5,
-            discarded_application_frames: 480,
-        }))).unwrap();
+        ledger
+            .apply(event(
+                2,
+                "yield",
+                EventKind::YieldApplied(YieldReceipt {
+                    decision_id: "decision-0".into(),
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 480,
+                }),
+            ))
+            .unwrap();
         let summary = ledger.summary();
         assert_eq!(summary.callback_observed, 0);
         assert_eq!(summary.cpal_predicted, 0);
@@ -1199,17 +1366,21 @@ mod tests {
         let before = initial_state();
         let after = invalidate_state(&before);
         assert_eq!(
-            ledger.apply(event(1, "veto", EventKind::VetoApplied(VetoReceipt {
-                session_id: "session-1".into(),
-                turn_id: "turn-1".into(),
-                participant_id: "performer-1".into(),
-                authority_valid: false,
-                control_sequence: 1,
-                before,
-                after,
-                discarded_unconsumed_notes: 5,
-                discarded_application_frames: 480,
-            }))),
+            ledger.apply(event(
+                1,
+                "veto",
+                EventKind::VetoApplied(VetoReceipt {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    participant_id: "performer-1".into(),
+                    authority_valid: false,
+                    control_sequence: 1,
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 480,
+                })
+            )),
             Err(LedgerError::VetoAuthorityRejected)
         );
         assert_eq!(ledger.state().epoch, 0);
@@ -1221,19 +1392,28 @@ mod tests {
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         let before = initial_state();
         let after = invalidate_state(&before);
-        ledger.apply(event(2, "veto", EventKind::VetoApplied(VetoReceipt {
-            session_id: "session-1".into(),
-            turn_id: "turn-1".into(),
-            participant_id: "performer-1".into(),
-            authority_valid: true,
-            control_sequence: 2,
-            before,
-            after,
-            discarded_unconsumed_notes: 5,
-            discarded_application_frames: 480,
-        }))).unwrap();
+        ledger
+            .apply(event(
+                2,
+                "veto",
+                EventKind::VetoApplied(VetoReceipt {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    participant_id: "performer-1".into(),
+                    authority_valid: true,
+                    control_sequence: 2,
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 480,
+                }),
+            ))
+            .unwrap();
         assert_eq!(ledger.decision_revoked("decision-0"), Some(true));
-        assert_eq!(ledger.apply(respond_event("decision-0", 3)), Err(LedgerError::RevokedDecision));
+        assert_eq!(
+            ledger.apply(respond_event("decision-0", 3)),
+            Err(LedgerError::RevokedDecision)
+        );
     }
 
     #[test]
@@ -1242,31 +1422,50 @@ mod tests {
         commit(&mut ledger, 1, decision(TurnAction::Yield, 0, 1));
         let before = initial_state();
         let after = invalidate_state(&before);
-        ledger.apply(event(2, "yield", EventKind::YieldApplied(YieldReceipt {
-            decision_id: "decision-0".into(),
-            before,
-            after,
-            discarded_unconsumed_notes: 5,
-            discarded_application_frames: 480,
-        }))).unwrap();
+        ledger
+            .apply(event(
+                2,
+                "yield",
+                EventKind::YieldApplied(YieldReceipt {
+                    decision_id: "decision-0".into(),
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 5,
+                    discarded_application_frames: 480,
+                }),
+            ))
+            .unwrap();
         let mut stale = decision(TurnAction::Wait, 1, 2);
         stale.output_epoch = 0;
         assert_eq!(
             ledger.apply(event(3, "stale", EventKind::DecisionCommitted(stale))),
-            Err(LedgerError::StaleOutputEpoch { expected: 1, received: 0 })
+            Err(LedgerError::StaleOutputEpoch {
+                expected: 1,
+                received: 0
+            })
         );
     }
 
     #[test]
     fn exact_event_replay_is_idempotent_and_conflicting_replay_fails() {
         let mut ledger = ledger();
-        let original = event(1, "same-id", EventKind::DecisionCommitted(decision(TurnAction::Wait, 0, 1)));
+        let original = event(
+            1,
+            "same-id",
+            EventKind::DecisionCommitted(decision(TurnAction::Wait, 0, 1)),
+        );
         ledger.apply(original.clone()).unwrap();
         ledger.apply(original).unwrap();
-        let conflict = event(1, "same-id", EventKind::DecisionCommitted(decision(TurnAction::Yield, 0, 1)));
+        let conflict = event(
+            1,
+            "same-id",
+            EventKind::DecisionCommitted(decision(TurnAction::Yield, 0, 1)),
+        );
         assert_eq!(
             ledger.apply(conflict),
-            Err(LedgerError::ConflictingDuplicateEvent { event_id: "same-id".into() })
+            Err(LedgerError::ConflictingDuplicateEvent {
+                event_id: "same-id".into()
+            })
         );
     }
 
@@ -1275,9 +1474,19 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        let predicted = stage_event("decision-0", "predicted", 3, EffectStage::CpalPredictedPlayback,
-            ClockDomain::CpalPlayback, "cpal-playback-1", 2_000);
-        assert_eq!(ledger.apply(predicted), Err(LedgerError::InvalidStageTransition));
+        let predicted = stage_event(
+            "decision-0",
+            "predicted",
+            3,
+            EffectStage::CpalPredictedPlayback,
+            ClockDomain::CpalPlayback,
+            "cpal-playback-1",
+            2_000,
+        );
+        assert_eq!(
+            ledger.apply(predicted),
+            Err(LedgerError::InvalidStageTransition)
+        );
     }
 
     #[test]
@@ -1285,14 +1494,50 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        ledger.apply(stage_event("decision-0", "enqueue", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::RunnerMonotonic, RUNNER, 1_200)).unwrap();
-        ledger.apply(stage_event("decision-0", "callback", 4, EffectStage::CallbackObserved,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000)).unwrap();
-        ledger.apply(stage_event("decision-0", "prediction", 5, EffectStage::CpalPredictedPlayback,
-            ClockDomain::CpalPlayback, "cpal-playback-1", 1_100)).unwrap();
-        ledger.apply(stage_event("decision-0", "loopback", 6, EffectStage::LoopbackObserved,
-            ClockDomain::IndependentLoopback, "loopback-1", 500)).unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "callback",
+                4,
+                EffectStage::CallbackObserved,
+                ClockDomain::CpalCallback,
+                "cpal-callback-1",
+                1_000,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "prediction",
+                5,
+                EffectStage::CpalPredictedPlayback,
+                ClockDomain::CpalPlayback,
+                "cpal-playback-1",
+                1_100,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "loopback",
+                6,
+                EffectStage::LoopbackObserved,
+                ClockDomain::IndependentLoopback,
+                "loopback-1",
+                500,
+            ))
+            .unwrap();
         let summary = ledger.summary();
         assert_eq!(summary.enqueued, 1);
         assert_eq!(summary.callback_observed, 1);
@@ -1305,12 +1550,39 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        ledger.apply(stage_event("decision-0", "enqueue", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::RunnerMonotonic, RUNNER, 1_200)).unwrap();
-        ledger.apply(stage_event("decision-0", "callback", 4, EffectStage::CallbackObserved,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000)).unwrap();
-        ledger.apply(stage_event("decision-0", "loopback", 5, EffectStage::LoopbackObserved,
-            ClockDomain::IndependentLoopback, "loopback-1", 500)).unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "callback",
+                4,
+                EffectStage::CallbackObserved,
+                ClockDomain::CpalCallback,
+                "cpal-callback-1",
+                1_000,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "loopback",
+                5,
+                EffectStage::LoopbackObserved,
+                ClockDomain::IndependentLoopback,
+                "loopback-1",
+                500,
+            ))
+            .unwrap();
         assert_eq!(ledger.summary().cpal_predicted, 0);
         assert_eq!(ledger.summary().loopback_observed, 1);
     }
@@ -1320,16 +1592,44 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        ledger.apply(stage_event("decision-0", "enqueue", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::RunnerMonotonic, RUNNER, 1_200)).unwrap();
-        ledger.apply(stage_event("decision-0", "callback", 4, EffectStage::CallbackObserved,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000)).unwrap();
-        let mut predicted = stage_event("decision-0", "prediction", 5, EffectStage::CpalPredictedPlayback,
-            ClockDomain::CpalPlayback, "cpal-playback-1", 1_100);
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "callback",
+                4,
+                EffectStage::CallbackObserved,
+                ClockDomain::CpalCallback,
+                "cpal-callback-1",
+                1_000,
+            ))
+            .unwrap();
+        let mut predicted = stage_event(
+            "decision-0",
+            "prediction",
+            5,
+            EffectStage::CpalPredictedPlayback,
+            ClockDomain::CpalPlayback,
+            "cpal-playback-1",
+            1_100,
+        );
         if let EventKind::EffectObserved(receipt) = &mut predicted.kind {
             receipt.clock_bridge_sha256 = None;
         }
-        assert_eq!(ledger.apply(predicted), Err(LedgerError::MissingEvidenceDigest));
+        assert_eq!(
+            ledger.apply(predicted),
+            Err(LedgerError::MissingEvidenceDigest)
+        );
     }
 
     #[test]
@@ -1337,16 +1637,44 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        ledger.apply(stage_event("decision-0", "enqueue", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::RunnerMonotonic, RUNNER, 1_200)).unwrap();
-        ledger.apply(stage_event("decision-0", "callback", 4, EffectStage::CallbackObserved,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000)).unwrap();
-        let mut loopback = stage_event("decision-0", "loopback", 5, EffectStage::LoopbackObserved,
-            ClockDomain::IndependentLoopback, "loopback-1", 500);
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "callback",
+                4,
+                EffectStage::CallbackObserved,
+                ClockDomain::CpalCallback,
+                "cpal-callback-1",
+                1_000,
+            ))
+            .unwrap();
+        let mut loopback = stage_event(
+            "decision-0",
+            "loopback",
+            5,
+            EffectStage::LoopbackObserved,
+            ClockDomain::IndependentLoopback,
+            "loopback-1",
+            500,
+        );
         if let EventKind::EffectObserved(receipt) = &mut loopback.kind {
             receipt.loopback_evidence_sha256 = None;
         }
-        assert_eq!(ledger.apply(loopback), Err(LedgerError::MissingEvidenceDigest));
+        assert_eq!(
+            ledger.apply(loopback),
+            Err(LedgerError::MissingEvidenceDigest)
+        );
     }
 
     #[test]
@@ -1354,8 +1682,15 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        let wrong = stage_event("decision-0", "wrong", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000);
+        let wrong = stage_event(
+            "decision-0",
+            "wrong",
+            3,
+            EffectStage::EnqueuedToApplicationOutput,
+            ClockDomain::CpalCallback,
+            "cpal-callback-1",
+            1_000,
+        );
         assert_eq!(ledger.apply(wrong), Err(LedgerError::WrongClockDomain));
     }
 
@@ -1364,25 +1699,58 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        ledger.apply(stage_event("decision-0", "enqueue", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::RunnerMonotonic, RUNNER, 1_200)).unwrap();
-        ledger.apply(stage_event("decision-0", "callback", 4, EffectStage::CallbackObserved,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000)).unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "callback",
+                4,
+                EffectStage::CallbackObserved,
+                ClockDomain::CpalCallback,
+                "cpal-callback-1",
+                1_000,
+            ))
+            .unwrap();
         let before = ledger.state().clone();
         let after = invalidate_state(&before);
-        ledger.apply(event(5, "veto", EventKind::VetoApplied(VetoReceipt {
-            session_id: "session-1".into(),
-            turn_id: "turn-1".into(),
-            participant_id: "performer-1".into(),
-            authority_valid: true,
-            control_sequence: 2,
-            before,
-            after,
-            discarded_unconsumed_notes: 0,
-            discarded_application_frames: 0,
-        }))).unwrap();
-        ledger.apply(stage_event("decision-0", "prediction", 6, EffectStage::CpalPredictedPlayback,
-            ClockDomain::CpalPlayback, "cpal-playback-1", 1_100)).unwrap();
+        ledger
+            .apply(event(
+                5,
+                "veto",
+                EventKind::VetoApplied(VetoReceipt {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    participant_id: "performer-1".into(),
+                    authority_valid: true,
+                    control_sequence: 2,
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 0,
+                    discarded_application_frames: 0,
+                }),
+            ))
+            .unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "prediction",
+                6,
+                EffectStage::CpalPredictedPlayback,
+                ClockDomain::CpalPlayback,
+                "cpal-playback-1",
+                1_100,
+            ))
+            .unwrap();
         assert_eq!(ledger.summary().cpal_predicted, 1);
     }
 
@@ -1391,23 +1759,45 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Respond, 0, 1));
         ledger.apply(respond_event("decision-0", 2)).unwrap();
-        ledger.apply(stage_event("decision-0", "enqueue", 3, EffectStage::EnqueuedToApplicationOutput,
-            ClockDomain::RunnerMonotonic, RUNNER, 1_200)).unwrap();
+        ledger
+            .apply(stage_event(
+                "decision-0",
+                "enqueue",
+                3,
+                EffectStage::EnqueuedToApplicationOutput,
+                ClockDomain::RunnerMonotonic,
+                RUNNER,
+                1_200,
+            ))
+            .unwrap();
         let before = ledger.state().clone();
         let after = invalidate_state(&before);
-        ledger.apply(event(4, "veto", EventKind::VetoApplied(VetoReceipt {
-            session_id: "session-1".into(),
-            turn_id: "turn-1".into(),
-            participant_id: "performer-1".into(),
-            authority_valid: true,
-            control_sequence: 2,
-            before,
-            after,
-            discarded_unconsumed_notes: 0,
-            discarded_application_frames: 0,
-        }))).unwrap();
-        let callback = stage_event("decision-0", "callback", 5, EffectStage::CallbackObserved,
-            ClockDomain::CpalCallback, "cpal-callback-1", 1_000);
+        ledger
+            .apply(event(
+                4,
+                "veto",
+                EventKind::VetoApplied(VetoReceipt {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    participant_id: "performer-1".into(),
+                    authority_valid: true,
+                    control_sequence: 2,
+                    before,
+                    after,
+                    discarded_unconsumed_notes: 0,
+                    discarded_application_frames: 0,
+                }),
+            ))
+            .unwrap();
+        let callback = stage_event(
+            "decision-0",
+            "callback",
+            5,
+            EffectStage::CallbackObserved,
+            ClockDomain::CpalCallback,
+            "cpal-callback-1",
+            1_000,
+        );
         assert_eq!(ledger.apply(callback), Err(LedgerError::RevokedDecision));
     }
 
@@ -1416,11 +1806,17 @@ mod tests {
         let mut ledger = ledger();
         commit(&mut ledger, 1, decision(TurnAction::Wait, 0, 1));
         commit(&mut ledger, 2, decision(TurnAction::Continue, 1, 2));
-        ledger.apply(event(3, "close", EventKind::FinalizeTurn {
-            session_id: "session-1".into(),
-            turn_id: "turn-1".into(),
-            chunk_count: 2,
-        })).unwrap();
+        ledger
+            .apply(event(
+                3,
+                "close",
+                EventKind::FinalizeTurn {
+                    session_id: "session-1".into(),
+                    turn_id: "turn-1".into(),
+                    chunk_count: 2,
+                },
+            ))
+            .unwrap();
     }
 
     #[test]
@@ -1429,13 +1825,21 @@ mod tests {
         let mut lookahead = decision(TurnAction::Wait, 0, 1);
         lookahead.observed_through_frame -= 1;
         assert_eq!(
-            ledger.apply(event(1, "lookahead", EventKind::DecisionCommitted(lookahead))),
+            ledger.apply(event(
+                1,
+                "lookahead",
+                EventKind::DecisionCommitted(lookahead)
+            )),
             Err(LedgerError::LookaheadOrObservedThroughMismatch)
         );
         let mut wrong_clock = decision(TurnAction::Wait, 0, 1);
         wrong_clock.runner_clock_origin_id = "different-runner".into();
         assert_eq!(
-            ledger.apply(event(1, "wrong-clock", EventKind::DecisionCommitted(wrong_clock))),
+            ledger.apply(event(
+                1,
+                "wrong-clock",
+                EventKind::DecisionCommitted(wrong_clock)
+            )),
             Err(LedgerError::ClockOriginMismatch)
         );
     }
