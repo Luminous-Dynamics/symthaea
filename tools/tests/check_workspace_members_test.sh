@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-script="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)/check_workspace_members.sh"
+script="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/check_workspace_members.sh"
 fixture="$(mktemp -d)"
 trap 'rm -rf "$fixture"' EXIT
 
