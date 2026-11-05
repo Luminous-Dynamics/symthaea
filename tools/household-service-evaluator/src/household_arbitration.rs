@@ -8,19 +8,20 @@
 //! The coordinator must preserve local manual controls. Local controller
 //! refusal is terminal for the request; callers must not retry it as a bypass.
 
-use crate::water_quality::{WaterQualificationStatus, WaterUseClass};
 use crate::EvaluationError;
+use crate::water_quality::{WaterQualificationStatus, WaterUseClass};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
 const NEGATIVE_CASE_IDS: [&str; 14] = [
-    "HRA-001", "HRA-002", "HRA-003", "HRA-004", "HRA-005", "HRA-006", "HRA-007",
-    "HRA-008", "HRA-009", "HRA-010", "HRA-011", "HRA-012", "HRA-013", "HRA-014",
+    "HRA-001", "HRA-002", "HRA-003", "HRA-004", "HRA-005", "HRA-006", "HRA-007", "HRA-008",
+    "HRA-009", "HRA-010", "HRA-011", "HRA-012", "HRA-013", "HRA-014",
 ];
 const POSITIVE_CASE_IDS: [&str; 3] = ["HRA-POS-001", "HRA-POS-002", "HRA-POS-003"];
-const ARBITRATION_MANIFEST: &str =
-    include_str!("../../../docs/research/household-services/household-resource-arbitration-scenarios-v0.1.json");
+const ARBITRATION_MANIFEST: &str = include_str!(
+    "../../../docs/research/household-services/household-resource-arbitration-scenarios-v0.1.json"
+);
 
 fn invalid(path: &'static str, message: impl Into<String>) -> EvaluationError {
     EvaluationError::new(path, message)
@@ -530,7 +531,10 @@ pub fn calculate_matched_thermal_cop(
     }
     let ratio_value = useful_thermal.value_kwh / electrical.value_kwh;
     if !ratio_value.is_finite() {
-        return Err(invalid("energy.ratio_value", "computed ratio is not finite"));
+        return Err(invalid(
+            "energy.ratio_value",
+            "computed ratio is not finite",
+        ));
     }
     Ok(MatchedEnergyRatio {
         ratio_name: "coefficient_of_performance".to_owned(),
@@ -758,8 +762,8 @@ pub fn validate_arbitration_manifest(
     ))
 }
 
-pub fn validate_bundled_arbitration_manifest(
-) -> Result<ArbitrationManifestValidation, EvaluationError> {
+pub fn validate_bundled_arbitration_manifest()
+-> Result<ArbitrationManifestValidation, EvaluationError> {
     let (_, validation) = validate_arbitration_manifest(ARBITRATION_MANIFEST)?;
     Ok(validation)
 }
@@ -835,9 +839,15 @@ mod tests {
 
     #[test]
     fn positive_control_hra_pos_001_is_eligible_only_for_local_evaluation() {
-        assert_eq!(fixture_expected("HRA-POS-001"), "EligibleForLocalControllerEvaluation");
+        assert_eq!(
+            fixture_expected("HRA-POS-001"),
+            "EligibleForLocalControllerEvaluation"
+        );
         let result = evaluate(&valid_request(), &valid_snapshot());
-        assert_eq!(result.decision, HouseholdActionDecision::EligibleForLocalControllerEvaluation);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::EligibleForLocalControllerEvaluation
+        );
         assert!(result.local_request_eligible);
         assert!(!result.actuator_command_emitted);
         assert!(result.local_controller_final_authority);
@@ -866,7 +876,10 @@ mod tests {
             declared_use: WaterUseClass::Drinking,
         });
         let result = evaluate(&request, &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::WaterUseQualificationUnknown);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::WaterUseQualificationUnknown
+        );
         assert!(!result.local_request_eligible);
     }
 
@@ -881,7 +894,10 @@ mod tests {
             declared_use: WaterUseClass::Drinking,
         });
         let result = evaluate(&request, &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::WaterUseQualificationUnknown);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::WaterUseQualificationUnknown
+        );
     }
 
     #[test]
@@ -890,7 +906,10 @@ mod tests {
         let mut snapshot = valid_snapshot();
         snapshot.critical_service_floor = GateState::Fail;
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::RejectedCriticalServiceFloor);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::RejectedCriticalServiceFloor
+        );
     }
 
     fn energy_observations() -> (EnergyObservation, EnergyObservation) {
@@ -947,9 +966,18 @@ mod tests {
     fn hra_006_reports_a_shared_failed_dependency() {
         assert_eq!(fixture_expected("HRA-006"), "CommonModeLossDeclared");
         let dependencies = vec![
-            ResourceDependency { resource_id: "grid-pump-feed".into(), dependent_service_id: "water-pumping".into() },
-            ResourceDependency { resource_id: "grid-pump-feed".into(), dependent_service_id: "household-controller".into() },
-            ResourceDependency { resource_id: "grid-pump-feed".into(), dependent_service_id: "thermal-recirculation".into() },
+            ResourceDependency {
+                resource_id: "grid-pump-feed".into(),
+                dependent_service_id: "water-pumping".into(),
+            },
+            ResourceDependency {
+                resource_id: "grid-pump-feed".into(),
+                dependent_service_id: "household-controller".into(),
+            },
+            ResourceDependency {
+                resource_id: "grid-pump-feed".into(),
+                dependent_service_id: "thermal-recirculation".into(),
+            },
         ];
         let failed = BTreeSet::from(["grid-pump-feed".to_owned()]);
         let impacts = find_common_mode_impacts(&dependencies, &failed).unwrap();
@@ -959,11 +987,17 @@ mod tests {
 
     #[test]
     fn hra_007_coordinator_loss_preserves_independent_manual_control() {
-        assert_eq!(fixture_expected("HRA-007"), "CoordinatorUnavailableLocalControlRetained");
+        assert_eq!(
+            fixture_expected("HRA-007"),
+            "CoordinatorUnavailableLocalControlRetained"
+        );
         let mut snapshot = valid_snapshot();
         snapshot.coordinator_state = CoordinatorState::Unavailable;
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::CoordinatorUnavailable);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::CoordinatorUnavailable
+        );
         assert!(result.local_manual_control_available);
         assert!(!result.local_request_eligible);
         assert!(!result.actuator_command_emitted);
@@ -971,18 +1005,27 @@ mod tests {
 
     #[test]
     fn hra_008_optional_deferral_requires_current_authorization() {
-        assert_eq!(fixture_expected("HRA-008"), "RequireAuthorizationOrKeepSchedule");
+        assert_eq!(
+            fixture_expected("HRA-008"),
+            "RequireAuthorizationOrKeepSchedule"
+        );
         let mut request = valid_request();
         request.action_kind = HouseholdActionKind::DeferOptionalLoad;
         let mut snapshot = valid_snapshot();
         snapshot.authorization.state = AuthorizationState::Missing;
         let result = evaluate(&request, &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::AuthorizationMissing);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::AuthorizationMissing
+        );
     }
 
     #[test]
     fn hra_009_unknown_safety_state_blocks_optimistic_plan() {
-        assert_eq!(fixture_expected("HRA-009"), "WidenUncertaintyAndBlockOptimisticPlan");
+        assert_eq!(
+            fixture_expected("HRA-009"),
+            "WidenUncertaintyAndBlockOptimisticPlan"
+        );
         let mut snapshot = valid_snapshot();
         snapshot.safety_gate = GateState::Unknown;
         let result = evaluate(&valid_request(), &snapshot);
@@ -991,34 +1034,52 @@ mod tests {
 
     #[test]
     fn hra_010_local_refill_envelope_refusal_is_final() {
-        assert_eq!(fixture_expected("HRA-010"), "LocalControllerEnforcesApprovedRamp");
+        assert_eq!(
+            fixture_expected("HRA-010"),
+            "LocalControllerEnforcesApprovedRamp"
+        );
         let mut request = valid_request();
         request.action_kind = HouseholdActionKind::RefillBuffer;
         let mut snapshot = valid_snapshot();
         snapshot.local_controller.state = LocalControllerState::Refused;
         let result = evaluate(&request, &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::LocalControllerRefused);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::LocalControllerRefused
+        );
         assert!(!result.local_request_eligible);
     }
 
     #[test]
     fn hra_011_model_confidence_cannot_override_local_isolation_policy() {
-        assert_eq!(fixture_expected("HRA-011"), "NoAutonomousIsolationWithoutPolicyConditions");
+        assert_eq!(
+            fixture_expected("HRA-011"),
+            "NoAutonomousIsolationWithoutPolicyConditions"
+        );
         let mut request = valid_request();
         request.action_kind = HouseholdActionKind::LeakIsolation;
         let mut snapshot = valid_snapshot();
         snapshot.local_controller.state = LocalControllerState::Refused;
         let result = evaluate(&request, &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::LocalControllerRefused);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::LocalControllerRefused
+        );
     }
 
     #[test]
     fn hra_012_coordinator_crash_after_proposal_does_not_issue_request() {
-        assert_eq!(fixture_expected("HRA-012"), "NoActuationLocalSafeOperationContinues");
+        assert_eq!(
+            fixture_expected("HRA-012"),
+            "NoActuationLocalSafeOperationContinues"
+        );
         let mut snapshot = valid_snapshot();
         snapshot.coordinator_state = CoordinatorState::Unavailable;
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::CoordinatorUnavailable);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::CoordinatorUnavailable
+        );
         assert!(!result.local_request_eligible);
         assert!(result.local_manual_control_available);
     }
@@ -1029,7 +1090,10 @@ mod tests {
         let mut snapshot = valid_snapshot();
         snapshot.local_controller.state = LocalControllerState::Refused;
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::LocalControllerRefused);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::LocalControllerRefused
+        );
         assert!(!result.local_request_eligible);
         assert!(!result.actuator_command_emitted);
     }
@@ -1037,10 +1101,8 @@ mod tests {
     #[test]
     fn hra_014_accepted_command_without_boundary_delivery_has_no_service_credit() {
         assert_eq!(fixture_expected("HRA-014"), "NoServiceCompletionCredit");
-        let result = classify_boundary_outcome(
-            true,
-            BoundaryDeliveryObservation::NoDeliveryObserved,
-        );
+        let result =
+            classify_boundary_outcome(true, BoundaryDeliveryObservation::NoDeliveryObserved);
         assert_eq!(result, BoundaryOutcome::NoServiceCredit);
     }
 
@@ -1058,7 +1120,10 @@ mod tests {
 
     #[test]
     fn hra_pos_002_requires_exact_water_use_match() {
-        assert_eq!(fixture_expected("HRA-POS-002"), "EligibleForLocalControllerEvaluation");
+        assert_eq!(
+            fixture_expected("HRA-POS-002"),
+            "EligibleForLocalControllerEvaluation"
+        );
         let mut request = valid_request();
         request.requested_water_use = Some(WaterUseClass::Drinking);
         let mut snapshot = valid_snapshot();
@@ -1081,12 +1146,18 @@ mod tests {
             declared_use: WaterUseClass::Irrigation,
         });
         let result = evaluate(&request, &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::RejectedWaterUseQualification);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::RejectedWaterUseQualification
+        );
     }
 
     #[test]
     fn hra_pos_003_requires_a_matching_authorized_scope() {
-        assert_eq!(fixture_expected("HRA-POS-003"), "EligibleForLocalControllerEvaluation");
+        assert_eq!(
+            fixture_expected("HRA-POS-003"),
+            "EligibleForLocalControllerEvaluation"
+        );
         let mut request = valid_request();
         request.action_kind = HouseholdActionKind::DeferOptionalLoad;
         let result = evaluate(&request, &valid_snapshot());
@@ -1102,7 +1173,10 @@ mod tests {
         let mut snapshot = valid_snapshot();
         snapshot.authorization.scope_id = Some("different-scope".into());
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::AuthorizationScopeMismatch);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::AuthorizationScopeMismatch
+        );
     }
 
     #[test]
@@ -1110,7 +1184,10 @@ mod tests {
         let mut snapshot = valid_snapshot();
         snapshot.authorization.policy_revision = None;
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::AuthorizationUnknown);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::AuthorizationUnknown
+        );
     }
 
     #[test]
@@ -1118,7 +1195,10 @@ mod tests {
         let mut snapshot = valid_snapshot();
         snapshot.local_controller.capability_revision = "capability-r4".into();
         let result = evaluate(&valid_request(), &snapshot);
-        assert_eq!(result.decision, HouseholdActionDecision::CapabilityRevisionMismatch);
+        assert_eq!(
+            result.decision,
+            HouseholdActionDecision::CapabilityRevisionMismatch
+        );
     }
 
     #[test]
