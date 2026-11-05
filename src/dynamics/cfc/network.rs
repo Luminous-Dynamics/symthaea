@@ -1972,7 +1972,7 @@ mod tests {
     // 15. named parameter-group replacement is bounded and validated
     // ---------------------------------------------------------------
     #[test]
-    fn test_named_parameter_group_replacement_changes_only_target_group() {
+    fn test_typed_parameter_group_replacement_changes_only_target_group() {
         let mut net = CfCNetwork::new(small_config());
         let before = net.get_weights();
         let manifest = net.parameter_manifest();
@@ -1985,7 +1985,7 @@ mod tests {
         let replacement = vec![0.25; group.len];
 
         assert!(net
-            .try_replace_parameter_group(&group.name, &replacement)
+            .try_replace_parameter_group(&group.id, &replacement)
             .is_ok());
 
         let after = net.get_weights();
@@ -2001,7 +2001,7 @@ mod tests {
     }
 
     #[test]
-    fn test_named_parameter_group_replacement_rejects_unknown_or_wrong_length() {
+    fn test_typed_parameter_group_replacement_rejects_unknown_or_wrong_length() {
         let mut net = CfCNetwork::new(small_config());
         let before = net.get_weights();
         assert!(matches!(
