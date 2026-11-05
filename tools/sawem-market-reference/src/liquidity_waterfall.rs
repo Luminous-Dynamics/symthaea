@@ -142,8 +142,9 @@ fn event_in_path(class: LiquidityEventClass, path: u8) -> bool {
 fn cash_delta(event: LiquidityCashEvent<'_>) -> Result<i128, LiquidityWaterfallError> {
     let amount = i128::from(event.amount_minor_zar);
     match event.kind {
-        LiquidityCashEventKind::OperatingReceipt
-        | LiquidityCashEventKind::CollateralRelease => Ok(amount),
+        LiquidityCashEventKind::OperatingReceipt | LiquidityCashEventKind::CollateralRelease => {
+            Ok(amount)
+        }
         LiquidityCashEventKind::MandatoryOutflow
         | LiquidityCashEventKind::CollateralCashLockup
         | LiquidityCashEventKind::EarlyInvoicePayment => Ok(-amount),
@@ -212,9 +213,8 @@ fn assess_path<'a>(
             minimum_cash = minimum_cash.min(cash);
             maximum_cover_shortfall = match (
                 maximum_cover_shortfall,
-                deadline_cover.map(|required| {
-                    required.saturating_sub(inputs.posted_credit_cover_minor_zar)
-                }),
+                deadline_cover
+                    .map(|required| required.saturating_sub(inputs.posted_credit_cover_minor_zar)),
             ) {
                 (Some(previous), Some(current)) => Some(previous.max(current)),
                 (Some(previous), None) => Some(previous),
@@ -288,10 +288,7 @@ pub fn evaluate_liquidity_waterfall<'a>(
         return Err(LiquidityWaterfallError::InvalidEvidenceReference);
     }
     if inputs.market_required_credit_cover_minor_zar.is_some()
-        && inputs
-            .required_cover_source_ref
-            .map(nonempty)
-            != Some(true)
+        && inputs.required_cover_source_ref.map(nonempty) != Some(true)
     {
         return Ok(LiquidityWaterfallResult::Indeterminate {
             reason: "Required Credit Cover source reference is missing",
@@ -368,11 +365,19 @@ pub fn evaluate_liquidity_waterfall<'a>(
     }
 
     let forecast_event_count = u32::try_from(
-        inputs.events.iter().filter(|event| event.class == LiquidityEventClass::Forecast).count(),
+        inputs
+            .events
+            .iter()
+            .filter(|event| event.class == LiquidityEventClass::Forecast)
+            .count(),
     )
     .map_err(|_| LiquidityWaterfallError::ArithmeticOverflow)?;
     let stress_event_count = u32::try_from(
-        inputs.events.iter().filter(|event| event.class == LiquidityEventClass::Stress).count(),
+        inputs
+            .events
+            .iter()
+            .filter(|event| event.class == LiquidityEventClass::Stress)
+            .count(),
     )
     .map_err(|_| LiquidityWaterfallError::ArithmeticOverflow)?;
 
@@ -415,9 +420,7 @@ mod tests {
         }
     }
 
-    fn base_inputs<'a>(
-        events: &'a [LiquidityCashEvent<'a>],
-    ) -> LiquidityWaterfallInputs<'a> {
+    fn base_inputs<'a>(events: &'a [LiquidityCashEvent<'a>]) -> LiquidityWaterfallInputs<'a> {
         LiquidityWaterfallInputs {
             scenario_id: "battery/project-001/base",
             start_day_ordinal: 1,
@@ -443,11 +446,51 @@ mod tests {
     #[test]
     fn committed_forecast_and_stress_paths_show_different_minimum_cash() {
         let events = [
-            event("contracted-receipt", 2, 9 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::OperatingReceipt, 15_000_000),
-            event("mandatory-bill", 2, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 20_000_000),
-            event("forecast-sales", 3, 9 * 60, 0, LiquidityEventClass::Forecast, LiquidityCashEventKind::OperatingReceipt, 18_000_000),
-            event("cash-lock", 3, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::CollateralCashLockup, 12_000_000),
-            event("adverse-cost", 4, 9 * 60, 0, LiquidityEventClass::Stress, LiquidityCashEventKind::ForecastAdjustment, 8_000_000),
+            event(
+                "contracted-receipt",
+                2,
+                9 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::OperatingReceipt,
+                15_000_000,
+            ),
+            event(
+                "mandatory-bill",
+                2,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::MandatoryOutflow,
+                20_000_000,
+            ),
+            event(
+                "forecast-sales",
+                3,
+                9 * 60,
+                0,
+                LiquidityEventClass::Forecast,
+                LiquidityCashEventKind::OperatingReceipt,
+                18_000_000,
+            ),
+            event(
+                "cash-lock",
+                3,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::CollateralCashLockup,
+                12_000_000,
+            ),
+            event(
+                "adverse-cost",
+                4,
+                9 * 60,
+                0,
+                LiquidityEventClass::Stress,
+                LiquidityCashEventKind::ForecastAdjustment,
+                8_000_000,
+            ),
         ];
         let inputs = base_inputs(&events);
         let result = evaluate_liquidity_waterfall(inputs).unwrap();
@@ -464,15 +507,34 @@ mod tests {
     #[test]
     fn projected_collateral_and_invoice_payments_reduce_cash_but_not_posted_cover() {
         let events = [
-            event("collateral-plan", 2, 9 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::CollateralCashLockup, 8_000_000),
-            event("invoice-early-pay", 2, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::EarlyInvoicePayment, 5_000_000),
+            event(
+                "collateral-plan",
+                2,
+                9 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::CollateralCashLockup,
+                8_000_000,
+            ),
+            event(
+                "invoice-early-pay",
+                2,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::EarlyInvoicePayment,
+                5_000_000,
+            ),
         ];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("base scenario is complete");
         };
         assert_eq!(result.committed.end_cash_minor_zar, 37_000_000);
-        assert_eq!(result.committed.cover_shortfall_at_deadline_minor_zar, Some(10_000_000));
+        assert_eq!(
+            result.committed.cover_shortfall_at_deadline_minor_zar,
+            Some(10_000_000)
+        );
         assert_eq!(
             result.committed.potentially_fundable_cover_at_deadline_minor_zar,
             Some(10_000_000)
@@ -482,21 +544,51 @@ mod tests {
     #[test]
     fn required_cover_reassessment_changes_cover_gap_only_after_its_event() {
         let events = [
-            event("new-mo-cover", 3, 16 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::RequiredCoverReassessment, 40_000_000),
+            event(
+                "new-mo-cover",
+                3,
+                16 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::RequiredCoverReassessment,
+                40_000_000,
+            ),
         ];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("cover source exists");
         };
-        assert_eq!(result.committed.cover_shortfall_at_deadline_minor_zar, Some(20_000_000));
-        assert_eq!(result.committed.external_funding_gap_at_deadline_minor_zar, Some(0));
+        assert_eq!(
+            result.committed.cover_shortfall_at_deadline_minor_zar,
+            Some(20_000_000)
+        );
+        assert_eq!(
+            result.committed.external_funding_gap_at_deadline_minor_zar,
+            Some(0)
+        );
     }
 
     #[test]
     fn peak_cover_shortfall_is_preserved_when_the_requirement_later_falls() {
         let events = [
-            event("mo-reassess-up", 2, 12 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::RequiredCoverReassessment, 45_000_000),
-            event("mo-reassess-down", 3, 16 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::RequiredCoverReassessment, 35_000_000),
+            event(
+                "mo-reassess-up",
+                2,
+                12 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::RequiredCoverReassessment,
+                45_000_000,
+            ),
+            event(
+                "mo-reassess-down",
+                3,
+                16 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::RequiredCoverReassessment,
+                35_000_000,
+            ),
         ];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
@@ -532,34 +624,82 @@ mod tests {
     #[test]
     fn cash_floor_breach_records_first_timestamp_and_scenario() {
         let events = [
-            event("outflow-1", 2, 9 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 35_000_000),
-            event("outflow-stress", 3, 11 * 60, 0, LiquidityEventClass::Stress, LiquidityCashEventKind::ForecastAdjustment, 20_000_000),
+            event(
+                "outflow-1",
+                2,
+                9 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::MandatoryOutflow,
+                35_000_000,
+            ),
+            event(
+                "outflow-stress",
+                3,
+                11 * 60,
+                0,
+                LiquidityEventClass::Stress,
+                LiquidityCashEventKind::ForecastAdjustment,
+                20_000_000,
+            ),
         ];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("cash flows are well formed");
         };
-        assert_eq!(result.committed.first_operating_floor_breach.unwrap().event_id, "outflow-1");
-        assert_eq!(result.forecast.first_operating_floor_breach, result.committed.first_operating_floor_breach);
-        assert_eq!(result.stress.first_operating_floor_breach.unwrap().event_id, "outflow-1");
+        assert_eq!(
+            result
+                .committed
+                .first_operating_floor_breach
+                .unwrap()
+                .event_id,
+            "outflow-1"
+        );
+        assert_eq!(
+            result.forecast.first_operating_floor_breach,
+            result.committed.first_operating_floor_breach
+        );
+        assert_eq!(
+            result.stress.first_operating_floor_breach.unwrap().event_id,
+            "outflow-1"
+        );
     }
 
     #[test]
     fn events_after_credit_cover_deadline_do_not_change_deadline_cash() {
         let events = [
-            event("after-deadline", 4, 9 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::OperatingReceipt, 25_000_000),
+            event(
+                "after-deadline",
+                4,
+                9 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::OperatingReceipt,
+                25_000_000,
+            ),
         ];
         let result = evaluate_liquidity_waterfall(base_inputs(&events)).unwrap();
         let LiquidityWaterfallResult::Determined(result) = result else {
             panic!("deadline lies within horizon");
         };
-        assert_eq!(result.committed.cash_at_cover_deadline_minor_zar, 50_000_000);
+        assert_eq!(
+            result.committed.cash_at_cover_deadline_minor_zar,
+            50_000_000
+        );
         assert_eq!(result.committed.end_cash_minor_zar, 75_000_000);
     }
 
     #[test]
     fn missing_required_cover_keeps_cash_paths_but_no_cover_conclusion() {
-        let events = [event("bill", 2, 9 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 5_000_000)];
+        let events = [event(
+            "bill",
+            2,
+            9 * 60,
+            0,
+            LiquidityEventClass::Committed,
+            LiquidityCashEventKind::MandatoryOutflow,
+            5_000_000,
+        )];
         let inputs = LiquidityWaterfallInputs {
             market_required_credit_cover_minor_zar: None,
             required_cover_source_ref: None,
@@ -571,7 +711,10 @@ mod tests {
         };
         assert_eq!(result.committed.minimum_cash_minor_zar, 45_000_000);
         assert_eq!(result.committed.cover_shortfall_at_deadline_minor_zar, None);
-        assert_eq!(result.committed.external_funding_gap_at_deadline_minor_zar, None);
+        assert_eq!(
+            result.committed.external_funding_gap_at_deadline_minor_zar,
+            None
+        );
     }
 
     #[test]
@@ -598,8 +741,24 @@ mod tests {
     #[test]
     fn unordered_events_duplicate_ids_and_incomplete_calendars_fail_closed() {
         let out_of_order = [
-            event("late", 3, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 1_000_000),
-            event("early", 2, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 1_000_000),
+            event(
+                "late",
+                3,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::MandatoryOutflow,
+                1_000_000,
+            ),
+            event(
+                "early",
+                2,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::MandatoryOutflow,
+                1_000_000,
+            ),
         ];
         assert_eq!(
             evaluate_liquidity_waterfall(base_inputs(&out_of_order)),
@@ -607,8 +766,24 @@ mod tests {
         );
 
         let duplicate = [
-            event("same", 2, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 1_000_000),
-            event("same", 3, 10 * 60, 0, LiquidityEventClass::Committed, LiquidityCashEventKind::MandatoryOutflow, 1_000_000),
+            event(
+                "same",
+                2,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::MandatoryOutflow,
+                1_000_000,
+            ),
+            event(
+                "same",
+                3,
+                10 * 60,
+                0,
+                LiquidityEventClass::Committed,
+                LiquidityCashEventKind::MandatoryOutflow,
+                1_000_000,
+            ),
         ];
         assert_eq!(
             evaluate_liquidity_waterfall(base_inputs(&duplicate)),
