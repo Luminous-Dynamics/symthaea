@@ -1,0 +1,363 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/aegis-integrity-report-v0.schema.json",
+  "title": "PITB Aegis integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "snapshot_mode",
+    "input_programs_jsonl_sha256",
+    "input_specifications_jsonl_sha256",
+    "input_sample_jsonl_sha256",
+    "input_attempts_jsonl_sha256",
+    "program_summary",
+    "outcome_summary",
+    "strata",
+    "prover_id",
+    "prover_version",
+    "artifact_admission",
+    "implementation_correspondence_boundary",
+    "proof_trust_boundary",
+    "interpretation_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.aegis-integrity-report.v0"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_mode": {
+      "enum": [
+        "not_located",
+        "available",
+        "synthetic_fixture"
+      ]
+    },
+    "input_programs_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_specifications_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_sample_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "input_attempts_jsonl_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "program_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_count_total",
+        "program_count_validated",
+        "program_count_rejected",
+        "program_count_in_sample",
+        "max_sample_specs_per_program"
+      ],
+      "properties": {
+        "program_count_total": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "program_count_validated": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "program_count_rejected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "program_count_in_sample": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_sample_specs_per_program": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "outcome_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selected_specification_count",
+        "attempted_specification_count",
+        "not_attempted_count",
+        "proved_statement_count",
+        "proved_negation_count",
+        "unresolved_count",
+        "resource_exhausted_count",
+        "harness_error_count",
+        "resolved_count",
+        "requested_polarity_correct_count",
+        "requested_polarity_opposite_count",
+        "resolution_rate_over_selected",
+        "original_statement_proof_rate_over_selected",
+        "requested_polarity_accuracy_over_resolved",
+        "total_wall_seconds",
+        "total_input_tokens",
+        "total_output_tokens",
+        "total_api_cost_microusd",
+        "p50_elapsed_seconds",
+        "p95_elapsed_seconds"
+      ],
+      "properties": {
+        "selected_specification_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attempted_specification_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "not_attempted_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "proved_statement_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "proved_negation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resource_exhausted_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "harness_error_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resolved_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requested_polarity_correct_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requested_polarity_opposite_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "resolution_rate_over_selected": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "original_statement_proof_rate_over_selected": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "requested_polarity_accuracy_over_resolved": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
+        },
+        "total_wall_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_api_cost_microusd": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50_elapsed_seconds": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0
+            }
+          ]
+        },
+        "p95_elapsed_seconds": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0
+            }
+          ]
+        }
+      }
+    },
+    "strata": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dimension",
+          "stratum",
+          "selected_count",
+          "attempted_count",
+          "proved_statement_count",
+          "proved_negation_count",
+          "unresolved_count",
+          "resource_exhausted_count",
+          "harness_error_count",
+          "resolved_count",
+          "resolution_rate_over_selected",
+          "original_statement_proof_rate_over_selected"
+        ],
+        "properties": {
+          "dimension": {
+            "enum": [
+              "category",
+              "difficulty"
+            ]
+          },
+          "stratum": {
+            "type": "string",
+            "minLength": 1
+          },
+          "selected_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "attempted_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "proved_statement_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "proved_negation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unresolved_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resource_exhausted_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "harness_error_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resolved_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "resolution_rate_over_selected": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          },
+          "original_statement_proof_rate_over_selected": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "prover_id": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "prover_version": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "artifact_admission": {
+      "type": "string",
+      "minLength": 1
+    },
+    "implementation_correspondence_boundary": {
+      "type": "string",
+      "minLength": 20
+    },
+    "proof_trust_boundary": {
+      "type": "string",
+      "minLength": 20
+    },
+    "interpretation_boundary": {
+      "type": "string",
+      "minLength": 20
+    }
+  }
+}
