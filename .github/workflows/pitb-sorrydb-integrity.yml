@@ -74,6 +74,7 @@ jobs:
               "sorrydb-snapshot-provenance-v0.schema.json",
               "sorrydb-task-reproduction-v0.schema.json",
               "sorrydb-integrity-report-v0.schema.json",
+              "sorrydb-snapshot-integrity-report-v0.schema.json",
           )
           schemas = {}
           for name in names:
