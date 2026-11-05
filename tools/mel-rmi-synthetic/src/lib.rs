@@ -2125,6 +2125,149 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_small_state_model_check_rejects_invalid_negotiation_dispositions() {
+        let mut explored = 0usize;
+        for modulus in 2_i32..=5 {
+            let offset_limit = 1_u32 << (modulus - 1);
+            for offset_mask in 1_u32..offset_limit {
+                let offsets: BTreeSet<i32> = (1..modulus)
+                    .filter(|offset| (offset_mask & (1_u32 << (offset - 1))) != 0)
+                    .collect();
+                let contract = NegotiatedResponseContractV1 {
+                    target_dimension: Dimension::Motif,
+                    modulus,
+                    accepted_offsets: offsets,
+                    max_branch_count: 2,
+                };
+                for input_value in 0..modulus {
+                    let input = Feature {
+                        dimension: Dimension::Motif,
+                        value: input_value,
+                    };
+                    let valid_values: Vec<i32> =
+                        contract.valid_values(input).unwrap().into_iter().collect();
+                    let veto_masks = 1_u32 << valid_values.len();
+                    for veto_mask in 0..veto_masks {
+                        let vetoed_values: BTreeSet<i32> = valid_values
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(index, value)| {
+                                ((veto_mask & (1_u32 << index)) != 0).then_some(*value)
+                            })
+                            .collect();
+                        let available: Vec<i32> = valid_values
+                            .iter()
+                            .copied()
+                            .filter(|value| !vetoed_values.contains(value))
+                            .collect();
+                        let unresolved = PartnerAuthorityV1 {
+                            selected_value: None,
+                            vetoed_values: vetoed_values.clone(),
+                        };
+
+                        let expected_ask = available.len() > 1;
+                        let ask = assess_negotiation(
+                            &contract,
+                            input,
+                            &unresolved,
+                            &NegotiationChoiceV1::AskClarification,
+                        )
+                        .unwrap();
+                        assert_eq!(ask.qualified, expected_ask);
+                        explored += 1;
+
+                        if available.is_empty() {
+                            let abstain = assess_negotiation(
+                                &contract,
+                                input,
+                                &unresolved,
+                                &NegotiationChoiceV1::Abstain,
+                            )
+                            .unwrap();
+                            assert!(abstain.qualified);
+                            explored += 1;
+                        } else if available.len() == 1 {
+                            let commit = assess_negotiation(
+                                &contract,
+                                input,
+                                &unresolved,
+                                &NegotiationChoiceV1::Commit(available[0]),
+                            )
+                            .unwrap();
+                            assert!(commit.qualified);
+                            explored += 1;
+                        } else {
+                            let branch = assess_negotiation(
+                                &contract,
+                                input,
+                                &unresolved,
+                                &NegotiationChoiceV1::Branch(available.clone()),
+                            )
+                            .unwrap();
+                            assert_eq!(branch.qualified, available.len() <= 2);
+                            explored += 1;
+
+                            for candidate in &available {
+                                let premature_commit = assess_negotiation(
+                                    &contract,
+                                    input,
+                                    &unresolved,
+                                    &NegotiationChoiceV1::Commit(*candidate),
+                                )
+                                .unwrap();
+                                assert!(!premature_commit.qualified);
+                                explored += 1;
+                            }
+                        }
+
+                        for selected in &available {
+                            let selected_authority = PartnerAuthorityV1 {
+                                selected_value: Some(*selected),
+                                vetoed_values: vetoed_values.clone(),
+                            };
+                            let follow = assess_negotiation(
+                                &contract,
+                                input,
+                                &selected_authority,
+                                &NegotiationChoiceV1::Commit(*selected),
+                            )
+                            .unwrap();
+                            assert!(follow.qualified);
+                            explored += 1;
+
+                            let defer = assess_negotiation(
+                                &contract,
+                                input,
+                                &selected_authority,
+                                &NegotiationChoiceV1::AskClarification,
+                            )
+                            .unwrap();
+                            assert!(!defer.qualified);
+                            explored += 1;
+
+                            for alternative in &available {
+                                if alternative == selected {
+                                    continue;
+                                }
+                                let override_choice = assess_negotiation(
+                                    &contract,
+                                    input,
+                                    &selected_authority,
+                                    &NegotiationChoiceV1::Commit(*alternative),
+                                )
+                                .unwrap();
+                                assert!(!override_choice.qualified);
+                                explored += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(explored > 1_000, "model check explored only {explored} dispositions");
+    }
+
+    #[test]
     fn rule_based_positive_control_passes_all_synthetic_gates() {
         let (task, interventions) = fixture();
         let record = run_trial(
