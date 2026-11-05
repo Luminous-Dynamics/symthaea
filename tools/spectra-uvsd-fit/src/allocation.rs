@@ -168,6 +168,7 @@ pub fn allocate_next_score_batch(
         return Err(AdaptiveAllocationError::InvalidTimeUniformSchedule);
     }
 
+    validate_receipt_sample_grid(receipt)?;
     let current_total_replications = receipt.samples.iter().try_fold(0usize, |total, cell| {
         let count = common_cell_sample_count(cell)?;
         total
@@ -380,6 +381,7 @@ fn compute_cell_priorities(
 
         let tail_contributions = scenario_tail_contributions(
             &action_metrics,
+            &receipt.scenarios,
             robust_utility,
         )?;
         for metric in action_metrics {
@@ -394,10 +396,7 @@ fn compute_cell_priorities(
                 .get(&metric.scenario_id)
                 .copied()
                 .ok_or(AdaptiveAllocationError::InvalidScenarioWeights)?;
-            let priority = match robust_utility {
-                RobustUtility::Maximin => width * tail_mass,
-                RobustUtility::LowerTailCvar { .. } => width * tail_mass,
-            };
+                let priority = width * tail_mass;
             if !priority.is_finite() || priority < 0.0 {
                 return Err(AdaptiveAllocationError::NonFinitePriority);
             }
@@ -414,31 +413,152 @@ fn compute_cell_priorities(
     Ok(priorities)
 }
 
+fn validate_receipt_sample_grid(
+    receipt: &ScoreBoundsReceipt,
+) -> Result<(), AdaptiveAllocationError> {
+    let expected = receipt
+        .action_snapshot
+        .len()
+        .checked_mul(receipt.scenarios.len())
+        .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
+    if receipt.samples.len() != expected {
+        return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+    }
+    let metric_by_pair: BTreeMap<_, _> = receipt
+        .metrics
+        .iter()
+        .map(|metric| ((metric.action_id, metric.scenario_id), metric))
+        .collect();
+    if metric_by_pair.len() != expected {
+        return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+    }
+    let mut seen = BTreeMap::new();
+    for sample in &receipt.samples {
+        let count = common_cell_sample_count(sample)?;
+        let key = (sample.action_id, sample.scenario_id);
+        if seen.insert(key, count).is_some() {
+            return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+        }
+        let metric = metric_by_pair
+            .get(&key)
+            .copied()
+            .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
+        if metric.target_utility.sample_count != count {
+            return Err(AdaptiveAllocationError::SampleMetricCountMismatch);
+        }
+    }
+    if seen.len() != expected {
+        return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+    }
+    Ok(())
+}
+
 fn scenario_tail_contributions(
     metrics: &[&super::score_bounds::ActionScenarioMetricBounds],
+    scenarios: &[ScenarioDefinition],
     robust_utility: RobustUtility,
 ) -> Result<BTreeMap<u16, f64>, AdaptiveAllocationError> {
+    if scenarios.is_empty() {
+        return Err(AdaptiveAllocationError::InvalidScenarioWeights);
+    }
+    let mut total_weight = 0.0;
+    let mut weights = BTreeMap::new();
+    for scenario in scenarios {
+        if !scenario.weight.is_finite() || scenario.weight <= 0.0 {
+            return Err(AdaptiveAllocationError::InvalidScenarioWeights);
+        }
+        total_weight += scenario.weight;
+        weights.insert(scenario.scenario_id, scenario.weight);
+    }
+    if !total_weight.is_finite() || (total_weight - 1.0).abs() > 1.0e-9 {
+        return Err(AdaptiveAllocationError::InvalidScenarioWeights);
+    }
+
     let mut lower_values = Vec::with_capacity(metrics.len());
     let mut upper_values = Vec::with_capacity(metrics.len());
-    let mut weights = BTreeMap::new();
     for metric in metrics {
-        lower_values.push((
-            metric.scenario_id,
-            metric.target_utility.declared_range.lower,
-            metric.target_utility.lower_bound,
-        ));
-        upper_values.push((
-            metric.scenario_id,
-            metric.target_utility.declared_range.upper,
-            metric.target_utility.upper_bound,
-        ));
-        // Recover scenario mass through no mutable input: the scenario ID and
-        // normalized mass are supplied by the parent receipt in the caller.
-        // This local map is populated below by the caller-specific wrapper.
-        let _ = weights.insert(metric.scenario_id, 0.0);
+        let weight = weights
+            .get(&metric.scenario_id)
+            .copied()
+            .ok_or(AdaptiveAllocationError::InvalidScenarioWeights)?;
+        lower_values.push((metric.scenario_id, weight, metric.target_utility.lower_bound));
+        upper_values.push((metric.scenario_id, weight, metric.target_utility.upper_bound));
     }
-    let _ = (lower_values, upper_values, robust_utility);
-    Err(AdaptiveAllocationError::NoActionableCell)
+
+    let mut contributions = BTreeMap::<u16, f64>::new();
+    match robust_utility {
+        RobustUtility::Maximin => {
+            let min_lower = lower_values
+                .iter()
+                .map(|(_, _, value)| *value)
+                .fold(f64::INFINITY, f64::min);
+            let min_upper = upper_values
+                .iter()
+                .map(|(_, _, value)| *value)
+                .fold(f64::INFINITY, f64::min);
+            let lower_ties = lower_values
+                .iter()
+                .filter(|(_, _, value)| (*value - min_lower).abs() <= 1.0e-12)
+                .count()
+                .max(1);
+            let upper_ties = upper_values
+                .iter()
+                .filter(|(_, _, value)| (*value - min_upper).abs() <= 1.0e-12)
+                .count()
+                .max(1);
+            for (scenario_id, _, value) in &lower_values {
+                if (*value - min_lower).abs() <= 1.0e-12 {
+                    *contributions.entry(*scenario_id).or_insert(0.0) +=
+                        1.0 / lower_ties as f64;
+                }
+            }
+            for (scenario_id, _, value) in &upper_values {
+                if (*value - min_upper).abs() <= 1.0e-12 {
+                    *contributions.entry(*scenario_id).or_insert(0.0) +=
+                        1.0 / upper_ties as f64;
+                }
+            }
+        }
+        RobustUtility::LowerTailCvar { tail_mass } => {
+            if !tail_mass.is_finite() || tail_mass <= 0.0 || tail_mass > 1.0 {
+                return Err(AdaptiveAllocationError::InvalidCvarTailMass);
+            }
+            let lower = lower_tail_mass(&lower_values, tail_mass);
+            let upper = lower_tail_mass(&upper_values, tail_mass);
+            for (scenario_id, mass) in lower {
+                *contributions.entry(scenario_id).or_insert(0.0) += mass;
+            }
+            for (scenario_id, mass) in upper {
+                *contributions.entry(scenario_id).or_insert(0.0) += mass;
+            }
+        }
+    }
+    Ok(contributions)
+}
+
+fn lower_tail_mass(
+    values: &[(u16, f64, f64)],
+    tail_mass: f64,
+) -> BTreeMap<u16, f64> {
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|left, right| {
+        left.2
+            .total_cmp(&right.2)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+    let mut remaining = tail_mass;
+    let mut included = BTreeMap::new();
+    for (scenario_id, weight, _) in sorted {
+        if remaining <= 0.0 {
+            break;
+        }
+        let mass = weight.min(remaining);
+        if mass > 0.0 {
+            included.insert(scenario_id, mass);
+            remaining -= mass;
+        }
+    }
+    included
 }
 
 /// Deterministic simulation seed derivation. The schedule must use the same
