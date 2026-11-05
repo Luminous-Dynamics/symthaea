@@ -205,22 +205,22 @@ pub enum ReuseRoundDecision {
 /// Trusted evaluator audit record. This type is crate-private so the cumulative
 /// certificate is not accidentally exposed through the proposer-facing API.
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct ReuseRoundAudit {
+pub struct ReuseRoundAudit {
     decision: ReuseRoundDecision,
     selected_certificate: Option<ReuseConfidenceCertificate>,
     cumulative_lower_bound: f64,
 }
 
 impl ReuseRoundAudit {
-    pub(crate) fn decision(&self) -> ReuseRoundDecision {
+    pub fn decision(&self) -> ReuseRoundDecision {
         self.decision
     }
 
-    pub(crate) fn selected_certificate(&self) -> Option<&ReuseConfidenceCertificate> {
+    pub fn selected_certificate(&self) -> Option<&ReuseConfidenceCertificate> {
         self.selected_certificate.as_ref()
     }
 
-    pub(crate) fn cumulative_lower_bound(&self) -> f64 {
+    pub fn cumulative_lower_bound(&self) -> f64 {
         self.cumulative_lower_bound
     }
 }
