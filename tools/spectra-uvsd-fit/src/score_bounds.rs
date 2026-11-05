@@ -12,8 +12,8 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use super::scenario::{ScenarioOutcome, ScenarioSet};
-use super::sequential::OperationalActionSet;
+use super::scenario::{ScenarioDefinition, ScenarioOutcome, ScenarioSet};
+use super::sequential::{OperationalAction, OperationalActionSet};
 
 pub const SCORE_BOUND_METHOD_ID: &str = "hoeffding-bonferroni-one-sided-v1";
 
@@ -118,6 +118,12 @@ pub struct MetricScoreBound {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoreBoundsReceipt {
     pub method_id: &'static str,
+    /// Canonical action inputs addressed by action_set_digest.
+    pub action_set_digest: String,
+    pub action_snapshot: Vec<OperationalAction>,
+    /// Canonical normalized scenario definitions addressed by scenario_set_digest.
+    pub scenario_set_digest: String,
+    pub scenarios: Vec<ScenarioDefinition>,
     pub familywise_alpha: f64,
     pub per_claim_alpha: f64,
     pub familywise_confidence: f64,
@@ -319,6 +325,10 @@ pub fn bound_candidate_score_samples(
 
     Ok(ScoreBoundsReceipt {
         method_id: SCORE_BOUND_METHOD_ID,
+        action_set_digest: action_set.digest().to_owned(),
+        action_snapshot: action_set.actions().to_vec(),
+        scenario_set_digest: scenario_set.digest().to_owned(),
+        scenarios: scenario_set.scenarios().to_vec(),
         familywise_alpha: config.familywise_alpha,
         per_claim_alpha,
         familywise_confidence: 1.0 - config.familywise_alpha,
@@ -715,6 +725,10 @@ mod tests {
             bounded.score_contract_digest.clone(),
         )
         .unwrap();
+        assert_eq!(bounded.action_set_digest, action_set.digest());
+        assert_eq!(bounded.action_snapshot, action_set.actions());
+        assert_eq!(bounded.scenario_set_digest, scenario_set.digest());
+        assert_eq!(bounded.scenarios, scenario_set.scenarios());
         assert_eq!(aggregated.assessments.len(), 2);
         assert_eq!(aggregated.scenario_set_digest, scenario_set.digest());
         assert_eq!(aggregated.score_contract_digest, bounded.score_contract_digest);
