@@ -311,7 +311,9 @@ fn compile_schema(schema_raw: &str, label: &str) -> Result<jsonschema::Validator
     let meta_validator = jsonschema::meta::validator_for(&schema)
         .map_err(|error| format!("cannot compile {label} meta-schema validator: {error}"))?;
     if !meta_validator.evaluate(&schema).flag().valid {
-        return Err(format!("{label} schema is invalid against its declared meta-schema"));
+        return Err(format!(
+            "{label} schema is invalid against its declared meta-schema"
+        ));
     }
     draft202012::options()
         .should_validate_formats(true)
@@ -324,13 +326,17 @@ fn validate_value(
     validator: &jsonschema::Validator,
     label: &str,
 ) -> Result<(), String> {
-    let errors: Vec<String> = validator.iter_errors(value)
+    let errors: Vec<String> = validator
+        .iter_errors(value)
         .map(|error| error.to_string())
         .collect();
     if errors.is_empty() {
         Ok(())
     } else {
-        Err(format!("{label} violates its schema: {}", errors.join("; ")))
+        Err(format!(
+            "{label} violates its schema: {}",
+            errors.join("; ")
+        ))
     }
 }
 
@@ -350,8 +356,12 @@ fn read_jsonl<T: DeserializeOwned>(
         let value: Value = serde_json::from_str(line)
             .map_err(|error| format!("{label} line {} is invalid JSON: {error}", index + 1))?;
         validate_value(&value, validator, &format!("{label} line {}", index + 1))?;
-        let row = serde_json::from_value::<T>(value)
-            .map_err(|error| format!("{label} line {} does not match its typed contract: {error}", index + 1))?;
+        let row = serde_json::from_value::<T>(value).map_err(|error| {
+            format!(
+                "{label} line {} does not match its typed contract: {error}",
+                index + 1
+            )
+        })?;
         rows.push(row);
     }
 
@@ -1397,7 +1407,8 @@ fn run() -> Result<(), String> {
 
     let pairs: Vec<PairMeta> = read_jsonl(&pair_bytes, "pair manifest", &pair_schema)?;
     let pair_map = validate_pairs(&pairs)?;
-    let result_rows: Vec<Prediction> = read_jsonl(&result_bytes, "prediction results", &result_schema)?;
+    let result_rows: Vec<Prediction> =
+        read_jsonl(&result_bytes, "prediction results", &result_schema)?;
     let prediction_map = validate_predictions(&plan, &pair_map, &result_rows)?;
 
     let mut observed = Vec::with_capacity(result_rows.len());
