@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "policy_id": "connectome-synthetic-trust-policy-v1",
+  "minimum_signatures": 3,
+  "required_roles": ["observer", "independent_reviewer", "data_steward"],
+  "trusted_keys": [
+    {
+      "key_id": "fixture-observer-key-v1",
+      "public_key_hex": "6e4f693be4c3ced3825a6c36a32cf02c0c77d27ea79538e44fe4c3897deaa521",
+      "role": "observer",
+      "valid_from_unix": 1790000000,
+      "valid_until_unix": 1800000000,
+      "revoked_at_unix": null
+    },
+    {
+      "key_id": "fixture-independent_reviewer-key-v1",
+      "public_key_hex": "613441b28600682e71b0a57306f97998b742e48f9f1126d4eb2bb242f0356db6",
+      "role": "independent_reviewer",
+      "valid_from_unix": 1790000000,
+      "valid_until_unix": 1800000000,
+      "revoked_at_unix": null
+    },
+    {
+      "key_id": "fixture-data_steward-key-v1",
+      "public_key_hex": "310b86a8e9718ded9df71ffef0a62309357cd87a93a01869b7a3fdf57fcb74ed",
+      "role": "data_steward",
+      "valid_from_unix": 1790000000,
+      "valid_until_unix": 1800000000,
+      "revoked_at_unix": null
+    }
+  ]
+}
