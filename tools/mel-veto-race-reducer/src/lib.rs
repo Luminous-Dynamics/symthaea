@@ -1156,7 +1156,14 @@ mod tests {
         duplicate_terminal.apply(enqueue_event(4, 7)).unwrap();
         duplicate_terminal.apply(callback_event(5, 7, 0)).unwrap();
         assert_eq!(
-            duplicate_terminal.apply(callback_event(6, 7, 0)),
+            duplicate_terminal.apply(event(
+                6,
+                "callback-7-second-disposition",
+                EventKind::CallbackEpochCheck {
+                    frame_id: 7,
+                    observed_epoch: 0,
+                },
+            )),
             Err(RaceError::FrameAlreadyTerminal { frame_id: 7 })
         );
     }
