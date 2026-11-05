@@ -272,7 +272,8 @@
         "energy_basis",
         "storage_cycle_efficiency",
         "mode_transition_seconds",
-        "capability_status"
+        "capability_status",
+        "max_continuous_discharging_mw"
       ],
       "properties": {
         "trading_unit_id": {
@@ -360,6 +361,9 @@
             "operator_certified",
             "independently_measured"
           ]
+        },
+        "max_continuous_discharging_mw": {
+          "$ref": "#/$defs/positiveNumber"
         }
       }
     },
