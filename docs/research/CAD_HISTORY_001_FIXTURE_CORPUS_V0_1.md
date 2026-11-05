@@ -280,3 +280,27 @@ References:
 - 2026 scan-based reverse-engineering uncertainty review: https://www.mdpi.com/2076-3417/16/3/1229
 
 Compose ENG-TOL-001 #4883 for dimensional/metrology requirements and ROB-REALIZE-001 #4859 for as-built article lineage; do not create another measurement system or as-built authority.
+
+
+## 7.3 Parametric CAD Bench V3 exact public run contract (retrieved 2026-11-05)
+
+Use V3 as a distinct external baseline. The current official run page specifies:
+- Harbor 0.23.0;
+- FreeCAD 1.1.0;
+- gnucleus-freecad-validator 0.6.0 with v2 scorer;
+- Harbor task schema 1.3;
+- 100 tasks: 30 text-to-CAD creation, 30 create-and-edit, 40 image-to-CAD engineering drawings;
+- one attempt per task, four-way concurrency, zero retries, 9,000-second per-task time limit;
+- network disabled except selected model provider, separate evaluator/reference geometry, agent state limited to task workspace;
+- failures and unscored cases count as zero reward.
+
+The current public leaderboard is not a single homogeneous capability score. On the official page retrieved 2026-11-05, Opus 5.5 / Claude Code has 61.03 overall but 39.69 create-and-edit and 84.66 image-to-CAD; GPT-6 Astra / Codex has 56.87 overall, 44.37 create-and-edit and 69.70 image-to-CAD. Current whole-run costs ($573.94 and $317.81 respectively) are totals for the 100-task jobs, not per-case costs.
+
+The benchmark's continuous reward mixes geometry similarity and specification consistency; it does not establish future arbitrary edit preservation, metrology traceability, manufacturing feasibility or physical safety. The CAD-HISTORY extension therefore focuses on downstream interventions and protected semantic invariants that are separately measured.
+
+References:
+- https://cadbench.ai/
+- https://cadbench.ai/benchmark
+- https://cadbench.ai/news/cad-bench-v3-paper
+- https://arxiv.org/abs/2611.02659
+
