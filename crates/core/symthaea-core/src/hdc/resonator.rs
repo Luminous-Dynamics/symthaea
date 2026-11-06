@@ -1841,6 +1841,7 @@ mod tests {
             max_iterations: 5,
             noise_scale: 0.0,
             energy_threshold: 0.0,
+            initialization_seed: 0x1234_5678,
         };
         let mut network = ResonatorNetwork::with_config(dimension, config).unwrap();
         let left = normalized_random_vector(dimension);
@@ -1870,6 +1871,35 @@ mod tests {
                 .0,
             ResonatorOutcome::NonConvergence
         );
+    }
+
+    #[test]
+    fn test_seeded_resonator_runs_are_replayable() {
+        let dimension = 96;
+        let config = ResonatorConfig {
+            initialization_seed: 0x5EED_CAFE,
+            noise_scale: 0.02,
+            max_iterations: 12,
+            ..Default::default()
+        };
+        let left = normalized_random_vector(dimension);
+        let target = normalized_random_vector(dimension);
+        let right: Vec<f32> = left
+            .iter()
+            .zip(target.iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
+        let constraints = vec![Constraint::new(left, right)];
+
+        let mut first = ResonatorNetwork::with_config(dimension, config.clone()).unwrap();
+        let mut second = ResonatorNetwork::with_config(dimension, config).unwrap();
+        let first_solution = first.solve(&constraints, Some(12)).unwrap();
+        let second_solution = second.solve(&constraints, Some(12)).unwrap();
+
+        assert_eq!(first_solution.vector, second_solution.vector);
+        assert_eq!(first_solution.iterations, second_solution.iterations);
+        assert_eq!(first_solution.converged, second_solution.converged);
+        assert_eq!(first.energy_history(), second.energy_history());
     }
 
     #[test]
