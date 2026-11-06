@@ -554,24 +554,8 @@ impl VocalTractController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Conditional weight decay (disabled during supervised phoneme training)
-        if weight_decay > 0.0 {
-            let decay = 1.0 - weight_decay;
-            for w in self.output_weights.iter_mut() {
-                *w *= decay;
-            }
-        }
-
-        // Update output weights
-        for i in 0..OUTPUT_DIM {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
-            }
-            self.output_bias[i] -= output_lr * d_raw[i];
-        }
-
-        // Backprop through network (BPTT)
+        // Compute the upstream HDC direction using the output head that
+        // produced this prediction, not the head after its optimizer update.
         let dim = HDC_DIMENSION;
         let mut grad_hv_values = vec![0.0f32; dim];
         for i in 0..OUTPUT_DIM {
@@ -579,6 +563,22 @@ impl VocalTractController {
             for j in 0..dim {
                 grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
             }
+        }
+
+        // Conditional weight decay (disabled during supervised phoneme training).
+        if weight_decay > 0.0 {
+            let decay = 1.0 - weight_decay;
+            for w in self.output_weights.iter_mut() {
+                *w *= decay;
+            }
+        }
+
+        for i in 0..OUTPUT_DIM {
+            let row_offset = i * HDC_DIMENSION;
+            for j in 0..HDC_DIMENSION {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+            }
+            self.output_bias[i] -= output_lr * d_raw[i];
         }
 
         let n_layers = self.network.n_layers();
