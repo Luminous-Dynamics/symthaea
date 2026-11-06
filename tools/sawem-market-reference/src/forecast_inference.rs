@@ -8,7 +8,7 @@
 use crate::forecast_skill::{ForecastSkillAssessment, PairedForecastLossDelta};
 
 const BPS: u128 = 10_000;
-const MIN_BOOTSTRAP_DRAWS: u32 = 100;
+const MIN_BOOTSTRAP_DRAWS: u32 = 2_000;
 const MAX_BOOTSTRAP_DRAWS: u32 = 100_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
