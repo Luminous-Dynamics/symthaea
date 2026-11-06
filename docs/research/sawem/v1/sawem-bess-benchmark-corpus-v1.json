@@ -1587,7 +1587,7 @@
       "case_id": "FORECAST-SKILL-BLOCK-BOOTSTRAP-001",
       "track": "forecast_and_decision_replay",
       "title": "Serial-dependence-aware confidence interval for paired forecast skill",
-      "scenario": "Use a frozen, source-digested circular moving-block bootstrap plan to resample paired candidate-minus-baseline per-period median-MAE and central-80% WIS improvements. The plan fixes block length, draw count, confidence level and all block starts before inspecting the holdout. Return exact integer confidence bounds over the mean paired improvement. A forecast superiority claim is supported only when the lower confidence bound is strictly positive; intervals crossing zero remain inconclusive. The evaluator must be deterministic and replay the exact resampling plan. The bootstrap input must be one chronological, contiguous Trading Period series. Mixed series, reversed timestamps or gaps are rejected rather than allowing a block to cross unrelated markets or missing intervals.",
+      "scenario": "Use a frozen, source-digested circular moving-block bootstrap plan to resample paired candidate-minus-baseline per-period median-MAE and central-80% WIS improvements. The plan fixes block length, draw count, confidence level and all block starts before inspecting the holdout. Return exact integer confidence bounds over the mean paired improvement. A forecast superiority claim is supported only when the lower confidence bound is strictly positive; intervals crossing zero remain inconclusive. The evaluator must be deterministic and replay the exact resampling plan. The bootstrap input must be one chronological, contiguous Trading Period series. Mixed series, reversed timestamps or gaps are rejected rather than allowing a block to cross unrelated markets or missing intervals. The reference evaluator requires at least 2,000 frozen draws for the two-sided interval calculation.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1607,7 +1607,8 @@
         "content digest and source reference for the bootstrap plan",
         "baseline fitting boundary strictly before evaluation holdout",
         "forecast and realized source/time receipts for every paired target",
-        "single-series chronological contiguous Trading Period sequence used by the moving-block plan"
+        "single-series chronological contiguous Trading Period sequence used by the moving-block plan",
+        "at least 2,000 predeclared circular-block bootstrap draws"
       ],
       "stress_tags": [
         "moving-block-bootstrap",
