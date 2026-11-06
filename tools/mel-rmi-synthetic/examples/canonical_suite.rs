@@ -9,8 +9,7 @@ use mel_rmi_synthetic::{
     TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation, assess_scoped_negotiation,
     bind_verified_artifacts, canonical_fixture_replicates_v1, measure_partner_contrast,
     run_policy_suite_v1, run_reciprocal_suite_v1, summarize_paired_effects,
-    validate_partner_authority_event,
-    verify_trial_artifact_bindings,
+    validate_partner_authority_event, verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -438,17 +437,20 @@ fn paired_agent_observations(
             || record.manifest.input_event_ids != yoke.manifest.input_event_ids
             || record.manifest.condition_order != yoke.manifest.condition_order
             || yoke.manifest.policy_id != "yoked"
-            || yoke.actions.iter().any(|action| action.mechanism != ActionMechanism::Yoked)
+            || yoke
+                .actions
+                .iter()
+                .any(|action| action.mechanism != ActionMechanism::Yoked)
         {
             return Err("candidate/yoke trial identity mismatch".into());
         }
         // Yoke effect is the treatment-vs-control change in the replay arm,
         // not the absolute distance between an unrelated response and the
         // candidate's control action.
-        let yoked_delta = record.task.expected_response.distance(
-            yoke.actions[0].feature.value,
-            yoke.actions[1].feature.value,
-        )?;
+        let yoked_delta = record
+            .task
+            .expected_response
+            .distance(yoke.actions[0].feature.value, yoke.actions[1].feature.value)?;
         observations.push(PairedEffectObservation {
             cluster_id: record.manifest.session_id.clone(),
             trial_id: record.task.task_id.clone(),
