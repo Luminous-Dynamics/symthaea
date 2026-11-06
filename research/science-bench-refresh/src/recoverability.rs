@@ -24,8 +24,8 @@ const MAX_REFERENCE_BYTES: usize = 256;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchSurfaceStateV1 {
-    FrozenObserved,
-    Partial,
+    CompleteFrozenInventory,
+    PartialObserved,
     Unknown,
 }
 
@@ -491,7 +491,7 @@ fn classify_unit(
         RouteMode::Navigation,
     ) {
         (RecoverabilityClassV1::NavigationRecoverable, Some(route))
-    } else if fields.surface_state == SearchSurfaceStateV1::FrozenObserved {
+    } else if fields.surface_state == SearchSurfaceStateV1::CompleteFrozenInventory {
         (RecoverabilityClassV1::UnreachableWithinBudget, None)
     } else {
         (RecoverabilityClassV1::NotEvaluable, None)
@@ -752,7 +752,7 @@ mod tests {
     #[test]
     fn partial_surface_preserves_positive_routes_but_never_claims_unreachable() {
         let mut fields = base_fields();
-        fields.surface_state = SearchSurfaceStateV1::Partial;
+        fields.surface_state = SearchSurfaceStateV1::PartialObserved;
         let result = report(fields);
         assert!(result.valid);
         let actual: BTreeMap<_, _> = result
