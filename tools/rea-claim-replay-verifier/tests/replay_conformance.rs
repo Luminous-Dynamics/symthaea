@@ -1070,8 +1070,7 @@ fn three_same_scope_contradictions_do_not_outvote_one_supporting_observation() {
 
     let mut evidence_inputs = vec![fixture_bytes()];
     evidence_inputs.extend(bytes.iter().map(Vec::as_slice));
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &evidence_inputs, &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &evidence_inputs, &result_bytes).unwrap();
 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
@@ -1095,10 +1094,7 @@ fn inferred_analyst_derived_evidence_does_not_promote_beyond_provider_observatio
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
     let result: Value = serde_json::from_slice(&result_bytes).unwrap();
-    assert_eq!(
-        result["disposition"],
-        json!("supported_within_scope")
-    );
+    assert_eq!(result["disposition"], json!("supported_within_scope"));
     assert_eq!(
         result["evidence_assessments"][0]["confidence"],
         json!("inferred")
@@ -1112,13 +1108,13 @@ fn inferred_analyst_derived_evidence_does_not_promote_beyond_provider_observatio
             .as_array()
             .unwrap()
             .iter()
-            .any(|line| line.as_str().unwrap().contains(
-                "does not prove the underlying real-world proposition"
-            ))
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
     );
 
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
@@ -1137,11 +1133,9 @@ fn mismatched_source_predicate_type_is_inapplicable_not_silent_promotion() {
 
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, Disposition::Inapplicable);
     assert_eq!(replay.reported_disposition, Disposition::Inapplicable);
 }
-
