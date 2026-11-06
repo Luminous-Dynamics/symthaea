@@ -59,7 +59,7 @@ pub struct BayesianModelReductionResult {
     pub most_probable_model_id: String,
     /// Posterior log-odds of the most probable model against the runner-up.
     /// None when only one model has nonzero posterior mass.
-    pub log_bayes_factor_over_runner_up: Option<f64>,
+    pub log_posterior_odds_over_runner_up: Option<f64>,
 }
 
 /// Input or numerical errors. Invalid distributions are rejected, not normalized silently.
@@ -270,7 +270,7 @@ pub fn reduce_models(
         .copied()
         .skip(1)
         .find(|index| posterior[*index] > 0.0);
-    let log_bayes_factor_over_runner_up = runner_up.map(|runner_index| {
+    let log_posterior_odds_over_runner_up = runner_up.map(|runner_index| {
         log_weights[best_index] - log_weights[runner_index]
     });
 
@@ -290,7 +290,7 @@ pub fn reduce_models(
         models,
         posterior_model_entropy_nats: entropy,
         most_probable_model_id: reduced_models[best_index].model_id.clone(),
-        log_bayes_factor_over_runner_up,
+        log_posterior_odds_over_runner_up,
     })
 }
 
@@ -334,7 +334,7 @@ fn diagonal_gaussian_log_evidence_ratio(
             });
         }
 
-        let constant = 0.5 * (v0 / vr).ln()
+        let constant = 0.5 * (v0.ln() - vr.ln())
             - (mq - mr).powi(2) * (0.5 * inverse_reduced)
             + (mq - m0).powi(2) * (0.5 * inverse_full);
         let contribution = constant - 0.5 * denominator.ln()
@@ -464,7 +464,7 @@ mod tests {
         let concentrated = &result.models[1];
         assert!(concentrated.posterior_probability > full.posterior_probability);
         assert_eq!(result.most_probable_model_id, "concentrated");
-        assert!(result.log_bayes_factor_over_runner_up.unwrap() > 0.0);
+        assert!(result.log_posterior_odds_over_runner_up.unwrap() > 0.0);
     }
 
     #[test]
@@ -633,6 +633,6 @@ mod tests {
         .expect("one positive prior mass");
         assert_eq!(result.models[0].posterior_probability, 0.0);
         assert_eq!(result.models[1].posterior_probability, 1.0);
-        assert!(result.log_bayes_factor_over_runner_up.is_none());
+        assert!(result.log_posterior_odds_over_runner_up.is_none());
     }
 }
