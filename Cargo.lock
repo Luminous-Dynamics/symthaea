@@ -18751,6 +18751,15 @@ name = "symthaea-epidemiology"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-emsr-evidence"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "symthaea-epistemic-types"
 version = "0.1.0"
 dependencies = [
