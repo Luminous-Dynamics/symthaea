@@ -951,7 +951,10 @@ mod tests {
     #[test]
     fn evidence_without_platform_version_cannot_support_version_scoped_claim() {
         let evidence = verified_fixture();
-        let mut claim = claim(ClaimPredicate::ProviderReportedObservation, vec![evidence.evidence_id.clone()]);
+        let mut claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
         claim.scope.platform_version = Some("Android 17 / API 37".to_owned());
         let result = evaluate_claim(&claim, &[evidence]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Underdetermined);
