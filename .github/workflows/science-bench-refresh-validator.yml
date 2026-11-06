@@ -37,9 +37,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustfmt --edition 2024 --emit stdout - \
-            < research/science-bench-refresh/src/recoverability.rs \
-            | base64 -w0 > /tmp/recoverability-rustfmt.b64
+          rustfmt --edition 2024 --emit stdout research/science-bench-refresh/src/recoverability.rs \
+            | tail -n +2 | base64 -w0 > /tmp/recoverability-rustfmt.b64
           echo "RECOVERABILITY_RUSTFMT_BASE64_BEGIN"
           cat /tmp/recoverability-rustfmt.b64
           echo
