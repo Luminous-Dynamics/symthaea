@@ -269,6 +269,34 @@
         "faulty_network_with_held_out_permutation",
         "incomplete_hidden_unit_permutation_that_changes_function"
       ]
+    },
+    {
+      "id": "partial_observation_rule_discovery",
+      "environment": "Three-ball-style partially observed rule-discovery environment: hidden ball attributes and a latent rule/likelihood mapping determine correct, incorrect, or no-feedback outcomes; an action reveals or samples only a restricted part of the scene. Reproduce the Friston et al. (2026) protocol only after its exact state space, rule set, preferences, observation model, and stopping rule are transcribed from the paper/supplement; otherwise label the environment an adaptation.",
+      "primary_outcomes": [
+        "rule_identification_accuracy",
+        "trials_to_model_selection",
+        "model_choice_brier_score",
+        "decision_regret",
+        "observation_cost"
+      ],
+      "diagnostics": [
+        "state_information_gain_nats",
+        "parameter_information_gain_nats",
+        "model_structure_information_gain_nats",
+        "realized_model_entropy_reduction_nats",
+        "bmr_log_evidence_ratio_nats",
+        "posterior_log_odds_of_selected_model",
+        "model_commitment_trial"
+      ],
+      "negative_controls": [
+        "random_partial_observation_policy",
+        "reward_greedy_without_model_information",
+        "model_information_channel_disabled_with_preferences_and_costs_fixed",
+        "state_information_only",
+        "parameter_information_only",
+        "oracle_rule_label_for_analysis_only"
+      ]
     }
   ],
   "baselines": [
@@ -423,6 +451,22 @@
     {
       "id": "diagonal_gaussian_bayesian_model_reduction",
       "scope": "Analytic BMR log evidence ratios for nested prior-only reductions under independent diagonal-Gaussian full posterior, full prior, and reduced priors"
+    },
+    {
+      "id": "three_ball_active_inference_published_protocol",
+      "scope": "Exact Friston et al. (2026) three-ball active structure-learning protocol; use only after paper/supplement task, preferences, likelihoods, and stopping rule are transcribed and verified"
+    },
+    {
+      "id": "random_partial_observation_policy",
+      "scope": "Random legal observation policy with identical action availability, observation cost, and horizon"
+    },
+    {
+      "id": "reward_greedy_without_model_information",
+      "scope": "Pragmatic/reward-only policy without model-structure information, sharing the same predictive and preference interfaces"
+    },
+    {
+      "id": "hierarchical_model_eig_with_bmr",
+      "scope": "Prospective hierarchical model information gain with post-observation BMR model comparison; evaluate only after predictive-outcome and posterior adapters are implemented"
     }
   ],
   "seeds": {
@@ -483,7 +527,12 @@
       "cross_permutation_repair_success",
       "state_information_gain_nats",
       "parameter_information_gain_nats",
-      "model_structure_information_gain_nats"
+      "model_structure_information_gain_nats",
+      "rule_identification_accuracy",
+      "trials_to_model_selection",
+      "model_choice_brier_score",
+      "realized_model_entropy_reduction_nats",
+      "bmr_log_evidence_ratio_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -551,7 +600,9 @@
     "Bayesian Model Reduction or another model-selection procedure must be qualified against held-out model evidence and cannot commit a structural change from a probe ranking alone.",
     "Hierarchical epistemic terms are derived from one declared joint posterior and action-conditioned outcome model; their sum must agree with the joint mutual-information chain rule within numerical tolerance.",
     "Bayesian Model Reduction is applied only to prior-only reductions that share one parameterization; the posterior/full-prior pair and exact-vs-variational posterior status are recorded, and non-integrable ratios are rejected.",
-    "The CfC symmetry fixture must execute the function-preserving hidden-unit permutation through WeightProgram and the candidate-only SWI adapter, verify distinct native fingerprints with held-out functional equivalence, and verify that an incomplete permutation changes outputs."
+    "The CfC symmetry fixture must execute the function-preserving hidden-unit permutation through WeightProgram and the candidate-only SWI adapter, verify distinct native fingerprints with held-out functional equivalence, and verify that an incomplete permutation changes outputs.",
+    "The three-ball task is labelled an exact reproduction only when the paper/supplement state space, rule set, preference distribution, observation likelihoods, action constraints, and stopping rule are transcribed and independently verified; otherwise it must be named a task adaptation.",
+    "BMR log evidence is used only for post-observation model comparison; it is not added directly to prospective expected information gain or pragmatic value."
   ],
   "research_references": [
     {
