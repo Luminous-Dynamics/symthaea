@@ -171,8 +171,8 @@ def evaluate_case(case: dict[str, Any], frame: dict[str, Any]) -> dict[str, Any]
     frame_stats = validate_frame(frame)
     require(case['frame_id'] == frame['frame_id'], 'case references an unknown residual candidate frame')
     coverage_receipt = sha256_text(
-        f"coverage-v1\\n{case['frame_id']}\\n{case['frame_coverage_status']}\\n"
-        f"{frame['candidate_frame_sha256']}\\n{frame['source_frame_receipt_sha256']}\\n"
+        f"coverage-v1\n{case['frame_id']}\n{case['frame_coverage_status']}\n"
+        f"{frame['candidate_frame_sha256']}\n{frame['source_frame_receipt_sha256']}\n"
     )
     require(case['frame_coverage_receipt_sha256'] == coverage_receipt, 'frame-coverage receipt does not bind the declared coverage status and source frame')
     global_snapshot = global_stop(case)
