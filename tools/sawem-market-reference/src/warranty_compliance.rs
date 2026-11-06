@@ -156,7 +156,7 @@ fn metric_status(
         WarrantyMetricStatus::NotSpecified
     } else if violations > 0 {
         WarrantyMetricStatus::ExceededSuppliedLimit
-    } else if missing > 0 {
+    } else if checked == 0 || missing > 0 {
         WarrantyMetricStatus::Indeterminate
     } else {
         WarrantyMetricStatus::WithinSuppliedLimit
