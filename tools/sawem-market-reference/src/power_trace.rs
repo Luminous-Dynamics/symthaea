@@ -197,14 +197,12 @@ pub fn integrate_power_trace<'a>(
     let time_coverage_bps = u64::try_from(coverage_numerator / u128::from(horizon_duration))
         .map_err(|_| PowerTraceError::ArithmeticOverflow)?;
 
-    let first_at_start = inputs.samples[0].timestamp_utc_seconds
-        == inputs.horizon_start_utc_seconds;
+    let first_at_start =
+        inputs.samples[0].timestamp_utc_seconds == inputs.horizon_start_utc_seconds;
     let last_at_end = inputs.samples[inputs.samples.len() - 1].timestamp_utc_seconds
         == inputs.horizon_end_utc_seconds;
-    let trace_complete = first_at_start
-        && last_at_end
-        && gap_interval_count == 0
-        && uncovered_seconds == 0;
+    let trace_complete =
+        first_at_start && last_at_end && gap_interval_count == 0 && uncovered_seconds == 0;
 
     Ok(PowerTraceAssessment {
         series_id: inputs.series_id,
@@ -318,28 +316,19 @@ mod tests {
 
     #[test]
     fn duplicate_ids_timestamps_and_out_of_order_samples_are_rejected() {
-        let duplicate_id = [
-            sample("same", 0, 1_000_000),
-            sample("same", 1, 1_000_000),
-        ];
+        let duplicate_id = [sample("same", 0, 1_000_000), sample("same", 1, 1_000_000)];
         assert_eq!(
             integrate_power_trace(inputs(&duplicate_id)),
             Err(PowerTraceError::DuplicateSampleId)
         );
 
-        let duplicate_time = [
-            sample("a", 0, 1_000_000),
-            sample("b", 0, 1_000_000),
-        ];
+        let duplicate_time = [sample("a", 0, 1_000_000), sample("b", 0, 1_000_000)];
         assert_eq!(
             integrate_power_trace(inputs(&duplicate_time)),
             Err(PowerTraceError::DuplicateTimestamp)
         );
 
-        let out_of_order = [
-            sample("a", 1, 1_000_000),
-            sample("b", 0, 1_000_000),
-        ];
+        let out_of_order = [sample("a", 1, 1_000_000), sample("b", 0, 1_000_000)];
         assert_eq!(
             integrate_power_trace(inputs(&out_of_order)),
             Err(PowerTraceError::SamplesOutOfOrder)
