@@ -1225,9 +1225,10 @@ mod tests {
         assert_eq!(from_bytes.evidence_id, from_value.evidence_id);
         assert_eq!(from_bytes.semantic_sha256, from_value.semantic_sha256);
         assert_eq!(from_bytes.value, from_value.value);
-        assert_eq!(from_bytes.raw_file_sha256.as_deref(), Some(sha256_hex(raw).as_str()));
+        assert_eq!(
+            from_bytes.raw_file_sha256.as_deref(),
+            Some(sha256_hex(raw).as_str())
+        );
         assert!(from_value.raw_file_sha256.is_none());
     }
-
-
 }
