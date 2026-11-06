@@ -109,7 +109,28 @@ Both intervals are clipped to the same [0,1] support and use the same directiona
 
 Interpretation: the prototype is wider during early looks, then materially narrower in these Bernoulli examples. At n=4,096 the simulated width reduction is about 38% at mean 0.5 and about 55–59% near the tails. These figures compare to SPECTRA's alpha-spending Hoeffding schedule, not to every modern normal-mixture or betting CS baseline. They are one bounded simulation family, not a general performance claim.
 
-## 5. Rust test declarations
+
+
+## 5.1 Numerical hardening — 2026-11-06
+
+A source review found that the cap
+\[
+\lambda_{\mathrm{cube}} = \left(\frac{g}{2s^3n}\right)^{1/3}
+\]
+was initially evaluated by forming \(2s^3n\). That intermediate product can overflow even when the cube-root cap itself is representable.
+
+The implementation now evaluates the algebraically equivalent scaled form:
+\[
+\lambda_{\mathrm{cube}} =
+\frac{(g/2)^{1/3}}{s\,n^{1/3}},
+\]
+which avoids constructing \(s^3n\). The constructor also rejects nonzero support widths whose half-range proxy underflows to zero, and proxy ranges whose square/cube or maximum admissible bet are not representable.
+
+A synthetic numeric stress-state regression declaration sets \(n=u64::mathrm{MAX}\) with finite \(s^3\) but overflowing \(s^3n\), and checks that the scaled expression still yields a finite interval. A separate Python numeric mirror confirmed the direct product overflows while the scaled expression remains finite and positive. This is numerical smoke evidence only; the Rust regression has not run.
+
+The formula remains conditional on a mathematically valid fixed-conditional-mean, known-proxy model. This hardening improves floating-point behavior; it does not widen the theorem's assumptions or provide production integration.
+
+## 6. Rust test declarations
 
 The experimental module includes tests for:
 - exact formula parity against a separately calculated two-pass equation (3.9) vector;
@@ -124,7 +145,7 @@ The experimental module includes tests for:
 
 The tests have not been executed: this environment has no cargo, rustc, or rustfmt. No compile, test, formatting, clippy, CI, inferential coverage, or wall-time pass is claimed.
 
-## 6. Locked next validation
+## 7. Locked next validation
 
 Compare the new sequence against:
 1. SPECTRA's current anytime Hoeffding alpha-spending bound;
@@ -152,7 +173,7 @@ Metrics:
 
 Run at least 10,000 independent outer campaigns per primary regime. Preserve exact alpha allocations, root seeds, input streams, method IDs, and replay receipts.
 
-## 7. Promotion gates
+## 8. Promotion gates
 
 Keep Hoeffding as the default until the new method:
 - passes independent Rust reference-vector and property tests;
