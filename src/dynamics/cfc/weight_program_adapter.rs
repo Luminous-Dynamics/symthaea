@@ -20,7 +20,7 @@ use super::network::{
     CfCNetwork, CfCNetworkConfig, CfCParameterGroupId, CfCParameterGroupReplacement,
     CfCParameterManifest, CfCWeightLoadError,
 };
-use super::types::MIN_TAU;
+use super::types::{CfCConfig, MIN_TAU};
 
 /// Candidate CfC network produced without changing the source network.
 #[derive(Debug, Clone)]
@@ -252,6 +252,137 @@ mod tests {
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn permute_rows(values: &[f32], rows: usize, cols: usize, permutation: &[usize]) -> Vec<f32> {
+        let mut result = vec![0.0; values.len()];
+        for new_row in 0..rows {
+            let old_row = permutation[new_row];
+            for col in 0..cols {
+                result[new_row * cols + col] = values[old_row * cols + col];
+            }
+        }
+        result
+    }
+
+    fn permute_square(values: &[f32], dimension: usize, permutation: &[usize]) -> Vec<f32> {
+        let mut result = vec![0.0; values.len()];
+        for new_row in 0..dimension {
+            for new_col in 0..dimension {
+                result[new_row * dimension + new_col] =
+                    values[permutation[new_row] * dimension + permutation[new_col]];
+            }
+        }
+        result
+    }
+
+    fn permute_columns(
+        values: &[f32],
+        rows: usize,
+        cols: usize,
+        permutation: &[usize],
+    ) -> Vec<f32> {
+        let mut result = vec![0.0; values.len()];
+        for row in 0..rows {
+            for new_col in 0..cols {
+                result[row * cols + new_col] = values[row * cols + permutation[new_col]];
+            }
+        }
+        result
+    }
+
+    #[test]
+    fn consistent_hidden_unit_permutation_preserves_cfc_function() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 4,
+            num_layers: 1,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 4,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let original = CfCNetwork::new(config);
+        let snapshot =
+            cfc_weight_model_snapshot(&original, digest('d')).expect("snapshot");
+        let permutation = [2usize, 0, 3, 1];
+        let get = |id: CfCWeightGroupId| {
+            snapshot
+                .groups
+                .iter()
+                .find(|group| group.target == WeightProgramTarget::CfC(id.clone()))
+                .expect("parameter group")
+                .values
+                .clone()
+        };
+
+        let input = get(CfCWeightGroupId::CellInputProjection { cell: 0 });
+        let recurrent = get(CfCWeightGroupId::CellRecurrentProjection { cell: 0 });
+        let bias = get(CfCWeightGroupId::CellHiddenBias { cell: 0 });
+        let tau = get(CfCWeightGroupId::CellTimeConstant { cell: 0 });
+        let output = get(CfCWeightGroupId::OutputProjection);
+        let replacements = vec![
+            CfCParameterGroupReplacement {
+                id: native_group_id(&CfCWeightGroupId::CellInputProjection { cell: 0 }),
+                values: permute_rows(&input, 4, 2, &permutation),
+            },
+            CfCParameterGroupReplacement {
+                id: native_group_id(&CfCWeightGroupId::CellRecurrentProjection { cell: 0 }),
+                values: permute_square(&recurrent, 4, &permutation),
+            },
+            CfCParameterGroupReplacement {
+                id: native_group_id(&CfCWeightGroupId::CellHiddenBias { cell: 0 }),
+                values: permutation.iter().map(|index| bias[*index]).collect(),
+            },
+            CfCParameterGroupReplacement {
+                id: native_group_id(&CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+                values: permutation.iter().map(|index| tau[*index]).collect(),
+            },
+            CfCParameterGroupReplacement {
+                id: native_group_id(&CfCWeightGroupId::OutputProjection),
+                values: permute_columns(&output, 2, 4, &permutation),
+            },
+        ];
+        let mut permuted = original.clone();
+        permuted
+            .try_apply_parameter_group_replacements(&snapshot.model_digest, &replacements)
+            .expect("function-preserving permutation");
+
+        assert_ne!(
+            original.fingerprint().expect("original digest").model_digest,
+            permuted.fingerprint().expect("permuted digest").model_digest,
+            "the parameter fingerprint must distinguish equivalent parameterizations"
+        );
+
+        let inputs = [
+            ndarray::Array1::from_vec(vec![0.25, -0.75]),
+            ndarray::Array1::from_vec(vec![-0.4, 0.6]),
+            ndarray::Array1::from_vec(vec![0.9, 0.1]),
+            ndarray::Array1::from_vec(vec![-0.2, -0.8]),
+        ];
+        let mut original_eval = original.clone();
+        let mut permuted_eval = permuted.clone();
+        let mut squared_error = 0.0_f64;
+        for input in &inputs {
+            let expected = original_eval.forward(input, 0.1);
+            let actual = permuted_eval.forward(input, 0.1);
+            for (a, b) in expected.iter().zip(actual.iter()) {
+                squared_error += f64::from((*a - *b).powi(2));
+            }
+        }
+        assert!(
+            squared_error.sqrt() < 1e-5,
+            "permutation-only parameter change must preserve outputs, error={}",
+            squared_error.sqrt()
+        );
     }
 
     #[test]
