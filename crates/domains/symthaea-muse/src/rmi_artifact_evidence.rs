@@ -205,7 +205,7 @@ impl RmiTrialArtifactManifestV1 {
 #[derive(Clone, Copy, Debug)]
 pub struct RmiArtifactPayloadV1<'a> {
     /// Content identity used by the manifest.
-    pub artifact_id: &'a str,
+    pub artifact_id: String,
     /// Exact bytes read from the authoritative artifact store.
     pub bytes: &'a [u8],
 }
@@ -240,7 +240,7 @@ pub fn verify_rmi_artifact_bytes<'a>(
 
     let mut supplied = BTreeMap::new();
     for payload in payloads {
-        if supplied.insert(payload.artifact_id, payload.bytes).is_some() {
+        if supplied.insert(payload.artifact_id.as_str(), payload.bytes).is_some() {
             return Err(RmiArtifactEvidenceError::DuplicatePayload);
         }
     }
@@ -685,15 +685,11 @@ mod tests {
     fn payloads() -> Vec<RmiArtifactPayloadV1<'static>> {
         vec![
             RmiArtifactPayloadV1 {
-                artifact_id: Box::leak(
-                    format!("sha256:{}", sha256_hex(b"partner-midi")).into_boxed_str(),
-                ),
+                artifact_id: format!("sha256:{}", sha256_hex(b"partner-midi")),
                 bytes: b"partner-midi",
             },
             RmiArtifactPayloadV1 {
-                artifact_id: Box::leak(
-                    format!("sha256:{}", sha256_hex(b"agent-midi")).into_boxed_str(),
-                ),
+                artifact_id: format!("sha256:{}", sha256_hex(b"agent-midi")),
                 bytes: b"agent-midi",
             },
         ]
@@ -789,7 +785,7 @@ mod tests {
         let mut inputs = payloads();
         inputs[0] = RmiArtifactPayloadV1 {
             artifact_id: inputs[0].artifact_id,
-            bytes: b"changed-midi",
+            bytes: b"changed-midi-longer",
         };
         assert_eq!(
             verify_rmi_artifact_bytes(&manifest, &inputs),
@@ -823,7 +819,7 @@ mod tests {
     fn unreferenced_payload_is_rejected() {
         let mut inputs = payloads();
         inputs.push(RmiArtifactPayloadV1 {
-            artifact_id: "sha256:extra",
+            artifact_id: "sha256:extra".to_owned(),
             bytes: b"extra",
         });
         assert_eq!(
