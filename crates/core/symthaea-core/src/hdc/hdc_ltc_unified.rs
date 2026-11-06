@@ -3034,7 +3034,7 @@ mod tests {
             analytic.is_finite() && numerical.is_finite(),
             "{name}: non-finite gradient, analytic={analytic}, numerical={numerical}"
         );
-        let scale = analytic.abs().max(numerical.abs()).max(1e-3);
+        let scale = analytic.abs().max(numerical.abs()).max(1e-4);
         let relative_error = (analytic - numerical).abs() / scale;
         assert!(
             relative_error < 1e-2,
@@ -3059,10 +3059,20 @@ mod tests {
                 ..UnifiedConfig::default()
             };
             let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
-            neuron.set_state(ContinuousHV::random(DIM, 12).scale(0.15));
+            // Give the two global scalar gates nontrivial, well-conditioned
+            // cosine signals so their vector gradients are meaningfully tested.
+            let initial_state = neuron
+                .gate_weight_ref()
+                .scale(0.2)
+                .add(&ContinuousHV::random(DIM, 12).scale(0.05));
+            let input = neuron
+                .tau_modulator_ref()
+                .scale(0.3)
+                .add(&ContinuousHV::random(DIM, 13).scale(0.1));
+            neuron.set_state(initial_state);
             neuron.set_evolution_clock(0.37, 0);
 
-            let input = ContinuousHV::random(DIM, 13).scale(0.3);
+
             let target = ContinuousHV::random(DIM, 14).scale(0.1);
             let gradients = neuron.backward(&input, &target, DT);
 
