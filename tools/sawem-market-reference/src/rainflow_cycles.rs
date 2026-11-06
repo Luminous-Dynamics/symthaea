@@ -339,6 +339,7 @@ pub fn count_soc_rainflow_cycles(
     let mut gap_count = 0_u64;
     let mut uncovered_seconds = 0_u64;
     let mut segment_count = 0_u64;
+    let mut reversal_count = 0_u64;
     let mut segment_start = 0_usize;
 
     for index in 1..inputs.samples.len() {
@@ -355,6 +356,12 @@ pub fn count_soc_rainflow_cycles(
                 .checked_add(gap_u64 - inputs.maximum_sample_gap_seconds)
                 .ok_or(RainflowError::ArithmeticOverflow)?;
             let reversals = extract_reversals(inputs.samples, segment_start, index);
+            reversal_count = reversal_count
+                .checked_add(
+                    u64::try_from(reversals.len())
+                        .map_err(|_| RainflowError::ArithmeticOverflow)?,
+                )
+                .ok_or(RainflowError::ArithmeticOverflow)?;
             count_reversal_segment(
                 &reversals,
                 &mut cycles,
@@ -375,6 +382,11 @@ pub fn count_soc_rainflow_cycles(
         segment_start,
         inputs.samples.len(),
     );
+    reversal_count = reversal_count
+        .checked_add(
+            u64::try_from(reversals.len()).map_err(|_| RainflowError::ArithmeticOverflow)?,
+        )
+        .ok_or(RainflowError::ArithmeticOverflow)?;
     count_reversal_segment(
         &reversals,
         &mut cycles,
@@ -397,7 +409,7 @@ pub fn count_soc_rainflow_cycles(
         method: RainflowMethod::AstmE1049ThreePointV1,
         sample_count: u64::try_from(inputs.samples.len())
             .map_err(|_| RainflowError::ArithmeticOverflow)?,
-        reversal_count: 0,
+        reversal_count,
         segment_count,
         gap_count,
         uncovered_seconds,
@@ -519,7 +531,7 @@ mod tests {
             sample("e", 4, 8_000),
         ];
         let result = count_soc_rainflow_cycles(inputs(&samples)).unwrap();
-        assert_eq!(result.reversal_count, 0);
+        assert_eq!(result.reversal_count, 2);
         assert_eq!(result.cycles.len(), 1);
         assert_eq!(result.cycles[0].range_bps, 6_000);
         assert_eq!(result.cycles[0].kind, RainflowCycleKind::Half);
@@ -541,7 +553,7 @@ mod tests {
         assert_eq!(result.gap_count, 1);
         assert_eq!(result.uncovered_seconds, 6);
         assert_eq!(result.segment_count, 2);
-        assert_eq!(result.cycles.len(), 2);
+        assert_eq!(result.cycles.len(), 3);
         assert!(result
             .cycles
             .iter()
@@ -550,11 +562,6 @@ mod tests {
 
     #[test]
     fn future_known_duplicate_and_bad_source_evidence_fail_closed() {
-        let future = [SocTelemetrySample {
-            available_at_utc: 10_001,
-            ..sample("future", 0, 5_000)
-        }];
-        let horizon = [sample("end", 1, 5_000)];
         let future = [
             SocTelemetrySample {
                 available_at_utc: 10_001,
@@ -610,11 +617,9 @@ mod tests {
             sample("first", 0, 2_000),
             sample("second", 1, 8_000),
         ];
+        let reversed = [out_of_order[1], out_of_order[0]];
         let invalid = RainflowInputs {
-            samples: &[
-                out_of_order[1],
-                out_of_order[0],
-            ],
+            samples: &reversed,
             ..inputs(&out_of_order)
         };
         assert_eq!(
