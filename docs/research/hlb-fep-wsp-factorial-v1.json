@@ -246,7 +246,7 @@
     },
     {
       "id": "permutation_equivalence_and_repair_transfer",
-      "environment": "Seeded small CfC networks with function-preserving hidden-unit permutations, paired truly faulty variants, exact functional probes, and held-out permutations; preserve the source checkpoint and withhold fault labels from the proposer",
+      "environment": "Seeded small CfC networks with function-preserving hidden-unit permutations, paired genuinely faulty variants, exact functional probes, and held-out permutations; the equivalence-preserving transform must be executed through the typed WeightProgram and candidate-only SWI adapter, while fault labels are withheld from the proposer",
       "primary_outcomes": [
         "function_equivalence_error",
         "equivalent_healthy_false_edit_rate",
@@ -259,13 +259,15 @@
         "repair_transfer_rate",
         "weight_distance_vs_function_distance",
         "candidate_parameter_count",
-        "candidate_evaluation_cost"
+        "candidate_evaluation_cost",
+        "candidate_only_wsp_materialization"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
         "deliberately_inconsistent_permutation_that_changes_function",
         "healthy_unpermuted_network",
-        "faulty_network_with_held_out_permutation"
+        "faulty_network_with_held_out_permutation",
+        "incomplete_hidden_unit_permutation_that_changes_function"
       ]
     }
   ],
@@ -548,7 +550,8 @@
     "Any aggregation of epistemic terms declares its factorization and is checked against a joint mutual-information chain-rule calculation; arbitrary entropy deltas cannot be added.",
     "Bayesian Model Reduction or another model-selection procedure must be qualified against held-out model evidence and cannot commit a structural change from a probe ranking alone.",
     "Hierarchical epistemic terms are derived from one declared joint posterior and action-conditioned outcome model; their sum must agree with the joint mutual-information chain rule within numerical tolerance.",
-    "Bayesian Model Reduction is applied only to prior-only reductions that share one parameterization; the posterior/full-prior pair and exact-vs-variational posterior status are recorded, and non-integrable ratios are rejected."
+    "Bayesian Model Reduction is applied only to prior-only reductions that share one parameterization; the posterior/full-prior pair and exact-vs-variational posterior status are recorded, and non-integrable ratios are rejected.",
+    "The CfC symmetry fixture must execute the function-preserving hidden-unit permutation through WeightProgram and the candidate-only SWI adapter, verify distinct native fingerprints with held-out functional equivalence, and verify that an incomplete permutation changes outputs."
   ],
   "research_references": [
     {
