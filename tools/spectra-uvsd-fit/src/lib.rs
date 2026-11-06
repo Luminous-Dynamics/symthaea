@@ -1760,5 +1760,8 @@ pub mod ranking;
 /// Time-uniform score bounds and adaptive robust simulation allocation.
 pub mod allocation;
 
+/// Conjunctive multi-objective threshold feasibility and no-good classification.
+pub mod multi_threshold;
+
 /// Robust threshold-feasibility classification over action utility intervals.
 pub mod threshold;
