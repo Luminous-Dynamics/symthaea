@@ -396,7 +396,7 @@ pub struct CfCHiddenUnitAlignment {
     /// equally well. Positive infinity means there is no alternative complete
     /// assignment. Consumers should abstain from alignment when this margin is
     /// below a task-calibrated threshold.
-    pub minimum_assignment_margin: f64,
+    pub minimum_assignment_margin: Option<f64>,
 }
 
 /// Fail-closed errors for functional hidden-unit correspondence.
@@ -595,10 +595,10 @@ pub fn align_cfc_hidden_unit_signatures(
 fn alternating_cycle_assignment_margin(
     costs: &[Vec<f64>],
     assignment: &[usize],
-) -> f64 {
+) -> Option<f64> {
     let n = assignment.len();
     if n <= 1 {
-        return f64::INFINITY;
+        return None;
     }
 
     let mut distance = vec![vec![f64::INFINITY; n]; n];
@@ -647,7 +647,7 @@ fn alternating_cycle_assignment_margin(
             }
         }
     }
-    margin
+    margin.is_finite().then_some(margin)
 }
 
 fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Option<(Vec<usize>, f64)> {
@@ -801,7 +801,7 @@ mod tests {
         assert_eq!(alignment.candidate_model_digest, digest('b'));
         assert_eq!(alignment.probe_digest, digest('p'));
         assert!(alignment.mean_squared_activation_error < 1e-15);
-        assert!(alignment.minimum_assignment_margin > 0.0);
+        assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
     }
 
     #[test]
@@ -814,7 +814,7 @@ mod tests {
             align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
         assert!(alignment.mean_squared_activation_error < 1e-15);
-        assert!(alignment.minimum_assignment_margin < 1e-15);
+        assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin < 1e-15));
     }
 
     #[test]
@@ -1079,7 +1079,7 @@ mod tests {
         assert_eq!(alignment.probe_digest, source_signatures.probe_digest);
         assert_eq!(alignment.layer_index, 0);
         assert!(alignment.mean_squared_activation_error < 1e-10);
-        assert!(alignment.minimum_assignment_margin > 0.0);
+        assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
 
         let mut original_eval = original.clone();
         let mut permuted_eval = permuted.clone();
