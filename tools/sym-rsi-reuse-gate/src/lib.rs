@@ -91,13 +91,13 @@ mod adaptive_null_simulation {
         let mut last_decision = 0usize;
         let mut any_false_promotion = false;
 
-        for round_index in 0..ROUNDS {
+        for (round_index, round_pool) in pool.iter().enumerate() {
             let round = round_index + 1;
             let candidate_index = adaptive_candidate_index(round, prior_promotions, last_decision);
             let second_index = (candidate_index + 1) % POOL_WIDTH;
             let candidates = [
-                ReuseCandidateEvidence::new(pool[round_index][candidate_index].clone()).unwrap(),
-                ReuseCandidateEvidence::new(pool[round_index][second_index].clone()).unwrap(),
+                ReuseCandidateEvidence::new(round_pool[candidate_index].clone()).unwrap(),
+                ReuseCandidateEvidence::new(round_pool[second_index].clone()).unwrap(),
             ];
 
             // The proposer chooses a pair from a pre-generated pool using
@@ -134,12 +134,12 @@ mod adaptive_null_simulation {
         let mut last_decision = 0usize;
         let mut any_false_promotion = false;
 
-        for round_index in 0..ROUNDS {
+        for (round_index, round_pool) in pool.iter().enumerate() {
             let round = round_index + 1;
             let candidate_index = adaptive_candidate_index(round, prior_promotions, last_decision);
             let second_index = (candidate_index + 1) % POOL_WIDTH;
             let bounded = [candidate_index, second_index].map(|index| {
-                pool[round_index][index]
+                round_pool[index]
                     .iter()
                     .map(|&value| value as f64)
                     .collect::<Vec<_>>()
