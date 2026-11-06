@@ -510,12 +510,10 @@ fn provider_fields(
 }
 
 fn canonical_json_equal(left: &Value, right: &Value) -> Result<bool, ClaimError> {
-    let left_bytes = canonical_jcs_bytes(left).map_err(|error| {
-        ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string())
-    })?;
-    let right_bytes = canonical_jcs_bytes(right).map_err(|error| {
-        ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string())
-    })?;
+    let left_bytes = canonical_jcs_bytes(left)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
+    let right_bytes = canonical_jcs_bytes(right)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
     Ok(left_bytes == right_bytes)
 }
 
