@@ -43,7 +43,7 @@ The registry first validates both run manifests, then marks a pair **directly co
 
 Otherwise the result is **descriptive only**, with explicit mismatch reasons. Different benchmarks, different tracks, different scorers, different budgets, different prompts, or different preprocessing do not become comparable because their headline metric names look similar. In particular, never pool TAG-Bench mIoU, MusTBench Hit@3s, Arena Elo and a bespoke Melothaea score.
 
-## Current external benchmark map (checked November 4, 2026)
+## Current external benchmark map (checked November 6, 2026)
 
 ### Temporal grounding and temporal reasoning
 
