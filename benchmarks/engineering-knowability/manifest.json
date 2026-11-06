@@ -375,5 +375,112 @@
       "source_uri": "https://www.bipm.org/en/web/guest/publications/guides",
       "status_note": "Listed in BIPM JCGM guides catalogue at retrieval 2026-11-06"
     }
+  ],
+  "external_benchmark_context": [
+    {
+      "id": "ple-2026-11-06",
+      "name": "Physical-Engineering's Last Exam",
+      "source_url": "https://ple-bench.com/leaderboard?set=all",
+      "captured_at": "2026-11-06",
+      "task_count": 85,
+      "scope": "all_85_tasks",
+      "run_protocol": "Three runs per model+harness pair; six-hour per-task limit; highest available reasoning effort; official Claude Opus 5.5 rubric judge.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Claude Code",
+          "score": 0.506,
+          "cost_per_task_usd": 17.18,
+          "median_duration_minutes": 63
+        },
+        {
+          "model": "GPT-6 Astra",
+          "harness": "Codex",
+          "score": 0.483,
+          "cost_per_task_usd": 9.15,
+          "median_duration_minutes": 25
+        }
+      ],
+      "comparability_boundary": "This all-85 run is distinct from the 29-task public development board, 56-task hidden board and competition artifact submission. Scores are complete model+harness systems and include LLM-graded rubric tasks."
+    },
+    {
+      "id": "ple-dev-2026-11-06",
+      "name": "Physical-Engineering's Last Exam — public development",
+      "source_url": "https://ple-bench.com/leaderboard?set=dev",
+      "captured_at": "2026-11-06",
+      "task_count": 29,
+      "scope": "public_development_29_tasks",
+      "run_protocol": "Three runs per model+harness pair; six-hour per-task limit; official development rubric.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Claude Code",
+          "score": 0.551,
+          "cost_per_task_usd": 17.3,
+          "median_duration_minutes": 63
+        },
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Codex",
+          "score": 0.549,
+          "cost_per_task_usd": 30.38,
+          "median_duration_minutes": 110
+        },
+        {
+          "model": "GPT-6 Astra",
+          "harness": "Codex",
+          "score": 0.53,
+          "cost_per_task_usd": 8.42,
+          "median_duration_minutes": 24
+        }
+      ],
+      "comparability_boundary": "Only compare against this same 29-task split and protocol. Not comparable to PLE 56-task hidden, all-85 or committed-artifact entry scores. Harness effects are material; preserve the exact model+harness pair."
+    },
+    {
+      "id": "parametric-cad-bench-v3-2026-11-06",
+      "name": "Parametric CAD Bench V3",
+      "source_url": "https://cadbench.ai/leaderboard",
+      "captured_at": "2026-11-06",
+      "task_count": 100,
+      "scope": "public_v3_100_task_cohort",
+      "run_protocol": "Harbor 0.23.0; FreeCAD 1.1.0; one attempt per task; four-way concurrency; zero retries; separate programmatic validator.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "Claude Code",
+          "score": 0.6103,
+          "displayed_uncertainty_95": 0.0753,
+          "cost_per_task_usd": 5.7394,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "One complete public cohort with a continuous geometry/specification reward. The displayed CI is task-score uncertainty; this is not a manufacturability, metrology, requalification or physical-safety benchmark. Total run cost is USD 573.94/100 = USD 5.7394 per task."
+    },
+    {
+      "id": "benchcad-2.0-core-2026-10-12",
+      "name": "BenchCAD 2.0 Core",
+      "source_url": "https://benchcad.com/blog/benchcad-2",
+      "captured_at": "2026-11-06",
+      "task_count": 100,
+      "scope": "v2.0_core_held_out",
+      "run_protocol": "30 rounds per case; reasoning not carried between rounds; per-task sandbox; automatic geometry/topology/assembly-placement/ECAD-connectivity scoring.",
+      "entries": [
+        {
+          "model": "GPT-6 Astra",
+          "harness": "BenchCAD v2.0 harness",
+          "score": 0.59,
+          "cost_per_task_usd": 11,
+          "median_duration_minutes": 62
+        },
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "BenchCAD v2.0 harness",
+          "score": 0.57,
+          "cost_per_task_usd": 28,
+          "median_duration_minutes": 222
+        }
+      ],
+      "comparability_boundary": "Do not compare v2.0 with v2.1. The score covers CAD geometry/topology, assembly placement and board connectivity, not manufacturing readiness, uncertainty, inspection access, lifecycle requalification or physical performance."
+    }
   ]
 }
