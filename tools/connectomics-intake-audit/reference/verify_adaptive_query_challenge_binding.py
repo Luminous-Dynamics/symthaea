@@ -22,7 +22,7 @@ def sha256(data: bytes) -> str:
 
 
 def git_blob_sha1(data: bytes) -> str:
-    header = f"blob {len(data)}\\0".encode("ascii")
+    header = f"blob {len(data)}\0".encode("ascii")
     return hashlib.sha1(header + data).hexdigest()
 
 
@@ -226,7 +226,7 @@ def main() -> int:
             input_bytes, report_bytes, input_data, report, binding,
             rust_source_bytes, oracle_bytes, args.upstream_commit_sha, oracle_module
         )
-        rendered = json.dumps(receipt, indent=2, sort_keys=True) + '\\n'
+        rendered = json.dumps(receipt, indent=2, sort_keys=True) + '\n'
         args.receipt.write_text(rendered, encoding='utf-8')
         print(
             'independent challenge replay: PASS; '
