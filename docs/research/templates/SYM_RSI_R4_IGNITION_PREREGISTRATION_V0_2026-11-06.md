@@ -90,3 +90,17 @@ cargo run --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- docs/r
 
 The current repository artifact is still `TEMPLATE_NOT_PREREGISTERED`; the checker must reject it as not ready. A passing check on a future completed document means only that its declared structure and semantic invariants are internally consistent. The checker does not authenticate referenced hashes/signatures, inspect split contents, prove custody or independence, execute a model, validate scientific truth, or authorize a run/promotion. The custodian's disjointness evidence and existing independent evaluator/receipt authorities remain authoritative.
 
+## Research-state continuity qualification
+
+This preregistration now treats persistence of research state as a measurable treatment, not merely a memory digest. Bind the exact state snapshot and record schema; retain accepted findings with evidence, rejected hypotheses, null/negative results, counterexamples/failures, candidate lineage, evaluator epochs/task contracts, inclusive costs/retries, and open questions.
+
+The comparison must include:
+- full verified state;
+- no state;
+- untyped history;
+- shuffled verified state;
+- accepted findings only.
+
+Measure provenance-complete record recovery, false-currentness rate, evidence revalidation precision/recall, duplicated-experiment rate and fresh-family confirmed yield. Require a cold-restart restoration test, successor-version migration test and independent recovery audit. Historical results retain their original as-of context; a migrated record must not silently inherit current validity when its source, scope, task, evaluator or policy changes.
+
+Compose existing claim-currentness/evidence-continuity semantics from #10630. This protocol does not create a second evidence ledger or memory service.
