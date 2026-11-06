@@ -165,6 +165,10 @@ def validate(data: dict[str, Any]) -> dict[str, Any]:
     require(rare is not None and rare['false_safe_global_stop_checkpoint_ids'] == ['A1'], 'rare-path counterexample must expose exactly one global-only false safe stop at A1')
     require(rare['earliest_query_safe_checkpoint']['checkpoint_id'] == 'A2', 'query-conditioned rare-path stop must wait until A2')
     require(early is not None and early['earliest_query_safe_checkpoint']['checkpoint_id'] == 'B0', 'query-specific policy must be able to stop at B0 before global convergence')
+    early_track = next(track for track in data['tracks'] if track['track_id'] == 'query-specific-early-stop-and-late-invalidation')
+    b0 = early_track['snapshots'][0]['query_evaluation']
+    require(b0['unresolved_graph_world_count'] == 1 and b0['unresolved_query_decision_world_count'] == 0, 'query-invariant graph ambiguity known answer is missing')
+    require(b0['safe_to_stop_for_query'] is True, 'graph identity ambiguity with a known common query decision should not block query-safe stopping')
     require(early['certificate_invalidation_event_count'] == 1, 'late query-changing alternative invalidation control is missing')
     require(early['false_safe_global_stop_checkpoint_ids'] == ['B3'], 'late query-changing alternative must expose the stale global-only stop at B3')
 
@@ -182,7 +186,7 @@ def validate(data: dict[str, Any]) -> dict[str, Any]:
 
 def self_test(data: dict[str, Any]) -> None:
     expected = validate(copy.deepcopy(data))
-    require(expected['false_safe_global_stop_count'] == 1, 'known-answer global-only false stop count changed')
+    require(expected['false_safe_global_stop_count'] == 2, 'known-answer global-only false stop count changed')
     mutated = copy.deepcopy(data)
     rare = next(track for track in mutated['tracks'] if track['track_id'] == 'rare-path-global-false-stop')
     rare['snapshots'][1]['query_evaluation']['safe_to_stop_for_query'] = True
