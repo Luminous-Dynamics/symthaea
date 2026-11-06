@@ -33,6 +33,7 @@ pub enum ContrastError {
     EmptyBlockId,
     EmptyClusterId,
     EmptyContextDigest,
+    InvalidContextDigest,
     DuplicateBlockId,
     EvaluationContextMismatch,
     NonFiniteInput,
@@ -166,6 +167,9 @@ pub fn summarize_equal_cluster_blocks(
         if block.evaluation_context_digest.trim().is_empty() {
             return Err(ContrastError::EmptyContextDigest);
         }
+        if !is_canonical_sha256(&block.evaluation_context_digest) {
+            return Err(ContrastError::InvalidContextDigest);
+        }
         if !block_ids.insert(block.block_id.as_str()) {
             return Err(ContrastError::DuplicateBlockId);
         }
@@ -248,16 +252,24 @@ fn mean_contrasts(
     Ok(mean)
 }
 
-/// Neumaier compensated mean. Input values are expected to have been checked.
+/// Scaled Neumaier compensated mean. Input values are expected to be finite.
 fn stable_mean(values: &[f64]) -> f64 {
     if values.is_empty() {
         return f64::NAN;
     }
 
+    let scale = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0_f64, f64::max);
+    if scale == 0.0 {
+        return 0.0;
+    }
+
     let mut sum = 0.0;
     let mut correction = 0.0;
     for raw_value in values {
-        let value = *raw_value;
+        let value = *raw_value / scale;
         let next = sum + value;
         if sum.abs() >= value.abs() {
             correction += (sum - next) + value;
@@ -266,7 +278,9 @@ fn stable_mean(values: &[f64]) -> f64 {
         }
         sum = next;
     }
-    (sum + correction) / values.len() as f64
+
+    let normalized_mean = ((sum + correction) / values.len() as f64).clamp(-1.0, 1.0);
+    normalized_mean * scale
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
@@ -932,7 +946,7 @@ mod tests {
             FactorialBlock {
                 block_id: "small-1".to_owned(),
                 cluster_id: "small".to_owned(),
-                evaluation_context_digest: "context".to_owned(),
+                evaluation_context_digest: digest('c'),
                 outcomes: Factorial2x2 { y00: 0.0, y10: 1.0, y01: 0.0, y11: 1.0 },
             },
             FactorialBlock {
@@ -961,18 +975,39 @@ mod tests {
     }
 
     #[test]
+    fn equal_cluster_summary_rejects_non_digest_context() {
+        let blocks = vec![FactorialBlock {
+            block_id: "block-a".to_owned(),
+            cluster_id: "family-a".to_owned(),
+            evaluation_context_digest: "not-a-digest".to_owned(),
+            outcomes: Factorial2x2 { y00: 0.0, y10: 1.0, y01: 0.0, y11: 1.0 },
+        }];
+        assert_eq!(
+            summarize_equal_cluster_blocks(&blocks),
+            Err(ContrastError::InvalidContextDigest)
+        );
+    }
+
+    #[test]
+    fn scaled_mean_handles_same_sign_near_maximum_values() {
+        let value = stable_mean(&[f64::MAX * 0.9, f64::MAX * 0.9]);
+        assert!(value.is_finite());
+        assert!((value / f64::MAX - 0.9).abs() < 1e-15);
+    }
+
+    #[test]
     fn equal_cluster_summary_rejects_context_mismatch() {
         let blocks = vec![
             FactorialBlock {
                 block_id: "block-a".to_owned(),
                 cluster_id: "family-a".to_owned(),
-                evaluation_context_digest: "context-a".to_owned(),
+                evaluation_context_digest: digest('a'),
                 outcomes: Factorial2x2 { y00: 0.0, y10: 1.0, y01: 0.0, y11: 1.0 },
             },
             FactorialBlock {
                 block_id: "block-b".to_owned(),
                 cluster_id: "family-b".to_owned(),
-                evaluation_context_digest: "context-b".to_owned(),
+                evaluation_context_digest: digest('b'),
                 outcomes: Factorial2x2 { y00: 0.0, y10: 1.0, y01: 0.0, y11: 1.0 },
             },
         ];
