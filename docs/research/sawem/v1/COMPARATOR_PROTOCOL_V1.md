@@ -16,6 +16,7 @@ The industry already has strong, specialized tools. Published documentation desc
 - **SAM:** detailed PV-battery and generic system-battery models; front-of-meter PPA and merchant financial models; dispatch and degradation. It does not expose a dedicated standalone-battery model, though NREL documents a generic-battery configuration for that use. Source: [SAM battery storage](https://sam.nlr.gov/index.php?Itemid=360&id=94&option=com_content&view=article).
 - **PyPSA:** economic dispatch, unit commitment, storage, linear network-constrained OPF, security-constrained LOPF and rolling-horizon optimisation. Sources: [PyPSA](https://github.com/PyPSA/PyPSA), [optimisation API](https://docs.pypsa.org/latest/api/networks/optimize/).
 - **GridPath:** current documentation (v2026.14.0) describes production-cost, capacity-expansion, asset-valuation and reliability modelling; storage energy tracking; upward/downward reserve headroom and footroom; and network constraints. Its documentation also distinguishes open-source capabilities from features that may require additional access. Pin the source release, local build and feature entitlements before execution. Sources: [GridPath introduction](https://gridpath.readthedocs.io/en/stable/introduction.html), [functionality](https://gridpath.readthedocs.io/en/latest/functionality.html), [Sylvan overview](https://www.sylvan.energy/gridpath).
+- **Supagrid market replay / bidding research:** use its public NEM work as an empirical reference for rebid families, the AEMO-forecast-following baseline, hindsight ceilings and own-price impact. Its September 2026 analysis examined 9.7m battery rebids and a year of results for 45 batteries; it explicitly notes that price-impact reconstruction omitted intra-region network effects and public records did not reveal contracts/hedges. This is an external reference study, not a drop-in South African market simulator. Source: [The machines that bid our batteries](https://www.supagrid.com.au/research/machines-that-bid-our-batteries).
 
 These platforms are not interchangeable, do not necessarily use South African market rules, and may require licensed datasets or specialist configuration. A published feature list is not evidence that a specific product/version supports every detail in this protocol.
 
@@ -97,6 +98,10 @@ Metrics:
 - non-anticipativity violations: **zero** across all shared information nodes; allow divergence only after the information frontier branches;
 - runtime, memory and solver gap;
 - strategy robustness under regime shift and distribution shift.
+- **Own-price impact:** report a price-taking value series and a policy-specific market-impact-adjusted value series; attribute their difference separately from forecast regret, execution loss and balancing settlement.
+- **Price-maker model fidelity:** evaluate clearing-price and dispatch replay on sealed dates against published prices, unit targets and binding network constraints before trusting any counterfactual policy-value comparison.
+- **Matched impact-adjusted policy comparison:** hold the no-self-impact reference-price path, interval census, scenario, forecast vintage, network assumptions and exact market-impact model build fixed between candidate and comparator; compare self-impact changes separately.
+- **Impact robustness:** stratify by region, concentration/market depth, net injection size and dispatch regime; report uncertainty intervals and cases where the price-taking assumption is adequate versus materially wrong.
 
 Do not compare an implementable forecast policy against a perfect-foresight oracle and call the difference model error. Do not give a model realized future data before its decision frontier.
 
@@ -190,6 +195,31 @@ Use the following staged cohorts without mixing incompatible units, chemistries,
 The M5BAT registry release and the Applied Energy Test 1/Test 2 dataset are distinct source records. Do not claim they are the same experiment unless the publisher archive manifests demonstrate identity. Keep all raw archives outside the public source repository; retain the untouched archive and member hashes, license/attribution, source retrieval time, timestamp/offset provenance, data-column map, missing-data report and an immutable extraction manifest before fitting or evaluating any model.
 
 First gate: reproduce the paper's published Test 1 and Test 2 values within the documented rounding/tolerance. Only after reproduction may a candidate be evaluated against the stretch gates in `m5bat-field-benchmark-v1.json`. A failure to reproduce the published baseline blocks superiority claims rather than being repaired by changing the cohort or cleaning rules.
+
+## 2B. Price-taking versus price-making evaluation
+
+A battery may change the clearing price through its own charge/discharge offer, especially in shallow, concentrated or constrained regions. A price-taking model treats market prices as exogenous; a price-making model lets the candidate action affect price formation. They answer different questions and must not be collapsed into one revenue figure.
+
+Every relevant benchmark must keep four values distinct:
+1. **Forecast-following implementable policy:** a baseline with only forecast vintages available at each historical decision time.
+2. **Price-taking perfect-information bound:** a non-implementable upper bound under exogenous realized prices.
+3. **Price-impact-adjusted perfect-information bound:** a non-implementable upper bound where the same policy's net injection changes the clearing price through a frozen market-impact model.
+4. **Paired implementable policies:** candidate and comparator evaluated through the same frozen price-making engine, inputs, network, scenario census and known-at frontier.
+
+The price-impact model must be calibrated/validated separately from the policy. For each frozen test period, report:
+- reference-price path and impact-adjusted clearing-price path;
+- energy revenue at each price path, with signed charge/import and discharge/export cashflows;
+- own-price-impact adjustment and uncertainty interval;
+- price and dispatch replay error against market records;
+- network constraint, regional separation and curtailment errors;
+- candidate/comparator delta under the same simulator build;
+- sensitivity by region, injection scale, market concentration and market regime.
+
+A model may not claim better bidding from a price difference caused by a different reference-price path, market simulator version, scenario distribution, dispatch horizon, network boundary, contract/hedge assumption or evidence timestamp. The exact reference-price source records and their available-at timestamps are part of the paired input identity.
+
+The Supagrid September 2026 NEM analysis provides a useful external reference: it examined 9.7 million battery rebids and one year of results for 45 batteries, compared to an AEMO-forecast-following baseline, and reported that accounting for own-price impact changed the median hindsight-ceiling score from 69% to 77%. The study's own methodology says the price-impact reconstruction excluded within-region network effects and did not observe asset contracts/hedges. Those findings motivate the benchmark design; they are not South African calibration constants and must not be copied into SAWEM expected revenues.
+
+The reference Rust kernel market_impact_attribution.rs performs exact revenue arithmetic on externally supplied prices. It does not clear the market, infer elasticity or replace PLEXOS / an independent market simulator. MARKET-PRICE-IMPACT-001 is synthetic until a rights-cleared historical price and offer archive plus a frozen market model are available.
 
 ## 3. Paired-comparison protocol
 
