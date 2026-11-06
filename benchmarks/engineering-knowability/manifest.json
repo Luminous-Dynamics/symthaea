@@ -95,7 +95,9 @@
       "standard_refs": [
         "ISO 14253-1:2017",
         "ISO 10360-2:2009",
-        "JCGM 100:2008/Amd.1:2026"
+        "JCGM 100:2008/Amd.1:2026",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -116,7 +118,9 @@
       "seeded_fault": null,
       "standard_refs": [
         "JCGM 100:2008/Amd.1:2026",
-        "JCGM GUM-5:2026"
+        "JCGM GUM-5:2026",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -137,7 +141,8 @@
       "seeded_fault": null,
       "standard_refs": [
         "ISO 14253-1:2017",
-        "JCGM 106:2012"
+        "JCGM 106:2012",
+        "ISO 10303-242:2025 (AP242 Edition 4)"
       ]
     },
     {
@@ -159,7 +164,8 @@
       "seeded_fault": null,
       "standard_refs": [
         "ISO 10360-2:2009",
-        "ISO 14253-1:2017"
+        "ISO 14253-1:2017",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -181,7 +187,8 @@
       "seeded_fault": null,
       "standard_refs": [
         "JCGM 100:2008/Amd.1:2026",
-        "JCGM GUM-5:2026"
+        "JCGM GUM-5:2026",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -206,7 +213,9 @@
         "ISO 14253-1:2017",
         "JCGM 100:2008/Amd.1:2026",
         "JCGM GUM-5:2026",
-        "JCGM 106:2012"
+        "JCGM 106:2012",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -226,7 +235,10 @@
         "unknown when no routed board exists"
       ],
       "seeded_fault": null,
-      "standard_refs": []
+      "standard_refs": [
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
+      ]
     },
     {
       "id": "KNOW-P08",
@@ -248,7 +260,9 @@
       "seeded_fault": null,
       "standard_refs": [
         "ISO 10360-2:2009",
-        "ISO 14253-1:2017"
+        "ISO 14253-1:2017",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -267,7 +281,9 @@
       ],
       "seeded_fault": "Remove all post-closure inspection access while retaining a candidate claim that the hidden cavity was measured after closure.",
       "standard_refs": [
-        "ISO 14253-1:2017"
+        "ISO 14253-1:2017",
+        "ISO 10303-242:2025 (AP242 Edition 4)",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -287,7 +303,8 @@
       "seeded_fault": "Substitute an expired calibration reference or another instrument identity without changing the displayed measurement.",
       "standard_refs": [
         "ISO 10360-2:2009",
-        "ISO 14253-1:2017"
+        "ISO 14253-1:2017",
+        "ISO 23952:2020 (QIF)"
       ]
     },
     {
@@ -306,7 +323,9 @@
         "Unknown/needs-evidence disposition"
       ],
       "seeded_fault": "Ask for a physical board test result from a logical netlist-only fixture with no routed board, test points or instrument profile.",
-      "standard_refs": []
+      "standard_refs": [
+        "ISO 10303-242:2025 (AP242 Edition 4)"
+      ]
     },
     {
       "id": "KNOW-N04",
@@ -325,7 +344,8 @@
       "seeded_fault": "Use a high-force contact measurement on a thin/compliant feature without modelling the induced deformation.",
       "standard_refs": [
         "JCGM 100:2008/Amd.1:2026",
-        "JCGM GUM-5:2026"
+        "JCGM GUM-5:2026",
+        "ISO 23952:2020 (QIF)"
       ]
     }
   ],
@@ -374,6 +394,20 @@
       "scope_limit": "Use as guidance for uncertainty-aware conformity decisions, not as a replacement for the applicable product specification or decision rule",
       "source_uri": "https://www.bipm.org/en/web/guest/publications/guides",
       "status_note": "Listed in BIPM JCGM guides catalogue at retrieval 2026-11-06"
+    },
+    {
+      "id": "ISO 10303-242:2025 (AP242 Edition 4)",
+      "role": "Managed model-based 3D product-definition exchange, including product/assembly structures, electrical connectivity and engineering/verification information within the declared application-protocol scope",
+      "scope_limit": "A referenced subset or a parser acceptance is not full AP242 conformance. Every profile/entity/semantic association and lossy or unsupported mapping must be explicit; this benchmark does not qualify a translator.",
+      "source_uri": "https://www.iso.org/standard/84300.html",
+      "status_note": "Edition 4 published 2025-08-25; ISO catalogue status was 'to be revised' at retrieval 2026-11-06. Use exact edition/profile pins."
+    },
+    {
+      "id": "ISO 23952:2020 (QIF)",
+      "role": "Integrated model for manufacturing quality information and quality-workflow documents, including structured characteristic, inspection-plan and result information",
+      "scope_limit": "A schema-valid QIF document does not prove a result is bound to the correct design characteristic, physical article, instrument or calibration; semantic links and profile coverage must be independently checked.",
+      "source_uri": "https://www.iso.org/standard/77461.html",
+      "status_note": "Edition 1 published 2020-07-31 and reviewed/confirmed 2026-06-14; current at retrieval 2026-11-06."
     }
   ],
   "external_benchmark_context": [
