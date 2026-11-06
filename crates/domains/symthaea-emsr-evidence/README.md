@@ -31,7 +31,7 @@ The crate is an explicit workspace package under `crates/domains/*`; it is not c
 - A pending rights record may remain in the discovery catalogue, but cannot authorize binary ingestion.
 - Event and recording groups may not cross train/validation/test partitions. Receiver, campaign and location dimensions are additionally held out when declared by an experiment.
 - Pairwise source relations are `shared_failure_domain`, `unknown`, or `no_declared_common_domain`. The last means only that both declared inventories are complete and no dependency identifier overlaps. It is not proof of physical independence.
-- A run receipt binds exact code, model, configuration, dataset, split, toolchain and environment identities. Its verifier reference records who independently reconstructed the receipt and which verifier/report artifacts were used.
+- A run receipt binds exact code, model, configuration, dataset, split, toolchain and environment identities. Each case binds its exact output-artifact SHA-256. The independent verifier identity must differ from the declared executor identity, and verifier/report artifacts are digest-bound. This identity separation is a structural check, not proof of organizational independence.
 - Design fixtures contain no measurements. Only separate run receipts carry observed outcomes.
 - A structurally valid receipt is not a detector-performance pass, operational safety case, certification, or data-rights opinion.
 
