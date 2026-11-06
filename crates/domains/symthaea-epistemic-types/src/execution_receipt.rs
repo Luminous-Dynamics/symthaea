@@ -16,8 +16,7 @@ pub const PROFILE_CORPUS_SHA256: &str =
     "d499b680d6461dbffed9b4ea053d3758ee4bd4e7d3e26658d26334acddc35cf7";
 pub const RECEIPT_CORPUS_SHA256: &str =
     "48ed00a275b8585666db8426a61e1330d44223196e50fb1017d58e0acc147d9b";
-pub const INTERPRETATION_SCHEMA_VERSION: &str =
-    "symthaea:execution-evidence-interpretation:v0.1";
+pub const INTERPRETATION_SCHEMA_VERSION: &str = "symthaea:execution-evidence-interpretation:v0.1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -408,7 +407,10 @@ pub fn interpret_tool_execution_receipt(
         errors.push(ReceiptInterpretationError::new(
             "unsupported_schema",
             "schema_version",
-            format!("expected {RECEIPT_SCHEMA_VERSION}, got {}", receipt.schema_version),
+            format!(
+                "expected {RECEIPT_SCHEMA_VERSION}, got {}",
+                receipt.schema_version
+            ),
         ));
     }
     if receipt.receipt_authority != RECEIPT_AUTHORITY {
@@ -622,9 +624,7 @@ pub fn interpret_tool_execution_receipt(
         _ => {}
     }
 
-    if coverage.evidence_refs.is_empty()
-        && coverage.state != CoverageState::UnknownCoverage
-    {
+    if coverage.evidence_refs.is_empty() && coverage.state != CoverageState::UnknownCoverage {
         errors.push(ReceiptInterpretationError::new(
             "coverage_without_evidence",
             "coverage.evidence_refs",
@@ -903,18 +903,15 @@ pub fn interpret_tool_execution_receipt_json(
     profile_corpus_bytes: &[u8],
     pinned_profile_corpus_sha256: &str,
 ) -> Result<ExecutionEvidenceInterpretationV1, Vec<ReceiptInterpretationError>> {
-    let receipt: ToolExecutionReceiptV1 = serde_json::from_slice(receipt_bytes).map_err(|error| {
-        vec![ReceiptInterpretationError::new(
-            "invalid_receipt_shape",
-            "receipt",
-            error.to_string(),
-        )]
-    })?;
-    interpret_tool_execution_receipt(
-        &receipt,
-        profile_corpus_bytes,
-        pinned_profile_corpus_sha256,
-    )
+    let receipt: ToolExecutionReceiptV1 =
+        serde_json::from_slice(receipt_bytes).map_err(|error| {
+            vec![ReceiptInterpretationError::new(
+                "invalid_receipt_shape",
+                "receipt",
+                error.to_string(),
+            )]
+        })?;
+    interpret_tool_execution_receipt(&receipt, profile_corpus_bytes, pinned_profile_corpus_sha256)
 }
 
 #[cfg(test)]
@@ -933,23 +930,18 @@ mod tests {
             .and_then(Value::as_array)
             .expect("receipt array")
             .clone();
-        (
-            receipts,
-            PROFILE_CORPUS.as_bytes().to_vec(),
-        )
+        (receipts, PROFILE_CORPUS.as_bytes().to_vec())
     }
 
     fn parse_receipt(value: Value) -> ToolExecutionReceiptV1 {
         serde_json::from_value(value).expect("typed receipt fixture")
     }
 
-    fn interpret(value: Value) -> Result<ExecutionEvidenceInterpretationV1, Vec<ReceiptInterpretationError>> {
+    fn interpret(
+        value: Value,
+    ) -> Result<ExecutionEvidenceInterpretationV1, Vec<ReceiptInterpretationError>> {
         let receipt = parse_receipt(value);
-        interpret_tool_execution_receipt(
-            &receipt,
-            PROFILE_CORPUS.as_bytes(),
-            PROFILE_CORPUS_SHA256,
-        )
+        interpret_tool_execution_receipt(&receipt, PROFILE_CORPUS.as_bytes(), PROFILE_CORPUS_SHA256)
     }
 
     #[test]
@@ -964,11 +956,8 @@ mod tests {
         assert_eq!(receipts.len(), 8);
         for value in receipts {
             let receipt = parse_receipt(value);
-            let result = interpret_tool_execution_receipt(
-                &receipt,
-                &profile_bytes,
-                PROFILE_CORPUS_SHA256,
-            );
+            let result =
+                interpret_tool_execution_receipt(&receipt, &profile_bytes, PROFILE_CORPUS_SHA256);
             assert!(result.is_ok(), "{:?}: {result:?}", receipt.receipt_id);
             assert_eq!(
                 result.unwrap().authority_ceiling,
@@ -986,7 +975,12 @@ mod tests {
             .unwrap();
         let result = interpret(value).unwrap();
         assert_eq!(result.coverage_state, CoverageState::RankedTopKObserved);
-        assert!(result.limitations.iter().any(|x| x.contains("not exhaustive")));
+        assert!(
+            result
+                .limitations
+                .iter()
+                .any(|x| x.contains("not exhaustive"))
+        );
     }
 
     #[test]
@@ -1001,7 +995,12 @@ mod tests {
             result.coverage_state,
             CoverageState::PaginationExhaustedUnderExactRunProfile
         );
-        assert!(result.limitations.iter().any(|x| x.contains("exact provider snapshot")));
+        assert!(
+            result
+                .limitations
+                .iter()
+                .any(|x| x.contains("exact provider snapshot"))
+        );
     }
 
     #[test]
@@ -1027,7 +1026,12 @@ mod tests {
         let result = interpret(value).unwrap();
         assert_eq!(result.coverage_state, CoverageState::PartialDueToTimeout);
         assert_eq!(result.degradation_reason, Some(DegradationReason::Timeout));
-        assert!(result.limitations.iter().any(|x| x.contains("Degraded execution")));
+        assert!(
+            result
+                .limitations
+                .iter()
+                .any(|x| x.contains("Degraded execution"))
+        );
     }
 
     #[test]
@@ -1050,7 +1054,12 @@ mod tests {
             .unwrap();
         let result = interpret(value).unwrap();
         assert_eq!(result.coverage_state, CoverageState::AccountScopedObserved);
-        assert!(result.limitations.iter().any(|x| x.contains("account-scoped")));
+        assert!(
+            result
+                .limitations
+                .iter()
+                .any(|x| x.contains("account-scoped"))
+        );
         assert_eq!(result.retention_assessment, RetentionClass::Unknown);
     }
 
@@ -1062,8 +1071,16 @@ mod tests {
             .find(|r| r["receipt_id"] == "receipt:synthetic:ocr-transform")
             .unwrap();
         let result = interpret(value).unwrap();
-        assert_eq!(result.coverage_state, CoverageState::TransformCompletedCoverageUnknown);
-        assert!(result.output_artifacts.iter().all(|output| !output.source_native));
+        assert_eq!(
+            result.coverage_state,
+            CoverageState::TransformCompletedCoverageUnknown
+        );
+        assert!(
+            result
+                .output_artifacts
+                .iter()
+                .all(|output| !output.source_native)
+        );
     }
 
     #[test]
@@ -1075,7 +1092,11 @@ mod tests {
             .unwrap();
         let result = interpret(value).unwrap();
         assert!(result.profile_drift_observed);
-        assert!(result.profile_drift_fields.contains(&ProfileDriftField::ProviderVersion));
+        assert!(
+            result
+                .profile_drift_fields
+                .contains(&ProfileDriftField::ProviderVersion)
+        );
     }
 
     #[test]
@@ -1172,7 +1193,8 @@ mod tests {
                 .find(|r| r["receipt_id"] == "receipt:synthetic:ranked-topk")
                 .unwrap(),
         );
-        let result = interpret_tool_execution_receipt(&receipt, PROFILE_CORPUS.as_bytes(), &"0".repeat(64));
+        let result =
+            interpret_tool_execution_receipt(&receipt, PROFILE_CORPUS.as_bytes(), &"0".repeat(64));
         assert!(result.is_err());
     }
 
