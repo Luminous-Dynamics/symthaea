@@ -25,6 +25,8 @@ pub enum HdcHrrError {
     DimensionMismatch { expected: usize, actual: usize },
     NonFiniteValue { index: usize },
     ZeroSpectrumBin { index: usize },
+    EmptyCodebook,
+    InvalidCleanupPolicy,
 }
 
 impl std::fmt::Display for HdcHrrError {
@@ -44,6 +46,10 @@ impl std::fmt::Display for HdcHrrError {
             }
             Self::ZeroSpectrumBin { index } => {
                 write!(f, "cannot unitary-normalize near-zero HRR spectrum bin {index}")
+            }
+            Self::EmptyCodebook => write!(f, "HRR cleanup codebook must contain at least one vector"),
+            Self::InvalidCleanupPolicy => {
+                write!(f, "HRR cleanup thresholds must be finite, with similarity in [-1,1] and margin in [0,2]")
             }
         }
     }
@@ -107,6 +113,136 @@ impl HdcHrrRole {
     /// Recover a filler using circular correlation with this unitary role.
     pub fn unbind(&self, bound: &ContinuousHV) -> Result<ContinuousHV, HdcHrrError> {
         circular_correlation(bound, &self.vector)
+    }
+}
+
+/// Confidence policy for nearest-codeword cleanup.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HdcHrrCleanupPolicy {
+    /// Minimum cosine similarity required to accept a decoded codeword.
+    pub min_similarity: f32,
+    /// Minimum best-versus-runner-up similarity margin required to accept.
+    pub min_margin: f32,
+}
+
+impl HdcHrrCleanupPolicy {
+    pub const fn new(min_similarity: f32, min_margin: f32) -> Self {
+        Self {
+            min_similarity,
+            min_margin,
+        }
+    }
+
+    fn validate(self) -> Result<(), HdcHrrError> {
+        if !self.min_similarity.is_finite()
+            || !(-1.0..=1.0).contains(&self.min_similarity)
+            || !self.min_margin.is_finite()
+            || !(0.0..=2.0).contains(&self.min_margin)
+        {
+            return Err(HdcHrrError::InvalidCleanupPolicy);
+        }
+        Ok(())
+    }
+}
+
+/// Result of a nearest-codeword cleanup attempt.
+///
+/// An unaccepted result is an explicit abstention, not a best-effort answer.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HdcHrrCleanupResult {
+    pub index: usize,
+    pub similarity: f32,
+    pub runner_up_similarity: Option<f32>,
+    pub margin: Option<f32>,
+    pub accepted: bool,
+}
+
+/// Fixed HRR-space codebook for cleanup after correlation-based unbinding.
+#[derive(Debug, Clone)]
+pub struct HdcHrrCodebook {
+    dimension: usize,
+    entries: Vec<ContinuousHV>,
+}
+
+impl HdcHrrCodebook {
+    /// Construct a codebook after validating dimensions and finite values.
+    pub fn new(entries: Vec<ContinuousHV>) -> Result<Self, HdcHrrError> {
+        let first = entries.first().ok_or(HdcHrrError::EmptyCodebook)?;
+        let dimension = first.dim();
+        validate_dimension(dimension)?;
+
+        for entry in &entries {
+            if entry.dim() != dimension {
+                return Err(HdcHrrError::DimensionMismatch {
+                    expected: dimension,
+                    actual: entry.dim(),
+                });
+            }
+            if let Some(index) = entry.values.iter().position(|value| !value.is_finite()) {
+                return Err(HdcHrrError::NonFiniteValue { index });
+            }
+        }
+
+        Ok(Self { dimension, entries })
+    }
+
+    pub fn dimension(&self) -> usize {
+        self.dimension
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Decode to the nearest codeword and explicitly abstain below confidence
+    /// thresholds. Similarity is cosine-based through ContinuousHV::similarity.
+    pub fn cleanup(
+        &self,
+        query: &ContinuousHV,
+        policy: HdcHrrCleanupPolicy,
+    ) -> Result<HdcHrrCleanupResult, HdcHrrError> {
+        policy.validate()?;
+        if query.dim() != self.dimension {
+            return Err(HdcHrrError::DimensionMismatch {
+                expected: self.dimension,
+                actual: query.dim(),
+            });
+        }
+        if let Some(index) = query.values.iter().position(|value| !value.is_finite()) {
+            return Err(HdcHrrError::NonFiniteValue { index });
+        }
+
+        let mut best_index = 0usize;
+        let mut best_similarity = f32::NEG_INFINITY;
+        let mut runner_up = f32::NEG_INFINITY;
+
+        for (index, entry) in self.entries.iter().enumerate() {
+            let similarity = query.similarity(entry);
+            if similarity > best_similarity {
+                runner_up = best_similarity;
+                best_similarity = similarity;
+                best_index = index;
+            } else if similarity > runner_up {
+                runner_up = similarity;
+            }
+        }
+
+        let runner_up_similarity = runner_up.is_finite().then_some(runner_up);
+        let margin = runner_up_similarity.map(|second| best_similarity - second);
+        let accepted = best_similarity >= policy.min_similarity
+            && margin.map(|value| value >= policy.min_margin).unwrap_or(true);
+
+        Ok(HdcHrrCleanupResult {
+            index: best_index,
+            similarity: best_similarity,
+            runner_up_similarity,
+            margin,
+            accepted,
+        })
     }
 }
 
@@ -347,6 +483,50 @@ mod tests {
             correct_retrievals >= load * 30 / 32,
             "HRR role-filler top-1 retrieval degraded at dimension={dimension}, load={load}: {correct_retrievals}/{load}"
         );
+    }
+
+    #[test]
+    fn cleanup_decodes_clear_codeword_and_abstains_on_ambiguous_query() {
+        let first = HdcHrrRole::from_seed(256, 710).unwrap();
+        let second = HdcHrrRole::from_seed(256, 711).unwrap();
+        let codebook = HdcHrrCodebook::new(vec![
+            first.vector().clone(),
+            second.vector().clone(),
+        ])
+        .unwrap();
+
+        let accepted = codebook
+            .cleanup(first.vector(), HdcHrrCleanupPolicy::new(0.90, 0.20))
+            .unwrap();
+        assert_eq!(accepted.index, 0);
+        assert!(accepted.accepted);
+        assert!(accepted.margin.unwrap() > 0.20);
+
+        let ambiguous = first.vector().add(second.vector()).normalize();
+        let rejected = codebook
+            .cleanup(&ambiguous, HdcHrrCleanupPolicy::new(0.0, 0.20))
+            .unwrap();
+        assert!(!rejected.accepted);
+        assert!(rejected.margin.unwrap() < 0.20);
+    }
+
+    #[test]
+    fn cleanup_rejects_invalid_codebook_and_policy() {
+        assert!(matches!(
+            HdcHrrCodebook::new(Vec::new()),
+            Err(HdcHrrError::EmptyCodebook)
+        ));
+
+        let role = HdcHrrRole::from_seed(64, 712).unwrap();
+        let codebook = HdcHrrCodebook::new(vec![role.vector().clone()]).unwrap();
+        assert!(matches!(
+            codebook.cleanup(role.vector(), HdcHrrCleanupPolicy::new(1.1, 0.0)),
+            Err(HdcHrrError::InvalidCleanupPolicy)
+        ));
+        assert!(matches!(
+            codebook.cleanup(role.vector(), HdcHrrCleanupPolicy::new(0.0, f32::NAN)),
+            Err(HdcHrrError::InvalidCleanupPolicy)
+        ));
     }
 
     #[test]
