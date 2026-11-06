@@ -95,6 +95,7 @@ pub fn materialize_cfc_weight_program(
         &snapshot.model_digest,
         &replacements,
     )?;
+    candidate_network.reset_optimizer_state_after_parameter_edit();
 
     let candidate_fingerprint = candidate_network
         .fingerprint()
