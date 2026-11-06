@@ -139,6 +139,7 @@ pub struct RecoverabilityManifestV1 {
     pub corpus_snapshot_sha256: String,
     pub search_surface_sha256: String,
     pub route_policy_sha256: String,
+    pub surface_completeness_evidence_refs: Vec<String>,
     pub surface_state: SearchSurfaceStateV1,
     pub start_node_ref: String,
     pub max_route_cost: u32,
