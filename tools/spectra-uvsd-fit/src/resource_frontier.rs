@@ -225,14 +225,18 @@ impl ResourceChargeLedger {
         Ok(())
     }
 
+    /// Compute remaining budget from the original total budget. Do not pass
+    /// ResourceFrontierContract.remaining_budget here: that field is already
+    /// the post-charge remainder consumed by the frontier filter.
     pub fn remaining(
         &self,
-        contract: &ResourceFrontierContract,
+        total_budget: ResourceUnits,
+        budget_currency_code: &str,
     ) -> Result<ResourceUnits, ResourceFrontierError> {
-        if self.currency_code != contract.currency_code {
+        if self.currency_code != budget_currency_code {
             return Err(ResourceFrontierError::CurrencyMismatch);
         }
-        contract.remaining_budget.checked_sub(self.charged)
+        total_budget.checked_sub(self.charged)
             .ok_or(ResourceFrontierError::CostExceedsRemainingBudget)
     }
 }
@@ -472,8 +476,9 @@ mod tests {
     fn resource_ledger_detects_overflow_and_budget_overrun() {
         let mut ledger=ResourceChargeLedger::new("USD").unwrap();
         ledger.charge("USD",units(2,3,4,5,6,7)).unwrap();
-        assert_eq!(ledger.remaining(&contract(units(4,6,8,10,12,14))),Ok(units(2,3,4,5,6,7)));
-        assert_eq!(ledger.remaining(&contract(units(1,6,8,10,12,14))),Err(ResourceFrontierError::CostExceedsRemainingBudget));
+        assert_eq!(ledger.remaining(units(4,6,8,10,12,14),"USD"),Ok(units(2,3,4,5,6,7)));
+        assert_eq!(ledger.remaining(units(1,6,8,10,12,14),"USD"),Err(ResourceFrontierError::CostExceedsRemainingBudget));
+        assert_eq!(ledger.remaining(units(4,6,8,10,12,14),"EUR"),Err(ResourceFrontierError::CurrencyMismatch));
         assert_eq!(ledger.charge("EUR",units(0,0,0,0,0,1)),Err(ResourceFrontierError::CurrencyMismatch));
         ledger.charged.simulation_replications=u64::MAX;
         assert_eq!(ledger.charge("USD",units(1,0,0,0,0,0)),Err(ResourceFrontierError::ResourceLedgerOverflow));
