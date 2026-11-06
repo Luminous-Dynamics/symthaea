@@ -1,0 +1,54 @@
+name: Connectome query-discriminating intervention contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py"
+      - ".github/workflows/connectome-query-discriminating-intervention.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py"
+      - ".github/workflows/connectome-query-discriminating-intervention.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-intervention-contract:
+    name: Validate decision-value intervention contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and synthetic contract
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["dataset_binding"]["evidence_tier"] == "SYNTHETIC"
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          print("Draft 2020-12 query-discriminating intervention contract: PASS")
+          PY
+      - name: Run independent decision-value oracle
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py
+          python3 tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py \
+            docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json
