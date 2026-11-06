@@ -280,7 +280,7 @@ pub fn cfc_hidden_unit_activation_signatures(
     let mut signatures = vec![Vec::with_capacity(probes.len()); hidden_dim];
 
     for (probe_index, probe) in probes.iter().enumerate() {
-        if probe.input.len() != network.config().input_dim && layer_index == 0 {
+        if probe.input.len() != network.config().input_dim {
             return Err(CfCPermutationAlignmentError::ProbeInputDimensionMismatch {
                 probe_index,
                 expected: network.config().input_dim,
@@ -582,6 +582,58 @@ mod tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    #[test]
+    fn activation_signature_alignment_recovers_hidden_unit_permutation() {
+        let source = vec![
+            vec![0.0, 0.2, 0.8, -0.1],
+            vec![0.7, -0.3, 0.1, 0.9],
+            vec![-0.2, 0.4, -0.6, 0.3],
+        ];
+        // candidate[new_unit] = source[permutation[new_unit]]
+        let permutation = [2usize, 0, 1];
+        let candidate = permutation
+            .iter()
+            .map(|source_unit| source[*source_unit].clone())
+            .collect::<Vec<_>>();
+        let alignment =
+            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+
+        assert_eq!(alignment.source_to_candidate, vec![1, 2, 0]);
+        assert!(alignment.mean_squared_activation_error < 1e-15);
+        assert!(alignment.minimum_assignment_margin > 0.0);
+    }
+
+    #[test]
+    fn activation_signature_alignment_exposes_ambiguous_units() {
+        let source = vec![vec![0.0, 1.0], vec![0.0, 1.0], vec![2.0, 3.0]];
+        let candidate = vec![vec![2.0, 3.0], vec![0.0, 1.0], vec![0.0, 1.0]];
+        let alignment =
+            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+
+        assert!(alignment.mean_squared_activation_error < 1e-15);
+        assert!(alignment.minimum_assignment_margin < 1e-15);
+    }
+
+    #[test]
+    fn activation_signature_alignment_rejects_malformed_inputs() {
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&[], &[]),
+            Err(CfCPermutationAlignmentError::EmptyHiddenUnitSet)
+        ));
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&[vec![0.0]], &[vec![0.0, 1.0]]),
+            Err(CfCPermutationAlignmentError::SignatureLengthMismatch { .. })
+        ));
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&[vec![f64::NAN]], &[vec![0.0]]),
+            Err(CfCPermutationAlignmentError::NonFiniteSignature { .. })
+        ));
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&[vec![0.0], vec![1.0]], &[vec![0.0]]),
+            Err(CfCPermutationAlignmentError::HiddenUnitCountMismatch { .. })
+        ));
+    }
+
     fn permute_rows(values: &[f32], rows: usize, cols: usize, permutation: &[usize]) -> Vec<f32> {
         let mut result = vec![0.0; values.len()];
         for new_row in 0..rows {
@@ -734,6 +786,28 @@ mod tests {
             ndarray::Array1::from_vec(vec![0.9, 0.1]),
             ndarray::Array1::from_vec(vec![-0.2, -0.8]),
         ];
+        let probes = inputs
+            .iter()
+            .map(|input| CfCFunctionalProbe {
+                input: input.to_vec(),
+                dt: 0.1,
+            })
+            .collect::<Vec<_>>();
+        let source_signatures =
+            cfc_hidden_unit_activation_signatures(&original, 0, &probes)
+                .expect("source activation signatures");
+        let candidate_signatures =
+            cfc_hidden_unit_activation_signatures(&permuted, 0, &probes)
+                .expect("candidate activation signatures");
+        let alignment = align_cfc_hidden_unit_signatures(
+            &source_signatures,
+            &candidate_signatures,
+        )
+        .expect("activation-based hidden-unit alignment");
+        assert_eq!(alignment.source_to_candidate, vec![1, 3, 0, 2]);
+        assert!(alignment.mean_squared_activation_error < 1e-10);
+        assert!(alignment.minimum_assignment_margin > 0.0);
+
         let mut original_eval = original.clone();
         let mut permuted_eval = permuted.clone();
         let mut squared_error = 0.0_f64;
