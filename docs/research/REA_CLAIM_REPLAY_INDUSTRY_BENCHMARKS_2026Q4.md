@@ -39,7 +39,7 @@ These layers should compose without substituting for one another. A signed state
 - [The Update Framework specification v1.0.36 (5 August 2026)](https://theupdateframework.github.io/specification/v1.0.36/)
 - [IETF RFC 8785 — JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html)
 
-Important detail: SLSA v1.2 is the current approved specification and has separate Build and Source tracks. Build provenance traces an artifact to its source/build process; Source provenance records how revisions were created and change-managed. REA adapters should bind a track-specific predicate and preserve the consumer's expected signer/builder policy. Sigstore's own security model requires independent Rekor monitoring; a log's signed append-only property is not a semantic truth oracle. SCITT RFC 9943 is a June 2026 IETF Standards Track publication for single-issuer signed-statement transparency; its receipts prove registration and auditability, not the truth of the issuer's statement. TUF 1.0.36 (5 August 2026) addresses update metadata, rollback and freeze protections. These systems supply distinct evidence families and must not be collapsed into one trust score. The approved v1.2 specification should be distinguished from working drafts: Build L4 and the additional Build Environment/Dependency tracks currently appear in draft material, not as approved v1.2 requirements. Do not report draft levels as achieved industry standards.
+Important detail: SLSA v1.2 is the current approved specification and has separate Build and Source tracks. Build provenance traces an artifact to its source/build process; Source provenance records how revisions were created and change-managed. REA adapters should bind a track-specific predicate and preserve the consumer's expected signer/builder policy. Sigstore's own security model requires independent Rekor monitoring; a log's signed append-only property is not a semantic truth oracle. SCITT RFC 9943 is a June 2026 IETF Standards Track publication for single-issuer signed-statement transparency; its receipts prove registration and auditability, not the truth of the issuer's statement. TUF 1.0.36 (5 August 2026) addresses update metadata, rollback and freeze protections. These systems supply distinct evidence families and must not be collapsed into one trust score.
 
 ## 2. Research benchmarks and what they teach us
 
@@ -208,7 +208,7 @@ A matching replay receipt remains a reproducibility result, not a signature, tru
 
 The producer implementation is [#10665](https://github.com/Luminous-Dynamics/symthaea/pull/10665). Its focused REA workflow passed on exact head `e2160007bcd8eb03c283465c08ba07e34372b75f` after the raw Evidence move/clone reduction, named provider metadata record, bundle-adapter Clippy cleanup and test-slice borrowing fixes. This is focused compatibility/claim-evaluator qualification, not full-workspace qualification or general semantic truth.
 
-The independent replay implementation is refreshed stacked draft [#10740](https://github.com/Luminous-Dynamics/symthaea/pull/10740), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It includes:
+The independent replay implementation is refreshed stacked draft [#10725](https://github.com/Luminous-Dynamics/symthaea/pull/10725), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It includes:
 - a frozen public seed oracle with 23 explicit expected-disposition/replay-outcome cases, authored independently of the production evaluator;
 - a standalone, bounded, read-only `rea-claim-replay` CLI with exit 0 for match, 1 for semantic mismatch, and 2 for invalid input / IO / resource failure;
 - separate request/result parsing, recursive duplicate-key rejection, required-nullable-field checks and closed result schemas;
@@ -221,9 +221,9 @@ The independent replay implementation is refreshed stacked draft [#10740](https:
 
 The replay exact-head workflow has already passed the parent formatter, upstream Evidence differential suite and warnings-denied parent Clippy on the refreshed stack. The independent replay formatter has been iterated on exact output; the current replay head must still complete the independent conformance and Clippy steps before a pass is claimed. Do not interpret a queued or skipped job as success.
 
-The independent fuzz workspace is refreshed as [#10742](https://github.com/Luminous-Dynamics/symthaea/pull/10742), with research contract [#10726](https://github.com/Luminous-Dynamics/symthaea/issues/10726). It keeps cargo-fuzz out of production dependencies and has three targets: raw request parsing, raw result parsing, and bounded framed end-to-end replay. It uses pinned nightly/cargo-fuzz, an inspectable public seed corpus, deterministic framing tests, 1 MiB per-input cap, 8 Evidence records per fuzz frame, five-second per-input timeout and 512 MiB runner RSS ceiling. The current-parent exact-head run passed 3 frame parser tests and all three bounded campaigns: 1,492,217 request executions (32,439/s, 275 MiB peak RSS), 329,258 result executions (7,157/s, 280 MiB) and 2,463,001 framed replay executions (53,543/s, 268 MiB). The fuzz branch's verifier Cargo manifest, library and CLI blobs were checked identical to the current replay branch; the later replay changes were tests/memo only. This is bounded no-crash evidence for that exact run, not parser certification or semantic correctness.
+The independent fuzz workspace is [#10728](https://github.com/Luminous-Dynamics/symthaea/pull/10728), with research contract [#10726](https://github.com/Luminous-Dynamics/symthaea/issues/10726). It keeps cargo-fuzz out of production dependencies and has three targets: raw request parsing, raw result parsing, and bounded framed end-to-end replay. It uses pinned nightly/cargo-fuzz, an inspectable public seed corpus, deterministic framing tests, 1 MiB per-input cap, 8 Evidence records per fuzz frame, five-second per-input timeout and 512 MiB runner RSS ceiling. Its corrected exact-head workflow passed the deterministic frame parser suite and all three bounded campaigns. This is bounded no-crash evidence for that exact run, not a parser security certification.
 
-The earlier replay drafts [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710) and [#10725](https://github.com/Luminous-Dynamics/symthaea/pull/10725) were closed as superseded after their bases diverged from the producer; all implementation and metamorphic-test work is carried on the clean current-parent stack in #10740.
+The older replay draft [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710) was closed as superseded after its branch diverged from the parent; its work was carried to #10725.
 
 ### Additional finite-oracle gates
 
@@ -235,50 +235,14 @@ The public seed is a conformance floor, not a broad population estimate. A blind
 
 Issue [#10738](https://github.com/Luminous-Dynamics/symthaea/issues/10738) extends fixed examples with transformations whose expected relation is known even when no new answer label is authored.
 
-Initial laws now being added to #10740:
+Initial laws now being added to #10725:
 - recursive JSON object-key permutation is representation-only; Evidence ID and replay must remain equivalent under JCS;
 - reordering raw Evidence transport records is representation-only when the claim's exact ordered Evidence ID list is unchanged;
 - reordering the claim's Evidence ID list is semantic input mutation and the old result must not replay;
 - duplicate or unreferenced records are invalid, never extra votes;
 - premise weakening, unsupported assumptions and absent scope dimensions must never produce an epistemic upgrade;
 - adding a same-scope contradiction preserves conflict rather than majority-voting it away;
-- unsupported predicate families remain non-positive regardless of evidence count; a regression now supplies four valid provider observations to an unimplemented ProducerAuthenticity predicate and requires Unverified.
+- unsupported predicate families remain non-positive regardless of evidence count.
 
 The target is 100% preservation of the finite metamorphic laws and zero unexpected upgrades. These tests qualify the transformations they exercise; they do not prove general semantic correctness.
-
-
-## 10. Next paradigm — proof-carrying claim obligations
-
-A future claim result should be a **proof-obligation certificate**, not only a verdict plus digest. Keep this outside the current v0 rule contract until a separate schema/version is reviewed.
-
-For each predicate, a closed, versioned rule manifest should declare:
-- the exact proposition and claim ceiling;
-- authorized Evidence types and source-authority requirements;
-- subject, operation, environment, platform and temporal scope keys;
-- lineage and independence obligations;
-- required prerequisite and falsification conditions;
-- contradiction, missing, unknown, inapplicable and unrepresented handling;
-- permitted inference operations and their rule/version digest.
-
-The evaluation output should enumerate every obligation with one of five non-collapsible outcomes: satisfied, violated, missing, unrepresented or not-applicable. Each satisfied obligation points to the exact Evidence IDs and source scope; each unsatisfied obligation states what is missing and why. Replay then verifies the entire obligation certificate under the pinned rule manifest, not merely a top-level disposition.
-
-This enables four further capabilities without a universal trust score:
-1. **Minimal witness sets:** identify a smallest sufficient subset of Evidence for each supported obligation; removing any witness should either preserve the result via another valid witness or invalidate it predictably.
-2. **Incremental proof invalidation:** when Evidence, source lineage, rule version, artifact digest or lifecycle state changes, invalidate only the dependent obligations and preserve unaffected proofs.
-3. **Counterexample-guided evaluation:** for each positive claim, expose the exact falsifying condition and the strongest observed counterexample or unresolved contradiction.
-4. **Auditable proof transfer:** a third party can replay the certificate without trusting the producer's internal evaluator, model weights or scoring function, subject to the disclosed shared primitives.
-
-### New benchmark dimensions
-
-| Dimension | Measurement | Proposed gate |
-|---|---|---|
-| Obligation completeness | Fraction of rule-declared obligations explicitly resolved or named as unresolved | 100%; no silent obligation omission |
-| Witness validity | Exact scope/identity and authorization for every cited witness | 100% finite oracle; zero unsupported witness promotion |
-| Witness minimality | Redundant premises per supported obligation; deletion sensitivity | Remove redundant premises without changing result; every retained minimal witness is necessary |
-| Counterexample sensitivity | Correct response to seeded falsifiers and same-scope contradiction | 100% finite falsification corpus; zero majority-vote contradiction suppression |
-| Incremental invalidation | Precision/recall of obligations invalidated by a change event | 100% exact finite change-impact oracle; zero stale positive certificates |
-| Rule drift detection | Rule semantic change without version/digest change | 0 undetected rule changes |
-| Independent certificate replay | Reproduction by independent implementation(s) | 100% finite supported subset; zero false replay matches |
-
-The current v0 evaluator deliberately supports only exact provider-reported normalized-result equality. The proof-obligation architecture is the path to broader predicates, but no predicate should be promoted until its manifest, independent oracle, falsifiers, source-owned Evidence contract and replay coverage exist.
 
