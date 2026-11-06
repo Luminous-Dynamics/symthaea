@@ -97,6 +97,32 @@ The best target may not be lights-off. Compare human-only, agent-only and human+
 
 **Breakthrough hypothesis:** +5 percentage points in confirmed-defect recall at equal effort, or non-inferior recall with at least 20% less human review time, while keeping a separate high-severity false-negative gate.
 
+### F1. From self-refinement to disconfirm-first independent review
+
+The October 2026 CRBugBench preprint makes human-agent complementarity more concrete. Its public summary reports 1,000 open-source review tasks across 98 repositories plus 800 proprietary tasks; the strongest reported setup (Claude Opus 5 + Copilot CLI) catches 71.9% of human-verified bugs in its top five comments. It also reports reduced performance on complex, non-local bugs and proprietary code. A PREreview of the preprint summarizes the reported combined result as 50.0% for human-only review, 71.9% for the best agent, and 82.1% for human-plus-agent review. These are source-specific observations, not CEB results or a universal expected gain. The PREreview also reports multi-agent setups adding about 2.8% on average at 3.68× cost, and raises—but does not test—the hypothesis that a second agent briefed to disprove the first review could be more valuable than ordinary self-refinement. [Microsoft Research CRBugBench summary](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/) · [PREreview, October 13, 2026](https://prereview.org/reviews/23335998)
+
+**Research hypothesis:** an independently briefed skeptic can improve review quality more efficiently than a second pass that merely polishes or ensembles the first review. This is untested and should be evaluated as a matched-budget ablation, not assumed to be true.
+
+**Required arms:**
+1. Human-only review.
+2. Single-agent review.
+3. Agent review followed by human review.
+4. Agent review followed by ordinary self-refinement.
+5. Two-agent candidate ensemble / consolidation.
+6. Blind independent second review: the second reviewer receives the same patch, specification and repository view, but not the first review's findings.
+7. Disconfirm-first review: the second reviewer sees the first review and must attempt to refute each finding, identify unsupported claims, and search for high-severity omissions before it may endorse anything.
+8. Human adjudication of the combined dossier, with the reviewer blind to agent identity and benchmark label where feasible.
+
+The blind independent arm tests complementarity without anchoring; the disconfirm-first arm tests whether explicit adversarial critique adds value beyond independent duplication. Keep them separate. An independent reviewer that sees the first output is not an independent first-pass witness.
+
+**Measurement:** preserve defect-level recall, finding-level precision, actionable precision, severity-weighted recall, critical false negatives, unsupported comments per 1,000 changed lines, exact location accuracy, reviewer minutes, reviewer overrides, escalation and compute/token/latency cost. Report top-1/3/5 separately. Count a defect once even when multiple comments describe it; preserve multiple distinct defects per change. Measure clean/no-known-defect PR controls so false-positive burden is not inferred from bug-positive tasks alone.
+
+**Oracle discipline:** CRBugBench's public PREreview describes three LLM judges matching submitted findings to known bugs. That is useful at scale but introduces a separate finding-to-defect matching instrument whose false matches and missed matches must be audited. CEB should retain human-confirmed defect provenance, then independently sample both accepted and rejected finding matches for blinded expert adjudication. Do not treat agreement among several LLM judges as independent ground truth; reuse #9431 for common-mode judge-error analysis and V4V work #10680/#10681 for verifier qualification. Missing or disputed adjudications remain unresolved, not silently converted to false positives or false negatives.
+
+**Budget rule:** all arms must be compared at matched total cost and effort, including all reviewer calls, context reads, orchestration, human time and adjudication. The 3.68× multi-agent cost observation makes unadjusted recall gains especially misleading. Also publish an unequal-budget frontier.
+
+**CEB integration:** this extends existing #10419 CEB-REVIEW, #10367's human-only / agent-only / human-assisted design and #10637/#10640 collaboration protocol. It adds no lane, primary metric, task schema, judge authority or composite score.
+
 ### G. From static benchmark scores to longitudinal engineering reliability
 
 Use repository-family and time-based splits, rotating fresh tasks, mutation sequences, regressions and operational follow-up. Score stale evidence after renames/moves/features/target changes, issue recurrence, rollback rate, and whether a correct fix remains correct under later changes.
@@ -176,3 +202,10 @@ Build and benchmark those capabilities as separable modules, then show that thei
 - [PDB results and per-task evidence](https://huggingface.co/datasets/Precise-Debugging-Benchmarking/PDB-Results)
 - [PDB paper](https://arxiv.org/abs/2604.17338)
 - [Rust-SWE-bench / RUSTFORGER paper](https://arxiv.org/abs/2602.22764)
+
+
+## Review-complementarity research update — 2026-11-06
+
+CRBugBench's October preprint makes pre-merge review a more concrete target: 1,000 public tasks across 98 repositories plus 800 proprietary tasks, with 71.9% top-five bug detection for Claude Opus 5 + Copilot CLI. A PREreview summarizes the paper's human-only / agent-only / combined findings as 50.0% / 71.9% / 82.1%, respectively, and notes an average 2.8% gain from multi-agent review at 3.68× cost. It proposes testing a disconfirm-first second reviewer, but that is a reviewer hypothesis, not a demonstrated paper result. The public methodological summary also says three LLM judges match candidate findings to known bugs; this finding-matching layer should be audited separately from the human-confirmed defect provenance.
+
+The new F1 protocol above preregisters blind independent second review and disconfirm-first review as distinct arms. It adds clean/no-known-defect controls and independent expert adjudication of a sample of finding matches. It extends existing CEB-REVIEW and human-complementarity work without adding metrics or another evaluator registry. All targets remain prospective; no CRBugBench replication or CEB review execution is claimed.
