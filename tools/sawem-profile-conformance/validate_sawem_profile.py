@@ -198,6 +198,7 @@ EXPECTED_CASE_IDS = {
     "MARKET-PRICE-IMPACT-001",
     "MARKET-READINESS-GATE-001",
     "UNDERWRITING-PROOF-CERTIFICATE-001",
+    "MARKET-EXECUTION-AUTHORITY-GATE-001",
 }
 
 
@@ -341,6 +342,7 @@ def main() -> None:
     forecast_cohort_kernel_path = root / "tools/sawem-market-reference/src/forecast_cohort.rs"
     forecast_skill_kernel_path = root / "tools/sawem-market-reference/src/forecast_skill.rs"
     forecast_inference_kernel_path = root / "tools/sawem-market-reference/src/forecast_inference.rs"
+    execution_authority_kernel_path = root / "tools/sawem-market-reference/src/execution_authority.rs"
     execution_fidelity_kernel_path = root / "tools/sawem-market-reference/src/execution_fidelity.rs"
     bms_calibration_kernel_path = root / "tools/sawem-market-reference/src/bms_calibration.rs"
     bms_capability_kernel_path = root / "tools/sawem-market-reference/src/bms_capability.rs"
@@ -379,6 +381,7 @@ def main() -> None:
         forecast_cohort_kernel_bytes = forecast_cohort_kernel_path.read_bytes()
         forecast_skill_kernel_bytes = forecast_skill_kernel_path.read_bytes()
         forecast_inference_kernel_bytes = forecast_inference_kernel_path.read_bytes()
+        execution_authority_kernel_bytes = execution_authority_kernel_path.read_bytes()
         execution_fidelity_kernel_bytes = execution_fidelity_kernel_path.read_bytes()
         bms_calibration_kernel_bytes = bms_calibration_kernel_path.read_bytes()
         bms_capability_kernel_bytes = bms_capability_kernel_path.read_bytes()
@@ -428,6 +431,8 @@ def main() -> None:
             + forecast_skill_kernel_bytes
             + b"\n"
             + forecast_inference_kernel_bytes
+            + b"\n"
+            + execution_authority_kernel_bytes
             + b"\n"
             + execution_fidelity_kernel_bytes
             + b"\n"
