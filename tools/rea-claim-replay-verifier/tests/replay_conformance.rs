@@ -932,7 +932,7 @@ fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
         .collect();
 
     let (claim_bytes, result_bytes) = produce(&claim, &evidence_records);
-    let raw_evidence: Vec<&[u8]> = evidence_bytes.iter().map(Vec::as_slice).collect();
+    let raw_evidence: Vec<&[u8]> = evidence_bytes.iter().map(|bytes| bytes.as_slice()).collect();
     let replay = replay_claim_evaluation(&claim_bytes, &raw_evidence, &result_bytes).unwrap();
 
     // Four valid observations cannot prove an authenticity predicate that
@@ -942,10 +942,7 @@ fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
         replay.expected_disposition,
         oracle_disposition("producer-authenticity-rule-unimplemented")
     );
-    assert_eq!(
-        replay.reported_disposition,
-        ClaimDisposition::Unverified
-    );
-    assert_eq!(replay.evidence_assessment_count, 4);
+    assert_eq!(replay.reported_disposition, Disposition::Unverified);
+    assert_eq!(replay.evidence_count, 4);
 }
 
