@@ -9,7 +9,6 @@ pub mod reuse_confidence_certificate;
 #[path = "../../../src/consciousness/recursive_improvement/reuse_error_budget.rs"]
 pub mod reuse_error_budget;
 
-
 #[cfg(test)]
 mod adaptive_null_simulation {
     use super::reuse_error_budget::{
@@ -137,8 +136,7 @@ mod adaptive_null_simulation {
 
         for round_index in 0..ROUNDS {
             let round = round_index + 1;
-            let candidate_index =
-                adaptive_candidate_index(round, prior_promotions, last_decision);
+            let candidate_index = adaptive_candidate_index(round, prior_promotions, last_decision);
             let second_index = (candidate_index + 1) % POOL_WIDTH;
             let bounded = [candidate_index, second_index].map(|index| {
                 pool[round_index][index]
