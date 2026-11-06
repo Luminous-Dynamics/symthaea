@@ -25,36 +25,34 @@ use std::fs;
 use std::process::ExitCode;
 
 fn usage(program: &str) {
-    eprintln!(
-        concat!(
-            "usage:\n",
-            "  {program} MANIFEST.json [--require-scoring|--require-sealed]\n",
-            "  {program} audit-overlap LEFT_LABEL LEFT_TASK_SET.json RIGHT_LABEL RIGHT_TASK_SET.json\n",
-            "  {program} audit-lineage LEFT_TASK_SET.json LEFT_LEDGER.json\n",
-            "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
-            "  {program} verify-search-receipt RECEIPT.json\n",
-            "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
-            "  {program} commit-evidence-intervention-plan PLAN_FIELDS.json\n",
-            "  {program} verify-evidence-intervention-plan PLAN.json\n",
-            "  {program} commit-evidence-outcomes PLAN.json OUTCOME_FIELDS.json\n",
-            "  {program} verify-evidence-outcomes PLAN.json OUTCOME_REPORT.json\n",
-            "  {program} commit-recoverability-manifest MANIFEST_FIELDS.json\n",
-            "  {program} audit-recoverability-manifest MANIFEST.json\n",
-            "  {program} commit-protected-index INDEX_FIELDS.json\n",
-            "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
-            "  {program} verify-search-exact-matches RECEIPT.json\n",
-            "    PROTECTED_INDEX.json MATCH_REPORT.json\n",
-            "  {program} protocol-commit MANIFEST.json\n",
-            "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
-            "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
-            "  {program} generate-task-set MANIFEST.json SEED_FILE\n",
-            "    GENERATOR_CONFIG.json OUTPUT.json\n",
-            "  {program} verify-regeneration MANIFEST.json SEED_FILE\n",
-            "    GENERATOR_CONFIG.json TASK_SET.json"
-        )
+    let usage = concat!(
+        "usage:\n",
+        "  {program} MANIFEST.json [--require-scoring|--require-sealed]\n",
+        "  {program} audit-overlap LEFT_LABEL LEFT_TASK_SET.json RIGHT_LABEL RIGHT_TASK_SET.json\n",
+        "  {program} audit-lineage LEFT_TASK_SET.json LEFT_LEDGER.json\n",
+        "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
+        "  {program} verify-search-receipt RECEIPT.json\n",
+        "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
+        "  {program} commit-evidence-intervention-plan PLAN_FIELDS.json\n",
+        "  {program} verify-evidence-intervention-plan PLAN.json\n",
+        "  {program} commit-evidence-outcomes PLAN.json OUTCOME_FIELDS.json\n",
+        "  {program} verify-evidence-outcomes PLAN.json OUTCOME_REPORT.json\n",
+        "  {program} commit-recoverability-manifest MANIFEST_FIELDS.json\n",
+        "  {program} audit-recoverability-manifest MANIFEST.json\n",
+        "  {program} commit-protected-index INDEX_FIELDS.json\n",
+        "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
+        "  {program} verify-search-exact-matches RECEIPT.json\n",
+        "    PROTECTED_INDEX.json MATCH_REPORT.json\n",
+        "  {program} protocol-commit MANIFEST.json\n",
+        "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
+        "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
+        "  {program} generate-task-set MANIFEST.json SEED_FILE\n",
+        "    GENERATOR_CONFIG.json OUTPUT.json\n",
+        "  {program} verify-regeneration MANIFEST.json SEED_FILE\n",
+        "    GENERATOR_CONFIG.json TASK_SET.json"
     );
+    eprintln!("{}", usage.replace("{program}", program));
 }
-
 fn read(path: &str, label: &str) -> Result<Vec<u8>, ExitCode> {
     fs::read(path).map_err(|error| {
         eprintln!("cannot read {label} {path}: {error}");
