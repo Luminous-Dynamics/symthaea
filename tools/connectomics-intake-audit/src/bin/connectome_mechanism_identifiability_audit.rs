@@ -364,6 +364,20 @@ fn validate_input(
 
     let mut intervention_map = BTreeMap::new();
     for action in &input.interventions {
+        if !matches!(
+            action.action_kind.as_str(),
+            "PASSIVE_OBSERVATION"
+                | "QUERY_DIRECTED_PERTURBATION"
+                | "PATHWAY_SELECTIVE_PERTURBATION"
+                | "ORTHOGONAL_MULTI_CHANNEL_MEASUREMENT"
+                | "DISALLOWED_REFERENCE"
+                | "OTHER"
+        ) {
+            return Err(format!(
+                "intervention {} has unsupported action kind {}",
+                action.intervention_id, action.action_kind
+            ));
+        }
         if !action.cost_units.is_finite() || action.cost_units <= 0.0 {
             return Err(format!(
                 "intervention {} has invalid cost",
@@ -578,6 +592,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         action_reports.insert(
             action.intervention_id.clone(),
             ActionReport {
+                action_kind: action.action_kind.clone(),
                 feasibility_status: action.feasibility_status.clone(),
                 cost_units: action.cost_units,
                 query_identified,
