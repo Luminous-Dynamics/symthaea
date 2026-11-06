@@ -126,6 +126,10 @@ pub struct RecoverabilityManifestFieldsV1 {
     pub search_surface_sha256: String,
     pub route_policy_sha256: String,
     pub surface_state: SearchSurfaceStateV1,
+    /// Digest of an independently reviewed receipt asserting that the finite
+    /// route inventory is complete for the exact surface and route policy.
+    /// The evaluator records this reference but does not verify the receipt.
+    pub surface_completeness_receipt_sha256: Option<String>,
     pub start_node_ref: String,
     pub max_route_cost: u32,
     pub budget_unit: String,
@@ -144,6 +148,10 @@ pub struct RecoverabilityManifestV1 {
     pub search_surface_sha256: String,
     pub route_policy_sha256: String,
     pub surface_state: SearchSurfaceStateV1,
+    /// Digest of an independently reviewed receipt asserting that the finite
+    /// route inventory is complete for the exact surface and route policy.
+    /// The evaluator records this reference but does not verify the receipt.
+    pub surface_completeness_receipt_sha256: Option<String>,
     pub start_node_ref: String,
     pub max_route_cost: u32,
     pub budget_unit: String,
@@ -163,6 +171,7 @@ impl From<&RecoverabilityManifestV1> for RecoverabilityManifestFieldsV1 {
             search_surface_sha256: value.search_surface_sha256.clone(),
             route_policy_sha256: value.route_policy_sha256.clone(),
             surface_state: value.surface_state,
+            surface_completeness_receipt_sha256: value.surface_completeness_receipt_sha256.clone(),
             start_node_ref: value.start_node_ref.clone(),
             max_route_cost: value.max_route_cost,
             budget_unit: value.budget_unit.clone(),
@@ -638,6 +647,7 @@ mod tests {
             search_surface_sha256: digest('b'),
             route_policy_sha256: digest('c'),
             surface_state: SearchSurfaceStateV1::CompleteFrozenInventory,
+            surface_completeness_receipt_sha256: Some(digest('d')),
             start_node_ref: "state:start".to_string(),
             max_route_cost: 8,
             budget_unit: "synthetic_action_credit".to_string(),
@@ -775,6 +785,7 @@ mod tests {
             search_surface_sha256: fields.search_surface_sha256,
             route_policy_sha256: fields.route_policy_sha256,
             surface_state: fields.surface_state,
+            surface_completeness_receipt_sha256: fields.surface_completeness_receipt_sha256,
             start_node_ref: fields.start_node_ref,
             max_route_cost: fields.max_route_cost,
             budget_unit: fields.budget_unit,
@@ -856,6 +867,35 @@ mod tests {
                 .unwrap()
                 .route_edge_refs
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn missing_inventory_completeness_receipt_preserves_positive_routes_but_blocks_absence() {
+        let mut fields = base_fields();
+        fields.surface_completeness_receipt_sha256 = None;
+        let result = report(fields);
+        assert!(result.valid);
+        let actual: BTreeMap<_, _> = result
+            .records
+            .iter()
+            .map(|record| (record.evidence_unit_id.as_str(), record.recoverability))
+            .collect();
+        assert_eq!(
+            actual["unit:direct"],
+            RecoverabilityClassV1::DirectlyReachable
+        );
+        assert_eq!(
+            actual["unit:rewrite"],
+            RecoverabilityClassV1::ReformulationRecoverable
+        );
+        assert_eq!(
+            actual["unit:navigation"],
+            RecoverabilityClassV1::NavigationRecoverable
+        );
+        assert_eq!(
+            actual["unit:unreachable"],
+            RecoverabilityClassV1::NotEvaluable
         );
     }
 
