@@ -293,6 +293,41 @@ At minimum, test:
 
 Do not call a solver's Unknown, timeout, crash or missing proof UNSAT.
 
+## Paradigm shift: a proof-carrying representation/reduction graph
+
+Algorithm discovery should search over **representations** as well as search heuristics. But every transition must say exactly what it preserves. This is especially important because the OpenAI ETH manuscript derives graph-counting consequences through controlled counting-preserving encodings, while arbitrary polynomial-time reductions can destroy subexponential parameter bounds.
+
+Create a directed graph of problem representations. Each node is a typed problem contract; each edge is a transformation with an explicit guarantee:
+
+| Reduction/transform class | Preserved property | Typical use |
+|---|---|---|
+| Decision-preserving many-one | SAT/UNSAT yes/no equivalence | NP-completeness and decision algorithms |
+| Parsimonious | Exact number of solutions | #SAT, graph colouring/independent-set counting |
+| Unique-extension | Each source solution has exactly one target extension | Tseitin encodings and count-preserving compilation |
+| Known-factor counting | Count related by a proved, explicit multiplier | Specialized counting reductions |
+| Approximation-preserving | Approximation quality transfers under stated parameters | FPRAS and approximation algorithms |
+| Optimization-preserving | Optimum/objective maps by a proved transformation | MaxSAT, ILP, graph optimization |
+| Parameter-preserving/FPT | Controlled parameter and size blow-up | Treewidth, backdoor and kernel algorithms |
+
+Every transformation record should contain:
+- source/target schemas and versions;
+- source and target input digests;
+- forward mapping and, where needed, reverse witness mapping;
+- semantic guarantee class;
+- proof/certificate for correctness;
+- variable/vertex/clause/edge blow-up;
+- parameter mapping (e.g. k -> k', treewidth w -> w');
+- runtime and space overhead of the transformation;
+- whether the transformation is deterministic or randomized and its failure/approximation guarantee.
+
+The discovery engine can then ask a more useful question than “which solver is fastest?”:
+
+**Which verified path through the representation graph gives the lowest end-to-end cost for this instance family, while preserving the exact property the task requires?**
+
+This is how we avoid invalid transfers: a decision-preserving reduction is not automatically parsimonious; an equisatisfiable encoding is not automatically count-preserving; and a subexponential algorithm does not automatically remain subexponential after a reduction with a superlinear variable blow-up.
+
+This representation graph should be a first-class Symthaea research capability and a shared transformation registry in the Luminous platform. It is also the right place to store the unique-extension guarantee of the new Tseitin encoder.
+
 ## Architecture proposal
 
 Keep the low-level solver independent of HDC and cognitive-loop code. Add a narrow shared problem/solver interface first; only introduce a new crate after reviewing the workspace's existing math and logic boundaries.
