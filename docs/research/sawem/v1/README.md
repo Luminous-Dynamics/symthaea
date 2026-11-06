@@ -154,6 +154,20 @@ Actions can diverge after the scenario information nodes diverge. The evaluator 
 
 This is intentionally a **policy audit**, not a stochastic optimizer. It does not prove that the policy is profitable or lower-regret; it prevents a perfect-foresight backtest from being mislabeled as implementable. Candidate policies still need matched scenario trees, common price/availability vintages, out-of-sample tests and regret/CVaR reporting. Benchmark case: `NON-ANTICIPATIVITY-POLICY-AUDIT-001`.
 
+### Paired comparison of implementable policies
+
+The new `paired_policy_comparison.rs` module is the competitive-evaluation counterpart to the perfect-information regret bound. It scores two submitted **implementable** policies on the same scenario set and requires:
+
+- identical scenario census, probability manifest and source-available probability inputs;
+- identical market-rule, asset-constraint, network-topology and settlement basis digests;
+- identical decision coverage and information-node ID, information-set digest and available-at timestamp at every corresponding decision;
+- separate non-anticipativity audits for the candidate and comparator;
+- paired candidate/comparator results with unique record IDs and source hashes.
+
+It reports exact candidate-minus-comparator expected net cash, probability that the candidate wins, probability that the comparator wins, tie probability, worst/best paired delta and lower-tail delta VaR/CVaR. A positive delta favours the candidate; a negative tail CVaR identifies a downside that an average-value comparison can hide.
+
+This is an evaluation adapter contract, not an external-engine runner. PLEXOS, Chronos, HOMER, SAM, PyPSA and GridPath have not yet been executed or scored through this module. The benchmark case `PAIRED-POLICY-COMPARISON-001` has four synthetic known-answer/negative-control tests. No vendor superiority or real project value improvement is claimed.
+
 ### Non-anticipative policy regret and EVPI
 
 The new `decision_regret.rs` module closes the next gap after non-anticipativity auditing: it measures the **cost of imperfect foresight** without confusing it with forecast error.
@@ -309,7 +323,7 @@ Sources:
 - [Synthetic comparator roster](sawem-bess-comparator-manifest-v1.synthetic.json)
 - [Matched-engine benchmark protocol](COMPARATOR_PROTOCOL_V1.md)
 - [Reserve economics and collateral liquidity crosswalk](RESERVE_ECONOMICS_AND_COLLATERAL_V1.md)
-- [Machine-readable 47-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
+- [Machine-readable 48-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
 - [Benchmark corpus JSON Schema](sawem-bess-benchmark-corpus-v1.schema.json)
 
 The JSON Schema uses Draft 2020-12. The synthetic fixture contains fictional project identifiers, ratings, energy declarations, dispatch, metered response, balancing components and credit-cover amounts. It is only a schema and interface example.
