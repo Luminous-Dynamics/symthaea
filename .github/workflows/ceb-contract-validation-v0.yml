@@ -7,6 +7,8 @@ on:
       - "docs/research/CEB_EXTERNAL_OBSERVATION_REGISTRY_V0_2026-11-05.md"
       - "docs/research/CEB_RUST_PILOT_PREREGISTRATION_V0_2026-11-05.md"
       - "scripts/validate_ceb_observations.py"
+      - "scripts/validate_ceb_rust_candidate_traceability.py"
+      - "docs/research/CEB_RUST_CANDIDATE_ORACLE_TRACEABILITY_V0_2026-11-06.json"
       - "docs/**/*.md"
       - "scripts/audit_doc_command_claims.py"
       - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
@@ -626,3 +628,9 @@ jobs:
         run: |
           set -euo pipefail
           "$RUNNER_TEMP/ceb-jsonschema/bin/python" scripts/validate_ceb_task_admission.py --self-test --repo-root .
+      - name: Validate public Rust candidate/oracle traceability
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_ceb_rust_candidate_traceability.py --self-test --repo-root .
+          python scripts/validate_ceb_rust_candidate_traceability.py --repo-root .
