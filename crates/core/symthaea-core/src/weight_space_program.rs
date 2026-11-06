@@ -327,6 +327,7 @@ impl WeightProgram {
             return Err(WeightProgramError::MaxDeltaBudgetExceeded);
         }
 
+        let program_digest = json_digest(b"symthaea-weight-program-v1\0", self)?;
         let candidate_snapshot_digest = candidate_digest(
             &snapshot.architecture_digest,
             &snapshot.manifest_digest,
@@ -339,6 +340,7 @@ impl WeightProgram {
             receipt: WeightProgramReceipt {
                 format_version: 1,
                 base_model_digest: snapshot.model_digest.clone(),
+                program_digest,
                 candidate_snapshot_digest,
                 edited_group_count,
                 changed_parameter_count,
@@ -430,10 +432,12 @@ fn validate_group(
     }
 
     match group.target {
-        WeightProgramTarget::CfC(crate::dynamics::cfc::network::CfCWeightGroupId::CellTimeConstant { .. })
-            if group.role != ParameterGroupRole::TimeConstant =>
-        {
-            return Err(WeightProgramError::InvalidConstraints);
+        WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { .. }) => {
+            if group.role != ParameterGroupRole::TimeConstant
+                || !group.constraints.min_value.is_some_and(|minimum| minimum > 0.0)
+            {
+                return Err(WeightProgramError::InvalidConstraints);
+            }
         }
         WeightProgramTarget::HdcLtc(_)
             if group.role != ParameterGroupRole::Hypervector =>
