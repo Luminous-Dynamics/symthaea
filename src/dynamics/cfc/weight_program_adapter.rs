@@ -349,6 +349,22 @@ mod tests {
             )
             .expect("plant tau-scale fault");
 
+        // Seed a nonzero recurrent state and stale optimizer counters so the
+        // adapter must reset them on the candidate, without touching the source.
+        let _ = faulty.forward(
+            &ndarray::Array1::from_vec(vec![0.25, -0.75]),
+            0.2,
+        );
+        let source_state_norm = faulty.cells[0]
+            .state()
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        assert!(source_state_norm > 0.0);
+        faulty.adam_states[0].t = 7;
+        faulty.adam_output.t = 7;
+
         let faulty_snapshot =
             cfc_weight_model_snapshot(&faulty, task_digest.clone()).expect("faulty snapshot");
         let faulty_digest_before = faulty_snapshot.model_digest.clone();
@@ -385,6 +401,26 @@ mod tests {
             faulty.fingerprint().expect("faulty remains unchanged").model_digest,
             faulty_digest_before
         );
+        let source_state_after = faulty.cells[0]
+            .state()
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        assert_eq!(source_state_after, source_state_norm);
+        assert_eq!(faulty.adam_states[0].t, 7);
+        assert_eq!(faulty.adam_output.t, 7);
+
+        let candidate_state_norm = candidate.network.cells[0]
+            .state()
+            .iter()
+            .map(|value| value * value)
+            .sum::<f32>()
+            .sqrt();
+        assert_eq!(candidate_state_norm, 0.0);
+        assert!(candidate.network.adam_states.iter().all(|state| state.t == 0));
+        assert_eq!(candidate.network.adam_output.t, 0);
+
         let repaired_tau = candidate.network.flattened_tau();
         for (repaired, expected) in repaired_tau.iter().zip(healthy_tau.iter()) {
             assert!((repaired - expected).abs() < 1e-5);
@@ -399,6 +435,7 @@ mod tests {
         ];
         let mut healthy_eval = healthy.clone();
         let mut faulty_eval = faulty.clone();
+        faulty_eval.reset_states_only();
         let mut repaired_eval = candidate.network.clone();
         let mut faulty_output_error = 0.0_f64;
         let mut repaired_output_error = 0.0_f64;
