@@ -620,13 +620,13 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
         Some(_) => {
             return (
                 ScopeDisposition::Inapplicable,
-                "subject digest differs from request scope".to_owned(),
+                "subject digest does not match claim scope".to_owned(),
             );
         }
         None => {
             return (
                 ScopeDisposition::Unverifiable,
-                "subject digest is absent from the Evidence record".to_owned(),
+                "Evidence has no subject digest to bind this claim".to_owned(),
             );
         }
     }
@@ -634,7 +634,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
     if string_at(evidence, &["operation"]) != Some(claim.scope.operation.as_str()) {
         return (
             ScopeDisposition::Inapplicable,
-            "operation differs from request scope".to_owned(),
+            "operation does not match claim scope".to_owned(),
         );
     }
 
@@ -653,8 +653,8 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
         return (
             platform,
             match platform {
-                ScopeDisposition::Inapplicable => "platform differs from request scope",
-                ScopeDisposition::Unverifiable => "platform is missing or broader than the request",
+                ScopeDisposition::Inapplicable => "platform does not match claim scope",
+                ScopeDisposition::Unverifiable => "platform scope is absent or broader than the Evidence observation",
                 ScopeDisposition::Match => unreachable!(),
             }
             .to_owned(),
@@ -669,8 +669,8 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
         return (
             environment,
             match environment {
-                ScopeDisposition::Inapplicable => "environment ID differs from request scope",
-                ScopeDisposition::Unverifiable => "environment ID is absent at requested scope",
+                ScopeDisposition::Inapplicable => "environment_id does not match claim scope",
+                ScopeDisposition::Unverifiable => "environment identity is not recorded at the requested scope",
                 ScopeDisposition::Match => unreachable!(),
             }
             .to_owned(),
@@ -679,7 +679,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
 
     (
         ScopeDisposition::Match,
-        "subject, operation and represented environment dimensions match".to_owned(),
+        "exact subject, operation and represented environment scope match".to_owned(),
     )
 }
 
@@ -745,7 +745,7 @@ fn claim_ceiling(predicate: Predicate) -> Vec<String> {
     ];
     if predicate == Predicate::ProviderReportedObservation {
         ceiling.push(
-            "JCS equality establishes a recorded provider observation only; it does not establish artifact semantics, completeness, authenticity or safety.".to_owned(),
+            "Exact normalized_result equality establishes a recorded provider observation only; it does not establish artifact semantics, completeness, authenticity or safety.".to_owned(),
         );
     } else {
         ceiling.push(
@@ -829,7 +829,7 @@ fn derive_reference_result(
                 evidence_id,
                 AssessmentKind::Inapplicable,
                 &record.value,
-                "source predicate type differs from request",
+                "source predicate_type does not match the requested provider observation",
             ));
             continue;
         }
@@ -841,7 +841,7 @@ fn derive_reference_result(
                 evidence_id,
                 AssessmentKind::Supports,
                 &record.value,
-                "normalized_result equals asserted_value under RFC 8785 JCS",
+                "normalized_result matches asserted_value under RFC 8785 canonical JSON semantics",
             ));
         } else {
             contradicts += 1;
@@ -849,7 +849,7 @@ fn derive_reference_result(
                 evidence_id,
                 AssessmentKind::Contradicts,
                 &record.value,
-                "normalized_result differs from asserted_value under RFC 8785 JCS",
+                "normalized_result differs from asserted_value",
             ));
         }
     }
