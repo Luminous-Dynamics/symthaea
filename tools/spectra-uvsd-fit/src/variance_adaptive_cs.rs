@@ -116,7 +116,7 @@ impl VarianceAdaptiveSubGaussianCs {
         }
 
         let subgaussian_proxy = width * 0.5;
-        if !subgaussian_proxy.is_finite() {
+        if !subgaussian_proxy.is_finite() || (width > 0.0 && subgaussian_proxy == 0.0) {
             return Err(VarianceAdaptiveCsError::InvalidScoreRange);
         }
         if subgaussian_proxy > 0.0 {
@@ -406,6 +406,10 @@ mod tests {
         );
         assert_eq!(
             VarianceAdaptiveSubGaussianCs::new(0.0, f64::MIN_POSITIVE, 0.05),
+            Err(VarianceAdaptiveCsError::InvalidScoreRange)
+        );
+        assert_eq!(
+            VarianceAdaptiveSubGaussianCs::new(0.0, f64::from_bits(1), 0.05),
             Err(VarianceAdaptiveCsError::InvalidScoreRange)
         );
         assert_eq!(
