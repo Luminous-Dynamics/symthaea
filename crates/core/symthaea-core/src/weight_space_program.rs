@@ -316,7 +316,11 @@ impl WeightProgram {
                     max_abs_delta = max_abs_delta.max(delta);
                 }
             }
-            if before.constraints.max_l2_delta.is_some_and(|limit| group_delta_sq.sqrt() > f64::from(limit)) {
+            if before
+                .constraints
+                .max_l2_delta
+                .is_some_and(|limit| group_delta_sq.sqrt() > f64::from(limit))
+            {
                 return Err(WeightProgramError::GroupDeltaBudgetExceeded);
             }
         }
@@ -420,14 +424,8 @@ fn validate_group(
     let violates = group.values.iter().any(|value| {
         group.constraints.min_value.is_some_and(|min| *value < min)
             || group.constraints.max_value.is_some_and(|max| *value > max)
-    }) || group
-        .constraints
-        .min_l2_norm
-        .is_some_and(|min| norm < min)
-        || group
-            .constraints
-            .max_l2_norm
-            .is_some_and(|max| norm > max);
+    }) || group.constraints.min_l2_norm.is_some_and(|min| norm < min)
+        || group.constraints.max_l2_norm.is_some_and(|max| norm > max);
     if violates {
         return Err(if validate_baseline {
             WeightProgramError::BaselineConstraintViolation
@@ -452,14 +450,20 @@ fn validate_group(
                 return Err(WeightProgramError::InvalidConstraints);
             }
             if matches!(id, CfCWeightGroupId::CellTimeConstant { .. })
-                && !group.constraints.min_value.is_some_and(|minimum| minimum > 0.0)
+                && !group
+                    .constraints
+                    .min_value
+                    .is_some_and(|minimum| minimum > 0.0)
             {
                 return Err(WeightProgramError::InvalidConstraints);
             }
         }
         WeightProgramTarget::HdcLtc(_)
             if group.role != ParameterGroupRole::Hypervector
-                || !group.constraints.max_l2_norm.is_some_and(|maximum| maximum <= 2.0) =>
+                || !group
+                    .constraints
+                    .max_l2_norm
+                    .is_some_and(|maximum| maximum <= 2.0) =>
         {
             return Err(WeightProgramError::InvalidConstraints);
         }
@@ -492,7 +496,10 @@ fn validate_group_constraints(
             return Err(WeightProgramError::InvalidConstraints);
         }
     }
-    if constraints.min_value.zip(constraints.max_value).is_some_and(|(a, b)| a > b)
+    if constraints
+        .min_value
+        .zip(constraints.max_value)
+        .is_some_and(|(a, b)| a > b)
         || constraints
             .min_l2_norm
             .zip(constraints.max_l2_norm)
@@ -517,9 +524,7 @@ fn apply_operation(
             }
             group.values.clone_from(values);
         }
-        WeightProgramOperation::AddDelta {
-            offset, values, ..
-        } => {
+        WeightProgramOperation::AddDelta { offset, values, .. } => {
             if values.is_empty() {
                 return Err(WeightProgramError::InvalidDeltaRange);
             }
@@ -594,13 +599,9 @@ fn candidate_digest(
     hasher.update(base_model_digest.as_bytes());
 
     for group in groups {
-        let metadata = serde_json::to_vec(&(
-            &group.target,
-            group.role,
-            &group.shape,
-            &group.constraints,
-        ))
-        .map_err(|_| WeightProgramError::InvalidConstraints)?;
+        let metadata =
+            serde_json::to_vec(&(&group.target, group.role, &group.shape, &group.constraints))
+                .map_err(|_| WeightProgramError::InvalidConstraints)?;
         hasher.update(&(metadata.len() as u64).to_le_bytes());
         hasher.update(&metadata);
         hasher.update(&(group.shape.len() as u64).to_le_bytes());
@@ -632,9 +633,9 @@ mod tests {
             target_specification_digest: digest('d'),
             groups: vec![
                 ParameterGroupSnapshot {
-                    target: WeightProgramTarget::CfC(
-                        CfCWeightGroupId::CellTimeConstant { cell: 0 },
-                    ),
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant {
+                        cell: 0,
+                    }),
                     role: ParameterGroupRole::TimeConstant,
                     shape: vec![2],
                     values: vec![0.5, 0.75],
@@ -646,9 +647,7 @@ mod tests {
                     },
                 },
                 ParameterGroupSnapshot {
-                    target: WeightProgramTarget::HdcLtc(
-                        HdcLtcParameterGroupId::GateBias,
-                    ),
+                    target: WeightProgramTarget::HdcLtc(HdcLtcParameterGroupId::GateBias),
                     role: ParameterGroupRole::Hypervector,
                     shape: vec![2],
                     values: vec![0.1, -0.1],
@@ -682,13 +681,13 @@ mod tests {
     fn valid_program_materializes_detached_candidate() {
         let base = snapshot();
         let proposal = program(WeightProgramOperation::AddDelta {
-            target: WeightProgramTarget::CfC(
-                CfCWeightGroupId::CellTimeConstant { cell: 0 },
-            ),
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
             offset: 0,
             values: vec![0.1, 0.0],
         });
-        let candidate = proposal.validate_and_materialize(&base).expect("valid program");
+        let candidate = proposal
+            .validate_and_materialize(&base)
+            .expect("valid program");
         assert_eq!(base.groups[0].values, vec![0.5, 0.75]);
         assert_eq!(candidate.groups[0].values, vec![0.6, 0.75]);
         assert_eq!(candidate.receipt.edited_group_count, 1);
@@ -702,9 +701,7 @@ mod tests {
     fn stale_model_digest_is_rejected_before_materialization() {
         let base = snapshot();
         let mut proposal = program(WeightProgramOperation::ScaleRange {
-            target: WeightProgramTarget::CfC(
-                CfCWeightGroupId::CellTimeConstant { cell: 0 },
-            ),
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
             start: 0,
             end: 2,
             factor: 1.1,
@@ -720,9 +717,7 @@ mod tests {
     fn invalid_tau_candidate_is_rejected_without_changing_snapshot() {
         let base = snapshot();
         let proposal = program(WeightProgramOperation::ReplaceGroup {
-            target: WeightProgramTarget::CfC(
-                CfCWeightGroupId::CellTimeConstant { cell: 0 },
-            ),
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
             values: vec![0.5, -0.1],
         });
         assert_eq!(
@@ -735,9 +730,7 @@ mod tests {
     #[test]
     fn duplicate_target_operations_are_rejected() {
         let base = snapshot();
-        let target = WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant {
-            cell: 0,
-        });
+        let target = WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 });
         let mut proposal = program(WeightProgramOperation::ScaleRange {
             target: target.clone(),
             start: 0,
@@ -819,15 +812,17 @@ mod tests {
     fn candidate_digest_is_deterministic() {
         let base = snapshot();
         let proposal = program(WeightProgramOperation::ScaleRange {
-            target: WeightProgramTarget::CfC(
-                CfCWeightGroupId::CellTimeConstant { cell: 0 },
-            ),
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
             start: 0,
             end: 2,
             factor: 1.1,
         });
-        let first = proposal.validate_and_materialize(&base).expect("first candidate");
-        let second = proposal.validate_and_materialize(&base).expect("second candidate");
+        let first = proposal
+            .validate_and_materialize(&base)
+            .expect("first candidate");
+        let second = proposal
+            .validate_and_materialize(&base)
+            .expect("second candidate");
         assert_eq!(
             first.receipt.candidate_snapshot_digest,
             second.receipt.candidate_snapshot_digest
