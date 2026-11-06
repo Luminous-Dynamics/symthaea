@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "audit_id": "randi-2023-atlas-source-reconciliation-metadata-v1",
+  "claim_scope": "metadata_inventory",
+  "paper": {
+    "title": "Neural signal propagation atlas of Caenorhabditis elegans",
+    "doi": "10.1038/s41586-023-06683-4",
+    "publication_date": "2023-11-01",
+    "source_data_url": "https://doi.org/10.17605/OSF.IO/E2SYT"
+  },
+  "dandi_release": {
+    "dandiset_id": "001075",
+    "version": "0.240930.1859",
+    "doi": "10.48324/dandi.001075/0.240930.1859",
+    "metadata_url": "https://dandiarchive.org/dandiset/001075/0.240930.1859",
+    "asset_manifest_url": "https://api.dandiarchive.org/api/dandisets/001075/versions/0.240930.1859/assets/",
+    "declared_asset_count": 223,
+    "declared_total_size": "4.1 TB",
+    "subject_count": 113,
+    "data_standard": "NWB",
+    "license": "CC-BY-4.0",
+    "open_access": true,
+    "inventory_state": "REMOTE_METADATA_ONLY",
+    "inventory_manifest_sha256": null,
+    "materialized_asset_count": 0
+  },
+  "osf_release": {
+    "doi": "10.17605/OSF.IO/E2SYT",
+    "project_id": "E2SYT",
+    "metadata_url": "https://osf.io/E2SYT/",
+    "inventory_state": "NOT_YET_ASSESSED",
+    "inventory_manifest_sha256": null,
+    "artifact_records": []
+  },
+  "code_repositories": [
+    {
+      "repository_id": "pumpprobe",
+      "url": "https://github.com/leiferlab/pumpprobe",
+      "revision_status": "UNPINNED",
+      "commit_sha": null,
+      "license": "GPL-3.0"
+    },
+    {
+      "repository_id": "wormdatamodel",
+      "url": "https://github.com/leiferlab/wormdatamodel",
+      "revision_status": "UNPINNED",
+      "commit_sha": null,
+      "license": null
+    },
+    {
+      "repository_id": "wormbrain",
+      "url": "https://github.com/leiferlab/wormbrain",
+      "revision_status": "UNPINNED",
+      "commit_sha": null,
+      "license": null
+    }
+  ],
+  "evidence_components": [
+    {
+      "component_id": "STIMULATED_RAW_RECORDINGS",
+      "description": "NWB optogenetic stimulation and imaging source recordings",
+      "availability": "REMOTE_METADATA_ONLY",
+      "source_id": "DANDI:001075@0.240930.1859",
+      "content_sha256": null
+    },
+    {
+      "component_id": "PROCESSED_TRACES",
+      "description": "Per-neuron processed trace products and derived response summaries",
+      "availability": "REMOTE_METADATA_ONLY",
+      "source_id": "DANDI:001075@0.240930.1859",
+      "content_sha256": null
+    },
+    {
+      "component_id": "SEGMENTATION_AND_ROI_LABELS",
+      "description": "NWB plane segmentation, ROI labels and neuron identity mappings",
+      "availability": "REMOTE_METADATA_ONLY",
+      "source_id": "DANDI:001075@0.240930.1859",
+      "content_sha256": null
+    },
+    {
+      "component_id": "STIMULATION_EVENT_TABLES",
+      "description": "Stimulus timing, target position and per-recording stimulation tables",
+      "availability": "REMOTE_METADATA_ONLY",
+      "source_id": "DANDI:001075@0.240930.1859",
+      "content_sha256": null
+    },
+    {
+      "component_id": "NEURON_IDENTITY_MAP",
+      "description": "Paper and export neuron identity / manual target lineage",
+      "availability": "NOT_YET_ASSESSED",
+      "source_id": "DANDI:001075 + OSF:E2SYT",
+      "content_sha256": null
+    },
+    {
+      "component_id": "EVENT_EXCLUSION_FLAGS",
+      "description": "Paper export exclusion markers and event eligibility rules",
+      "availability": "NOT_YET_ASSESSED",
+      "source_id": "OSF:E2SYT",
+      "content_sha256": null
+    },
+    {
+      "component_id": "UNSTIMULATED_NULL_CONTROLS",
+      "description": "Raw no-stimulation empirical null recordings required for q and q_eq",
+      "availability": "NOT_YET_ASSESSED",
+      "source_id": "OSF:E2SYT + analysis repository",
+      "content_sha256": null
+    },
+    {
+      "component_id": "PAPER_Q_SOURCE_TABLE",
+      "description": "Published source table containing q / functional-connection references",
+      "availability": "NOT_YET_ASSESSED",
+      "source_id": "Nature source data",
+      "content_sha256": null
+    },
+    {
+      "component_id": "PAPER_QEQ_SOURCE_TABLE",
+      "description": "Published source table containing q_eq / equivalence references",
+      "availability": "NOT_YET_ASSESSED",
+      "source_id": "Nature source data",
+      "content_sha256": null
+    },
+    {
+      "component_id": "ANALYSIS_METHOD_AND_PARAMETERS",
+      "description": "Published methods, including empirical null, Fisher combination, Storey-Tibshirani FDR and epsilon=1.2 sigma TOST",
+      "availability": "SOURCE_TABLE_AVAILABLE",
+      "source_id": "Nature 623 (2023) Methods",
+      "content_sha256": null
+    }
+  ],
+  "reproduction_evidence": {
+    "event_exclusion_lineage_complete": false,
+    "neuron_identity_lineage_complete": false,
+    "paper_source_tables_verified": false,
+    "paper_source_tables_sha256": null,
+    "analysis_code_commit_sha": null,
+    "q_method_reproduced": false,
+    "qeq_method_reproduced": false,
+    "qeq_epsilon_sigma": null
+  },
+  "independent_audit_leads": [
+    {
+      "lead_id": "encore-trace-bearing-subject-count",
+      "source_url": "https://encorescience.org/datasets/dandi/001075/",
+      "claim": "An independent reproduction audit reports that 110 of 113 DANDI subjects have segmentation traces and stimulation tables, while three have imaging files only.",
+      "status": "UNVERIFIED_LEAD",
+      "verification_receipt_sha256": null
+    },
+    {
+      "lead_id": "encore-paper-export-exclusion-flags",
+      "source_url": "https://encorescience.org/datasets/dandi/001075/",
+      "claim": "An independent reproduction audit reports 950 stimulations marked excluded in the paper export and differences between DANDI-derived and paper-exported event/ROI assignments.",
+      "status": "UNVERIFIED_LEAD",
+      "verification_receipt_sha256": null
+    },
+    {
+      "lead_id": "encore-null-control-availability",
+      "source_url": "https://encorescience.org/datasets/dandi/001075/",
+      "claim": "An independent reproduction audit reports that the raw unstimulated null-control recordings used to derive q and q_eq were not located in the inspected public DANDI/OSF materials.",
+      "status": "UNVERIFIED_LEAD",
+      "verification_receipt_sha256": null
+    }
+  ],
+  "declared_reproduction_tier": "METADATA_ONLY"
+}
