@@ -3,7 +3,7 @@
 **Date:** 6 November 2026  
 **Status:** Research and evaluation strategy; targets are not results.  
 **Parent:** [#10417 — Reproducible external SOTA and industry comparison ledger](https://github.com/Luminous-Dynamics/symthaea/issues/10417)  
-**Composes:** #10307, #10390, #10393, #10402, #10409, #10088, #10190, #10133, #10249, #10421.
+**Composes:** #10088, #10133, #10190, #10249, #10382, #10417, #10454, #10721.
 
 ## Executive decision
 
