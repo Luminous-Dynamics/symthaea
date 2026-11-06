@@ -3074,7 +3074,7 @@ mod tests {
         assert_eq!(&midi[14..18], b"MTrk");
         assert!(midi.len() > 60);
         assert!(midi.windows(3).any(|window| window == [0x90, 65, 88]));
-        assert!(midi.windows(3).any(|window| window == [0x90, 74, 76]));
+        assert!(midi.windows(3).any(|window| window == [0x94, 74, 76]));
         assert!(midi.ends_with(&[0x00, 0xff, 0x2f, 0x00]));
     }
 
@@ -3119,7 +3119,54 @@ mod tests {
 
             assert_ne!(target_notes_before, target_notes_after);
             assert_eq!(protected_before, protected_after);
+            if input.dimension == Dimension::Tempo {
+                assert_ne!(midi_tempo(&before), midi_tempo(&after));
+            }
+            if protected.dimension == Dimension::Tempo {
+                assert_eq!(midi_tempo(&before), midi_tempo(&after));
+            }
         }
+    }
+
+    fn midi_tempo(midi: &[u8]) -> Option<[u8; 3]> {
+        let track_len = u32::from_be_bytes(midi[18..22].try_into().unwrap()) as usize;
+        let track = &midi[22..22 + track_len];
+        let mut cursor = 0usize;
+        while cursor < track.len() {
+            let first = track[cursor];
+            cursor += 1;
+            let mut delta = u32::from(first & 0x7f);
+            let mut byte = first;
+            while byte & 0x80 != 0 {
+                byte = track[cursor];
+                cursor += 1;
+                delta = (delta << 7) | u32::from(byte & 0x7f);
+            }
+            let _ = delta;
+            let status = track[cursor];
+            cursor += 1;
+            if status == 0xff {
+                let meta_type = track[cursor];
+                cursor += 1;
+                let length = usize::from(track[cursor]);
+                cursor += 1;
+                if meta_type == 0x51 && length == 3 {
+                    let tempo = track[cursor..cursor + 3].try_into().unwrap();
+                    return Some(tempo);
+                }
+                cursor += length;
+                if meta_type == 0x2f {
+                    break;
+                }
+            } else if status & 0xf0 == 0x80 || status & 0xf0 == 0x90 {
+                cursor += 2;
+            } else if status & 0xf0 == 0xc0 {
+                cursor += 1;
+            } else {
+                panic!("unexpected MIDI status byte: {status:#x}");
+            }
+        }
+        None
     }
 
     fn midi_channel_note_events(midi: &[u8], status: u8) -> Vec<Vec<u8>> {
