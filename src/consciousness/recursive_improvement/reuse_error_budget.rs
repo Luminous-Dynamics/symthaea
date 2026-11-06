@@ -206,7 +206,6 @@ impl ReuseCandidateEvidence {
     }
 }
 
-
 /// Candidate evidence for one predeclared bounded-score estimand.
 ///
 /// Each value is candidate-minus-incumbent in [-1, 1]. The empirical mean is
@@ -353,8 +352,6 @@ pub fn evaluate_reuse_round(
     )?
     .decision())
 }
-
-
 
 /// Evaluate exactly K bounded-score candidates and return only the coarse
 /// REUSE round decision. Detailed evidence and certificates remain internal.
@@ -532,8 +529,6 @@ pub(crate) fn evaluate_reuse_round_audited(
         cumulative_lower_bound,
     })
 }
-
-
 
 /// Trusted evaluator audit record for the bounded-score REUSE route.
 /// Full certificate and cumulative progress remain outside proposer feedback.
@@ -955,7 +950,9 @@ mod bounded_score_round_tests {
             evaluate_bounded_score_reuse_round(0.05, 1, 0, 2, 0.05, &candidates).unwrap();
         assert_eq!(
             decision,
-            ReuseRoundDecision::PromoteCandidate { candidate_number: 2 }
+            ReuseRoundDecision::PromoteCandidate {
+                candidate_number: 2
+            }
         );
     }
 
@@ -1016,4 +1013,3 @@ mod bounded_score_round_tests {
         );
     }
 }
-
