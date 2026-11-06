@@ -1,0 +1,467 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_MANIFEST.schema.json",
+  "title": "ConnectomeBench2 versioned provenance and comparator manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "checked_date",
+    "sources",
+    "dataset_revisions",
+    "v2_full_test",
+    "v2_model_results",
+    "open_reproducibility_gaps",
+    "claim_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "checked_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "dataset_revisions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/revision"
+      }
+    },
+    "v2_full_test": {
+      "$ref": "#/$defs/full_test"
+    },
+    "v2_model_results": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/model_result"
+      }
+    },
+    "open_reproducibility_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_policy": {
+      "$ref": "#/$defs/claim_policy"
+    }
+  },
+  "$defs": {
+    "sha1": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "kind",
+        "title",
+        "url",
+        "publication_status",
+        "observed_identity"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "dataset_card",
+            "dataset_commit",
+            "paper",
+            "preprint",
+            "conference_proceedings"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "publication_status": {
+          "enum": [
+            "peer_reviewed",
+            "preprint",
+            "under_submission",
+            "dataset_documentation"
+          ]
+        },
+        "observed_identity": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "revision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_id",
+        "revision_selector",
+        "immutable_git_commit_sha1",
+        "pin_status",
+        "row_count",
+        "train_count",
+        "validation_count",
+        "test_count",
+        "denominator_kind",
+        "em_rows",
+        "geometry_rows",
+        "sample_type_counts",
+        "source_ids",
+        "sample_type_count_reconciliation"
+      ],
+      "properties": {
+        "revision_id": {
+          "enum": [
+            "V1_INITIAL_SUBMISSION",
+            "V2_PAPER_REVISION"
+          ]
+        },
+        "revision_selector": {
+          "type": "string",
+          "minLength": 1
+        },
+        "immutable_git_commit_sha1": {
+          "$ref": "#/$defs/sha1"
+        },
+        "pin_status": {
+          "enum": [
+            "PINNED_IMMUTABLE_REVISION",
+            "UNPINNED_IMMUTABLE_REVISION"
+          ]
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "train_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "validation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "test_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "denominator_kind": {
+          "enum": [
+            "DATASET_ROWS",
+            "EXPERT_LABELLED_DECISIONS"
+          ]
+        },
+        "em_rows": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "geometry_rows": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sample_type_counts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sample_type"
+          }
+        },
+        "source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sample_type_count_reconciliation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reported_sum",
+            "delta_vs_row_count",
+            "status"
+          ],
+          "properties": {
+            "reported_sum": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "delta_vs_row_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "status": {
+              "enum": [
+                "RECONCILED",
+                "SOURCE_REPORTED_COUNTS_DO_NOT_RECONCILE",
+                "NOT_REPORTED"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "sample_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_type",
+        "rows",
+        "em_coverage_percent",
+        "coverage_rounding"
+      ],
+      "properties": {
+        "sample_type": {
+          "enum": [
+            "adjacent_control",
+            "junction_control",
+            "synapse_control",
+            "merge_edit",
+            "split_edit"
+          ]
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "em_coverage_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "coverage_rounding": {
+          "enum": [
+            "EXACT",
+            "ROUNDED_AS_SOURCE_REPORTED",
+            "NOT_REPORTED"
+          ]
+        }
+      }
+    },
+    "full_test": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_id",
+        "test_operation_count",
+        "species_task_counts",
+        "train_count",
+        "validation_count",
+        "task_metrics",
+        "metric_name",
+        "test_protocol_note"
+      ],
+      "properties": {
+        "revision_id": {
+          "const": "V2_PAPER_REVISION"
+        },
+        "test_operation_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "species_task_counts": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/species_task_count"
+          }
+        },
+        "train_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "validation_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "task_metrics": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/task_metric"
+          }
+        },
+        "metric_name": {
+          "const": "BALANCED_ACCURACY_PERCENT"
+        },
+        "test_protocol_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "species_task_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "species",
+        "split_error_count",
+        "merge_error_count"
+      ],
+      "properties": {
+        "species": {
+          "enum": [
+            "mouse",
+            "fly",
+            "human",
+            "zebrafish"
+          ]
+        },
+        "split_error_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "merge_error_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "task_metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "training_regime",
+        "split_error_balanced_accuracy_percent",
+        "merge_error_balanced_accuracy_percent",
+        "evaluation_regime"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "training_regime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_error_balanced_accuracy_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "merge_error_balanced_accuracy_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "evaluation_regime": {
+          "enum": [
+            "FULL_V2_NATURAL_TEST_SPLIT"
+          ]
+        }
+      }
+    },
+    "model_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model",
+        "training_regime",
+        "split_error_balanced_accuracy_percent",
+        "merge_error_balanced_accuracy_percent",
+        "dataset_revision_id",
+        "table"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "training_regime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split_error_balanced_accuracy_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "merge_error_balanced_accuracy_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "dataset_revision_id": {
+          "const": "V2_PAPER_REVISION"
+        },
+        "table": {
+          "const": "TABLE_2_FULL_V2_TEST"
+        }
+      }
+    },
+    "claim_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_v2_exact_reproduction_claim",
+        "require_immutable_v2_revision",
+        "prohibit_cross_revision_denominator_pooling",
+        "prohibit_inferred_v2_em_coverage",
+        "require_matched_endpoint_comparison"
+      ],
+      "properties": {
+        "allow_v2_exact_reproduction_claim": {
+          "type": "boolean"
+        },
+        "require_immutable_v2_revision": {
+          "const": true
+        },
+        "prohibit_cross_revision_denominator_pooling": {
+          "const": true
+        },
+        "prohibit_inferred_v2_em_coverage": {
+          "const": true
+        },
+        "require_matched_endpoint_comparison": {
+          "const": true
+        }
+      }
+    }
+  }
+}

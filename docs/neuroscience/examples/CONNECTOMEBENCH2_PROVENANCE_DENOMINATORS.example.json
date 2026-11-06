@@ -1,0 +1,244 @@
+{
+  "schema_version": 1,
+  "manifest_id": "connectomebench2-v1-v2-provenance-reconciliation-2026-11-06",
+  "checked_date": "2026-11-06",
+  "sources": [
+    {
+      "source_id": "cb2_hf_main",
+      "kind": "dataset_card",
+      "title": "ConnectomeBench2 dataset card — main explicitly identifies itself as V1",
+      "url": "https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2",
+      "publication_status": "dataset_documentation",
+      "observed_identity": "Hugging Face dataset README at main commit 1039fdf5d69f221a7078f0a66c31b1cc04080cc3; card says main is initially submitted V1 and points to revision v2 for paper dataset."
+    },
+    {
+      "source_id": "cb2_hf_main_commit",
+      "kind": "dataset_commit",
+      "title": "ConnectomeBench2 V1 main README commit",
+      "url": "https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2/commit/1039fdf5d69f221a7078f0a66c31b1cc04080cc3",
+      "publication_status": "dataset_documentation",
+      "observed_identity": "Full Git commit SHA observed on V1 main README page; V1 source revision pin only."
+    },
+    {
+      "source_id": "cb2_paper",
+      "kind": "paper",
+      "title": "ConnectomeBench2: A Unified Benchmark for Automated Connectomic Proofreading",
+      "url": "https://synthneuro.org/publications/connectomebench2-a-unified-benchmark-for-automated-connectomic-proofreading/",
+      "publication_status": "under_submission",
+      "observed_identity": "Paper page reports 716485 expert-labelled decisions and more than 4500000 associated images across mouse, fly, human and zebrafish."
+    },
+    {
+      "source_id": "vlm_preprint_2609_36492",
+      "kind": "preprint",
+      "title": "Benchmarking Vision-Language Models on Synapse Detection and Proofreading in Connectomics",
+      "url": "https://arxiv.org/abs/2609.36492",
+      "publication_status": "preprint",
+      "observed_identity": "Version dated 2026-09-29; reports V2 train/validation/test counts and full test species/task split with Table 2/3 metrics."
+    },
+    {
+      "source_id": "connectomebench_neurips_2025",
+      "kind": "conference_proceedings",
+      "title": "ConnectomeBench: Can LLMs proofread the connectome?",
+      "url": "https://proceedings.neurips.cc/paper_files/paper/2025/hash/4a70f0c8443593ca59a88ebc8a937ed6-Abstract-Datasets_and_Benchmarks_Track.html",
+      "publication_status": "peer_reviewed",
+      "observed_identity": "NeurIPS 2025 Datasets and Benchmarks Track; distinct earlier benchmark and denominator."
+    },
+    {
+      "source_id": "global_stopping_preprint",
+      "kind": "preprint",
+      "title": "Connectome quality converges predictably to reveal optimal stopping points during proofreading",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13345220/",
+      "publication_status": "preprint",
+      "observed_identity": "bioRxiv preprint version 1 dated 2026-07-04; global graph-invariant stopping proxy."
+    }
+  ],
+  "dataset_revisions": [
+    {
+      "revision_id": "V1_INITIAL_SUBMISSION",
+      "revision_selector": "main",
+      "immutable_git_commit_sha1": "1039fdf5d69f221a7078f0a66c31b1cc04080cc3",
+      "pin_status": "PINNED_IMMUTABLE_REVISION",
+      "row_count": 401170,
+      "train_count": 319727,
+      "validation_count": 43517,
+      "test_count": 37926,
+      "denominator_kind": "DATASET_ROWS",
+      "em_rows": 251499,
+      "geometry_rows": 401170,
+      "sample_type_counts": [
+        {
+          "sample_type": "adjacent_control",
+          "rows": 121333,
+          "em_coverage_percent": 100,
+          "coverage_rounding": "EXACT"
+        },
+        {
+          "sample_type": "junction_control",
+          "rows": 38272,
+          "em_coverage_percent": 100,
+          "coverage_rounding": "EXACT"
+        },
+        {
+          "sample_type": "synapse_control",
+          "rows": 18182,
+          "em_coverage_percent": 100,
+          "coverage_rounding": "EXACT"
+        },
+        {
+          "sample_type": "merge_edit",
+          "rows": 146461,
+          "em_coverage_percent": 38,
+          "coverage_rounding": "ROUNDED_AS_SOURCE_REPORTED"
+        },
+        {
+          "sample_type": "split_edit",
+          "rows": 77213,
+          "em_coverage_percent": 23,
+          "coverage_rounding": "ROUNDED_AS_SOURCE_REPORTED"
+        }
+      ],
+      "source_ids": [
+        "cb2_hf_main",
+        "cb2_hf_main_commit"
+      ],
+      "sample_type_count_reconciliation": {
+        "reported_sum": 401461,
+        "delta_vs_row_count": 291,
+        "status": "SOURCE_REPORTED_COUNTS_DO_NOT_RECONCILE"
+      }
+    },
+    {
+      "revision_id": "V2_PAPER_REVISION",
+      "revision_selector": "v2",
+      "immutable_git_commit_sha1": null,
+      "pin_status": "UNPINNED_IMMUTABLE_REVISION",
+      "row_count": 716485,
+      "train_count": 531734,
+      "validation_count": 82822,
+      "test_count": 101929,
+      "denominator_kind": "EXPERT_LABELLED_DECISIONS",
+      "em_rows": null,
+      "geometry_rows": null,
+      "sample_type_counts": [],
+      "source_ids": [
+        "cb2_hf_main",
+        "cb2_paper",
+        "vlm_preprint_2609_36492"
+      ],
+      "sample_type_count_reconciliation": {
+        "reported_sum": null,
+        "delta_vs_row_count": null,
+        "status": "NOT_REPORTED"
+      }
+    }
+  ],
+  "v2_full_test": {
+    "revision_id": "V2_PAPER_REVISION",
+    "test_operation_count": 101929,
+    "species_task_counts": [
+      {
+        "species": "mouse",
+        "split_error_count": 20879,
+        "merge_error_count": 22094
+      },
+      {
+        "species": "fly",
+        "split_error_count": 24065,
+        "merge_error_count": 24203
+      },
+      {
+        "species": "human",
+        "split_error_count": 5351,
+        "merge_error_count": 60
+      },
+      {
+        "species": "zebrafish",
+        "split_error_count": 5223,
+        "merge_error_count": 54
+      }
+    ],
+    "train_count": 531734,
+    "validation_count": 82822,
+    "task_metrics": [
+      {
+        "model": "Qwen3.5-9B",
+        "training_regime": "LoRA adapter trained on V2 train and validation",
+        "split_error_balanced_accuracy_percent": 94.6,
+        "merge_error_balanced_accuracy_percent": 90.2,
+        "evaluation_regime": "FULL_V2_NATURAL_TEST_SPLIT"
+      },
+      {
+        "model": "InternVL3-8B",
+        "training_regime": "LoRA adapter trained on V2 train and validation",
+        "split_error_balanced_accuracy_percent": 93.9,
+        "merge_error_balanced_accuracy_percent": 90.1,
+        "evaluation_regime": "FULL_V2_NATURAL_TEST_SPLIT"
+      },
+      {
+        "model": "Gemma 4 12B",
+        "training_regime": "LoRA adapter trained on V2 train and validation",
+        "split_error_balanced_accuracy_percent": 95,
+        "merge_error_balanced_accuracy_percent": 90.9,
+        "evaluation_regime": "FULL_V2_NATURAL_TEST_SPLIT"
+      },
+      {
+        "model": "ConnectomeBench2 ViT-B",
+        "training_regime": "EM-only source-paper reference",
+        "split_error_balanced_accuracy_percent": 94.2,
+        "merge_error_balanced_accuracy_percent": 91.1,
+        "evaluation_regime": "FULL_V2_NATURAL_TEST_SPLIT"
+      }
+    ],
+    "metric_name": "BALANCED_ACCURACY_PERCENT",
+    "test_protocol_note": "Full V2 test split with natural class mix. The 101929 denominator and per-species counts are reported in arXiv:2609.36492. The preprint drops the oblique em_best plane for the merge-error task due to label leakage. This is distinct from its balanced mouse/fly subset and unseen-species transfer regime."
+  },
+  "v2_model_results": [
+    {
+      "model": "Qwen3.5-9B",
+      "training_regime": "LoRA adapter trained on V2 train and validation",
+      "split_error_balanced_accuracy_percent": 94.6,
+      "merge_error_balanced_accuracy_percent": 90.2,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    },
+    {
+      "model": "InternVL3-8B",
+      "training_regime": "LoRA adapter trained on V2 train and validation",
+      "split_error_balanced_accuracy_percent": 93.9,
+      "merge_error_balanced_accuracy_percent": 90.1,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    },
+    {
+      "model": "Gemma 4 12B",
+      "training_regime": "LoRA adapter trained on V2 train and validation",
+      "split_error_balanced_accuracy_percent": 95,
+      "merge_error_balanced_accuracy_percent": 90.9,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    },
+    {
+      "model": "ConnectomeBench2 ViT-B",
+      "training_regime": "EM-only source-paper reference",
+      "split_error_balanced_accuracy_percent": 94.2,
+      "merge_error_balanced_accuracy_percent": 91.1,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    }
+  ],
+  "open_reproducibility_gaps": [
+    "Resolve the immutable Git commit SHA behind the Hugging Face dataset selector v2.",
+    "Materialize the exact V2 dataset card and exact shard manifest with SHA-256 identities.",
+    "Recompute V2 row counts by split, species, sample_type, task_routing and has_em from the pinned V2 snapshot.",
+    "Reconcile the 716485 paper decision count to the exact V2 dataset rows and every task-valid row filter.",
+    "Pin image view construction and exclude/handle em_best according to task-specific leakage controls.",
+    "Resolve upstream per-species licenses and rights for any derived data or redistribution."
+  ],
+  "claim_policy": {
+    "allow_v2_exact_reproduction_claim": false,
+    "require_immutable_v2_revision": true,
+    "prohibit_cross_revision_denominator_pooling": true,
+    "prohibit_inferred_v2_em_coverage": true,
+    "require_matched_endpoint_comparison": true
+  }
+}
