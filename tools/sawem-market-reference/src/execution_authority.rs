@@ -170,6 +170,7 @@ pub enum ExecutionAuthorityError {
     InvalidEvidenceTimestamp,
     DuplicateAccreditationStage,
     MissingAccreditationStage,
+    AccreditationStageOutOfOrder,
     InvalidRegulatoryWindow,
 }
 
@@ -224,6 +225,9 @@ fn validate_accreditation(
         AccreditationStage::CommercialApproval,
     ];
     for (index, (stage, _, evidence)) in participant.accreditation_stages.iter().enumerate() {
+        if required.get(index) != Some(stage) {
+            return Err(ExecutionAuthorityError::AccreditationStageOutOfOrder);
+        }
         if participant.accreditation_stages[..index]
             .iter()
             .any(|(prior, _, _)| prior == stage)
@@ -631,6 +635,22 @@ mod tests {
         assert_eq!(
             evaluate_execution_authority(inputs).unwrap().disposition,
             ExecutionAuthorityDisposition::Blocked
+        );
+    }
+
+    #[test]
+    fn accreditation_stages_must_follow_the_declared_sequence() {
+        let mut stages = accreditation();
+        stages.swap(2, 3);
+        let mut inputs = base_inputs(
+            MarketEnvironment::ExternalCommercial,
+            TradingWorkflowAction::SubmitBidOrOffer,
+            SubmissionControlMode::HumanReviewRequired,
+        );
+        inputs.participant.accreditation_stages = &stages;
+        assert_eq!(
+            evaluate_execution_authority(inputs),
+            Err(ExecutionAuthorityError::AccreditationStageOutOfOrder)
         );
     }
 
