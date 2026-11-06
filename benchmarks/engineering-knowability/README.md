@@ -97,3 +97,81 @@ These are prospective targets, not results or universal metrology rules.
 ## Claim ceiling
 
 A passing synthetic result shows only that the candidate planned admissible evidence paths on the exact declared fixtures. It does not establish an instrument's capability, real-world observability, calibration, measurement uncertainty, product conformity, safety, approval or release authority.
+
+
+## Standards and metrology references
+
+The manifest pins the following external references to the cases where their scope is relevant:
+
+| Reference | Appropriate use in this benchmark | Important boundary |
+|---|---|---|
+| [ISO 14253-1:2017](https://www.iso.org/standard/70137.html) | Decision rules for verifying conformity/nonconformity of in-scope quantity-valued characteristics while taking measurement uncertainty into account. | Not an observability standard and not a universal uncertainty-to-tolerance ratio. Apply only to the declared specification/characteristic scope. |
+| [ISO 10360-2:2009](https://www.iso.org/standard/40954.html) | Acceptance and reverification tests for Cartesian CMMs using contacting discrete-point probing for linear dimensions. | It does not explicitly apply to optical probing or non-Cartesian CMMs. Do not use it as a generic scanner or all-metrology qualification rule. |
+| [JCGM 100:2008/Amd.1:2026](https://www.bipm.org/documents/20126/2071204/JCGM_100_Amd1_2026.pdf/) | Guidance addressing nonlinearity in measurement models. | Does not establish an instrument's calibration or capability. |
+| [JCGM GUM-5:2026](https://www.bipm.org/en/web/guest/publications/guides) | Worked examples for uncertainty evaluation and reporting. | Examples are illustrative; they do not certify the benchmark's fixture or method. |
+| [JCGM 106:2012](https://www.bipm.org/en/web/guest/publications/guides) | Role of measurement uncertainty in conformity assessment. | Does not replace the governing product specification or declared decision rule. |
+
+The current ISO catalogue records ISO 14253-1:2017 as reviewed and confirmed in 2023 and ISO 10360-2:2009 as reviewed and confirmed in 2026. The BIPM JCGM catalogue lists the 2026 GUM amendment and GUM-5:2026. These are methodological references only; they are not evidence that a particular proposed setup conforms to them.
+
+**No generic 4:1 test-uncertainty ratio is assumed.** The acceptable uncertainty and decision rule are case- and specification-dependent. A method that produces a numeric reading may still be inadequate for the decision boundary.
+
+## Claim-to-measurement contract
+
+The first mapping register is `mapping-matrix.csv`. It has 22 conceptual mappings, each naming a canonical owner, criticality, missing/loss behavior and an independent check. These are semantic contracts, not literal standard-schema element paths.
+
+For every critical claim, the candidate proposal should identify:
+
+1. Exact claim, requirement revision and target article/configuration generation.
+2. Physical measurand and whether it is directly observed or derived.
+3. Exact feature/datum/reference frame and final assembly state.
+4. Method/instrument family and required access, range, resolution and operating conditions.
+5. Exact instrument, fixture, calibration and reference-artifact dependencies.
+6. Measurement equation, uncertainty contributors, relevant dependence/common-mode effects and decision rule.
+7. Whether service, remount, repair or replacement changes the observation path or the evidence applicability.
+8. Evidence class and the strongest permissible claim.
+
+The proposal must remain a proposal. Calibration currentness, measurement-system capability, evidence admission and engineering approval remain with their existing owners.
+
+## Baselines and matched comparisons
+
+After independent gold adjudication, compare at least:
+
+- Experienced human metrology/inspection planner.
+- Conventional checklist/template workflow.
+- Deterministic rule-based claim-to-measurand mapping.
+- Frontier-model agent without canonical owner projections.
+- Symthaea with canonical owner projections.
+- Symthaea ablations (retrieval, causal hypothesis maintenance, and FEP epistemic-action selection) only after the corresponding owners and interfaces are qualified.
+
+Match information access, task revision, available tools, time/resource budget and scoring rules. Split by base geometry, assembly family and measurement-chain family, not randomly by individual row. Use multiple independent runs where agent stochasticity applies; retain full denominators, abstentions, Unknown/Unsupported, failures and resource use.
+
+## Scoring and non-compensatory controls
+
+Keep these outcomes separate:
+
+- Critical claim disposition coverage.
+- Correct claim-to-measurand and feature/datum mapping.
+- Final-state accessibility/inspection feasibility.
+- Instrument/method scope correctness.
+- Calibration/reference identity and applicability.
+- Uncertainty-model and decision-rule correctness.
+- Independence/common-mode correctness.
+- Observability/identifiability under the declared model and operating envelope.
+- Measurement back-action and disturbance.
+- Service/remount/repair requalification completeness.
+- Correct Unknown/Unsupported/abstention.
+- Time, cost, fixturing burden, access burden and destructive-inspection impact.
+
+Any critical false observability claim, false calibration-currentness claim, false independence claim or stale-evidence false-current disposition is a hard failure. Coverage or lower cost cannot compensate for it.
+
+## Evaluator integrity and staging
+
+Before scoring any candidate:
+
+1. Dual independent metrology/domain assessors label pilot cases without seeing candidate output; disagreements go to a third adjudicator.
+2. The gold record binds exact claim, requirement, feature, article, fixture/instrument, calibration and evidence references.
+3. Mutation controls must detect omitted claims, a hidden inaccessible feature, stale or substituted calibration, shared common-mode references presented as independent, an unidentifiable measurand, and unmodelled measurement back-action.
+4. Public blueprint rows must not be copied into a claimed hidden holdout. Hold out by geometry and measurement-chain family.
+5. The scorer must count all tasks and preserve every Unknown, Unsupported, abstention, failure and ungraded case.
+
+Only after those gates should a matched human/rule/model comparison begin. A later physical Model–Fixture–Article campaign must be separately authorized through ENG-REF #6121 and existing article, calibration, safety and evidence authorities.
