@@ -1,0 +1,127 @@
+{
+  "schema": "symthaea.formal.rea-provider-observation.v1",
+  "issue": 10782,
+  "parent_issue": 6073,
+  "parent_pr": 6077,
+  "parent_formal_head": "e0172f5440e917641bfd124c4ccfc8458819883b",
+  "parent_formal_proof": {
+    "path": "formal/lean/assurance/Closure.lean",
+    "blob": "3b7e9edca79b01cc005b86ca6ae0c2afdc2e26f4",
+    "relationship": "existing-closure-kernel-parent-not-rea-semantic-premise"
+  },
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "authored-not-yet-lean-qualified",
+  "proof_subject": {
+    "path": "formal/lean/assurance/REAProviderObservation.lean",
+    "imports": [
+      "assurance.Closure"
+    ],
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "proof_holes_permitted": false,
+    "namespace": "Symthaea.Formal.REA"
+  },
+  "extension": {
+    "generic_evidence_class": "ProviderObservation",
+    "claim_meta_predicate": "ProviderReportedObservation",
+    "rule_scope": [
+      "exact canonical claim-request digest",
+      "request/result schema generations",
+      "evaluator rule generation and rule identifier",
+      "subject and generic closure claim identities",
+      "operation and represented environment",
+      "ordered premises and assumptions through full request digest"
+    ],
+    "descriptors": {
+      "confidence": [
+        "Observed",
+        "Derived",
+        "Inferred"
+      ],
+      "authority": [
+        "ShippedArtifact",
+        "ControlledReplay",
+        "HistoricalReference",
+        "ExternalService",
+        "AnalystInference"
+      ],
+      "orderable": false,
+      "promotion_effect": false
+    }
+  },
+  "theorem_targets": [
+    "provider_observation_support_binds_full_request",
+    "provider_observation_is_a_distinct_evidence_class",
+    "provider_observation_support_has_exact_predicate",
+    "provider_observation_cannot_promote_to_other_predicate",
+    "provider_observation_cannot_close_member_integrity",
+    "provider_observation_cannot_close_producer_authenticity",
+    "provider_observation_cannot_close_signer_trust",
+    "provider_observation_cannot_close_package_authorization",
+    "provider_observation_cannot_close_security_control",
+    "confidence_authority_are_non_amplifying",
+    "provider_observation_refutation_remains_meta_claim",
+    "provider_aliases_do_not_create_independence"
+  ],
+  "forbidden_promotions": [
+    [
+      "ProviderReportedObservation",
+      "MemberContentIntegrity"
+    ],
+    [
+      "ProviderReportedObservation",
+      "ProducerAuthenticity"
+    ],
+    [
+      "ProviderReportedObservation",
+      "SignatureCryptographicValidity"
+    ],
+    [
+      "ProviderReportedObservation",
+      "SignerIdentity"
+    ],
+    [
+      "ProviderReportedObservation",
+      "SignerTrust"
+    ],
+    [
+      "ProviderReportedObservation",
+      "PackageAuthorization"
+    ],
+    [
+      "ProviderReportedObservation",
+      "PlatformAcceptance"
+    ],
+    [
+      "ProviderReportedObservation",
+      "WholeArchiveCompleteness"
+    ],
+    [
+      "ProviderReportedObservation",
+      "SecurityControlPass"
+    ]
+  ],
+  "qualification": {
+    "environment": "nix develop .#formal",
+    "exact_pr_head_required": true,
+    "parent_formal_head_ancestor_required": true,
+    "lean_nonzero_fails": true,
+    "sorryAx_forbidden": true,
+    "proof_holes_forbidden": true,
+    "known_bad_lean_subject_must_fail": true,
+    "receipt_binds_exact_head_tree_toolchain_and_theorem_sources": true,
+    "postflight_repository_clean_required": true
+  },
+  "nonclaims": [
+    "provider-observation-formal-adapter-does-not-prove-provider-observation-true",
+    "not-producer-authentication",
+    "not-signature-validity-or-signer-trust",
+    "not-package-authorization",
+    "not-member-content-integrity-or-whole-archive-completeness",
+    "not-provider-independence-from-provider-names",
+    "not-temporal-validity-or-trusted-time",
+    "not-proof-of-soundness-of-imported-rust-verifiers",
+    "not-runtime-authorization-or-security-certification",
+    "source-authored-theorem-is-not-an-executed-qualified-theorem"
+  ]
+}
