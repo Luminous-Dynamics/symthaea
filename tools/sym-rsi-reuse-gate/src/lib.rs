@@ -20,6 +20,7 @@ mod adaptive_null_simulation {
     const REPLICATES: usize = 512;
     const ROUNDS: usize = 24;
     const POOL_WIDTH: usize = 4;
+    const CANDIDATES_PER_ROUND: usize = 2;
     const INDEPENDENT_UNITS: usize = 128;
     const ALPHA: f64 = 0.05;
     const WILSON_Z_95: f64 = 1.959_963_984_540_054;
@@ -96,31 +97,34 @@ mod adaptive_null_simulation {
             let round = round_index + 1;
             let candidate_index =
                 adaptive_candidate_index(round, prior_promotions, last_decision);
-            let candidate = ReuseCandidateEvidence::new(
-                pool[round_index][candidate_index].clone(),
-            )
-            .unwrap();
+            let second_index = (candidate_index + 1) % POOL_WIDTH;
+            let candidates = [
+                ReuseCandidateEvidence::new(pool[round_index][candidate_index].clone()).unwrap(),
+                ReuseCandidateEvidence::new(pool[round_index][second_index].clone()).unwrap(),
+            ];
 
-            // K=1: the adaptive history still matters, while the candidate
-            // proposer sees only RejectAll or PromoteCandidate(1).
+            // The proposer chooses a pair from a pre-generated pool using
+            // only previous coarse decisions. Both candidates are evaluated
+            // against the same incumbent and independent task population.
             let decision = evaluate_reuse_round(
                 ALPHA,
                 round,
                 prior_promotions,
-                1,
+                CANDIDATES_PER_ROUND,
                 0.5,
-                &[candidate],
+                &candidates,
             )
             .unwrap();
 
             match decision {
                 ReuseRoundDecision::RejectAll => last_decision = 0,
-                ReuseRoundDecision::PromoteCandidate { candidate_number: 1 } => {
+                ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
+                | ReuseRoundDecision::PromoteCandidate { candidate_number: 2 } => {
                     // Every candidate is population-neutral, so every
                     // promotion in this simulation is false by construction.
                     any_false_promotion = true;
                     prior_promotions += 1;
-                    last_decision = 1;
+                    last_decision = decision.candidate_number();
                 }
                 ReuseRoundDecision::PromoteCandidate { candidate_number } => {
                     panic!("unexpected candidate index {candidate_number}");
@@ -140,28 +144,35 @@ mod adaptive_null_simulation {
             let round = round_index + 1;
             let candidate_index =
                 adaptive_candidate_index(round, prior_promotions, last_decision);
-            let bounded = pool[round_index][candidate_index]
-                .iter()
-                .map(|&value| value as f64)
-                .collect::<Vec<_>>();
-            let candidate = BoundedScoreCandidateEvidence::new(bounded).unwrap();
+            let second_index = (candidate_index + 1) % POOL_WIDTH;
+            let bounded = [candidate_index, second_index].map(|index| {
+                pool[round_index][index]
+                    .iter()
+                    .map(|&value| value as f64)
+                    .collect::<Vec<_>>()
+            });
+            let candidates = [
+                BoundedScoreCandidateEvidence::new(bounded[0].clone()).unwrap(),
+                BoundedScoreCandidateEvidence::new(bounded[1].clone()).unwrap(),
+            ];
 
             let decision = evaluate_bounded_score_reuse_round(
                 ALPHA,
                 round,
                 prior_promotions,
-                1,
+                CANDIDATES_PER_ROUND,
                 0.0,
-                &[candidate],
+                &candidates,
             )
             .unwrap();
 
             match decision {
                 ReuseRoundDecision::RejectAll => last_decision = 0,
-                ReuseRoundDecision::PromoteCandidate { candidate_number: 1 } => {
+                ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
+                | ReuseRoundDecision::PromoteCandidate { candidate_number: 2 } => {
                     any_false_promotion = true;
                     prior_promotions += 1;
-                    last_decision = 1;
+                    last_decision = decision.candidate_number();
                 }
                 ReuseRoundDecision::PromoteCandidate { candidate_number } => {
                     panic!("unexpected candidate index {candidate_number}");
@@ -177,7 +188,9 @@ mod adaptive_null_simulation {
         for replicate in 0..REPLICATES {
             let seed = 0x9e37_79b9_7f4a_7c15_u64
                 .wrapping_add((replicate as u64).wrapping_mul(0x5851_f42d_4c95_7f2d));
-            false_campaigns += usize::from(run_pass_fail_campaign(seed));
+            if run_pass_fail_campaign(seed) {
+                false_campaigns += 1;
+            }
         }
 
         let upper = wilson_upper_95(false_campaigns, REPLICATES);
@@ -194,7 +207,9 @@ mod adaptive_null_simulation {
         for replicate in 0..REPLICATES {
             let seed = 0x243f_6a88_85a3_08d3_u64
                 .wrapping_add((replicate as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
-            false_campaigns += usize::from(run_bounded_score_campaign(seed));
+            if run_bounded_score_campaign(seed) {
+                false_campaigns += 1;
+            }
         }
 
         let upper = wilson_upper_95(false_campaigns, REPLICATES);
