@@ -445,7 +445,7 @@ mod tests {
     fn later_publication_does_not_rewrite_prepublication_replay() {
         let rules = [
             revision("v1", "code/rev1", OLD_SHA, 90, 92, 100, Some(220), None),
-            revision("v2", "code/rev2", NEW_SHA, 216, 210, 220, None, Some("v1")),
+            revision("v2", "code/rev2", NEW_SHA, 210, 216, 220, None, Some("v1")),
         ];
         let result = resolve_applicable_rule(query(220, 205), &rules).unwrap();
         assert_eq!(
