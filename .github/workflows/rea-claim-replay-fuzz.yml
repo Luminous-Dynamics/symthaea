@@ -1,0 +1,137 @@
+name: REA Claim Replay Fuzz
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "53 4 * * 1"
+  pull_request:
+    paths:
+      - "tools/rea-claim-replay-fuzz/**"
+      - "tools/rea-claim-replay-verifier/**"
+      - ".github/workflows/rea-claim-replay-fuzz.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-claim-replay-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  replay-fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact PR head or dispatched revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned nightly Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: nightly-2026-11-03
+          components: llvm-tools-preview
+
+      - name: Install pinned cargo-fuzz
+        run: cargo +nightly-2026-11-03 install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Resolve isolated fuzz lockfile
+        run: cargo +nightly-2026-11-03 generate-lockfile --manifest-path tools/rea-claim-replay-fuzz/Cargo.toml
+
+      - name: Audit resolved fuzz dependency graph
+        run: cargo +nightly-2026-11-03 tree --manifest-path tools/rea-claim-replay-fuzz/Cargo.toml --locked -e normal,dev
+
+      - name: Run deterministic frame parser unit tests
+        run: cargo +nightly-2026-11-03 test --manifest-path tools/rea-claim-replay-fuzz/Cargo.toml --locked
+
+      - name: Record exact fuzz run context
+        run: |
+          expected_commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$expected_commit"
+          if test "$GITHUB_EVENT_NAME" = "pull_request"; then
+            fuzz_seconds=45
+          else
+            fuzz_seconds=120
+          fi
+          mkdir -p tools/rea-claim-replay-fuzz/artifacts
+          {
+            echo "tested_tree_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$expected_commit"
+            echo "rust_toolchain=nightly-2026-11-03"
+            rustc +nightly-2026-11-03 --version --verbose
+            cargo +nightly-2026-11-03 --version
+            cargo +nightly-2026-11-03 fuzz --version
+            uname -a
+            sha256sum tools/rea-claim-replay-fuzz/Cargo.lock
+            sha256sum tools/rea-claim-replay-fuzz/corpus/claim_request/*
+            sha256sum tools/rea-claim-replay-fuzz/corpus/claim_result/*
+            sha256sum tools/rea-claim-replay-fuzz/corpus/framed_replay/*
+            echo "fuzz_seconds_per_target=$fuzz_seconds"
+          } | tee tools/rea-claim-replay-fuzz/artifacts/run-context.txt
+          echo "FUZZ_SECONDS=$fuzz_seconds" >> "$GITHUB_ENV"
+
+      - name: Fuzz raw claim request parser
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run claim_request -- \
+            -artifact_prefix=artifacts/request- \
+            -max_total_time="$FUZZ_SECONDS" \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -timeout=5 \
+            -print_final_stats=1 2>&1 | tee artifacts/request-output.txt
+        working-directory: tools/rea-claim-replay-fuzz
+
+      - name: Fuzz raw claim result parser
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run claim_result -- \
+            -artifact_prefix=artifacts/result- \
+            -max_total_time="$FUZZ_SECONDS" \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -timeout=5 \
+            -print_final_stats=1 2>&1 | tee artifacts/result-output.txt
+        working-directory: tools/rea-claim-replay-fuzz
+
+      - name: Fuzz framed end-to-end replay input
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run framed_replay -- \
+            -artifact_prefix=artifacts/replay- \
+            -max_total_time="$FUZZ_SECONDS" \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -timeout=5 \
+            -print_final_stats=1 2>&1 | tee artifacts/replay-output.txt
+        working-directory: tools/rea-claim-replay-fuzz
+
+      - name: Bind final statistics and artifacts to exact run
+        if: always()
+        run: |
+          for target in request result replay; do
+            output="tools/rea-claim-replay-fuzz/artifacts/$target-output.txt"
+            summary="tools/rea-claim-replay-fuzz/artifacts/$target-summary.txt"
+            if test -f "$output"; then
+              sha256sum "$output" | tee -a tools/rea-claim-replay-fuzz/artifacts/run-context.txt
+              grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' "$output" > "$summary" || true
+            fi
+          done
+
+      - name: Upload claim replay fuzz lock, corpus and run artifacts
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-claim-replay-fuzz-run
+          path: |
+            tools/rea-claim-replay-fuzz/Cargo.lock
+            tools/rea-claim-replay-fuzz/artifacts/**
+            tools/rea-claim-replay-fuzz/corpus/**
+          if-no-files-found: warn
+          retention-days: 14
