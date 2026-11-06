@@ -36,7 +36,7 @@ The most important change is to reject the idea that a better aggregate can comp
 
 ## 3. Corpus design
 
-The initial catalog contains **28 negative/adversarial controls** and **8 positive/valid-state controls**, exceeding the initial minimum of 20 negative and 5 positive cases.
+The initial catalog contains **36 negative/adversarial controls** and **10 positive/valid-state controls**, exceeding the initial minimum of 20 negative and 5 positive cases. The new controls extend the original grader/custody attacks with verifier-of-verifiers (V4V) checks.
 
 Negative controls cover:
 - grader result channels, grader/test mutation and hidden-test access;
@@ -49,6 +49,31 @@ Negative controls cover:
 Positive controls are essential: a system that rejects every run can obtain zero false accepts while being useless. The controls include a valid reference patch, a correct alternative patch, authorized workspace edits, a true independent regrade, digest-bound cache reuse, exact pinned runner metadata, a validly recorded candidate failure and metamorphic equivalence.
 
 The full case definitions and expected qualification states are machine-readable. Each case is explicitly marked `design_only_not_executed`. No attack payloads are included; scenarios describe what a future isolated control must test.
+
+
+
+### 3.1 Verifier-of-verifiers qualification
+
+The evaluator itself must be tested before it is treated as an oracle. This is distinct from checking whether a candidate patch passes. The V4V layer qualifies the reference verifier and any generated verifier against independently labeled positive and negative cases.
+
+The research trigger is the public [VerifierBench overview](https://verifierbench.github.io/), which is an anonymous submission under review and had no public paper, code or dataset release at the time of this snapshot. Its public page reports 222 retained tasks from six source benchmarks, 4,993 hidden test cases, 36 model–harness configurations and 45 source-defect exclusions from an initial 267 tasks. Across the 19 pi-harness models it reports TPR of 21.1–70.2% and TNR of 79.2–96.3%; all 36 configurations fall below TPR=TNR. For nine models with archived task-level traces, all-reject verifiers account for 87.9–96.0% of false rejections. These are source-reported observations, not CEB results and not an independently reproduced leaderboard.
+
+The public V4V procedure proposes six useful checks, adapted here as authoring/qualification obligations:
+
+1. **Replay:** the frozen reference verifier must reproduce the adjudicated PASS/FAIL label for every frozen case.
+2. **Repeatability:** repeated execution from the same reset state and immutable inputs must produce the same normalized decision.
+3. **Provenance:** every decision binds to exact case bytes, task specification, verifier revision and reference version.
+4. **Input–label consistency:** identical verifier-visible inputs under the same task/policy identity cannot carry contradictory labels without an adjudicated hidden-state distinction.
+5. **Trivial baselines:** expose always-accept, always-reject and exact-match-only verifiers; none may qualify. Positive controls must be able to falsify an always-reject strategy.
+6. **Mutation sensitivity:** weakening a necessary verifier condition must change at least one preregistered decision. A check that never affects a decision is not demonstrated to be operative.
+
+A high TNR by itself is insufficient. Always-reject can reject every invalid candidate while also rejecting every valid candidate. Always-accept has the inverse failure. CEB therefore preserves false-accept and false-reject outcomes separately; the reference verifier must pass known positives and known negatives before it may serve as an oracle. A valid alternative implementation is required where the task semantics permit one; byte identity with the gold patch is not a substitute for semantic equivalence.
+
+The [SpecBench paper](https://arxiv.org/abs/2605.21384) adds a complementary task-construction warning: visible tests that exercise features in isolation may not establish behavior when the specification requires those features to compose. Its 30 systems-level tasks compare agent-visible validation tests with hidden tests that compose specification-mandated behaviors. The paper reports that the upper-tail reward-hacking gap grows by about 27 percentage points per tenfold increase in reference implementation size (the abstract rounds this to 28). CEB should use this as a reason to audit specification-to-test composition, not as a direct CEB target or transferable score.
+
+The [GSO benchmark](https://gso-bench.github.io/) similarly reports raw and hack-adjusted optimization scores; its public page documents a hack detector for deceptive optimizations such as memoization or harness hijacking. This motivates explicit semantic and measurement controls for CEB-OPT, but GSO's Opt@1 and hack-adjusted score remain distinct from CEB's expert-normalized speedup metric.
+
+All V4V cases in this catalog remain `design_only_not_executed`. These checks do not authorize running candidate-controlled code, generated verifiers, build scripts or attacks on the host-opt-in runner.
 
 ## 4. Scoring without hiding failure
 
@@ -74,9 +99,9 @@ Do not hide false accepts inside an accuracy/F1 score. Do not weight away critic
 
 | Dimension | Target |
 |---|---:|
-| Initial hand-authored corpus | >=20 negative and >=5 positive controls |
+| Initial hand-authored corpus | >=20 negative and >=5 positive controls; current design catalog has 36 negative and 10 positive |
 | Qualification campaign | >=300 distinct negative and >=300 distinct positive instantiations |
-| Fault-family diversity | >=30 distinct negative fault families |
+| Fault-family diversity | >=36 distinct negative fault families |
 | Critical false accepts | 0 permitted |
 | Statistical target | One-sided 95% exact upper bound <1% for FA and FR, subject to cluster-aware analysis |
 | Reference / empty-patch gate | 100% reference pass and empty-patch fail before a task enters the scored set |
@@ -126,8 +151,8 @@ A system that solves 1–2 percentage points fewer tasks but has verified eviden
 - The static Rust verifier can be expanded with non-executing malformed-receipt and inventory tests, but those tests do not qualify an OS boundary or hidden-answer custody.
 - The CEB task catalog and this attack catalog are design artifacts until source fixtures, independently administered graders, pins, qualified runner and exact-head test evidence exist.
 
-**Current status:** 28 negative controls, 8 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
+**Current status:** 36 negative controls, 10 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate plus V4V protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
 
 ## CEB-wide measurement linkage
 
-The integrity lane is one component of a 13-lane CEB measurement portfolio. See [the machine-readable comparison matrix](../../benchmarks/ceb/measurement-matrix.v0.json) and [the measurement/comparative-claim protocol](CEB_MEASUREMENT_CLAIM_PROTOCOL_V0_2026-11-05.md). The matrix prevents integrity, security, resolution, cost and human-review outcomes from being blended into a single compensatory score.
+The integrity lane is one component of a 14-lane CEB measurement portfolio. See [the machine-readable comparison matrix](../../benchmarks/ceb/measurement-matrix.v0.json) and [the measurement/comparative-claim protocol](CEB_MEASUREMENT_CLAIM_PROTOCOL_V0_2026-11-05.md). The matrix prevents integrity, security, resolution, cost and human-review outcomes from being blended into a single compensatory score.

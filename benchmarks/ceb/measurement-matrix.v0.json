@@ -1006,7 +1006,12 @@
         "negative_controls",
         "positive_controls",
         "independent_verifier_implementation",
-        "primary_vs_pristine_regrade"
+        "primary_vs_pristine_regrade",
+        "always_accept_verifier_negative_control",
+        "always_reject_verifier_negative_control",
+        "exact_match_only_verifier_negative_control",
+        "semantically_equivalent_alternative_solution_positive_control",
+        "mutation_sensitivity_ablation"
       ],
       "evidence_contract": {
         "required_artifacts": [
@@ -1018,7 +1023,13 @@
           "failure_domain_graph",
           "primary_receipt",
           "regrade_receipt",
-          "control_outcomes"
+          "control_outcomes",
+          "reference_verifier_replay_matrix",
+          "verifier_positive_negative_control_set",
+          "verifier_mutation_results",
+          "input_label_consistency_audit",
+          "trivial_baseline_results",
+          "confirmed_positive_verification_record"
         ],
         "independent_adjudication": true,
         "unresolved_state_required": true,
@@ -1030,7 +1041,13 @@
         "positive controls must pass",
         "task qualification requires reference pass and empty-patch fail",
         "independent pristine regrade",
-        "common_mode custody failures block qualification"
+        "common_mode custody failures block qualification",
+        "reference_verifier_replay_matches_adjudicated_positive_and_negative_labels",
+        "repeatable_verifier_decisions_from_frozen_reset_state",
+        "identical verifier-visible inputs cannot carry contradictory labels without adjudicated hidden-state distinction",
+        "always_accept_always_reject_and_exact_match_only_verifier_baselines_must_fail",
+        "necessary verifier mutations must change at least one preregistered decision",
+        "at least one known-valid positive solution must be accepted before verifier freeze"
       ],
       "holdout_design": "Rotating private controls held outside agent-visible repositories. Publish commitments before the run; reveal retired control definitions only after version retirement."
     },
