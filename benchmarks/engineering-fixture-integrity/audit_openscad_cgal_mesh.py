@@ -247,6 +247,28 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
     return manifest, subjects, assembly_path, assembly_digest, manifest_digest
 
 
+
+def ensure_safe_output_path(
+    output: Path,
+    fixture_root: Path,
+    manifest: dict[str, Any],
+    assembly_path: Path,
+    cad_subjects: list[tuple[str, Path, str]],
+) -> Path:
+    resolved_output = output.resolve()
+    protected = {
+        assembly_path.resolve(),
+        (fixture_root / "materialization-manifest.json").resolve(),
+    }
+    protected.update(path.resolve() for _, path, _ in cad_subjects)
+    for part in manifest["assembly"]["part_definitions"]:
+        protected.add(package_path(fixture_root, part["artifact"]).resolve())
+    require(
+        resolved_output not in protected,
+        "Audit output cannot overwrite an input STEP or the manifest",
+    )
+    return resolved_output
+
 def validate_audit_toolchain(manifest: dict[str, Any], openscad_arg: str) -> tuple[str, str, dict[str, str]]:
     import OCP
 
@@ -539,18 +561,13 @@ def main() -> int:
         "max_brep_to_cgal_bbox_error_mm": max_bbox,
         "subjects": records,
     }
-    output = (
-        args.output
-        or (fixture_root / "openscad-cgal-mesh-audit.json")
-    ).resolve()
-    protected = {
-        assembly_path.resolve(),
-        (fixture_root / "materialization-manifest.json").resolve(),
-    }
-    protected.update(path.resolve() for _, path, _ in cad_subjects)
-    for part in manifest["assembly"]["part_definitions"]:
-        protected.add(package_path(fixture_root, part["artifact"]).resolve())
-    require(output not in protected, "Audit output cannot overwrite an input STEP or the manifest")
+    output = ensure_safe_output_path(
+        args.output or (fixture_root / "openscad-cgal-mesh-audit.json"),
+        fixture_root,
+        manifest,
+        assembly_path,
+        cad_subjects,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     summary_keys = (
