@@ -232,3 +232,12 @@ The mapping register adds three semantic contracts for profile/edition scope, se
 NIST's [2026 AI/ML Roadmap for Smart Manufacturing](https://www.nist.gov/publications/2026-roadmap-artificial-intelligence-and-machine-learning-smart-manufacturing) explicitly identifies data-centric metrology, advanced digital twins, explainability, reliability, availability, maintainability and safety as research directions for trustworthy industrial AI. NIST's [Digital Thread for Manufacturing](https://www.nist.gov/programs-projects/digital-thread-manufacturing) describes the required feedback path: product models specify form/fit/function for inspection and in-process measurement systems, and inspection/measurement results are linked back to design. These are industrial research priorities, not validation results for this repository.
 
 The knowability benchmark specializes one part of that gap into a falsifiable agent task: preserve critical claim/feature/datum/instrument/article/calibration applicability through design, final assembly, inspection and lifecycle change. The standards-interoperability owner #10595 separately verifies whether those semantic links survive AP242/QIF/MTConnect exchange. The two benchmarks compose but do not duplicate one another.
+
+
+## Co-design paired-task authoring matrix
+
+The separately scoped [paired task matrix](codesign-paired-task-matrix.csv) now fixes eight authoring families for #10702. Each row names the reused fixture, design-first and co-design alternatives, lifecycle mutation, required claim/evidence links, a non-compensatory failure gate, required canonical owner inputs, separate outcome dimensions and a claim ceiling.
+
+The eight conflicts are: closed cavity access; remount-destroyed registration; inspection-port versus function trade-off; instrument/method scope mismatch; common-mode false independence; uncertainty versus decision boundary; logical versus physical ECAD testability; and destructive inspection versus lifecycle/service continuity.
+
+The matrix is an authoring plan, not a scored corpus. Cases still require dual independent domain/metrology adjudication, a third-party resolution path for disagreements, frozen fixture digests, and hidden mutation/evaluator isolation. Missing material properties, tolerances, instrument capabilities, route geometry or process capability must remain explicit owner inputs—not invented numeric assumptions.
