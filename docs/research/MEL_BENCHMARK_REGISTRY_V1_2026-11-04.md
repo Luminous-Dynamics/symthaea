@@ -68,11 +68,32 @@ Use its native task metrics and evaluator, not an invented single score. https:/
 
 ### Industry music-generation preference
 
-A live Artificial Analysis Music Arena snapshot captured on **November 5, 2026** uses separate AA-Music-Instrumental v1.1 and AA-Music-Vocal v1.1 boards, based on blind preferences from validated evaluators. Instrumental leaders: Suno v6 1148±22 (2,208 samples), Suno v6-mini 1114±21 (2,332), Mureka V9.5 1084±21 (2,297), Mureka V9 1083±21 (2,322), Lyria 3 Pro 1080±21 (2,329), and Lyria 3.5 1078±21 (2,302). Vocal leaders: Suno v6 1144±18 (3,037), Suno v6-mini 1132±18 (3,151), Mureka V9.5 1102±18 (3,107), Mureka V9 1063±18 (3,097), Lyria 3.5 1051±18 (3,164), and Lyria 3 Pro 1048±18 (3,158). These Elo values are **within-board blind-preference estimates**, not absolute music-quality measurements; do not combine the instrumental and vocal scales, infer control/editing ability, or treat a small Elo gap as a meaningful win without uncertainty analysis. They do not measure structure control, temporal grounding, collaboration, rights, or cultural validity. Re-capture the live board immediately before any external claim. Sources: https://artificialanalysis.ai/music/leaderboard/instrumental ; https://artificialanalysis.ai/music/leaderboard/vocals ; methodology: https://artificialanalysis.ai/methodology/music
+A live Artificial Analysis Music Arena snapshot captured on **November 6, 2026** uses separate AA-Music-Instrumental v1.1 and AA-Music-Vocal v1.1 boards, based on blind preferences from validated evaluators. Instrumental leaders: Suno v6 1148±22 (2,208 samples), Suno v6-mini 1114±21 (2,332), Mureka V9.5 1084±21 (2,297), Mureka V9 1083±21 (2,322), Lyria 3 Pro 1080±21 (2,329), and Lyria 3.5 1078±21 (2,302). Vocal leaders: Suno v6 1144±18 (3,063), Suno v6-mini 1132±18 (3,175), Mureka V9.5 1101±18 (3,141), Mureka V9 1063±18 (3,121), Lyria 3.5 1050±18 (3,203), and Lyria 3 Pro 1048±18 (3,191). These Elo values are **within-board blind-preference estimates**, not absolute music-quality measurements; do not combine instrumental and vocal scales, infer control/editing ability, or treat overlapping 95% intervals as proof of equivalence. The boards do not measure structure control, temporal grounding, collaboration, rights, or cultural validity. Re-capture the live board immediately before each external comparison. Sources: https://artificialanalysis.ai/music/leaderboard/instrumental ; https://artificialanalysis.ai/music/leaderboard/vocals ; methodology: https://artificialanalysis.ai/methodology/music
 
 Google's Lyria 3 product announcements describe Gemini-app 30-second generation and developer API access to Lyria 3 Pro/Clip. These are product capabilities, not independent quality scores. https://blog.google/innovation-and-ai/products/gemini-app/lyria-3/ ; https://blog.google/innovation-and-ai/technology/developers-tools/lyria-3-developers/
 
 AgentAbstain (NeurIPS 2026 Oral) reports 263 paired near-identical agent tasks across 42 executable environments, with a best paired score of 59.5% across 17 frontier agents. It is a tool-agent abstention benchmark, not a music baseline; use its paired-task methodology only as an analogy for #10402. https://agentabstain.github.io/
+
+## Near-term external challenge windows — 6 November 2026
+
+### Audio Editing Challenge (ICASSP 2027)
+
+- **10 November 2026:** hidden challenge test set and submission SDK released; the Single Model and Agent tracks each use 500 hidden examples, ranked separately.
+- **25 November:** final submission and leaderboard freeze; **7 December:** reproducibility checks complete; **8 December:** final rankings announced.
+- The public MMAE development set contains 2,000 examples and 17,741 atomic rubrics. It reports IFR, CR and EMR; the official ranking is primarily EMR, with IFR then CR as tie-breakers.
+- Registration closed **8 October**. For the Agent Track, component model versions and weights had to be publicly released before **1 November**. Do not imply official entry or eligibility unless the team registration and exact versions are demonstrable. Public-set reproduction remains useful and reportable.
+- Source: https://audio-editing-challenge.github.io/leaderboard/
+
+### HEARTBEAT 2027 (adjacent, not music SOTA)
+
+The official 6 November site snapshot lists:
+- **16 November 2026:** development leaderboard opens.
+- **2 December:** team membership/resource declarations freeze.
+- **16 December:** development leaderboard closes.
+- **23 December:** final container deadline.
+- **30 December:** rankings and paper invitations.
+
+The challenge reports 132,571 samples (127,371 train / 5,200 development) over approximately 3,103 hours. Track I evaluates WAIT / RESPOND / CONTINUE / YIELD, with separate offline and online rankings. Track II evaluates streaming proactive understanding. Online systems must use only current and previously received input, log every chunk including no-response chunks, and timestamp a response at the end of the input chunk that produced it; no backdating. This is useful prior art for temporal accounting and abstention, but it is a human-centred audio-agent challenge, not a music-generation leaderboard. Source: https://heartbeat-challenge.github.io/
 
 ## Qualification targets (targets, not results)
 
