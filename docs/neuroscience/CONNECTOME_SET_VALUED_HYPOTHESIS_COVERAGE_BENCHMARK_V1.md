@@ -90,3 +90,12 @@ Promotion requires uncertainty bounds and per-stratum results. These are targets
 ## 9. Claim ceiling
 
 Exact Recovery applies only to genuinely enumerable synthetic hypothesis sets. Biological discovery is limited to the declared source frame and sampling design, with an explicit all-list-missed sensitivity envelope. No finite proposal set proves global connectome completeness. No metric in this benchmark establishes causal synaptic transmission or biological truth without independent source evidence and intervention-grounded validation.
+## 7A. Tenfold scale known-answer
+
+`CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE_SCALE_30.example.json` increases the admissible biological equivalence-class universe from 3 to 30 while keeping the proposal budget fixed at K=5.
+
+- The mode-collapse channel emits five different candidate identities that all canonicalize to one admissible class: validity 1.0, uniqueness 0.20, recovery 1/30, query-critical recovery 0.
+- The query-focused channel spends the same five proposals on the rare query-critical class plus four other classes: validity 1.0, uniqueness 1.0, recovery 5/30, query-critical recovery 1.0.
+- The pooled union recovers five classes at K=5 per channel, but reports the duplicated proposal burden (10 admissible proposals, five unique classes; uniqueness 0.50).
+
+This fixture demonstrates that the same perfect validity can conceal a tenfold-space coverage collapse and a missed decision-changing alternative. It is a constructed oracle contrast, not evidence that a biological generator achieves these scores.
