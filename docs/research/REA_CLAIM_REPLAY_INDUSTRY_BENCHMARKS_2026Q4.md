@@ -70,6 +70,20 @@ A schema-valid answer is not automatically correct. A correct fact placed in an 
 
 Reference: [AgentRE-Bench v3.1 results and method](https://www.agentre-bench.ai/results/v3-1/).
 
+### Realistic binary reverse engineering — SRE-Bench
+
+SRE-Bench (updated October 2026) is the closest hard external benchmark for agentic reverse engineering at realistic scale: 19 private programs, 262 binary instances, 1,572 deterministic graded tasks, five domains, four source languages, and 44 in-house anti-analysis mechanisms. It was built with more than 5,000 expert hours, and runs instances in isolated environments without exposing source or reference solutions. [Official benchmark](https://daplab.cs.columbia.edu/benchmarks/sre-bench/).
+
+Its published public-facing result for GPT-6 Astra is 5.55 passed tasks per binary out of six across 181 graded instances; it fully solved 149/181 graded instances (82.3%), with 7 zero-score instances. However, only 181 of the 262 eligible instances were graded in that run. The 82.3% number is conditional on graded instances; relative to the full 262-instance eligible cohort, 149 complete solves are 56.9%. The benchmark also reports a separate unconstrained Astra pass@1 of 88.0% and pass@4 of 99.2%; those must not be mixed with the public-facing score or used as a direct comparison to AgentRE-Bench. [Official result details](https://daplab.cs.columbia.edu/benchmarks/sre-bench/).
+
+**REA consequence:** reuse SRE-Bench's deterministic hidden-ground-truth and realistic-domain design where its access rules permit, but do not try to beat its leaderboard with a different denominator. Add a separate REA-groundedness overlay: was each recovered fact actually entailed by source-bound observations, exact artifact/scope references and independently replayed derivations? Keep specialist RE capability and epistemic grounding as two independent axes.
+
+### Source-groundedness and parametric leakage — RDQA
+
+RDQA (EMNLP 2026) tests whether multimodal agents actually retrieve and inspect the requested source rather than produce correct answers from parametric memory. It has 1,350 questions across document, video and audio sources and 20 real-world scenarios. The paper introduces Parametric Leakage Rate (PLR), the fraction of correct answers produced without genuine evidence retrieval. It reports 24.0% adjusted accuracy for the best generic agent, 41.1% for its process-aware RDQA-Skill baseline, and PLR as high as 96.0% among evaluated systems. These are RDQA-specific measures, not REA measurements, but the mechanism generalizes directly to reverse engineering: a model may guess a likely binary behavior without inspecting the exact artifact. [ACL Anthology paper](https://aclanthology.org/2026.emnlp-main.1855/).
+
+**REA consequence:** add an REA-specific parametric leakage rate, with a preregistered denominator and strict source-evidence requirements. For every correct raw answer, test whether an accepted Evidence chain binds the exact artifact, operation, occurrence/byte range and scope. Correct-but-ungrounded answers receive no evidence-grounded credit; report raw accuracy and PLR separately. Use paired high-entropy artifact mutations to break prior-based guessing, plus irrelevant-byte controls to test justified invariance. Do not claim comparability with RDQA PLR unless its exact published scoring method is adopted.
+
 ### Continuous engineering — SWE-Milestone and SWE-CI
 
 SWE-Milestone reconstructs real release histories into milestone DAGs and evaluates agents in an unbroken sequence, preserving earlier mistakes and regression effects. Its paper reports that some isolated-task results above 80% fell to at most 38% in continuous settings across its evaluated models/frameworks. Its current public leaderboard is a different versioned evaluation and must not be conflated with the paper's study.
@@ -105,6 +119,8 @@ References:
 NIST AI 800-3 distinguishes accuracy on a fixed benchmark from generalized accuracy over a broader population of similar tasks. It warns that common analyses can hide assumptions or produce invalid uncertainty estimates; it demonstrates generalized linear mixed models and variance decomposition on 22 API-access models and three benchmarks.
 
 NIST's TEVV-Athlon Framework is a four-stage method for constructing a context-specific assessment from TEVV objectives; it structures that assessment around Events and Tools that produce data for Blocks linked to measurement concepts. The initial NIST AI 200-2 public draft comment period ran through October 6, 2026. NIST AI 800-3 (February 2026) separately argues that benchmark generalization and uncertainty depend on explicit statistical assumptions, and demonstrates hierarchical modelling of model capability and item difficulty.
+
+NIST AI 800-3 (February 2026) formalizes the distinction between fixed-benchmark accuracy and generalized accuracy over a population of similar items. Its study of 22 API-access models across three benchmarks demonstrates generalized linear mixed models, item-difficulty estimation and variance decomposition as ways to make assumptions and uncertainty explicit. [NIST publication](https://www.nist.gov/publications/expanding-ai-evaluation-toolbox-statistical-models).
 
 **REA consequence:** report fixed-corpus conformance and generalized performance as separate estimands. For model/agent comparisons, use paired tasks, item/domain random effects where assumptions are defensible, variance decomposition, and confidence intervals. Keep every unsupported, abstained, missing, invalid and budget-exhausted attempt in the denominator.
 
