@@ -1,0 +1,482 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_COHORT_TRANSPORT.schema.json",
+  "title": "Connectome cohort transportability audit input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "dataset_binding",
+    "split_manifest",
+    "animals",
+    "pairs",
+    "observations",
+    "models",
+    "predictions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "dataset_binding": {
+      "$ref": "#/$defs/dataset"
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split"
+    },
+    "animals": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/animal"
+      }
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/model"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    }
+  },
+  "$defs": {
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision_sha256",
+        "source_access_receipt_sha256",
+        "species",
+        "evidence_tier"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_access_receipt_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "species": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_tier": {
+          "enum": [
+            "SYNTHETIC",
+            "OBSERVATIONAL_FUNCTIONAL",
+            "MEASURED_INTERVENTION",
+            "PROSPECTIVE_INTERVENTION"
+          ]
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "track",
+        "split_unit",
+        "train_animal_ids",
+        "validation_animal_ids",
+        "lockbox_animal_ids",
+        "split_sha256",
+        "lockbox_frozen_before_prediction"
+      ],
+      "properties": {
+        "track": {
+          "const": "NEW_ANIMAL_SAME_PAIR"
+        },
+        "split_unit": {
+          "const": "ANIMAL"
+        },
+        "train_animal_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "validation_animal_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "lockbox_animal_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "split_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lockbox_frozen_before_prediction": {
+          "const": true
+        }
+      }
+    },
+    "animal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "animal_id",
+        "condition_id",
+        "cohort_role"
+      ],
+      "properties": {
+        "animal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cohort_role": {
+          "enum": [
+            "TRAIN",
+            "VALIDATION",
+            "LOCKBOX"
+          ]
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "upstream_neuron_id",
+        "downstream_neuron_id",
+        "direct_wiring_status",
+        "structure_evidence_sha256"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upstream_neuron_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "downstream_neuron_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direct_wiring_status": {
+          "enum": [
+            "DIRECT_EDGE",
+            "NO_DIRECT_EDGE",
+            "UNKNOWN"
+          ]
+        },
+        "structure_evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "animal_id",
+        "condition_id",
+        "pair_id",
+        "measurement_disposition",
+        "functional_disposition",
+        "trial_count",
+        "response_mean",
+        "response_kernel_sha256",
+        "equivalence_protocol_sha256",
+        "equivalence_receipt_sha256"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "animal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_disposition": {
+          "enum": [
+            "OBSERVED",
+            "NOT_MEASURED",
+            "FAILED",
+            "INACCESSIBLE"
+          ]
+        },
+        "functional_disposition": {
+          "enum": [
+            "FUNCTIONAL_CONNECTION",
+            "FUNCTIONAL_NON_CONNECTION",
+            "INDETERMINATE",
+            "NOT_MEASURED",
+            "FAILED",
+            "INACCESSIBLE"
+          ]
+        },
+        "trial_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "response_mean": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "response_kernel_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "equivalence_protocol_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "equivalence_receipt_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_kind",
+        "implementation_sha256",
+        "training_manifest_sha256",
+        "training_animal_ids",
+        "supported_conditions"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_kind": {
+          "enum": [
+            "ANATOMY_ONLY",
+            "FITTED_WIRED_EDGES",
+            "FUNCTIONAL_ATLAS",
+            "HIERARCHICAL_ANIMAL",
+            "STATE_HISTORY_AWARE",
+            "WIRED_PLUS_EXTRASYNAPTIC",
+            "OTHER"
+          ]
+        },
+        "implementation_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "training_animal_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "supported_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/condition_support"
+          }
+        }
+      }
+    },
+    "condition_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_id",
+        "support_basis",
+        "support_receipt_sha256"
+      ],
+      "properties": {
+        "condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "support_basis": {
+          "enum": [
+            "TRAIN_OBSERVED",
+            "MECHANISTIC_INVARIANCE_ASSUMPTION",
+            "EXTERNAL_VALIDATION"
+          ]
+        },
+        "support_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prediction_id",
+        "model_id",
+        "observation_id",
+        "prediction_disposition",
+        "out_of_domain_receipt_sha256",
+        "probability_functional",
+        "predicted_response_mean",
+        "lower90",
+        "upper90"
+      ],
+      "properties": {
+        "prediction_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prediction_disposition": {
+          "enum": [
+            "PREDICTED",
+            "ABSTAINED_OUT_OF_DOMAIN",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "out_of_domain_receipt_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "probability_functional": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "predicted_response_mean": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lower90": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "upper90": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
