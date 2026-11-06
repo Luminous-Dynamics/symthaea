@@ -276,7 +276,7 @@ pub enum HdcLtcParameterRole {
 }
 
 /// One trainable hypervector group in the stable flattened parameter layout.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HdcLtcParameterGroup {
     pub id: HdcLtcParameterGroupId,
     pub name: String,
@@ -289,7 +289,7 @@ pub struct HdcLtcParameterGroup {
 }
 
 /// Architecture-aware manifest for the five trainable HDC-LTC parameter vectors.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HdcLtcParameterManifest {
     pub format_version: u32,
     pub dimension: usize,
@@ -1489,7 +1489,7 @@ impl HdcLtcUnifiedNeuron {
             let group = manifest
                 .groups
                 .iter()
-                .find(|group| group.id == edit.id)
+                .find(|group| &group.id == &edit.id)
                 .ok_or_else(|| HdcLtcParameterError::UnknownParameterGroup {
                     name: format!("{:?}", edit.id),
                 })?;
