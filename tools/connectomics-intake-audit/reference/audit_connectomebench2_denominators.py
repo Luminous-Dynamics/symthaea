@@ -50,6 +50,10 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
     split_rows = data['split_counts']
     unique([row['category'] for row in sample_rows], 'sample_type categories')
     unique([row['category'] for row in split_rows], 'split categories')
+    for row in sample_rows + split_rows:
+        require(row['source_id'] in sources, f"count references unknown source {row['source_id']}")
+    for row in data['em_coverage']:
+        require(row['source_id'] in sources, f"EM coverage references unknown source {row['source_id']}")
     sample_total = sum(row['value'] for row in sample_rows)
     split_total = sum(row['value'] for row in split_rows)
     card_total = next(
@@ -115,7 +119,7 @@ def main() -> int:
     try:
         data = json.loads(args.manifest.read_text(encoding='utf-8'))
         report = validate_manifest(data)
-        rendered = json.dumps(report, indent=2, sort_keys=True) + '\\n'
+        rendered = json.dumps(report, indent=2, sort_keys=True) + '\n'
         if args.output is not None:
             args.output.write_text(rendered, encoding='utf-8')
         print(rendered, end='')
