@@ -463,23 +463,76 @@ pub fn align_cfc_hidden_unit_signatures(
     let (source_to_candidate, best_total_cost) =
         minimum_cost_assignment(&costs).ok_or(CfCPermutationAlignmentError::NoFeasibleAssignment)?;
 
-    let mut minimum_assignment_margin = f64::INFINITY;
-    for (source_unit, candidate_unit) in source_to_candidate.iter().copied().enumerate() {
-        let mut alternative_costs = costs.clone();
-        alternative_costs[source_unit][candidate_unit] = f64::INFINITY;
-        if let Some((_alternative_assignment, alternative_total_cost)) =
-            minimum_cost_assignment(&alternative_costs)
-        {
-            minimum_assignment_margin = minimum_assignment_margin
-                .min((alternative_total_cost - best_total_cost).max(0.0));
-        }
-    }
+    let minimum_assignment_margin =
+        alternating_cycle_assignment_margin(&costs, &source_to_candidate);
 
     Ok(CfCHiddenUnitAlignment {
         source_to_candidate,
         mean_squared_activation_error: best_total_cost / unit_count as f64,
         minimum_assignment_margin,
     })
+}
+
+/// Compute the smallest cost increase of any reassignment that forbids one
+/// matched pair. Alternative assignments decompose into alternating cycles.
+/// Floyd-Warshall over the row-transition graph computes all shortest cycles in
+/// O(n^3), avoiding n separate O(n^3) Hungarian re-solves.
+fn alternating_cycle_assignment_margin(
+    costs: &[Vec<f64>],
+    assignment: &[usize],
+) -> f64 {
+    let n = assignment.len();
+    if n <= 1 {
+        return f64::INFINITY;
+    }
+
+    let mut distance = vec![vec![f64::INFINITY; n]; n];
+    for source_row in 0..n {
+        let source_cost = costs[source_row][assignment[source_row]];
+        for next_row in 0..n {
+            if source_row == next_row {
+                continue;
+            }
+            let reassigned_cost = costs[source_row][assignment[next_row]];
+            if reassigned_cost.is_finite() && source_cost.is_finite() {
+                distance[source_row][next_row] = reassigned_cost - source_cost;
+            }
+        }
+    }
+
+    for intermediate in 0..n {
+        for source in 0..n {
+            if !distance[source][intermediate].is_finite() {
+                continue;
+            }
+            for destination in 0..n {
+                if !distance[intermediate][destination].is_finite() {
+                    continue;
+                }
+                let through = distance[source][intermediate]
+                    + distance[intermediate][destination];
+                if through < distance[source][destination] {
+                    distance[source][destination] = through;
+                }
+            }
+        }
+    }
+
+    let mut margin = f64::INFINITY;
+    for source in 0..n {
+        for next_row in 0..n {
+            if source == next_row || !distance[next_row][source].is_finite() {
+                continue;
+            }
+            let cycle_cost = costs[source][assignment[next_row]]
+                - costs[source][assignment[source]]
+                + distance[next_row][source];
+            if cycle_cost.is_finite() {
+                margin = margin.min(cycle_cost.max(0.0));
+            }
+        }
+    }
+    margin
 }
 
 fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Option<(Vec<usize>, f64)> {
