@@ -598,7 +598,6 @@ fn candidate_digest(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dynamics::cfc::network::CfCParameterGroupId;
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
