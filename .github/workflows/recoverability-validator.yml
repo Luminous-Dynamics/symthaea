@@ -49,7 +49,7 @@ jobs:
           jq empty tools/recoverability-validator/schema/recoverability-manifest-fields.schema.json
 
           python3 tools/recoverability-validator/tools/recoverability_test_vectors.py /tmp/recoverability-vectors
-          jq -e '.metamorphic_controls.post_retrieval_requires_prior_reformulation == true' \
+          jq -e '.metamorphic_controls.post_retrieval_requires_prior_reformulation == true and .metamorphic_controls.reformulation_requires_prior_initial_retrieval == true and .metamorphic_controls.navigation_requires_prior_initial_retrieval == true and .metamorphic_controls.partial_surface_preserves_positive_routes_only == true and .metamorphic_controls.unknown_surface_all_not_evaluable == true' \
             /tmp/recoverability-vectors/summary.json >/dev/null
 
           rust_commitment="$(cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
@@ -69,6 +69,16 @@ jobs:
           jq -e '.class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.UnreachableWithinBudget == 1 and .class_counts.NotEvaluable == 1' \
             /tmp/recoverability-vectors/valid-report.json >/dev/null
 
+          # Compare every class and shortest witness, not just aggregate counts.
+          jq -e --slurpfile expected /tmp/recoverability-vectors/summary.json '
+            [.records[] | {
+              evidence_unit_id,
+              recoverability,
+              route_cost: .shortest_route_cost,
+              route_edge_refs
+            }] == $expected[0].expected_records
+          ' /tmp/recoverability-vectors/valid-report.json >/dev/null
+
           set +e
           cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
             audit-recoverability-manifest /tmp/recoverability-vectors/tampered-manifest.json \
@@ -82,8 +92,27 @@ jobs:
           cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
             audit-recoverability-manifest /tmp/recoverability-vectors/partial-surface-manifest.json \
             > /tmp/recoverability-vectors/partial-report.json
-          jq -e '.valid == true and .class_counts.NotEvaluable == 5' \
+          jq -e '.valid == true and .class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.NotEvaluable == 2 and (.class_counts.UnreachableWithinBudget // 0) == 0' \
             /tmp/recoverability-vectors/partial-report.json >/dev/null
+
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/unknown-surface-manifest.json \
+            > /tmp/recoverability-vectors/unknown-surface-report.json
+          jq -e '.valid == true and .class_counts.NotEvaluable == 5' \
+            /tmp/recoverability-vectors/unknown-surface-report.json >/dev/null
+
+          # Operation-order controls: no rewrite or navigation without first-pass retrieval.
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/no-initial-before-rewrite-manifest.json \
+            > /tmp/recoverability-vectors/no-initial-before-rewrite-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:rewrite")][0].recoverability == "UnreachableWithinBudget"' \
+            /tmp/recoverability-vectors/no-initial-before-rewrite-report.json >/dev/null
+
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/no-initial-before-navigation-manifest.json \
+            > /tmp/recoverability-vectors/no-initial-before-navigation-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:navigation")][0].recoverability == "UnreachableWithinBudget"' \
+            /tmp/recoverability-vectors/no-initial-before-navigation-report.json >/dev/null
 
           cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
             audit-recoverability-manifest /tmp/recoverability-vectors/lower-budget-manifest.json \
