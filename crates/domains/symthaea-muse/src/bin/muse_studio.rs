@@ -3294,7 +3294,7 @@ mod keeper_bundle_integrity_tests {
     fn keeper_bundle_readback_rejects_zero_length_required_artifacts() {
         let path = temp_bundle_path("empty-required");
         create_fixture_bundle(&path, false);
-        std::fs::write(path.join("score.json"), []).unwrap();
+        std::fs::write(path.join("score.json"), b"").unwrap();
         assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
         let _ = std::fs::remove_dir_all(path);
     }
