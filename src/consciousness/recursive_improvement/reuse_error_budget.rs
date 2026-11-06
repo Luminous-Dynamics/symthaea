@@ -25,7 +25,8 @@
 //! never rounded to zero because zero would falsely imply an error-free test.
 
 use super::reuse_confidence_certificate::{
-    MAX_CERTIFICATE_SAMPLE_COUNT, ReuseCertificateError, ReuseConfidenceCertificate,
+    MAX_CERTIFICATE_SAMPLE_COUNT, BoundedScoreConfidenceCertificate, ReuseCertificateError,
+    ReuseConfidenceCertificate, bounded_score_confidence_certificate,
     pass_fail_confidence_certificate,
 };
 use std::fmt;
@@ -45,6 +46,8 @@ pub enum ReuseBudgetError {
     AllocationUnderflow,
     ComparisonCountOverflow,
     InvalidCandidateEvidence,
+    InvalidBoundedCandidateEvidence,
+    InvalidBoundedDifference,
     CandidateSampleTooLarge { actual: usize, maximum: usize },
     InvalidPairedDifference(i8),
     CandidateCountMismatch { expected: usize, actual: usize },
@@ -79,6 +82,12 @@ impl fmt::Display for ReuseBudgetError {
                     f,
                     "candidate evidence requires a non-empty paired outcome vector"
                 )
+            }
+            Self::InvalidBoundedCandidateEvidence => {
+                write!(f, "bounded-score candidate evidence requires a non-empty paired outcome vector")
+            }
+            Self::InvalidBoundedDifference => {
+                write!(f, "bounded-score paired differences must be finite and within [-1, 1]")
             }
             Self::CandidateSampleTooLarge { actual, maximum } => {
                 write!(
@@ -191,6 +200,52 @@ impl ReuseCandidateEvidence {
     }
 }
 
+
+
+/// Candidate evidence for one predeclared bounded-score estimand.
+///
+/// Each value is candidate-minus-incumbent in [-1, 1]. The empirical mean is
+/// derived internally; callers cannot supply detached summary statistics.
+/// Rows must already be reduced to the preregistered independent paired unit
+/// and supplied in canonical order by the trusted evidence adapter.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoundedScoreCandidateEvidence {
+    paired_differences: Vec<f64>,
+    empirical_improvement: f64,
+}
+
+impl BoundedScoreCandidateEvidence {
+    pub fn new(paired_differences: impl Into<Vec<f64>>) -> Result<Self, ReuseBudgetError> {
+        let paired_differences = paired_differences.into();
+        if paired_differences.is_empty() {
+            return Err(ReuseBudgetError::InvalidBoundedCandidateEvidence);
+        }
+        if paired_differences.len() > MAX_CERTIFICATE_SAMPLE_COUNT {
+            return Err(ReuseBudgetError::CandidateSampleTooLarge {
+                actual: paired_differences.len(),
+                maximum: MAX_CERTIFICATE_SAMPLE_COUNT,
+            });
+        }
+
+        let mut sum = 0.0_f64;
+        for &difference in &paired_differences {
+            if !difference.is_finite() || !(-1.0..=1.0).contains(&difference) {
+                return Err(ReuseBudgetError::InvalidBoundedDifference);
+            }
+            sum += difference;
+        }
+        let empirical_improvement = sum / paired_differences.len() as f64;
+        if !empirical_improvement.is_finite() {
+            return Err(ReuseBudgetError::InvalidBoundedDifference);
+        }
+
+        Ok(Self { paired_differences, empirical_improvement })
+    }
+
+    pub fn sample_count(&self) -> usize { self.paired_differences.len() }
+    pub fn empirical_improvement(&self) -> f64 { self.empirical_improvement }
+}
+
 /// Candidate-facing output for one complete REUSE round. This is the paper's
 /// y_t in {0, ..., K}: RejectAll represents zero, and PromoteCandidate uses
 /// a one-based candidate number in 1..=K. A proposer receives only this one
@@ -286,6 +341,103 @@ pub fn evaluate_reuse_round(
     .decision())
 }
 
+
+
+/// Evaluate exactly K bounded-score candidates and return only the coarse
+/// REUSE round decision. Detailed evidence and certificates remain internal.
+pub fn evaluate_bounded_score_reuse_round(
+    alpha: f64,
+    round: usize,
+    prior_promotions: usize,
+    candidates_per_round: usize,
+    practical_improvement_threshold: f64,
+    candidates: &[BoundedScoreCandidateEvidence],
+) -> Result<ReuseRoundDecision, BoundedScoreRoundError> {
+    Ok(evaluate_bounded_score_reuse_round_audited(
+        alpha,
+        round,
+        prior_promotions,
+        candidates_per_round,
+        practical_improvement_threshold,
+        candidates,
+        0.0,
+    )?.decision())
+}
+
+/// In-crate audit path for a trusted bounded-score evaluator.
+///
+/// The same REUSE allocation covers each possible candidate/history comparison.
+/// A candidate is eligible only when its lower confidence bound exceeds the
+/// preregistered gamma. Among eligible candidates, the highest empirical mean
+/// is selected. Only the selected lower bound is added to the private progress
+/// ledger. This helper is not a persisted or independently operated service.
+pub(crate) fn evaluate_bounded_score_reuse_round_audited(
+    alpha: f64,
+    round: usize,
+    prior_promotions: usize,
+    candidates_per_round: usize,
+    practical_improvement_threshold: f64,
+    candidates: &[BoundedScoreCandidateEvidence],
+    prior_cumulative_lower_bound: f64,
+) -> Result<BoundedScoreRoundAudit, BoundedScoreRoundError> {
+    if !practical_improvement_threshold.is_finite()
+        || practical_improvement_threshold < 0.0
+    {
+        return Err(BoundedScoreRoundError::InvalidPracticalImprovementThreshold);
+    }
+    if !prior_cumulative_lower_bound.is_finite() || prior_cumulative_lower_bound < 0.0 {
+        return Err(BoundedScoreRoundError::InvalidCumulativeLowerBound);
+    }
+    if candidates.len() != candidates_per_round {
+        return Err(ReuseBudgetError::CandidateCountMismatch {
+            expected: candidates_per_round,
+            actual: candidates.len(),
+        }.into());
+    }
+
+    let delta = compute_reuse_total_error_budget(
+        alpha, round, prior_promotions, candidates_per_round,
+    )?;
+
+    let mut best: Option<(usize, usize, f64, BoundedScoreConfidenceCertificate)> = None;
+    for (candidate_index, candidate) in candidates.iter().enumerate() {
+        let certificate =
+            bounded_score_confidence_certificate(&candidate.paired_differences, delta)?;
+        if certificate.lower_bound() > practical_improvement_threshold
+            && best.as_ref().is_none_or(|(_, _, best_mean, _)| {
+                candidate.empirical_improvement > *best_mean
+            })
+        {
+            best = Some((
+                candidate_index,
+                candidate_index + 1,
+                candidate.empirical_improvement,
+                certificate,
+            ));
+        }
+    }
+
+    let Some((_candidate_index, candidate_number, _mean, certificate)) = best else {
+        return Ok(BoundedScoreRoundAudit {
+            decision: ReuseRoundDecision::RejectAll,
+            selected_certificate: None,
+            cumulative_lower_bound: prior_cumulative_lower_bound,
+        });
+    };
+
+    let cumulative_lower_bound =
+        prior_cumulative_lower_bound + certificate.lower_bound();
+    if !cumulative_lower_bound.is_finite() {
+        return Err(BoundedScoreRoundError::InvalidCumulativeLowerBound);
+    }
+
+    Ok(BoundedScoreRoundAudit {
+        decision: ReuseRoundDecision::PromoteCandidate { candidate_number },
+        selected_certificate: Some(certificate),
+        cumulative_lower_bound,
+    })
+}
+
 /// In-crate audit path for the independent evaluator service.
 ///
 /// The candidate evidence contains the full paired outcomes. This function:
@@ -370,6 +522,60 @@ pub(crate) fn evaluate_reuse_round_audited(
     })
 }
 
+
+
+/// Trusted evaluator audit record for the bounded-score REUSE route.
+/// Full certificate and cumulative progress remain outside proposer feedback.
+#[derive(Debug, Clone, PartialEq)]
+pub struct BoundedScoreRoundAudit {
+    decision: ReuseRoundDecision,
+    selected_certificate: Option<BoundedScoreConfidenceCertificate>,
+    cumulative_lower_bound: f64,
+}
+
+impl BoundedScoreRoundAudit {
+    pub fn decision(&self) -> ReuseRoundDecision { self.decision }
+    pub fn selected_certificate(&self) -> Option<&BoundedScoreConfidenceCertificate> {
+        self.selected_certificate.as_ref()
+    }
+    pub fn cumulative_lower_bound(&self) -> f64 { self.cumulative_lower_bound }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BoundedScoreRoundError {
+    Budget(ReuseBudgetError),
+    ConfidenceCertificate(ReuseCertificateError),
+    InvalidPracticalImprovementThreshold,
+    InvalidCumulativeLowerBound,
+}
+
+impl fmt::Display for BoundedScoreRoundError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Budget(error) => write!(f, "bounded-score REUSE input error: {error}"),
+            Self::ConfidenceCertificate(error) => {
+                write!(f, "bounded-score confidence certificate failed: {error}")
+            }
+            Self::InvalidPracticalImprovementThreshold => {
+                write!(f, "practical improvement threshold gamma must be finite and nonnegative")
+            }
+            Self::InvalidCumulativeLowerBound => {
+                write!(f, "prior cumulative lower bound must be finite and nonnegative")
+            }
+        }
+    }
+}
+
+impl std::error::Error for BoundedScoreRoundError {}
+
+impl From<ReuseBudgetError> for BoundedScoreRoundError {
+    fn from(value: ReuseBudgetError) -> Self { Self::Budget(value) }
+}
+
+impl From<ReuseCertificateError> for BoundedScoreRoundError {
+    fn from(value: ReuseCertificateError) -> Self { Self::ConfidenceCertificate(value) }
+}
+
 /// Allocate the per-comparison REUSE error budget for one adaptive round.
 ///
 /// Arguments:
@@ -385,18 +591,17 @@ pub(crate) fn evaluate_reuse_round_audited(
 /// authority, and it cannot enforce that the proposer sees only a decision.
 /// Do not use this function alone to authorize promotion or claim the REUSE
 /// simultaneous guarantee.
-pub fn allocate_reuse_error_budget(
+/// Compute the complete per-comparison REUSE allocation before any rho split.
+/// Used by the bounded-score route, which spends the complete allocation on
+/// its single lower-confidence-bound decision.
+fn compute_reuse_total_error_budget(
     alpha: f64,
     round: usize,
     prior_promotions: usize,
     candidates_per_round: usize,
-    rho: f64,
-) -> Result<ReuseErrorAllocation, ReuseBudgetError> {
+) -> Result<f64, ReuseBudgetError> {
     if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
         return Err(ReuseBudgetError::InvalidAlpha);
-    }
-    if !rho.is_finite() || rho <= 0.0 || rho >= 1.0 {
-        return Err(ReuseBudgetError::InvalidRho);
     }
     if round == 0 {
         return Err(ReuseBudgetError::InvalidRound);
@@ -413,25 +618,42 @@ pub fn allocate_reuse_error_budget(
 
     let n = round - 1;
     let log_choose = log_binomial_coefficient(n, prior_promotions);
-
-    // Compute entirely in log space to avoid integer binomial coefficients and
-    // intermediate K^(p+1) overflow.
     let log_alpha = alpha.ln();
     let log_round_weight = -((round as f64).ln() + ((round + 1) as f64).ln());
     let log_promotion_weight =
         -(((prior_promotions + 1) as f64).ln() + ((prior_promotions + 2) as f64).ln());
-    let log_candidate_factor = (prior_promotions + 1) as f64 * (candidates_per_round as f64).ln();
+    let log_candidate_factor =
+        (prior_promotions + 1) as f64 * (candidates_per_round as f64).ln();
     let log_total =
         log_alpha + log_round_weight + log_promotion_weight - log_choose - log_candidate_factor;
-
     let total_error_budget = log_total.exp();
-    let paired_test_error_budget = total_error_budget * rho;
-    let lower_bound_error_budget = total_error_budget * (1.0 - rho);
 
     if !log_total.is_finite()
         || !total_error_budget.is_finite()
         || total_error_budget <= 0.0
-        || !paired_test_error_budget.is_finite()
+    {
+        return Err(ReuseBudgetError::AllocationUnderflow);
+    }
+    Ok(total_error_budget)
+}
+
+/// Allocate the per-comparison REUSE error budget for one adaptive pass/fail round.
+pub fn allocate_reuse_error_budget(
+    alpha: f64,
+    round: usize,
+    prior_promotions: usize,
+    candidates_per_round: usize,
+    rho: f64,
+) -> Result<ReuseErrorAllocation, ReuseBudgetError> {
+    if !rho.is_finite() || rho <= 0.0 || rho >= 1.0 {
+        return Err(ReuseBudgetError::InvalidRho);
+    }
+    let total_error_budget =
+        compute_reuse_total_error_budget(alpha, round, prior_promotions, candidates_per_round)?;
+    let paired_test_error_budget = total_error_budget * rho;
+    let lower_bound_error_budget = total_error_budget * (1.0 - rho);
+
+    if !paired_test_error_budget.is_finite()
         || paired_test_error_budget <= 0.0
         || !lower_bound_error_budget.is_finite()
         || lower_bound_error_budget <= 0.0
@@ -688,3 +910,83 @@ mod tests {
         );
     }
 }
+
+
+#[cfg(test)]
+mod bounded_score_round_tests {
+    use super::*;
+
+    fn evidence(positive: f64, n: usize) -> BoundedScoreCandidateEvidence {
+        let rows = (0..n)
+            .map(|i| if i % 4 == 3 { -0.1 } else { positive })
+            .collect::<Vec<_>>();
+        BoundedScoreCandidateEvidence::new(rows).unwrap()
+    }
+
+    #[test]
+    fn bounded_score_round_selects_highest_mean_among_candidates_over_gamma() {
+        let candidates = [evidence(0.2, 1_000), evidence(0.3, 1_000)];
+        let decision = evaluate_bounded_score_reuse_round(
+            0.05, 1, 0, 2, 0.05, &candidates,
+        ).unwrap();
+        assert_eq!(
+            decision,
+            ReuseRoundDecision::PromoteCandidate { candidate_number: 2 }
+        );
+    }
+
+    #[test]
+    fn bounded_score_round_rejects_when_no_candidate_clears_gamma() {
+        let candidates = [BoundedScoreCandidateEvidence::new(vec![0.0; 100]).unwrap()];
+        let decision = evaluate_bounded_score_reuse_round(
+            0.05, 1, 0, 1, 0.0, &candidates,
+        ).unwrap();
+        assert_eq!(decision, ReuseRoundDecision::RejectAll);
+    }
+
+    #[test]
+    fn bounded_score_round_requires_exact_candidate_count() {
+        let candidates = [evidence(0.2, 1_000)];
+        let result = evaluate_bounded_score_reuse_round(0.05, 1, 0, 2, 0.0, &candidates);
+        assert!(matches!(
+            result,
+            Err(BoundedScoreRoundError::Budget(
+                ReuseBudgetError::CandidateCountMismatch { expected: 2, actual: 1 }
+            ))
+        ));
+    }
+
+    #[test]
+    fn bounded_score_round_rejects_invalid_gamma_and_history() {
+        let candidates = [evidence(0.2, 1_000)];
+        assert!(matches!(
+            evaluate_bounded_score_reuse_round(0.05, 1, 0, 1, f64::NAN, &candidates),
+            Err(BoundedScoreRoundError::InvalidPracticalImprovementThreshold)
+        ));
+        assert!(matches!(
+            evaluate_bounded_score_reuse_round(0.05, 1, 1, 1, 0.0, &candidates),
+            Err(BoundedScoreRoundError::Budget(ReuseBudgetError::PromotionCountExceedsHistory))
+        ));
+    }
+
+    #[test]
+    fn bounded_score_candidate_evidence_rejects_invalid_values() {
+        assert_eq!(
+            BoundedScoreCandidateEvidence::new(Vec::<f64>::new()),
+            Err(ReuseBudgetError::InvalidBoundedCandidateEvidence)
+        );
+        assert_eq!(
+            BoundedScoreCandidateEvidence::new(vec![0.0, f64::NAN]),
+            Err(ReuseBudgetError::InvalidBoundedDifference)
+        );
+        assert_eq!(
+            BoundedScoreCandidateEvidence::new(vec![1.1]),
+            Err(ReuseBudgetError::InvalidBoundedDifference)
+        );
+        assert_eq!(
+            BoundedScoreCandidateEvidence::new(vec![-1.1]),
+            Err(ReuseBudgetError::InvalidBoundedDifference)
+        );
+    }
+}
+
