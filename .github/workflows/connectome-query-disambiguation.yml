@@ -2,6 +2,7 @@ name: Connectome query-disambiguation observation planner
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_query_disambiguation_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_query_disambiguation_oracle.py"
@@ -28,6 +29,7 @@ permissions:
 jobs:
   exact-observation-plan:
     name: Exact query-disambiguation set cover and independent oracle
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
