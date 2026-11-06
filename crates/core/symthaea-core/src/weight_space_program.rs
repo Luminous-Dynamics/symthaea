@@ -16,15 +16,29 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::hdc::hdc_ltc_unified::HdcLtcParameterGroupId;
-use crate::dynamics::cfc::network::CfCParameterGroupId;
+
+/// Stable, architecture-aware identity for a CfC serialized parameter group.
+///
+/// This adapter-neutral identity mirrors the SWI CfC manifest. The main-crate
+/// adapter must map it explicitly to the model's native identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CfCWeightGroupId {
+    CellInputProjection { cell: usize },
+    CellRecurrentProjection { cell: usize },
+    CellHiddenBias { cell: usize },
+    CellTimeConstant { cell: usize },
+    CellBackboneWeight { cell: usize, layer: usize },
+    CellBackboneBias { cell: usize, layer: usize },
+    OutputProjection,
+    OutputBias,
+}
 
 /// Stable, architecture-aware identity for a parameter group.
 ///
-/// This intentionally wraps the current CfC and unified HDC-LTC identifiers;
-/// it does not flatten their distinct mathematical semantics into string keys.
+/// It does not flatten CfC and HDC-LTC mathematical semantics into string keys.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WeightProgramTarget {
-    CfC(CfCParameterGroupId),
+    CfC(CfCWeightGroupId),
     HdcLtc(HdcLtcParameterGroupId),
 }
 
@@ -407,7 +421,7 @@ fn validate_group(
     }
 
     match group.target {
-        WeightProgramTarget::CfC(crate::dynamics::cfc::network::CfCParameterGroupId::CellTimeConstant { .. })
+        WeightProgramTarget::CfC(crate::dynamics::cfc::network::CfCWeightGroupId::CellTimeConstant { .. })
             if group.role != ParameterGroupRole::TimeConstant =>
         {
             return Err(WeightProgramError::InvalidConstraints);
@@ -566,7 +580,7 @@ mod tests {
             groups: vec![
                 ParameterGroupSnapshot {
                     target: WeightProgramTarget::CfC(
-                        CfCParameterGroupId::CellTimeConstant { cell: 0 },
+                        CfCWeightGroupId::CellTimeConstant { cell: 0 },
                     ),
                     role: ParameterGroupRole::TimeConstant,
                     shape: vec![2],
@@ -616,7 +630,7 @@ mod tests {
         let base = snapshot();
         let proposal = program(WeightProgramOperation::AddDelta {
             target: WeightProgramTarget::CfC(
-                CfCParameterGroupId::CellTimeConstant { cell: 0 },
+                CfCWeightGroupId::CellTimeConstant { cell: 0 },
             ),
             offset: 0,
             values: vec![0.1, 0.0],
@@ -635,7 +649,7 @@ mod tests {
         let base = snapshot();
         let mut proposal = program(WeightProgramOperation::ScaleRange {
             target: WeightProgramTarget::CfC(
-                CfCParameterGroupId::CellTimeConstant { cell: 0 },
+                CfCWeightGroupId::CellTimeConstant { cell: 0 },
             ),
             start: 0,
             end: 2,
@@ -653,7 +667,7 @@ mod tests {
         let base = snapshot();
         let proposal = program(WeightProgramOperation::ReplaceGroup {
             target: WeightProgramTarget::CfC(
-                CfCParameterGroupId::CellTimeConstant { cell: 0 },
+                CfCWeightGroupId::CellTimeConstant { cell: 0 },
             ),
             values: vec![0.5, -0.1],
         });
@@ -667,7 +681,7 @@ mod tests {
     #[test]
     fn duplicate_target_operations_are_rejected() {
         let base = snapshot();
-        let target = WeightProgramTarget::CfC(CfCParameterGroupId::CellTimeConstant {
+        let target = WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant {
             cell: 0,
         });
         let mut proposal = program(WeightProgramOperation::ScaleRange {
@@ -706,7 +720,7 @@ mod tests {
         let base = snapshot();
         let proposal = program(WeightProgramOperation::ScaleRange {
             target: WeightProgramTarget::CfC(
-                CfCParameterGroupId::CellTimeConstant { cell: 0 },
+                CfCWeightGroupId::CellTimeConstant { cell: 0 },
             ),
             start: 0,
             end: 2,
