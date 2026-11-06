@@ -1,0 +1,89 @@
+name: Connectome response-model challenge envelope
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_RESPONSE_MODEL_CHALLENGE_V1.md"
+      - "docs/neuroscience/CONNECTOME_RESPONSE_MODEL_CHALLENGE.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_RESPONSE_MODEL_CHALLENGE.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_INTERVENTION_MODEL_CHALLENGE.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_response_model_challenge.py"
+      - ".github/workflows/connectome-response-model-challenge.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_RESPONSE_MODEL_CHALLENGE_V1.md"
+      - "docs/neuroscience/CONNECTOME_RESPONSE_MODEL_CHALLENGE.schema.json"
+      - "docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_RESPONSE_MODEL_CHALLENGE.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_INTERVENTION_MODEL_CHALLENGE.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_response_model_challenge.py"
+      - ".github/workflows/connectome-response-model-challenge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-response-model-expansion:
+    name: Verify additive response-model challenge and monotonicity
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate schemas and both synthetic intervention fixtures
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          intervention_schema = json.loads(Path("docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json").read_text())
+          challenge_schema = json.loads(Path("docs/neuroscience/CONNECTOME_RESPONSE_MODEL_CHALLENGE.schema.json").read_text())
+          base = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json").read_text())
+          challenged = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_INTERVENTION_MODEL_CHALLENGE.example.json").read_text())
+          binding = json.loads(Path("docs/neuroscience/examples/CONNECTOME_RESPONSE_MODEL_CHALLENGE.example.json").read_text())
+
+          Draft202012Validator.check_schema(intervention_schema)
+          Draft202012Validator.check_schema(challenge_schema)
+          Draft202012Validator(intervention_schema).validate(base)
+          Draft202012Validator(intervention_schema).validate(challenged)
+          Draft202012Validator(challenge_schema).validate(binding)
+
+          assert len(base["nuisance_models"]) == 2
+          assert len(challenged["nuisance_models"]) == 3
+          assert len(base["predictions"]) == 24
+          assert len(challenged["predictions"]) == 36
+          assert base["query"] == challenged["query"]
+          assert base["worlds"] == challenged["worlds"]
+          assert base["interventions"] == challenged["interventions"]
+          print("base and challenged Draft 2020-12 contracts: PASS")
+          PY
+      - name: Run independent decision-value oracle controls
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_response_model_challenge.py
+          python3 tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py --self-test
+          python3 tools/connectomics-intake-audit/reference/verify_response_model_challenge.py --self-test
+      - name: Verify base decision-value fixture
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py \
+            docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json
+      - name: Verify additive model challenge and robust identifiability withdrawal
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_response_model_challenge.py \
+            --base docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json \
+            --challenged docs/neuroscience/examples/CONNECTOME_QUERY_INTERVENTION_MODEL_CHALLENGE.example.json \
+            --binding docs/neuroscience/examples/CONNECTOME_RESPONSE_MODEL_CHALLENGE.example.json \
+            --oracle tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py \
+            --receipt "$RUNNER_TEMP/response-model-challenge-receipt.json"
+          cat "$RUNNER_TEMP/response-model-challenge-receipt.json"

@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_RESPONSE_MODEL_CHALLENGE.schema.json",
+  "title": "Connectome response-model challenge and expansion binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "challenge_id",
+    "base_fixture_path",
+    "challenged_fixture_path",
+    "base_fixture_git_blob_sha1",
+    "challenged_fixture_git_blob_sha1",
+    "challenger_model",
+    "expected_outcomes",
+    "claim_scope"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_fixture_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "challenged_fixture_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_fixture_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "challenged_fixture_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "challenger_model": {
+      "$ref": "#/$defs/challenger_model"
+    },
+    "expected_outcomes": {
+      "$ref": "#/$defs/expected_outcomes"
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    }
+  },
+  "$defs": {
+    "challenger_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance_model_id",
+        "model_sha256",
+        "observation_model_sha256",
+        "challenger_evidence_sha256",
+        "adjudication_status",
+        "ancestry_group_ids"
+      ],
+      "properties": {
+        "nuisance_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "observation_model_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "challenger_evidence_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "adjudication_status": {
+          "enum": [
+            "ADMITTED_FOR_SENSITIVITY",
+            "REJECTED",
+            "PENDING"
+          ]
+        },
+        "ancestry_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "expected_outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_decision_status",
+        "challenged_decision_status",
+        "base_selected_intervention_id",
+        "challenged_selected_intervention_id",
+        "base_worst_case_query_loss",
+        "challenged_worst_case_query_loss",
+        "challenged_decision_value_per_cost",
+        "robust_identifiability_status",
+        "robust_separating_intervention_ids",
+        "monotonicity_passed"
+      ],
+      "properties": {
+        "base_decision_status": {
+          "const": "DISCRIMINATING_INTERVENTION_AVAILABLE"
+        },
+        "challenged_decision_status": {
+          "const": "NO_FEASIBLE_DISCRIMINATING_INTERVENTION"
+        },
+        "base_selected_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challenged_selected_intervention_id": {
+          "type": "null"
+        },
+        "base_worst_case_query_loss": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "challenged_worst_case_query_loss": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "challenged_decision_value_per_cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "robust_identifiability_status": {
+          "const": "ROBUST_NOT_IDENTIFIABLE"
+        },
+        "robust_separating_intervention_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 0
+        },
+        "monotonicity_passed": {
+          "const": true
+        }
+      }
+    }
+  }
+}
