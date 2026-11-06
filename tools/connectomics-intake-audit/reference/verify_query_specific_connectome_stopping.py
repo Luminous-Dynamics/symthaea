@@ -232,6 +232,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         'status': 'SYNTHETIC_CONTRACT_VALIDATED',
         'claim_scope': data['claim_scope'],
         'query_id': query['query_id'],
+        'baseline_decision': query['baseline_decision'],
         'sampling_frame_count': len(frames),
         'case_count': len(results),
         'results': results,
