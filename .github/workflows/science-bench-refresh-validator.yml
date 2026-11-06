@@ -896,6 +896,13 @@ jobs:
           jq -e '.valid == true and .class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.NotEvaluable == 2 and .class_counts.UnreachableWithinBudget == null' \
             /tmp/sbr-recoverability/partial-report.json >/dev/null
 
+          # A "complete" state without a separately pinned completeness receipt can prove positives only.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-recoverability-manifest /tmp/sbr-recoverability/missing-completeness-receipt-manifest.json \
+            > /tmp/sbr-recoverability/missing-completeness-receipt-report.json
+          jq -e '.valid == true and .class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.NotEvaluable == 2 and .class_counts.UnreachableWithinBudget == null and .surface_completeness_receipt_sha256 == null' \
+            /tmp/sbr-recoverability/missing-completeness-receipt-report.json >/dev/null
+
           # A completely unknown surface makes even apparent route edges non-evaluable.
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
             audit-recoverability-manifest /tmp/sbr-recoverability/unknown-surface-manifest.json \
