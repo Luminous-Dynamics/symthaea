@@ -295,7 +295,10 @@
                   "minimum": 0
                 },
                 "cost_per_task_usd": {
-                  "type": "number",
+                  "type": [
+                    "number",
+                    "null"
+                  ],
                   "minimum": 0
                 },
                 "median_duration_minutes": {
