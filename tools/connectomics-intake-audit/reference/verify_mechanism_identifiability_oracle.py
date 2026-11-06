@@ -207,13 +207,17 @@ def verify(data: dict[str, Any], raw_input: bytes) -> dict[str, Any]:
 
 
 def self_test(data: dict[str, Any]) -> None:
-    baseline = verify(copy.deepcopy(data), b'known-answer-self-test')
+    def verify_mutation(value: dict[str, Any]) -> dict[str, Any]:
+        raw = json.dumps(value, separators=(",", ":")).encode("utf-8")
+        return verify(value, raw)
+
+    baseline = verify_mutation(copy.deepcopy(data))
     require(baseline["selected_intervention_id"] == "orthogonal-joint", "starter fixture known answer failed")
 
     missing = copy.deepcopy(data)
     missing["predictions"].pop()
     try:
-        verify(missing)
+        verify_mutation(missing)
     except AssertionError:
         pass
     else:
@@ -222,7 +226,7 @@ def self_test(data: dict[str, Any]) -> None:
     infeasible = copy.deepcopy(data)
     next(row for row in infeasible["interventions"] if row["intervention_id"] == "infeasible-perfect")["feasibility_status"] = "FEASIBLE"
     try:
-        verify(infeasible)
+        verify_mutation(infeasible)
     except AssertionError:
         pass
     else:
@@ -231,7 +235,7 @@ def self_test(data: dict[str, Any]) -> None:
     underpowered = copy.deepcopy(data)
     underpowered["replicate_design"]["replicate_count"] = 1
     try:
-        verify(underpowered)
+        verify_mutation(underpowered)
     except AssertionError:
         pass
     else:
