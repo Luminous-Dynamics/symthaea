@@ -1218,6 +1218,7 @@ fn summarize_proof_runs(
         .collect();
     let mut run_ids = BTreeSet::new();
     let mut groups = BTreeMap::<StrategyKey, Vec<&ProofRun>>::new();
+    let mut execution_conditions = BTreeMap::<StrategyKey, (String, String)>::new();
     let mut verified_success_count = 0usize;
     let mut successful_task_ids = BTreeSet::<&str>::new();
     for (index, run) in runs.iter().enumerate() {
@@ -1225,11 +1226,24 @@ fn summarize_proof_runs(
         if !run_ids.insert(run.run_id.as_str()) {
             return Err(format!("duplicate proof-run ID {}", run.run_id));
         }
+        let key = strategy_key(run);
+        let condition = (
+            run.budget_policy_sha256.clone(),
+            run.evaluation_condition_sha256.clone(),
+        );
+        if let Some(previous) = execution_conditions.insert(key.clone(), condition.clone()) {
+            if previous != condition {
+                return Err(format!(
+                    "strategy {} mixes resource-budget or evaluation-condition identities",
+                    strategy_label(&key)
+                ));
+            }
+        }
         if run.outcome == "verified_success" {
             verified_success_count += 1;
             successful_task_ids.insert(run.task_id.as_str());
         }
-        groups.entry(strategy_key(run)).or_default().push(run);
+        groups.entry(key).or_default().push(run);
     }
 
     let mut summaries = Vec::new();
