@@ -455,7 +455,7 @@ fn find_route(
                         && !state.used_navigation
                 }
                 navigation_operation if navigation_operation.is_navigation() => {
-                    state.used_initial_retrieval
+                    state.used_initial_retrieval && !state.reformulation_pending
                 }
                 _ => false,
             };
