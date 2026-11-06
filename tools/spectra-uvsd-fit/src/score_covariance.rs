@@ -649,9 +649,14 @@ mod tests {
     fn missing_duplicate_unknown_and_nonfinite_vector_rows_fail_closed() {
         let c = contract();
         let rows = observations();
-        let missing = &rows[..rows.len() - 1];
+        let mut missing_middle = rows.clone();
+        missing_middle.remove(2);
         assert_eq!(
-            diagnose_score_vector_covariance(&c, missing),
+            diagnose_score_vector_covariance(&c, &missing_middle),
+            Err(ScoreCovarianceError::NonContiguousReplicationIndices)
+        );
+        assert_eq!(
+            diagnose_score_vector_covariance(&c, &rows[..1]),
             Err(ScoreCovarianceError::InsufficientReplications)
         );
         let duplicate = vec![rows[0], rows[0]];
@@ -703,11 +708,14 @@ mod tests {
             weights: [1.0, 1.0, 1.0, 1.0, 1.0],
         }];
         let values = [
-            [-2.0, 2.0, -1.0, 1.0, 0.5],
-            [-1.0, -1.0, 2.0, -2.0, -0.5],
-            [0.0, 1.0, -2.0, 0.0, 1.0],
-            [1.0, -2.0, 1.0, 2.0, -1.0],
-            [2.0, 0.0, 0.0, -1.0, 0.0],
+            [1.0, 1.0, 1.0, 1.0, 1.0],
+            [1.0, 1.0, -1.0, 1.0, -1.0],
+            [1.0, -1.0, 1.0, -1.0, 1.0],
+            [1.0, -1.0, -1.0, -1.0, -1.0],
+            [-1.0, 1.0, 1.0, -1.0, -1.0],
+            [-1.0, 1.0, -1.0, -1.0, 1.0],
+            [-1.0, -1.0, 1.0, 1.0, -1.0],
+            [-1.0, -1.0, -1.0, 1.0, 1.0],
         ];
         let rows = values
             .iter()
@@ -722,7 +730,7 @@ mod tests {
         let result = diagnose_score_vector_covariance(&c, &rows).unwrap();
         let diagnostic = &result.cells[0].directional_variances[0];
         assert!(
-            (diagnostic.covariance_to_diagonal_ratio.unwrap() - 1.0).abs() < 0.5
+            (diagnostic.covariance_to_diagonal_ratio.unwrap() - 1.0).abs() < 1.0e-12
         );
     }
 }
