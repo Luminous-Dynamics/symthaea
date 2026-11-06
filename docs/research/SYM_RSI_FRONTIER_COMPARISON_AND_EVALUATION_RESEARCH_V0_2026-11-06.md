@@ -125,11 +125,11 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 
 1. AIDE², *Recursive self-improvement of AI research agents*: https://arxiv.org/abs/2609.26457
 2. RSI-Env, *An Open-Ended Environment for Recursive Self-Improvement of Agents* (2026-11-01): https://arxiv.org/abs/2611.01736
-2. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
-3. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
-4. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
-5. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
-6. RSIBench-Data: https://arxiv.org/abs/2607.25886
-7. EvalResearchBench: https://arxiv.org/abs/2610.04184
-8. RSI evidence census: https://arxiv.org/abs/2610.27610
-9. METR research productivity coverage (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
+3. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
+4. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
+5. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+6. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+7. RSIBench-Data: https://arxiv.org/abs/2607.25886
+8. EvalResearchBench: https://arxiv.org/abs/2610.04184
+9. RSI evidence census: https://arxiv.org/abs/2610.27610
+10. METR research productivity coverage (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
