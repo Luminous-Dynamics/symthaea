@@ -84,6 +84,8 @@ jobs:
           paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,' "$summary")"
           agent_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=agent,' "$summary")"
           partner_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=partner,' "$summary")"
+          agent_yoke_na="$(awk -F, '/^RMI_PAIRED_BOOTSTRAP,track=agent,/ && /targeted_minus_yoked=NA/ { count++ } END { print count + 0 }' "$summary")"
+          partner_yoke_na="$(awk -F, '/^RMI_PAIRED_BOOTSTRAP,track=partner,/ && /targeted_minus_yoked=NA/ { count++ } END { print count + 0 }' "$summary")"
           paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,' "$summary")"
           agent_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=agent,' "$summary")"
           partner_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=partner,' "$summary")"
@@ -110,6 +112,8 @@ jobs:
           test "$paired_summary_count" -eq 35
           test "$agent_paired_summary_count" -eq 30
           test "$partner_paired_summary_count" -eq 5
+          test "$agent_yoke_na" -eq 0
+          test "$partner_yoke_na" -eq 0
           test "$paired_summary_count" -eq 35
           test "$agent_paired_summary_count" -eq 30
           test "$partner_paired_summary_count" -eq 5
