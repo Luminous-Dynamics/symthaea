@@ -1,0 +1,9 @@
+[package]
+name = "ceb-workspace-tool-cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ceb-workspace-path = { path = "../workspace-path" }
+ceb-workspace-command-runner = { path = "../command-runner" }
