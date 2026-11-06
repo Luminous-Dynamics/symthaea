@@ -464,5 +464,48 @@ fn replay_preserves_inferred_confidence_and_analyst_authority_without_promotion(
         ["evidence_assessments"][0];
     assert_eq!(assessment["confidence"], json!("inferred"));
     assert_eq!(assessment["authority"], json!("analyst-inference"));
+#[test]
+fn recomputed_forged_result_digest_cannot_bless_an_incorrect_disposition() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let mut forged: Value = serde_json::from_slice(&result_bytes).unwrap();
+    forged["disposition"] = json!("refuted_within_scope");
+    let mut forged_body = forged.clone();
+    forged_body
+        .as_object_mut()
+        .unwrap()
+        .remove("derivation_sha256");
+    let canonical = rea_compat::canonical_jcs_bytes(&forged_body).unwrap();
+    forged["derivation_sha256"] = json!(rea_compat::sha256_hex(&canonical));
+    let forged_bytes = serde_json::to_vec(&forged).unwrap();
+
+    // The attacker has recomputed a self-consistent hash over the forged body.
+    assert_ne!(
+        forged["derivation_sha256"].as_str().unwrap(),
+        serde_json::from_slice::<Value>(&result_bytes).unwrap()["derivation_sha256"]
+            .as_str()
+            .unwrap()
+    );
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &forged_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
+    assert_eq!(replay.reported_disposition, ClaimDisposition::RefutedWithinScope);
+}
+
+#[test]
+fn replay_input_evidence_record_count_is_bounded_before_parsing() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+    let too_many: Vec<&[u8]> = vec![b"{}"; replay_verifier::MAX_EVIDENCE_RECORDS + 1];
+
+    let error = replay_claim_evaluation(&claim_bytes, &too_many, &result_bytes).unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::ResourceLimit);
+}
+
 }
 
