@@ -412,11 +412,15 @@
     },
     {
       "id": "bayesian_model_reduction_structure_selection",
-      "scope": "active-inference model-structure selection using posterior model reduction"
+      "scope": "Bayesian model reduction over nested, prior-restricted model structures; separate posterior model-evidence update, only for shared parameterization"
     },
     {
       "id": "hierarchical_state_parameter_model_information_gain",
       "scope": "joint-posterior chain-rule decomposition over model structure, model parameters, and latent state"
+    },
+    {
+      "id": "diagonal_gaussian_bayesian_model_reduction",
+      "scope": "Analytic BMR log evidence ratios for nested prior-only reductions under independent diagonal-Gaussian full posterior, full prior, and reduced priors"
     }
   ],
   "seeds": {
@@ -491,7 +495,10 @@
       "joint_information_chain_rule_error",
       "posterior_calibration_by_uncertainty_level",
       "joint_information_gain_nats",
-      "mutual_information_chain_rule_error_nats"
+      "mutual_information_chain_rule_error_nats",
+      "model_evidence_log_ratio_nats",
+      "posterior_model_entropy_after_bmr_nats",
+      "bmr_nonintegrable_ratio_rejection_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -540,7 +547,8 @@
     "State-, parameter-, and model-structure information gains are reported separately only when their generative models and posterior updates are explicitly defined.",
     "Any aggregation of epistemic terms declares its factorization and is checked against a joint mutual-information chain-rule calculation; arbitrary entropy deltas cannot be added.",
     "Bayesian Model Reduction or another model-selection procedure must be qualified against held-out model evidence and cannot commit a structural change from a probe ranking alone.",
-    "Hierarchical epistemic terms are derived from one declared joint posterior and action-conditioned outcome model; their sum must agree with the joint mutual-information chain rule within numerical tolerance."
+    "Hierarchical epistemic terms are derived from one declared joint posterior and action-conditioned outcome model; their sum must agree with the joint mutual-information chain rule within numerical tolerance.",
+    "Bayesian Model Reduction is applied only to prior-only reductions that share one parameterization; the posterior/full-prior pair and exact-vs-variational posterior status are recorded, and non-integrable ratios are rejected."
   ],
   "research_references": [
     {
