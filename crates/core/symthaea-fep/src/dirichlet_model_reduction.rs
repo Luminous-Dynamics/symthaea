@@ -1284,6 +1284,159 @@ mod tests {
         ));
     }
 
+    fn symmetric_beta_model_family() -> (
+        DirichletConcentrationTensor,
+        Vec<ReducedDirichletModelHypothesis>,
+    ) {
+        let full = tensor(&[&[2.5, 2.5]], 'a');
+        let models = vec![
+            ReducedDirichletModelHypothesis {
+                model_id: "success-favouring".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[4.0, 1.0]], 'a'),
+            },
+            ReducedDirichletModelHypothesis {
+                model_id: "failure-favouring".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[1.0, 4.0]], 'a'),
+            },
+        ];
+        (full, models)
+    }
+
+    #[test]
+    fn prospective_dirichlet_model_eig_matches_beta_binomial_information_gain() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        let action = DirichletActionPrediction {
+            action_id: "inspect-outcome".into(),
+            outcomes: vec![
+                DirichletPredictedOutcome {
+                    outcome_id: "success".into(),
+                    full_model_predictive_probability: 0.5,
+                    posterior_count_increment: vec![vec![1.0, 0.0]],
+                },
+                DirichletPredictedOutcome {
+                    outcome_id: "failure".into(),
+                    full_model_predictive_probability: 0.5,
+                    posterior_count_increment: vec![vec![0.0, 1.0]],
+                },
+            ],
+        };
+        let result = evaluate_dirichlet_model_information_gain(
+            &full_prior,
+            &full_prior,
+            &models,
+            &action,
+        )
+        .expect("coherent one-step BMR model-EIG prediction");
+
+        let expected_posterior_entropy =
+            -(0.8_f64 * 0.8_f64.ln() + 0.2_f64 * 0.2_f64.ln());
+        let expected_information_gain = std::f64::consts::LN_2 - expected_posterior_entropy;
+        assert!((result.current_model_entropy_nats - std::f64::consts::LN_2).abs() < 1e-12);
+        assert!(
+            (result.expected_posterior_model_entropy_nats - expected_posterior_entropy).abs()
+                < 1e-10
+        );
+        assert!(
+            (result.model_information_gain_nats - expected_information_gain).abs() < 1e-10
+        );
+        assert!((result.predictive_probability_mass - 1.0).abs() < 1e-12);
+        assert!((result.outcomes[0].predictive_probability - 0.5).abs() < 1e-12);
+        assert!((result.outcomes[1].predictive_probability - 0.5).abs() < 1e-12);
+        assert!(
+            (result.outcomes[0].posterior_model_probabilities[0].1 - 0.8).abs() < 1e-10
+        );
+        assert!(
+            (result.outcomes[1].posterior_model_probabilities[0].1 - 0.2).abs() < 1e-10
+        );
+    }
+
+    #[test]
+    fn uninformative_outcomes_have_zero_prospective_model_eig() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        let action = DirichletActionPrediction {
+            action_id: "uninformative-action".into(),
+            outcomes: vec![
+                DirichletPredictedOutcome {
+                    outcome_id: "outcome-a".into(),
+                    full_model_predictive_probability: 0.3,
+                    posterior_count_increment: vec![vec![0.0, 0.0]],
+                },
+                DirichletPredictedOutcome {
+                    outcome_id: "outcome-b".into(),
+                    full_model_predictive_probability: 0.7,
+                    posterior_count_increment: vec![vec![0.0, 0.0]],
+                },
+            ],
+        };
+        let result = evaluate_dirichlet_model_information_gain(
+            &full_prior,
+            &full_prior,
+            &models,
+            &action,
+        )
+        .expect("uninformative but normalized action prediction");
+        assert!(result.model_information_gain_nats.abs() < 1e-12);
+        assert!((result.outcomes[0].posterior_model_probabilities[0].1 - 0.5).abs() < 1e-12);
+        assert!((result.outcomes[1].posterior_model_probabilities[0].1 - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn prospective_model_eig_rejects_non_bma_priors_and_bad_predictive_mass() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        let action = DirichletActionPrediction {
+            action_id: "bad-prediction".into(),
+            outcomes: vec![
+                DirichletPredictedOutcome {
+                    outcome_id: "success".into(),
+                    full_model_predictive_probability: 0.6,
+                    posterior_count_increment: vec![vec![1.0, 0.0]],
+                },
+                DirichletPredictedOutcome {
+                    outcome_id: "failure".into(),
+                    full_model_predictive_probability: 0.3,
+                    posterior_count_increment: vec![vec![0.0, 1.0]],
+                },
+            ],
+        };
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(
+                &full_prior,
+                &full_prior,
+                &models,
+                &action,
+            ),
+            Err(DirichletModelInformationGainError::PredictiveProbabilityMassNotNormalized { .. })
+        ));
+
+        let mismatched_parent = tensor(&[&[2.6, 2.4]], 'a');
+        let coherent_action = DirichletActionPrediction {
+            action_id: "coherent-shape-but-wrong-parent".into(),
+            outcomes: vec![
+                DirichletPredictedOutcome {
+                    outcome_id: "success".into(),
+                    full_model_predictive_probability: 0.5,
+                    posterior_count_increment: vec![vec![1.0, 0.0]],
+                },
+                DirichletPredictedOutcome {
+                    outcome_id: "failure".into(),
+                    full_model_predictive_probability: 0.5,
+                    posterior_count_increment: vec![vec![0.0, 1.0]],
+                },
+            ],
+        };
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(
+                &mismatched_parent,
+                &mismatched_parent,
+                &models,
+                &coherent_action,
+            ),
+            Err(DirichletModelInformationGainError::ModelAveragePriorMismatch { .. })
+        ));
+    }
+
     #[test]
     fn parameter_order_permutation_is_invariant_when_digest_tracks_same_ordering() {
         let first = reduce_dirichlet_models(
