@@ -13,8 +13,9 @@ use super::claims::{
     validate_claim,
 };
 use super::{canonical_jcs_bytes, sha256_hex};
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Number, Value};
 use std::collections::HashSet;
 use std::fmt;
 
@@ -137,7 +138,7 @@ fn request_from_evaluation(
     evaluation: &ClaimEvaluation,
 ) -> Result<ClaimRequest, FormalMappingError> {
     let request = ClaimRequest {
-        schema: evaluation.schema.clone(),
+        schema: CLAIM_SCHEMA.to_owned(),
         claim_id: evaluation.claim_id.clone(),
         predicate: evaluation.predicate,
         scope: evaluation.scope.clone(),
@@ -395,6 +396,100 @@ pub fn validate_formal_provider_observation(
     Ok(())
 }
 
+
+struct UniqueJsonValue(Value);
+
+impl<'de> Deserialize<'de> for UniqueJsonValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(UniqueJsonVisitor)
+    }
+}
+
+struct UniqueJsonVisitor;
+
+impl<'de> Visitor<'de> for UniqueJsonVisitor {
+    type Value = UniqueJsonValue;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("JSON with unique object keys at every nesting level")
+    }
+
+    fn visit_bool<E>(self, value: bool) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::Bool(value)))
+    }
+
+    fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::Number(Number::from(value))))
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::Number(Number::from(value))))
+    }
+
+    fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Number::from_f64(value)
+            .map(|number| UniqueJsonValue(Value::Number(number)))
+            .ok_or_else(|| E::custom("JSON numbers must be finite"))
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::String(value.to_owned())))
+    }
+
+    fn visit_string<E>(self, value: String) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::String(value)))
+    }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::Null))
+    }
+
+    fn visit_none<E>(self) -> Result<Self::Value, E> {
+        Ok(UniqueJsonValue(Value::Null))
+    }
+
+    fn visit_some<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        UniqueJsonValue::deserialize(deserializer)
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut values = Vec::new();
+        while let Some(item) = sequence.next_element::<UniqueJsonValue>()? {
+            values.push(item.0);
+        }
+        Ok(UniqueJsonValue(Value::Array(values)))
+    }
+
+    fn visit_map<A>(self, mut object: A) -> Result<Self::Value, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut values = Map::new();
+        let mut seen = HashSet::new();
+        while let Some((key, item)) = object.next_entry::<String, UniqueJsonValue>()? {
+            if !seen.insert(key.clone()) {
+                return Err(de::Error::custom(format!(
+                    "duplicate JSON object key '{key}'"
+                )));
+            }
+            values.insert(key, item.0);
+        }
+        Ok(UniqueJsonValue(Value::Object(values)))
+    }
+}
+
 /// Parse a formal envelope with a strict byte bound and closed, deny-unknown
 /// structs. Raw duplicate-key rejection remains the responsibility of the
 /// upstream REA request/result parser and replay verifier.
@@ -407,10 +502,24 @@ pub fn parse_formal_provider_observation_json(
             "formal provider-observation envelope exceeds its byte limit",
         ));
     }
-    let envelope: FormalProviderObservation = serde_json::from_slice(bytes).map_err(|error| {
+    let mut deserializer = serde_json::Deserializer::from_slice(bytes);
+    let UniqueJsonValue(value) =
+        UniqueJsonValue::deserialize(&mut deserializer).map_err(|error| {
+            FormalMappingError::new(
+                FormalMappingErrorKind::InvalidJson,
+                format!("formal provider-observation envelope parsing failed: {error}"),
+            )
+        })?;
+    deserializer.end().map_err(|error| {
         FormalMappingError::new(
             FormalMappingErrorKind::InvalidJson,
-            format!("formal provider-observation envelope parsing failed: {error}"),
+            format!("formal provider-observation envelope has trailing data: {error}"),
+        )
+    })?;
+    let envelope: FormalProviderObservation = serde_json::from_value(value).map_err(|error| {
+        FormalMappingError::new(
+            FormalMappingErrorKind::InvalidJson,
+            format!("formal provider-observation envelope schema validation failed: {error}"),
         )
     })?;
     validate_formal_provider_observation(&envelope)?;
