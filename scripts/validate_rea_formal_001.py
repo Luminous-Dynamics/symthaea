@@ -19,6 +19,9 @@ PARENT_CLOSURE_BLOB = "3b7e9edca79b01cc005b86ca6ae0c2afdc2e26f4"
 
 THEOREMS = (
     "provider_observation_support_binds_full_request",
+    "changed_derivation_digest_cannot_support",
+    "changed_claim_id_cannot_support",
+    "changed_subject_digest_cannot_support",
     "changed_claim_digest_cannot_support",
     "changed_request_schema_cannot_support",
     "changed_result_schema_cannot_support",
@@ -131,10 +134,14 @@ def validate() -> None:
     )
     for term in (
         "claimRequestDigest",
+        "derivationDigest",
         "requestSchemaGeneration",
         "resultSchemaGeneration",
         "evaluatorRuleGeneration",
         "ruleId",
+        "evaluatorVersion",
+        "claimId",
+        "subjectSha256",
         "operation",
         "platform",
         "platformVersion",
