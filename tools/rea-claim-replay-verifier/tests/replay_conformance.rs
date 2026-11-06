@@ -948,7 +948,7 @@ fn evidence_transport_order_is_commutative_for_a_fixed_claim_reference_order() {
         assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
         assert_eq!(
             replay.expected_disposition,
-            ClaimDisposition::SupportedWithinScope
+            Disposition::SupportedWithinScope
         );
         assert_eq!(
             replay.recomputed_derivation_sha256,
