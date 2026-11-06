@@ -118,6 +118,9 @@ jobs:
       - name: Rust Evidence identity and upstream differential tests
         run: cargo test --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked
 
+      - name: Rust Evidence harness Clippy
+        run: cargo clippy --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked --all-targets -- -D warnings
+
       - name: Generate isolated claim replay verifier lockfile
         run: |
           cargo metadata \
