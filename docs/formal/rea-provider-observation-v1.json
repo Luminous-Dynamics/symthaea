@@ -140,5 +140,34 @@
     "not-proof-of-soundness-of-imported-rust-verifiers",
     "not-runtime-authorization-or-security-certification",
     "source-authored-theorem-is-not-an-executed-qualified-theorem"
-  ]
+  ],
+  "wire_binding": {
+    "schema": "luminous.rea.formal-provider-observation.v1",
+    "mapping_rule": "rea-provider-observation-projection/v1",
+    "evidence_class": "provider_observation",
+    "fields": {
+      "claim_request_sha256": "ClaimBinding.claimRequestDigest",
+      "derivation_sha256": "ClaimBinding.derivationDigest",
+      "request_schema": "ClaimBinding.requestSchemaGeneration",
+      "result_schema": "ClaimBinding.resultSchemaGeneration",
+      "evaluator_rule_generation": {
+        "lean": "ClaimBinding.evaluatorRuleGeneration",
+        "wire_value": 0,
+        "representation": "JSON integer, not inferred from text version"
+      },
+      "evaluator_version": "ClaimBinding.evaluatorVersion",
+      "evaluator_rule_id": "ClaimBinding.ruleId",
+      "claim_id": "ClaimBinding.claimId",
+      "subject_sha256": "ClaimBinding.subjectSha256",
+      "operation": "ClaimBinding.operation",
+      "platform": "ClaimBinding.platform",
+      "platform_version": "ClaimBinding.platformVersion",
+      "environment_id": "ClaimBinding.environment",
+      "predicate": "ClaimBinding.predicate"
+    },
+    "request_and_result_payload": "FormalProviderObservation.rea_evaluation",
+    "ordered_premise_ids": "FormalProviderObservation.binding.requested_evidence_ids",
+    "claim_ceiling": "FormalProviderObservation.claim_ceiling",
+    "distinction": "Exact source strings and digests are retained; generic closure subject/claim identities remain separate typed identities"
+  }
 }
