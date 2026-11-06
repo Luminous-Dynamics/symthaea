@@ -33,6 +33,17 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Export pinned Rust formatter snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --emit stdout research/science-bench-refresh/src/recoverability.rs \
+            | base64 -w0 > /tmp/recoverability-rustfmt.b64
+          echo "RECOVERABILITY_RUSTFMT_BASE64_BEGIN"
+          cat /tmp/recoverability-rustfmt.b64
+          echo
+          echo "RECOVERABILITY_RUSTFMT_BASE64_END"
+
       - name: Formatting for recoverability implementation
         run: rustfmt --edition 2024 --check research/science-bench-refresh/src/recoverability.rs
 
