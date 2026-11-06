@@ -136,6 +136,7 @@ struct PairwiseResult {
 
 #[derive(Debug, Clone, Serialize)]
 struct ActionReport {
+    action_kind: String,
     feasibility_status: String,
     cost_units: f64,
     query_identified: bool,
@@ -255,9 +256,9 @@ fn total_variation(left: &[f64], right: &[f64]) -> f64 {
         .sum::<f64>()
 }
 
-fn validate_input<'a>(
-    input: &'a Input,
-) -> Result<(PredictionMap, BTreeMap<String, &'a Intervention>), String> {
+fn validate_input(
+    input: &Input,
+) -> Result<(PredictionMap, BTreeMap<String, &Intervention>), String> {
     if input.schema_version != 1 {
         return Err("schema_version must equal 1".into());
     }
