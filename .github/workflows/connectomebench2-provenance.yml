@@ -1,0 +1,56 @@
+name: ConnectomeBench2 provenance and denominator contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_AND_DENOMINATORS_V1.md"
+      - "docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_MANIFEST.schema.json"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_PROVENANCE_DENOMINATORS.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_connectomebench2_provenance.py"
+      - ".github/workflows/connectomebench2-provenance.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_AND_DENOMINATORS_V1.md"
+      - "docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_MANIFEST.schema.json"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_PROVENANCE_DENOMINATORS.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_connectomebench2_provenance.py"
+      - ".github/workflows/connectomebench2-provenance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-connectomebench2-provenance:
+    name: Validate versioned denominators and comparator bindings
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate strict Draft 2020-12 manifest
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator, FormatChecker
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_MANIFEST.schema.json").read_text())
+          manifest = json.loads(Path("docs/neuroscience/examples/CONNECTOMEBENCH2_PROVENANCE_DENOMINATORS.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema, format_checker=FormatChecker()).validate(manifest)
+          print("ConnectomeBench2 provenance schema: PASS")
+          PY
+      - name: Recompute denominator and comparator arithmetic
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_connectomebench2_provenance.py
+          python3 tools/connectomics-intake-audit/reference/verify_connectomebench2_provenance.py \
+            --manifest docs/neuroscience/examples/CONNECTOMEBENCH2_PROVENANCE_DENOMINATORS.example.json \
+            --self-test
