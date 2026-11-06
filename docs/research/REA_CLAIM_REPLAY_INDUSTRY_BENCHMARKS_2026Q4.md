@@ -20,7 +20,7 @@ These layers should compose without substituting for one another. A signed state
 
 | System / standard | Strongly qualifies | Does not establish by itself | REA relationship |
 |---|---|---|---|
-| SLSA Provenance v1.1 | Build subject, build definition, resolved dependencies, builder identity and run details | Source correctness, runtime safety, signer authorization outside the chosen trust policy, or truth of downstream semantic claims | Consume exact provenance as one evidence family; require signer/builder policy and preserve its build claim ceiling |
+| SLSA Provenance v1.2 (current approved specification) | Build subject, build definition, resolved dependencies, builder identity and run details | Source correctness, runtime safety, signer authorization outside the chosen trust policy, or truth of downstream semantic claims | Consume exact provenance as one evidence family; require signer/builder policy and preserve its build claim ceiling |
 | Sigstore Rekor | Signed-entry registration, inclusion proof, signed checkpoint, and auditable append-only log history | That the signed statement is true, complete, benign or authorized for a specific target | Compose log evidence with claim evaluation; a log entry is not a positive semantic claim |
 | Certificate Transparency RFC 9162 | Merkle inclusion, consistency between tree heads, and monitoring/auditing of log behavior | Semantic correctness of logged objects or universal agreement without monitoring / gossip | Reuse the Merkle model and explicit checkpoint/witness obligations |
 | SCITT RFC 9943 | Interoperable signed-statement transparency and registration receipts | Statement accuracy; SCITT explicitly permits false statements and subsequent supersession | Exact signed statement predicate and receipt become separate evidence; claim truth remains independently evaluated |
@@ -31,7 +31,7 @@ These layers should compose without substituting for one another. A signed state
 
 ### Standards and implementation references
 
-- [SLSA Provenance v1.1](https://slsa.dev/spec/v1.1/provenance)
+- [SLSA Provenance v1.1](https://slsa.dev/spec/v1.2/provenance)
 - [Sigstore Rekor overview](https://docs.sigstore.dev/logging/overview/)
 - [Sigstore security model](https://docs.sigstore.dev/about/security/)
 - [IETF RFC 9943 — SCITT architecture](https://www.rfc-editor.org/rfc/rfc9943.html)
@@ -39,7 +39,7 @@ These layers should compose without substituting for one another. A signed state
 - [The Update Framework specification](https://github.com/theupdateframework/specification/blob/master/tuf-spec.md)
 - [IETF RFC 8785 — JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html)
 
-Important detail: SLSA's builder identity represents the trust base responsible for faithfully running and recording the build; consumers should accept only expected signer/builder pairs. Rekor's log entries are signed records and its log requires independent monitoring. SCITT explicitly distinguishes registration of a signed statement from the statement's accuracy. These are precisely the boundaries the REA claim layer must preserve.
+Important detail: SLSA v1.2 is the current approved specification and includes Build and Source tracks. The Build Track describes artifact provenance and expected build process/inputs; the Source Track describes how source revisions were created and change-managed. The v1.1 provenance page is now marked retired. REA adapters should pin the track-specific v1.2 predicate and preserve the expected signer/builder policy boundary. Rekor's log entries are signed records and its log requires independent monitoring. SCITT explicitly distinguishes registration of a signed statement from the statement's accuracy. These are precisely the boundaries the REA claim layer must preserve. Rekor's log entries are signed records and its log requires independent monitoring. SCITT explicitly distinguishes registration of a signed statement from the statement's accuracy. These are precisely the boundaries the REA claim layer must preserve.
 
 ## 2. Research benchmarks and what they teach us
 
@@ -90,12 +90,12 @@ References:
 
 NIST AI 800-3 distinguishes accuracy on a fixed benchmark from generalized accuracy over a broader population of similar tasks. It warns that common analyses can hide assumptions or produce invalid uncertainty estimates; it demonstrates generalized linear mixed models and variance decomposition on 22 API-access models and three benchmarks.
 
-NIST's TEVV-Athlon framework structures assessments around measurement concepts, events and tools rather than treating one score as a complete trustworthiness result.
+NIST's TEVV-Athlon Framework is a four-stage method for constructing a context-specific assessment from TEVV objectives; it structures that assessment around Events and Tools that produce data for Blocks linked to measurement concepts. The initial NIST AI 200-2 public draft comment period ran through October 6, 2026. NIST AI 800-3 (February 2026) separately argues that benchmark generalization and uncertainty depend on explicit statistical assumptions, and demonstrates hierarchical modelling of model capability and item difficulty.
 
 **REA consequence:** report fixed-corpus conformance and generalized performance as separate estimands. For model/agent comparisons, use paired tasks, item/domain random effects where assumptions are defensible, variance decomposition, and confidence intervals. Keep every unsupported, abstained, missing, invalid and budget-exhausted attempt in the denominator.
 
 References:
-- [NIST AI 800-3](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.800-3.pdf)
+- [NIST AI 800-3 (February 2026)](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.800-3.pdf)
 - [NIST TEVV-Athlon framework](https://www.nist.gov/artificial-intelligence/ai-research/tevv-athlon-framework-evaluating-ai-systems)
 - [NIST ARIA evaluation planning manual](https://www.nist.gov/publications/aria-evaluation-planning-manual-elements-aria-style-ai-evaluations)
 
