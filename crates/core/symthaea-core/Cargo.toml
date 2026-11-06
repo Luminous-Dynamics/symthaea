@@ -171,6 +171,10 @@ harness = false
 name = "cantor_cleanup_bench"
 harness = false
 
+[[bench]]
+name = "hlb_algebra_dynamics"
+harness = false
+
 [features]
 default = ["simd", "parallel"]
 embeddings = ["dep:ort", "dep:tokenizers", "dep:hf-hub"]  # Enable ONNX embedding model integration
