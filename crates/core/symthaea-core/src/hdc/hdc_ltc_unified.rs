@@ -255,6 +255,119 @@ pub struct HdcLtcUnifiedNeuron {
     update_count: u64,
 }
 
+/// Typed identity for a trainable hypervector parameter group in an HDC-LTC neuron.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HdcLtcParameterGroupId {
+    WeightHdc,
+    InputMask,
+    TauModulator,
+    GateWeight,
+    GateBias,
+}
+
+/// Mathematical role of one trainable HDC-LTC hypervector.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HdcLtcParameterRole {
+    StateBinding,
+    InputBinding,
+    TemporalModulation,
+    GateDirection,
+    GateOffset,
+}
+
+/// One trainable hypervector group in the stable flattened parameter layout.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcLtcParameterGroup {
+    pub id: HdcLtcParameterGroupId,
+    pub name: String,
+    pub role: HdcLtcParameterRole,
+    pub shape: Vec<usize>,
+    pub offset: usize,
+    pub len: usize,
+    /// The norm bound enforced by the HDC-LTC parameter update contract.
+    pub max_norm: f32,
+}
+
+/// Architecture-aware manifest for the five trainable HDC-LTC parameter vectors.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcLtcParameterManifest {
+    pub format_version: u32,
+    pub dimension: usize,
+    pub total_parameters: usize,
+    pub groups: Vec<HdcLtcParameterGroup>,
+}
+
+/// Content-addressed identity for one HDC-LTC neuron parameterization.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HdcLtcParameterFingerprint {
+    pub format_version: u32,
+    pub architecture_digest: String,
+    pub manifest_digest: String,
+    pub parameter_digest: String,
+    pub model_digest: String,
+}
+
+/// One replacement in a digest-bound HDC-LTC parameter edit batch.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HdcLtcParameterGroupReplacement {
+    pub id: HdcLtcParameterGroupId,
+    pub values: Vec<f32>,
+}
+
+/// Validation failure when applying a HDC-LTC parameter edit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HdcLtcParameterError {
+    LengthMismatch { expected: usize, actual: usize },
+    NonFiniteValue { index: usize },
+    GroupNormExceeded { name: String, max_norm_micros: u64 },
+    UnknownParameterGroup { name: String },
+    GroupLengthMismatch { name: String, expected: usize, actual: usize },
+    ManifestRangeOutOfBounds { name: String },
+    StaleModelFingerprint { expected: String, actual: String },
+    DuplicateParameterGroup { name: String },
+    FingerprintSerialization { reason: String },
+}
+
+impl std::fmt::Display for HdcLtcParameterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LengthMismatch { expected, actual } => {
+                write!(f, "HDC-LTC parameter count mismatch: expected {expected}, received {actual}")
+            }
+            Self::NonFiniteValue { index } => {
+                write!(f, "HDC-LTC parameter at flat index {index} is not finite")
+            }
+            Self::GroupNormExceeded { name, max_norm_micros } => write!(
+                f,
+                "HDC-LTC parameter group {name} exceeds its norm limit {:.6}",
+                *max_norm_micros as f32 / 1_000_000.0
+            ),
+            Self::UnknownParameterGroup { name } => {
+                write!(f, "unknown HDC-LTC parameter group: {name}")
+            }
+            Self::GroupLengthMismatch { name, expected, actual } => write!(
+                f,
+                "HDC-LTC parameter group {name} length mismatch: expected {expected}, received {actual}"
+            ),
+            Self::ManifestRangeOutOfBounds { name } => {
+                write!(f, "HDC-LTC parameter group {name} is outside the flat parameter vector")
+            }
+            Self::StaleModelFingerprint { expected, actual } => write!(
+                f,
+                "stale HDC-LTC edit proposal: expected model {expected}, current model is {actual}"
+            ),
+            Self::DuplicateParameterGroup { name } => {
+                write!(f, "HDC-LTC edit batch targets group more than once: {name}")
+            }
+            Self::FingerprintSerialization { reason } => {
+                write!(f, "could not serialize HDC-LTC fingerprint input: {reason}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for HdcLtcParameterError {}
+
 /// Fast rational approximation of `tanh(x)` that auto-vectorizes on AVX2.
 ///
 /// Uses `tanh(x) ≈ x * (27 + x²) / (27 + 9x²)` for |x| < 4.97.
@@ -1158,6 +1271,267 @@ impl HdcLtcUnifiedNeuron {
     // ═══════════════════════════════════════════════════════════════════════════
     // ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Describe the five trainable hypervector groups in their stable flat order.
+    ///
+    /// The recurrent state, momentum vectors, running statistics, and evolution
+    /// clock are deliberately excluded: they are state/optimizer metadata, not
+    /// trainable parameter groups. Each learned vector is constrained to norm ≤ 2.
+    pub fn parameter_manifest(&self) -> HdcLtcParameterManifest {
+        let dim = self.config.dimension;
+        let definitions = [
+            (
+                HdcLtcParameterGroupId::WeightHdc,
+                "weight_hv",
+                HdcLtcParameterRole::StateBinding,
+            ),
+            (
+                HdcLtcParameterGroupId::InputMask,
+                "input_mask",
+                HdcLtcParameterRole::InputBinding,
+            ),
+            (
+                HdcLtcParameterGroupId::TauModulator,
+                "tau_modulator",
+                HdcLtcParameterRole::TemporalModulation,
+            ),
+            (
+                HdcLtcParameterGroupId::GateWeight,
+                "gate_weight",
+                HdcLtcParameterRole::GateDirection,
+            ),
+            (
+                HdcLtcParameterGroupId::GateBias,
+                "gate_bias",
+                HdcLtcParameterRole::GateOffset,
+            ),
+        ];
+
+        let groups = definitions
+            .into_iter()
+            .enumerate()
+            .map(|(index, (id, name, role))| HdcLtcParameterGroup {
+                id,
+                name: name.to_string(),
+                role,
+                shape: vec![dim],
+                offset: index * dim,
+                len: dim,
+                max_norm: 2.0,
+            })
+            .collect();
+
+        HdcLtcParameterManifest {
+            format_version: 1,
+            dimension: dim,
+            total_parameters: 5 * dim,
+            groups,
+        }
+    }
+
+    /// Serialize trainable hypervectors in exactly the order declared by the manifest.
+    pub fn parameter_values(&self) -> Vec<f32> {
+        let mut values = Vec::with_capacity(5 * self.config.dimension);
+        values.extend_from_slice(&self.weight_hv.values);
+        values.extend_from_slice(&self.input_mask.values);
+        values.extend_from_slice(&self.tau_modulator.values);
+        values.extend_from_slice(&self.gate_weight.values);
+        values.extend_from_slice(&self.gate_bias.values);
+        values
+    }
+
+    /// Compute architecture, manifest, parameter, and combined model digests.
+    ///
+    /// Parameter values are hashed as little-endian IEEE-754 f32 bytes. JSON
+    /// serialization is used only for the versioned config and manifest, whose
+    /// struct field order is stable for a given schema version.
+    pub fn parameter_fingerprint(
+        &self,
+    ) -> Result<HdcLtcParameterFingerprint, HdcLtcParameterError> {
+        let manifest = self.parameter_manifest();
+        let config_bytes = serde_json::to_vec(&self.config).map_err(|error| {
+            HdcLtcParameterError::FingerprintSerialization {
+                reason: error.to_string(),
+            }
+        })?;
+        let manifest_bytes = serde_json::to_vec(&manifest).map_err(|error| {
+            HdcLtcParameterError::FingerprintSerialization {
+                reason: error.to_string(),
+            }
+        })?;
+
+        let manifest_digest = blake3::hash(&manifest_bytes).to_hex().to_string();
+
+        let mut architecture_hasher = blake3::Hasher::new();
+        architecture_hasher.update(b"symthaea-hdc-ltc-architecture-v1\\0");
+        architecture_hasher.update(&config_bytes);
+        architecture_hasher.update(&manifest_bytes);
+        let architecture_digest = architecture_hasher.finalize().to_hex().to_string();
+
+        let mut parameter_hasher = blake3::Hasher::new();
+        for value in self.parameter_values() {
+            parameter_hasher.update(&value.to_le_bytes());
+        }
+        let parameter_digest = parameter_hasher.finalize().to_hex().to_string();
+
+        let mut model_hasher = blake3::Hasher::new();
+        model_hasher.update(b"symthaea-hdc-ltc-model-v1\\0");
+        model_hasher.update(architecture_digest.as_bytes());
+        model_hasher.update(manifest_digest.as_bytes());
+        model_hasher.update(parameter_digest.as_bytes());
+
+        Ok(HdcLtcParameterFingerprint {
+            format_version: 1,
+            architecture_digest,
+            manifest_digest,
+            parameter_digest,
+            model_digest: model_hasher.finalize().to_hex().to_string(),
+        })
+    }
+
+    /// Validate and replace the complete trainable parameter vector transactionally.
+    ///
+    /// Exact length, finite values, and the norm bound of every typed group are
+    /// checked before any live value is changed. Successful replacements reset
+    /// momentum so optimizer history from the previous parameterization cannot
+    /// contaminate the newly installed candidate.
+    pub fn try_set_parameter_values(
+        &mut self,
+        values: &[f32],
+    ) -> Result<(), HdcLtcParameterError> {
+        let manifest = self.parameter_manifest();
+        if values.len() != manifest.total_parameters {
+            return Err(HdcLtcParameterError::LengthMismatch {
+                expected: manifest.total_parameters,
+                actual: values.len(),
+            });
+        }
+        if let Some((index, _)) = values
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, value)| !value.is_finite())
+        {
+            return Err(HdcLtcParameterError::NonFiniteValue { index });
+        }
+
+        for group in &manifest.groups {
+            let end = group
+                .offset
+                .checked_add(group.len)
+                .ok_or(HdcLtcParameterError::LengthMismatch {
+                    expected: manifest.total_parameters,
+                    actual: values.len(),
+                })?;
+            let slice = values
+                .get(group.offset..end)
+                .ok_or_else(|| HdcLtcParameterError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            let norm = slice.iter().map(|value| value * value).sum::<f32>().sqrt();
+            if !norm.is_finite() || norm > group.max_norm {
+                return Err(HdcLtcParameterError::GroupNormExceeded {
+                    name: group.name.clone(),
+                    max_norm_micros: (group.max_norm * 1_000_000.0) as u64,
+                });
+            }
+        }
+
+        let dim = self.config.dimension;
+        let mut offset = 0usize;
+        self.weight_hv.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.input_mask.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.tau_modulator.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.gate_weight.values.copy_from_slice(&values[offset..offset + dim]);
+        offset += dim;
+        self.gate_bias.values.copy_from_slice(&values[offset..offset + dim]);
+
+        self.reset_momentum();
+        Ok(())
+    }
+
+    /// Apply typed parameter-group replacements against an exact model digest.
+    ///
+    /// All IDs, duplicate targets, lengths, and ranges are checked before the
+    /// candidate vector is passed to the full invariant validator. The live
+    /// neuron is mutated only once after the entire edit batch is valid.
+    pub fn try_apply_parameter_group_replacements(
+        &mut self,
+        expected_model_digest: &str,
+        edits: &[HdcLtcParameterGroupReplacement],
+    ) -> Result<(), HdcLtcParameterError> {
+        let actual_model_digest = self
+            .parameter_fingerprint()?
+            .model_digest;
+        if actual_model_digest != expected_model_digest {
+            return Err(HdcLtcParameterError::StaleModelFingerprint {
+                expected: expected_model_digest.to_string(),
+                actual: actual_model_digest,
+            });
+        }
+        if edits.is_empty() {
+            return Ok(());
+        }
+
+        let manifest = self.parameter_manifest();
+        let mut candidate = self.parameter_values();
+        let mut seen = std::collections::HashSet::with_capacity(edits.len());
+
+        for edit in edits {
+            if !seen.insert(edit.id.clone()) {
+                return Err(HdcLtcParameterError::DuplicateParameterGroup {
+                    name: format!("{:?}", edit.id),
+                });
+            }
+            let group = manifest
+                .groups
+                .iter()
+                .find(|group| group.id == edit.id)
+                .ok_or_else(|| HdcLtcParameterError::UnknownParameterGroup {
+                    name: format!("{:?}", edit.id),
+                })?;
+            if edit.values.len() != group.len {
+                return Err(HdcLtcParameterError::GroupLengthMismatch {
+                    name: group.name.clone(),
+                    expected: group.len,
+                    actual: edit.values.len(),
+                });
+            }
+            let end = group
+                .offset
+                .checked_add(group.len)
+                .ok_or_else(|| HdcLtcParameterError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            let target = candidate
+                .get_mut(group.offset..end)
+                .ok_or_else(|| HdcLtcParameterError::ManifestRangeOutOfBounds {
+                    name: group.name.clone(),
+                })?;
+            target.copy_from_slice(&edit.values);
+        }
+
+        self.try_set_parameter_values(&candidate)
+    }
+
+    /// Replace one typed HDC-LTC group against an exact model fingerprint.
+    pub fn try_replace_parameter_group(
+        &mut self,
+        expected_model_digest: &str,
+        id: &HdcLtcParameterGroupId,
+        values: &[f32],
+    ) -> Result<(), HdcLtcParameterError> {
+        self.try_apply_parameter_group_replacements(
+            expected_model_digest,
+            &[HdcLtcParameterGroupReplacement {
+                id: id.clone(),
+                values: values.to_vec(),
+            }],
+        )
+    }
 
     /// Get current state
     pub fn state(&self) -> &ContinuousHV {
