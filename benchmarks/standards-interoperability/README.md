@@ -204,3 +204,21 @@ Do not freeze numeric thresholds until the gold protocol and pilot corpus have b
 ## Claim ceiling
 
 A passing report establishes only that the pinned implementations preserved the declared semantic subset on the exact tested corpus and configuration. It does not establish full AP242/QIF/MTConnect certification, general interoperability, product safety, structural validity, code compliance, supplier qualification, process capability, physical conformity, or authorization to manufacture or operate.
+
+
+## MTConnect release / compatibility gate (machine-readable)
+
+**MTConnect is not yet eligible for execution or scoring in MBD-INTEROP-001.** At the current retrieval, public version labels do not identify one self-consistent compatibility tuple:
+
+| Surface | Public label observed | What this does *not* prove |
+|---|---|---|
+| Official standard-download page | 2.5 | That the latest normative XMI, generated XSD and a given agent/adaptor all implement this release |
+| Normative SysML model release | 2.7 (release dated 2026-02-27) | That a given downloadable XMI and published schema bundle have matching semantics |
+| Normative model documentation | 2.8 documentation site | That the docs site release label corresponds to the published XSD bundle or a released agent |
+| XML schema index | 2.7 XSD files | That the selected agent/protocol implementation is compatible with those files |
+
+Sources: [official standard download](https://mtconnect.squarespace.com/standard-download20181), [SysML model releases](https://github.com/mtconnect/mtconnect_sysml_model/releases), [model documentation](https://model.mtconnect.org/Version2.8/), [schema index](https://schemas.mtconnect.org/).
+
+The machine-readable `mtconnect_execution_gate` therefore locks both `eligible_for_candidate_execution` and `eligible_for_scoring` to false. Before enabling MTConnect, freeze the exact normative model/XMI digest, XSD bundle digests, agent/adaptor/protocol versions, capability profile and validator version, and provide an independent compatibility witness. Any mismatch stays Unknown/Unsupported.
+
+**Phase boundary:** proceed with AP242 Edition 4 ↔ QIF / ISO 23952:2020 only for the initial executable tranche. MTConnect manufacturing-event cases remain public blueprint placeholders until the complete compatibility tuple is independently reviewed. There is no live device connection in the first tranche.
