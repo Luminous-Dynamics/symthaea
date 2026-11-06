@@ -606,8 +606,7 @@ fn resource_summary(
         recorded_trials: 0,
         total_observed: 0,
     };
-    for value in values {
-        if let Some(value) = value {
+    for value in values.into_iter().flatten() {
             summary.recorded_trials = summary
                 .recorded_trials
                 .checked_add(1)
