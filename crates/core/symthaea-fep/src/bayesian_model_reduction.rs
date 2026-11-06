@@ -28,6 +28,9 @@ const PROBABILITY_TOLERANCE: f64 = 1e-9;
 /// Independent Gaussian coordinates for a parameter vector.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiagonalGaussian {
+    /// Digest of the canonical ordered parameterization: names, roles, shapes, and coordinate order.
+    /// All three Gaussian distributions in a BMR comparison must carry the same digest.
+    pub parameterization_digest: String,
     pub mean: Vec<f64>,
     /// Variances, not precisions. Every entry must be finite and strictly positive.
     pub variance: Vec<f64>,
@@ -66,6 +69,14 @@ pub struct BayesianModelReductionResult {
 #[derive(Debug, Clone, PartialEq)]
 pub enum BayesianModelReductionError {
     EmptyParameterVector,
+    InvalidParameterizationDigest {
+        distribution: &'static str,
+    },
+    ParameterizationMismatch {
+        distribution: &'static str,
+        expected: String,
+        actual: String,
+    },
     ParameterDimensionMismatch {
         distribution: &'static str,
         mean_len: usize,
@@ -109,6 +120,17 @@ impl std::fmt::Display for BayesianModelReductionError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyParameterVector => write!(f, "parameter vectors must not be empty"),
+            Self::InvalidParameterizationDigest { distribution } => {
+                write!(f, "{distribution} has an invalid parameterization digest")
+            }
+            Self::ParameterizationMismatch {
+                distribution,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "{distribution} parameterization digest {actual} does not match full posterior {expected}"
+            ),
             Self::ParameterDimensionMismatch {
                 distribution,
                 mean_len,
@@ -188,6 +210,11 @@ pub fn reduce_models(
     }
     validate_gaussian(full_posterior, "full posterior", dimension)?;
     validate_gaussian(full_prior, "full prior", dimension)?;
+    ensure_parameterization_matches(
+        &full_posterior.parameterization_digest,
+        "full prior",
+        &full_prior.parameterization_digest,
+    )?;
 
     if reduced_models.is_empty() {
         return Err(BayesianModelReductionError::EmptyModelSet);
@@ -212,6 +239,11 @@ pub fn reduce_models(
         }
         prior_sum += model.prior_probability;
         validate_gaussian(&model.parameter_prior, "reduced prior", dimension)?;
+        ensure_parameterization_matches(
+            &full_posterior.parameterization_digest,
+            "reduced prior",
+            &model.parameter_prior.parameterization_digest,
+        )?;
     }
     if (prior_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
         return Err(BayesianModelReductionError::ModelPriorMassNotNormalized { sum: prior_sum });
@@ -359,6 +391,9 @@ fn validate_gaussian(
     distribution: &'static str,
     expected_dimension: usize,
 ) -> Result<(), BayesianModelReductionError> {
+    if !is_sha256_digest(&gaussian.parameterization_digest) {
+        return Err(BayesianModelReductionError::InvalidParameterizationDigest { distribution });
+    }
     if gaussian.mean.len() != expected_dimension || gaussian.variance.len() != expected_dimension {
         return Err(BayesianModelReductionError::ParameterDimensionMismatch {
             distribution,
@@ -387,12 +422,47 @@ fn validate_gaussian(
     Ok(())
 }
 
+fn ensure_parameterization_matches(
+    expected: &str,
+    distribution: &'static str,
+    actual: &str,
+) -> Result<(), BayesianModelReductionError> {
+    if actual != expected {
+        return Err(BayesianModelReductionError::ParameterizationMismatch {
+            distribution,
+            expected: expected.to_owned(),
+            actual: actual.to_owned(),
+        });
+    }
+    Ok(())
+}
+
+fn is_sha256_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
     fn gaussian(mean: &[f64], variance: &[f64]) -> DiagonalGaussian {
+        gaussian_with_digest(mean, variance, 'a')
+    }
+
+    fn gaussian_with_digest(
+        mean: &[f64],
+        variance: &[f64],
+        parameterization: char,
+    ) -> DiagonalGaussian {
         DiagonalGaussian {
+            parameterization_digest: digest(parameterization),
             mean: mean.to_vec(),
             variance: variance.to_vec(),
         }
@@ -590,12 +660,12 @@ mod tests {
         )
         .expect("first coordinate order");
         let result_b = reduce_models(
-            &gaussian(&[-0.3, 0.2], &[0.6, 0.4]),
-            &gaussian(&[0.1, 0.0], &[0.8, 1.0]),
+            &gaussian_with_digest(&[-0.3, 0.2], &[0.6, 0.4], 'b'),
+            &gaussian_with_digest(&[0.1, 0.0], &[0.8, 1.0], 'b'),
             &[ReducedModelHypothesis {
                 model_id: "model".into(),
                 prior_probability: 1.0,
-                parameter_prior: gaussian(&[-0.1, 0.2], &[0.3, 0.2]),
+                parameter_prior: gaussian_with_digest(&[-0.1, 0.2], &[0.3, 0.2], 'b'),
             }],
         )
         .expect("permuted coordinate order");
@@ -603,6 +673,29 @@ mod tests {
             (result_a.models[0].log_evidence_ratio - result_b.models[0].log_evidence_ratio).abs()
                 < 1e-12
         );
+    }
+
+    #[test]
+    fn mismatched_parameterization_digest_is_rejected_even_when_dimensions_match() {
+        let posterior = gaussian(&[0.0, 0.2], &[1.0, 0.5]);
+        let full_prior = gaussian(&[0.0, 0.0], &[1.0, 1.0]);
+        let reduced_prior = gaussian_with_digest(&[0.0, 0.1], &[0.5, 0.5], 'b');
+        let result = reduce_models(
+            &posterior,
+            &full_prior,
+            &[ReducedModelHypothesis {
+                model_id: "same-width-different-coordinate-system".into(),
+                prior_probability: 1.0,
+                parameter_prior: reduced_prior,
+            }],
+        );
+        assert!(matches!(
+            result,
+            Err(BayesianModelReductionError::ParameterizationMismatch {
+                distribution: "reduced prior",
+                ..
+            })
+        ));
     }
 
     #[test]
