@@ -1229,12 +1229,7 @@ fn summarize_proof_runs(
             verified_success_count += 1;
             successful_task_ids.insert(run.task_id.as_str());
         }
-        groups.entry((
-            run.strategy.name.clone(),
-            run.strategy.version.clone(),
-            run.strategy.model_id.clone(),
-            run.strategy.model_version.clone(),
-        )).or_default().push(run);
+        groups.entry(strategy_key(run)).or_default().push(run);
     }
 
     let mut summaries = Vec::new();
