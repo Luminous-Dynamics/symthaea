@@ -269,8 +269,6 @@ This motivates a separate **R&D productivity frontier**, not a relaxation of the
 
 Measure independently confirmed research artifacts, accepted improvements, human active minutes and review/rework, compute/tokens, wall time, evaluation cost and cost per valid discovery. Publish quality-versus-human-time and quality-versus-total-resource frontiers. Keep expert oversight and intervention visible; self-reported speedup, code volume and faster patch production are not substitutes for independently confirmed research output.
 
-AIDE² should be treated as a particularly relevant comparison: its paper reports seven successive improvements during an autonomous eight-day run and transfer to four held-out benchmarks, including an out-of-distribution weather-forecasting task. Those are the paper's reported results, not an independent replication by Symthaea. Our comparison should therefore use the same-start swap, matched total budget, inherited meta-level changes, fresh-family transfer and independent confirmation rather than claiming superiority from a different task suite.
-
 Symthaea should not claim novelty for “an agent that edits itself,” “an editable meta-agent,” “a multi-parent archive,” or “rollback ablation.” The stronger contribution is a common, auditable method that ties **exact change → randomized intervention → mechanism prediction → independent replication → transfer** to the candidate's inherited research process.
 
 ### External references
@@ -279,22 +277,17 @@ Symthaea should not claim novelty for “an agent that edits itself,” “an ed
 - HyperAgents: https://ai.meta.com/research/publications/hyperagents/
 - RSIGym: https://arxiv.org/abs/2610.10310 and https://github.com/evolvent-ai/RSIGym
 - RSI-Env: https://arxiv.org/abs/2611.01736
-- RSIGym results and limitations: https://github.com/evolvent-ai/RSIGym
-- AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
-- Independent AI4AI-Bench audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
-- RSIBench protocol: https://harness-rsibench.com/docs/
-- Red Queen Gödel Machine: https://arxiv.org/abs/2606.26294
-- METR R&D acceleration assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
 - RSIBench protocol: https://harness-rsibench.com/docs/
 - SelfImprove-Bench: https://arxiv.org/abs/2611.02797
-- AI4AI-Bench: https://arxiv.org/abs/2608.20318
+- AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
 - Independent AI4AI-Bench audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
-- FIRE-Bench: https://proceedings.mlr.press/v306/wang26d.html
+- Red Queen Gödel Machine: https://arxiv.org/abs/2606.26294
 - AIDE² paper and ignition test: https://arxiv.org/abs/2609.26457
 - RSI evaluation-evidence census (2026-10-20): https://arxiv.org/abs/2610.27610
 - RSI-Anything world-model framework: https://arxiv.org/abs/2610.13912
 - RSI survey and seven-dimensional evaluation profile: https://lee1003-lee.github.io/Awesome-RSI-Research/
-- Red Queen Gödel Machine: https://arxiv.org/abs/2606.26294
+- FIRE-Bench: https://proceedings.mlr.press/v306/wang26d.html
+- METR R&D acceleration assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
 
 ## 13. Claim boundary
 
