@@ -3153,7 +3153,7 @@ mod tests {
         None
     }
 
-    fn midi_channel_note_events(midi: &[u8], status: u8) -> Vec<Vec<u8>> {
+    fn midi_channel_note_events(midi: &[u8], status: u8) -> Vec<(u32, Vec<u8>)> {
         let track_len = u32::from_be_bytes(midi[18..22].try_into().unwrap()) as usize;
         let track = &midi[22..22 + track_len];
         let mut cursor = 0usize;
@@ -3192,7 +3192,7 @@ mod tests {
                 panic!("unexpected MIDI status byte: {event_status:#x}");
             }
         }
-        events.into_iter().map(|(_, event)| event).collect()
+        events
     }
 
     #[test]
