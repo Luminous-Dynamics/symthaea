@@ -83,6 +83,63 @@ added and compared against external reference implementations such as
 TeNPy, ITensor and quimb. This is a more demanding but scientifically honest
 route to competing with the current state of the art.
 
+### Broader physics-module audit
+
+A read-through of the existing physics modules found a consistent boundary that
+must be reflected in all external claims:
+
+- `symthaea-core::physics::general_relativity` explicitly describes itself as
+  HDC encodings of GR concepts. Its metric/curvature/geodesic types are not a
+  numerical relativity solver.
+- `symthaea-core::physics::quantum_information` and `qft` represent concepts,
+  gate types, particles, propagator labels and vertices as HDC structures.
+  They do not currently implement complete complex-amplitude circuit
+  evolution, momentum-dependent QFT propagators, renormalized amplitudes or
+  scattering calculations.
+- `symthaea-frontier-physics::path_integrals` includes a pedagogical
+  Euclidean-action / Metropolis path sampler. Its analytic shortcuts and
+  conventions (including the free-particle propagator helper) require
+  normalization, units and exact-reference audits before scientific claims.
+- `holographic.rs` implements formula-level quantities. In particular,
+  mapping mutual information directly to a wormhole/bridge "width" is an
+  illustrative proxy, not a derived bulk metric relation.
+- `nonequilibrium_thermo.rs` contains formula-level helpers; the current
+  `minimum_entropy_production` helper sets selected forces to zero rather
+  than solving the general constrained quadratic minimization, and the
+  Jarzynski estimator needs log-sum-exp stabilization and sampling diagnostics.
+
+These modules are useful vocabulary, interfaces and teaching prototypes.
+They must not be counted as production quantum-information, QFT, holography,
+thermodynamics or GR solvers. Each needs an equation-to-code audit, explicit
+units/conventions, analytic reference cases, dimensional checks and
+uncertainty/error analysis before it can support physical inference.
+
+### Time-crystal implementation audit
+
+A further examination of `floquet_time_crystal.rs` shows a structural
+limitation beyond the already documented "classical toy" caveat:
+
+- For the alternating initial spin pattern, the two nearest neighbours cancel
+  in the local field, so the implemented `j_interaction` term contributes
+  exactly zero in the intended even periodic chain.
+- The update uses `spin.signum()` and a near-deterministic flip/retain
+  interpolation. It therefore preserves a period-two sign pattern by
+  construction; this does not demonstrate interaction-stabilized spontaneous
+  discrete time-translation symmetry breaking.
+- The detector is a period-two/Nyquist detector for a sequence sampled once
+  per drive cycle, not a general time-crystal detector.
+- The current semantic-stream adapter uses one component at a time and a
+  single zero-valued null score. That cannot support calibrated significance
+  or broad claims about language-model activation dynamics.
+
+Immediate response: retain this crate as a toy regression fixture, but do not
+promote its "Persistent 2T response" score as physical DTC evidence. Replace
+the scientific path with (i) exact complex-state Floquet evolution for small
+spin systems, (ii) independent Hamiltonian and gate-order references, (iii)
+interaction/noninteraction controls, (iv) phase-rigidity and perturbation
+sweeps, and (v) finite-size/lifetime analysis. Only then add a validated
+MPS/TEBD or PEPS route for larger 1D/2D systems.
+
 ### GravCraft foundation
 
 Existing component:
