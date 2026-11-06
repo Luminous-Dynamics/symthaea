@@ -2201,7 +2201,27 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS Holm correction preserves monotonic adjusted p-values");
 
+    let report = synthetic_report()?;
+    let proof_runs = synthetic_proof_runs();
+    let proof_run_jsonl = proof_runs_to_jsonl(&proof_runs)?;
+    let exact_run_input_digest = sha256(&proof_run_jsonl);
+    if report["run_input_sha256"].as_str() != Some(exact_run_input_digest.as_str()) {
+        return Err("synthetic audit report run-input digest differs from canonical proof-run JSONL bytes".into());
+    }
+    println!("SELF_TEST_PASS synthetic report digest matches exact emitted proof-run JSONL");
+
     Ok(())
+}
+
+fn proof_runs_to_jsonl(runs: &[ProofRun]) -> Result<Vec<u8>, String> {
+    let mut jsonl = Vec::new();
+    for run in runs {
+        jsonl.extend_from_slice(
+            &serde_json::to_vec(run).map_err(|e| format!("serialize proof run {}: {e}", run.run_id))?
+        );
+        jsonl.push(b'\n');
+    }
+    Ok(jsonl)
 }
 
 fn synthetic_report() -> Result<Value, String> {
@@ -2237,11 +2257,7 @@ fn synthetic_report() -> Result<Value, String> {
     let (verified_success_run_count, unique_successful_task_count, strategy_summaries) =
         summarize_proof_runs(&proof_runs, &evaluation)?;
     let clustered_comparisons = pairwise_clustered_comparisons(&proof_runs, &evaluation)?;
-    let mut run_bytes = Vec::new();
-    for run in &proof_runs {
-        run_bytes.extend_from_slice(&serde_json::to_vec(run).map_err(|e| e.to_string())?);
-        run_bytes.push(b'\n');
-    }
+    let run_bytes = proof_runs_to_jsonl(&proof_runs)?;
     let run_input_sha256 = sha256(&run_bytes);
     let mut report = json!({
         "schema_version": REPORT_SCHEMA,
@@ -2317,13 +2333,7 @@ fn execute() -> Result<(), String> {
         fs::write(&args[2], bytes).map_err(|e| format!("write synthetic audit report: {e}"))?;
         if args.len() == 4 {
             let runs = synthetic_proof_runs();
-            let mut jsonl = Vec::new();
-            for run in &runs {
-                jsonl.extend_from_slice(
-                    &serde_json::to_vec(run).map_err(|e| format!("serialize synthetic proof run: {e}"))?
-                );
-                jsonl.push(b'\n');
-            }
+            let jsonl = proof_runs_to_jsonl(&runs)?;
             fs::write(&args[3], jsonl).map_err(|e| format!("write synthetic proof-run JSONL: {e}"))?;
         }
         println!("PITB_SORRYDB_AUDIT_SYNTHETIC_REPORT_OK");
