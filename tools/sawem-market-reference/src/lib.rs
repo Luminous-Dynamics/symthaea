@@ -20,6 +20,7 @@ pub mod liquidity_options;
 pub mod liquidity_stress;
 pub mod liquidity_waterfall;
 pub mod non_anticipativity;
+pub mod rainflow_cycles;
 pub mod revenue_realization;
 pub mod warranty_compliance;
 
