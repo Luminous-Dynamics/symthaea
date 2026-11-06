@@ -509,6 +509,16 @@ fn provider_fields(
     )
 }
 
+fn canonical_json_equal(left: &Value, right: &Value) -> Result<bool, ClaimError> {
+    let left_bytes = canonical_jcs_bytes(left).map_err(|error| {
+        ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string())
+    })?;
+    let right_bytes = canonical_jcs_bytes(right).map_err(|error| {
+        ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string())
+    })?;
+    Ok(left_bytes == right_bytes)
+}
+
 fn claim_ceiling(predicate: ClaimPredicate) -> Vec<String> {
     let mut ceiling = vec![
         "A supported result is scoped to the exact subject, operation, environment fields and Evidence IDs in this derivation.".to_owned(),
@@ -685,7 +695,13 @@ pub fn evaluate_claim(
             continue;
         }
 
-        if evidence.value.get("normalized_result") == Some(&claim.asserted_value) {
+        let observation_matches = evidence
+            .value
+            .get("normalized_result")
+            .map(|observed| canonical_json_equal(observed, &claim.asserted_value))
+            .transpose()?
+            .unwrap_or(false);
+        if observation_matches {
             supporting += 1;
             assessments.push(EvidenceAssessment {
                 evidence_id: evidence_id.clone(),
@@ -695,7 +711,7 @@ pub fn evaluate_claim(
                 provider_version,
                 confidence,
                 authority,
-                reason: "normalized_result exactly matches asserted_value".to_owned(),
+                reason: "normalized_result matches asserted_value under RFC 8785 canonical JSON semantics".to_owned(),
             });
         } else {
             contradicting += 1;
@@ -879,6 +895,22 @@ mod tests {
             EvidenceAssessmentKind::Supports
         );
         assert!(valid_sha256(&result.derivation_sha256));
+    }
+
+    #[test]
+    fn normalized_result_comparison_uses_jcs_number_semantics() {
+        let evidence = verified_fixture();
+        let mut numeric_claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
+        numeric_claim.asserted_value["entries"][0]["size"] = json!(42.0);
+        let result = evaluate_claim(&numeric_claim, &[evidence.clone()]).unwrap();
+        assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
+
+        numeric_claim.asserted_value["entries"][0]["size"] = json!(42.0001);
+        let changed = evaluate_claim(&numeric_claim, &[evidence]).unwrap();
+        assert_eq!(changed.disposition, ClaimDisposition::RefutedWithinScope);
     }
 
     #[test]
