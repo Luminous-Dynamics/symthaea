@@ -1840,7 +1840,8 @@
         "future_known_receipts_and_expired_claims_fail_closed",
         "dependency_cycles_missing_dependencies_and_unsupported_dependencies_fail_closed",
         "qualified_claims_need_evidence_and_evaluator_receipts",
-        "duplicate_ids_and_invalid_manifest_digests_are_rejected"
+        "duplicate_ids_and_invalid_manifest_digests_are_rejected",
+        "conditional_claims_require_both_supporting_evidence_and_invalidation_conditions"
       ],
       "required_evidence": [
         "exact project revision ID and content digest",
@@ -1870,7 +1871,7 @@
       "case_id": "MARKET-EXECUTION-AUTHORITY-GATE-001",
       "track": "market_access_and_regulatory_execution",
       "title": "Separate analysis from authorised external bid/offer submission",
-      "scenario": "Evaluate a workflow action against a source-bound regulatory execution profile and participant status. Analysis, forecasting, optimisation and bid/offer preparation remain separate from actual transmission. Internal simulation is an isolated non-commercial path. External submission is blocked unless a final in-force rule profile is available by the evaluation time, its effective window covers the action, participant admission and all accreditation stages (design approval, FAT, integration test, market simulation, pilot, commercial approval) are verified, and API submission permission is evidenced. If the applicable rule requires human review, an authorised reviewer must approve the exact bid-manifest digest for that participant before the submission decision. A draft consultation proposal or unknown rule must never be promoted into permission for autonomous commercial submission.",
+      "scenario": "Evaluate a workflow action against a source-bound regulatory execution profile and participant status. Analysis, forecasting, optimisation and bid/offer preparation remain separate from actual transmission. Internal simulation is an isolated non-commercial path. External submission is blocked unless a final in-force rule profile is available by the evaluation time, its effective window covers the action, participant admission and all accreditation stages (design approval, FAT, integration test, market simulation, pilot, commercial approval) are verified, and API submission permission is evidenced. If the applicable rule requires human review, an authorised reviewer must approve the exact bid-manifest digest for that participant before the submission decision. A draft consultation proposal or unknown rule must never be promoted into permission for autonomous commercial submission. Accreditation evidence must appear in the declared stage order; having all stage labels but reordering or skipping the process is not equivalent to completing the sequence.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1885,7 +1886,8 @@
         "automated_principal_cannot_self_approve_and_approval_receipt_cannot_predate_review",
         "explicitly_effective_autonomous_rule_still_requires_admission_accreditation_and_api",
         "future_known_rule_or_review_receipts_are_rejected",
-        "invalid_digests_missing_stage_and_duplicate_stage_fail_closed"
+        "invalid_digests_missing_stage_and_duplicate_stage_fail_closed",
+        "accreditation_stages_must_follow_the_declared_sequence"
       ],
       "required_evidence": [
         "final approved regulatory instrument identity, content digest, publication and effective window",
@@ -1897,7 +1899,8 @@
         "human reviewer identity, authorised role and authority evidence if required",
         "human approval receipt bound to the exact bid manifest and participant",
         "source availability timestamps for all authority and approval receipts",
-        "explicit environment identifier distinguishing internal simulation from commercial platform"
+        "explicit environment identifier distinguishing internal simulation from commercial platform",
+        "ordered stage transition history with source receipts"
       ],
       "stress_tags": [
         "regulatory-execution-gate",
