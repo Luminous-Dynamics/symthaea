@@ -2167,9 +2167,7 @@ fn inspect_midi_track_v1(
                         .checked_add(length)
                         .filter(|end| *end <= track_bytes.len())
                         .ok_or(HarnessError::InvalidMidi)?;
-                    if track_bytes[cursor..end].iter().any(|byte| *byte > 0x7f) {
-                        return Err(HarnessError::InvalidMidi);
-                    }
+                    // SMF SysEx payload may include an F7 terminator byte.
                     cursor = end;
                 }
                 _ => return Err(HarnessError::InvalidMidi),
@@ -3434,29 +3432,49 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_midi_is_a_valid_smf_with_note_events() {
+    fn smf_format0_with_track(track: &[u8]) -> Vec<u8> {
+        let mut bytes = b"MThd\x00\x00\x00\x06\x00\x00\x00\x01\x01\xe0MTrk".to_vec();
+        bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+        bytes.extend_from_slice(track);
+        bytes
+    }
+
+    #[test]
+    fn synthetic_midi_is_a_valid_smf_with_semantic_note_tempo_meter_and_program_events() {
         let midi = render_synthetic_midi_v1(
             Feature {
                 dimension: Dimension::Motif,
                 value: 5,
             },
             Feature {
-                dimension: Dimension::Texture,
-                value: 4,
+                dimension: Dimension::Role,
+                value: 3,
             },
             b"midi-fixture",
         )
         .unwrap();
+        let inspected = inspect_synthetic_midi_v1(&midi).unwrap();
+        assert_eq!(inspected.format, 0);
+        assert_eq!(inspected.track_count, 1);
+        assert_eq!(inspected.ticks_per_quarter, 480);
+        assert!(!inspected.notes.is_empty());
+        assert!(inspected
+            .time_signatures
+            .iter()
+            .any(|meter| meter.numerator == 4 && meter.denominator == 4));
+        assert!(inspected
+            .program_changes
+            .iter()
+            .any(|program| program.channel == 3 && program.program == 73));
+        assert!(inspected.notes.iter().any(|note| note.channel == 0 && note.pitch == 65));
+        assert!(inspected.notes.iter().any(|note| note.channel == 3 && note.pitch == 72));
         assert_eq!(&midi[0..4], b"MThd");
         assert_eq!(&midi[14..18], b"MTrk");
-        assert!(midi.len() > 60);
-        assert!(midi.windows(3).any(|window| window == [0x90, 65, 88]));
-        assert!(midi.windows(3).any(|window| window == [0x94, 74, 76]));
         assert!(midi.ends_with(&[0x00, 0xff, 0x2f, 0x00]));
     }
 
     #[test]
-    fn synthetic_midi_changes_target_events_and_preserves_protected_channel() {
+    fn synthetic_midi_changes_target_semantics_and_preserves_protected_semantics() {
         for fixture in canonical_fixture_suite_v1() {
             let input = fixture.interventions.control.current_partner_feature;
             let output = Feature {
@@ -3466,122 +3484,171 @@ mod tests {
             let protected = fixture.interventions.control.unrelated_feature;
             let before = render_synthetic_midi_v1(input, protected, b"input").unwrap();
             let after = render_synthetic_midi_v1(output, protected, b"output").unwrap();
+            let before_view = inspect_synthetic_midi_v1(&before).unwrap();
+            let after_view = inspect_synthetic_midi_v1(&after).unwrap();
 
             let target_channel = match input.dimension {
-                Dimension::Motif => 0x90,
-                Dimension::Rhythm => 0x91,
-                Dimension::Tempo => 0x92,
-                Dimension::Role => 0x93,
-                Dimension::Texture => 0x94,
+                Dimension::Motif => 0,
+                Dimension::Rhythm => 1,
+                Dimension::Tempo => 2,
+                Dimension::Role => 3,
+                Dimension::Texture => 4,
             };
             let protected_channel = match protected.dimension {
-                Dimension::Motif => 0x90,
-                Dimension::Rhythm => 0x91,
-                Dimension::Tempo => 0x92,
-                Dimension::Role => 0x93,
-                Dimension::Texture => 0x94,
+                Dimension::Motif => 0,
+                Dimension::Rhythm => 1,
+                Dimension::Tempo => 2,
+                Dimension::Role => 3,
+                Dimension::Texture => 4,
             };
-            let target_notes_before: Vec<_> = midi_channel_note_events(&before, target_channel);
-            let target_notes_after: Vec<_> = midi_channel_note_events(&after, target_channel);
-            let protected_before: Vec<_> = midi_channel_note_events(&before, protected_channel);
-            let protected_after: Vec<_> = midi_channel_note_events(&after, protected_channel);
+            let target_notes_before: Vec<_> = before_view
+                .notes
+                .iter()
+                .filter(|note| note.channel == target_channel)
+                .collect();
+            let target_notes_after: Vec<_> = after_view
+                .notes
+                .iter()
+                .filter(|note| note.channel == target_channel)
+                .collect();
+            let protected_notes_before: Vec<_> = before_view
+                .notes
+                .iter()
+                .filter(|note| note.channel == protected_channel)
+                .collect();
+            let protected_notes_after: Vec<_> = after_view
+                .notes
+                .iter()
+                .filter(|note| note.channel == protected_channel)
+                .collect();
+            let protected_programs_before: Vec<_> = before_view
+                .program_changes
+                .iter()
+                .filter(|program| program.channel == protected_channel)
+                .collect();
+            let protected_programs_after: Vec<_> = after_view
+                .program_changes
+                .iter()
+                .filter(|program| program.channel == protected_channel)
+                .collect();
 
             if input.dimension == Dimension::Tempo {
-                assert_ne!(midi_tempo(&before), midi_tempo(&after));
+                assert_ne!(before_view.tempos, after_view.tempos);
             } else {
                 assert_ne!(target_notes_before, target_notes_after);
             }
-            assert_eq!(protected_before, protected_after);
+            assert_eq!(protected_notes_before, protected_notes_after);
+            assert_eq!(protected_programs_before, protected_programs_after);
             if protected.dimension == Dimension::Tempo {
-                assert_eq!(midi_tempo(&before), midi_tempo(&after));
+                assert_eq!(before_view.tempos, after_view.tempos);
             }
         }
-    }
-
-    fn midi_tempo(midi: &[u8]) -> Option<[u8; 3]> {
-        let track_len = u32::from_be_bytes(midi[18..22].try_into().unwrap()) as usize;
-        let track = &midi[22..22 + track_len];
-        let mut cursor = 0usize;
-        while cursor < track.len() {
-            let first = track[cursor];
-            cursor += 1;
-            let mut delta = u32::from(first & 0x7f);
-            let mut byte = first;
-            while byte & 0x80 != 0 {
-                byte = track[cursor];
-                cursor += 1;
-                delta = (delta << 7) | u32::from(byte & 0x7f);
-            }
-            let _ = delta;
-            let status = track[cursor];
-            cursor += 1;
-            if status == 0xff {
-                let meta_type = track[cursor];
-                cursor += 1;
-                let length = usize::from(track[cursor]);
-                cursor += 1;
-                if meta_type == 0x51 && length == 3 {
-                    let tempo = track[cursor..cursor + 3].try_into().unwrap();
-                    return Some(tempo);
-                }
-                cursor += length;
-                if meta_type == 0x2f {
-                    break;
-                }
-            } else if status & 0xf0 == 0x80 || status & 0xf0 == 0x90 {
-                cursor += 2;
-            } else if status & 0xf0 == 0xc0 {
-                cursor += 1;
-            } else {
-                panic!("unexpected MIDI status byte: {status:#x}");
-            }
-        }
-        None
-    }
-
-    fn midi_channel_note_events(midi: &[u8], status: u8) -> Vec<(u32, Vec<u8>)> {
-        let track_len = u32::from_be_bytes(midi[18..22].try_into().unwrap()) as usize;
-        let track = &midi[22..22 + track_len];
-        let mut cursor = 0usize;
-        let mut absolute_tick = 0_u32;
-        let mut events = Vec::new();
-        while cursor < track.len() {
-            let first = track[cursor];
-            cursor += 1;
-            let mut delta = u32::from(first & 0x7f);
-            let mut byte = first;
-            while byte & 0x80 != 0 {
-                byte = track[cursor];
-                cursor += 1;
-                delta = (delta << 7) | u32::from(byte & 0x7f);
-            }
-            absolute_tick += delta;
-            let event_status = track[cursor];
-            cursor += 1;
-            if event_status == 0xff {
-                let meta_type = track[cursor];
-                cursor += 1;
-                let length = usize::from(track[cursor]);
-                cursor += 1 + length;
-                if meta_type == 0x2f {
-                    break;
-                }
-            } else if event_status & 0xf0 == 0x80 || event_status & 0xf0 == 0x90 {
-                let event = track[cursor - 1..cursor + 2].to_vec();
-                cursor += 2;
-                if event_status == status {
-                    events.push((absolute_tick, event));
-                }
-            } else if event_status & 0xf0 == 0xc0 {
-                cursor += 1;
-            } else {
-                panic!("unexpected MIDI status byte: {event_status:#x}");
-            }
-        }
-        events
     }
 
     #[test]
+    fn midi_inspector_rejects_truncated_header_track_and_missing_end_marker() {
+        let valid = render_synthetic_midi_v1(
+            Feature {
+                dimension: Dimension::Motif,
+                value: 2,
+            },
+            Feature {
+                dimension: Dimension::Texture,
+                value: 3,
+            },
+            b"valid",
+        )
+        .unwrap();
+
+        let mut truncated_header = valid.clone();
+        truncated_header.truncate(13);
+        assert_eq!(
+            inspect_midi_file_v1(&truncated_header),
+            Err(HarnessError::InvalidMidi)
+        );
+
+        let mut oversized_track = valid.clone();
+        oversized_track[18..22].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert_eq!(
+            inspect_midi_file_v1(&oversized_track),
+            Err(HarnessError::InvalidMidi)
+        );
+
+        let mut missing_end_marker = valid;
+        missing_end_marker.truncate(missing_end_marker.len() - 4);
+        let new_track_len = (missing_end_marker.len() - 22) as u32;
+        missing_end_marker[18..22].copy_from_slice(&new_track_len.to_be_bytes());
+        assert_eq!(
+            inspect_midi_file_v1(&missing_end_marker),
+            Err(HarnessError::InvalidMidi)
+        );
+    }
+
+    #[test]
+    fn midi_inspector_rejects_overlong_delta_and_unmatched_note_on() {
+        let overlong_delta = smf_format0_with_track(&[
+            0x80, 0x80, 0x80, 0x80, 0x00, 0xff, 0x2f, 0x00,
+        ]);
+        assert_eq!(
+            inspect_midi_file_v1(&overlong_delta),
+            Err(HarnessError::InvalidMidi)
+        );
+
+        let unmatched_note = smf_format0_with_track(&[
+            0x00, 0x90, 60, 80, 0x00, 0xff, 0x2f, 0x00,
+        ]);
+        assert_eq!(
+            inspect_midi_file_v1(&unmatched_note),
+            Err(HarnessError::InvalidMidi)
+        );
+    }
+
+    #[test]
+    fn midi_inspector_supports_running_status_and_note_on_zero_velocity() {
+        let midi = smf_format0_with_track(&[
+            0x00, 0x90, 60, 80, // note on
+            0x60, 60, 0, // running-status note off via zero-velocity note-on
+            0x00, 0xff, 0x2f, 0x00,
+        ]);
+        let inspected = inspect_midi_file_v1(&midi).unwrap();
+        assert_eq!(inspected.notes.len(), 1);
+        assert_eq!(inspected.notes[0].pitch, 60);
+        assert_eq!(inspected.notes[0].velocity, 80);
+        assert_eq!(inspected.notes[0].start_tick, 0);
+        assert_eq!(inspected.notes[0].end_tick, 96);
+    }
+
+    #[test]
+    fn artifact_binder_rejects_malformed_bytes_declared_as_midi() {
+        let (task, interventions) = fixture();
+        let mut record = run_trial(
+            task,
+            interventions,
+            &RuleBasedPolicy {
+                id: "rule-positive".to_owned(),
+            },
+            config(),
+        )
+        .unwrap();
+        let (mut inputs, outputs) = artifact_payloads(&record);
+        inputs[0].artifacts
+            .iter_mut()
+            .find(|artifact| artifact.format == ArtifactFormatV1::Midi)
+            .unwrap()
+            .bytes = b"not-a-midi-file".to_vec();
+
+        assert_eq!(
+            bind_verified_artifacts(
+                &mut record,
+                inputs,
+                outputs,
+                "test-verifier",
+                "v1",
+            ),
+            Err(HarnessError::InvalidMidi)
+        );
+    }
+
     fn canonical_fixture_suite_covers_all_five_declared_dimensions() {
         let fixtures = canonical_fixture_suite_v1();
         assert_eq!(fixtures.len(), 5);
