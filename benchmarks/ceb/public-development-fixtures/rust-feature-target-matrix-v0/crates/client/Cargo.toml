@@ -1,0 +1,15 @@
+[package]
+name = "ceb-feature-matrix-client"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ceb-feature-matrix-protocol = { path = "../protocol", default-features = false }
+
+[features]
+default = ["json"]
+json = ["ceb-feature-matrix-protocol/json"]
+# Intentional development defect: the feature is declared, but the dependency
+# feature is not forwarded. The client source still expects encode_binary.
+binary = []
