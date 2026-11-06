@@ -81,6 +81,46 @@ def validate() -> None:
     require(manifest.get("parent_issue") == 6073, "wrong formal parent issue")
     require(manifest.get("parent_pr") == 6077, "wrong formal parent PR")
     require(manifest.get("parent_formal_head") == PARENT_HEAD, "wrong formal parent head")
+    rust_adapter = manifest.get("rust_adapter", {})
+    require(rust_adapter.get("pr") == 10832, "wrong Rust adapter PR binding")
+    require(
+        rust_adapter.get("source") == "src/rea_compat/formal.rs",
+        "wrong Rust formal adapter source path",
+    )
+    require(
+        rust_adapter.get("schema") == "docs/formal/rea-formal-provider-observation-v1.schema.json",
+        "wrong formal envelope schema path",
+    )
+    wire = manifest.get("wire_binding", {})
+    require(
+        wire.get("schema") == "luminous.rea.formal-provider-observation.v1"
+        and wire.get("mapping_rule") == "rea-provider-observation-projection/v1"
+        and wire.get("evidence_class") == "provider_observation",
+        "wrong formal wire schema, mapping rule or evidence class",
+    )
+    expected_wire_fields = {
+        "claim_request_sha256": "ClaimBinding.claimRequestDigest",
+        "derivation_sha256": "ClaimBinding.derivationDigest",
+        "request_schema": "ClaimBinding.requestSchemaGeneration",
+        "result_schema": "ClaimBinding.resultSchemaGeneration",
+        "evaluator_version": "ClaimBinding.evaluatorVersion",
+        "evaluator_rule_id": "ClaimBinding.ruleId",
+        "claim_id": "ClaimBinding.claimId",
+        "subject_sha256": "ClaimBinding.subjectSha256",
+        "operation": "ClaimBinding.operation",
+        "platform": "ClaimBinding.platform",
+        "platform_version": "ClaimBinding.platformVersion",
+        "environment_id": "ClaimBinding.environment",
+        "predicate": "ClaimBinding.predicate",
+    }
+    require(wire.get("fields", {}) == {
+        **expected_wire_fields,
+        "evaluator_rule_generation": {
+            "lean": "ClaimBinding.evaluatorRuleGeneration",
+            "wire_value": 0,
+            "representation": "JSON integer, not inferred from text version",
+        },
+    }, "Rust-to-Lean wire binding differs from the formal ClaimBinding")
     require(
         manifest.get("evidence_class") == "AbstractFormalTheorem",
         "wrong formal evidence class",
