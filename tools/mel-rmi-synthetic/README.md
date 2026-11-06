@@ -15,6 +15,7 @@ It is a benchmark-integrity oracle, not a Melothaea evaluation. Its positive con
 - Exact event-ID, seeded condition-order execution, policy-version and Git-revision binding.
 - SHA-256 binding of exact supplied source/output bytes and serialized transaction-receipt bytes, plus a second-call digest comparison over caller-supplied payload sets. The helper itself does not fetch durable Studio storage or prove that a read-back occurred.
 - A typed `CommittedArtifactReadbackV1` boundary that asks an adapter to fetch each of the eight event IDs from committed storage before digest comparison. Two tests check exact event lookup and post-commit byte substitution rejection using a fake read-back provider. The fake provider tests the contract only; it is not proof that Studio storage has been reopened.
+- Actual Standard MIDI File format-0 payloads with note-on/note-off events, time signature, tempo and program events. Motif maps to pitch transformation, rhythm to onset positions, tempo to a MIDI tempo meta-event, role to instrument/register, and texture to chord density. Target and protected dimensions use separate channels; output MIDI encodes the action feature plus the unchanged protected feature. Tests compare target event changes and protected-channel/tempo preservation.
 - Pinned `sha2 = 0.10.9` dependency and minimal committed lockfile; all test/run commands use `--locked`.
 - A fresh agent-policy fork restored from one frozen pre-intervention checkpoint for every condition; mutable agent state cannot leak between counterfactual arms. The controlled-partner path now does the same in reverse: a fresh partner fork per condition, all from the same frozen partner checkpoint and common-random-number seed, executed in the registered condition order. The same explicit seed is passed to every arm so stochastic adapters can pair random draws. A stateful partner fixture asserts per-fork call ordinal one, identical fork seeds, and randomized invocation order.
 - Explicit NotApplicable metric state for unsupported modalities.
@@ -38,7 +39,9 @@ feature dimension) for fixed, imitation, one-way, yoked, unrelated-feature-
 shortcut and rule-based policies, followed by 160 four-condition reciprocal
 controlled-partner trials. Every one of the 960 policy trials and 160 reciprocal
 trials receives four input and four output synthetic Score JSON/MIDI payload
-sets plus synthetic receipt bytes. The example hashes and rechecks the supplied
+sets plus synthetic receipt bytes. MIDI payloads contain real symbolic note
+and control events generated from the target/protected feature pair; they are
+not audio renders and have no human-musician validation. The example hashes and rechecks the supplied
 in-memory payload sets before reporting `artifact_verified,1120`; this is
 synthetic byte-equality evidence, not proof of a separate durable-storage
 read-back. A real Studio adapter must independently fetch committed bytes and
