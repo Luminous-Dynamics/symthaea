@@ -33,12 +33,18 @@ def hash_field(digest: Any, value: str) -> None:
     digest.update(encoded)
 
 
-def canonical_split_sha256(train_ids: list[str], validation_ids: list[str], lockbox_ids: list[str]) -> str:
+def canonical_split_sha256(
+    train_ids: list[str],
+    validation_ids: list[str],
+    calibration_ids: list[str],
+    lockbox_ids: list[str],
+) -> str:
     digest = hashlib.sha256()
     digest.update(b"connectome-cohort-transport-split-v1")
     for label, values in (
         ("TRAIN", train_ids),
         ("VALIDATION", validation_ids),
+        ("CALIBRATION", calibration_ids),
         ("LOCKBOX", lockbox_ids),
     ):
         rows = sorted(values)
@@ -64,6 +70,31 @@ def canonical_training_manifest_sha256(
     for animal_id in animal_rows:
         hash_field(digest, animal_id)
     conditions = sorted({animals[animal_id]["condition_id"] for animal_id in training_animal_ids})
+    digest.update(len(conditions).to_bytes(8, "big"))
+    for condition_id in conditions:
+        hash_field(digest, condition_id)
+    return digest.hexdigest()
+
+
+
+
+def canonical_calibration_manifest_sha256(
+    model_id: str,
+    split_sha256: str,
+    calibration_method: str,
+    calibration_animal_ids: list[str],
+    animals: dict[str, dict[str, Any]],
+) -> str:
+    digest = hashlib.sha256()
+    digest.update(b"connectome-cohort-calibration-manifest-v1")
+    hash_field(digest, model_id)
+    digest.update(split_sha256.encode("ascii"))
+    hash_field(digest, calibration_method)
+    animal_rows = sorted(calibration_animal_ids)
+    digest.update(len(animal_rows).to_bytes(8, "big"))
+    for animal_id in animal_rows:
+        hash_field(digest, animal_id)
+    conditions = sorted({animals[animal_id]["condition_id"] for animal_id in calibration_animal_ids})
     digest.update(len(conditions).to_bytes(8, "big"))
     for condition_id in conditions:
         hash_field(digest, condition_id)
@@ -99,14 +130,15 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(valid_sha(split['split_sha256']), 'split digest malformed')
     train_ids = split['train_animal_ids']
     validation_ids = split['validation_animal_ids']
+    calibration_ids = split['calibration_animal_ids']
     lockbox_ids = split['lockbox_animal_ids']
     unique(train_ids, 'train animal IDs')
     unique(validation_ids, 'validation animal IDs')
+    unique(calibration_ids, 'calibration animal IDs')
     unique(lockbox_ids, 'lockbox animal IDs')
-    require(not (set(train_ids) & set(validation_ids)), 'train/validation animal leakage')
-    require(not (set(train_ids) & set(lockbox_ids)), 'train/lockbox animal leakage')
-    require(not (set(validation_ids) & set(lockbox_ids)), 'validation/lockbox animal leakage')
-    expected_split_sha = canonical_split_sha256(train_ids, validation_ids, lockbox_ids)
+    partitions = [set(train_ids), set(validation_ids), set(calibration_ids), set(lockbox_ids)]
+    require(all(not (partitions[i] & partitions[j]) for i in range(len(partitions)) for j in range(i + 1, len(partitions))), 'animal leakage across train/validation/calibration/lockbox')
+    expected_split_sha = canonical_split_sha256(train_ids, validation_ids, calibration_ids, lockbox_ids)
     require(split['split_sha256'] == expected_split_sha, 'split digest does not bind the exact animal membership')
 
     animals_list = data['animals']
@@ -116,6 +148,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     expected_roles = {
         **{animal_id: 'TRAIN' for animal_id in train_ids},
         **{animal_id: 'VALIDATION' for animal_id in validation_ids},
+        **{animal_id: 'CALIBRATION' for animal_id in calibration_ids},
         **{animal_id: 'LOCKBOX' for animal_id in lockbox_ids},
     }
     require(set(animals) == set(expected_roles), 'animal records do not exactly match the frozen split manifest')
@@ -174,6 +207,20 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         require(set(model['training_animal_ids']), f"model {model['model_id']} has no training animals")
         expected_training_sha = canonical_training_manifest_sha256(model['model_id'], split['split_sha256'], model['training_animal_ids'], animals)
         require(model['training_manifest_sha256'] == expected_training_sha, f"model {model['model_id']} training manifest digest does not bind exact animal membership")
+        unique(model['calibration_animal_ids'], f"{model['model_id']} calibration animal IDs")
+        require(set(model['calibration_animal_ids']).issubset(set(calibration_ids)), f"model {model['model_id']} uses a non-calibration animal to fit its calibrator")
+        expected_calibration_sha = canonical_calibration_manifest_sha256(
+            model['model_id'], split['split_sha256'], model['calibration_method'],
+            model['calibration_animal_ids'], animals
+        )
+        require(model['calibration_manifest_sha256'] == expected_calibration_sha, f"model {model['model_id']} calibration manifest digest does not bind its exact calibration animal membership")
+        if model['calibration_method'] == 'NONE':
+            require(not model['calibration_animal_ids'], f"model {model['model_id']} declares no calibration method but lists calibration animals")
+            require(model['calibration_receipt_sha256'] is None, f"model {model['model_id']} declares no calibration method but carries a calibrator receipt")
+        else:
+            require(model['calibration_method'] in {'TEMPERATURE_SCALING', 'PLATT_SCALING', 'ISOTONIC', 'SPLIT_CONFORMAL', 'ISOTONIC_PLUS_SPLIT_CONFORMAL', 'OTHER'}, f"model {model['model_id']} has an unknown calibration method")
+            require(model['calibration_animal_ids'], f"model {model['model_id']} has a calibration method but no calibration animals")
+            require(valid_sha(model['calibration_receipt_sha256']), f"model {model['model_id']} calibrated model lacks a calibration artifact receipt")
         support_ids = [row['condition_id'] for row in model['supported_conditions']]
         unique(support_ids, f"{model['model_id']} supported condition IDs")
         for support in model['supported_conditions']:
@@ -285,6 +332,9 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         determinate_count = len(determinate)
         model_reports.append({
             'model_id': model_id,
+            'calibration_method': models[model_id]['calibration_method'],
+            'calibration_animal_ids': sorted(models[model_id]['calibration_animal_ids']),
+            'calibration_manifest_sha256': models[model_id]['calibration_manifest_sha256'],
             'lockbox_animal_count': lockbox_animal_count,
             'observed_prediction_count': predicted_observed,
             'out_of_domain_abstention_count': abstained,
@@ -315,6 +365,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         'split_integrity': 'PASS_ANIMAL_IDS_DISJOINT',
         'train_animal_count': len(train_ids),
         'validation_animal_count': len(validation_ids),
+        'calibration_animal_count': len(calibration_ids),
         'lockbox_animal_count': lockbox_animal_count,
         'lockbox_observation_count': len(observations_list),
         'truth_counts': truth_counts,
@@ -357,6 +408,12 @@ def run_negative_controls(data: dict[str, Any]) -> None:
     missing_prediction = copy.deepcopy(data)
     missing_prediction['predictions'].pop()
     mutations.append(('incomplete model × lockbox prediction matrix', missing_prediction))
+    calibration_leak = copy.deepcopy(data)
+    calibration_leak['models'][1]['calibration_animal_ids'] = ['UNC31-LOCKBOX-01']
+    mutations.append(('lockbox animal used for calibration', calibration_leak))
+    stale_calibration = copy.deepcopy(data)
+    stale_calibration['models'][1]['calibration_manifest_sha256'] = '0' * 64
+    mutations.append(('stale calibration manifest digest', stale_calibration))
     stale_split = copy.deepcopy(data)
     stale_split['split_manifest']['split_sha256'] = '0' * 64
     mutations.append(('stale animal split digest', stale_split))
