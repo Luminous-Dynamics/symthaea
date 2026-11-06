@@ -696,19 +696,18 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// Time constant adapts to both state complexity and input
     #[inline]
-    fn compute_tau(&self, input: &ContinuousHV) -> f32 {
+    fn compute_tau_unclamped(&self, input: &ContinuousHV) -> f32 {
         let state_norm = self.state.norm();
-
-        // Input-dependent adjustment via similarity with tau_modulator
         let input_adjustment = cosine_similarity_full(input, &self.tau_modulator);
 
-        // τ = τ₀ × (1 + backbone × ||x||) × (1 + 0.2 × input_adjustment)
-        let tau = self.config.tau_base
+        self.config.tau_base
             * (1.0 + self.config.backbone_tau * state_norm)
-            * (1.0 + 0.2 * input_adjustment);
+            * (1.0 + 0.2 * input_adjustment)
+    }
 
-        // Clamp to reasonable range
-        tau.clamp(0.01, 10.0)
+    #[inline]
+    fn compute_tau(&self, input: &ContinuousHV) -> f32 {
+        self.compute_tau_unclamped(input).clamp(0.01, 10.0)
     }
 
     /// State/input similarity plus mean gate bias before the sigmoid.
@@ -1527,7 +1526,9 @@ impl HdcLtcUnifiedNeuron {
         // Call backward() before evolve_closed_form() for this input and dt.
         let z = self.compute_pre_activation(input);
         let equilibrium = self.config.activation.apply(&z);
-        let tau = self.compute_tau(input);
+        let tau_unclamped = self.compute_tau_unclamped(input);
+        let tau = tau_unclamped.clamp(0.01, 10.0);
+        let tau_gradient_active = tau_unclamped > 0.01 && tau_unclamped < 10.0;
         let gate_activation = self.compute_gate_activation(input);
         let gate_base =
             1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
@@ -1568,7 +1569,11 @@ impl HdcLtcUnifiedNeuron {
         let du = dz.bind(input);
 
         // Exact derivative of sigma with respect to the effective scalar tau.
-        let dsigma_dtau = -decay * (1.0 - gate_base) * dt / (tau * tau);
+        let dsigma_dtau = if tau_gradient_active {
+            -decay * (1.0 - gate_base) * dt / (tau * tau)
+        } else {
+            0.0
+        };
         let dloss_dtau = dloss_dsigma * dsigma_dtau;
 
         // tau = tau_base * (1 + backbone_tau * ||state||)
