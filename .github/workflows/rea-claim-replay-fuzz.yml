@@ -120,7 +120,10 @@ jobs:
             summary="tools/rea-claim-replay-fuzz/fuzz/artifacts/$target-summary.txt"
             if test -f "$output"; then
               sha256sum "$output" | tee -a tools/rea-claim-replay-fuzz/fuzz/artifacts/run-context.txt
-              grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' "$output" > "$summary" || true
+              {
+                echo "target=$target"
+                grep -E 'DONE[[:space:]]+cov:|Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::new_units_added:|stat::peak_rss_mb:' "$output" | tail -n 6
+              } > "$summary"
             fi
           done
 
