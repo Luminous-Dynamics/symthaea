@@ -234,11 +234,19 @@ pub fn validate_dataset_catalog(input: &str) -> Result<CatalogSummary, Validatio
         }
 
         let rights = &entry.rights;
-        if rights.state == RightsState::Blocked && entry.ingestion != IngestionState::NotImported {
-            return Err(ValidationError::new(
-                format!("{path}.ingestion"),
-                "blocked source rights prohibit payload ingestion",
-            ));
+        if rights.state == RightsState::Blocked {
+            if entry.ingestion != IngestionState::NotImported {
+                return Err(ValidationError::new(
+                    format!("{path}.ingestion"),
+                    "blocked source rights prohibit payload ingestion",
+                ));
+            }
+            if !rights.permitted_uses.is_empty() {
+                return Err(ValidationError::new(
+                    format!("{path}.rights.permitted_uses"),
+                    "blocked source rights cannot declare permitted uses",
+                ));
+            }
         }
         if rights.state == RightsState::Pending {
             if !rights.permitted_uses.is_empty() {
@@ -917,6 +925,14 @@ mod tests {
         let input = sample_catalog("imported", "pending", vec![]);
         let error = validate_dataset_catalog(&input).expect_err("pending rights must fail closed");
         assert!(error.to_string().contains("pending"));
+    }
+
+    #[test]
+    fn blocked_rights_cannot_declare_permitted_uses() {
+        let input = sample_catalog("not_imported", "blocked", vec!["research"]);
+        let error = validate_dataset_catalog(&input)
+            .expect_err("blocked rights cannot declare any permitted use");
+        assert!(error.to_string().contains("blocked source rights"));
     }
 
     #[test]
