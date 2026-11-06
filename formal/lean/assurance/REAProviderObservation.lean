@@ -50,6 +50,7 @@ structure ClaimBinding where
   requestSchemaGeneration : Nat
   resultSchemaGeneration : Nat
   evaluatorRuleGeneration : GenerationIdentity
+  ruleId : Nat
   operation : Nat
   environment : Nat
   predicate : ClaimPredicate
@@ -88,6 +89,8 @@ def ProviderObservationSupports
   receipt.binding = obligation.binding ∧
   receipt.binding.predicate = .ProviderReportedObservation ∧
   obligation.binding.predicate = .ProviderReportedObservation ∧
+  receipt.binding.evaluatorRuleGeneration = receipt.base.generation ∧
+  obligation.binding.evaluatorRuleGeneration = obligation.base.generation ∧
   receipt.base.evidenceClass = .ProviderObservation ∧
   obligation.base.requiredClass = .ProviderObservation ∧
   Supports refinements entailments receipt.base obligation.base
