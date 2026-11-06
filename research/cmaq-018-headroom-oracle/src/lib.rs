@@ -420,7 +420,7 @@ pub fn select_supported_candidate(
     let baseline_sum = checked_sum(
         &design.headroom.selection.candidates[baseline_index].values,
     )
-    .map_err(|error| SupportedSelectorError::InvalidHeadroomDesign(error))?;
+    .map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
 
     let mut qualifying = Vec::<(usize, i128)>::new();
     for index in eligible_alternatives {
