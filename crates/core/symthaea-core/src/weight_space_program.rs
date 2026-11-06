@@ -546,6 +546,15 @@ fn l2_norm(values: &[f32]) -> f64 {
         .sqrt()
 }
 
+fn json_digest<T: Serialize>(domain: &[u8], value: &T) -> Result<String, WeightProgramError> {
+    let encoded = serde_json::to_vec(value).map_err(|_| WeightProgramError::InvalidConstraints)?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(domain);
+    hasher.update(&(encoded.len() as u64).to_le_bytes());
+    hasher.update(&encoded);
+    Ok(hasher.finalize().to_hex().to_string())
+}
+
 fn candidate_digest(
     architecture_digest: &str,
     manifest_digest: &str,
@@ -559,10 +568,15 @@ fn candidate_digest(
     hasher.update(base_model_digest.as_bytes());
 
     for group in groups {
-        let target = serde_json::to_vec(&group.target)
-            .map_err(|_| WeightProgramError::InvalidConstraints)?;
-        hasher.update(&(target.len() as u64).to_le_bytes());
-        hasher.update(&target);
+        let metadata = serde_json::to_vec(&(
+            &group.target,
+            group.role,
+            &group.shape,
+            &group.constraints,
+        ))
+        .map_err(|_| WeightProgramError::InvalidConstraints)?;
+        hasher.update(&(metadata.len() as u64).to_le_bytes());
+        hasher.update(&metadata);
         hasher.update(&(group.shape.len() as u64).to_le_bytes());
         for dimension in &group.shape {
             hasher.update(&(*dimension as u64).to_le_bytes());
@@ -654,6 +668,7 @@ mod tests {
         assert_eq!(candidate.receipt.edited_group_count, 1);
         assert_eq!(candidate.receipt.changed_parameter_count, 1);
         assert_eq!(candidate.receipt.base_model_digest, digest('c'));
+        assert_eq!(candidate.receipt.program_digest.len(), 64);
         assert_eq!(candidate.receipt.candidate_snapshot_digest.len(), 64);
     }
 
