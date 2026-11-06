@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/matched-benchmark-run-v0.schema.json",
+  "title": "PITB matched benchmark run record v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "snapshot_id",
+    "split_id",
+    "split_manifest_sha256",
+    "task_id",
+    "cluster_id",
+    "repository",
+    "repository_commit",
+    "lean_version",
+    "source_file",
+    "target_statement_sha256",
+    "environment_sha256",
+    "budget_policy_sha256",
+    "arm_id",
+    "model_id",
+    "model_version",
+    "scaffold_sha256",
+    "implementation_sha256",
+    "outcome",
+    "attempts",
+    "wall_ms",
+    "cost_microusd",
+    "tokens",
+    "kernel_verified",
+    "source_reproduction_status",
+    "source_reproduction_receipt_sha256",
+    "goal_alignment",
+    "goal_alignment_receipt_sha256",
+    "specification_audit_status",
+    "specification_audit_receipt_sha256",
+    "vacuity_audit_status",
+    "vacuity_audit_receipt_sha256",
+    "assumption_audit_status",
+    "assumption_audit_receipt_sha256",
+    "run_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.matched-benchmark-run.v0"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cluster_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_commit": {
+      "type": "string",
+      "pattern": "^([a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_statement_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "budget_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "arm_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scaffold_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "implementation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outcome": {
+      "enum": [
+        "solved",
+        "unsolved",
+        "timeout",
+        "invalid_proof",
+        "build_failure",
+        "did_not_compete"
+      ]
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "wall_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "kernel_verified": {
+      "type": "boolean"
+    },
+    "source_reproduction_status": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_run",
+        "not_applicable"
+      ]
+    },
+    "source_reproduction_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "goal_alignment": {
+      "enum": [
+        "exact",
+        "normalized",
+        "reviewed",
+        "mismatch",
+        "not_applicable"
+      ]
+    },
+    "goal_alignment_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "specification_audit_status": {
+      "enum": [
+        "passed",
+        "finding",
+        "not_run",
+        "not_applicable"
+      ]
+    },
+    "specification_audit_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "vacuity_audit_status": {
+      "enum": [
+        "passed",
+        "finding",
+        "not_run",
+        "not_applicable"
+      ]
+    },
+    "vacuity_audit_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "assumption_audit_status": {
+      "enum": [
+        "passed",
+        "finding",
+        "not_run",
+        "not_applicable"
+      ]
+    },
+    "assumption_audit_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "run_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "solved"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "kernel_verified": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "did_not_compete"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "attempts": {
+            "const": 0
+          },
+          "wall_ms": {
+            "const": 0
+          },
+          "cost_microusd": {
+            "const": 0
+          },
+          "tokens": {
+            "const": 0
+          },
+          "kernel_verified": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_reproduction_status": {
+            "enum": [
+              "passed",
+              "failed"
+            ]
+          }
+        },
+        "required": [
+          "source_reproduction_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "source_reproduction_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "goal_alignment": {
+            "enum": [
+              "normalized",
+              "reviewed",
+              "mismatch"
+            ]
+          }
+        },
+        "required": [
+          "goal_alignment"
+        ]
+      },
+      "then": {
+        "properties": {
+          "goal_alignment_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "specification_audit_status": {
+            "enum": [
+              "passed",
+              "finding"
+            ]
+          }
+        },
+        "required": [
+          "specification_audit_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "specification_audit_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "vacuity_audit_status": {
+            "enum": [
+              "passed",
+              "finding"
+            ]
+          }
+        },
+        "required": [
+          "vacuity_audit_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "vacuity_audit_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assumption_audit_status": {
+            "enum": [
+              "passed",
+              "finding"
+            ]
+          }
+        },
+        "required": [
+          "assumption_audit_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "assumption_audit_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}
