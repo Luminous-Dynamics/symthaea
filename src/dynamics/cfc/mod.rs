@@ -24,6 +24,9 @@ pub(crate) mod network;
 mod phi_gated;
 pub(crate) mod types;
 
+/// Candidate-only adapter from typed WeightPrograms to transactional CfC edits.
+pub mod weight_program_adapter;
+
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
@@ -51,6 +54,12 @@ pub use network::{
     CfCParameterGroupReplacement, CfCParameterManifest,
     CfCParameterRole,
     CfCWeightLoadError,
+};
+
+// Weight-space programming
+pub use weight_program_adapter::{
+    CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
+    cfc_weight_model_snapshot, materialize_cfc_weight_program,
 };
 
 // Phi-gated attention
