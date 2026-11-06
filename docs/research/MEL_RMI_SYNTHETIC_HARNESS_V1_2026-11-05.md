@@ -77,6 +77,12 @@ The `verifier_id` and `verifier_version` fields are caller-supplied labels, not 
 
 The production integration must reuse MEL-013A: resolve Studio-owned artifacts, independently re-read exact bytes after commit, authenticate the transaction receipt and purpose-specific actor authority, and bind the verified transaction into the RMI trial. Do not create a parallel artifact registry.
 
+### Synthetic MIDI semantics (added 6 November 2026)
+
+The canonical example no longer uses marker-only MIDI files. The new renderer writes Standard MIDI File format 0 with one track, a 4/4 time signature, actual note-on/note-off events, and dimension-specific control events. Motif values transpose a fixed melodic contour; rhythm values rotate a note-onset pattern; tempo values produce a tempo meta-event; role values select General MIDI program and register; texture values change chord polyphony. Target and protected features are encoded on separate MIDI channels. An output artifact is generated from the agent action plus the same protected-feature value as its input.
+
+The semantic MIDI tests verify that all five target dimensions change their expected event representation while the protected dimension's note events remain identical; protected tempo is compared as a tempo map, not inferred from note events. These files are actual symbolic MIDI event streams, but they remain procedural fixtures—not expressive performances, audio renders, or human judgments of musical equivalence. The extension raises the authored Rust unit-test count from 64 to 66; the expanded version still needs an exact-head workflow run before any pass claim.
+
 ## Executable suite and output
 
 The standalone example writes:
