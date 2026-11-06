@@ -33,12 +33,15 @@ def validate_universe(data: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], 
     require(len(query['query_spec_sha256']) == 64 and all(c in '0123456789abcdef' for c in query['query_spec_sha256']), 'query spec digest malformed')
     by_id: dict[str, dict[str, Any]] = {}
     class_meta: dict[str, dict[str, Any]] = {}
+    class_status: dict[str, str] = {}
     for candidate in data['hypothesis_universe']:
         candidate_id = candidate['candidate_id']
         class_id = candidate['equivalence_class_id']
         require(candidate_id.strip() and class_id.strip(), 'candidate and equivalence-class identities must be non-empty')
         require(candidate_id not in by_id, f'duplicate candidate identity: {candidate_id}')
         by_id[candidate_id] = candidate
+        previous_status = class_status.setdefault(class_id, candidate['adjudication_status'])
+        require(previous_status == candidate['adjudication_status'], f'equivalence class {class_id} has inconsistent adjudication status')
         if candidate['adjudication_status'] == 'ADMISSIBLE':
             require(isinstance(candidate['query_decision'], bool), f'admissible candidate {candidate_id} needs a query decision')
             require(candidate['impact_weight'] >= 0.0, 'impact weight cannot be negative')
@@ -49,6 +52,10 @@ def validate_universe(data: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], 
                 'query_critical': critical,
                 'impact_weight': candidate['impact_weight'],
             }
+            if not critical:
+                require(candidate['impact_weight'] == 0.0, f'non-critical equivalence class {class_id} cannot carry impact weight')
+            else:
+                require(candidate['impact_weight'] > 0.0, f'query-critical equivalence class {class_id} needs positive impact weight')
             if class_id in class_meta:
                 require(class_meta[class_id] == meta, f'equivalence class {class_id} has inconsistent adjudication/query semantics')
             else:
@@ -203,6 +210,8 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
         'admissible_equivalence_class_count': len(admissible_classes),
         'query_critical_equivalence_class_count': len(critical_classes),
         'channel_count': len(channels),
+        'channel_ancestry_ids': {channel['channel_id']: channel['ancestry_id'] for channel in channels},
+        'channel_independence_claim': 'NOT_ESTABLISHED_PROVENANCE_ADJUDICATION_REQUIRED',
         'proposal_budget_max': max_budget,
         'per_channel_curves': per_channel,
         'final_per_channel': final_per_channel,
@@ -260,7 +269,7 @@ def main() -> int:
             self_test(data)
         rendered = json.dumps(result, indent=2, sort_keys=True)
         if args.output:
-            args.output.write_text(rendered + '\\n', encoding='utf-8')
+            args.output.write_text(rendered + '\n', encoding='utf-8')
         else:
             print(rendered)
         print('independent set-valued hypothesis coverage oracle: PASS', file=sys.stderr)
