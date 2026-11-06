@@ -3,7 +3,7 @@
   "challenge_id": "append-uninformative-model-c",
   "base_input_git_blob_sha1": "5e8c2f3fdbead5184ebb343ead297ee5b717f714",
   "expanded_input_git_blob_sha1": "a473aee1631598c613f22e03445a7cb78c68a79d",
-  "sequential_oracle_git_blob_sha1": "b24bd3a2b37770c715402ec1b34bac789f423f7f",
+  "sequential_oracle_git_blob_sha1": "d2c44b6b6aa1b4386ca9534a05d18907ef479862",
   "base_model_vertex_ids": [
     "MODEL-A",
     "MODEL-B"
