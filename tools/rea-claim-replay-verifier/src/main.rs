@@ -20,6 +20,20 @@ const MAX_TOTAL_EVIDENCE_BYTES: usize = 128 * 1024 * 1024;
 fn read_bounded(path: &Path, max_bytes: usize, label: &str) -> Result<Vec<u8>, String> {
     let file = File::open(path)
         .map_err(|error| format!("cannot open {label} '{}': {error}", path.display()))?;
+    let file_size = file
+        .metadata()
+        .map_err(|error| format!("cannot inspect {label} '{}': {error}", path.display()))?
+        .len();
+    if file_size > max_bytes as u64 {
+        return Err(format!(
+            "{label} '{}' exceeds the {}-byte input limit",
+            path.display(),
+            max_bytes
+        ));
+    }
+
+    // The metadata check avoids reading an already-oversized regular file.
+    // The capped read remains necessary because a file can grow after stat.
     let mut bytes = Vec::new();
     file.take((max_bytes as u64).saturating_add(1))
         .read_to_end(&mut bytes)
