@@ -207,7 +207,7 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
         one_shot_selection_optimism,
         repeated_selection_optimism,
         heldout_share_of_one_shot_apparent_gain: positive_gain_share(
-            heldout_repeated.heldout_gain,
+            one_shot.heldout_gain,
             one_shot.selection_gain,
         ),
         heldout_share_of_repeated_in_sample_gain: positive_gain_share(
@@ -482,6 +482,57 @@ mod tests {
         assert_eq!(
             report.actual_selector_status,
             ActualSelectorStatus::NotMeasuredInThisReference
+        );
+    }
+
+    #[test]
+    fn one_shot_heldout_share_scores_the_one_shot_selected_candidate() {
+        let design = HeadroomDesign {
+            candidate_ids: vec![
+                "baseline".to_owned(),
+                "candidate-a".to_owned(),
+                "candidate-b".to_owned(),
+            ],
+            baseline_candidate_id: "baseline".to_owned(),
+            selection: batch(
+                &["s0", "s1", "s2"],
+                vec![
+                    candidate("baseline", &[0, 0, 0]),
+                    candidate("candidate-a", &[2, 2, 2]),
+                    candidate("candidate-b", &[10, -10, 0]),
+                ],
+                shared(),
+            ),
+            evaluation: batch(
+                &["e0", "e1"],
+                vec![
+                    candidate("baseline", &[0, 0]),
+                    candidate("candidate-a", &[2, 2]),
+                    candidate("candidate-b", &[0, 0]),
+                ],
+                shared(),
+            ),
+        };
+
+        let report = evaluate_headroom(&design).unwrap();
+        assert_eq!(
+            report.one_shot_oracle.selected_candidate_id,
+            "candidate-b"
+        );
+        assert_eq!(
+            report.repeated_in_sample_oracle.selected_candidate_id,
+            "candidate-a"
+        );
+        assert_eq!(report.one_shot_oracle.selection_gain, 10.0);
+        assert_eq!(report.one_shot_oracle.heldout_gain, 0.0);
+        assert_eq!(report.heldout_repeated_oracle.heldout_gain, 2.0);
+        assert_eq!(
+            report.heldout_share_of_one_shot_apparent_gain,
+            Some(0.0)
+        );
+        assert_eq!(
+            report.heldout_share_of_repeated_in_sample_gain,
+            Some(1.0)
         );
     }
 
