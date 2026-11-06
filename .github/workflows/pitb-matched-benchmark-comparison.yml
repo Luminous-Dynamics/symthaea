@@ -115,6 +115,14 @@ jobs:
               raise SystemExit("paired task/cluster statistics changed")
           if pair["challenger_wins"] != 2 or pair["ties"] != 2 or pair["reference_wins"] != 0:
               raise SystemExit("paired success comparison changed")
+          if pair["cluster_sign_flip_method"] != "exact_cluster_sign_flip":
+              raise SystemExit("two-cluster synthetic test must use exact sign-flip enumeration")
+          if pair["cluster_sign_flip_permutations"] != 4:
+              raise SystemExit("exact sign-flip permutation denominator changed")
+          if abs(pair["cluster_sign_flip_p_value"] - 0.5) > 1e-12:
+              raise SystemExit("exact paired cluster sign-flip p-value changed")
+          if abs(pair["holm_adjusted_p_value"] - 0.5) > 1e-12:
+              raise SystemExit("Holm-adjusted synthetic pair p-value changed")
           if report["scheduler_admission"] is not False or report["cluster_unit"] != "repository":
               raise SystemExit("comparison trust boundary or cluster unit changed")
           print("PITB_MATCHED_BENCHMARK_SCHEMAS_AND_REPORT_PASS")
