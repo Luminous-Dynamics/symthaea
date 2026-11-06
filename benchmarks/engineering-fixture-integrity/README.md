@@ -79,10 +79,14 @@ The exact toolchain check records and pins:
 - OpenSCAD 2021.01
 
 The manifest-binding layer uses only the Python standard library; optional
-CAD/mesh dependencies are imported only when the geometry audit runs.
+CAD/mesh dependencies are imported only when the geometry audit runs. The
+isolated manifest-only CI lane requests the Python 3.13 series rather than a
+fixed patch because the GitHub Ubuntu 26.04 image did not provide 3.13.5. The
+full geometry profile still rejects any Python version other than the pinned
+3.13.5.
 
 A dedicated [Engineering Fixture Integrity workflow](../../.github/workflows/engineering-fixture-integrity.yml)
-runs the exact 20-test suite and Python byte-compilation independently of the
+runs the exact 20-test suite using the available Python 3.13 patch release and Python byte-compilation independently of the
 repository-wide Rust workspace metadata checks.
 
 
