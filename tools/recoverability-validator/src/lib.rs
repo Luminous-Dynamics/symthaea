@@ -404,9 +404,7 @@ fn find_route(
         let reached = state.node_ref == target_node_ref;
         let qualifies = match mode {
             RouteMode::Direct => {
-                state.used_initial_retrieval
-                    && !state.used_reformulation
-                    && !state.used_navigation
+                state.used_initial_retrieval && !state.used_reformulation && !state.used_navigation
             }
             RouteMode::Reformulation => {
                 state.used_reformulation
@@ -856,8 +854,18 @@ mod tests {
             .edges
             .retain(|edge| edge.edge_ref != "route:open-document");
         let after = report(fields);
-        let before_class = before.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability;
-        let after_class = after.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability;
+        let before_class = before
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:navigation")
+            .unwrap()
+            .recoverability;
+        let after_class = after
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:navigation")
+            .unwrap()
+            .recoverability;
         assert!(after_class.rank() >= before_class.rank());
     }
 
