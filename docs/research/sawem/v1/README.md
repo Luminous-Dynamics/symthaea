@@ -466,7 +466,7 @@ Each certificate binds:
 
 Critical and material obligations are conjunctive, not weighted. A high NPV cannot compensate for missing grid allocation, unsupported participant admission, an invalid battery envelope or an unresolved contractual right. A critical rejected/invalidated obligation yields `DoNotProceed`; a critical unresolved obligation yields `NotSupportable`; a conditional critical or unresolved/conditional material obligation yields `Conditional`. Only complete qualification of critical and material claims produces `SupportableWithinDeclaredScope`.
 
-The evaluator rejects future-known receipts, expired/not-yet-valid claims, dependency cycles, missing dependencies, unsupported dependencies and qualified claims without both evidence and evaluator receipts. Every conditional claim must declare its invalidation conditions.
+The evaluator rejects future-known receipts, expired/not-yet-valid claims, dependency cycles, missing dependencies, unsupported dependencies and qualified claims without both evidence and evaluator receipts. Every conditional claim must carry supporting evidence and declare its invalidation conditions; a conditional label is not a waiver of evidence.
 
 This is a certificate assembler and dependency/temporal integrity checker, not a source authenticator or independent model verifier. It does not validate signatures, issuer authority, upstream evaluator correctness or actual source facts. A supportable certificate is only as strong as its independently verified receipts and the correctness of the designated specialist evaluators. Benchmark case: `UNDERWRITING-PROOF-CERTIFICATE-001`.
 
@@ -480,7 +480,7 @@ For an external commercial bid/offer, the evaluator requires:
 - verified participant admission;
 - verified evidence for every accreditation stage: design approval, factory acceptance testing, integration testing, market simulation, pilot operation and commercial approval;
 - source-bound API/platform submission permission; and
-- where required, a human approval bound to the exact canonical bid/offer manifest digest and participant identity, with an authorised reviewer and review receipt available by the submission time.
+- where required, a human approval bound to the exact canonical bid/offer manifest digest and participant identity, with an authorised reviewer and review receipt available by the submission time. Accreditation evidence must show the ordered progression from design approval through FAT, integration testing, market simulation, pilot operation and commercial approval; a bag of six unordered stage labels is not sufficient. A reviewer cannot be the same identity as the declared automated sender, and the approval receipt cannot predate the review event.
 
 A draft, superseded or unknown regulatory instrument blocks external submission. Internal simulation is reported only as `SimulationOnlyPermitted` and does not authorize commercial transmission. Analysis, forecasting, optimisation and preparation are not blocked merely because submission authority is unresolved.
 
