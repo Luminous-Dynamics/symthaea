@@ -329,38 +329,52 @@ mod tests {
         let bias = get(CfCWeightGroupId::CellHiddenBias { cell: 0 });
         let tau = get(CfCWeightGroupId::CellTimeConstant { cell: 0 });
         let output = get(CfCWeightGroupId::OutputProjection);
-        let replacements = vec![
-            CfCParameterGroupReplacement {
-                id: native_group_id(&CfCWeightGroupId::CellInputProjection { cell: 0 }),
-                values: permute_rows(&input, 4, 2, &permutation),
-            },
-            CfCParameterGroupReplacement {
-                id: native_group_id(&CfCWeightGroupId::CellRecurrentProjection { cell: 0 }),
-                values: permute_square(&recurrent, 4, &permutation),
-            },
-            CfCParameterGroupReplacement {
-                id: native_group_id(&CfCWeightGroupId::CellHiddenBias { cell: 0 }),
-                values: permutation.iter().map(|index| bias[*index]).collect(),
-            },
-            CfCParameterGroupReplacement {
-                id: native_group_id(&CfCWeightGroupId::CellTimeConstant { cell: 0 }),
-                values: permutation.iter().map(|index| tau[*index]).collect(),
-            },
-            CfCParameterGroupReplacement {
-                id: native_group_id(&CfCWeightGroupId::OutputProjection),
-                values: permute_columns(&output, 2, 4, &permutation),
-            },
-        ];
-        let mut permuted = original.clone();
-        permuted
-            .try_apply_parameter_group_replacements(&snapshot.model_digest, &replacements)
-            .expect("function-preserving permutation");
+        let task_digest = digest('d');
+        let program = WeightProgram {
+            format_version: 1,
+            architecture_digest: snapshot.architecture_digest.clone(),
+            manifest_digest: snapshot.manifest_digest.clone(),
+            base_model_digest: snapshot.model_digest.clone(),
+            target_specification_digest: task_digest.clone(),
+            fault_hypothesis_ids: vec!["hypothesis:function-preserving-permutation".into()],
+            evidence_receipt_ids: vec!["receipt:permutation-probe-set-v1".into()],
+            max_changed_parameters: 40,
+            max_total_l2_delta: 100.0,
+            max_abs_delta: 100.0,
+            operations: vec![
+                WeightProgramOperation::ReplaceGroup {
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellInputProjection { cell: 0 }),
+                    values: permute_rows(&input, 4, 2, &permutation),
+                },
+                WeightProgramOperation::ReplaceGroup {
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellRecurrentProjection { cell: 0 }),
+                    values: permute_square(&recurrent, 4, &permutation),
+                },
+                WeightProgramOperation::ReplaceGroup {
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellHiddenBias { cell: 0 }),
+                    values: permutation.iter().map(|index| bias[*index]).collect(),
+                },
+                WeightProgramOperation::ReplaceGroup {
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+                    values: permutation.iter().map(|index| tau[*index]).collect(),
+                },
+                WeightProgramOperation::ReplaceGroup {
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::OutputProjection),
+                    values: permute_columns(&output, 2, 4, &permutation),
+                },
+            ],
+        };
+        let candidate = materialize_cfc_weight_program(&original, task_digest, &program)
+            .expect("function-preserving WSP candidate");
+        let permuted = candidate.network;
 
         assert_ne!(
-            original.fingerprint().expect("original digest").model_digest,
-            permuted.fingerprint().expect("permuted digest").model_digest,
+            candidate.base_native_model_digest,
+            candidate.candidate_native_model_digest,
             "the parameter fingerprint must distinguish equivalent parameterizations"
         );
+        assert_eq!(candidate.receipt.edited_group_count, 5);
+        assert!(candidate.receipt.changed_parameter_count <= 40);
 
         let inputs = [
             ndarray::Array1::from_vec(vec![0.25, -0.75]),
