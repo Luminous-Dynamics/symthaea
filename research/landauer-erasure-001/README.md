@@ -13,9 +13,10 @@ cargo clippy --locked --manifest-path research/landauer-erasure-001/Cargo.toml -
 ```
 
 The test corpus pins one-bit Landauer heat values at 300 K and 310 K, checks
-linear scaling with the declared erased-bit count and bath temperature, and
+linear scaling with the declared erased-bit count and bath temperature,
 rejects negative/non-finite bit counts, invalid temperatures, invalid
-Boltzmann constants, and arithmetic overflow.
+Boltzmann constants, and arithmetic overflow, and validates that the result
+uses the finite `PhysicalEnergyJoules` unit type rather than a raw scalar.
 
 This validates the pure formula implementation only. It does not prove that
 any upstream Shannon-entropy, FLOP, belief-change, or token-count telemetry is
