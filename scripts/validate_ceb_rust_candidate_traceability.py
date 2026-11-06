@@ -423,7 +423,7 @@ def fixture_errors(payload: dict, repo_root: Path) -> list[str]:
 
 def self_test() -> list[str]:
     errors: list[str] = []
-    if git_blob_sha1(b"hello\\n") != "ce013625030ba8dba906f756967f9e9ca394464a":
+    if git_blob_sha1(b"hello\n") != "ce013625030ba8dba906f756967f9e9ca394464a":
         errors.append("Git blob SHA-1 known-vector self-test failed")
     minimal = {
         "format_id": "CEB-RUST-CANDIDATE-ORACLE-TRACEABILITY",
