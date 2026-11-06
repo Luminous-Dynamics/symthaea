@@ -15,7 +15,7 @@ use serde_json::{Map, Number, Value};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use symthaea_rea_compat::{
-    VerifiedEvidence, canonical_jcs_bytes, sha256_hex, verify_evidence_json,
+    EvidenceErrorKind, VerifiedEvidence, canonical_jcs_bytes, sha256_hex, verify_evidence_json,
 };
 
 pub const CLAIM_SCHEMA: &str = "luminous.rea.claim.v0";
@@ -541,8 +541,12 @@ pub fn replay_claim_evaluation(
         }
 
         let evidence = verify_evidence_json(raw).map_err(|error| {
+            let kind = match error.kind {
+                EvidenceErrorKind::InputTooLarge => ReplayErrorKind::InputTooLarge,
+                _ => ReplayErrorKind::InvalidEvidence,
+            };
             ReplayError::new(
-                ReplayErrorKind::InvalidEvidence,
+                kind,
                 format!("REA Evidence verification failed: {error}"),
             )
         })?;
