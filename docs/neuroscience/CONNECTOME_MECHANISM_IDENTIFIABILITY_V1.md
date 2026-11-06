@@ -122,6 +122,24 @@ V1 requires:
 - #9587: broad blind intervention benchmark and mechanism scorecard; this V1 is its finite-family identifiability kernel.
 - #10670: query-directed intervention selection; this V1 supplies a separate mechanism-identification acceptance condition.
 
+
+### Matched modern baselines and benchmark denominator discipline
+
+| Comparator | What it establishes | Required matched comparison |
+|---|---|---|
+| ConnectomeBench2 V2 (2026) | Predictive split/merge proofreading across four species; paper page reports 716,485 expert decisions and >4.5M images. | Reproduce classification/calibration/transfer separately. The current dataset card reports 401,170 rows, with 37,926 test rows and EM on 63% overall, but only 38% of merge-edit and 23% of split-edit rows. Pin revision and task filters; these are not interchangeable denominators. |
+| NEURD (Nature 2025) | Morphology-informed proofreading; selected high-confidence merge subsets report 99%/95% agreement with expert splits, nearly 150k automatic edits and >3× speed-up for multi-soma review. | Use as a candidate mechanism/reconstruction generator; preserve selected-subset and workflow denominators rather than treating agreement as global reconstruction accuracy. |
+| RoboEM (Nature Methods 2024) | Self-steering 3D neurite tracing; ~400× lower computational annotation cost in studied cortical analyses. | Compare reconstruction/candidate generation and all-in annotation cost; do not describe the result as 400× less expert labor. |
+| Connectomics VLMs (arXiv:2609.36492, 2026 preprint) | LoRA adaptation on a few thousand labels brings some open VLMs near specialist proofreading performance on evaluated tasks, with selected unseen-species merge-transfer gains. | Include as a candidate generator and cross-species shift baseline; reproduce exact split, data filters and preprint task definitions. |
+| NPI (Nature Methods 2025) | Learns a surrogate of large-scale fMRI dynamics and virtually perturbs it to estimate effective connectivity; validates on generative networks and compares with cortico-cortical evoked potentials. | Use as a virtual-perturbation baseline, but do not equate model-internal perturbation with a measured optogenetic intervention or single-cell connectome mechanism. |
+| GO-CBED (TMLR 2026) | Goal-oriented, non-myopic sequential Bayesian design targets information about a specified causal quantity; uses a learned policy and variational approximation. | Directly compare query targeting and multi-step policy value against entropy/EIG and the exact finite minimax oracle here. Its approximate Bayesian objective is not the same as nuisance-worst-case finite-sample mechanism risk. |
+| C. elegans signal-propagation atlas (Nature 2023) | Direct optogenetic perturbation and whole-brain calcium imaging for 23,433 neuron pairs across 113 animals; includes extrasynaptic effects and explicit insufficient-evidence outcomes. | Use as measured perturbation data and abstention/overclaim controls; its effective connections are not a direct monosynaptic ground-truth table. |
+| Global graph-invariant stopping (2026 preprint) | Fits global invariant convergence to estimate proofreading effort/stopping. | Matched global convergence baseline only; its authors explicitly caution that global proxies do not measure progress toward a specific scientific query. |
+
+Sources: ConnectomeBench2 [paper/project](https://synthneuro.org/publications/connectomebench2-a-unified-benchmark-for-automated-connectomic-proofreading/) and [current dataset card](https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2); [NEURD](https://www.nature.com/articles/s41586-025-08660-5); [RoboEM](https://www.nature.com/articles/s41592-024-02226-5); [VLM proofreading preprint](https://arxiv.org/abs/2609.36492); [NPI](https://www.nature.com/articles/s41592-025-02654-x); [GO-CBED](https://tmlr.infinite-conf.org/paper_pages/6dVCZT7pO2.html); [C. elegans signal-propagation atlas](https://www.nature.com/articles/s41586-023-06683-4); [graph-invariant stopping](https://www.biorxiv.org/content/10.64898/2026.06.30.735414v1).
+
+These systems answer different questions. The mechanism-identifiability benchmark is not a new classifier leaderboard. It tests whether competing causal explanations can be discriminated under declared intervention, nuisance, observation and finite-sample limits. Report task accuracy, reconstruction fidelity, effective-connectivity prediction, mechanism attribution and expert cost as separate scorecards.
+
 ## 9. Promotion targets
 
 These are aspirational, not achieved results:
