@@ -126,6 +126,24 @@ The current Symthaea model-information-gain primitive computes `I(Model; Outcome
 
 **Proposed research shift:** implement a hierarchical *epistemic controller* with explicit fast state inference, slower parameter learning, and slower still model-structure selection. Use the structure-level information term to choose discriminating probes; use evidence thresholds and model evidence to decide whether to retain, reduce, or replace a model. A probe ranking does not automatically authorize model replacement.
 
+### 2.5 WSP must pass exact-protocol replication, not headline comparison
+
+An important reproducibility update appeared on 6 November 2026. The independent [OpenWSP replication](https://github.com/openwsp/openwsp) reports that its recorded live Experiment 8 edit scored **12.9% on MATH-500**, versus the MIT authors' reported 48.1% and OpenWSP's local calibration of the released edit at 50.6%. OpenWSP reports that 84.25% of its live MATH-500 generations hit the token limit, and that its live evaluation used four samples per problem while the local calibration used one. GSM8K and IFEval were still pending in that repository snapshot.
+
+This is not a controlled refutation of the MIT result: the live run and local calibration use different evaluation multiplicity and possibly other execution differences. It is, however, strong evidence that raw headline scores are not portable without protocol identity. A direct WSP baseline can vary with prompts, editor model/version, tool permissions, number of passes, forward-pass opportunities, token limits, sampling, evaluation multiplicity, and the checkpoint revision.
+
+For every WSP result, bind and report:
+
+1. Exact base checkpoint revision and tensor digests.
+2. Editor model/version, prompt and system-instruction digests, context budget, tools, and sandbox restrictions.
+3. Number of edit rounds, forward-pass opportunities, tool calls, candidate count, and token/run budget.
+4. Exact evaluation code/version, test split, sampling count, pass@k/aggregation rule, decoding settings, and token cutoff.
+5. Local calibration results and live/independent replication results as separate rows.
+6. Independent live replications, variance and confidence intervals; never select only the best run.
+7. Every intermediate and final weight diff, rejected candidate, and rollback.
+
+The SWI benchmark must reproduce the published WSP protocol where it can, then compare it with SWI-constrained typed edits under equal budgets. The original MIT result is a motivating baseline, not an assumed performance floor or a verified guarantee.
+
 ### 2.4 Weight-space reasoning must account for parameter symmetries
 
 A raw parameter vector is not a unique description of a learned function. Hidden-unit permutations can produce different serialized weight arrays with exactly equivalent behavior when the corresponding incoming, outgoing, bias, and state-associated parameters are permuted consistently. Similar equivalences can arise from architecture-specific rescalings or other reparameterizations.
@@ -307,6 +325,8 @@ Recent complexity-matched active-inference/RL comparisons do not establish a uni
 - Gradient/Adam repair with matched forward/backward and evaluation budgets.
 - Black-box search / evolutionary or coordinate search with matched candidate budgets.
 - WSP weights-only.
+- Published WSP prompt/tool/protocol replication with the original editor budget.
+- Independent WSP reproduction; report calibration and live-run rows separately.
 - WSP trace-assisted.
 - SWI-constrained WSP plus independent verifier.
 
@@ -345,6 +365,7 @@ The analytical/oracle baseline is an upper bound, never a tuning signal. Weights
 - Healthy-model false-edit rate with confidence interval.
 - Parameter edit count, sparsity, norm, candidate count and forward-pass/compute budget.
 - Time and evidence required to repair, verifier disagreement, rollback frequency.
+- WSP replication variance, pass@k/evaluation multiplicity, token-limit fraction, and calibration-to-live gap.
 - Weights-only vs trace-assisted performance.
 
 **Non-negotiable gates:**
@@ -357,7 +378,8 @@ The analytical/oracle baseline is an upper bound, never a tuning signal. Weights
 7. Information gain is computed from model-conditioned predictive outcomes/posteriors, not entropy of a deterministic state or novelty.
 8. A negative control disables information-bearing observations while holding reward, costs, and novelty accounting constant.
 9. Primary contrasts and multiplicity correction are preregistered; paired seeds and effect sizes with 95% confidence intervals are reported.
-10. Protocol validation never emits an accuracy, capability, efficiency, SOTA, safety, or consciousness claim.
+10. WSP headline results are not compared unless checkpoint, editor, prompt, tool, pass budget, decoding, evaluation multiplicity, and token-limit protocol are matched or explicitly reported as deviations.
+11. Protocol validation never emits an accuracy, capability, efficiency, SOTA, safety, or consciousness claim.
 
 For healthy-model false-edit rate, report exact binomial confidence intervals. Do not declare a low false-edit rate from a tiny control sample. A target such as an upper 95% confidence bound below 1% requires hundreds of independent healthy trials (approximately 300 zero-false-edit trials as a rough planning minimum); confirm the exact interval before stating that gate is met.
 
@@ -397,6 +419,7 @@ For healthy-model false-edit rate, report exact binomial confidence intervals. D
 ## 9. Research references
 
 - Takehi, Teoh, Zhang & Khattab (2026), *Sparks of Weight-Space Programming: LLMs can natively read & write neural network weights* (MIT CSAIL research blog, 2 Nov 2026): https://rikiyat.github.io/blog/weight-space-programming/
+- OpenWSP, independent replication and versioned experiment records for WSP (updated 6 Nov 2026): https://github.com/openwsp/openwsp
 - Han et al. (2026), *A Survey of Weight Space Learning: Understanding, Representation, and Generation*: https://arxiv.org/abs/2603.10090
 - Dayan, Eitan & Maron (2026), *On the Expressive Power of Permutation-Equivariant Weight-Space Networks*, ICML 2026: https://proceedings.mlr.press/v306/dayan26a.html
 - Wang, Wang & Wang (2026), *Position: Weight Space Should Be a First-Class Generative AI Modality*, ICML 2026: https://proceedings.mlr.press/v306/wang26mc.html
