@@ -959,8 +959,8 @@ mod tests {
                 &payloads(),
                 &envelope,
                 &UnavailableRmiStudioReceiptVerifier,
-                200,),
-            )
+                200,
+            ),
             Err(RmiArtifactEvidenceError::ReceiptVerifierUnavailable)
         );
     }
@@ -973,7 +973,6 @@ mod tests {
         envelope.body_sha256 = canonical_json_sha256(&envelope.body).unwrap();
         assert_eq!(
             verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200,),
-            )
             Err(RmiArtifactEvidenceError::ReceiptContextMismatch)
         );
     }
@@ -986,7 +985,6 @@ mod tests {
         envelope.body_sha256 = canonical_json_sha256(&envelope.body).unwrap();
         assert_eq!(
             verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200,),
-            )
             Err(RmiArtifactEvidenceError::ReceiptContextMismatch)
         );
     }
@@ -998,7 +996,6 @@ mod tests {
         envelope.body.transaction_id = "other-transaction".to_owned();
         assert_eq!(
             verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200,),
-            )
             Err(RmiArtifactEvidenceError::ReceiptDigestMismatch)
         );
     }
@@ -1009,7 +1006,6 @@ mod tests {
         let envelope = receipt(&manifest);
         assert_eq!(
             verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 99,),
-            )
             Err(RmiArtifactEvidenceError::ReceiptContextMismatch)
         );
     }
