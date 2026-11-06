@@ -598,7 +598,7 @@ impl HdcLtcBridge {
         Array1::from_vec(self.current_output.clone())
     }
 
-    /// Train step using analytical BPTT gradients (matches CfCNetwork::train_step).
+    /// Train step using an output-space loss and one-step local HDC-LTC gradients.
     ///
     /// PURE with respect to live evolution state (2026-07-17): the training
     /// forward pass runs on a scratch evolution — live neuron state,
@@ -742,7 +742,7 @@ impl HdcLtcBridge {
             .sum::<f32>()
             / target.len() as f32;
 
-        // Apply BPTT gradients to all layers (weights persist past the restore)
+        // Apply one-step local gradients to all layers (weights persist past the restore).
         let n_layers = self.network.n_layers();
         for layer_idx in 0..n_layers {
             let layer_in = self.network.layer_input(layer_idx, &hdc_input);

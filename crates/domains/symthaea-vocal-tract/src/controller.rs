@@ -39,7 +39,7 @@ pub struct VocalTractConfig {
     pub network_layers: usize,
     /// Neurons per layer.
     pub neurons_per_layer: usize,
-    /// Learning rate for output projection and BPTT.
+    /// Learning rate for output projection and one-step local HDC-LTC updates.
     pub learning_rate: f32,
     /// Base fundamental frequency (Hz).
     pub base_f0: f32,
@@ -442,7 +442,7 @@ impl VocalTractController {
         frame
     }
 
-    /// Train the output projection via BPTT.
+    /// Train the output projection and apply one-step local HDC-LTC target updates.
     ///
     /// Uses `target` as the ground-truth FormantFrame.
     pub fn train_step(
@@ -554,24 +554,8 @@ impl VocalTractController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Conditional weight decay (disabled during supervised phoneme training)
-        if weight_decay > 0.0 {
-            let decay = 1.0 - weight_decay;
-            for w in self.output_weights.iter_mut() {
-                *w *= decay;
-            }
-        }
-
-        // Update output weights
-        for i in 0..OUTPUT_DIM {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
-            }
-            self.output_bias[i] -= output_lr * d_raw[i];
-        }
-
-        // Backprop through network (BPTT)
+        // Compute the upstream HDC direction using the output head that
+        // produced this prediction, not the head after its optimizer update.
         let dim = HDC_DIMENSION;
         let mut grad_hv_values = vec![0.0f32; dim];
         for i in 0..OUTPUT_DIM {
@@ -579,6 +563,22 @@ impl VocalTractController {
             for j in 0..dim {
                 grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
             }
+        }
+
+        // Conditional weight decay (disabled during supervised phoneme training).
+        if weight_decay > 0.0 {
+            let decay = 1.0 - weight_decay;
+            for w in self.output_weights.iter_mut() {
+                *w *= decay;
+            }
+        }
+
+        for i in 0..OUTPUT_DIM {
+            let row_offset = i * HDC_DIMENSION;
+            for j in 0..HDC_DIMENSION {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+            }
+            self.output_bias[i] -= output_lr * d_raw[i];
         }
 
         let n_layers = self.network.n_layers();
@@ -1093,7 +1093,7 @@ impl VocalTractController {
         }
     }
 
-    /// Train on phoneme transitions (BPTT sequence training).
+    /// Train on phoneme transitions with teacher forcing and one-step local HDC-LTC updates.
     ///
     /// Unlike `train_on_phoneme_targets()` which resets between phonemes, this
     /// method trains the LTC network to smoothly transition between phoneme pairs.

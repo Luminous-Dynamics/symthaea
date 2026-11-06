@@ -207,13 +207,15 @@ impl PhonemeHdcLtc {
         )
     }
 
-    /// Train one step: evolve network, then update each neuron via backward.
+    /// Train one frame with a layer-local target objective.
     ///
-    /// For each neuron in each layer, computes gradients against the target
-    /// phoneme prototype and updates weights. This distributes learning
-    /// across all 24 neurons.
+    /// Each layer computes its local gradients from the neuron's pre-evolution
+    /// state, applies the update, and then evolves. The next layer receives the
+    /// updated output of the previous layer. This fixes the former forward /
+    /// backward state mismatch; it is deliberately not described as temporal
+    /// BPTT or full chain-rule backpropagation.
     ///
-    /// Returns cosine similarity of output to target prototype.
+    /// Returns cosine similarity of the post-update output to the target prototype.
     pub fn train_step(
         &mut self,
         input_hv: &ContinuousHV,
@@ -221,37 +223,17 @@ impl PhonemeHdcLtc {
         dt: f32,
         lr: f32,
     ) -> f32 {
-        // Find target prototype
-        let target_idx = self.prototypes.iter().position(|(l, _)| l == target_label);
-        let target_idx = match target_idx {
-            Some(idx) => idx,
+        let target_idx = match self.prototypes.iter().position(|(label, _)| label == target_label) {
+            Some(index) => index,
             None => return 0.0,
         };
         let target_proto = self.prototypes[target_idx].1.clone();
 
-        // Forward: evolve entire network
-        self.network.evolve_closed_form(dt, input_hv);
-
-        // Compute output similarity before update (for metrics)
-        let output = self.network.output().normalize();
-        let sim_before = output.similarity(&target_proto);
-
-        // Backward: update each neuron in each layer
-        let n_layers = self.network.n_layers();
-        for layer_idx in 0..n_layers {
-            // Get the input this layer received
-            let layer_input = self.network.layer_input(layer_idx, input_hv);
-
-            // Update each neuron in this layer
-            if let Some(layer) = self.network.layer_mut(layer_idx) {
-                for neuron in layer.iter_mut() {
-                    let grads = neuron.backward(&layer_input, &target_proto, dt);
-                    neuron.apply_gradients_no_decay(&grads, lr);
-                }
-            }
-        }
-
-        sim_before
+        let output = self
+            .network
+            .train_local_target_step(dt, input_hv, &target_proto, lr)
+            .normalize();
+        output.similarity(&target_proto)
     }
 
     /// Reset all neuron states.
@@ -342,18 +324,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known bug, not yet root-caused: see comment below"]
+    #[ignore = "historical learning regression; re-enable only after new diagnostics establish a stable acceptance threshold"]
     fn test_training_changes_output() {
-        // KNOWN BUG (2026-07): raising the training schedule to 100 steps at
-        // lr=0.1 (a 100x increase over the original 10 steps @ lr=0.01) did
-        // NOT change the observed similarity at all (0.999890 -> 0.999889),
-        // so this is not a step-count/learning-rate tuning problem. The
-        // one-step-from-reset evaluation methodology below may be masking
-        // real weight changes (e.g. tanh saturation making x_inf insensitive
-        // to the trained input_mask, or a vanishing-gradient issue in
-        // `HdcLtcUnifiedNeuron::backward`) rather than training being inert.
-        // Needs instrumented printf/diagnostic investigation of gradient and
-        // weight-hv magnitude across steps, not another hyperparameter guess.
+        // Historical failure (2026-07): increasing the schedule to 100 steps
+        // at lr=0.1 left the reset-state output essentially unchanged
+        // (similarity 0.999890 -> 0.999889). Source inspection later found
+        // forward/backward inconsistencies: backward omitted the adaptive gate
+        // and Fourier term, used a different tau derivative, and the trainer
+        // evolved before asking for gradients. SWI-001 now aligns the local
+        // gradient with the forward map and updates before evolution.
+        //
+        // Keep this end-to-end assertion ignored until it is rerun with
+        // per-step loss, parameter-norm, saturation, and held-out phoneme
+        // accuracy measurements. Do not replace the known failure with a
+        // learning-rate sweep or weaken the threshold without evidence.
         let genesis = GenesisSeed::from_phrase("test_changes");
         let labels = vec!["AA".to_string(), "IH".to_string()];
         let mut ltc = PhonemeHdcLtc::new(&genesis, &labels, 0.020);
