@@ -1,0 +1,300 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "MBD-INTEROP-001",
+  "source_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10595",
+  "title": "Standards-based engineering semantic round-trip fixture blueprints",
+  "status": {
+    "corpus": "blueprint_only",
+    "gold_adjudication": "not_yet_adjudicated",
+    "scoring": "not_scored",
+    "candidate_execution_authorized": false,
+    "oracle_access_authorized": false,
+    "physical_testing_authorized": false
+  },
+  "standards": [
+    {
+      "id": "ISO 10303-242:2025",
+      "edition": "4",
+      "version": "2025-08",
+      "surface": "AP242",
+      "source_uri": "https://www.iso.org/standard/84300.html"
+    },
+    {
+      "id": "ISO 23952:2020",
+      "edition": "1",
+      "version": "2020-07; reviewed and confirmed 2026",
+      "surface": "QIF",
+      "source_uri": "https://committee.iso.org/standard/77461.html"
+    },
+    {
+      "id": "NIST IR 8536",
+      "edition": "Final",
+      "version": "2026-09-09",
+      "surface": "traceability_principles",
+      "source_uri": "https://csrc.nist.gov/pubs/ir/8536/final"
+    },
+    {
+      "id": "MTConnect standard download package",
+      "edition": "2.5",
+      "version": "current-release label on official standard download page; February 2025",
+      "surface": "MTConnect",
+      "source_uri": "https://mtconnect.squarespace.com/standard-download20181"
+    },
+    {
+      "id": "MTConnect normative SysML model release",
+      "edition": "2.7",
+      "version": "published 2026-02-27; exact XMI asset digest not yet frozen",
+      "surface": "MTConnect",
+      "source_uri": "https://github.com/mtconnect/mtconnect_sysml_model/releases"
+    },
+    {
+      "id": "MTConnect normative model documentation",
+      "edition": "2.8",
+      "version": "model documentation site serves Version 2.8; release and XMI digest require pinning",
+      "surface": "MTConnect",
+      "source_uri": "https://model.mtconnect.org/Version2.8/"
+    },
+    {
+      "id": "MTConnect XML schema bundle",
+      "edition": "2.7",
+      "version": "public schema index lists XSD files modified 2026-02-22",
+      "surface": "MTConnect",
+      "source_uri": "https://schemas.mtconnect.org/"
+    }
+  ],
+  "cases": [
+    {
+      "id": "MBDI-POS-001",
+      "title": "Semantic PMI part round-trip",
+      "category": "positive_blueprint",
+      "primary_surface": "AP242",
+      "surfaces": [
+        "AP242"
+      ],
+      "critical": true,
+      "intent": "Preserve a bounded part definition, units, datums, and machine-interpretable PMI through a pinned AP242 exchange path.",
+      "required_semantics": [
+        "exact part and generation identity",
+        "units and coordinate frame",
+        "datum identity and datum references",
+        "semantic dimension/tolerance values",
+        "PMI-to-feature associations",
+        "distinction between semantic and presentation PMI"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "MBDI-POS-002",
+      "title": "Assembly structure and instance-transform round-trip",
+      "category": "positive_blueprint",
+      "primary_surface": "AP242",
+      "surfaces": [
+        "AP242"
+      ],
+      "critical": true,
+      "intent": "Preserve product structure, exact component variants, external identifiers, and assembly instance transforms.",
+      "required_semantics": [
+        "assembly parent-child structure",
+        "component identity and variant",
+        "instance identity",
+        "rigid transforms and frame conventions",
+        "units and orientation/handedness"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "MBDI-POS-003",
+      "title": "Design-characteristic to QIF inspection lineage",
+      "category": "positive_blueprint",
+      "primary_surface": "cross_surface",
+      "surfaces": [
+        "AP242",
+        "QIF"
+      ],
+      "critical": true,
+      "intent": "Bind an inspection plan and result to exact design characteristics and an exact article/configuration generation.",
+      "required_semantics": [
+        "AP242 PMI characteristic identity",
+        "QIF characteristic reference",
+        "nominal and tolerance semantics",
+        "exact design generation",
+        "exact article and inspection event",
+        "raw observation versus derived measurand"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "MBDI-POS-004",
+      "title": "Manufacturing-event context linkage",
+      "category": "positive_blueprint",
+      "primary_surface": "cross_surface",
+      "surfaces": [
+        "QIF",
+        "MTConnect"
+      ],
+      "critical": true,
+      "intent": "Link manufacturing-device observations to the correct device, job, lot, article, and inspection context without treating telemetry as conformity proof.",
+      "required_semantics": [
+        "device and adapter identity",
+        "data-item identity and units",
+        "timebase and event ordering",
+        "job/operation reference",
+        "lot/article reference",
+        "stale/missing/invalid data state"
+      ],
+      "seeded_fault": null
+    },
+    {
+      "id": "MBDI-NEG-001",
+      "title": "Semantic PMI downgraded to presentation-only annotation",
+      "category": "negative_control_blueprint",
+      "primary_surface": "AP242",
+      "surfaces": [
+        "AP242"
+      ],
+      "critical": true,
+      "intent": "Detect an exchange path that preserves a visually plausible annotation while dropping machine-interpretable PMI semantics.",
+      "required_semantics": [
+        "semantic versus graphical PMI classification",
+        "PMI-to-feature association",
+        "explicit unsupported/lossy disposition"
+      ],
+      "seeded_fault": "Replace or drop semantic PMI while retaining a rendered graphical annotation."
+    },
+    {
+      "id": "MBDI-NEG-002",
+      "title": "Datum, unit, or coordinate-frame corruption",
+      "category": "negative_control_blueprint",
+      "primary_surface": "AP242",
+      "surfaces": [
+        "AP242",
+        "QIF"
+      ],
+      "critical": true,
+      "intent": "Detect silent changes in dimensional units, datum references, axis orientation, handedness, or coordinate origin.",
+      "required_semantics": [
+        "quantity kind and unit",
+        "datum identity",
+        "coordinate frame and handedness",
+        "declared geometric tolerance",
+        "explicit discrepancy disposition"
+      ],
+      "seeded_fault": "Apply one controlled unit-scale or frame/datum mutation while leaving geometry appearance superficially plausible."
+    },
+    {
+      "id": "MBDI-NEG-003",
+      "title": "QIF result rebound to the wrong design generation",
+      "category": "negative_control_blueprint",
+      "primary_surface": "QIF",
+      "surfaces": [
+        "AP242",
+        "QIF"
+      ],
+      "critical": true,
+      "intent": "Detect an inspection record attached to a same-named characteristic or article from a different design/configuration generation.",
+      "required_semantics": [
+        "exact source generation",
+        "exact characteristic/feature reference",
+        "exact article identity",
+        "inspection event identity",
+        "claim/evidence applicability disposition"
+      ],
+      "seeded_fault": "Keep the friendly name but replace the exact generation or characteristic reference."
+    },
+    {
+      "id": "MBDI-NEG-004",
+      "title": "Inspection result loses calibration or uncertainty context",
+      "category": "negative_control_blueprint",
+      "primary_surface": "QIF",
+      "surfaces": [
+        "QIF"
+      ],
+      "critical": true,
+      "intent": "Detect a measurement result whose instrument calibration, measurement equation, or uncertainty/dependence context is missing or inapplicable.",
+      "required_semantics": [
+        "instrument identity",
+        "calibration identity and applicability",
+        "raw observation and derived measurand",
+        "measurement equation reference",
+        "uncertainty and dependence references"
+      ],
+      "seeded_fault": "Remove or stale the calibration/uncertainty reference while retaining a numeric result."
+    },
+    {
+      "id": "MBDI-NEG-005",
+      "title": "MTConnect timebase or device identity substitution",
+      "category": "negative_control_blueprint",
+      "primary_surface": "MTConnect",
+      "surfaces": [
+        "MTConnect"
+      ],
+      "critical": true,
+      "intent": "Detect clock-domain drift, event reordering, stale observations, or a device/adapter identity rebound.",
+      "required_semantics": [
+        "device/adapter identity",
+        "data-item identity and units",
+        "timebase and timestamp semantics",
+        "event ordering",
+        "stale/missing/invalid state"
+      ],
+      "seeded_fault": "Shift a timestamp or substitute an asset identity without changing the payload's human-readable label."
+    },
+    {
+      "id": "MBDI-NEG-006",
+      "title": "Unsupported semantics or provenance loss silently accepted",
+      "category": "negative_control_blueprint",
+      "primary_surface": "cross_surface",
+      "surfaces": [
+        "AP242",
+        "QIF",
+        "MTConnect"
+      ],
+      "critical": true,
+      "intent": "Detect partial imports, unsupported extensions, content-digest mismatches, or broken provenance links that are incorrectly reported as complete.",
+      "required_semantics": [
+        "declared profile/schema version",
+        "supported/unsupported field inventory",
+        "source and output content digests",
+        "provenance/reference integrity",
+        "Unknown or explicit-loss disposition"
+      ],
+      "seeded_fault": "Drop an unsupported extension or alter a referenced artifact digest while returning a nominally successful import."
+    }
+  ],
+  "limitations": [
+    "All ten records are public authoring blueprints, not adjudicated gold cases.",
+    "No candidate output, expected answer key, hidden oracle, execution trace, or benchmark score is included.",
+    "The standard baselines are pinned for this research profile; the fixture corpus does not claim full standards coverage or certification.",
+    "Candidate execution, untrusted execution, and physical testing remain unauthorized.",
+    "Any later scoring requires independent adjudication, frozen toolchains, and separate evaluator custody.",
+    "MTConnect public version labels are not yet reconciled across the standard-download page, normative SysML model releases, model documentation, and generated XML schemas. No MTConnect adapter is eligible for scoring until exact XMI, XSD, agent and protocol revisions are separately pinned and compatibility is independently reviewed."
+  ],
+  "mtconnect_execution_gate": {
+    "status": "blocked_until_compatibility_tuple_frozen",
+    "eligible_for_candidate_execution": false,
+    "eligible_for_scoring": false,
+    "observed_public_version_labels": {
+      "official_standard_download_page": "2.5",
+      "normative_sysml_model_release": "2.7",
+      "normative_model_documentation": "2.8",
+      "published_xml_schema_bundle": "2.7"
+    },
+    "sources": {
+      "official_standard_download_page": "https://mtconnect.squarespace.com/standard-download20181",
+      "normative_sysml_model_releases": "https://github.com/mtconnect/mtconnect_sysml_model/releases",
+      "normative_model_documentation": "https://model.mtconnect.org/Version2.8/",
+      "published_xml_schema_index": "https://schemas.mtconnect.org/"
+    },
+    "required_frozen_tuple": [
+      "official normative model/XMI release identity and SHA-256",
+      "exact XSD bundle files and SHA-256 digests",
+      "agent implementation and exact version",
+      "protocol/adaptor implementation and exact version",
+      "supported profile/capability declaration",
+      "schema validator implementation and exact version",
+      "independent compatibility witness linking the selected model, XSD, agent and protocol"
+    ],
+    "phase_policy": "The first executable exchange tranche is AP242 Edition 4 ↔ QIF ISO 23952:2020 only. MTConnect event cases remain blueprint-only and may not be executed or scored until the complete compatibility tuple is frozen and independently reviewed.",
+    "rejection_rule": "Any unresolved version mismatch, absent digest, unsupported schema/profile or missing compatibility witness is Unsupported/Unknown, never Pass."
+  }
+}
