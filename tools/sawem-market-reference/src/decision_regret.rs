@@ -186,11 +186,10 @@ pub fn evaluate_decision_regret<'a>(
         return Err(DecisionRegretError::ScenarioCensusMismatch);
     }
 
-    let non_anticipativity = audit_non_anticipative_policy(
-        inputs.declared_scenario_ids,
-        inputs.decisions,
-    )
-    .map_err(|_: NonAnticipativityError| DecisionRegretError::NonAnticipativePolicyInvalid)?;
+    let non_anticipativity =
+        audit_non_anticipative_policy(inputs.declared_scenario_ids, inputs.decisions).map_err(
+            |_: NonAnticipativityError| DecisionRegretError::NonAnticipativePolicyInvalid,
+        )?;
     if non_anticipativity.shared_information_set_count == 0 && declared.len() > 1 {
         return Err(DecisionRegretError::NoSharedInformationFrontier);
     }
@@ -292,8 +291,7 @@ pub fn evaluate_decision_regret<'a>(
     if u128::from(total_probability) != PROBABILITY_BPS {
         return Err(DecisionRegretError::ProbabilitiesDoNotSumToOne);
     }
-    if oracle_expected_numerator
-        .checked_sub(policy_expected_numerator)
+    if oracle_expected_numerator.checked_sub(policy_expected_numerator)
         != Some(regret_expected_numerator)
     {
         return Err(DecisionRegretError::ArithmeticOverflow);
@@ -363,10 +361,8 @@ mod tests {
     use super::*;
     use crate::non_anticipativity::DispatchAction;
 
-    const SOURCE_SHA: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const INFO_SHA: &str =
-        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const INFO_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     fn decision(
         scenario_id: &'static str,
@@ -463,8 +459,8 @@ mod tests {
             outcome("low", 5_000, 80, 100),
             outcome("high", 5_000, 50, 70),
         ];
-        let result = evaluate_decision_regret(inputs(&declared, &decisions, &outcomes, 5_000))
-            .unwrap();
+        let result =
+            evaluate_decision_regret(inputs(&declared, &decisions, &outcomes, 5_000)).unwrap();
         assert_eq!(
             result.policy_expected_net_cash_numerator_minor_zar_bps,
             650_000
@@ -502,8 +498,8 @@ mod tests {
             outcome("b", 4_000, 0, 50),
             outcome("c", 5_000, 0, 0),
         ];
-        let result = evaluate_decision_regret(inputs(&declared, &decisions, &outcomes, 3_000))
-            .unwrap();
+        let result =
+            evaluate_decision_regret(inputs(&declared, &decisions, &outcomes, 3_000)).unwrap();
         assert_eq!(result.upper_tail_regret_var_minor_zar, 50);
         assert_eq!(
             result.upper_tail_regret_cvar_numerator_minor_zar_bps,
@@ -566,10 +562,7 @@ mod tests {
 
         let mut future_probability = outcome("low", 5_000, 80, 100);
         future_probability.probability_available_at_utc = 101;
-        let future = [
-            future_probability,
-            outcome("high", 5_000, 50, 70),
-        ];
+        let future = [future_probability, outcome("high", 5_000, 50, 70)];
         assert_eq!(
             evaluate_decision_regret(inputs(&declared, &decisions, &future, 5_000)),
             Err(DecisionRegretError::ProbabilityNotAvailableAtDecision)
@@ -594,12 +587,7 @@ mod tests {
             outcome("high", 5_000, 50, 70),
         ];
         assert_eq!(
-            evaluate_decision_regret(inputs(
-                &declared,
-                &decisions,
-                &invalid_probability,
-                5_000
-            )),
+            evaluate_decision_regret(inputs(&declared, &decisions, &invalid_probability, 5_000)),
             Err(DecisionRegretError::ProbabilitiesDoNotSumToOne)
         );
 
