@@ -84,6 +84,8 @@ pub mod observability;
 /// Narrow Tier-1 observation contract for evidence-gathering consumers (CognitiveObservation).
 #[allow(missing_docs)]
 pub mod observation;
+/// Typed, digest-bound candidate programs for bounded weight-space edits.
+pub mod weight_space_program;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
