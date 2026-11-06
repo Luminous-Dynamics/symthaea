@@ -356,9 +356,13 @@ pub fn evaluate_underwriting_certificate<'a>(
                 .map_err(|_| UnderwritingCertificateError::ArithmeticOverflow)?,
             evidence_receipt_count: u32::try_from(obligation.evidence_receipts.len())
                 .map_err(|_| UnderwritingCertificateError::ArithmeticOverflow)?,
-            evaluator_receipt_id: obligation.evaluator_receipt.map(|receipt| receipt.receipt_id),
+            evaluator_receipt_id: obligation
+                .evaluator_receipt
+                .map(|receipt| receipt.receipt_id),
             invalidation_condition_count: u32::try_from(obligation.invalidation_conditions.len())
-                .map_err(|_| UnderwritingCertificateError::ArithmeticOverflow)?,
+                .map_err(|_| {
+                    UnderwritingCertificateError::ArithmeticOverflow
+                })?,
         });
     }
 
@@ -366,10 +370,7 @@ pub fn evaluate_underwriting_certificate<'a>(
         UnderwritingDecision::DoNotProceed
     } else if unresolved_critical > 0 {
         UnderwritingDecision::NotSupportable
-    } else if conditional_critical > 0
-        || unresolved_material > 0
-        || conditional_material > 0
-    {
+    } else if conditional_critical > 0 || unresolved_material > 0 || conditional_material > 0 {
         UnderwritingDecision::Conditional
     } else {
         UnderwritingDecision::SupportableWithinDeclaredScope
@@ -531,7 +532,9 @@ mod tests {
         };
         let all = [obligations[0], obligations[1], obligations[2], material];
         assert_eq!(
-            evaluate_underwriting_certificate(inputs(&all)).unwrap().decision,
+            evaluate_underwriting_certificate(inputs(&all))
+                .unwrap()
+                .decision,
             UnderwritingDecision::Conditional
         );
 
@@ -552,7 +555,9 @@ mod tests {
         let mut obligations = base_obligations();
         obligations[1].disposition = ProofDisposition::Invalidated;
         assert_eq!(
-            evaluate_underwriting_certificate(inputs(&obligations)).unwrap().decision,
+            evaluate_underwriting_certificate(inputs(&obligations))
+                .unwrap()
+                .decision,
             UnderwritingDecision::DoNotProceed
         );
     }
