@@ -87,5 +87,96 @@
     "test_2_reproduced": false,
     "symthaea_comparison_run": false,
     "field_metrics_state": "not_run"
+  },
+  "field_data_registry_context": {
+    "repository": "Astrolabe-Analytics/public-battery-field-data",
+    "repository_url": "https://github.com/Astrolabe-Analytics/public-battery-field-data",
+    "registry_version": "1.2.0",
+    "registry_commit_sha": "04803c0606facc96e899b2d648759646b989c609",
+    "registry_commit_date": "2026-10-26",
+    "registry_snapshot_date": "2026-11-06",
+    "published_registry_totals": {
+      "releases": 35,
+      "batteries": 3187,
+      "li_ion_cells": 149188,
+      "faults": 6465,
+      "energy_mwh": 115.6,
+      "unit_years": 3040,
+      "observation_hours": 331704,
+      "charging_sessions": 31449,
+      "charging_sessions_counted_as_batteries": false
+    },
+    "related_field_datasets": [
+      {
+        "package_id": "m5bat-2023-04",
+        "role": "high-resolution operational context and component-level replay support",
+        "source_record": "https://publications.rwth-aachen.de/record/985923",
+        "data_doi": "https://doi.org/10.18154/RWTH-2024-04895",
+        "license": "CC-BY-4.0",
+        "asset_scope": "10 M5BAT units, 6.714 MWh subset, Apr 2023; 1-second unit and plant time series",
+        "access": "manual_browser",
+        "package_size_gb": 0.103,
+        "known_caveats": [
+          "This is a separate public field-data release and is not assumed to be the Applied Energy Test 1/Test 2 archive at DOI 10.18154/RWTH-2025-06555.",
+          "Plant BESS.csv is the point-of-connection measurement; BattN files are battery-unit/inverter measurements.",
+          "The SOC fields are BMS/system estimates, not independent measurements.",
+          "Ambient temperature is not cell temperature.",
+          "M5BAT_P and BESS point-of-connection sign is documented with negative charging and positive discharging.",
+          "M5BAT unit Pb1 is separately counted in m5bat-pbacid; do not double-count."
+        ]
+      },
+      {
+        "package_id": "m5bat-pbacid",
+        "role": "long-horizon flooded lead-acid degradation and operational-state context",
+        "source_record": "https://publications.rwth-aachen.de/record/1038622",
+        "data_doi": "https://doi.org/10.18154/RWTH-2026-06637",
+        "paper_doi": "https://doi.org/10.3390/en19174141",
+        "license": "CC-BY-4.0",
+        "asset_scope": "one M5BAT Pb1 flooded lead-acid string; 1.066 MWh; 2017-2025",
+        "access": "manual_browser",
+        "package_size_gb": 4.661,
+        "known_caveats": [
+          "Processed data rather than raw manufacturer exports.",
+          "Short gaps under 5 seconds were forward-filled; the exported data do not label each filled row.",
+          "SOC is a proprietary BMS estimate, not an independent calibrated measurement.",
+          "Some cumulative energy counters reset and must be analysed with period-to-period differences.",
+          "The flag semantics and data quality require the published codebook and schema."
+        ]
+      },
+      {
+        "package_id": "pnnl_epri",
+        "role": "multi-technology stationary storage external validation cohort",
+        "source_record": "https://doi.org/10.5281/zenodo.22947521",
+        "license": "CC-BY-4.0",
+        "asset_scope": "11 stationary storage systems; 9 have stated or computed energy ratings totalling 63.87 MWh; LFP, NMC, LMO/NMC and vanadium flow",
+        "access": "one_command",
+        "package_size_gb": 3.428,
+        "known_caveats": [
+          "Nine of eleven systems have energy values; two are unrated.",
+          "Data are system/pack-level; no individual cell-voltage channels are released.",
+          "One system has a documented overlap with the PPL release and is counted only once in registry totals.",
+          "EPRI_LFP3 energy is computed from power and E/P assumptions, not a stated nameplate; preserve this uncertainty."
+        ]
+      },
+      {
+        "package_id": "aitio",
+        "role": "African distributed stationary-storage transferability cohort; not a grid-scale BESS comparator",
+        "source_record": "https://doi.org/10.5287/bodleian:aVR4oDV4N",
+        "paper_doi": "https://doi.org/10.1016/j.joule.2021.11.006",
+        "license": "CC-BY-NC-4.0",
+        "asset_scope": "1,027 lead-acid off-grid/distributed batteries; approximately 0.24648 MWh computed from stated 12 V / 20 Ah configuration",
+        "access": "one_command",
+        "package_size_gb": 3.051,
+        "use_boundary": "Non-commercial only unless a separate commercial license is obtained. Do not mix these off-grid fleet observations into the M5BAT grid-scale dispatch score."
+      }
+    ],
+    "acquisition_policy": [
+      "Acquire the Applied Energy Test 1/Test 2 archive as the primary schedule-execution benchmark; keep it distinct from the April 2023 registry release until archive member manifests prove overlap.",
+      "Use m5bat-2023-04 for high-resolution POC, per-unit power, SOC and converter-mode checks, not as a substitute for the paper's separate calibration/validation tests.",
+      "Use PNNL/EPRI as a technology-transfer validation set with chemistry-stratified cohorts; do not aggregate all systems into one error score.",
+      "Use Aitio only for non-commercial African distributed-storage transferability research unless commercial reuse rights are separately obtained.",
+      "Store all raw archives outside the public repo; preserve original bytes, per-member SHA-256, publisher DOI, acquisition timestamp, license and immutable extraction manifest before parsing."
+    ],
+    "claim_boundary": "The registry is a discovery catalogue and its headline totals are not a validation result. No candidate archive in this registry context is marked as staged by this record; source files must be acquired, digested and independently checked before any raw-field metric is claimed."
   }
 }
