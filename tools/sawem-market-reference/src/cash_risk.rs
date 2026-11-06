@@ -214,11 +214,7 @@ mod tests {
 
     const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-    fn scenario(
-        id: &'static str,
-        probability: u16,
-        cash: i64,
-    ) -> CashScenarioOutcome<'static> {
+    fn scenario(id: &'static str, probability: u16, cash: i64) -> CashScenarioOutcome<'static> {
         CashScenarioOutcome {
             scenario_id: id,
             result_source_ref: id,
@@ -232,10 +228,7 @@ mod tests {
         }
     }
 
-    fn inputs<'a>(
-        scenarios: &'a [CashScenarioOutcome<'a>],
-        tail_bps: u16,
-    ) -> CashRiskInputs<'a> {
+    fn inputs<'a>(scenarios: &'a [CashScenarioOutcome<'a>], tail_bps: u16) -> CashRiskInputs<'a> {
         CashRiskInputs {
             portfolio_id: "battery-001/base-and-stress",
             evaluation_as_of_utc: 100,
