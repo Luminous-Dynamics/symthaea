@@ -438,6 +438,90 @@ fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
     );
 }
 
+#[test]
+fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+    let original: Value = serde_json::from_slice(&result_bytes).unwrap();
+
+    let mut malformed_requested = original.clone();
+    malformed_requested["requested_evidence_ids"][0] = json!("ev_not-a-sha256");
+    assert_eq!(
+        oracle_label("malformed-requested-result-evidence-id", "expected_replay_outcome"),
+        "invalid_input"
+    );
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&malformed_requested).unwrap(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+
+    let mut unrequested_assessment = original.clone();
+    unrequested_assessment["evidence_assessments"][0]["evidence_id"] =
+        json!(format!("ev_{}", "c".repeat(64)));
+    assert_eq!(
+        oracle_label("unrequested-result-assessment-id", "expected_replay_outcome"),
+        "invalid_input"
+    );
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&unrequested_assessment).unwrap(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+
+    let mut duplicate_assessment = original.clone();
+    duplicate_assessment["evidence_assessments"]
+        .as_array_mut()
+        .unwrap()
+        .push(duplicate_assessment["evidence_assessments"][0].clone());
+    assert_eq!(
+        oracle_label("duplicate-result-assessment-id", "expected_replay_outcome"),
+        "invalid_input"
+    );
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&duplicate_assessment).unwrap(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+
+    let mut missing_unrequested = original.clone();
+    missing_unrequested["missing_evidence_ids"] =
+        json!([format!("ev_{}", "d".repeat(64))]);
+    assert_eq!(
+        oracle_label("unrequested-missing-result-evidence-id", "expected_replay_outcome"),
+        "invalid_input"
+    );
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&missing_unrequested).unwrap(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+
+    let mut assessed_and_missing = original;
+    assessed_and_missing["missing_evidence_ids"] =
+        json!([rea_compat::verify_evidence_json(fixture_bytes()).unwrap().evidence_id]);
+    assert_eq!(
+        oracle_label("evidence-id-marked-assessed-and-missing", "expected_replay_outcome"),
+        "invalid_input"
+    );
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&assessed_and_missing).unwrap(),
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+}
+
 fn temporary_cli_dir() -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
