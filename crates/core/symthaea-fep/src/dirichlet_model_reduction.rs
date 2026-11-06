@@ -629,6 +629,414 @@ fn log_gamma_positive(value: f64) -> f64 {
         + series.ln()
 }
 
+
+/// One possible observation under an action, with its full-model predictive
+/// probability and the expected Dirichlet sufficient-statistic increment.
+///
+/// The increment is typically the outer product of the predicted outcome
+/// modality and posterior expectations over its parent state factors.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirichletPredictedOutcome {
+    pub outcome_id: String,
+    pub full_model_predictive_probability: f64,
+    pub posterior_count_increment: Vec<Vec<f64>>,
+}
+
+/// All possible outcomes for one candidate action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirichletActionPrediction {
+    pub action_id: String,
+    pub outcomes: Vec<DirichletPredictedOutcome>,
+}
+
+/// Posterior model belief induced by one predicted outcome.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirichletOutcomeModelBelief {
+    pub outcome_id: String,
+    pub predictive_probability: f64,
+    pub full_model_predictive_probability: f64,
+    pub posterior_model_entropy_nats: f64,
+    pub posterior_model_probabilities: Vec<(String, f64)>,
+}
+
+/// Prospective expected information gain about model structure for one action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DirichletModelInformationGain {
+    pub action_id: String,
+    pub prior_model_entropy_nats: f64,
+    pub expected_posterior_model_entropy_nats: f64,
+    pub model_information_gain_nats: f64,
+    /// Must be approximately one; retained as an auditable coherence diagnostic.
+    pub predictive_probability_mass: f64,
+    pub outcomes: Vec<DirichletOutcomeModelBelief>,
+}
+
+/// Fail-closed validation errors for prospective Dirichlet model information gain.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DirichletModelInformationGainError {
+    ModelReduction(DirichletBayesianModelReductionError),
+    EmptyActionId,
+    EmptyOutcomeSet,
+    EmptyOutcomeId { index: usize },
+    DuplicateOutcomeId(String),
+    InvalidPredictiveProbability {
+        outcome_id: String,
+        probability: f64,
+    },
+    PredictiveProbabilityMassNotNormalized { sum: f64 },
+    CountIncrementColumnCountMismatch {
+        outcome_id: String,
+        expected: usize,
+        actual: usize,
+    },
+    CountIncrementOutcomeCountMismatch {
+        outcome_id: String,
+        column: usize,
+        expected: usize,
+        actual: usize,
+    },
+    InvalidCountIncrement {
+        outcome_id: String,
+        column: usize,
+        outcome: usize,
+        increment: f64,
+    },
+    ModelAveragePriorMismatch {
+        column: usize,
+        outcome: usize,
+        expected: f64,
+        actual: f64,
+    },
+    PredictiveModelEvidenceMassNotNormalized { sum: f64 },
+    InvalidModelInformationGain { value: f64 },
+}
+
+impl std::fmt::Display for DirichletModelInformationGainError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ModelReduction(error) => write!(f, "Dirichlet BMR failed: {error}"),
+            Self::EmptyActionId => write!(f, "action ID must not be empty"),
+            Self::EmptyOutcomeSet => write!(f, "an action must have at least one possible outcome"),
+            Self::EmptyOutcomeId { index } => {
+                write!(f, "predicted outcome at index {index} has an empty ID")
+            }
+            Self::DuplicateOutcomeId(id) => write!(f, "duplicate predicted outcome ID: {id}"),
+            Self::InvalidPredictiveProbability {
+                outcome_id,
+                probability,
+            } => write!(
+                f,
+                "outcome {outcome_id} has invalid full-model predictive probability {probability}"
+            ),
+            Self::PredictiveProbabilityMassNotNormalized { sum } => {
+                write!(f, "full-model predictive outcome mass sums to {sum}, expected 1")
+            }
+            Self::CountIncrementColumnCountMismatch {
+                outcome_id,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "outcome {outcome_id} count increment has {actual} columns, expected {expected}"
+            ),
+            Self::CountIncrementOutcomeCountMismatch {
+                outcome_id,
+                column,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "outcome {outcome_id} count increment column {column} has {actual} entries, expected {expected}"
+            ),
+            Self::InvalidCountIncrement {
+                outcome_id,
+                column,
+                outcome,
+                increment,
+            } => write!(
+                f,
+                "outcome {outcome_id} has invalid count increment {increment} at column {column}, coordinate {outcome}"
+            ),
+            Self::ModelAveragePriorMismatch {
+                column,
+                outcome,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "full prior at column {column}, coordinate {outcome} is {actual}, but the model-prior-weighted reduced priors average to {expected}"
+            ),
+            Self::PredictiveModelEvidenceMassNotNormalized { sum } => write!(
+                f,
+                "model-averaged predictive outcome mass sums to {sum}, expected 1"
+            ),
+            Self::InvalidModelInformationGain { value } => {
+                write!(f, "prospective model information gain is invalid: {value}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for DirichletModelInformationGainError {}
+
+/// Evaluate the one-step expected information gain about model structure.
+///
+/// full_posterior is the current posterior under the Bayesian model-average
+/// parent model. For each possible outcome, posterior_count_increment is
+/// added to those full-model counts, and BMR computes the posterior over
+/// reduced models without refitting. The full prior must equal the
+/// model-probability-weighted mean of the reduced priors (the Bayesian model
+/// average constraint in Friston et al., 2026).
+///
+/// The supplied full-model predictive outcome probabilities are combined with
+/// BMR evidence ratios to reconstruct model-averaged outcome probabilities.
+/// Their total mass must remain one. This deliberately rejects mismatched
+/// predictive and BMR parameterizations rather than silently renormalizing.
+///
+/// This function scores model information only. Parameter and state EIG,
+/// preference/risk, ambiguity, action cost, and multi-step planning remain
+/// separate terms in a complete expected-free-energy policy.
+pub fn evaluate_dirichlet_model_information_gain(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+    action: &DirichletActionPrediction,
+) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
+    validate_tensor(full_posterior, "full posterior", None, false)
+        .map_err(DirichletModelInformationGainError::ModelReduction)?;
+    validate_tensor(full_prior, "full prior", Some(full_posterior), false)
+        .map_err(DirichletModelInformationGainError::ModelReduction)?;
+    ensure_parameterization_matches(
+        &full_posterior.parameterization_digest,
+        "full prior",
+        &full_prior.parameterization_digest,
+    )
+    .map_err(DirichletModelInformationGainError::ModelReduction)?;
+
+    // Validate model priors and dimensions before using them in the BMA check.
+    reduce_dirichlet_models(full_posterior, full_prior, reduced_models)
+        .map_err(DirichletModelInformationGainError::ModelReduction)?;
+    validate_model_average_prior(full_prior, reduced_models)?;
+
+    if action.action_id.trim().is_empty() {
+        return Err(DirichletModelInformationGainError::EmptyActionId);
+    }
+    if action.outcomes.is_empty() {
+        return Err(DirichletModelInformationGainError::EmptyOutcomeSet);
+    }
+
+    let mut outcome_ids = BTreeSet::new();
+    let mut full_probability_mass = 0.0;
+    for (index, outcome) in action.outcomes.iter().enumerate() {
+        if outcome.outcome_id.trim().is_empty() {
+            return Err(DirichletModelInformationGainError::EmptyOutcomeId { index });
+        }
+        if !outcome_ids.insert(outcome.outcome_id.clone()) {
+            return Err(DirichletModelInformationGainError::DuplicateOutcomeId(
+                outcome.outcome_id.clone(),
+            ));
+        }
+        let probability = outcome.full_model_predictive_probability;
+        if !probability.is_finite() || probability <= 0.0 || probability > 1.0 {
+            return Err(
+                DirichletModelInformationGainError::InvalidPredictiveProbability {
+                    outcome_id: outcome.outcome_id.clone(),
+                    probability,
+                },
+            );
+        }
+        full_probability_mass += probability;
+        if outcome.posterior_count_increment.len() != full_posterior.columns.len() {
+            return Err(
+                DirichletModelInformationGainError::CountIncrementColumnCountMismatch {
+                    outcome_id: outcome.outcome_id.clone(),
+                    expected: full_posterior.columns.len(),
+                    actual: outcome.posterior_count_increment.len(),
+                },
+            );
+        }
+        for (column, (increment, posterior_column)) in outcome
+            .posterior_count_increment
+            .iter()
+            .zip(full_posterior.columns.iter())
+            .enumerate()
+        {
+            if increment.len() != posterior_column.len() {
+                return Err(
+                    DirichletModelInformationGainError::CountIncrementOutcomeCountMismatch {
+                        outcome_id: outcome.outcome_id.clone(),
+                        column,
+                        expected: posterior_column.len(),
+                        actual: increment.len(),
+                    },
+                );
+            }
+            for (coordinate, value) in increment.iter().copied().enumerate() {
+                if !value.is_finite() || value < 0.0 {
+                    return Err(DirichletModelInformationGainError::InvalidCountIncrement {
+                        outcome_id: outcome.outcome_id.clone(),
+                        column,
+                        outcome: coordinate,
+                        increment: value,
+                    });
+                }
+            }
+        }
+    }
+    if (full_probability_mass - 1.0).abs() > PROBABILITY_TOLERANCE {
+        return Err(
+            DirichletModelInformationGainError::PredictiveProbabilityMassNotNormalized {
+                sum: full_probability_mass,
+            },
+        );
+    }
+
+    let prior_model_entropy_nats = reduced_models
+        .iter()
+        .filter(|model| model.prior_probability > 0.0)
+        .map(|model| -model.prior_probability * model.prior_probability.ln())
+        .sum::<f64>();
+
+    let mut outcomes = Vec::with_capacity(action.outcomes.len());
+    let mut marginal_probability_mass = 0.0;
+    let mut expected_posterior_model_entropy_nats = 0.0;
+
+    for outcome in &action.outcomes {
+        let mut hypothetical_posterior = full_posterior.clone();
+        for (column, increments) in outcome.posterior_count_increment.iter().enumerate() {
+            for (coordinate, increment) in increments.iter().copied().enumerate() {
+                hypothetical_posterior.columns[column][coordinate] += increment;
+            }
+        }
+
+        let reduced = reduce_dirichlet_models(
+            &hypothetical_posterior,
+            full_prior,
+            reduced_models,
+        )
+        .map_err(DirichletModelInformationGainError::ModelReduction)?;
+
+        // log sum_m p(m) p(o|m)/p(o|full), where the Bayes factors are
+        // precisely the post-outcome BMR ratios returned above.
+        let log_evidence_mixture = log_sum_exp(
+            reduced
+                .models
+                .iter()
+                .filter(|model| model.prior_probability > 0.0)
+                .map(|model| {
+                    if model.log_evidence_ratio == f64::NEG_INFINITY {
+                        f64::NEG_INFINITY
+                    } else {
+                        model.prior_probability.ln() + model.log_evidence_ratio
+                    }
+                }),
+        );
+        if !log_evidence_mixture.is_finite() {
+            // A positive full-model predictive probability paired with zero
+            // model-average evidence is a contradictory predictive contract.
+            return Err(
+                DirichletModelInformationGainError::PredictiveModelEvidenceMassNotNormalized {
+                    sum: 0.0,
+                },
+            );
+        }
+        let log_marginal_probability =
+            outcome.full_model_predictive_probability.ln() + log_evidence_mixture;
+        let marginal_probability = log_marginal_probability.exp();
+        if !marginal_probability.is_finite() || marginal_probability <= 0.0 {
+            return Err(
+                DirichletModelInformationGainError::PredictiveModelEvidenceMassNotNormalized {
+                    sum: marginal_probability,
+                },
+            );
+        }
+
+        marginal_probability_mass += marginal_probability;
+        expected_posterior_model_entropy_nats +=
+            marginal_probability * reduced.posterior_model_entropy_nats;
+        outcomes.push(DirichletOutcomeModelBelief {
+            outcome_id: outcome.outcome_id.clone(),
+            predictive_probability: marginal_probability,
+            full_model_predictive_probability: outcome.full_model_predictive_probability,
+            posterior_model_entropy_nats: reduced.posterior_model_entropy_nats,
+            posterior_model_probabilities: reduced
+                .models
+                .into_iter()
+                .map(|model| (model.model_id, model.posterior_probability))
+                .collect(),
+        });
+    }
+
+    if (marginal_probability_mass - 1.0).abs() > PROBABILITY_TOLERANCE {
+        return Err(
+            DirichletModelInformationGainError::PredictiveModelEvidenceMassNotNormalized {
+                sum: marginal_probability_mass,
+            },
+        );
+    }
+
+    let raw_information_gain =
+        prior_model_entropy_nats - expected_posterior_model_entropy_nats;
+    if !raw_information_gain.is_finite() || raw_information_gain < -1e-8 {
+        return Err(DirichletModelInformationGainError::InvalidModelInformationGain {
+            value: raw_information_gain,
+        });
+    }
+    Ok(DirichletModelInformationGain {
+        action_id: action.action_id.clone(),
+        prior_model_entropy_nats,
+        expected_posterior_model_entropy_nats,
+        model_information_gain_nats: raw_information_gain.max(0.0),
+        predictive_probability_mass: marginal_probability_mass,
+        outcomes,
+    })
+}
+
+fn validate_model_average_prior(
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+) -> Result<(), DirichletModelInformationGainError> {
+    for column in 0..full_prior.columns.len() {
+        for coordinate in 0..full_prior.columns[column].len() {
+            let expected = reduced_models
+                .iter()
+                .map(|model| {
+                    model.prior_probability * model.parameter_prior.columns[column][coordinate]
+                })
+                .sum::<f64>();
+            let actual = full_prior.columns[column][coordinate];
+            let tolerance = 1e-8 * expected.abs().max(actual.abs()).max(1.0);
+            if (expected - actual).abs() > tolerance {
+                return Err(
+                    DirichletModelInformationGainError::ModelAveragePriorMismatch {
+                        column,
+                        outcome: coordinate,
+                        expected,
+                        actual,
+                    },
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn log_sum_exp(values: impl IntoIterator<Item = f64>) -> f64 {
+    let values = values.into_iter().collect::<Vec<_>>();
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if !maximum.is_finite() {
+        return maximum;
+    }
+    maximum
+        + values
+            .iter()
+            .copied()
+            .filter(|value| value.is_finite())
+            .map(|value| (value - maximum).exp())
+            .sum::<f64>()
+            .ln()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
