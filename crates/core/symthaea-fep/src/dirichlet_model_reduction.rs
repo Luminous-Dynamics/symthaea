@@ -19,12 +19,14 @@
 //! factorize, so their log ratios add. This is the Dirichlet BMR construction
 //! used for categorical active-inference likelihood tensors.
 //!
-//! This implementation requires proper Dirichlet distributions with strictly
-//! positive concentrations. Exact-zero concentrations imply lower-dimensional
-//! support / structural point masses, not an ordinary proper Dirichlet; those
-//! require an explicit support-restricted model representation and are
-//! rejected here. Small positive shrinkage concentrations (e.g. 1/32) are
-//! supported when the resulting reduced posterior remains positive.
+//! Full-model priors and posteriors use proper Dirichlet distributions with
+//! strictly positive concentrations. A reduced model may explicitly exclude
+//! coordinates through its active-support mask: inactive coordinates must have
+//! exactly zero concentration and denote a lower-dimensional simplex face.
+//! Any observed count in an excluded coordinate makes that reduced model's
+//! evidence exactly zero. Implicit zeros, empty support, and non-integrable
+//! reduced posteriors are rejected. Small positive shrinkage concentrations
+//! (e.g. 1/32) are supported when the resulting reduced posterior remains positive.
 //!
 //! This is post-observation model evidence, not prospective expected
 //! information gain and not a complete expected-free-energy policy.
