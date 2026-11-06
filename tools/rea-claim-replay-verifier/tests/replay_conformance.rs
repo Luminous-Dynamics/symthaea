@@ -1139,3 +1139,199 @@ fn mismatched_source_predicate_type_is_inapplicable_not_silent_promotion() {
     assert_eq!(replay.expected_disposition, Disposition::Inapplicable);
     assert_eq!(replay.reported_disposition, Disposition::Inapplicable);
 }
+
+#[test]
+fn deterministic_claim_mutation_matrix_never_replays_the_old_result() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+
+    let mut mutations = Vec::<(&str, ClaimRequest)>::new();
+
+    let mut changed = claim.clone();
+    changed.claim_id.push_str("-changed");
+    mutations.push(("claim_id", changed));
+
+    let mut changed = claim.clone();
+    changed.predicate = ClaimPredicate::ProducerAuthenticity;
+    changed.source_predicate_type = None;
+    mutations.push(("predicate", changed));
+
+    let mut changed = claim.clone();
+    changed.scope.subject_sha256 =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
+    mutations.push(("scope.subject_sha256", changed));
+
+    let mut changed = claim.clone();
+    changed.scope.operation = "verify_signature".to_owned();
+    mutations.push(("scope.operation", changed));
+
+    let mut changed = claim.clone();
+    changed.scope.platform = Some("Android".to_owned());
+    mutations.push(("scope.platform", changed));
+
+    let mut changed = claim.clone();
+    changed.scope.platform_version = Some("Android 17 / API 37".to_owned());
+    mutations.push(("scope.platform_version", changed));
+
+    let mut changed = claim.clone();
+    changed.scope.environment_id = Some("device-42".to_owned());
+    mutations.push(("scope.environment_id", changed));
+
+    let mut changed = claim.clone();
+    changed.asserted_value["status"] = json!("partial");
+    mutations.push(("asserted_value", changed));
+
+    let mut changed = claim.clone();
+    changed.source_predicate_type = Some("rea.other-analysis".to_owned());
+    mutations.push(("source_predicate_type", changed));
+
+    let mut changed = claim.clone();
+    changed
+        .assumptions
+        .push("the provider database is complete".to_owned());
+    mutations.push(("assumptions", changed));
+
+    let mut changed = claim;
+    changed.falsification_condition = "a different falsifier".to_owned();
+    mutations.push(("falsification_condition", changed));
+
+    for (field, mutated) in mutations {
+        let mutated_bytes = serde_json::to_vec(&mutated).unwrap();
+        let replay = replay_claim_evaluation(
+            &mutated_bytes,
+            &[fixture_bytes()],
+            &result_bytes,
+        );
+        match replay {
+            Ok(receipt) => assert_ne!(
+                receipt.outcome,
+                ReplayOutcome::ReplayMatch,
+                "mutation of {field} unexpectedly replayed"
+            ),
+            Err(error) => assert_ne!(
+                error.kind,
+                ReplayErrorKind::Canonicalization,
+                "mutation of {field} failed for an unrelated canonicalization error"
+            ),
+        }
+    }
+
+    // Keep the original request bytes in use: the matrix mutates each field
+    // independently, never the expected baseline.
+    assert!(!claim_bytes.is_empty());
+}
+
+#[test]
+fn contradiction_cardinality_sweep_never_turns_conflict_into_majority_support() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+
+    for contradiction_count in [1usize, 2, 3, 7, 15] {
+        let mut evidence_values = vec![original.clone()];
+        let mut evidence_bytes = Vec::new();
+
+        for index in 0..contradiction_count {
+            let mut value = original.value.clone();
+            value["provider"]["id"] =
+                json!(format!("cardinality-contradiction-{contradiction_count}-{index}"));
+            value["provider"]["name"] =
+                json!(format!("Cardinality Contradiction {contradiction_count} {index}"));
+            value["analysis_profile"]["provider"] = value["provider"].clone();
+            value["analysis_profile"]["digest"] =
+                json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+            value["normalized_result"]["status"] = json!("partial");
+            value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+            let bytes = serde_json::to_vec(&value).unwrap();
+            evidence_values.push(rea_compat::verify_evidence_json(&bytes).unwrap());
+            evidence_bytes.push(bytes);
+        }
+
+        let mut claim = provider_claim(original.evidence_id.clone());
+        claim.evidence_ids = evidence_values
+            .iter()
+            .map(|record| record.evidence_id.clone())
+            .collect();
+
+        let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
+        let mut supplied = vec![fixture_bytes()];
+        supplied.extend(evidence_bytes.iter().map(Vec::as_slice));
+        let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+
+        assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+        assert_eq!(
+            replay.expected_disposition,
+            oracle_disposition("same-scope-disagreement")
+        );
+        assert_eq!(replay.expected_disposition, Disposition::Conflicted);
+        assert_eq!(replay.evidence_count, contradiction_count + 1);
+    }
+}
+
+#[test]
+fn unsupported_predicate_closure_sweep_cannot_be_bought_with_more_observations() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let predicates = [
+        ClaimPredicate::MemberContentIntegrity,
+        ClaimPredicate::ArchiveContentIdentity,
+        ClaimPredicate::WholeArchiveCompleteness,
+        ClaimPredicate::ProducerAuthenticity,
+        ClaimPredicate::SignatureCryptographicValidity,
+        ClaimPredicate::SignerIdentity,
+        ClaimPredicate::SignerTrust,
+        ClaimPredicate::PackageAuthorization,
+        ClaimPredicate::PlatformAcceptance,
+        ClaimPredicate::ProviderCorroboration,
+        ClaimPredicate::CausalFinding,
+        ClaimPredicate::SecurityControlPass,
+    ];
+
+    for predicate in predicates {
+        for evidence_count in [0usize, 1, 2, 4, 8, 16, 32] {
+            let mut evidence_values = Vec::new();
+            let mut evidence_bytes = Vec::new();
+
+            for index in 0..evidence_count {
+                let mut value = original.value.clone();
+                value["provider"]["id"] =
+                    json!(format!("unsupported-{predicate:?}-{evidence_count}-{index}"));
+                value["provider"]["name"] =
+                    json!(format!("Unsupported {predicate:?} {evidence_count} {index}"));
+                value["analysis_profile"]["provider"] = value["provider"].clone();
+                value["analysis_profile"]["digest"] =
+                    json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+                value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+                let bytes = serde_json::to_vec(&value).unwrap();
+                evidence_values.push(rea_compat::verify_evidence_json(&bytes).unwrap());
+                evidence_bytes.push(bytes);
+            }
+
+            let placeholder = evidence_values
+                .first()
+                .map(|record| record.evidence_id.clone())
+                .unwrap_or_else(|| format!("ev_{}", "e".repeat(64)));
+            let mut claim = provider_claim(placeholder);
+            claim.predicate = predicate;
+            claim.source_predicate_type = None;
+            claim.evidence_ids = evidence_values
+                .iter()
+                .map(|record| record.evidence_id.clone())
+                .collect();
+
+            let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
+            let supplied: Vec<&[u8]> =
+                evidence_bytes.iter().map(Vec::as_slice).collect();
+            let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+
+            assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+            assert_eq!(
+                replay.expected_disposition,
+                oracle_disposition("producer-authenticity-rule-unimplemented")
+            );
+            assert_eq!(replay.expected_disposition, Disposition::Unverified);
+            assert_eq!(replay.evidence_count, evidence_count);
+        }
+    }
+}
+
