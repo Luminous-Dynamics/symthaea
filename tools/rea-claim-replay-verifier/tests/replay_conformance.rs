@@ -73,7 +73,6 @@ fn oracle_replay_outcome(case_id: &str) -> ReplayOutcome {
     }
 }
 
-
 fn json_with_reversed_object_keys(value: &Value) -> String {
     match value {
         Value::Object(object) => {
@@ -834,8 +833,7 @@ fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
 fn recursive_json_object_key_permutations_preserve_semantic_replay() {
     let original_evidence: Value = serde_json::from_slice(fixture_bytes()).unwrap();
     let reordered_evidence = json_with_reversed_object_keys(&original_evidence);
-    let verified =
-        rea_compat::verify_evidence_json(reordered_evidence.as_bytes()).unwrap();
+    let verified = rea_compat::verify_evidence_json(reordered_evidence.as_bytes()).unwrap();
     assert_eq!(
         verified.evidence_id,
         rea_compat::verify_evidence_json(fixture_bytes())
@@ -886,9 +884,12 @@ fn evidence_transport_order_does_not_change_bound_claim_replay() {
     let (claim_bytes, result_bytes) = produce(&claim, &[first, second]);
 
     // Transport order is not semantic order: evidence is keyed by its bound ID.
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&second_bytes, fixture_bytes()], &result_bytes)
-            .unwrap();
+    let replay = replay_claim_evaluation(
+        &claim_bytes,
+        &[&second_bytes, fixture_bytes()],
+        &result_bytes,
+    )
+    .unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
@@ -899,4 +900,3 @@ fn evidence_transport_order_does_not_change_bound_claim_replay() {
         replay.reported_derivation_sha256
     );
 }
-
