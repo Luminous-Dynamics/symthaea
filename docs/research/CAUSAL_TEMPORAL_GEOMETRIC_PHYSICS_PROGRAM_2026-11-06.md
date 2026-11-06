@@ -253,6 +253,11 @@ Every result should carry:
 6. Thinning, boundary and finite-size sensitivity.
 7. Higher-dimensional controls: 2+1D and 3+1D, with expected ordering
    fractions from the gamma-function relation.
+8. **1+1D algorithmic scaling:** compare O(N log N) observables with an
+   O(N²) brute-force oracle through at least N=2,048; then target N=10⁵ and
+   N=10⁶ for throughput and peak-memory measurements. Performance targets
+   are not claims until measured on a named machine, exact commit and input
+   seed.
 
 ### Time crystals
 
@@ -289,11 +294,6 @@ Every result should carry:
 5. False-positive rate at a fixed recall, with confidence intervals.
 6. Calibration error, missing metadata and adversarial video transformations.
 7. A separate unresolved category; no forced classification.
-8. **1+1D algorithmic scaling:** compare O(N log N) observables with an
-   O(N²) brute-force oracle through at least N=2,048; then target N=10⁵ and
-   N=10⁶ for throughput and peak-memory measurements. Performance targets
-   are not claims until measured on a named machine, exact commit and input
-   seed.
 
 ## State-of-the-art comparison and strategy
 
