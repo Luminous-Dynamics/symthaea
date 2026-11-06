@@ -43,12 +43,12 @@ fn main() {
         );
     }
 
-    if let Ok(declared_revision) = std::env::var("SBR_GENERATOR_SOURCE_REVISION") {
-        if declared_revision != checked_out_revision {
-            panic!(
-                "SBR_GENERATOR_SOURCE_REVISION ({declared_revision}) does not match git HEAD ({checked_out_revision})"
-            );
-        }
+    if let Ok(declared_revision) = std::env::var("SBR_GENERATOR_SOURCE_REVISION")
+        && declared_revision != checked_out_revision
+    {
+        panic!(
+            "SBR_GENERATOR_SOURCE_REVISION ({declared_revision}) does not match git HEAD ({checked_out_revision})"
+        );
     }
 
     println!("cargo:rustc-env=SBR_GENERATOR_SOURCE_REVISION={checked_out_revision}");
