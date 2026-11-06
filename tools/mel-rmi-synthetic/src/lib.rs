@@ -3614,6 +3614,54 @@ mod tests {
     }
 
     #[test]
+    fn midi_inspector_accepts_format1_multitrack_tempo_and_note_events() {
+        let conductor = [
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, // 500000 us/quarter
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let performance = [
+            0x00, 0x90, 64, 92, // note on, channel 0
+            0x60, 0x80, 64, 0, // note off after 96 ticks
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let mut midi = b"MThd\x00\x00\x00\x06\x00\x01\x00\x02\x01\xe0".to_vec();
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&(conductor.len() as u32).to_be_bytes());
+        midi.extend_from_slice(&conductor);
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&(performance.len() as u32).to_be_bytes());
+        midi.extend_from_slice(&performance);
+
+        let inspected = inspect_midi_file_v1(&midi).unwrap();
+        assert_eq!(inspected.format, 1);
+        assert_eq!(inspected.track_count, 2);
+        assert_eq!(inspected.tempos.len(), 1);
+        assert_eq!(inspected.tempos[0].micros_per_quarter, 500_000);
+        assert_eq!(inspected.notes.len(), 1);
+        assert_eq!(inspected.notes[0].track, 1);
+        assert_eq!(inspected.notes[0].start_tick, 0);
+        assert_eq!(inspected.notes[0].end_tick, 96);
+    }
+
+    #[test]
+    fn generic_midi_inspection_allows_zero_tick_notes_but_synthetic_profile_rejects_them() {
+        let track = [
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08, // 4/4
+            0x00, 0x90, 60, 80, // note on
+            0x00, 0x80, 60, 0, // same-tick note off
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let midi = smf_format0_with_track(&track);
+        let generic = inspect_midi_file_v1(&midi).unwrap();
+        assert_eq!(generic.notes.len(), 1);
+        assert_eq!(generic.notes[0].start_tick, generic.notes[0].end_tick);
+        assert_eq!(
+            inspect_synthetic_midi_v1(&midi),
+            Err(HarnessError::InvalidMidi)
+        );
+    }
+
+    #[test]
     fn midi_inspector_supports_running_status_and_note_on_zero_velocity() {
         let midi = smf_format0_with_track(&[
             0x00, 0x90, 60, 80, // note on
