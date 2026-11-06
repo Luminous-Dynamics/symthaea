@@ -698,3 +698,54 @@ Sources:
 - Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
 - Sun et al., *Which Self-Improvements Should We Trust?*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
 - Chen et al., *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
+
+
+## 14. Bounded-score REUSE and November 6 benchmark update
+
+### Why bounded-score evaluation is a separate kernel
+
+The REUSE pass/fail implementation in #10576 is a valid and useful first specialization, but Symthaea's benchmark evidence also includes normalized continuous scores. Thresholding those scores into pass/fail can discard useful effect information and makes the result depend on a chosen threshold.
+
+Issue [#10668 — bounded-score REUSE](https://github.com/Luminous-Dynamics/symthaea/issues/10668) specifies the additive Appendix A.1 route from Sun et al. (2026-09-27, arXiv:2609.33180). For independently sampled paired differences $Z_i\in[-1,1]$, it computes a lower confidence bound using:
+- the empirical mean $\bar Z$;
+- an upper confidence limit on $E[Z^2]$ obtained by inverting Bernoulli KL;
+- the empirical-Bernstein deviation $\epsilon(v,L)=2L/(3n)+\sqrt{(2L/(3n))^2+2vL/n}$;
+- $L=\ln(2/\delta)$ and $\mathrm{LCB}=\bar Z-\epsilon$.
+
+For this route, the complete per-comparison REUSE allocation is used for the bounded-score LCB; it is not split by the pass/fail rho parameter. A candidate is eligible only when its LCB exceeds the preregistered practical threshold gamma >= 0. If multiple candidates qualify, choose the one with the largest empirical mean, and add its LCB to the private cumulative progress certificate. The proposer still receives only the coarse round decision.
+
+The bounded-score vector must contain independent paired units. Correlated task rows must first be reduced under the frozen cluster/task-family sampling design. The numerical helper does not authenticate this provenance or make a curated benchmark representative of a target population.
+
+### New external benchmark evidence
+
+- **SelfImprove-Bench (arXiv:2611.02797, 2026-11-02)** defines an Exploring / Planning / Reasoning task space and a G0-G4 generalization ladder. Include its controllable task templates as a direct transfer diagnostic, but add real software and scientific R&D task families: game-world gains alone do not establish generalization to the kinds of work Symthaea targets.
+- **RSIGym (arXiv:2610.10310, 2026-10-07)** supplies a strong infrastructure comparator with Data, Harness and Joint tracks and a reported leading RSI-Index of 0.4809. Its public results README states that final evaluations reuse tasks available during development and that research-agent inference / official evaluation are billed outside the platform-service budget. Treat the reported RSI-Index as an optimization-on-a-known-suite result, not an independently sampled unseen-population transfer result. Symthaea should report both known-task score and sealed, fresh-family transfer.
+- **HyperAgents (Meta, 2026-03-24)** already demonstrates that the meta-procedure itself can evolve, so Symthaea's novelty claim cannot simply be "we have a self-modifying meta-agent". The discriminating target is stronger experimental qualification: same-start matched-budget improver swaps, cross-domain meta-transfer, multi-parent lineage, complete task accounting, and independent promotion.
+- **AI4AI-Bench (arXiv:2608.20318, 2026-08-20)** isolates algorithmic redesign from data and harness changes. Its best reported score is 0.250 on ten frozen training-algorithm tasks. Keep that benchmark as a distinct Algorithm track; do not describe prompt or harness improvements as algorithmic RSI.
+
+Sources:
+- SelfImprove-Bench: https://arxiv.org/abs/2611.02797
+- RSIGym: https://arxiv.org/abs/2610.10310 and https://github.com/evolvent-ai/RSIGym
+- HyperAgents: https://ai.meta.com/research/publications/hyperagents/
+- AI4AI-Bench: https://arxiv.org/abs/2608.20318
+
+### Revised comparison protocol
+
+For every external comparison, freeze model/checkpoint bytes, task and family manifests, tool permissions, evaluator build, harness, inference budget, training budget, retry policy, and all costs. Report the raw per-domain outcomes rather than only a normalized composite.
+
+Add these result lanes:
+1. **Known-suite optimization:** development tasks may be reused, matching RSIGym-style experiments.
+2. **Fresh-task transfer:** new instances from families held out from search.
+3. **Fresh-family transfer:** task families never used for candidate generation or selection.
+4. **Difficulty extrapolation:** preregistered harder tasks and shifted resource regimes.
+5. **Improver transfer:** old and new meta-agents start from identical research states and compete under matched budgets on a different domain.
+6. **Algorithm transfer:** changes to objectives/update rules are retrained from scratch under matched data and compute, then evaluated on held-out tasks.
+
+These lanes must never be collapsed into one unqualified "RSI score". For each report, include best-so-far and final candidate, false promotions, rejected candidates, independent replications, resource consumption, retention floors, and population uncertainty.
+
+### Current engineering status and claim boundary
+
+- #10576's pass/fail REUSE branch has a focused exact-head workflow; its standalone harness is separate from root-workspace compilation.
+- This branch adds the bounded-score empirical-Bernstein confidence kernel and per-round decision path as a draft implementation of #10668.
+- Both branches remain non-authorizing numerical kernels. The independent evaluator service, authenticated immutable history, feedback firewall, source-to-executable provenance, sampling-frame qualification, and multi-metric error allocation remain required before any real RSI promotion claim.
+- Source-authored tests are not test execution. Focused CI must pass at the exact PR head, and root-workspace integration must be qualified separately.
