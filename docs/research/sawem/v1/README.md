@@ -235,6 +235,21 @@ This is still a deterministic paired scorer, not a significance test. A credible
 
 Benchmark case: `FORECAST-PAIRED-SKILL-001`. The tests use synthetic pairs only. No Chronos, HOMER, persistence, seasonal-persistence or climatology model has yet been run on the same rights-cleared South African data.
 
+### Statistical evidence for forecast superiority
+
+The new `forecast_inference.rs` module adds a deterministic circular moving-block bootstrap over the paired per-Trading-Period loss improvements emitted by `forecast_skill.rs`. It accepts a source-digested manifest containing all block starts, the block length, draw count and confidence level. The kernel uses no random generator; it reproduces the exact resamples specified by the plan and returns integer confidence bounds for mean MAE and weighted-interval improvement.
+
+The preregistered decision rule is deliberately conservative: a candidate is supported as better only when the entire two-sided interval for baseline-minus-candidate loss is above zero. A confidence interval that crosses zero is inconclusive; a negative interval is evidence of worse performance under the tested design. The block length must be chosen before looking at the sealed holdout, with its rationale recorded. A deterministic resampling receipt does not make an inadequate block length statistically valid.
+
+This completes a useful evaluation ladder:
+1. reconstruct the decision-time information frontier;
+2. score each exact forecast build with proper quantile/interval metrics;
+3. compare it with persistence, seasonal persistence and training-only climatology on paired targets;
+4. quantify uncertainty in the paired skill difference with a predeclared serial-dependence-aware resampling plan;
+5. only then test whether improved forecasts change dispatch and realized value without increasing operational risk.
+
+Benchmark case: `FORECAST-SKILL-BLOCK-BOOTSTRAP-001`. Current tests use a tiny synthetic paired set; no market-wide statistical significance or SOTA win has been established.
+
 ### Dispatch execution: from optimal schedules to delivered energy
 
 The new `execution_fidelity.rs` module reconciles a frozen signed schedule (positive export, negative import) with interval meter evidence and booked balancing settlement lines. It reports schedule-time, meter-time and settlement-time coverage independently; absolute energy deviation; unfulfilled scheduled energy; overdelivery; schedule fulfilment; and booked balancing charges. It withholds a complete fulfilment ratio if any interval is missing meter evidence or the schedule does not cover the full horizon. It withholds a complete balancing-cost total if any interval lacks a booked settlement record. This module does not invent a balancing tariff or calculate Market Operator settlement.
