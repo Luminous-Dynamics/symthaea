@@ -118,7 +118,6 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     model_ids = [row['model_id'] for row in models_list]
     unique(model_ids, 'model IDs')
     models = {row['model_id']: row for row in models_list}
-    train_condition_ids = {animals[animal_id]['condition_id'] for animal_id in train_ids}
     for model in models_list:
         require(valid_sha(model['implementation_sha256']), f"model implementation digest malformed: {model['model_id']}")
         require(valid_sha(model['training_manifest_sha256']), f"model training-manifest digest malformed: {model['model_id']}")
@@ -317,6 +316,27 @@ def run_negative_controls(data: dict[str, Any]) -> None:
     print(f'cohort-transport negative controls: PASS ({len(mutations)})')
 
 
+
+def run_known_answer_checks(report: dict[str, Any]) -> None:
+    models = {row["model_id"]: row for row in report["model_reports"]}
+    anatomy = models["anatomy-only"]
+    state = models["state-aware"]
+    require(report["truth_counts"]["observed"] == 4, "known-answer observed count mismatch")
+    require(report["truth_counts"]["not_measured"] == 2, "known-answer not-measured count mismatch")
+    require(report["truth_counts"]["functional_connection"] == 1, "known-answer positive count mismatch")
+    require(report["truth_counts"]["functional_non_connection"] == 1, "known-answer equivalence-negative count mismatch")
+    require(report["truth_counts"]["indeterminate"] == 2, "known-answer indeterminate count mismatch")
+    require(abs(anatomy["animal_macro_brier_score"] - 0.41) <= 1e-9, "anatomy-only animal-macro Brier known answer mismatch")
+    require(abs(anatomy["animal_macro_interval_coverage_90"] - 0.25) <= 1e-9, "anatomy-only animal-macro interval coverage known answer mismatch")
+    require(anatomy["false_negative_count"] == 1, "anatomy-only extrasynaptic-style false negative not detected")
+    require(abs(state["animal_macro_brier_score"] - 0.04) <= 1e-9, "state-aware animal-macro Brier known answer mismatch")
+    require(abs(state["animal_macro_interval_coverage_90"] - 1.0) <= 1e-9, "state-aware animal-macro interval coverage known answer mismatch")
+    require(state["out_of_domain_abstention_count"] == 2, "state-aware unsupported-mutant abstention count mismatch")
+    require(abs(state["binary_scoring_coverage"] - 0.5) <= 1e-9, "state-aware binary selective coverage mismatch")
+    print("cohort-transport known answers: PASS")
+
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=Path, required=True)
@@ -327,6 +347,7 @@ def main() -> int:
         report = verify(data)
         if args.self_test:
             run_negative_controls(data)
+            run_known_answer_checks(report)
         print(json.dumps(report, indent=2, sort_keys=True))
         print('independent connectome cohort transport oracle: PASS')
         return 0
