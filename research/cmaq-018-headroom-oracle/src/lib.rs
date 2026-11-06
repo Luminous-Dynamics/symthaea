@@ -87,6 +87,52 @@ pub struct VarianceDecompositionResult {
     pub decomposition: Option<CandidateContinuationDecomposition>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PairingVarianceDisposition {
+    /// Matched differences are computed under caller-declared invariant exogenous
+    /// continuation identities. This module does not authenticate that claim.
+    ComputedUnderDeclaredSharedInvariant,
+    /// Marginal variances are available, but no candidate-by-candidate pairing
+    /// is admitted because the continuation streams are independent.
+    NotIdentifiedUncoupled,
+    /// Paired statistics are shown only as sensitivity diagnostics.
+    SensitivityOnlyNotPrimary,
+    /// Fewer than two evaluation continuations were supplied.
+    InsufficientContinuations,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CandidatePairVariance {
+    pub candidate_sample_variance: Option<f64>,
+    pub baseline_sample_variance: Option<f64>,
+    pub sample_covariance: Option<f64>,
+    pub paired_difference_sample_variance: Option<f64>,
+    /// Variance of the difference in sample means under independent sampling:
+    /// (s_candidate^2 + s_baseline^2) / M.
+    pub independent_difference_of_means_variance: Option<f64>,
+    /// Variance of the paired-difference sample mean: s_(candidate-baseline)^2 / M.
+    pub paired_difference_of_means_variance: Option<f64>,
+    /// Paired mean variance / independent mean variance. Values above 1 mean
+    /// declared pairing increased variance.
+    pub paired_to_independent_variance_ratio: Option<f64>,
+    /// 1 - paired_to_independent_variance_ratio. Negative values are retained.
+    pub common_random_number_variance_reduction_fraction: Option<f64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CandidatePairVarianceRecord {
+    pub candidate_id: String,
+    pub baseline_candidate_id: String,
+    pub continuation_count: usize,
+    pub variance: CandidatePairVariance,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PairingVarianceReport {
+    pub disposition: PairingVarianceDisposition,
+    pub comparisons: Vec<CandidatePairVarianceRecord>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct OracleLane {
     pub selected_candidate_id: String,
@@ -129,6 +175,8 @@ pub struct HeadroomReport {
     pub heldout_share_of_one_shot_apparent_gain: Option<f64>,
     pub heldout_share_of_repeated_in_sample_gain: Option<f64>,
     pub variance_decomposition: VarianceDecompositionResult,
+    /// Paired-versus-independent variance comparison on held-out continuations.
+    pub pairing_variance: PairingVarianceReport,
     pub actual_selector_status: ActualSelectorStatus,
 }
 
@@ -212,6 +260,7 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
         heldout_share_of_one_shot_apparent_gain,
         heldout_share_of_repeated_in_sample_gain,
         variance_decomposition,
+        pairing_variance: pairing_variance_report(&design.evaluation, baseline_index),
         actual_selector_status: ActualSelectorStatus::NotMeasuredInThisReference,
     })
 }
@@ -409,6 +458,125 @@ fn decompose_candidate_continuation(
         interaction_sum_squares,
         interaction_fraction_of_candidate_distinguishing_variation: interaction_fraction,
     }
+}
+
+
+fn pairing_variance_report(
+    batch: &ContinuationBatch,
+    baseline_index: usize,
+) -> PairingVarianceReport {
+    let continuation_count = batch.continuation_ids.len();
+    if continuation_count < 2 {
+        return PairingVarianceReport {
+            disposition: PairingVarianceDisposition::InsufficientContinuations,
+            comparisons: Vec::new(),
+        };
+    }
+
+    let baseline = &batch.candidates[baseline_index];
+    let disposition = match &batch.coupling {
+        CouplingDisposition::SharedInvariant { .. } => {
+            PairingVarianceDisposition::ComputedUnderDeclaredSharedInvariant
+        }
+        CouplingDisposition::Uncoupled => PairingVarianceDisposition::NotIdentifiedUncoupled,
+        CouplingDisposition::SensitivityOnly { .. } => {
+            PairingVarianceDisposition::SensitivityOnlyNotPrimary
+        }
+    };
+
+    let comparisons = batch
+        .candidates
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index != baseline_index)
+        .map(|(_, candidate)| {
+            let baseline_variance = sample_variance_i64(&baseline.values);
+            let candidate_variance = sample_variance_i64(&candidate.values);
+            let independent_mean_variance =
+                (baseline_variance + candidate_variance) / continuation_count as f64;
+
+            let (covariance, paired_difference_variance) = match &batch.coupling {
+                CouplingDisposition::SharedInvariant { .. }
+                | CouplingDisposition::SensitivityOnly { .. } => {
+                    let covariance = sample_covariance_i64(
+                        &candidate.values,
+                        &baseline.values,
+                    );
+                    let paired = sample_variance_f64(
+                        &candidate
+                            .values
+                            .iter()
+                            .zip(&baseline.values)
+                            .map(|(candidate, baseline)| {
+                                *candidate as f64 - *baseline as f64
+                            })
+                            .collect::<Vec<_>>(),
+                    );
+                    (Some(covariance), Some(paired))
+                }
+                CouplingDisposition::Uncoupled => (None, None),
+            };
+
+            let paired_mean_variance = paired_difference_variance
+                .map(|variance| variance / continuation_count as f64);
+            let ratio = paired_mean_variance.and_then(|paired| {
+                (independent_mean_variance > 0.0)
+                    .then_some(paired / independent_mean_variance)
+            });
+            let reduction = ratio.map(|value| 1.0 - value);
+
+            CandidatePairVarianceRecord {
+                candidate_id: candidate.candidate_id.clone(),
+                baseline_candidate_id: baseline.candidate_id.clone(),
+                continuation_count,
+                variance: CandidatePairVariance {
+                    candidate_sample_variance: Some(candidate_variance),
+                    baseline_sample_variance: Some(baseline_variance),
+                    sample_covariance: covariance,
+                    paired_difference_sample_variance: paired_difference_variance,
+                    independent_difference_of_means_variance: Some(independent_mean_variance),
+                    paired_difference_of_means_variance: paired_mean_variance,
+                    paired_to_independent_variance_ratio: ratio,
+                    common_random_number_variance_reduction_fraction: reduction,
+                },
+            }
+        })
+        .collect();
+
+    PairingVarianceReport {
+        disposition,
+        comparisons,
+    }
+}
+
+fn sample_variance_i64(values: &[i64]) -> f64 {
+    let average = mean(values);
+    values
+        .iter()
+        .map(|value| (*value as f64 - average).powi(2))
+        .sum::<f64>()
+        / (values.len() - 1) as f64
+}
+
+fn sample_variance_f64(values: &[f64]) -> f64 {
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    values
+        .iter()
+        .map(|value| (*value - average).powi(2))
+        .sum::<f64>()
+        / (values.len() - 1) as f64
+}
+
+fn sample_covariance_i64(left: &[i64], right: &[i64]) -> f64 {
+    let left_mean = mean(left);
+    let right_mean = mean(right);
+    left.iter()
+        .zip(right)
+        .map(|(left, right)| {
+            (*left as f64 - left_mean) * (*right as f64 - right_mean)
+        })
+        .sum::<f64>()
+        / (left.len() - 1) as f64
 }
 
 #[cfg(test)]
@@ -679,6 +847,130 @@ mod tests {
             VarianceDecompositionDisposition::SensitivityOnlyNotPrimary
         );
         assert!(report.variance_decomposition.decomposition.is_none());
+    }
+
+
+    #[test]
+    fn positive_common_noise_covariance_reduces_difference_variance() {
+        let design = HeadroomDesign {
+            candidate_ids: vec!["baseline".to_owned(), "candidate-a".to_owned()],
+            baseline_candidate_id: "baseline".to_owned(),
+            selection: batch(
+                &["s0", "s1", "s2"],
+                vec![
+                    candidate("baseline", &[0, 10, 20]),
+                    candidate("candidate-a", &[2, 12, 22]),
+                ],
+                shared(),
+            ),
+            evaluation: batch(
+                &["e0", "e1", "e2"],
+                vec![
+                    candidate("baseline", &[0, 10, 20]),
+                    candidate("candidate-a", &[2, 12, 22]),
+                ],
+                shared(),
+            ),
+        };
+
+        let report = evaluate_headroom(&design).unwrap();
+        let pairing = &report.pairing_variance;
+        assert_eq!(
+            pairing.disposition,
+            PairingVarianceDisposition::ComputedUnderDeclaredSharedInvariant
+        );
+        let comparison = &pairing.comparisons[0].variance;
+        assert_eq!(comparison.paired_difference_sample_variance, Some(0.0));
+        assert!(comparison.independent_difference_of_means_variance.unwrap() > 0.0);
+        assert_eq!(comparison.paired_to_independent_variance_ratio, Some(0.0));
+        assert_eq!(
+            comparison.common_random_number_variance_reduction_fraction,
+            Some(1.0)
+        );
+    }
+
+    #[test]
+    fn negative_common_noise_covariance_reports_variance_increase() {
+        let design = HeadroomDesign {
+            candidate_ids: vec!["baseline".to_owned(), "candidate-a".to_owned()],
+            baseline_candidate_id: "baseline".to_owned(),
+            selection: batch(
+                &["s0", "s1", "s2"],
+                vec![
+                    candidate("baseline", &[0, 10, 20]),
+                    candidate("candidate-a", &[20, 10, 0]),
+                ],
+                shared(),
+            ),
+            evaluation: batch(
+                &["e0", "e1", "e2"],
+                vec![
+                    candidate("baseline", &[0, 10, 20]),
+                    candidate("candidate-a", &[20, 10, 0]),
+                ],
+                shared(),
+            ),
+        };
+
+        let report = evaluate_headroom(&design).unwrap();
+        let comparison = &report.pairing_variance.comparisons[0].variance;
+        assert_eq!(comparison.sample_covariance, Some(-100.0));
+        assert_eq!(comparison.paired_to_independent_variance_ratio, Some(2.0));
+        assert_eq!(
+            comparison.common_random_number_variance_reduction_fraction,
+            Some(-1.0)
+        );
+    }
+
+    #[test]
+    fn unpaired_continuations_estimate_independent_variance_but_not_paired_effect() {
+        let mut design = noise_only_design();
+        design.evaluation.coupling = CouplingDisposition::Uncoupled;
+
+        let report = evaluate_headroom(&design).unwrap();
+        assert_eq!(
+            report.pairing_variance.disposition,
+            PairingVarianceDisposition::NotIdentifiedUncoupled
+        );
+        let comparison = &report.pairing_variance.comparisons[0].variance;
+        assert!(comparison.independent_difference_of_means_variance.is_some());
+        assert!(comparison.sample_covariance.is_none());
+        assert!(comparison.paired_difference_of_means_variance.is_none());
+        assert!(comparison.common_random_number_variance_reduction_fraction.is_none());
+    }
+
+    #[test]
+    fn sensitivity_only_pairing_keeps_paired_statistics_out_of_primary_lane() {
+        let mut design = noise_only_design();
+        design.evaluation.coupling = CouplingDisposition::SensitivityOnly {
+            justification_digest: "sensitivity-only-evaluation-pairing".to_owned(),
+        };
+
+        let report = evaluate_headroom(&design).unwrap();
+        assert_eq!(
+            report.pairing_variance.disposition,
+            PairingVarianceDisposition::SensitivityOnlyNotPrimary
+        );
+        assert!(report.pairing_variance.comparisons[0]
+            .variance
+            .paired_difference_of_means_variance
+            .is_some());
+    }
+
+    #[test]
+    fn paired_variance_is_not_reported_from_a_single_evaluation_continuation() {
+        let mut design = noise_only_design();
+        design.evaluation.continuation_ids.truncate(1);
+        for candidate in &mut design.evaluation.candidates {
+            candidate.values.truncate(1);
+        }
+
+        let report = evaluate_headroom(&design).unwrap();
+        assert_eq!(
+            report.pairing_variance.disposition,
+            PairingVarianceDisposition::InsufficientContinuations
+        );
+        assert!(report.pairing_variance.comparisons.is_empty());
     }
 
     #[test]

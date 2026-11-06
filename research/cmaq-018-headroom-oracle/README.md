@@ -15,6 +15,15 @@ The selected candidate is always scored on the same held-out continuation batch 
 
 ## Pairing and variance decomposition
 
+The held-out batch also reports candidate-versus-baseline variance under two sampling designs:
+
+- paired continuation differences, when the evaluation batch declares SharedInvariant or SensitivityOnly;
+- hypothetical independent-mean variance, computed from the two marginal sample variances.
+
+The module reports sample covariance, paired-difference sample variance, both variances of the mean, the paired/independent variance ratio, and `1 - ratio` as the CRN variance reduction fraction. Negative reduction values are retained: they mean that the declared pairing increased variance. Uncoupled batches report only the independent marginal estimate and explicitly mark the paired effect as not identified. Sensitivity-only pairing is never promoted to the primary lane. At least two evaluation continuations are required.
+
+This remains a finite descriptive calculation. The coupling disposition and justification digest are caller-supplied; no causal invariance proof, external authentication, or sampling-distribution guarantee is inferred.
+
 A candidate-by-continuation decomposition is computed only when the selection batch declares **SharedInvariant** and supplies a nonempty justification reference. In that case the column index denotes a common exogenous continuation across candidate branches.
 
 **Uncoupled** and **SensitivityOnly** batches do not produce the primary decomposition. Equal seeds, equal column indexes or matching labels do not prove causal invariance. The justification digest is metadata supplied by the caller; this finite module does not authenticate it or establish that the coupling is scientifically valid.
@@ -31,8 +40,8 @@ The tests include:
 - A noise-only selection trap: one-shot best-of-three appears to gain 10 units, while repeated and held-out oracle gain is zero.
 - A genuine candidate effect that survives held-out scoring.
 - A selection case where the one-shot winner differs from the repeated winner; the one-shot held-out share is scored on its own selected candidate.
-- Candidate × continuation rank reversal where all candidate main effects are zero and all candidate-distinguishing variation is interaction.
-- Uncoupled and sensitivity-only pairing, both of which refuse the primary decomposition.
+- Candidate × continuation rank reversal where all candidate main effects are zero and all candidate-distinguishing variation is interaction; paired CRN fixtures where positive covariance reduces variance and negative covariance increases it.
+- Uncoupled and sensitivity-only pairing, both of which refuse primary variance reduction claims; single-continuation batches do not report sample variance.
 - Selection/evaluation overlap, noncanonical candidate ordering, malformed outcome dimensions and missing coupling justification.
 
 ## Deliberate limits
