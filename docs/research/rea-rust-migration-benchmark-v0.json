@@ -2365,7 +2365,9 @@
         "https://github.com/Luminous-Dynamics/symthaea/issues/6283",
         "https://github.com/Luminous-Dynamics/symthaea/issues/2270",
         "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
-        "https://github.com/Luminous-Dynamics/symthaea/issues/10630"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10630",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10673",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10710"
       ],
       "objective": "Qualify whether an investigator's typed conclusion is entailed by exact, scoped, dependency-aware evidence; preserve contradictions, missing evidence, inapplicability and unknown provenance instead of turning them into confidence or majority votes.",
       "principle": "Evidence does not vote; claims must be entailed within declared scope. Receipt validity, cryptographic validity, signer trust, package authorization, completeness, runtime behavior and semantic truth are distinct propositions.",
@@ -2426,7 +2428,15 @@
         "cli_does_not_write_extract_execute_or_mutate_input_artifacts",
         "record_confidence_and_authority_labels_are_preserved_verbatim_in_claim_assessments",
         "analyst_inference_label_cannot_be_promoted_to_artifact_truth_by_record_level_support",
-        "confidence_observed_vs_inferred_does_not_change_record_equality_but_changes_the_claim_ceiling"
+        "confidence_observed_vs_inferred_does_not_change_record_equality_but_changes_the_claim_ceiling",
+        "frozen_public_oracle_case_labels_are_authored_independently_of_production_evaluator",
+        "replay_match_numeric_representation_equivalence_in_reported_result",
+        "forged_disposition_with_recomputed_self_digest_is_rejected_semantically",
+        "supplied_evidence_list_duplicate_semantic_id_is_rejected",
+        "cli_emits_machine_readable_replay_receipt",
+        "cli_exit_code_zero_for_match_one_for_semantic_mismatch_two_for_invalid_io_or_resource_failure",
+        "cli_rejects_per_input_and_aggregate_oversize_before_unbounded_read",
+        "replay_reference_implementation_does_not_call_production_disposition_or_scope_helpers"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2453,9 +2463,17 @@
         "cli_exit_code_accuracy_by_outcome",
         "bounded_input_limit_enforcement_rate",
         "confidence_authority_label_preservation_rate",
-        "false_semantic_promotion_rate_for_analyst_inference_records"
+        "false_semantic_promotion_rate_for_analyst_inference_records",
+        "frozen_oracle_case_accuracy",
+        "independent_replay_match_mismatch_accuracy",
+        "forged_self_digest_semantic_false_accept_rate",
+        "result_jcs_representation_invariance",
+        "duplicate_or_unreferenced_premise_rejection_rate",
+        "cli_exit_code_accuracy",
+        "resource_limit_failure_classification_accuracy",
+        "replay_checker_independent_code_path_audit_coverage"
       ],
-      "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.",
+      "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.; first frozen public seed contains 18 labeled cases; do not generalize the finite conformance result to unseen artifacts or semantic predicates.",
       "protocol": [
         "reuse upstream Evidence, EvidenceBundle and receipt identities; do not mutate pinned REA Evidence ID semantics",
         "freeze claim vocabulary, scope dimensions, dispositions and rule version before evaluation",
@@ -2477,7 +2495,13 @@
         "for agent benchmarking separate factual accuracy, schema/field-placement accuracy, answer coverage, abstention, and grader adjudication quality",
         "the standalone rea-claim-replay CLI must bounded-read inputs before JSON parsing and distinguish match, semantic mismatch, invalid input, IO and resource-limit outcomes through stable exit codes",
         "a producer-supplied unkeyed SHA-256 digest is not an authenticator; recompute a forged but self-consistent derivation digest over an incorrect disposition and require independent semantic replay to reject it",
-        "compare full serialized results with RFC 8785 canonical bytes so representation-only number spelling changes do not create false replay mismatches"
+        "compare full serialized results with RFC 8785 canonical bytes so representation-only number spelling changes do not create false replay mismatches",
+        "freeze tests/fixtures/rea-claim-replay-v0-oracle.json before running the producer; its expected labels must be authored independently and never materialized from evaluator output",
+        "report exact numerator/denominator by expected disposition and fault family, including invalid input, resource limit and unsupported-rule outcomes",
+        "require a forged disposition with a recomputed unkeyed derivation digest to be rejected by independent semantic replay",
+        "test canonicalization representation invariance for complete result objects separately from semantic mutations",
+        "include a read-only CLI with bounded reads and distinct stable exit codes; exercise it as a subprocess in tests",
+        "review independence at the semantic implementation level; disclose shared Evidence identity and JCS primitives rather than claiming cryptographic diversity"
       ],
       "claim_boundaries": {
         "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
@@ -2494,6 +2518,14 @@
         "lifecycle_time": "Valid time, knowledge time, supersession, stale/conflict actions and source-family temporal reasoning belong to #10600.",
         "repository_continuity": "Evidence retention, invalidation and selective revalidation across repository revisions belong to #10630.",
         "measurement_validity": "Benchmark sampling, dependence, uncertainty and generalization remain under #6283."
+      },
+      "independent_replay": {
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10673",
+        "implementation_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10710",
+        "public_seed_corpus": "tools/rea-claim-replay-verifier/tests/fixtures/rea-claim-replay-v0-oracle.json",
+        "seed_cases": 18,
+        "verifier_design": "separate scope/disposition code; same pinned REA Evidence ID verifier and RFC 8785 canonicalization primitive",
+        "qualification_status": "draft; exact-head workflow not yet qualified"
       }
     }
   ],
