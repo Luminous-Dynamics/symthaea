@@ -502,6 +502,44 @@ impl SplitMix64 {
 mod tests {
     use super::*;
 
+    fn brute_related_pair_count(causet: &CausalSet2D) -> u64 {
+        let mut count = 0_u64;
+        for i in 0..causet.events.len() {
+            for j in (i + 1)..causet.events.len() {
+                let a = causet.events[i];
+                let b = causet.events[j];
+                if a.causally_precedes(b) || b.causally_precedes(a) {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+
+    fn brute_longest_chain_length(causet: &CausalSet2D) -> usize {
+        let n = causet.events.len();
+        if n == 0 {
+            return 0;
+        }
+        let mut order: Vec<usize> = (0..n).collect();
+        order.sort_by(|&a, &b| {
+            causet.events[a]
+                .u
+                .total_cmp(&causet.events[b].u)
+                .then_with(|| causet.events[a].v.total_cmp(&causet.events[b].v))
+                .then_with(|| causet.events[a].id.cmp(&causet.events[b].id))
+        });
+        let mut best = vec![1_usize; n];
+        for j in 0..n {
+            for i in 0..j {
+                if causet.events[order[i]].causally_precedes(causet.events[order[j]]) {
+                    best[j] = best[j].max(best[i] + 1);
+                }
+            }
+        }
+        best.into_iter().max().unwrap_or(0)
+    }
+
     #[test]
     fn expected_myrheim_fractions_match_reference_values() {
         assert!((expected_ordering_fraction(2.0).unwrap() - 0.5).abs() < 1e-12);
@@ -556,6 +594,63 @@ mod tests {
         let causet = CausalSet2D::sprinkle_fixed_cardinality(2026, 1_024, 1.0).unwrap();
         let scaled = causet.longest_chain_length() as f64 / (causet.len() as f64).sqrt();
         assert!((1.25..=2.5).contains(&scaled), "L/sqrt(N)={scaled}");
+    }
+
+    #[test]
+    fn identical_coordinate_events_are_not_related_or_chained() {
+        let causet = CausalSet2D::new(
+            vec![
+                Event2D { id: 10, u: 0.1, v: 0.1 },
+                Event2D { id: 11, u: 0.1, v: 0.1 },
+                Event2D { id: 12, u: 0.2, v: 0.2 },
+            ],
+            1.0,
+            1.0,
+        )
+        .unwrap();
+
+        assert_eq!(causet.related_pair_count(), 2);
+        assert_eq!(causet.longest_chain_length(), 2);
+        assert_eq!(causet.related_pair_count(), brute_related_pair_count(&causet));
+        assert_eq!(causet.longest_chain_length(), brute_longest_chain_length(&causet));
+    }
+
+    #[test]
+    fn n_log_n_observables_match_bruteforce_on_quantized_orders() {
+        // Quantization deliberately creates repeated u values, repeated v
+        // values, equal-coordinate events and incomparable pairs.
+        for seed in 0..24 {
+            let mut rng = SplitMix64::new(seed);
+            let events = (0..48)
+                .map(|id| Event2D {
+                    id,
+                    u: (rng.unit_f64() * 6.0).floor(),
+                    v: (rng.unit_f64() * 6.0).floor(),
+                })
+                .collect();
+
+            let causet = CausalSet2D::new(events, 6.0, 6.0).unwrap();
+            assert_eq!(
+                causet.related_pair_count(),
+                brute_related_pair_count(&causet),
+                "related-pair mismatch for seed={seed}"
+            );
+
+            let chain = causet.longest_chain_ids();
+            assert_eq!(
+                chain.len(),
+                brute_longest_chain_length(&causet),
+                "longest-chain mismatch for seed={seed}"
+            );
+            for pair in chain.windows(2) {
+                let a = *causet.events().iter().find(|event| event.id == pair[0]).unwrap();
+                let b = *causet.events().iter().find(|event| event.id == pair[1]).unwrap();
+                assert!(
+                    a.causally_precedes(b),
+                    "returned chain contains a non-causal edge for seed={seed}"
+                );
+            }
+        }
     }
 
     #[test]
