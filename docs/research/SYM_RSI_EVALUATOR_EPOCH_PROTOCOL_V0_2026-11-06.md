@@ -319,3 +319,71 @@ A better evaluator is not itself a better agent. A co-evolved agent and evaluato
 - RSI-Env (2026): https://arxiv.org/abs/2611.01736
 - RSIBench protocol: https://harness-rsibench.com/docs/
 - FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+
+
+## 15. Conservative cross-epoch composition: conditional union-bound proof obligations
+
+The phrase "no cross-epoch guarantee" should not be read as saying composition is impossible. A conservative composition may be possible under stronger epoch-separation conditions. The following is a **sufficient-condition sketch**, not a proof that the REUSE theorem, evaluator-admission procedure or a future service already satisfies these conditions.
+
+Let \(H_{e-1}\) denote the complete history before candidate epoch \(e\): previous candidate proposals and coarse decisions, accepted evaluator versions, evaluator-admission outcomes, development information, candidate-generator state, and all other variables that can shape the next candidate or evaluator.
+
+Let \(F_e\) be the event that epoch \(e\) makes at least one false candidate promotion. Suppose:
+
+1. The independent authority freezes evaluator \(V_e\), its rubric, task population, grader, normalizer, decision alphabet and error allocation **before** accessing candidate-confirmation sample \(S_e\).
+2. \(S_e\) is fresh and independent of \(H_{e-1}\), evaluator-challenger anchor data, development/selection inputs and all candidate/evaluator-improver randomness, except for the permitted within-epoch decision-only REUSE feedback.
+3. The within-epoch service enforces the exact REUSE assumptions and can establish the conditional guarantee
+   \[
+   \Pr(F_e\mid H_{e-1})\leq \alpha_{c,e}
+   \]
+   almost surely for every admissible prior history. A marginal guarantee averaged over histories is not sufficient for this step.
+4. Every attempted epoch is included in the campaign accounting. Restarts, branches, evaluator IDs, experiment IDs and rejected/failed epochs cannot reset or erase the allocation.
+5. Evaluator-admission event \(G_j\) for challenger \(j\) is governed by its own fresh anchor sample, disjoint from candidate-confirmation samples, and has a separately established conditional false-admission bound
+   \[
+   \Pr(G_j\mid K_{j-1})\leq \alpha_{v,j}
+   \]
+   for the full prior evaluator-admission history \(K_{j-1}\).
+
+Then, by the tower property and the union bound:
+
+\[
+\Pr\left(\bigcup_e F_e\right)
+\leq \sum_e \Pr(F_e)
+= \sum_e \mathbb{E}\left[\Pr(F_e\mid H_{e-1})\right]
+\leq \sum_e \alpha_{c,e}.
+\]
+
+Similarly:
+
+\[
+\Pr\left(\bigcup_j G_j\right)\leq \sum_j \alpha_{v,j}.
+\]
+
+Consequently, the probability of either kind of event is bounded by the sum of the two global allocations:
+\[
+\Pr\left(\bigcup_e F_e\;\cup\;\bigcup_j G_j\right)
+\leq \sum_e \alpha_{c,e}+\sum_j\alpha_{v,j}.
+\]
+
+This is deliberately conservative and may spend more error budget than a joint proof. It makes no claim that the two event families are independent.
+
+### What this sketch does and does not establish
+
+- It shows why a fresh, independent candidate-confirmation sample per evaluator epoch is the straightforward safe route.
+- It shows why an evaluator challenger must be chosen using a separate anchor sample and frozen before the next candidate-confirmation sample is touched.
+- It explains why simply splitting alpha across labels while reusing the same adaptive holdout or admitting an evaluator based on candidate-promotion outcomes does **not** meet the sufficient conditions.
+- It does not prove the within-epoch conditional REUSE guarantee; that must be established by #10573's implementation and theorem review.
+- It does not prove evaluator-admission validity; #10708 must preregister and qualify that inference separately.
+- It does not prove measurement invariance or make raw scores comparable across epochs. The fixed external confirmation lane remains necessary.
+- It may be operationally expensive because each epoch needs fresh candidate-confirmation evidence. Reusing the same benchmark population across evaluator epochs requires a different proof and must not be assumed safe.
+
+### Required review questions
+
+Before adopting this composition:
+1. Does the exact REUSE theorem establish a bound conditional on arbitrary admissible prior history, or only under a narrower experiment model?
+2. Does candidate-generator state contain any information derived from the next epoch's confirmation sample beyond allowed decisions?
+3. Can evaluator selection, calibration, rubric revision or anchor curation leak information from \(S_e\)?
+4. Are candidate and evaluator familywise error budgets both frozen at the start of the campaign and reconciled on every restart?
+5. Are task-family/project clusters the actual independent units, with no hidden overlap across epoch samples?
+6. Does the evaluator challenger procedure have its own valid conditional error control?
+
+Until every question is answered with implementation evidence and an independent statistical review, this is a research proof sketch only. It must not be described as a REUSE cross-epoch theorem or a qualified false-promotion guarantee.
