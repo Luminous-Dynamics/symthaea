@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "binding_id": "connectome-hypothesis-expansion-refuting-world-v1",
+  "challenge_id": "append-refuting-world-sharing-observation-tuple",
+  "expected_base": {
+    "dataset_revision_commit_sha": "9999999999999999999999999999999999999999",
+    "query_id": "adaptive-query-decision",
+    "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "scenario_set_sha256": "f617895108b57aa7aa22de5ce663ca285567363bdc4e385fa51873acae3b7f21",
+    "action_set_sha256": "d7a28966c938eafec9653f640f5ae1403887b25fec001e87548975c2133afbbf",
+    "joint_support_sha256": "2e32fa23a76d8f6e126b29ea82f313e2e420b82d6fb3e6c7971840ad18840f35"
+  },
+  "expected_challenge_result": {
+    "added_scenario_count": 1,
+    "adaptive_worst_case_effort_before": 4,
+    "adaptive_worst_case_effort_after": null,
+    "adaptive_status_before": "POLICY_EXISTS",
+    "adaptive_status_after": "NO_POLICY",
+    "adaptive_effort_non_decreasing": true,
+    "monotonicity_passed": true
+  },
+  "upstream_source": {
+    "rust_git_blob_sha1": "21d6237aec66ae327cbd148bbd26a7c7d523b7df",
+    "oracle_git_blob_sha1": "7c96bc1cd65ea4e88caf5387e3ddf7a5a119c799"
+  }
+}
