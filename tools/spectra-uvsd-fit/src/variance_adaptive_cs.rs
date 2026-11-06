@@ -243,7 +243,8 @@ impl VarianceAdaptiveSubGaussianCs {
         // Equations (3.5)–(3.8): select one member from a calibrated,
         // countable grid of bets whose total allocation is one.
         let g = ((std::f64::consts::E.powf(std::f64::consts::E) + n).ln()).ln()
-            + (20.0 / alpha).ln();
+            + 20.0_f64.ln()
+            - alpha.ln();
         let b = 1.0 / (5.0 * s);
         let lambda_star = b
             .min((2.0 * g / variance_charge).sqrt())
@@ -282,8 +283,10 @@ impl VarianceAdaptiveSubGaussianCs {
             return Err(VarianceAdaptiveCsError::NumericFailure);
         }
 
-        let grid_log_threshold = (10.0 / (alpha * grid_mass)).ln();
-        let coarse_log_threshold = (10.0 / alpha).ln();
+        // Work in log space instead of forming 10/(alpha*mass), which
+        // can overflow even when the mathematical logarithm is representable.
+        let grid_log_threshold = 10.0_f64.ln() - alpha.ln() - grid_mass.ln();
+        let coarse_log_threshold = 10.0_f64.ln() - alpha.ln();
         let radius_for = |bet: f64, log_threshold: f64| {
             let first = log_threshold / (n * bet);
             let second = bet * variance_charge / (2.0 * n);
@@ -388,6 +391,22 @@ mod tests {
             cs.update(3.1),
             Err(VarianceAdaptiveCsError::SampleOutsideDeclaredRange)
         );
+    }
+
+    #[test]
+    fn tiny_valid_alpha_uses_stable_log_arithmetic() {
+        let tiny_one_sided_alpha = f64::from_bits(1);
+        let mut cs = VarianceAdaptiveSubGaussianCs::new_for_one_sided_claim(
+            0.0,
+            1.0,
+            tiny_one_sided_alpha,
+        )
+        .unwrap();
+        let interval = cs.update(0.4).unwrap();
+        assert!(interval.lower_bound.is_finite());
+        assert!(interval.upper_bound.is_finite());
+        assert!(interval.lower_bound <= 0.4);
+        assert!(interval.upper_bound >= 0.4);
     }
 
     #[test]
