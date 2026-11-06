@@ -12,6 +12,7 @@ pub use claims::{
     EvidenceAssessmentKind, MAX_CLAIM_JSON_BYTES, evaluate_claim, parse_claim_json, validate_claim,
 };
 
+#[allow(unused_imports)] // This adapter intentionally re-exports the complete Evidence API.
 pub use symthaea_rea_compat::{
     EVIDENCE_ID_PREFIX, EvidenceError, EvidenceErrorKind, MAX_EVIDENCE_JSON_BYTES,
     VerifiedEvidence, analysis_profile_digest, canonical_jcs_bytes, compute_evidence_id,
