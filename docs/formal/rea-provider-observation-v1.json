@@ -31,7 +31,8 @@
       "subject and generic closure claim identities",
       "operation and represented environment",
       "ordered premises and assumptions through full request digest",
-      "exact optional platform and platform-version identity; no absent-versus-present scope collapse"
+      "exact optional platform and platform-version identity; no absent-versus-present scope collapse",
+      "exact claim ID, subject SHA-256 and derivation commitment remain bound separately from the canonical request digest"
     ],
     "descriptors": {
       "confidence": [
@@ -52,6 +53,9 @@
   },
   "theorem_targets": [
     "provider_observation_support_binds_full_request",
+    "changed_derivation_digest_cannot_support",
+    "changed_claim_id_cannot_support",
+    "changed_subject_digest_cannot_support",
     "changed_claim_digest_cannot_support",
     "changed_request_schema_cannot_support",
     "changed_result_schema_cannot_support",
