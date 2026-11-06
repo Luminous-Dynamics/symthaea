@@ -4,9 +4,9 @@
 /*!
 Phase 12: Resonator Networks for Algebraic Problem-Solving
 
-Revolutionary HDC-based constraint satisfaction through coupled oscillators.
-Instead of gradient descent, we find solutions via resonance - like tuning
-a radio to find the right frequency!
+HDC-based heuristic constraint satisfaction through coupled resonators.
+The current implementation uses continuous Hadamard correlations as update
+signals; its fixed points must be evaluated for correctness, not just stability.
 
 ## The Paradigm Shift
 
@@ -19,12 +19,14 @@ Resonator Networks:
 - **Coupled oscillators** that "resonate" to constraint solutions
 - **O(log N)** convergence for many constraint satisfaction problems
 - **Energy-based**: Solutions are low-energy stable states
-- **Holographic**: Exploits HDC's algebraic properties (bind = multiply)
+- **Algebra-aware**: Current continuous-Hadamard mode is approximate; exact
+  inverse contracts require bipolar MAP or unitary HRR roles
 
 ## Core Insight
 
 Given constraint: A ⊛ X ≈ C (where ⊛ is HDC bind)
-Solution: X = A⁻¹ ⊛ C (HDC unbind)
+Solution: X = A⁻¹ ⊛ C (algebra-specific inverse; not plain multiplication
+for arbitrary continuous vectors)
 
 But what if we have multiple constraints? What if we don't know which
 factors to unbind? Resonator networks find the solution through iteration:
@@ -33,7 +35,8 @@ factors to unbind? Resonator networks find the solution through iteration:
 X(t+1) = normalize(cleanup(A⁻¹ ⊛ C + prior(X(t))))
 ```
 
-The system resonates to a fixed point that satisfies all constraints!
+The system may settle at a fixed point; convergence and correctness are
+separate outcomes and must be measured independently.
 
 ## Applications
 
@@ -491,6 +494,9 @@ impl ResonatorNetwork {
             let energy = self.compute_energy(&estimate, constraints);
             self.energy_history.push(energy);
 
+            let system_energy = self.compute_system_energy(constraints, &estimates)?;
+            self.energy_history.push(system_energy);
+
             // Update introspection state
             self.iteration_count += 1;
             if let Some(state) = self.states.first_mut() {
@@ -524,7 +530,7 @@ impl ResonatorNetwork {
             }
         }
 
-        // Did not converge within max iterations
+        // Did not converge within max iterations.
         Ok(self.create_solution(estimate, max_iterations, false))
     }
 
@@ -788,6 +794,45 @@ impl ResonatorNetwork {
         Ok(solutions)
     }
 
+    /// Evaluate residual energy for a multi-unknown system.
+    ///
+    /// Each constraint represents left ⊙ estimate(unknown) ≈ right. This
+    /// metric is a diagnostic for the current continuous-Hadamard resonator;
+    /// it is not an exact inverse or a calibrated probability of correctness.
+    fn compute_system_energy(
+        &self,
+        constraints: &[MultiConstraint],
+        estimates: &HashMap<String, Vec<f32>>,
+    ) -> Result<f32> {
+        let mut weighted_energy = 0.0f32;
+        let mut total_weight = 0.0f32;
+
+        for constraint in constraints {
+            let left = self.resolve_factor(&constraint.left, estimates)?;
+            let right = self.resolve_factor(&constraint.right, estimates)?;
+            let unknown_name = match &constraint.unknown {
+                Factor::Unknown(name) => name,
+                _ => anyhow::bail!("Multi-constraint update target must be an unknown"),
+            };
+            let estimate = estimates
+                .get(unknown_name)
+                .ok_or_else(|| anyhow::anyhow!("Unknown resonator variable: {unknown_name}"))?;
+            let predicted: Vec<f32> = left
+                .iter()
+                .zip(estimate.iter())
+                .map(|(&left_value, &estimate_value)| left_value * estimate_value)
+                .collect();
+            let similarity = cosine_similarity(&predicted, &right);
+            weighted_energy += constraint.weight * (1.0 - similarity);
+            total_weight += constraint.weight;
+        }
+
+        if total_weight <= 0.0 || !total_weight.is_finite() {
+            anyhow::bail!("Multi-constraint system has no positive finite total weight");
+        }
+        Ok(weighted_energy / total_weight)
+    }
+
     /// Cleanup vector to nearest codebook entry
     ///
     /// Uses softmax-weighted sum for smooth cleanup:
@@ -881,10 +926,13 @@ impl ResonatorNetwork {
         };
 
         // Confidence based on symbol similarity and convergence
-        let confidence = if converged {
-            symbol_similarity.max(0.5)
+        // This is a similarity-derived diagnostic, not a calibrated probability.
+        let confidence = if self.codebook.is_empty() {
+            0.0
+        } else if converged {
+            symbol_similarity.clamp(0.0, 1.0)
         } else {
-            symbol_similarity * 0.5
+            (symbol_similarity * 0.5).clamp(0.0, 1.0)
         };
 
         ResonatorSolution {
@@ -1118,10 +1166,11 @@ impl MultiConstraint {
 
 /// Unbind operation: inverse of bind
 ///
-/// For element-wise multiplication binding:
-/// unbind(a, b) = a * b (since a * a = 1 for normalized vectors)
+/// Approximate correlation update for continuous Hadamard binding.
 ///
-/// This gives us: if c = bind(a, x), then x ≈ unbind(a, c)
+/// Multiplying by `a` is an exact inverse only for bipolar components in
+/// {-1,+1}. For arbitrary continuous vectors, `a ⊙ a != 1`; this function
+/// intentionally remains a heuristic update signal, not a mathematical inverse.
 fn unbind(a: &[f32], b: &[f32]) -> Vec<f32> {
     a.iter().zip(b.iter()).map(|(x, y)| x * y).collect()
 }
