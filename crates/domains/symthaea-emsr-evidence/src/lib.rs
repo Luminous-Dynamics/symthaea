@@ -483,6 +483,131 @@ pub fn validate_split_manifest(input: &str) -> Result<SplitSummary, ValidationEr
     Ok(summary)
 }
 
+/// One source's declared failure-domain dependencies for a specific assessment snapshot.
+///
+/// dependencies_complete = false means the inventory is incomplete. Absence
+/// of a shared domain is therefore not evidence of independence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvidenceSourceProfile {
+    pub source_id: String,
+    pub failure_domains: Vec<String>,
+    pub dependencies_complete: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PairwiseRelation {
+    /// No common domain was declared and both inventories are marked complete.
+    /// This is scoped to the declared profile; it is not proof of physical truth.
+    NoDeclaredCommonDomain,
+    /// At least one known failure domain is shared by the pair.
+    SharedFailureDomain,
+    /// No shared domain is known, but at least one dependency inventory is incomplete.
+    Unknown,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PairwiseIndependence {
+    pub left_source_id: String,
+    pub right_source_id: String,
+    pub relation: PairwiseRelation,
+    pub shared_failure_domains: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndependenceSummary {
+    pub source_count: usize,
+    pub pair_count: usize,
+    pub no_declared_common_domain_pairs: usize,
+    pub shared_failure_domain_pairs: usize,
+    pub unknown_pairs: usize,
+    pub pairs: Vec<PairwiseIndependence>,
+}
+
+/// Build a deterministic pairwise common-mode conflict graph.
+///
+/// The function never infers independence from missing dependency evidence.
+/// NoDeclaredCommonDomain means only that the supplied, marked-complete
+/// inventories have no intersection; it is not a certificate of physical
+/// independence, receiver validity, or sensor truth.
+pub fn assess_common_mode_independence(
+    sources: &[EvidenceSourceProfile],
+) -> Result<IndependenceSummary, ValidationError> {
+    let mut source_ids = HashSet::new();
+    for (index, source) in sources.iter().enumerate() {
+        let path = format!("$.sources[{index}]");
+        if !nonempty(&source.source_id) || !source_ids.insert(source.source_id.as_str()) {
+            return Err(ValidationError::new(
+                format!("{path}.source_id"),
+                "source IDs must be non-empty and unique",
+            ));
+        }
+        let mut domains = HashSet::new();
+        for (domain_index, domain) in source.failure_domains.iter().enumerate() {
+            if !nonempty(domain) || !domains.insert(domain.as_str()) {
+                return Err(ValidationError::new(
+                    format!("{path}.failure_domains[{domain_index}]"),
+                    "failure-domain IDs must be non-empty and unique per source",
+                ));
+            }
+        }
+    }
+
+    let mut summary = IndependenceSummary {
+        source_count: sources.len(),
+        pair_count: 0,
+        no_declared_common_domain_pairs: 0,
+        shared_failure_domain_pairs: 0,
+        unknown_pairs: 0,
+        pairs: Vec::new(),
+    };
+
+    for left_index in 0..sources.len() {
+        for right_index in (left_index + 1)..sources.len() {
+            let left = &sources[left_index];
+            let right = &sources[right_index];
+            let left_domains: HashSet<&str> =
+                left.failure_domains.iter().map(String::as_str).collect();
+            let mut shared: Vec<String> = right
+                .failure_domains
+                .iter()
+                .filter(|domain| left_domains.contains(domain.as_str()))
+                .cloned()
+                .collect();
+            shared.sort();
+
+            let relation = if !shared.is_empty() {
+                PairwiseRelation::SharedFailureDomain
+            } else if left.dependencies_complete && right.dependencies_complete {
+                PairwiseRelation::NoDeclaredCommonDomain
+            } else {
+                PairwiseRelation::Unknown
+            };
+
+            match relation {
+                PairwiseRelation::NoDeclaredCommonDomain => {
+                    summary.no_declared_common_domain_pairs += 1;
+                }
+                PairwiseRelation::SharedFailureDomain => {
+                    summary.shared_failure_domain_pairs += 1;
+                }
+                PairwiseRelation::Unknown => summary.unknown_pairs += 1,
+            }
+            summary.pairs.push(PairwiseIndependence {
+                left_source_id: left.source_id.clone(),
+                right_source_id: right.source_id.clone(),
+                relation,
+                shared_failure_domains: shared,
+            });
+            summary.pair_count += 1;
+        }
+    }
+
+    Ok(summary)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RunState {
@@ -786,6 +911,76 @@ mod tests {
         let summary = validate_split_manifest(&input).expect("disjoint split manifest is valid");
         assert_eq!(summary.record_count, 3);
         assert_eq!(summary.test_count, 1);
+    }
+
+    #[test]
+    fn common_mode_graph_does_not_overcount_shared_clock_sources() {
+        let sources = vec![
+            EvidenceSourceProfile {
+                source_id: "rx-a".to_owned(),
+                failure_domains: vec!["clock:shared".to_owned(), "power:a".to_owned()],
+                dependencies_complete: true,
+            },
+            EvidenceSourceProfile {
+                source_id: "rx-b".to_owned(),
+                failure_domains: vec!["clock:shared".to_owned(), "power:b".to_owned()],
+                dependencies_complete: true,
+            },
+            EvidenceSourceProfile {
+                source_id: "rx-c".to_owned(),
+                failure_domains: vec!["clock:independent".to_owned(), "power:c".to_owned()],
+                dependencies_complete: true,
+            },
+        ];
+
+        let summary = assess_common_mode_independence(&sources).expect("valid source profiles");
+        assert_eq!(summary.pair_count, 3);
+        assert_eq!(summary.shared_failure_domain_pairs, 1);
+        assert_eq!(summary.no_declared_common_domain_pairs, 2);
+        assert_eq!(summary.unknown_pairs, 0);
+        assert_eq!(
+            summary.pairs[0].relation,
+            PairwiseRelation::SharedFailureDomain
+        );
+        assert_eq!(
+            summary.pairs[0].shared_failure_domains,
+            vec!["clock:shared".to_owned()]
+        );
+    }
+
+    #[test]
+    fn common_mode_graph_returns_unknown_for_incomplete_dependency_inventory() {
+        let sources = vec![
+            EvidenceSourceProfile {
+                source_id: "rx-a".to_owned(),
+                failure_domains: vec!["clock:a".to_owned()],
+                dependencies_complete: true,
+            },
+            EvidenceSourceProfile {
+                source_id: "rx-b".to_owned(),
+                failure_domains: vec!["power:b".to_owned()],
+                dependencies_complete: false,
+            },
+        ];
+
+        let summary = assess_common_mode_independence(&sources).expect("valid source profiles");
+        assert_eq!(summary.unknown_pairs, 1);
+        assert_eq!(
+            summary.pairs[0].relation,
+            PairwiseRelation::Unknown
+        );
+    }
+
+    #[test]
+    fn common_mode_graph_rejects_duplicate_source_ids() {
+        let source = EvidenceSourceProfile {
+            source_id: "rx-a".to_owned(),
+            failure_domains: vec!["clock:a".to_owned()],
+            dependencies_complete: true,
+        };
+        let error = assess_common_mode_independence(&[source.clone(), source])
+            .expect_err("duplicate source IDs must fail closed");
+        assert!(error.to_string().contains("unique"));
     }
 
     #[test]
