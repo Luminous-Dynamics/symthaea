@@ -1,6 +1,6 @@
 # Melothaea competitive frontier and dual-track strategy v1
 
-**Date:** 5 November 2026  
+**Date:** 6 November 2026  
 **Status:** Research and evaluation strategy; targets are not results.  
 **Parent:** [#10417 — Reproducible external SOTA and industry comparison ledger](https://github.com/Luminous-Dynamics/symthaea/issues/10417)  
 **Composes:** #10307, #10390, #10393, #10402, #10409, #10088, #10190, #10133, #10249, #10421.
@@ -22,7 +22,7 @@ The product architecture should therefore be **generator-neutral**: Melothaea ow
 
 Artificial Analysis currently exposes separate AA-Music-Instrumental v1.1 and AA-Music-Vocal v1.1 leaderboards. Its methodology describes blind pairwise comparisons on the same prompt and modality, Bradley–Terry maximum-likelihood ratings rescaled to Elo, and 95% intervals. Audio is loudness-normalized to a -16 LUFS target (with a -1 dBTP ceiling) and delivered as 320 kbps MP3 at 44.1 kHz; the methodology also documents an October 2026 statistical update. This is a useful production-quality comparator, not a complete measure of controllability, musical structure, ownership, collaboration or rights.
 
-**Instrumental v1.1 retrieved snapshot (5 November 2026):**
+**Instrumental v1.1 retrieved snapshot (6 November 2026):**
 
 | Model | Elo | Reported 95% interval | Samples |
 | --- | ---: | ---: |
@@ -33,10 +33,10 @@ Artificial Analysis currently exposes separate AA-Music-Instrumental v1.1 and AA
 | Lyria 3 Pro | 1080 | 1059–1101 | 2,329 |
 | Lyria 3.5 | 1078 | 1057–1099 | 2,302 |
 
-**Vocal v1.1 retrieved snapshot (5 November 2026):**
+**Vocal v1.1 retrieved snapshot (6 November 2026):**
 
-| Model | Elo | Reported 95% interval |
-| --- | ---: | ---: |
+| Model | Elo | Reported 95% interval | Samples |
+| --- | ---: | ---: | ---: |
 | Suno v6 | 1144 | 1126–1162 | 3,037 |
 | Suno v6-mini | 1132 | 1114–1150 | 3,151 |
 | Mureka V9.5 | 1102 | 1084–1120 | 3,107 |
@@ -81,7 +81,7 @@ The vocal board adds Eleven Music v2.5 1016±18 (3,220 samples), Eleven Music v2
 - **TAG-Bench:** 1,750 human-verified query/recording pairs over 149.5 hours; 22.1% have multiple ground-truth intervals. The leading reported model reaches 31.2 mIoU and 21.5% recall at IoU ≥ 0.7; reported one-to-many occurrence-count accuracy does not exceed 13.2%. Melothaea must enumerate all relevant occurrences and preserve parsing failures in denominators.
 - **InteractionBench (2 November 2026):** evaluates timing, spoken-task accuracy, whisper/volume and long-conversation groundedness over the same seven real-time voice systems: 221 items per system, 13 scenarios and 1,519 graded runs. Timing is measured at the client-heard boundary; one server-clock correction materially changed a reported timing score. This is a speech/voice benchmark, not a music result. Its reusable lesson is to score the same input stream across timing, action correctness and grounding while keeping server, client, network and device clocks distinct. https://arxiv.org/abs/2611.02430
 - **InteractionBench (5 October 2026, streaming video):** evaluates 1,060 interactions over 812 videos, including 69 negative streams and 53 suites pairing counted events with look-alike near misses. It reports a costly timing/silence trade-off: a polled model reaches 77.8% timing accuracy but 10.9% silence compliance; a native real-time system emits on 89.9% of negative streams. Offline metrics miss important online restraint failures. This is video interaction research, not music evidence, but its negative-stream/near-miss protocol is directly reusable for musical WAIT decisions. https://arxiv.org/abs/2610.05775
-- **HEARTBEAT 2027:** as of the 5 November official-site snapshot, 132,571 samples (127,371 train / 5,200 development) across roughly 3,103 hours; it evaluates reciprocal audio turn-taking (WAIT/RESPOND/CONTINUE/YIELD) and streaming proactive understanding. Track I has separate offline and online settings. Online scoring covers behavior, response quality and speech onset/offset; the protocol requires only current/previously received input, per-chunk logging including no-response chunks, and no backdated response timestamps. This is a human-centered audio-agent challenge, not a music leaderboard.
+- **HEARTBEAT 2027:** as of the 6 November official-site snapshot, 132,571 samples (127,371 train / 5,200 development) across roughly 3,103 hours; it evaluates reciprocal audio turn-taking (WAIT/RESPOND/CONTINUE/YIELD) and streaming proactive understanding. Track I has separate offline and online settings. Online scoring covers behavior, response quality and speech onset/offset; the protocol requires only current/previously received input, per-chunk logging including no-response chunks, and no backdated response timestamps. This is a human-centered audio-agent challenge, not a music leaderboard.
 - **JAM_BOT (NIME 2026):** already demonstrates relevant work on expressive velocity, higher throughput, free-form call-and-response across varying tempi and external MIDI latency compensation. These concepts are prior art; Melothaea's contribution must be their integration with permission, recovery and evidence.
 - **Agents in Concert (IUI 2026):** a two-month co-design process with three jazz musicians culminated in a public performance with 97 attendees. It motivates performer-accessible controls and previews, but is not proof that preview alone improves agency in every context.
 
@@ -89,7 +89,7 @@ The vocal board adds Eleven Music v2.5 1016±18 (3,220 samples), Eleven Music v2
 
 ### HEARTBEAT 2027
 
-The official dedicated challenge page was opened and re-checked on **5 November 2026**. It states that all deadlines are 23:59 UTC unless otherwise noted. Its current schedule reads:
+The official dedicated challenge page was opened and re-checked on **6 November 2026**. It states that all deadlines are 23:59 UTC unless otherwise noted. Its current schedule reads:
 
 - 16 November 2026: development leaderboard opens.
 - 2 December: team membership and resource declarations freeze.
@@ -98,18 +98,21 @@ The official dedicated challenge page was opened and re-checked on **5 November 
 - 30 December: rankings and paper invitations.
 - 7 January 2027: invited two-page papers due; 28 January: camera-ready two-page papers due.
 
+This is the current official-site schedule retrieved on 6 November. It supersedes the previous 27 November / 11 December / 18 December dates in our 5 November working note.
+
 The current page describes 132,571 samples (127,371 train / 5,200 development) across approximately 3,103 hours and ~599.83 GB, with reciprocal audio turn-taking and streaming proactive-understanding tracks. Offline Track I asks for WAIT/RESPOND/CONTINUE/YIELD; Online Track I requires generated audio plus timestamped interaction logs. Track I online scoring covers behavior, response quality and speech onset/offset timing. Track II online scoring uses precision, recall and joint F1; its protocol requires current/past input only, logs every chunk including no-response chunks, and response timestamps at the end of the producing chunk (no backdating).
 
 The page has returned multiple conflicting schedule snapshots during this research session. The current opened page explicitly shows 16 November/2 December/16 December/23 December/30 December. Re-check the official page before every submission milestone and archive the page content with the run manifest. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
 ### MMAE
 
 The official challenge site lists:
-- 10 November 2026: hidden test/SDK release and leaderboard opening.
-- 25 November: final submission/leaderboard freeze.
-- 7 December: reproducibility checks complete.
+- 10 November 2026: hidden test set, submission SDK and leaderboard release.
+- 25 November: final submission and leaderboard freeze.
+- 7 December: evaluation/reproducibility checks complete.
 - 8 December: final rankings and invited teams announced.
+- 7 January 2027: invited two-page ICASSP papers due.
 
-Registration was extended to 8 October. The Agent Track's specific model components and weights had to be publicly released before 1 November. Unless registration and exact-version eligibility can be demonstrated, report public-set reproduction only; do not imply official competition entry.
+Before 10 November, teams may use the public 2,000-example / 17,741-rubric MMAE set. The hidden evaluation has 500 examples for the Single Model Track and 500 for the Agent Track; rubrics remain private until results are finalized. A frozen Qwen3-Omni judge scores each rubric three times with shuffled choices and majority voting. Metrics are IFR, CR and EMR; ranking is primarily EMR, then IFR, then CR. The Agent Track permits local model/tool orchestration, but the specific model versions and weights had to be publicly released before 1 November. Registration was extended to 8 October. Unless registration and exact-version eligibility can be demonstrated, report public-set reproduction only; do not imply official competition entry.
 
 ## 3. The paradigm shifts
 
