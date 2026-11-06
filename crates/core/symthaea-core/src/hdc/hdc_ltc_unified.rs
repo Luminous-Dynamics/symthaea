@@ -972,11 +972,14 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// ## Mathematical Basis
     ///
-    /// For the ODE: dx/dt = (x_∞ - x) / τ
+    /// For the gated ODE:
+    /// dx/dt = gate_rate(x,u) * (x_∞(x,u,t) - x) / τ(x,u).
     ///
-    /// The exact solution is:
+    /// Freezing equilibrium, tau, and gate_rate over one interval gives the
+    /// local exponential update:
     /// ```text
-    /// x(t+Δt) = x_∞ + (x(t) - x_∞) × exp(-Δt * gate_rate / τ)
+    /// σ = 1 - exp(-Δt * gate_rate / τ)
+    /// x(t+Δt) = σ * x_∞ + (1-σ) * x(t)
     /// ```
     ///
     /// With a learned positive rate multiplier g(x,u):
@@ -1229,9 +1232,9 @@ impl HdcLtcUnifiedNeuron {
     /// For the frozen-coefficient ODE:
     /// dx/dt = gate_rate * (x_∞ - x) / τ with CONSTANT x_∞, tau and gate_rate
     ///
-    /// The exact analytical solution is:
+    /// The exact analytical solution for those frozen coefficients is:
     /// ```text
-    /// x(t+Δt) = x_∞ + (x(t) - x_∞) × exp(-Δt/τ)
+    /// x(t+Δt) = x_∞ + (x(t) - x_∞) × exp(-Δt * gate_rate / τ)
     /// ```
     ///
     /// ## Important Note
