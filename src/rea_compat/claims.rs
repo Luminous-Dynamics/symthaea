@@ -588,7 +588,7 @@ pub fn evaluate_claim(
         ));
     }
 
-    let mut verified_by_id = HashMap::<String, VerifiedEvidence>::new();
+    let mut verified_by_id = HashMap::<String, &VerifiedEvidence>::new();
     for supplied in supplied_evidence {
         let verified = verify_evidence_value(&supplied.value).map_err(|error| {
             ClaimError::new(
@@ -605,19 +605,17 @@ pub fn evaluate_claim(
                 "supplied VerifiedEvidence identifier does not match its verified value",
             ));
         }
-        if !claim.evidence_ids.contains(&verified.evidence_id) {
+        let verified_id = verified.evidence_id.clone();
+        drop(verified);
+        if !claim.evidence_ids.contains(&verified_id) {
             return Err(ClaimError::new(
                 ClaimErrorKind::UnexpectedEvidence,
-                format!(
-                    "supplied Evidence {} is not referenced by the claim",
-                    verified.evidence_id
-                ),
+                format!("supplied Evidence {verified_id} is not referenced by the claim"),
             ));
         }
-        if verified_by_id
-            .insert(verified.evidence_id.clone(), verified)
-            .is_some()
-        {
+        // Retain a reference to the caller's already-verified value rather
+        // than a second full Evidence clone for the duration of evaluation.
+        if verified_by_id.insert(verified_id, supplied).is_some() {
             return Err(ClaimError::new(
                 ClaimErrorKind::DuplicateEvidence,
                 "duplicate Evidence ID supplied to claim evaluator",
