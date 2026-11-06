@@ -243,6 +243,30 @@
         "p95_latency_ns",
         "peak_memory_bytes"
       ]
+    },
+    {
+      "id": "permutation_equivalence_and_repair_transfer",
+      "environment": "Seeded small CfC networks with function-preserving hidden-unit permutations, paired truly faulty variants, exact functional probes, and held-out permutations; preserve the source checkpoint and withhold fault labels from the proposer",
+      "primary_outcomes": [
+        "function_equivalence_error",
+        "equivalent_healthy_false_edit_rate",
+        "cross_permutation_repair_success"
+      ],
+      "diagnostics": [
+        "permutation_alignment_precision",
+        "false_fault_rate_on_equivalent_models",
+        "functional_probe_budget",
+        "repair_transfer_rate",
+        "weight_distance_vs_function_distance",
+        "candidate_parameter_count",
+        "candidate_evaluation_cost"
+      ],
+      "negative_controls": [
+        "function_preserving_hidden_unit_permutation",
+        "deliberately_inconsistent_permutation_that_changes_function",
+        "healthy_unpermuted_network",
+        "faulty_network_with_held_out_permutation"
+      ]
     }
   ],
   "baselines": [
@@ -369,6 +393,22 @@
     {
       "id": "swi_constrained_wsp_with_verifier",
       "scope": "typed WeightProgram, transactional candidate edits and independent verifier"
+    },
+    {
+      "id": "raw_flat_weight_distance_editor",
+      "scope": "weight-space repair without hidden-unit alignment"
+    },
+    {
+      "id": "activation_probe_alignment_editor",
+      "scope": "functional probe/activation-based hidden-unit alignment followed by bounded edits"
+    },
+    {
+      "id": "permutation_equivariant_weight_space_editor",
+      "scope": "weight-space model designed to respect hidden-unit permutation symmetries"
+    },
+    {
+      "id": "oracle_permutation_alignment",
+      "scope": "labelled alignment upper bound only; never used by proposer or tuning"
     }
   ],
   "seeds": {
@@ -423,7 +463,10 @@
       "collateral_regression_rate",
       "healthy_model_false_edit_rate",
       "held_out_compositional_success",
-      "forecast_error"
+      "forecast_error",
+      "function_equivalence_error",
+      "equivalent_healthy_false_edit_rate",
+      "cross_permutation_repair_success"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -431,7 +474,9 @@
       "selective_risk_at_common_coverage",
       "false_retrieval_rate",
       "invalid_edit_rejection_rate",
-      "rollback_rate"
+      "rollback_rate",
+      "permutation_false_fault_rate",
+      "false_edit_rate_on_function_equivalent_models"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -441,7 +486,9 @@
       "peak_memory_bytes",
       "state_bytes",
       "edited_parameter_count",
-      "measured_operation_count"
+      "measured_operation_count",
+      "functional_probe_budget",
+      "permutation_alignment_operations"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -449,7 +496,7 @@
     "pairing": "Pair all task seeds, fault instances, and scenarios across all sixteen profiles and baselines.",
     "uncertainty": "Report per-task effect sizes, distributions across seeds, and 95% confidence intervals; use exact binomial intervals for false-edit rates.",
     "multiplicity": "Predeclare primary contrasts and apply Holm correction across registered primary tests.",
-    "interaction": "Estimate preregistered H×C×F×W interaction effects; do not infer synergy from the full profile alone.",
+    "interaction": "Estimate preregistered H×C×F×W interaction effects; do not infer synergy from the full profile alone. Include an explicit equivalence subgroup contrast: healthy permutation-only controls must not be classified as faults.",
     "budgets": "Match proposer candidates, forward passes, tuning opportunities, parameter counts, and compute. Report unmatched deviations.",
     "holdout": "Holdout labels/results are inaccessible to proposer, policy, editor, and tuning. Open once for final report; no post-hoc retuning.",
     "healthy_controls": "Include enough independent healthy networks to estimate low false-edit rates. A low observed count from a small sample is not a low-risk guarantee.",
@@ -471,7 +518,10 @@
     "Gradient, analytic, black-box, random matched-sparsity, no-edit, and task-appropriate conventional baselines must be budget-matched.",
     "Primary contrasts, multiple-comparison procedure, and stop conditions must be preregistered before held-out evaluation.",
     "Incomplete execution, skipped tests, queued workflows, missing baselines, invalid outputs, or integrity failures are non-qualification states.",
-    "No SOTA, production readiness, general self-improvement, safety certification, biological equivalence, or consciousness claim follows from this protocol."
+    "No SOTA, production readiness, general self-improvement, safety certification, biological equivalence, or consciousness claim follows from this protocol.",
+    "Function-preserving hidden-unit permutations are negative controls; raw parameter distance alone cannot label a behavior change.",
+    "Any permutation alignment is diagnostic metadata and must not silently rewrite the source checkpoint or alter native digest semantics.",
+    "Cross-permutation repair is scored only after held-out function equivalence and preservation tests; oracle alignments are upper bounds, not proposer inputs."
   ],
   "research_references": [
     {
