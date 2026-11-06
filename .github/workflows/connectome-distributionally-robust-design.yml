@@ -54,4 +54,6 @@ jobs:
       - name: Run common-policy minimax oracle and adversarial controls
         run: |
           python3 -m py_compile tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py
-          python3 tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py docs/neuroscience/examples/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.example.json
+          python3 tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py docs/neuroscience/examples/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.example.json --report "$RUNNER_TEMP/distributionally-robust-report.json"
+          python3 -m json.tool "$RUNNER_TEMP/distributionally-robust-report.json" > /dev/null
+          sha256sum "$RUNNER_TEMP/distributionally-robust-report.json"
