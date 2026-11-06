@@ -73,6 +73,7 @@ fn supported_provider_observation_exports_only_formal_meta_claim() {
     assert_eq!(formal.binding.claim_request_sha256, result.claim_request_sha256);
     assert_eq!(formal.binding.derivation_sha256, result.derivation_sha256);
     assert_eq!(formal.binding.requested_evidence_ids, claim.evidence_ids);
+    assert_eq!(formal.binding.evaluator_rule_generation, 0);
     assert_eq!(formal.binding.predicate, ClaimPredicate::ProviderReportedObservation);
     validate_formal_provider_observation(&formal).unwrap();
 }
