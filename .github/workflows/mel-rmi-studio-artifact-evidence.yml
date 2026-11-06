@@ -1,0 +1,39 @@
+name: MEL-RMI Studio artifact evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - ".github/workflows/mel-rmi-studio-artifact-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  studio-artifact-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format the changed module
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs
+      - name: Test Studio artifact evidence contract
+        run: cargo test --locked -p symthaea-muse --features studio rmi_artifact_evidence::tests
