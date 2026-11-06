@@ -117,14 +117,64 @@ fn valid_hex(value: &str, length: usize) -> bool {
 }
 
 fn git_blob_sha1(bytes: &[u8]) -> String {
-    // Git blob object digest: SHA1("blob <length>\\0" || bytes).
-    let mut hasher = Sha256::new();
-    let _ = &mut hasher;
+    // Git blob object digest: SHA1("blob <length>\0" || bytes).
+    // Kept dependency-free so the split planner has one pinned Rust dependency set.
     let header = format!("blob {}\0", bytes.len());
-    let mut sha = sha1::Sha1::new();
-    sha.update(header.as_bytes());
-    sha.update(bytes);
-    format!("{:x}", sha.digest())
+    let mut message = Vec::with_capacity(header.len() + bytes.len() + 72);
+    message.extend_from_slice(header.as_bytes());
+    message.extend_from_slice(bytes);
+    let bit_length = (message.len() as u64).wrapping_mul(8);
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_length.to_be_bytes());
+
+    let mut h0 = 0x67452301_u32;
+    let mut h1 = 0xefcdab89_u32;
+    let mut h2 = 0x98badcfe_u32;
+    let mut h3 = 0x10325476_u32;
+    let mut h4 = 0xc3d2e1f0_u32;
+    for chunk in message.chunks_exact(64) {
+        let mut w = [0_u32; 80];
+        for (index, word) in w.iter_mut().take(16).enumerate() {
+            let offset = index * 4;
+            *word = u32::from_be_bytes([
+                chunk[offset],
+                chunk[offset + 1],
+                chunk[offset + 2],
+                chunk[offset + 3],
+            ]);
+        }
+        for index in 16..80 {
+            w[index] = (w[index - 3] ^ w[index - 8] ^ w[index - 14] ^ w[index - 16]).rotate_left(1);
+        }
+        let (mut a, mut b, mut c, mut d, mut e) = (h0, h1, h2, h3, h4);
+        for (index, word) in w.iter().enumerate() {
+            let (function, constant) = match index {
+                0..=19 => ((b & c) | ((!b) & d), 0x5a827999),
+                20..=39 => (b ^ c ^ d, 0x6ed9eba1),
+                40..=59 => ((b & c) | (b & d) | (c & d), 0x8f1bbcdc),
+                _ => (b ^ c ^ d, 0xca62c1d6),
+            };
+            let next = a.rotate_left(5)
+                .wrapping_add(function)
+                .wrapping_add(e)
+                .wrapping_add(constant)
+                .wrapping_add(*word);
+            e = d;
+            d = c;
+            c = b.rotate_left(30);
+            b = a;
+            a = next;
+        }
+        h0 = h0.wrapping_add(a);
+        h1 = h1.wrapping_add(b);
+        h2 = h2.wrapping_add(c);
+        h3 = h3.wrapping_add(d);
+        h4 = h4.wrapping_add(e);
+    }
+    format!("{h0:08x}{h1:08x}{h2:08x}{h3:08x}{h4:08x}")
 }
 
 fn canonical_repository_key(remote: &str) -> Result<String, String> {
@@ -280,13 +330,6 @@ fn build_report(
             if !assigned_tasks.insert(task_id.clone()) {
                 return Err(format!("task {task_id} was assigned more than once"));
             }
-            let repository_key = fold.repository_keys.iter()
-                .find(|repo| {
-                    // Reconstruct membership from the original group table below.
-                    let _ = repo;
-                    false
-                });
-            let _ = repository_key;
         }
         folds.push(Fold {
             fold_id: index,
@@ -354,9 +397,9 @@ fn build_report(
 fn synthetic_dataset() -> Vec<u8> {
     let mut tasks = Vec::new();
     for repo_index in 0..17 {
-        for task_index in 0..(repo_index % 7 + 1) {
+        for task_index in 0..(repo_index % 7 + 2) {
             let id = sha256(format!("repo-{repo_index}-task-{task_index}").as_bytes());
-            let remote = if repo_index % 2 == 0 {
+            let remote = if task_index % 2 == 0 {
                 format!("https://github.com/Example/Repo{repo_index}.git")
             } else {
                 format!("https://github.com/example/repo{repo_index}")
@@ -366,7 +409,7 @@ fn synthetic_dataset() -> Vec<u8> {
                 "repo": {
                     "remote": remote,
                     "branch": "main",
-                    "commit": format!("{:040x}", repo_index + 1),
+                    "commit": format!("{:040x}", repo_index + task_index + 1),
                     "lean_version": "leanprover/lean4:v4.22.0"
                 },
                 "location": {
@@ -383,6 +426,12 @@ fn synthetic_dataset() -> Vec<u8> {
 }
 
 fn self_test() -> Result<Report, String> {
+    if git_blob_sha1(b"") != "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+        || git_blob_sha1(b"abc") != "f2ba8f84ab5c1bce84a7b441cb1959cfc7093b7f"
+    {
+        return Err("Git blob SHA-1 control failed".into());
+    }
+    println!("SELF_TEST_PASS Git blob SHA-1 matches canonical empty and non-empty objects");
     let source = synthetic_dataset();
     let groups = parse_dataset(&source)?;
     let a = build_report(groups.clone(), &source, 5, "pitb-project-split-v1", None)?;
@@ -396,8 +445,10 @@ fn self_test() -> Result<Report, String> {
     if !a.repository_disjoint || !a.every_task_assigned_once
         || a.task_count != a.assignments.len()
         || a.repository_count != 17
+        || a.repository_commit_pair_count <= a.repository_count
+        || a.assignments.iter().filter(|x| x.repository_key == "https://github.com/example/repo0").count() != 2
     {
-        return Err("synthetic project-disjoint coverage control failed".into());
+        return Err("synthetic project-disjoint coverage or canonicalization control failed".into());
     }
     println!("SELF_TEST_PASS every task and repository appears in exactly one fold");
     if a.max_tasks_per_fold - a.min_tasks_per_fold > a.max_repository_group_size {
