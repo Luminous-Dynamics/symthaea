@@ -13,10 +13,10 @@ use rea_claim_replay_verifier::{
     MAX_CLAIM_JSON_BYTES, MAX_EVIDENCE_RECORDS, MAX_RESULT_JSON_BYTES,
     MAX_TOTAL_EVIDENCE_JSON_BYTES, ReplayOutcome, replay_claim_evaluation,
 };
+use rea_compat::VerifiedEvidence;
 use rea_compat::claims::{
     ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
 };
-use rea_compat::VerifiedEvidence;
 use serde_json::{Value, json};
 use std::hint::black_box;
 use std::time::Instant;
