@@ -6,6 +6,7 @@ on:
       - "crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - "crates/domains/symthaea-muse-protocol/src/catalog.rs"
       - "tools/mel-rmi-studio-evidence-harness/**"
       - ".github/workflows/mel-rmi-studio-artifact-evidence.yml"
   workflow_dispatch:
