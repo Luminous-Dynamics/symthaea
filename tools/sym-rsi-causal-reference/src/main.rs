@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use sym_rsi_causal_reference::{validate_fixture_file, validate_manifest_json};
@@ -21,14 +22,14 @@ fn run() -> Result<(), String> {
         .ok_or_else(usage)?
         .to_string_lossy()
         .into_owned();
-    let path = arguments.next().ok_or_else(usage)?;
+    let path = PathBuf::from(arguments.next().ok_or_else(usage)?);
 
     if arguments.next().is_some() {
         return Err(usage());
     }
 
     let input = fs::read_to_string(&path)
-        .map_err(|error| format!("cannot read {}: {error}", path.to_string_lossy()))?;
+        .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
 
     match command.as_str() {
         "fixtures" => {
