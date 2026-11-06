@@ -441,7 +441,7 @@ mod tests {
         }
     }
 
-    fn inputs(samples: &[SocTelemetrySample<'_>]) -> RainflowInputs<'_> {
+    fn inputs<'a>(samples: &'a [SocTelemetrySample<'a>]) -> RainflowInputs<'a> {
         RainflowInputs {
             scenario_id: "battery-001/soc-cycle-test",
             evaluation_as_of_utc: 10_000,
@@ -566,7 +566,7 @@ mod tests {
                 available_at_utc: 10_001,
                 ..sample("future-start", 0, 5_000)
             },
-            horizon[0],
+            sample("future-end", 1, 5_000),
         ];
         assert_eq!(
             count_soc_rainflow_cycles(inputs(&future)),
