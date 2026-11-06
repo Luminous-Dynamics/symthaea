@@ -122,6 +122,66 @@ This is directly relevant to Symthaea. Treat those reported improvements as resu
 
 LACE's input/output/tool/heuristic-portfolio interface and complementary evolution are a strong model for a domain-independent algorithm-discovery layer. It evaluates a broad CO benchmark and structurally new problems. Reuse its interface and evaluation ideas where licensing and engineering review permit; do not assume its results transfer unchanged to SAT or industrial workloads.
 
+## Additional OpenAI 2026 algorithmic results with direct transfer potential
+
+The broader OpenAI math release contains several results that are useful beyond SAT. Keep these as separate tracks; they solve different problems and carry different guarantees.
+
+### General-graph perfect-matching counting FPRAS (2026-09-23)
+
+[Paper and source](https://github.com/openai/math/tree/main/preprints/A-Fully-Polynomial-Randomized-Approximation-Scheme-for-Perfect-Matchings-in-General-Graphs-September-23-2026)
+
+The paper claims an FPRAS for the number of perfect matchings in every finite simple undirected graph. For rational accuracy 0 < epsilon < 1 and failure probability 0 < delta < 1/2, it returns a nonnegative rational estimate with relative error at most epsilon with probability at least 1-delta, in worst-case bit time polynomial in input length, epsilon^-1 and log(delta^-1). It returns zero with certainty when no perfect matching exists. This is **approximate counting**, not an exact counter and not a maximum-weight matching solver.
+
+**Transfer:** Mycelix resource/partner matching and allocation analytics; Symtropy assignment and maintenance scheduling; Sol-Atlas network matching. Benchmark estimator bias, variance, confidence calibration, runtime and exact small-graph agreement against brute force.
+
+### Almost-linear-time maximum-cardinality matching (2026-09-24)
+
+[Paper and source](https://github.com/openai/math/tree/main/preprints/Almost-Linear-Time-Maximum-Cardinality-Matching-in-Sparse-General-Graphs-September-24-2026)
+
+The paper claims one uniform randomized algorithm finding a maximum-cardinality matching in a simple undirected graph with n vertices and m edges in (n+m)^(1+o(1)) time, with probability at least 2/3. The time bound holds on every computation path in the stated logarithmic-word model; the result is a randomized success guarantee, not deterministic correctness.
+
+**Transfer:** graph preprocessing and operational matching in transport, supply chains, workforce and resource allocation. Compare exact matching size and certificate validity; report failure probability and time distribution separately.
+
+### FPRAS for common integer polymatroid bases (2026-10-05)
+
+[OpenAI Math preprint](https://github.com/openai/math/tree/main/preprints/An-FPRAS-for-Common-Integer-Polymatroid-Bases-with-Binary-Capacities-October-5-2026)
+
+The paper claims an FPRAS for counting common integer bases of two integral polymatroids of equal total rank, with exact rank-value oracles and binary-encoded capacities. Its matroid-oracle corollaries include common independent sets under several cardinality regimes.
+
+**Transfer:** constrained resource allocation, intersection of capacity policies, and counting feasible allocations. Keep oracle complexity and binary-encoded numeric sizes explicit; do not assume that a practical rank oracle is free.
+
+### FPRAS for contingency tables (2026-09-24)
+
+[Paper and source](https://github.com/openai/math/tree/main/preprints/An-FPRAS-for-Cell-Bounded-Contingency-Tables-September-24-2026)
+
+The work claims sampling and approximate-counting results for nonnegative integer matrices with prescribed row/column margins and arbitrary cell bounds, including structural zeros. This directly relates to synthetic data, privacy-preserving statistics, allocation tables and constrained planning.
+
+**Transfer:** benchmark exact small cases, marginal preservation, cell restrictions, sampling uniformity/total variation where claimed, and approximation error.
+
+### Approximation-hardness boundaries: Vertex Cover and Max-Cut
+
+[Factor-Two Hardness Threshold for Vertex Cover](https://github.com/openai/math/tree/main/preprints/The-Factor-Two-Hardness-Threshold-for-Vertex-Cover-September-23-2026) claims NP-hardness of approximating minimum Vertex Cover within every fixed factor below 2, even on simple unweighted graphs. The accompanying Lean scope note specifies a formalized gap reduction from binary 3-SAT. [Scope note](https://github.com/openai/math/blob/main/lean/docs/102.md).
+
+The same OpenAI release includes a direct proof of Max-Cut hardness beyond the Goemans–Williamson approximation constant. These are **hardness boundaries**, not new approximation algorithms. They are useful for setting honest targets: a heuristic should be compared against the best possible known guarantees and should not promise a polynomial-time approximation factor that conflicts with established hardness unless it exposes a new assumption or a restricted input class.
+
+### Competitive online algorithms: k-server on arbitrary metrics
+
+[OpenAI Math overview](https://github.com/openai/math/blob/main/overview.tex) lists a result establishing a randomized competitive ratio O(log^2(k+1)) for k-server on arbitrary metrics, matching the worst-case lower-bound order. This is relevant to online dispatch and dynamic infrastructure, where future requests are unknown. It is not a static TSP solver and the competitive guarantee is not a per-instance approximation ratio.
+
+**Transfer:** dynamic Sol-Atlas dispatch and re-routing; benchmark adversarial and oblivious request sequences, movement cost, competitive ratio and online computation separately from offline optimal routing.
+
+### Research lesson
+
+The Luminous portfolio should distinguish at least five guarantee classes:
+
+1. Exact optimization/counting with proof or independently checkable certificate.
+2. Randomized exact algorithms with one-sided/two-sided error.
+3. FPRAS / approximate counting with explicit relative-error and confidence guarantees.
+4. Approximation algorithms with a proven ratio or gap.
+5. Online algorithms with competitive guarantees.
+
+A single “accuracy” metric cannot compare these classes. The type of guarantee must be part of each problem contract and every benchmark receipt.
+
 ## State of practice: competition and benchmark baselines
 
 - [SAT Competition 2026](https://satcompetition.github.io/2026/): Main, Parallel, Experimental and Cloud tracks, with AI-generated/AI-tuned subtracks. Main-track proof-checker support and proof-checking rules are especially relevant. Use the published benchmark list, per-instance outcomes, solver sources and result logs.
