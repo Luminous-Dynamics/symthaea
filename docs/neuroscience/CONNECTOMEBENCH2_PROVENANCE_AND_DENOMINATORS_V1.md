@@ -35,6 +35,8 @@ The visible V1 card reports five sample types:
 
 The three synthetic control classes have EM on every row; the real edit classes are stratified subsets. Therefore an all-row EM model score can be biased toward synthetic controls if it is not filtered and stratified by `sample_type`, task routing, `has_em`, species and split. Do not calculate per-class EM counts from the rounded 38% and 23% summaries.
 
+**V1 card inconsistency:** the five reported sample-type counts sum to **401,461**, which is **291 greater** than the card's stated 401,170 rows. The split counts (319,727 + 43,517 + 37,926) do sum to 401,170. This is a source-reported discrepancy, not an inferred overlap or a correction. The V1 sample-type census is therefore not reconciled until the immutable metadata/shard snapshot is counted. The manifest records this as `SOURCE_REPORTED_COUNTS_DO_NOT_RECONCILE`; no row identities are invented.
+
 Task routing is material: merge correction of false splits uses dual-segment renders; split correction of false merges uses single-segment renders. The V1 card warns that `em_best` was selected using both labels and can leak dual-label information; it advises discarding it for single-segment tasks. The VLM preprint separately says it dropped the oblique `em_best` plane for its merge-error task because its orientation is chosen from post-split masks.
 
 ## 3. V2 full-test comparator: exact denominator and class census
