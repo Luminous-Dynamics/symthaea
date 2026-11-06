@@ -234,8 +234,12 @@ pub fn evaluate_paired_policy_comparison<'a>(
         inputs.settlement_basis_source_sha256,
         inputs.scenario_manifest_source_sha256,
     ];
+    let mut unique_common_references = BTreeSet::new();
     for (reference, digest) in common_references.into_iter().zip(common_digests) {
         validate_reference(reference, digest)?;
+        if !unique_common_references.insert(reference) {
+            return Err(PairedPolicyComparisonError::InvalidEvidenceReference);
+        }
     }
     if inputs.declared_scenario_ids.is_empty() {
         return Err(PairedPolicyComparisonError::EmptyScenarioSet);
