@@ -57,7 +57,7 @@
     "validation_test": "Test 2",
     "leakage_rule": "No Test 2 measurements, fitted parameters or revised data may be used to fit the Test 1-calibrated model. All source and model versions must be content-addressed before the validation replay.",
     "raw_preservation": "Preserve the original ZIP and every extracted member unchanged; hash the archive and each data member before parsing.",
-    "time_alignment": "Preserve source timezone and UTC offset as supplied. Do not normalize time, daylight-saving transitions, gaps or duplicate timestamps before recording the raw mapping.",
+    "time_alignment": "Preserve every raw timestamp string and its source-declared offset. The schedule CSV is documented as UTC+1 and the measurement CSV as UTC+2. Convert each independently to UTC using the source_time_mapping kernel; same wall-clock labels differ by exactly 3,600 seconds after conversion. This difference is not a correction instruction. The schedule-to-meter alignment remains unresolved until the primary article or dataset maintainers confirm the intended clock basis. Never silently shift a source file.",
     "schedule_mapping": "Map each optimized schedule interval to synchronized one-second grid-point measurements, then aggregate using energy integration rather than averaging power values without duration weights.",
     "physical_replay": "Compare schedule against grid-connection-point energy; separately evaluate inverter AC/DC efficiency, system SOC drift and individual-unit SOC trajectories.",
     "balancing_cost": "Only calculate balancing cost when the required market price/settlement evidence is present in the dataset or separately source-frozen. Never infer a currency charge from energy deviation alone.",
@@ -86,7 +86,10 @@
     "test_1_reproduced": false,
     "test_2_reproduced": false,
     "symthaea_comparison_run": false,
-    "field_metrics_state": "not_run"
+    "field_metrics_state": "not_run",
+    "clock_mapping_kernel_tested": false,
+    "m5bat_source_clock_reconciled": false,
+    "schedule_measurement_alignment_state": "not_reconciled"
   },
   "field_data_registry_context": {
     "repository": "Astrolabe-Analytics/public-battery-field-data",
@@ -178,5 +181,42 @@
       "Store all raw archives outside the public repo; preserve original bytes, per-member SHA-256, publisher DOI, acquisition timestamp, license and immutable extraction manifest before parsing."
     ],
     "claim_boundary": "The registry is a discovery catalogue and its headline totals are not a validation result. No candidate archive in this registry context is marked as staged by this record; source files must be acquired, digested and independently checked before any raw-field metric is claimed."
+  },
+  "source_clock_contract": {
+    "state": "source_offsets_documented_alignment_unresolved",
+    "schedule_clock": {
+      "source_document_label": "UTC + 1",
+      "declared_utc_offset_minutes": 60,
+      "evidence_ref": "M5BAT supplementary dataset PDF, p. 6 / schedule CSV field description",
+      "evidence_url": "https://publications.rwth-aachen.de/record/1015732/files/Supplementary_file.pdf"
+    },
+    "measurement_clock": {
+      "source_document_label": "UTC + 2",
+      "declared_utc_offset_minutes": 120,
+      "evidence_ref": "M5BAT supplementary dataset PDF, p. 7 / measurement CSV field description",
+      "evidence_url": "https://publications.rwth-aachen.de/record/1015732/files/Supplementary_file.pdf"
+    },
+    "equal_civil_wall_time_comparison": {
+      "measurement_utc_minus_schedule_utc_seconds": -3600,
+      "interpretation": "For identical local wall-clock label, converting schedule UTC+1 and measurement UTC+2 independently to UTC yields measurement UTC instant one hour earlier.",
+      "status": "mathematically_determined_from_declared_offsets"
+    },
+    "prohibited_assumptions": [
+      "Do not treat raw timestamps as UTC.",
+      "Do not normalize both files using the workstation timezone.",
+      "Do not silently add or subtract one hour to force schedule/meter alignment.",
+      "Do not assume the two labels share the same intended physical instant.",
+      "Do not infer daylight-saving transitions from the city name alone."
+    ],
+    "required_reconciliation": [
+      "Stage and hash both original CSVs and the archive.",
+      "Parse raw timestamp strings without changing their wall-clock values.",
+      "Confirm the time basis in the primary article or with dataset maintainers.",
+      "Determine whether one file is intentionally offset, mislabelled, or expressed in a different clock convention.",
+      "Emit a source-clock mapping receipt for every file and any per-row offset changes.",
+      "Only then align 15-minute schedule intervals with one-second measurements."
+    ],
+    "automatic_clock_correction_permitted": false,
+    "field_alignment_state": "not_reconciled"
   }
 }
