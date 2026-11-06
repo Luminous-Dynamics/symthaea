@@ -1,0 +1,29 @@
+{
+  "schema_version": "pitb.sorrydb-snapshot-manifest.v0",
+  "benchmark_id": "SorryDB_2601",
+  "release_period": "2026-01",
+  "upstream_repository": "SorryDB/SorryDB",
+  "upstream_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+  "license": "Apache-2.0",
+  "dataset_path": "data/SorryDB_2601/SorryDB_2601.json",
+  "dataset_git_blob_sha1": "5fafddac467af6d30d8f5c8731d6edec9c273a47",
+  "evaluation_path": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json",
+  "evaluation_git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7",
+  "expected_dataset_records": 2601,
+  "expected_evaluation_records": 1000,
+  "identity_fields": [
+    "id",
+    "repo.remote",
+    "repo.branch",
+    "repo.commit",
+    "repo.lean_version",
+    "location.path",
+    "location.start_line",
+    "location.start_column",
+    "location.end_line",
+    "location.end_column"
+  ],
+  "environment_policy": "repository_commit_and_lean_version_are_part_of_task_identity",
+  "debug_goal_policy": "diagnostic_only_not_an_authoritative_target_statement",
+  "proof_verification_policy": "requires_fresh_checkout_at_exact_repo_commit_and_independent_lean_kernel_replay"
+}
