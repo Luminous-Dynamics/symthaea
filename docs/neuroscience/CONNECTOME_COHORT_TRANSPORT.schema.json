@@ -119,6 +119,7 @@
         "split_unit",
         "train_animal_ids",
         "validation_animal_ids",
+        "calibration_animal_ids",
         "lockbox_animal_ids",
         "split_sha256",
         "lockbox_frozen_before_prediction"
@@ -163,6 +164,15 @@
         },
         "lockbox_frozen_before_prediction": {
           "const": true
+        },
+        "calibration_animal_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },
@@ -187,6 +197,7 @@
           "enum": [
             "TRAIN",
             "VALIDATION",
+            "CALIBRATION",
             "LOCKBOX"
           ]
         }
@@ -336,7 +347,11 @@
         "implementation_sha256",
         "training_manifest_sha256",
         "training_animal_ids",
-        "supported_conditions"
+        "supported_conditions",
+        "calibration_method",
+        "calibration_animal_ids",
+        "calibration_manifest_sha256",
+        "calibration_receipt_sha256"
       ],
       "properties": {
         "model_id": {
@@ -377,8 +392,74 @@
           "items": {
             "$ref": "#/$defs/condition_support"
           }
+        },
+        "calibration_method": {
+          "enum": [
+            "NONE",
+            "TEMPERATURE_SCALING",
+            "PLATT_SCALING",
+            "ISOTONIC",
+            "SPLIT_CONFORMAL",
+            "ISOTONIC_PLUS_SPLIT_CONFORMAL",
+            "OTHER"
+          ]
+        },
+        "calibration_animal_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "calibration_manifest_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "calibration_receipt_sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/sha64"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "calibration_method": {
+                "const": "NONE"
+              }
+            },
+            "required": [
+              "calibration_method"
+            ]
+          },
+          "then": {
+            "properties": {
+              "calibration_animal_ids": {
+                "maxItems": 0
+              },
+              "calibration_receipt_sha256": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "calibration_animal_ids": {
+                "minItems": 1
+              },
+              "calibration_receipt_sha256": {
+                "$ref": "#/$defs/sha64"
+              }
+            }
+          }
+        }
+      ]
     },
     "condition_support": {
       "type": "object",
