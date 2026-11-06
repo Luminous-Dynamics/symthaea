@@ -16,13 +16,15 @@
     "repository_identities_assigned": false,
     "development_or_holdout_partition_assigned": false,
     "difficulty_labels_assigned": false,
-    "fixtures_created": false,
+    "fixtures_created": true,
     "reference_patches_created": false,
     "graders_implemented": false,
     "candidate_execution_performed": false,
     "task_admission_claimed": false,
     "sealed_holdout_claimed": false,
-    "performance_result_claimed": false
+    "performance_result_claimed": false,
+    "fixtures_compiled": false,
+    "fixture_tests_run": false
   },
   "oracle_semantics": {
     "accepted_candidate": "The candidate implementation satisfies every cited normative requirement for that case.",
@@ -138,7 +140,16 @@
           "why_spec_derived": "The composition case exercises compatibility and typed errors together, both explicitly required."
         }
       ],
-      "unresolved_before_fixture": "Freeze exact public items, supported feature combinations, compatibility window, Rust toolchain and the set of error distinctions observable to downstream callers."
+      "unresolved_before_fixture": "Freeze exact public items, supported feature combinations, compatibility window, Rust toolchain and the set of error distinctions observable to downstream callers.",
+      "source_fixture": {
+        "path": "benchmarks/ceb/public-development-fixtures/rust-api-migration-v0/",
+        "status": "public_source_only_not_compiled_or_executed",
+        "file_count": 10,
+        "has_cargo_lock": false,
+        "reference_patch_present": false,
+        "executable_oracle_present": false,
+        "task_manifest_present": false
+      }
     },
     {
       "candidate_key": "trait-async",
@@ -705,6 +716,17 @@
         }
       ],
       "unresolved_before_fixture": "Freeze key type, total ordering, numeric policy, tie-breaker, workload distribution, memory ceiling, hardware and measurement protocol."
+    }
+  ],
+  "public_development_fixtures": [
+    {
+      "candidate_key": "api-migration",
+      "path": "benchmarks/ceb/public-development-fixtures/rust-api-migration-v0/",
+      "status": "source_only_not_compiled_or_executed",
+      "file_count": 10,
+      "purpose": "Minimal four-crate workspace showing an internal typed parser, an exposed legacy Option adapter, a storage compatibility consumer and a CLI consumer to migrate.",
+      "admission_status": "not_admitted",
+      "holdout_eligible": false
     }
   ]
 }
