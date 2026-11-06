@@ -33,8 +33,21 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Formatting
+      - name: Apply pinned formatter to stacked science-benchmark sources
+        run: cargo fmt --manifest-path research/science-bench-refresh/Cargo.toml
+
+      - name: Verify formatting after pinned formatter
         run: cargo fmt --manifest-path research/science-bench-refresh/Cargo.toml -- --check
+
+      - name: Export formatted source snapshot for review
+        run: tar -czf /tmp/sbr-formatted-sources.tar.gz research/science-bench-refresh/src
+
+      - name: Upload formatted source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbr-rustfmt-source-snapshot
+          path: /tmp/sbr-formatted-sources.tar.gz
+          if-no-files-found: error
 
       - name: Unit tests
         run: cargo test --locked --manifest-path research/science-bench-refresh/Cargo.toml
