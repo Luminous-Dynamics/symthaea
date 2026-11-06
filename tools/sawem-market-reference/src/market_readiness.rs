@@ -172,7 +172,11 @@ pub fn assess_market_readiness<'a>(
         if !valid_sha256(evidence.source_sha256) {
             return Err(MarketReadinessError::InvalidDigest);
         }
-        if evidence.valid_until_utc.map(|end| end <= evidence.valid_from_utc) == Some(true) {
+        if evidence
+            .valid_until_utc
+            .map(|end| end <= evidence.valid_from_utc)
+            == Some(true)
+        {
             return Err(MarketReadinessError::InvalidValidityWindow);
         }
         if evidence.available_at_utc < evidence.published_at_utc {
@@ -204,15 +208,13 @@ pub fn assess_market_readiness<'a>(
                 continue;
             }
             if evidence.scope != inputs.scope {
-                scope_mismatch_excluded_count =
-                    scope_mismatch_excluded_count.saturating_add(1);
+                scope_mismatch_excluded_count = scope_mismatch_excluded_count.saturating_add(1);
                 continue;
             }
             if evidence.available_at_utc > inputs.decision_time_utc
                 || evidence.published_at_utc > inputs.decision_time_utc
             {
-                future_known_excluded_count =
-                    future_known_excluded_count.saturating_add(1);
+                future_known_excluded_count = future_known_excluded_count.saturating_add(1);
                 continue;
             }
             if !evidence_is_valid_at(evidence, inputs.decision_time_utc) {
@@ -267,10 +269,8 @@ pub fn assess_market_readiness<'a>(
 mod tests {
     use super::*;
 
-    const PROFILE_SHA: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const SOURCE_SHA: &str =
-        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const PROFILE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const SOURCE_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     fn requirement(
         requirement_id: &'static str,
@@ -580,9 +580,12 @@ mod tests {
             ReadinessEvidenceClass::OfficialAuthorityRecord,
         );
         assert_eq!(
-            assess_market_readiness(inputs(&[requirements[0], other_requirement], &shared_source))
-                .unwrap()
-                .state,
+            assess_market_readiness(inputs(
+                &[requirements[0], other_requirement],
+                &shared_source
+            ))
+            .unwrap()
+            .state,
             MarketReadinessState::Ready
         );
     }
