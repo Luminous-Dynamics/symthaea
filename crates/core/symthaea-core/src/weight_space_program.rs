@@ -458,13 +458,13 @@ fn validate_group(
             }
         }
         WeightProgramTarget::HdcLtc(_)
-            if group.role != ParameterGroupRole::Hypervector =>
+            if group.role != ParameterGroupRole::Hypervector
+                || !group.constraints.max_l2_norm.is_some_and(|maximum| maximum <= 2.0) =>
         {
             return Err(WeightProgramError::InvalidConstraints);
         }
         WeightProgramTarget::HdcLtc(_) => {}
-    }
-    Ok(())
+
 }
 
 fn validate_group_constraints(
@@ -750,6 +750,36 @@ mod tests {
         assert_eq!(
             proposal.validate_and_materialize(&base),
             Err(WeightProgramError::DuplicateProgramTarget)
+        );
+    }
+
+    #[test]
+    fn target_specification_digest_is_bound() {
+        let base = snapshot();
+        let mut proposal = program(WeightProgramOperation::ScaleRange {
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+            start: 0,
+            end: 1,
+            factor: 1.1,
+        });
+        proposal.target_specification_digest = digest('e');
+        assert_eq!(
+            proposal.validate_and_materialize(&base),
+            Err(WeightProgramError::StaleDigest("target specification"))
+        );
+    }
+
+    #[test]
+    fn per_group_delta_budget_is_enforced() {
+        let base = snapshot();
+        let proposal = program(WeightProgramOperation::AddDelta {
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+            offset: 0,
+            values: vec![0.4, 0.4],
+        });
+        assert_eq!(
+            proposal.validate_and_materialize(&base),
+            Err(WeightProgramError::GroupDeltaBudgetExceeded)
         );
     }
 
