@@ -196,25 +196,8 @@ impl FlightController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Weight decay: pull output weights toward zero to prevent unbounded drift.
-        const WEIGHT_DECAY: f32 = 1e-4;
-        let decay = 1.0 - WEIGHT_DECAY;
-        for w in self.output_weights.iter_mut() {
-            *w *= decay;
-        }
-
-        // Update output weights: dW[i][j] = -output_lr * d_raw[i] * hv[j]
-        // output_lr = lr * √D compensates for gradient dilution across 16,384 weights.
-        for i in 0..4 {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
-            }
-            self.output_bias[i] -= output_lr * d_raw[i];
-        }
-
-        // Backprop through network: compute gradient HV in output space
-        // dL/d(hv) = sum_i (d_raw[i] * W[i])
+        // Build the upstream HDC target direction from the output-head weights
+        // that generated this prediction, before mutating those weights.
         let dim = HDC_DIMENSION;
         let mut grad_hv_values = vec![0.0f32; dim];
         for i in 0..4 {
@@ -222,6 +205,21 @@ impl FlightController {
             for j in 0..dim {
                 grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
             }
+        }
+
+        // Weight decay and output-head update.
+        const WEIGHT_DECAY: f32 = 1e-4;
+        let decay = 1.0 - WEIGHT_DECAY;
+        for w in self.output_weights.iter_mut() {
+            *w *= decay;
+        }
+
+        for i in 0..4 {
+            let row_offset = i * HDC_DIMENSION;
+            for j in 0..HDC_DIMENSION {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+            }
+            self.output_bias[i] -= output_lr * d_raw[i];
         }
 
         // Full BPTT: iterate from last layer backward through all layers
