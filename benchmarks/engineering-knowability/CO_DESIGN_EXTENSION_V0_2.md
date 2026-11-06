@@ -173,3 +173,12 @@ The eight paired rows are a pilot/authoring tranche, not a powered confirmatory 
 For zero false accepts on (n) independent negative-control families, the one-sided 95% exact binomial upper bound is (1-0.05^{1/n}): 59/59 is below 5%, and 299/299 is below 1%. Mutations/variants from one base family are correlated and do not increase (n). These bounds apply only to the declared sampling frame; no universal safety or reliability guarantee follows.
 
 The eight-row matrix is only a pilot. No claim that co-design beats a frontier agent or reduces lifecycle cost is permitted until an independently adjudicated, preregistered confirmatory study is completed.
+
+
+## Candidate / evaluator trust boundary
+
+The machine-readable [candidate submission contract](candidate-output.schema.json) deliberately excludes candidate scores, hidden gold labels, evaluator mutations and hidden-case metadata. A candidate can return editable design alternatives, explicit critical-claim dispositions, proposed evidence paths, Unknown/Unsupported states, owner-evidence requests and resource usage. Its allowed evidence classes for this synthetic v0.1 task contract are `synthetic_reference`, `proposal` and `simulation`.
+
+The separate [evaluator-only gold contract](gold-adjudication.schema.json) requires at least two independent assessor records, declared assessor independence, a third-adjudicator route when disagreement exists, independent mutation-oracle references and a sealed custody record. It is not candidate-visible.
+
+Neither schema creates an evidence authority. The candidate proposes; independent scoring adjudicates; ETK/ENG-MEAS/ENG-TOL/FIELD/ENG-REF retain their existing decision authority.
