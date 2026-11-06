@@ -1198,11 +1198,7 @@ fn deterministic_claim_mutation_matrix_never_replays_the_old_result() {
 
     for (field, mutated) in mutations {
         let mutated_bytes = serde_json::to_vec(&mutated).unwrap();
-        let replay = replay_claim_evaluation(
-            &mutated_bytes,
-            &[fixture_bytes()],
-            &result_bytes,
-        );
+        let replay = replay_claim_evaluation(&mutated_bytes, &[fixture_bytes()], &result_bytes);
         match replay {
             Ok(receipt) => assert_ne!(
                 receipt.outcome,
@@ -1232,10 +1228,12 @@ fn contradiction_cardinality_sweep_never_turns_conflict_into_majority_support() 
 
         for index in 0..contradiction_count {
             let mut value = original.value.clone();
-            value["provider"]["id"] =
-                json!(format!("cardinality-contradiction-{contradiction_count}-{index}"));
-            value["provider"]["name"] =
-                json!(format!("Cardinality Contradiction {contradiction_count} {index}"));
+            value["provider"]["id"] = json!(format!(
+                "cardinality-contradiction-{contradiction_count}-{index}"
+            ));
+            value["provider"]["name"] = json!(format!(
+                "Cardinality Contradiction {contradiction_count} {index}"
+            ));
             value["analysis_profile"]["provider"] = value["provider"].clone();
             value["analysis_profile"]["digest"] =
                 json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
@@ -1293,10 +1291,12 @@ fn unsupported_predicate_closure_sweep_cannot_be_bought_with_more_observations()
 
             for index in 0..evidence_count {
                 let mut value = original.value.clone();
-                value["provider"]["id"] =
-                    json!(format!("unsupported-{predicate:?}-{evidence_count}-{index}"));
-                value["provider"]["name"] =
-                    json!(format!("Unsupported {predicate:?} {evidence_count} {index}"));
+                value["provider"]["id"] = json!(format!(
+                    "unsupported-{predicate:?}-{evidence_count}-{index}"
+                ));
+                value["provider"]["name"] = json!(format!(
+                    "Unsupported {predicate:?} {evidence_count} {index}"
+                ));
                 value["analysis_profile"]["provider"] = value["provider"].clone();
                 value["analysis_profile"]["digest"] =
                     json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
@@ -1320,8 +1320,7 @@ fn unsupported_predicate_closure_sweep_cannot_be_bought_with_more_observations()
                 .collect();
 
             let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
-            let supplied: Vec<&[u8]> =
-                evidence_bytes.iter().map(Vec::as_slice).collect();
+            let supplied: Vec<&[u8]> = evidence_bytes.iter().map(Vec::as_slice).collect();
             let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
 
             assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
@@ -1397,4 +1396,3 @@ fn bounded_cli_rejects_oversized_sparse_files_before_reading_payloads() {
 
     std::fs::remove_dir_all(directory).unwrap();
 }
-
