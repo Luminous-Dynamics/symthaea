@@ -232,6 +232,16 @@ References:
 - Public field dataset and supplementary file: https://publications.rwth-aachen.de/record/1015732
 - Dataset DOI: https://doi.org/10.18154/RWTH-2025-06555
 
+### Source-clock integrity for high-resolution field replay
+
+The new `source_time_mapping.rs` module converts source-local civil timestamps to UTC only when an explicit, source-referenced offset and content digest are present. It uses integer Gregorian calendar arithmetic, validates leap days and civil fields, and preserves the original civil timestamp, source clock label, offset, source reference and mapped UTC instant. It does not query the host timezone, infer DST from a place name, sort or deduplicate timestamps silently, or repair clock skew.
+
+This is now a material issue in the public M5BAT dataset. The supplementary note documents optimized schedule timestamps as **UTC+1** (p. 6) and measurement timestamps as **UTC+2** (p. 7). For the same wall-clock label, these source declarations map to UTC instants 3,600 seconds apart. That arithmetic is certain; the intended schedule-to-measurement clock alignment is not. The original archive has not yet been staged, so we do not know whether the difference reflects an intentional source convention, a label inconsistency or a required mapping adjustment.
+
+The manifest `m5bat-field-benchmark-v1.json` now freezes both source clock declarations, the calculated one-hour difference and an unresolved alignment state. No file shift is allowed until the raw CSVs, the primary article and/or dataset-maintainer clarification establish the intended time basis. Once staged, the schedule's 15-minute intervals must be mapped against the one-second measurements using explicit, content-addressed clock receipts. This is a prerequisite for any honest schedule-fulfilment, balancing-cost or model-improvement comparison.
+
+Benchmark case: `FIELD-SOURCE-CLOCK-ALIGNMENT-001`. The new kernel currently has seven synthetic known-answer and hostile-control tests; no M5BAT CSV has been replayed.
+
 ### SOC-dependent BMS capability envelopes
 
 The new `bms_capability.rs` module replaces a single static power limit with separate, source-bound charge and discharge power curves over an explicit SOC calibration range. Between measured/certified breakpoints it performs exact rational linear interpolation and rounds the available-power result down to the next whole watt. It rejects out-of-range SOC rather than extrapolating. A curve marked synthetic can be used for scenario exploration, but its result is marked as synthetic-basis only. A non-synthetic evidence basis is not by itself a source-authenticity proof, BMS approval or operational authorization.
