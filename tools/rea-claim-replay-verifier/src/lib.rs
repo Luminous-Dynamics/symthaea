@@ -791,7 +791,7 @@ fn derive_reference_result(
                 evidence_id,
                 AssessmentKind::NotEvaluated,
                 &record.value,
-                "no authorized v0 inference rule evaluates this premise",
+                "no authorized inference rule evaluates this premise for the requested predicate",
             ));
             continue;
         }
