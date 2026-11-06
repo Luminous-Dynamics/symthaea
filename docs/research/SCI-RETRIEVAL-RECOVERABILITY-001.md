@@ -39,14 +39,14 @@ For each required, pinned evidence unit, a finite graph binds the initial state 
 | Class | Operational definition |
 |---|---|
 | DirectlyReachable | Route uses first-pass retrieval only |
-| ReformulationRecoverable | Route requires query reformulation and a post-reformulation retrieval, but no navigation |
+| ReformulationRecoverable | First-pass retrieval misses the required unit; then a query reformulation and post-reformulation retrieval reach it, without structural navigation |
 | NavigationRecoverable | Route requires a structural operation such as open, follow link/TOC, pagination or in-document find |
 | UnreachableWithinBudget | No permitted route fits the frozen graph and budget |
 | NotEvaluable | Search surface is not frozen/observed or artifact availability is unknown/unavailable |
 
 A direct route takes precedence over a reformulation or navigation route; reformulation takes precedence over navigation. The report includes the deterministic shortest route witness and route cost. These witnesses and gold artifact references are evaluator-side only. The reported family-reference count is descriptive: this module does not resolve opaque source-family references against Mycelix provenance, and it must not be interpreted as an independent-source count.
 
-The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. Reachability is asymmetric: a concrete pinned route is positive evidence even when the observed surface is partial; a missing route is not evidence of unreachability unless the declared finite surface and route inventory are frozen and complete. Thus a partial surface can preserve DirectlyReachable, ReformulationRecoverable, or NavigationRecoverable witnesses, but an item with no observed route becomes NotEvaluable. An entirely unknown surface makes every item NotEvaluable.
+A ReformulationRecoverable route must perform InitialRetrieval first, then QueryReformulation, then PostReformulationRetrieval. Query rewriting before any first-pass retrieval, or retrieval before the rewrite, does not qualify. The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. Reachability is asymmetric: a concrete pinned route is positive evidence even when the observed surface is partial; a missing route is not evidence of unreachability unless the declared finite surface and route inventory are frozen and complete. Thus a partial surface can preserve DirectlyReachable, ReformulationRecoverable, or NavigationRecoverable witnesses, but an item with no observed route becomes NotEvaluable. An entirely unknown surface makes every item NotEvaluable.
 
 ## Executable contract
 
@@ -91,7 +91,7 @@ The initial synthetic fixture covers:
 - unknown artifact availability;
 - duplicate artifact mirrors with a shared source family.
 
-Metamorphic checks verify that reducing budget never improves reachability, adding a concrete first-pass edge can improve only the target unit, partial surfaces preserve positive route witnesses while blocking negative claims, unknown surfaces yield only NotEvaluable, and a tampered manifest commitment yields no route labels. An independent Python reference is compared against Rust for every classification and shortest-route witness. A model-supplied judgment field is rejected as an unknown property.
+Metamorphic checks verify that reducing budget never improves reachability, adding a concrete first-pass edge can improve only the target unit, partial surfaces preserve positive route witnesses while blocking negative claims, unknown surfaces yield only NotEvaluable, post-retrieval-before-rewrite is rejected, rewriting-before-first-retrieval is rejected, and a tampered manifest commitment yields no route labels. An independent Python reference is compared against Rust for every classification and shortest-route witness. A model-supplied judgment field is rejected as an unknown property.
 
 ## Benchmark strategy and target comparisons
 
