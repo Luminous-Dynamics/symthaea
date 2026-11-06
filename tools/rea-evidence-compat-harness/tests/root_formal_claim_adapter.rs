@@ -209,3 +209,54 @@ fn formal_envelope_byte_limit_is_enforced() {
     let error = parse_formal_provider_observation_json(&oversized).unwrap_err();
     assert_eq!(error.kind, FormalMappingErrorKind::InputTooLarge);
 }
+
+#[test]
+fn assumptions_and_inapplicable_scope_never_export_positive_or_negative_polarity() {
+    let evidence = verify_evidence_json(fixture_bytes()).unwrap();
+
+    let mut assumed = provider_claim(evidence.evidence_id.clone());
+    assumed
+        .assumptions
+        .push("the scanner database is complete".to_owned());
+    let result = evaluate_claim(&assumed, std::slice::from_ref(&evidence)).unwrap();
+    assert_eq!(result.disposition, ClaimDisposition::Unverified);
+    let formal = export_formal_provider_observation(&result).unwrap();
+    assert_eq!(
+        formal.semantic_polarity,
+        FormalSemanticPolarity::NoSemanticConclusion
+    );
+
+    let mut wrong_subject = provider_claim(evidence.evidence_id.clone());
+    wrong_subject.scope.subject_sha256 =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
+    let result = evaluate_claim(&wrong_subject, &[evidence]).unwrap();
+    assert_eq!(result.disposition, ClaimDisposition::Inapplicable);
+    let formal = export_formal_provider_observation(&result).unwrap();
+    assert_eq!(
+        formal.semantic_polarity,
+        FormalSemanticPolarity::NoSemanticConclusion
+    );
+}
+
+#[test]
+fn formal_rule_generation_is_a_versioned_wire_value_and_schema_contract() {
+    let evidence = verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let result = evaluate_claim(&claim, &[evidence]).unwrap();
+    let mut formal = export_formal_provider_observation(&result).unwrap();
+    assert_eq!(formal.binding.evaluator_rule_generation, 0);
+
+    formal.binding.evaluator_rule_generation = 1;
+    let error = validate_formal_provider_observation(&formal).unwrap_err();
+    assert_eq!(error.kind, FormalMappingErrorKind::InvalidEvaluation);
+
+    let schema: Value = serde_json::from_str(include_str!(
+        "../../../docs/formal/rea-formal-provider-observation-v1.schema.json"
+    ))
+    .unwrap();
+    assert_eq!(
+        schema["properties"]["binding"]["properties"]["evaluator_rule_generation"]["const"],
+        json!(0)
+    );
+}
+
