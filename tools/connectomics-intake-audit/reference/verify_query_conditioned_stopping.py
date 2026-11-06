@@ -34,7 +34,10 @@ def expected_query_status(evaluation: dict[str, Any], maximum_missed: float) -> 
         or evaluation['missed_candidate_upper_bound'] > maximum_missed
     ):
         return 'INSUFFICIENT_COVERAGE'
-    if len(set(evaluation['query_decisions'])) > 1 or evaluation['unresolved_world_count'] > 0:
+    if (
+        len(set(value for value in evaluation['query_decisions'] if value is not None)) > 1
+        or evaluation['unresolved_query_decision_world_count'] > 0
+    ):
         return 'QUERY_UNSTABLE'
     return 'QUERY_STABLE_WITHIN_DECLARED_SCOPE'
 
@@ -65,7 +68,11 @@ def validate_track(track: dict[str, Any], global_stop_rule: dict[str, Any]) -> d
         world_ids = evaluation['admissible_world_ids']
         decisions = evaluation['query_decisions']
         require(len(world_ids) == len(set(world_ids)), 'duplicate admissible world ID')
-        require(len(world_ids) == len(decisions), 'one query decision is required for every admissible world')
+        require(len(world_ids) == len(decisions), 'one query decision (or null unresolved result) is required for every admissible world')
+        require(
+            evaluation['unresolved_query_decision_world_count'] == sum(value is None for value in decisions),
+            'unresolved query-decision world count differs from null decision entries',
+        )
         require(valid_sha(evaluation['certificate_sha256']) or evaluation['certificate_sha256'] is None, 'query certificate digest malformed')
         require(evaluation['missed_candidate_upper_bound'] <= 1.0, 'missed-candidate upper bound outside [0,1]')
 
@@ -194,6 +201,16 @@ def self_test(data: dict[str, Any]) -> None:
         pass
     else:
         raise AssertionError('open boundary with safe-stop flag was not rejected')
+    mutated = copy.deepcopy(data)
+    early = next(track for track in mutated['tracks'] if track['track_id'] == 'query-specific-early-stop-and-late-invalidation')
+    early['snapshots'][0]['query_evaluation']['query_decisions'] = [False, None]
+    early['snapshots'][0]['query_evaluation']['unresolved_query_decision_world_count'] = 1
+    try:
+        validate(mutated)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('unresolved query consequence with safe-stop flag was not rejected')
     mutated = copy.deepcopy(data)
     early = next(track for track in mutated['tracks'] if track['track_id'] == 'query-specific-early-stop-and-late-invalidation')
     early['snapshots'][1]['edit_strategy'] = 'SPLIT_FOCUSED'
