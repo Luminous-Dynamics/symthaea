@@ -11,7 +11,7 @@
   },
   "solver_corpus": {
     "path": "solver-input.public-dev-v0.1.json",
-    "sha256": "79dbaddcb5e6e14d7dc4c6aa8bc803f5e1326499df06808aa93d7c028fecd84c",
+    "sha256": "ccd29f32c9858ebd785485ebcbabd999d56146c046bb2220075d6441e9858692",
     "schema": "xstack-solver-input-v0.1.schema.json"
   },
   "evaluator_corpus": {
