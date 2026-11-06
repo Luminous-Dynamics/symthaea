@@ -367,3 +367,53 @@ The existing tools measure orthogonal properties. REA should compare against the
 7. Model/agent synthesis with claim gating, independent replay and explicit abstention.
 
 The improvement claim should be: lower false-entailment and stale-evidence error at a measured cost, while retaining useful coverage—not "beats SLSA" or "beats AgentRE" on unrelated scores.
+
+
+## 9. New source-grounding and reverse-engineering frontiers (2026-11-06)
+
+### RDQA: correctness is not evidence retrieval
+
+The October 2026 EMNLP paper *Can Your Agent Read the Source Faithfully?* introduces RDQA: 1,350 questions over documents, video and audio, with 20 real-world scenarios and nine capability families. It defines Parametric Leakage Rate (PLR) to catch correct answers generated without genuine retrieval. Across 12 agent systems, the best generic agent has 24.0% adjusted accuracy and a process-aware RDQA-Skill baseline reaches 41.1%; PLR reaches as high as 96.0% in the evaluated systems. These are RDQA results, not REA performance numbers, but the failure mode is exactly relevant: answer correctness and evidence-grounded correctness are different estimands.
+
+**REA consequence: add a source-grounding / parametric-leakage track.** For each hidden artifact, include unique per-instance facts that cannot be reliably guessed from domain priors. The benchmark should:
+- randomize high-entropy values, offsets, identifiers, constants and behavior markers across artifacts;
+- use paired counterfactual artifacts that differ in one controlled fact while keeping surrounding task language fixed;
+- require the agent's answer and claim result to bind the exact source artifact/member digest and occurrence;
+- instrument actual source-byte reads / tool access and preserve extraction or observation digests, not merely model-reported tool calls;
+- score both correct recovery and whether the conclusion changes appropriately under the counterfactual mutation;
+- measure source-grounded accuracy, unsupported-correct-answer rate / PLR, evidence coverage, false entailment, abstention and mutation sensitivity separately.
+
+A model that guesses the right value but cannot bind it to an observation gets zero source-grounded credit. A model that calls a tool but cites the wrong member/occurrence also gets zero. Tool-call count is not evidence; instrumented access plus exact observation identity and claim scope is.
+
+The key metamorphic law is **counterfactual sensitivity**: when an artifact's relevant bytes are changed and the expected fact changes, the system's evidence-backed answer must change accordingly or abstain. When unrelated bytes are changed, the claim may remain invariant only if its exact scope/subject contract permits that transformation. Both sides need explicit expected labels.
+
+Reference: [Gao et al., EMNLP 2026, RDQA / source-grounded multimodal retrieval](https://aclanthology.org/2026.emnlp-main.1855/).
+
+### SRE-Bench and AgentRE-Bench measure different reverse-engineering regimes
+
+The October 2026 SRE-Bench update reports 19 private programs, 262 binary instances and 1,572 deterministically graded tasks across firmware, malware, games, file formats and protocols, four source languages and 44 anti-analysis mechanisms. Public-facing GPT-6 Astra scores 5.55 of six tasks on 181 graded instances, fully solving 149 (82.3%) of those graded instances. That denominator matters: model-side cyber safeguards left 81 of the 262 eligible instances ungraded/refused. In the separate unconstrained evaluation, GPT-6 Astra reaches pass@4 99.2% but pass@1 88.0%, showing that candidate selection/reliability remains an issue.
+
+AgentRE-Bench v3.1 is a different fixed Windows PE benchmark: six models, 20 artifacts, five attempts each (600 episodes). Its current 87.37 vs 87.04 scores are not comparable with SRE-Bench's out-of-six task score. The two should be reported as separate protocols, not blended into a synthetic leaderboard.
+
+**REA consequence:** build two separate transfer tracks:
+1. **Deterministic artifact-operation track:** ZIP/APK/IPA/member evidence admission, integrity, signatures, parsers and exact-byte controls. Aim for complete finite-oracle correctness and zero false accepts.
+2. **Agent reverse-engineering track:** protected held-out artifacts, source-free tasks, exact observation lineage, counterfactual mutation pairs, source-grounding/PLR, per-domain coverage, refusal/budget accounting and independent human/automated adjudication.
+
+REA should be the evidence/claim layer beneath either track, not claim to beat the binary-analysis specialists at disassembly or decompilation by itself.
+
+References: [DAPLab SRE-Bench (updated October 2026)](https://daplab.cs.columbia.edu/benchmarks/sre-bench/); [AgentRE-Bench v3.1, updated November 5, 2026](https://www.agentre-bench.ai/results/v3-1/).
+
+### New proposed benchmark gates for source-grounded RE
+
+| Metric | Proposed target | What it prevents |
+|---|---:|---|
+| Source-grounded claim accuracy | 100% on finite deterministic hidden-value controls | Correct-looking but ungrounded answers |
+| Parametric leakage rate on controlled facts | 0% on unique high-entropy facts | Guessing from priors |
+| Counterfactual mutation sensitivity | 100% on relevant one-field mutations | Evidence-insensitive answers |
+| Irrelevant-mutation invariance | 100% where the scope is unchanged | Overreacting to unrelated bytes |
+| Source/member/occurrence binding | 100% | Citing the wrong artifact or duplicate-name member |
+| False supported claims on unsupported controls | 0 | Plausible but non-entailed conclusions |
+| Evidence access attribution | 100% of accepted source claims have instrumented acquisition/observation lineage | Self-reported tool-use as proof |
+| Adjudication agreement | Report inter-rater/automatic-human agreement and unresolved cases | Treating a reproducible but flawed grader as ground truth |
+
+These are proposed release gates, not measured REA results. Do not copy RDQA's PLR numerical definition without inspecting and pinning its scoring protocol; use the concept but define a REA-specific denominator and adjudication plan before collecting scores.
