@@ -18126,6 +18126,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-aircraft-maintenance"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-alife"
 version = "0.1.0"
 dependencies = [
