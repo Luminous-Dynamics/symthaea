@@ -860,5 +860,16 @@
       "admission_status": "not_admitted",
       "holdout_eligible": false
     }
-  ]
+  ],
+  "canonical_family_ids": [
+    "rust-types-traits",
+    "multi-crate-api-regression",
+    "feature-target-configuration",
+    "issue-reproduction-debugging",
+    "security-correctness",
+    "performance-correctness"
+  ],
+  "canonical_sampling_plan_blob_sha1": "7a17223e98c3c2a87c333535620d3937db5e80f0",
+  "canonical_preregistration_blob_sha1": "d355ed00accfe4a02995894463ccd6ac714d760b",
+  "canonical_plan_provenance_note": "These Git blob IDs pin the canonical #10617 sampling-plan and preregistration files on the declared branch at authoring time. The family list is a snapshot, not a second source of task assignments; update it only when #10617's canonical source changes."
 }
