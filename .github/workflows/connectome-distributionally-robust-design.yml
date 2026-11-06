@@ -1,0 +1,57 @@
+name: Distributionally robust connectome intervention design
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_DISTRIBUTIONALLY_ROBUST_INTERVENTION_DESIGN_V1.md"
+      - "docs/neuroscience/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py"
+      - ".github/workflows/connectome-distributionally-robust-design.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_DISTRIBUTIONALLY_ROBUST_INTERVENTION_DESIGN_V1.md"
+      - "docs/neuroscience/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py"
+      - ".github/workflows/connectome-distributionally-robust-design.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-common-policy-minimax:
+    name: Validate exact common-policy minimax semantics
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned Draft 2020-12 validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate schema and full joint-model fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["ambiguity_set"]["declared_vertex_count"] == 2
+          assert len(fixture["model_vertices"]) == 2
+          assert all(len(vertex["predictions"]) == 15 for vertex in fixture["model_vertices"])
+          assert fixture["oracle_expectations"]["expected_selected_intervention_id"] == "orthogonal-robust"
+          print("Draft 2020-12 schema and joint-model matrix: PASS")
+          PY
+      - name: Run common-policy minimax oracle and adversarial controls
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py
+          python3 tools/connectomics-intake-audit/reference/verify_distributionally_robust_intervention_oracle.py docs/neuroscience/examples/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.example.json
