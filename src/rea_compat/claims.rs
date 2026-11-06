@@ -1059,14 +1059,19 @@ mod tests {
         // It does not upgrade an inferred analyst report to an observation
         // about artifact truth or to an independently trusted authority.
         assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
-        assert_eq!(result.evidence_assessments[0].confidence.as_deref(), Some("inferred"));
+        assert_eq!(
+            result.evidence_assessments[0].confidence.as_deref(),
+            Some("inferred")
+        );
         assert_eq!(
             result.evidence_assessments[0].authority.as_deref(),
             Some("analyst-inference")
         );
-        assert!(result.claim_ceiling.iter().any(|line| {
-            line.contains("does not prove the underlying real-world proposition")
-        }));
+        assert!(
+            result.claim_ceiling.iter().any(|line| {
+                line.contains("does not prove the underlying real-world proposition")
+            })
+        );
     }
 
     #[test]
