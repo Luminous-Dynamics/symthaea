@@ -77,10 +77,10 @@ https://arxiv.org/abs/2610.42058
 https://arxiv.org/html/2610.42058v1
 
 The paper's Section 4 gives:
-1. A planned-time matrix-heat ellipsoid (Theorem 4.1 / Appendix D.3) with finite-sample coverage, pilot-based whitening, covariance localization, explicit eigenvalue/heat gates, and score-mixture fallback.
-2. A time-uniform adaptive linear-bandit confidence sequence (Theorem 4.3 / Appendix D.4.3) whose simultaneous event covers matrix frames, directions, bets and time, with an ellipsoid output or R^d for singular design.
+1. A planned-time matrix-heat ellipsoid for direct vector means (Theorem 4.1 / Appendix D.3) with finite-sample coverage, pilot-based whitening, covariance localization, explicit eigenvalue/heat gates, and score-mixture fallback.
+2. A time-uniform adaptive linear-bandit confidence sequence (Theorem 4.3 / Appendix D.4.3) for scalar outcomes with predictable bounded design vectors. Its simultaneous event covers matrix frames, directions, bets and time, with an ellipsoid output or R^d for singular design.
 
-Those are distinct inferential constructions. This module implements neither. It is the exact geometry layer they can both reuse after their theorem-specific builders produce a valid center, factor and radius.
+The second method is not a drop-in anytime confidence sequence for SPECTRA's directly observed multi-metric score vectors. A separate time-uniform vector-mean construction would require its own proof. The planned-time vector-mean ellipsoid must be used only at its frozen analysis horizon, after allocation and selection are frozen. These are distinct inferential constructions. This module implements neither; it is the exact geometry layer they can reuse after their theorem-specific builders produce a valid center, factor and radius.
 
 For the paper's mean-ellipsoid notation {x : (x-m)ᵀ B⁻¹ (x-m) ≤ r²}, provide L satisfying B=LLᵀ. Its support in direction c is cᵀm ± r sqrt(cᵀBc). For the regression parameter ellipsoid with metric G B⁻¹ G, the corresponding shape matrix is G⁻¹ B G⁻¹ when G is symmetric positive definite.
 
