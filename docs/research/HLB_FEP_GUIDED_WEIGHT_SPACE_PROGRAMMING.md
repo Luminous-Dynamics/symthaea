@@ -97,6 +97,58 @@ The recent MIT CSAIL WSP report is an early research blog post, not a peer-revie
 
 SWI-001 already supplies the important safety foundations: typed parameter manifests, exact model fingerprints, transactional digest-bound edits, parameter constraints, and rejection of malformed updates. This programme adds the *proposal and verification protocol* around that boundary.
 
+### 2.3 FEP should reason over three kinds of uncertainty
+
+The strongest current research direction is not just action-dependent mutual information over one flat set of model IDs. Friston et al. (2026) distinguish uncertainty over **latent states**, **generative-model parameters**, and **generative-model structure**. Their active-reasoning work adds model-structure information gain to expected free energy and uses Bayesian Model Reduction (BMR) to compare reduced models efficiently. In their three-ball rule-discovery task, the state-, parameter-, and model-level information terms play complementary roles; removing model information can leave plausible hypotheses unresolved.
+
+Research source: Friston et al., *Active inference and artificial reasoning*, Nature Communications 17, 10125 (2026), https://doi.org/10.1038/s41467-026-77209-5.
+
+For Symthaea, keep these terms separately observable:
+
+- **State information:** will this observation disambiguate the current hidden state?
+- **Parameter information:** will it improve beliefs over dynamics, likelihoods, transition rates, or other generative parameters?
+- **Structure information:** will it distinguish competing causal, transition, or computational models?
+- **Pragmatic value:** does the predicted outcome satisfy declared preferences?
+- **Cost and risk:** what is the observation/action burden, feasibility, and safety exposure?
+
+A useful decomposition, when the model's conditional structure is explicit, is the mutual-information chain rule:
+
+```text
+I(M, Θ, S; O | a)
+  = I(M; O | a)
+  + I(Θ; O | M, a)
+  + I(S; O | M, Θ, a)
+```
+
+Here M is model structure, Θ its parameters, S latent state, O the prospective observation, and a a candidate information action. This is a decomposition of a joint information quantity; it is **not** permission to add arbitrary entropy deltas that double-count uncertainty. The adapter must declare its factorization, posterior approximation, and which terms it can calculate. Unavailable terms remain unavailable rather than being replaced by novelty.
+
+The current Symthaea model-information-gain primitive computes `I(Model; Outcome | action)` from supplied hypothesis priors and action-conditioned outcome distributions. It is a useful structure-information primitive, but it does not by itself implement state or parameter information gain, BMR over a learned model family, or a complete expected-free-energy policy. Those require their own model and posterior contracts.
+
+**Proposed research shift:** implement a hierarchical *epistemic controller* with explicit fast state inference, slower parameter learning, and slower still model-structure selection. Use the structure-level information term to choose discriminating probes; use evidence thresholds and model evidence to decide whether to retain, reduce, or replace a model. A probe ranking does not automatically authorize model replacement.
+
+### 2.4 Weight-space reasoning must account for parameter symmetries
+
+A raw parameter vector is not a unique description of a learned function. Hidden-unit permutations can produce different serialized weight arrays with exactly equivalent behavior when the corresponding incoming, outgoing, bias, and state-associated parameters are permuted consistently. Similar equivalences can arise from architecture-specific rescalings or other reparameterizations.
+
+Consequences for SWI:
+
+- A large parameter-space distance does not necessarily imply a large behavioral change.
+- A small sparse edit can have a large behavioral effect.
+- Parameter index similarity across two checkpoints is not semantic correspondence unless architecture and neuron/group alignment are established.
+- A WSP editor that interprets raw indices without alignment can mistake an equivalent healthy model for a faulty one.
+
+Add a **function-space and symmetry-aware** lane alongside raw weight introspection:
+
+1. Compute exact architecture/manifest/model digests as today.
+2. Collect a small, frozen set of functional probes (input/output and, where permitted, internal activation/temporal traces).
+3. Detect allowed parameter symmetries for the nominated architecture; start with exact hidden-unit permutation equivalence for small CfC networks.
+4. Align candidate groups using behavior/activation correspondence, then diagnose/edit the aligned typed groups.
+5. Validate the proposal in both parameter space and function space. Never use a symmetry alignment to rewrite the source checkpoint silently.
+
+The WeightProgram IR should remain tied to the exact source model digest. An aligned view is diagnostic metadata, not a new authority to mutate a different checkpoint.
+
+This creates a distinctive benchmark: can SWI distinguish **parameter reordering with identical behavior** from a real fault, and can a repair learned in one parameterization transfer to a functionally equivalent permuted network?
+
 ## 3. Proposed architecture: FEP chooses probes; WSP writes candidates
 
 ### 3.1 Typed WeightProgram intermediate representation
@@ -188,9 +240,12 @@ A seeded partially observable task has several plausible fault/model hypotheses 
 Primary outcomes: diagnosis accuracy, normalized regret, information acquisition cost, posterior calibration, number of probes, and realized information gain.
 
 ### B. Injected-fault repair with healthy controls
+
 Create small, fully specified CfC and HDC-LTC networks. Inject known faults in controlled groups: input path, recurrent path, tau/gate, mixing operator, and HDC role vector. Include untouched healthy models. Publish the fault generator and ground truth to the verifier, not the candidate proposer.
 
 Primary outcomes: fault detection precision/recall, fault localization precision, repair success, collateral regression, edit sparsity/norm, candidate evaluation cost, and healthy-model false-edit rate.
+
+Add a symmetry negative-control cohort: generate behaviorally equivalent CfC networks by consistent hidden-unit permutations, without changing the represented function. Measure false fault declarations and false repairs on these equivalents. Add a transfer cohort where one repair is mapped between equivalent parameterizations through an explicit alignment procedure.
 
 ### C. Compositional and associative transfer
 Use role–filler, nested relation, temporal order, and held-out composition tasks. Probe binding/unbinding, retrieval under crosstalk, role swaps, missing elements, and controlled corruption. Compare Hadamard/MAP, bipolar XOR, HRR, random projection, tensor-product small-scale oracle, and classical models where appropriate.
@@ -225,6 +280,8 @@ A 2025 comparative HDC review across 121 UCI datasets found that conventional SV
 - Always-observe and cue-greedy policies.
 - Bounded Bayesian value-of-information policy.
 - Model-information-gain-only policy.
+- BMR / model-structure selection policy where the same reduced-model family and posterior information are available.
+
 - Matched RL exploration baseline and a labelled perfect-information oracle upper bound.
 
 Recent complexity-matched active-inference/RL comparisons do not establish a universal accuracy advantage for active inference. Compare both on identical observations, actions, horizons, model information, tuning budgets, and reward/preference structures. Report behavioral/interpretive differences separately from task accuracy.
@@ -259,7 +316,10 @@ The analytical/oracle baseline is an upper bound, never a tuning signal. Weights
 
 ### FEP
 - Action-dependent expected information gain must vary under controlled changes to observation likelihoods.
+- Report state-, parameter-, and model-structure information terms separately when each has a valid generative/posterior contract; unavailable terms are omitted, not fabricated.
 - Predicted information gain must correlate with realized posterior reduction / correct model disambiguation.
+- Do not sum marginal information terms without a declared factorization and a check against the joint chain-rule quantity.
+
 - Brier score, log loss, posterior calibration, regret, probe count and observation cost.
 - Information-channel-off negative control must remove the information-selection benefit when outcome distributions become non-discriminating.
 - Hold novelty, reward preference, and action costs fixed in causal ablations.
