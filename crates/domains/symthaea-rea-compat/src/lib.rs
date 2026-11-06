@@ -1216,4 +1216,18 @@ mod tests {
             EvidenceErrorKind::SchemaViolation
         );
     }
+    #[test]
+    fn byte_and_value_admission_share_identity_and_semantics() {
+        let raw = include_str!("../tests/fixtures/rea-evidence-v1.json").as_bytes();
+        let from_bytes = verify_evidence_json(raw).unwrap();
+        let from_value = verify_evidence_value(&from_bytes.value).unwrap();
+
+        assert_eq!(from_bytes.evidence_id, from_value.evidence_id);
+        assert_eq!(from_bytes.semantic_sha256, from_value.semantic_sha256);
+        assert_eq!(from_bytes.value, from_value.value);
+        assert_eq!(from_bytes.raw_file_sha256.as_deref(), Some(sha256_hex(raw).as_str()));
+        assert!(from_value.raw_file_sha256.is_none());
+    }
+
+
 }
