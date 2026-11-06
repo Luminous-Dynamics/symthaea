@@ -122,15 +122,20 @@ def global_stop(case: dict[str, Any]) -> str | None:
     require(all(edits[i] < edits[i + 1] for i in range(len(edits) - 1)), 'snapshot edit counts must be strictly increasing')
     invariant_sets = []
     for snapshot in snapshots:
+        require(snapshot['snapshot_id'].strip(), 'snapshot ID is empty')
         rows = snapshot['graph_invariants']
         names = [row['invariant_id'] for row in rows]
         require(names and len(names) == len(set(names)), 'snapshot invariant IDs are empty or duplicated')
+        require(all(name.strip() for name in names), 'graph invariant ID is empty')
+        require(all(math.isfinite(row['value']) for row in rows), 'graph invariant value is not finite')
         invariant_sets.append(set(names))
     require(all(names == invariant_sets[0] for names in invariant_sets[1:]), 'graph-invariant identity changes across checkpoints')
 
     policy = case['global_stop_policy']
     tolerance = policy['relative_delta_tolerance']
     required_stable = policy['consecutive_stable_transitions']
+    require(math.isfinite(tolerance) and tolerance > 0, 'global relative-drift tolerance is invalid')
+    require(required_stable > 0, 'stable-transition count must be positive')
     stable_run = 0
     scale_floor = 1e-12
     for index in range(1, len(snapshots)):
@@ -148,6 +153,9 @@ def global_stop(case: dict[str, Any]) -> str | None:
 
 def world_agreement(worlds: list[dict[str, Any]]) -> tuple[bool, bool]:
     require(worlds, 'no reconstruction worlds were supplied')
+    world_ids = [row['world_id'] for row in worlds]
+    require(all(value.strip() for value in world_ids) and len(world_ids) == len(set(world_ids)), 'world IDs are empty or duplicated')
+    require(all(row['biological_disposition'] in {'ADMISSIBLE', 'INADMISSIBLE', 'INDETERMINATE', 'DISPUTED'} for row in worlds), 'unknown biological disposition')
     unresolved = any(row['biological_disposition'] in {'INDETERMINATE', 'DISPUTED'} for row in worlds)
     admissible = [row for row in worlds if row['biological_disposition'] == 'ADMISSIBLE']
     require(all(row['query_decision'] is None for row in worlds if row['biological_disposition'] in {'INDETERMINATE', 'DISPUTED'}), 'indeterminate/disputed world must not carry a promoted query decision')
@@ -208,12 +216,14 @@ def evaluate_case(case: dict[str, Any], frame: dict[str, Any]) -> dict[str, Any]
 def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(data['schema_version'] == 1, 'unsupported schema version')
     require(data['claim_scope'] == 'synthetic_known_truth', 'V1 oracle accepts only synthetic known-truth fixtures')
+    require(data['run_id'].strip(), 'run ID is empty')
     require(data['preregistration']['frozen_before_sampling'] is True, 'preregistration was not frozen before sampling')
-    require(len(data['preregistration']['preregistration_sha256']) == 64, 'preregistration digest is malformed')
+    require(len(data['preregistration']['preregistration_sha256']) == 64 and all(ch in '0123456789abcdef' for ch in data['preregistration']['preregistration_sha256']), 'preregistration digest is malformed')
     query = data['query_binding']
     require(query['query_id'].strip(), 'query ID is empty')
-    require(len(query['query_spec_sha256']) == 64 and len(query['decision_loss_sha256']) == 64, 'query/loss digest is malformed')
+    require(len(query['query_spec_sha256']) == 64 and len(query['decision_loss_sha256']) == 64 and all(ch in '0123456789abcdef' for ch in query['query_spec_sha256'] + query['decision_loss_sha256']), 'query/loss digest is malformed')
 
+    require(bool(data['sampling_frames']), 'no sampling frame supplied')
     frames = {row['frame_id']: row for row in data['sampling_frames']}
     require(len(frames) == len(data['sampling_frames']), 'duplicate sampling frame IDs')
     frame_stats = {frame_id: validate_frame(frame) for frame_id, frame in frames.items()}
@@ -221,6 +231,9 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(len(case_ids) == len(set(case_ids)), 'duplicate case IDs')
     results = []
     for case in data['cases']:
+        require(len(case['dataset_revision_sha256']) == 64 and all(ch in '0123456789abcdef' for ch in case['dataset_revision_sha256']), 'dataset revision digest malformed')
+        require(case['frame_coverage_status'] in {'CLOSED', 'INCOMPLETE'}, 'unknown frame coverage status')
+        require(len(case['frame_coverage_receipt_sha256']) == 64 and all(ch in '0123456789abcdef' for ch in case['frame_coverage_receipt_sha256']), 'frame coverage receipt digest malformed')
         frame_id = case['frame_id']
         require(frame_id in frames, f"case {case['case_id']} references an unknown frame")
         result = evaluate_case(case, frames[frame_id])
