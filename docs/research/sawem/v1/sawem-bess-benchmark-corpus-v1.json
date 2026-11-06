@@ -329,7 +329,7 @@
       "title": "Warranty-envelope breach",
       "scenario": "A high-revenue dispatch policy breaches a warranty operating envelope or excluded operating condition. The evaluator checks only source-supplied terms and an explicit charge/discharge throughput basis. Missing channels, interval gaps and future-known telemetry cannot produce a warranty-compliance pass. It does not infer degradation coefficients, warranty exclusions, replacement costs or cycle-counting conventions.",
       "owner": "Symtropy",
-      "expected_disposition": "not_run",
+      "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
       "oracle_state": "draft_expected_disposition",
       "test_names": [
