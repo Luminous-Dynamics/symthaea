@@ -308,6 +308,48 @@ mod tests {
     }
 
     #[test]
+    fn bundled_record_retrieves_each_role_filler_at_nontrivial_load() {
+        // Deterministic associative-retrieval smoke benchmark. This is not a
+        // capacity claim; the load/dimension curve belongs in the benchmark suite.
+        let dimension = 2048;
+        let load = 32;
+        let roles: Vec<HdcHrrRole> = (0..load)
+            .map(|index| HdcHrrRole::from_seed(dimension, 10_000 + index as u64).unwrap())
+            .collect();
+        let fillers: Vec<ContinuousHV> = (0..load)
+            .map(|index| ContinuousHV::random(dimension, 20_000 + index as u64))
+            .collect();
+
+        let mut record = ContinuousHV::zero(dimension);
+        for (role, filler) in roles.iter().zip(fillers.iter()) {
+            record = record.add(&role.bind(filler).unwrap());
+        }
+
+        let correct_retrievals = roles
+            .iter()
+            .enumerate()
+            .filter(|(index, role)| {
+                let recovered = role.unbind(&record).unwrap();
+                let best = fillers
+                    .iter()
+                    .enumerate()
+                    .map(|(candidate_index, candidate)| {
+                        (candidate_index, recovered.similarity(candidate))
+                    })
+                    .max_by(|left, right| left.1.total_cmp(&right.1))
+                    .map(|(candidate_index, _)| candidate_index)
+                    .unwrap_or(usize::MAX);
+                best == *index
+            })
+            .count();
+
+        assert!(
+            correct_retrievals >= load * 30 / 32,
+            "HRR role-filler top-1 retrieval degraded at dimension={dimension}, load={load}: {correct_retrievals}/{load}"
+        );
+    }
+
+    #[test]
     fn rejects_invalid_dimensions_and_non_finite_values() {
         assert!(matches!(
             HdcHrrRole::from_seed(0, 1),
