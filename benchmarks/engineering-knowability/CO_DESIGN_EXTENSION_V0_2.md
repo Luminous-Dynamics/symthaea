@@ -22,7 +22,7 @@ The benchmark should reward a system that discovers *before design freeze* that 
 
 ### External engineering-agent benchmarks
 
-The public comparators are now materially stronger than simple CAD-code-generation demonstrations:
+The public comparators are now materially stronger than simple CAD-code-generation demonstrations. Snapshot note: CADWorld's live page (14 evaluated agents, extended runs) now reports 41.5% for its strongest agent against an 87.0% single-trial expert reference; its original September paper reports a separate seven-agent snapshot with 17.5% best success. Do not merge those snapshots:
 
 | Benchmark | Current public reference | What it evaluates | What it does not establish |
 |---|---|---|---|
@@ -151,3 +151,8 @@ These are research targets, not established industry standards or current result
 ## Claim ceiling
 
 A successful V1/V2 result establishes only that the evaluated candidate produced better design/inspection proposals on exact synthetic/native CAD tasks. It does not establish measurement-system capability, calibration, physical observability, article conformity, product safety, regulatory compliance or design release authority.
+
+
+## Current execution owner
+
+The co-design benchmark track is now tracked in [ENG-KNOW-CODESIGN-001 #10702](https://github.com/Luminous-Dynamics/symthaea/issues/10702). This issue owns the matched design-first/checklist/knowability-conditioned/co-design experiment, non-compensatory evaluator mutations, lifecycle economics and Pareto-preserving report. This proposal remains design-only until those tasks have independent gold adjudication and owner review.
