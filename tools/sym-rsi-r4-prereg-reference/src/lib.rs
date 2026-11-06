@@ -269,6 +269,76 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
     );
 }
 
+fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) {
+    for field in ["state_snapshot_digest", "record_schema_digest"] {
+        require_sha256(report, root, &["research_state_continuity", field]);
+    }
+    for field in [
+        "cold_restart_restore_test_ref",
+        "successor_migration_test_ref",
+        "independent_recovery_audit_ref",
+        "provenance_policy",
+        "stale_evidence_policy",
+    ] {
+        require_string(report, root, &["research_state_continuity", field]);
+    }
+    require_string(report, root, &["issue_refs", "evidence_continuity"]);
+
+    let required_record_types = [
+        "accepted_finding_with_evidence",
+        "rejected_hypothesis",
+        "null_or_negative_result",
+        "counterexample_and_failure",
+        "candidate_lineage_and_patch_digest",
+        "evaluator_epoch_and_task_contract",
+        "inclusive_cost_and_retry_record",
+        "open_question_and_next_test",
+    ];
+    let observed_records: BTreeSet<String> = at(root, &["research_state_continuity", "required_record_types"])
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default();
+    for record_type in required_record_types {
+        if !observed_records.contains(record_type) {
+            report.issue("STATE_RECORD_TYPE_MISSING", record_type);
+        }
+    }
+
+    let required_ablations = [
+        "full_verified_state",
+        "no_state",
+        "untyped_history",
+        "shuffled_verified_state",
+        "accepted_findings_only",
+    ];
+    let observed_ablations: BTreeSet<String> = at(root, &["research_state_continuity", "ablation_arms"])
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default();
+    for arm in required_ablations {
+        if !observed_ablations.contains(arm) {
+            report.issue("STATE_ABLATION_MISSING", arm);
+        }
+    }
+
+    let required_metrics = [
+        "provenance_complete_record_recovery",
+        "false_currentness_rate",
+        "evidence_revalidation_precision_recall",
+        "duplicated_experiment_rate",
+        "fresh_family_confirmed_yield",
+    ];
+    let observed_metrics: BTreeSet<String> = at(root, &["research_state_continuity", "metrics"])
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+        .unwrap_or_default();
+    for metric in required_metrics {
+        if !observed_metrics.contains(metric) {
+            report.issue("STATE_METRIC_MISSING", metric);
+        }
+    }
+}
+
 fn check_budget(report: &mut ValidationReport, root: &Value) {
     require_sha256(report, root, &["budget", "shared_envelope_digest"]);
     for field in [
@@ -662,6 +732,7 @@ pub fn validate_preregistration(root: &Value) -> ValidationReport {
     }
 
     check_arm_bindings(&mut report, root);
+    check_research_state_continuity(&mut report, root);
     check_budget(&mut report, root);
     check_splits(&mut report, root);
     check_evaluator(&mut report, root);
@@ -759,6 +830,46 @@ mod tests {
             Value::String("starting_state.other_candidate".to_owned());
         let report = validate_preregistration(&value);
         assert!(report.issues.iter().any(|issue| issue.starts_with("START_REFERENCE_MISMATCH")));
+    }
+
+    #[test]
+    fn rejects_missing_cold_restart_restore_audit() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["cold_restart_restore_test_ref"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("cold_restart_restore_test_ref")));
+    }
+
+    #[test]
+    fn rejects_missing_rejected_hypothesis_state_class() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["required_record_types"]
+            .as_array_mut()
+            .expect("record type array")
+            .retain(|item| item != "rejected_hypothesis");
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("STATE_RECORD_TYPE_MISSING")));
+    }
+
+    #[test]
+    fn rejects_missing_untyped_history_ablation() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["ablation_arms"]
+            .as_array_mut()
+            .expect("ablation array")
+            .retain(|item| item != "untyped_history");
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("STATE_ABLATION_MISSING")));
     }
 
     #[test]
