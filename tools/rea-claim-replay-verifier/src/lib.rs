@@ -283,11 +283,7 @@ impl<'de> Visitor<'de> for UniqueVisitor {
     }
 }
 
-fn parse_unique_json(
-    bytes: &[u8],
-    max_bytes: usize,
-    context: &str,
-) -> Result<Value, ReplayError> {
+fn parse_unique_json(bytes: &[u8], max_bytes: usize, context: &str) -> Result<Value, ReplayError> {
     if bytes.len() > max_bytes {
         return Err(ReplayError::new(
             ReplayErrorKind::InputTooLarge,
@@ -337,9 +333,7 @@ fn is_sha256(value: &str) -> bool {
 }
 
 fn is_evidence_id(value: &str) -> bool {
-    value
-        .strip_prefix("ev_")
-        .is_some_and(is_sha256)
+    value.strip_prefix("ev_").is_some_and(is_sha256)
 }
 
 fn nonempty(value: &str) -> bool {
@@ -398,7 +392,9 @@ fn validate_claim(claim: &ClaimRequest) -> Result<(), ReplayError> {
         ("environment_id", claim.scope.environment_id.as_deref()),
     ] {
         if value.is_some_and(|value| !nonempty(value)) {
-            return Err(invalid(&format!("scope.{label} must be non-empty when present")));
+            return Err(invalid(&format!(
+                "scope.{label} must be non-empty when present"
+            )));
         }
     }
     if !nonempty(&claim.falsification_condition) {
@@ -654,7 +650,9 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
             platform,
             match platform {
                 ScopeDisposition::Inapplicable => "platform does not match claim scope",
-                ScopeDisposition::Unverifiable => "platform scope is absent or broader than the Evidence observation",
+                ScopeDisposition::Unverifiable => {
+                    "platform scope is absent or broader than the Evidence observation"
+                },
                 ScopeDisposition::Match => unreachable!(),
             }
             .to_owned(),
@@ -670,7 +668,9 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
             environment,
             match environment {
                 ScopeDisposition::Inapplicable => "environment_id does not match claim scope",
-                ScopeDisposition::Unverifiable => "environment identity is not recorded at the requested scope",
+                ScopeDisposition::Unverifiable => {
+                    "environment identity is not recorded at the requested scope"
+                },
                 ScopeDisposition::Match => unreachable!(),
             }
             .to_owned(),
@@ -723,8 +723,7 @@ fn assessment(
     evidence: &Value,
     reason: impl Into<String>,
 ) -> Assessment {
-    let (provider_id, provider_name, provider_version, confidence, authority) =
-        metadata(evidence);
+    let (provider_id, provider_name, provider_version, confidence, authority) = metadata(evidence);
     Assessment {
         evidence_id: evidence_id.to_owned(),
         kind,
@@ -775,8 +774,7 @@ fn derive_reference_result(
     }
     if !claim.assumptions.is_empty() {
         unmet.push(
-            "claim assumptions are recorded but evaluator v0 has no assumption verifier"
-                .to_owned(),
+            "claim assumptions are recorded but evaluator v0 has no assumption verifier".to_owned(),
         );
     }
 
@@ -821,9 +819,7 @@ fn derive_reference_result(
             ScopeDisposition::Match => {}
         }
 
-        if string_at(&record.value, &["predicate_type"])
-            != claim.source_predicate_type.as_deref()
-        {
+        if string_at(&record.value, &["predicate_type"]) != claim.source_predicate_type.as_deref() {
             inapplicable += 1;
             assessments.push(assessment(
                 evidence_id,
@@ -834,7 +830,10 @@ fn derive_reference_result(
             continue;
         }
 
-        let normalized = record.value.get("normalized_result").unwrap_or(&Value::Null);
+        let normalized = record
+            .value
+            .get("normalized_result")
+            .unwrap_or(&Value::Null);
         if jcs_equal(normalized, &claim.asserted_value)? {
             supports += 1;
             assessments.push(assessment(
@@ -903,12 +902,10 @@ fn derive_reference_result(
         "no-registered-predicate-rule/v0"
     };
 
-    let claim_value = serde_json::to_value(claim).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
-    let claim_bytes = canonical_jcs_bytes(&claim_value).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
+    let claim_value = serde_json::to_value(claim)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
+    let claim_bytes = canonical_jcs_bytes(&claim_value)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
     let claim_request_sha256 = sha256_hex(&claim_bytes);
 
     let ceiling = claim_ceiling(claim.predicate);
@@ -931,12 +928,10 @@ fn derive_reference_result(
         falsification_condition: &claim.falsification_condition,
         claim_ceiling: &ceiling,
     };
-    let body_value = serde_json::to_value(body).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
-    let body_bytes = canonical_jcs_bytes(&body_value).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
+    let body_value = serde_json::to_value(body)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
+    let body_bytes = canonical_jcs_bytes(&body_value)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
     let derivation_sha256 = sha256_hex(&body_bytes);
 
     Ok(ClaimEvaluation {
