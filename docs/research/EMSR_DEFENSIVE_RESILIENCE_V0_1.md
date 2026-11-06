@@ -249,3 +249,13 @@ The target is defensive, evidence-qualified resilience and safe service continui
 - [Multicriteria Collaborative GNSS Integrity Monitoring](https://ieeexplore.ieee.org/abstract/document/11505703), IEEE Journal of Indoor and Seamless Positioning and Navigation, 4 May 2026.
 - U.S. DoD ASSIST, [MIL-STD-464](https://quicksearch.dla.mil/qsdocdetails.aspx?ident_number=35794), active listing, document date 9 February 2026.
 - CISA, [Understanding Vulnerabilities of Positioning, Navigation & Timing](https://www.cisa.gov/sites/default/files/2023-04/fs_positioning-navigation-timing-vulnerabilities_508.pdf).
+
+
+## 12. Initial machine-readable artifacts
+
+The branch also contains:
+
+- `docs/research/emsr-v0.1/emsr-receiver-observation-v0.1.schema.json` — versioned receive-side observation contract. It keeps source, time quality, receiver/calibration status, operational status, provenance, and source label separate.
+- `docs/research/emsr-v0.1/public-dataset-catalog-v0.1.json` — discovery-only registry for the Jammertest 2025 and 2024 receiver corpora, FGI repository, and published statistical/collaborative baselines.
+
+The catalogue deliberately marks the datasets as `not_imported` / rights review pending. No binary data have been downloaded, redistributed, or assumed to be licensed for reuse. The next step is source-term review and an exact file/hash inventory before any ingestion.
