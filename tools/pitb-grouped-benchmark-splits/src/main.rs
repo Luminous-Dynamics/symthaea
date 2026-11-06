@@ -182,7 +182,8 @@ fn canonical_repository_key(remote: &str) -> Result<String, String> {
     if !value.starts_with("https://") || value.contains('@') || value.contains('?') || value.contains('#') {
         return Err(format!("repository remote must be a credential-free HTTPS URL: {value}"));
     }
-    let without_scheme = &value["https://".len()..];
+    let normalized_remote = value.trim_end_matches('/');
+    let without_scheme = &normalized_remote["https://".len()..];
     let mut parts = without_scheme.split('/');
     let host = parts.next().unwrap_or_default().to_ascii_lowercase();
     let owner = parts.next().unwrap_or_default().to_ascii_lowercase();
@@ -468,7 +469,8 @@ fn self_test() -> Result<Report, String> {
     let mut bad = synthetic_dataset();
     let parsed: Value = serde_json::from_slice(&bad).map_err(|e| e.to_string())?;
     let mut value = parsed;
-    value["sorries"][0]["id"] = Value::String(value["sorries"][1]["id"].as_str().unwrap().to_owned());
+    let duplicate_id = value["sorries"][1]["id"].as_str().unwrap().to_owned();
+    value["sorries"][0]["id"] = Value::String(duplicate_id);
     bad = serde_json::to_vec(&value).map_err(|e| e.to_string())?;
     if parse_dataset(&bad).is_ok() {
         return Err("duplicate source task IDs were accepted".into());
