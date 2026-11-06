@@ -429,7 +429,9 @@ fn find_route(
         let reached = state.node_ref == target_node_ref;
         let qualifies = match mode {
             RouteMode::Direct => {
-                state.used_initial_retrieval && !state.used_reformulation && !state.used_navigation_after_initial_retrieval
+                state.used_initial_retrieval
+                    && !state.used_reformulation
+                    && !state.used_navigation_after_initial_retrieval
             }
             RouteMode::Reformulation => {
                 state.used_initial_retrieval
@@ -439,7 +441,7 @@ fn find_route(
             }
             RouteMode::Navigation => {
                 state.used_initial_retrieval && state.used_navigation_after_initial_retrieval
-            },
+            }
         };
         if reached && qualifies {
             return Some(RouteWitness {
@@ -482,7 +484,8 @@ fn find_route(
                 used_post_reformulation_retrieval: state.used_post_reformulation_retrieval
                     || (state.used_reformulation
                         && edge.operation == RouteOperationV1::PostReformulationRetrieval),
-                used_navigation_after_initial_retrieval: state.used_navigation_after_initial_retrieval
+                used_navigation_after_initial_retrieval: state
+                    .used_navigation_after_initial_retrieval
                     || (state.used_initial_retrieval && edge.operation.is_navigation()),
             };
 
