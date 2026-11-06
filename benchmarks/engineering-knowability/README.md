@@ -254,3 +254,15 @@ The eight paired rows are a pilot/authoring tranche, not a powered confirmatory 
 For zero false accepts on (n) independent negative-control families, the one-sided 95% exact binomial upper bound is (1-0.05^{1/n}): 59/59 is below 5%, and 299/299 is below 1%. Mutations/variants from one base family are correlated and do not increase (n). These bounds apply only to the declared sampling frame; no universal safety or reliability guarantee follows.
 
 The eight-row matrix is only a pilot. No claim that co-design beats a frontier agent or reduces lifecycle cost is permitted until an independently adjudicated, preregistered confirmatory study is completed.
+
+
+## Candidate / evaluator contract boundary
+
+Two JSON Schema 2020-12 contracts now make the trust boundary explicit:
+
+- [`candidate-output.schema.json`](candidate-output.schema.json) defines the candidate submission: exact task and fixture digests, model/harness/configuration, editable design alternatives, critical-claim dispositions, evidence-path proposals, owner-evidence requests, and harness/candidate resource reporting. It rejects candidate-supplied scores, gold labels, evaluator mutation outcomes and hidden-case metadata. Current v0.1 candidate evidence classes are limited to `synthetic_reference`, `proposal` and `simulation`; the contract does not authorize actual measurement or physical execution.
+- [`gold-adjudication.schema.json`](gold-adjudication.schema.json) is evaluator-only. It requires at least two independent assessments, explicit assessor independence declarations, a third-adjudicator path for disagreement, mutation records with independent oracle references, and an explicit sealing/custody record. Gold records must not be made available to the candidate.
+
+The candidate output is not itself a score or engineering approval. The evaluator computes results from the frozen task, independent oracle, candidate artifact digests and mutation suite. A candidate may propose an evidence path; only existing owners determine evidence admission, calibration applicability, physical conformance and downstream authority.
+
+These schemas have been read back and parsed as JSON. A JSON Schema 2020-12 validation engine and real candidate/gold example validation have not yet been run; no gold record has been created or sealed.
