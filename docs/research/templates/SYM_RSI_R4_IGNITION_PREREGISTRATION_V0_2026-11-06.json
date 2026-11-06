@@ -1,0 +1,285 @@
+{
+  "schema_version": "sym-rsi-r4-ignition-preregistration-v0",
+  "document_status": "TEMPLATE_NOT_PREREGISTERED",
+  "warning": "This template contains unresolved placeholders. It is not a preregistration, benchmark receipt, proof of execution, or promotion authorization. Replace every required placeholder, obtain independent review, and freeze/commit the completed document before outcomes are observed.",
+  "issue_refs": {
+    "r4_design": "#10497",
+    "causal_attribution": "#10717",
+    "independent_promotion": "#10573",
+    "evaluator_epochs": "#10708",
+    "source_build_lineage": "#10569",
+    "canonical_receipts": "#10314/#10370/#10533",
+    "statistical_inference": "#8438/#9433/#10513"
+  },
+  "experiment": {
+    "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "protocol_version": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "preregistered_at_utc": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "preregistration_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "reviewers": [
+      "__REQUIRED_BEFORE_PREREGISTRATION__"
+    ],
+    "claim_profile": {
+      "product_improvement": false,
+      "accumulation": false,
+      "repeatability": false,
+      "matched_budget_better_improver": false,
+      "outer_loop_ignition": false,
+      "recursive_progress": false,
+      "fresh_family_transfer": false,
+      "cross_domain_transfer": false,
+      "selected_claims": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "claim_ceiling": "No claim is qualified by completing this template. Each selected claim must point to the specific independent evidence required below."
+    },
+    "estimand": {
+      "primary_question": "Does the evolved outer-loop researcher produce more independently confirmed and transferable inherited improvements than the fixed/reference outer-loop researcher, from the same inner-agent starting artifact and under the same inclusive total resource budget?",
+      "primary_outcome": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "target_population": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "practical_effect_threshold": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "outcome_direction": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  },
+  "starting_state": {
+    "shared_inner_agent": {
+      "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "source_tree_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "executable_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "checkpoint_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "source_build_evidence_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "memory_research_state_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "outer_loop_arms": {
+      "evolved_researcher": {
+        "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "source_tree_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "executable_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "model_backend_version": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "prompt_tool_contract_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "memory_state_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "lineage_evidence_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      },
+      "reference_researcher": {
+        "artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "source_tree_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "executable_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "model_backend_version": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "prompt_tool_contract_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "memory_state_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "lineage_evidence_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      },
+      "shared_frozen_context_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "declared_differences": "Only the outer-loop researcher treatment identified above may differ. Every other difference must be declared, justified and either matched or separately factored."
+    }
+  },
+  "arms": [
+    {
+      "arm_id": "evolved_outer_loop",
+      "researcher_ref": "starting_state.outer_loop_arms.evolved_researcher",
+      "inner_agent_start_ref": "starting_state.shared_inner_agent",
+      "treatment": "The evolved meta-agent controls proposal, experiment selection and candidate retention within the frozen permission and resource envelope."
+    },
+    {
+      "arm_id": "reference_outer_loop",
+      "researcher_ref": "starting_state.outer_loop_arms.reference_researcher",
+      "inner_agent_start_ref": "starting_state.shared_inner_agent",
+      "treatment": "The fixed incumbent or preregistered human-authored meta-agent controls the same proposal, experiment selection and candidate retention interfaces."
+    }
+  ],
+  "matched_conditions": {
+    "required_equalities": [
+      "shared inner-agent artifact, source/build and checkpoint",
+      "task/family/cluster population and assignment",
+      "base model/backend availability and version unless the model is the explicitly tested treatment",
+      "tool registry, permissions, prompts/interfaces and execution isolation",
+      "evaluator/verifier and objective definitions within each evaluator epoch",
+      "context/memory capacity and retention policy except the predeclared meta-agent artifact difference",
+      "retry, timeout, stopping and invalid-candidate treatment",
+      "total resource ceiling and cost-accounting rules",
+      "validation, confirmation and transfer split access rules"
+    ],
+    "execution_order_randomization": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "common_random_numbers_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "permitted_arm_specific_differences": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "budget": {
+    "accounting_boundary": "Inclusive total research cost for each arm; no free external evaluation, retry, human review, build, failure, or candidate-generation work.",
+    "total_budget": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "currency_and_price_basis": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "per_arm_caps": {
+      "model_inference_tokens": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "model_training_compute": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accelerator_hours_by_type": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cpu_hours": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "evaluator_calls": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "candidate_builds_and_executions": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retries": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "wall_clock": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "peak_memory": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "energy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_active_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_review_and_rework_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "failure_accounting": "Every failed, rejected, invalid, timed-out, interrupted and not-run attempt is retained with its allocated and realized cost. Missing outcomes are not silently scored as zero or discarded."
+  },
+  "task_population": {
+    "task_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "task_family_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "cluster_definition_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "capability_domains": [
+      "__REQUIRED_BEFORE_PREREGISTRATION__"
+    ],
+    "licensing_and_data_rights_review_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "splits": {
+    "discovery": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accessible_to_candidate": true,
+      "permitted_uses": [
+        "hypothesis generation",
+        "candidate generation",
+        "debugging"
+      ]
+    },
+    "validation": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accessible_feedback": "Declared validation results only; no confirmation labels, task seeds or evaluator internals."
+    },
+    "sealed_confirmation": {
+      "manifest_digest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_candidate": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "access_policy": "Candidate and researcher cannot read task instances, labels, seeds, evaluator code, detailed intermediate results or credentials.",
+      "feedback_policy": "Only the independently governed promotion service may return the predeclared decision-only feedback. No detailed outcome feedback may enter adaptive candidate search.",
+      "one_shot_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "fresh_family_transfer": {
+      "manifest_digest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_candidate": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retuning_prohibited": true,
+      "feedback_policy": "No transfer outcome may be used for candidate, checkpoint, prompt, hyperparameter or stopping-rule selection."
+    },
+    "access_audit": {
+      "workspace_mount_audit_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "credentials_and_egress_test_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "canary_file_test_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "reviewer": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  },
+  "seed_and_replication_plan": {
+    "seed_generation_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "paired_pilot_seed_count": 5,
+    "pilot_count_is_floor_not_confirmatory_sample": true,
+    "pilot_precision_objective": "Estimate between-seed and between-family variance and operational failure rates.",
+    "confirmatory_seed_count": "DETERMINE_AFTER_PILOT_AND_FREEZE_BEFORE_CONFIRMATION",
+    "confirmatory_power_or_precision_analysis_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "randomization_plan_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "independent_full_loop_reruns_required": 2,
+    "all_trajectories_retained": true
+  },
+  "rounds": {
+    "planned_outer_loop_steps": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "per_round_reporting_required": true,
+    "per_round_fields": [
+      "development score and objective",
+      "independent audit score and objective",
+      "candidate artifact/source/build identities",
+      "accepted/rejected/invalid/failed/not-run changes",
+      "promotion decision and policy/evaluator epoch",
+      "budget consumed by category",
+      "best-so-far and final state",
+      "protected capability regressions",
+      "human interventions and review time"
+    ],
+    "evaluator_epoch_policy_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "cross_epoch_error_budget_policy_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "outcomes": {
+    "primary": {
+      "name": "independently_confirmed_transferable_improvements_per_equal_total_budget",
+      "definition": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "analysis_scale": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "practical_effect_threshold": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "secondary": [
+      "time and total cost per independently confirmed improvement",
+      "best-so-far and final outer-loop capability",
+      "per-round development-to-audit retention",
+      "fresh-family and cross-domain transfer",
+      "protected capability floors and worst regression",
+      "invalid/rejected/failed candidate rate",
+      "hypothesis falsification and experiment information yield",
+      "human active time, review and rework"
+    ],
+    "noncompensatory_guardrails": [
+      "protected capability floors",
+      "safety/constraint compliance",
+      "calibration and abstention floors",
+      "source/build provenance integrity",
+      "independent evaluator and sealed-data isolation"
+    ]
+  },
+  "controls": [
+    {
+      "control_id": "fixed_meta",
+      "purpose": "Baseline for task-agent/archive improvements without meta-procedure evolution."
+    },
+    {
+      "control_id": "fixed_meta_archive",
+      "purpose": "Isolates archive/diversity value while the meta-procedure remains fixed."
+    },
+    {
+      "control_id": "noop_or_null",
+      "purpose": "Measures false improvement and pipeline bias."
+    },
+    {
+      "control_id": "random_matched_cost",
+      "purpose": "Controls for search budget and candidate volume."
+    },
+    {
+      "control_id": "shuffled_feedback",
+      "purpose": "Tests whether claimed gains depend on meaningful feedback rather than feedback volume."
+    },
+    {
+      "control_id": "human_authored_reference",
+      "purpose": "Human research procedure comparator where feasible, with human effort fully costed."
+    },
+    {
+      "control_id": "candidate_evaluator_mismatch",
+      "purpose": "Adversarial control; candidate-side evaluator or task-contract edits must be rejected."
+    }
+  ],
+  "analysis_plan": {
+    "primary_contrast": "Evolved outer-loop researcher minus reference outer-loop researcher from the same inner-agent start and matched total cost.",
+    "statistical_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "clustering_and_dependence": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "uncertainty_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "confidence_level": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "multiplicity_and_sequential_looks": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "missingness_and_invalid_run_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "stopping_rule": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "sensitivity_analyses": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "analysis_code_commit": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "governance": {
+    "independent_evaluator_ref": "#10573",
+    "evaluator_epoch_protocol_ref": "#10708",
+    "source_build_lineage_ref": "#10569",
+    "run_receipt_and_attestation_ref": "#10314/#10370/#10533",
+    "statistical_inference_refs": "#8438/#9433/#10513",
+    "causal_intervention_ref": "#10717",
+    "final_claim_authority": "Independent reviewers and the existing promotion authority; this template itself has no authority.",
+    "candidate_can_modify_evaluator": false,
+    "candidate_can_access_confirmation_material": false,
+    "candidate_can_change_preregistered_outcomes": false
+  },
+  "reporting": {
+    "claim_index_required": true,
+    "raw_roundwise_data_required": true,
+    "full_trajectory_and_failure_log_required": true,
+    "cost_ledger_required": true,
+    "best_so_far_and_final_required": true,
+    "code_artifact_and_build_digests_required": true,
+    "null_and_negative_control_results_required": true,
+    "limitations_and_unidentified_effects_required": true
+  }
+}
