@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY.schema.json",
+  "title": "Exact adaptive query-directed connectome intervention policy input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "analysis_id",
+    "claim_scope",
+    "dataset_revision_commit_sha",
+    "query",
+    "worlds",
+    "nuisance_models",
+    "actions",
+    "potential_outcomes",
+    "search_limits",
+    "expected"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "analysis_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "dataset_revision_commit_sha": {
+      "$ref": "#/$defs/sha40"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "nuisance_models": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/nuisance"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "potential_outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/potential"
+      }
+    },
+    "search_limits": {
+      "$ref": "#/$defs/limits"
+    },
+    "expected": {
+      "$ref": "#/$defs/expected"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha40": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$"
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "graph_sha256",
+        "source_evidence_sha256",
+        "biological_disposition",
+        "query_decision"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "biological_disposition": {
+          "const": "ADMISSIBLE"
+        },
+        "query_decision": {
+          "type": "boolean"
+        }
+      }
+    },
+    "nuisance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance_model_id",
+        "model_sha256",
+        "description"
+      ],
+      "properties": {
+        "nuisance_model_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "intervention_kind",
+        "effort_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "safety_profile_sha256"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "intervention_kind": {
+          "enum": [
+            "OPTOGENETIC",
+            "ELECTRICAL",
+            "PHARMACOLOGICAL",
+            "SENSORY",
+            "BEHAVIORAL",
+            "SIMULATED",
+            "OTHER"
+          ]
+        },
+        "effort_units": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "safety_profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "potential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "nuisance_model_id",
+        "observations"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "nuisance_model_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "outcome_id"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "outcome_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_memo_states",
+        "max_policy_depth"
+      ],
+      "properties": {
+        "max_memo_states": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000000
+        },
+        "max_policy_depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adaptive_status",
+        "adaptive_worst_case_effort_units",
+        "adaptive_root_action_id",
+        "fixed_status",
+        "fixed_minimum_effort_units",
+        "fixed_action_ids",
+        "adaptivity_savings_units"
+      ],
+      "properties": {
+        "adaptive_status": {
+          "enum": [
+            "EXACT_POLICY",
+            "NO_GUARANTEED_QUERY_RESOLUTION"
+          ]
+        },
+        "adaptive_worst_case_effort_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "adaptive_root_action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fixed_status": {
+          "enum": [
+            "EXACT_FIXED_PLAN",
+            "NO_GUARANTEED_FIXED_PLAN"
+          ]
+        },
+        "fixed_minimum_effort_units": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fixed_action_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "adaptivity_savings_units": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
