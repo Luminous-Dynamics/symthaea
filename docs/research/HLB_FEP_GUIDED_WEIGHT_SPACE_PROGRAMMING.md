@@ -313,6 +313,23 @@ Compare raw flattened-weight inspection, activation-probe alignment, permutation
 **Executable anchor now present on this branch:** `src/dynamics/cfc/weight_program_adapter.rs::consistent_hidden_unit_permutation_preserves_cfc_function` materializes the equivalence-preserving permutation through the actual `WeightProgram → materialize_cfc_weight_program → cloned SWI candidate` path. It checks that the native fingerprint changes while a four-step temporal probe sequence remains equivalent. The paired partial-permutation negative control changes only the input-projection rows and must change the output sequence. The fixture is intentionally narrow: one small, one-layer, no-backbone CfC network. It validates one exact symmetry family, not arbitrary multi-layer/backbone transformations or an alignment algorithm.
 
 
+### F. Partial-observation rule discovery
+
+Add a three-ball-style rule-discovery task with hidden object attributes, competing rule/likelihood mappings, and restricted observations. The agent must choose which object/outcome to inspect before it can know the latent scene or rule. This gives the new state-, parameter-, and model-structure information terms a concrete active-reasoning test rather than treating them as abstract metrics.
+
+Friston et al. (2026) use a three-ball paradigm to illustrate active sampling for rule discovery. Their paper explicitly assumes a known generative-model family and focuses on selecting observations that distinguish its candidate likelihood mappings; it does not solve general perception-to-world-model construction or arbitrary ARC-style reasoning. Symthaea should preserve that limitation.
+
+Two evaluation tracks must remain separate:
+
+1. **Exact reproduction:** transcribe and independently verify the paper/supplement's state space, rule set, observation and outcome likelihoods, action constraints, preference distribution, horizon, and model-commitment stopping rule. Record the source/supplement revision and all choices.
+2. **Task adaptation:** any modified ball count, rule family, feedback mapping, preference, or observation mechanism must be labelled an adaptation, not a reproduction.
+
+Primary outcomes: rule-identification accuracy, trials to model selection, model-choice Brier score, decision regret, and observation cost. Diagnostics: prospective information gain at state/parameter/model levels, realized model-entropy reduction, BMR log-evidence ratios, posterior model odds, and the trial at which the selection threshold is crossed.
+
+Compare random legal observation, reward-greedy without model information, state-only and parameter-only information policies, hierarchical model EIG, and an analysis-only oracle. Keep rewards, observation cost, action availability, and horizon identical across ablations. The model-information channel-off control must remove model-disambiguating information without changing preferences or the reward channel.
+
+BMR is evaluated **after** an observation updates the posterior. It must not be added directly to prospective expected information gain or pragmatic value. Report whether the posterior is exact or variational, and whether the reduced models share the same parameterization.
+
 ## 6. Baselines and fairness requirements
 
 ### Temporal models
