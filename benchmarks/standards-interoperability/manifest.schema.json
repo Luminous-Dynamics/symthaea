@@ -12,7 +12,8 @@
     "status",
     "standards",
     "cases",
-    "limitations"
+    "limitations",
+    "mtconnect_execution_gate"
   ],
   "properties": {
     "schema_version": {
@@ -186,6 +187,80 @@
       "items": {
         "type": "string",
         "minLength": 1
+      }
+    },
+    "mtconnect_execution_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "eligible_for_candidate_execution",
+        "eligible_for_scoring",
+        "observed_public_version_labels",
+        "sources",
+        "required_frozen_tuple",
+        "phase_policy",
+        "rejection_rule"
+      ],
+      "properties": {
+        "status": {
+          "const": "blocked_until_compatibility_tuple_frozen"
+        },
+        "eligible_for_candidate_execution": {
+          "const": false
+        },
+        "eligible_for_scoring": {
+          "const": false
+        },
+        "observed_public_version_labels": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "official_standard_download_page",
+            "normative_sysml_model_release",
+            "normative_model_documentation",
+            "published_xml_schema_bundle"
+          ],
+          "properties": {
+            "official_standard_download_page": {
+              "type": "string"
+            },
+            "normative_sysml_model_release": {
+              "type": "string"
+            },
+            "normative_model_documentation": {
+              "type": "string"
+            },
+            "published_xml_schema_bundle": {
+              "type": "string"
+            }
+          }
+        },
+        "sources": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "format": "uri"
+          },
+          "minProperties": 4
+        },
+        "required_frozen_tuple": {
+          "type": "array",
+          "minItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "phase_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rejection_rule": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     }
   }
