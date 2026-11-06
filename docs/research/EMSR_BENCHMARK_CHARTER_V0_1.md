@@ -42,7 +42,20 @@ Source: https://doi.org/10.1109/JISPIN.2026.3690078
 
 **Benchmark implication:** Compare single-receiver assessment with collaborative assessment, and explicitly test shared failure domains. The number of reports, signatures or agents is not an independence measure.
 
-### 2.4 Dataset diversity and rights
+### 2.4 Explainable multimodal jammer classification
+
+Savaş, *An explainable multi-modal fusion framework for robust detection and classification of GNSS jamming attacks in critical infrastructures*, International Journal of Information Security (19 May 2026), reports 99.33% test accuracy for a fusion of engineered statistical features, raw 1D temporal features and 2D time-frequency features, with SHAP and Grad-CAM explainability. The paper reports mean inference latency of 95.60 ms per segment.
+
+Its authors also state that the data are simulated and that complex real-world multipath, atmospheric effects, moving receivers/interference sources, dynamic environments, and composite interference remain to be evaluated.
+
+Source: https://doi.org/10.1007/s10207-026-01267-5
+
+**Benchmark implication:** Include the model as a multimodal/XAI comparator only when source data, feature preprocessing, class definitions and split policy can be matched. Do not compare its 99.33% simulated-data test accuracy directly to field-campaign cross-domain scores. Reproduce the modality ablations and report latency/throughput on named hardware, then test real-world holdouts separately.
+
+A 28 July 2026 review of multi-source GNSS spoofing detection also identifies heterogeneous corroboration sources such as INS, vision and communications as a major research direction. This supports a later PNT-service integrity track, provided each alternative source has independently documented failure domains and time quality:
+https://doi.org/10.3390/electronics15153326
+
+## 2.4 Dataset diversity and rights
 
 - FGI Jammertest 2025 receiver corpus: SBF/RINEX, receiver status, corrections, metadata and ground truth; collected 15–17 September 2025 with a Septentrio PolaRx5. The Etsin listing states CC BY 4.0 and notes that the dataset is cumulative.
   - https://etsin.fairdata.fi/dataset/095782a8-4e31-456e-8719-7021b4c96362
@@ -148,7 +161,8 @@ For aviation and other safety-critical domains, time-to-alert, protection levels
 7. No-collaboration ablation.
 8. No-provenance / no-common-mode analysis ablations.
 9. Symthaea uncertainty-aware assessment.
-10. Integrated evidence-qualified service-continuity workflow.
+10. Explainable multimodal statistical + 1D temporal + 2D time-frequency fusion baseline, with per-modality ablations and matched hardware profiling where data conditions permit.
+11. Integrated evidence-qualified service-continuity workflow.
 
 Use matched data, splits, receiver inputs, labels, time basis and false-alarm budgets. Reproducing a paper's abstract-level headline is not reproduction.
 
