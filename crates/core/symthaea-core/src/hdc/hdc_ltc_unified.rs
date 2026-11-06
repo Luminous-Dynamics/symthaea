@@ -566,9 +566,12 @@ impl HdcLtcUnifiedNeuron {
         }
     }
 
-    /// Create a neuron with all internal HVs deterministically derived from a genesis seed.
+    /// Create a neuron with domain-separated, deterministic GenesisSeed parameters.
     ///
-    /// Domain labels are derived as `"{label}::weight_hv"`, `"{label}::input_mask"`, etc.
+    /// Each generated vector is orthogonalized and normalized to match the
+    /// unit-norm, low-interference initialization contract of [`Self::new`].
+    /// Domain labels are derived as `"{label}::weight_hv"`,
+    /// `"{label}::input_mask"`, and so on.
     pub fn from_genesis(
         config: UnifiedConfig,
         genesis: &crate::genesis::GenesisSeed,
@@ -1503,13 +1506,15 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// Re-runs the forward pass internally, then backpropagates through:
     /// ```text
-    /// x' = σ × x_∞ + (1-σ) × x       // interpolation
-    /// x_∞ = f(W⊗x + U⊗u)             // equilibrium
-    /// σ = 1 - exp(-dt/τ)              // gating from tau
-    /// τ = τ₀ × (1 + β×||x||) × (1 + 0.2×sim(u, τ_mod))
+    /// x' = σ × x_∞ + (1-σ) × x
+    /// x_∞ = f(bundle(W⊙x, U⊙u, optional Fourier basis))
+    /// σ = 1 - exp(-dt/τ) × (1 - sigmoid(k × gate_activation))
+    /// τ = clamp(τ₀ × (1 + β×||x||) × (1 + 0.2×cosine(u, τ_mod)))
     /// ```
     ///
-    /// Since HDC binding is element-wise multiply, ∂(A⊗B)/∂A = B element-wise.
+    /// Returns one-step local derivatives at the current state; it is not
+    /// temporal BPTT through a sequence. Since HDC binding is Hadamard product,
+    /// ∂(A⊙B)/∂A = B element-wise.
     pub fn backward(
         &self,
         input: &ContinuousHV,
