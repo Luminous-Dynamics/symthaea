@@ -45,3 +45,10 @@ The isolated REA Evidence compatibility harness also compiles the root adapter a
 The derivation commits to the complete canonical claim request, not merely to the final disposition. It carries the request SHA-256 and reproduces the asserted value, source predicate type, ordered Evidence ID list and assumptions in the result body. Two different assertions that both fail to match the observed normalized result therefore cannot collapse to the same derivation commitment.
 
 Raw claim import also requires every schema-required field to be present, including nullable source_predicate_type and the evidence_ids / assumptions arrays. Serde defaults do not make omitted request fields silently equivalent to explicit null or empty arrays.
+
+## Versioned schemas
+
+- Request: `docs/research/rea-claim-evaluation-v0.schema.json` (`luminous.rea.claim.v0`).
+- Result: `docs/research/rea-claim-evaluation-result-v0.schema.json` (`luminous.rea.claim-evaluation.v0`).
+
+The result schema requires the complete asserted value, source predicate, ordered requested Evidence IDs, assumptions, per-premise assessments, missing IDs, unmet obligations, claim ceiling, canonical request digest and derivation digest. Consumers should validate the result against the result schema before treating it as a portable derivation record.
