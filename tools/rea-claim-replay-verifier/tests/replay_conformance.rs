@@ -900,3 +900,52 @@ fn evidence_transport_order_does_not_change_bound_claim_replay() {
         replay.reported_derivation_sha256
     );
 }
+
+
+#[test]
+fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
+    let base = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut evidence_records = Vec::new();
+    let mut evidence_bytes = Vec::new();
+
+    for index in 0..4 {
+        let mut value = base.value.clone();
+        value["provider"]["id"] = json!(format!("correlated-observation-provider-{index}"));
+        value["provider"]["name"] = json!(format!("Correlated Observation Provider {index}"));
+        value["analysis_profile"]["provider"] = value["provider"].clone();
+        value["analysis_profile"]["digest"] =
+            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+        value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+        let raw = serde_json::to_vec(&value).unwrap();
+        let verified = rea_compat::verify_evidence_json(&raw).unwrap();
+        evidence_bytes.push(raw);
+        evidence_records.push(verified);
+    }
+
+    let mut claim = provider_claim(evidence_records[0].evidence_id.clone());
+    claim.predicate = ClaimPredicate::ProducerAuthenticity;
+    claim.source_predicate_type = None;
+    claim.evidence_ids = evidence_records
+        .iter()
+        .map(|evidence| evidence.evidence_id.clone())
+        .collect();
+
+    let (claim_bytes, result_bytes) = produce(&claim, &evidence_records);
+    let raw_evidence: Vec<&[u8]> = evidence_bytes.iter().map(Vec::as_slice).collect();
+    let replay = replay_claim_evaluation(&claim_bytes, &raw_evidence, &result_bytes).unwrap();
+
+    // Four valid observations cannot prove an authenticity predicate that
+    // has no registered v0 inference rule, regardless of provider count.
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("producer-authenticity-rule-unimplemented")
+    );
+    assert_eq!(
+        replay.reported_disposition,
+        ClaimDisposition::Unverified
+    );
+    assert_eq!(replay.evidence_assessment_count, 4);
+}
+
