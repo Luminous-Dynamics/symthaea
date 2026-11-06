@@ -1,0 +1,553 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-connectome-distributionally-robust-design-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_binding": {
+    "dataset_id": "synthetic-joint-model-ambiguity-fixture",
+    "dataset_revision_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "species": "synthetic",
+    "evidence_tier": "SYNTHETIC",
+    "source_access_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "ambiguity_set": {
+    "scope": "CONVEX_HULL_OF_ENUMERATED_JOINT_DISTRIBUTION_VERTICES",
+    "vertex_enumeration_protocol_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "declared_vertex_count": 2,
+    "vertex_completeness_status": "DECLARED_COMPLETE_FOR_SYNTHETIC_FIXTURE"
+  },
+  "query": {
+    "query_id": "is-the-query-critical-circuit-supported",
+    "query_spec_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "decision_rule_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "certificate_max_expected_loss": 0.01
+  },
+  "worlds": [
+    {
+      "world_id": "H-TRUE-A",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true
+    },
+    {
+      "world_id": "H-FALSE",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false
+    },
+    {
+      "world_id": "H-TRUE-B",
+      "graph_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "reversal-high-eig",
+      "intervention_kind": "SIMULATED",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "safety_profile_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "intervention_kind": "SIMULATED",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "safety_profile_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "intervention_kind": "OPTOGENETIC",
+      "cost_units": 0.5,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "safety_profile_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "intervention_kind": "ELECTRICAL",
+      "cost_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "safety_profile_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "intervention_kind": "SIMULATED",
+      "cost_units": 0.1,
+      "feasibility_status": "DISALLOWED",
+      "feasibility_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "safety_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "model_vertices": [
+    {
+      "model_vertex_id": "M1",
+      "causal_model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "observation_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "dependence_group_ids": [
+        "shared-connectome-revision-01",
+        "shared-assay-calibration-family"
+      ],
+      "prior": [
+        {
+          "world_id": "H-TRUE-A",
+          "probability": 0.1
+        },
+        {
+          "world_id": "H-FALSE",
+          "probability": 0.1
+        },
+        {
+          "world_id": "H-TRUE-B",
+          "probability": 0.8
+        }
+      ],
+      "predictions": [
+        {
+          "intervention_id": "reversal-high-eig",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "reversal-high-eig",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+          "outcomes": [
+            {
+              "outcome_id": "Y",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "reversal-high-eig",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+          "outcomes": [
+            {
+              "outcome_id": "Z",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "high-eig-irrelevant",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "high-eig-irrelevant",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "high-eig-irrelevant",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+          "outcomes": [
+            {
+              "outcome_id": "Y",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "cheap-confounded",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000015",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "cheap-confounded",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000016",
+          "outcomes": [
+            {
+              "outcome_id": "Y",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "cheap-confounded",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000017",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "orthogonal-robust",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000001f",
+          "outcomes": [
+            {
+              "outcome_id": "A",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "orthogonal-robust",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000020",
+          "outcomes": [
+            {
+              "outcome_id": "B",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "orthogonal-robust",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000021",
+          "outcomes": [
+            {
+              "outcome_id": "A",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "infeasible-perfect",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000029",
+          "outcomes": [
+            {
+              "outcome_id": "IP",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "infeasible-perfect",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000002a",
+          "outcomes": [
+            {
+              "outcome_id": "IM",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "infeasible-perfect",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000002b",
+          "outcomes": [
+            {
+              "outcome_id": "IS",
+              "probability": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model_vertex_id": "M2",
+      "causal_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "observation_model_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "dependence_group_ids": [
+        "shared-connectome-revision-01",
+        "shared-assay-calibration-family"
+      ],
+      "prior": [
+        {
+          "world_id": "H-TRUE-A",
+          "probability": 0.15
+        },
+        {
+          "world_id": "H-FALSE",
+          "probability": 0.15
+        },
+        {
+          "world_id": "H-TRUE-B",
+          "probability": 0.7
+        }
+      ],
+      "predictions": [
+        {
+          "intervention_id": "reversal-high-eig",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000065",
+          "outcomes": [
+            {
+              "outcome_id": "Y",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "reversal-high-eig",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000066",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "reversal-high-eig",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000067",
+          "outcomes": [
+            {
+              "outcome_id": "W",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "high-eig-irrelevant",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000006f",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "high-eig-irrelevant",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000070",
+          "outcomes": [
+            {
+              "outcome_id": "X",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "high-eig-irrelevant",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000071",
+          "outcomes": [
+            {
+              "outcome_id": "Y",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "cheap-confounded",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000079",
+          "outcomes": [
+            {
+              "outcome_id": "Q",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "cheap-confounded",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000007a",
+          "outcomes": [
+            {
+              "outcome_id": "Q",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "cheap-confounded",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000007b",
+          "outcomes": [
+            {
+              "outcome_id": "Q",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "orthogonal-robust",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000083",
+          "outcomes": [
+            {
+              "outcome_id": "C",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "orthogonal-robust",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000084",
+          "outcomes": [
+            {
+              "outcome_id": "D",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "orthogonal-robust",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "0000000000000000000000000000000000000000000000000000000000000085",
+          "outcomes": [
+            {
+              "outcome_id": "C",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "infeasible-perfect",
+          "world_id": "H-TRUE-A",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000008d",
+          "outcomes": [
+            {
+              "outcome_id": "IP",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "infeasible-perfect",
+          "world_id": "H-FALSE",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000008e",
+          "outcomes": [
+            {
+              "outcome_id": "IM",
+              "probability": 1
+            }
+          ]
+        },
+        {
+          "intervention_id": "infeasible-perfect",
+          "world_id": "H-TRUE-B",
+          "trajectory_sha256": "000000000000000000000000000000000000000000000000000000000000008f",
+          "outcomes": [
+            {
+              "outcome_id": "IS",
+              "probability": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "split_manifest": {
+    "split_unit": "synthetic_unit",
+    "train_units": [
+      "train-unit-01"
+    ],
+    "validation_units": [
+      "validation-unit-01"
+    ],
+    "lockbox_units": [
+      "lockbox-unit-01"
+    ],
+    "split_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "selection_objective": "MINIMIZE_WORST_CASE_SHARED_POLICY_LOSS_REDUCTION_PER_COST",
+  "oracle_expectations": {
+    "baseline_robust_loss": 0.15,
+    "robust_loss_by_intervention": {
+      "reversal-high-eig": 0.15,
+      "high-eig-irrelevant": 0.15,
+      "cheap-confounded": 0.15,
+      "orthogonal-robust": 0,
+      "infeasible-perfect": null
+    },
+    "clairvoyant_lower_bound_by_intervention": {
+      "reversal-high-eig": 0,
+      "high-eig-irrelevant": 0.15,
+      "cheap-confounded": 0.15,
+      "orthogonal-robust": 0,
+      "infeasible-perfect": null
+    },
+    "uncertainty_penalty_by_intervention": {
+      "reversal-high-eig": 0.15,
+      "high-eig-irrelevant": 0,
+      "cheap-confounded": 0,
+      "orthogonal-robust": 0,
+      "infeasible-perfect": null
+    },
+    "value_per_cost_by_intervention": {
+      "reversal-high-eig": 0,
+      "high-eig-irrelevant": 0,
+      "cheap-confounded": 0,
+      "orthogonal-robust": 0.075,
+      "infeasible-perfect": null
+    },
+    "vertex_min_eig_bits_by_intervention": {
+      "reversal-high-eig": 0.9219280948873623,
+      "high-eig-irrelevant": 0.7219280948873623,
+      "cheap-confounded": 0,
+      "orthogonal-robust": 0.4689955935892812,
+      "infeasible-perfect": null
+    },
+    "vertex_max_eig_bits_by_intervention": {
+      "reversal-high-eig": 1.1812908992306925,
+      "high-eig-irrelevant": 0.8812908992306927,
+      "cheap-confounded": 0.4689955935892812,
+      "orthogonal-robust": 0.6098403047164004,
+      "infeasible-perfect": null
+    },
+    "robust_certificate_by_intervention": {
+      "reversal-high-eig": false,
+      "high-eig-irrelevant": false,
+      "cheap-confounded": false,
+      "orthogonal-robust": true,
+      "infeasible-perfect": false
+    },
+    "expected_selected_intervention_id": "orthogonal-robust",
+    "expected_vertex_min_eig_greedy_intervention_id": "reversal-high-eig",
+    "pairwise_midpoint_eig_min_bits_by_intervention": {
+      "reversal-high-eig": 0.8185404758454655,
+      "high-eig-irrelevant": 0.8112781244591328,
+      "cheap-confounded": 0.2441664241947461,
+      "orthogonal-robust": 0.5490865765529465,
+      "infeasible-perfect": null
+    },
+    "pairwise_midpoint_eig_max_bits_by_intervention": {
+      "reversal-high-eig": 0.8185404758454655,
+      "high-eig-irrelevant": 0.8112781244591328,
+      "cheap-confounded": 0.2441664241947461,
+      "orthogonal-robust": 0.5490865765529465,
+      "infeasible-perfect": null
+    }
+  }
+}
