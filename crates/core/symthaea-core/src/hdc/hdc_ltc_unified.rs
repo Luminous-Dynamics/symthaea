@@ -697,7 +697,7 @@ impl HdcLtcUnifiedNeuron {
         let state_norm = self.state.norm();
 
         // Input-dependent adjustment via similarity with tau_modulator
-        let input_adjustment = input.similarity(&self.tau_modulator);
+        let input_adjustment = cosine_similarity_full(input, &self.tau_modulator);
 
         // τ = τ₀ × (1 + backbone × ||x||) × (1 + 0.2 × input_adjustment)
         let tau = self.config.tau_base
@@ -1518,66 +1518,121 @@ impl HdcLtcUnifiedNeuron {
     ) -> HdcLtcGradients {
         let dim = self.config.dimension;
 
-        // This local gradient is defined at the neuron's PRE-EVOLUTION state.
-        // Call backward() before evolve_closed_form() for the same input/dt.
-        // The forward and backward paths share pre-activation and gate helpers,
-        // avoiding the former mismatch (ungated pure exponential in backward
-        // versus adaptive gating/Fourier input in the actual forward path).
+        // The local derivative is evaluated at the PRE-EVOLUTION state.
+        // Call backward() before evolve_closed_form() for this input and dt.
         let z = self.compute_pre_activation(input);
-        let x_inf = self.config.activation.apply(&z);
+        let equilibrium = self.config.activation.apply(&z);
         let tau = self.compute_tau(input);
-        let sigma_base = self.compute_gate_base(input);
+        let gate_activation = self.compute_gate_activation(input);
+        let gate_base =
+            1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
         let decay = (-dt / tau).exp();
-        let sigma = (1.0 - decay * (1.0 - sigma_base)).clamp(0.0, 1.0);
+        let sigma = (1.0 - decay * (1.0 - gate_base)).clamp(0.0, 1.0);
+        let new_state = equilibrium
+            .scale(sigma)
+            .add(&self.state.scale(1.0 - sigma));
 
-        // One-step prediction from the current (pre-evolution) state.
-        let new_state = x_inf.scale(sigma).add(&self.state.scale(1.0 - sigma));
-
-        // dL/dx' for mean-squared error.
+        // Mean-squared-error derivative at the one-step prediction.
         let dh = new_state.subtract(target).scale(2.0 / dim as f32);
-        let dx_inf = dh.scale(sigma);
+        let dloss_dsigma: f32 = dh
+            .values
+            .iter()
+            .zip(equilibrium.values.iter().zip(self.state.values.iter()))
+            .map(|(&error, (&eq, &state))| error * (eq - state))
+            .sum();
 
-        // ContinuousHV::bundle averages its inputs. Account for the exact
-        // 1/n factor (2 components, or 3 when a Fourier basis is injected).
+        // The bundle is the arithmetic mean of two or three components.
         let bundle_terms = if self.config.fourier_frequencies.is_empty() {
             2.0
         } else {
             3.0
         };
         let activation = self.config.activation;
-        let dz_values: Vec<f32> = dx_inf
-            .values
-            .iter()
-            .zip(z.values.iter())
-            .map(|(&di, &zi)| di * activation.derivative(zi) / bundle_terms)
-            .collect();
-        let dz = ContinuousHV::from_values(dz_values);
+        let dz = ContinuousHV::from_values(
+            dh.values
+                .iter()
+                .zip(z.values.iter())
+                .map(|(&error, &pre)| {
+                    error * sigma * activation.derivative(pre) / bundle_terms
+                })
+                .collect(),
+        );
 
-        // Partial gradients for the state/input binding paths. The adaptive
-        // gate and tau are held fixed for dw/du; tau receives its own scalar
-        // derivative below. Gate-parameter gradients are a separate follow-up.
+        // Direct equilibrium-path derivatives (binding is Hadamard product).
         let dw = dz.bind(&self.state);
         let du = dz.bind(input);
-        let d_input = dz.bind(&self.input_mask);
 
-        // sigma = 1 - exp(-dt/tau) * (1 - sigma_base).
-        // Holding sigma_base fixed, d sigma / d tau is:
-        // -exp(-dt/tau) * (1 - sigma_base) * dt / tau^2.
-        let diff = x_inf.subtract(&self.state);
-        let dloss_dsigma: f32 = dh
-            .values
-            .iter()
-            .zip(diff.values.iter())
-            .map(|(&dhi, &di)| dhi * di)
-            .sum();
-        let dsigma_dtau = -decay * (1.0 - sigma_base) * dt / (tau * tau);
-        let dtau_scalar = dloss_dsigma * dsigma_dtau;
+        // Exact derivative of sigma with respect to the effective scalar tau.
+        let dsigma_dtau = -decay * (1.0 - gate_base) * dt / (tau * tau);
+        let dloss_dtau = dloss_dsigma * dsigma_dtau;
+
+        // tau = tau_base * (1 + backbone_tau * ||state||)
+        //                 * (1 + 0.2 * cosine(input, tau_modulator)).
+        let state_norm = self.state.norm();
+        let input_tau_similarity = cosine_similarity_full(input, &self.tau_modulator);
+        let tau_mod_coefficient =
+            self.config.tau_base * (1.0 + self.config.backbone_tau * state_norm) * 0.2;
+        let tau_similarity_gradient = dloss_dtau * tau_mod_coefficient;
+        let d_tau_modulator =
+            cosine_gradient_wrt_right(input, &self.tau_modulator).scale(tau_similarity_gradient);
+        let d_input_tau =
+            cosine_gradient_wrt_left(input, &self.tau_modulator).scale(tau_similarity_gradient);
+        let tau_state_coefficient = self.config.tau_base
+            * self.config.backbone_tau
+            * (1.0 + 0.2 * input_tau_similarity);
+        let d_state_tau = if state_norm > 1e-10 {
+            self.state
+                .scale(tau_state_coefficient / state_norm)
+                .scale(dloss_dtau)
+        } else {
+            ContinuousHV::zero(dim)
+        };
+
+        // The adaptive gate is based on cosine(bundle(state, input), gate_weight)
+        // plus the mean gate bias. Differentiate this path as well.
+        let bundled_state_input =
+            self.state.add(input).scale(0.5);
+        let dloss_dgate_activation = dloss_dsigma
+            * decay
+            * self.config.gating_steepness
+            * gate_base
+            * (1.0 - gate_base);
+        let d_gate_weight = cosine_gradient_wrt_right(
+            &bundled_state_input,
+            &self.gate_weight,
+        )
+        .scale(dloss_dgate_activation);
+        let d_gate_bias = ContinuousHV::from_values(vec![
+            dloss_dgate_activation / dim as f32;
+            dim
+        ]);
+        let gate_bundle_gradient = cosine_gradient_wrt_left(
+            &bundled_state_input,
+            &self.gate_weight,
+        )
+        .scale(0.5 * dloss_dgate_activation);
+
+        // d_input and d_state include the direct equilibrium path, the gate path,
+        // the tau path, and (for state) the residual interpolation branch.
+        let d_input = dz
+            .bind(&self.input_mask)
+            .add(&gate_bundle_gradient)
+            .add(&d_input_tau);
+        let d_state = dz
+            .bind(&self.weight_hv)
+            .add(&dh.scale(1.0 - sigma))
+            .add(&gate_bundle_gradient)
+            .add(&d_state_tau);
 
         HdcLtcGradients {
             dw,
             du,
-            dtau_scalar,
+            dtau_scalar: dloss_dtau,
+            d_tau_modulator,
+            d_gate_weight,
+            d_gate_bias,
             d_input,
+            d_state,
         }
     }
 
@@ -1618,22 +1673,30 @@ impl HdcLtcUnifiedNeuron {
             .scale(decay_factor)
             .add(&self.input_momentum);
 
-        // Tau modulator update (project scalar gradient onto tau_modulator direction)
-        if grads.dtau_scalar.abs() > 1e-10 {
-            self.tau_modulator = self.tau_modulator.add(
-                &self
-                    .tau_modulator
-                    .normalize()
-                    .scale(-lr * grads.dtau_scalar),
-            );
-        }
+        // Update cosine-based tau and gate directions. Their exact gradients are
+        // orthogonal to the current unit vector; norm clipping prevents drift.
+        self.tau_modulator = self
+            .tau_modulator
+            .subtract(&grads.d_tau_modulator.scale(lr));
+        self.gate_weight = self
+            .gate_weight
+            .subtract(&grads.d_gate_weight.scale(lr));
+        self.gate_bias = self
+            .gate_bias
+            .subtract(&grads.d_gate_bias.scale(lr));
 
-        // Norm clip to 2.0
+        // Norm clip to 2.0 for all vector-valued parameter groups.
         if self.weight_hv.norm() > 2.0 {
             self.weight_hv = self.weight_hv.normalize().scale(2.0);
         }
         if self.input_mask.norm() > 2.0 {
             self.input_mask = self.input_mask.normalize().scale(2.0);
+        }
+        if self.tau_modulator.norm() > 2.0 {
+            self.tau_modulator = self.tau_modulator.normalize().scale(2.0);
+        }
+        if self.gate_weight.norm() > 2.0 {
+            self.gate_weight = self.gate_weight.normalize().scale(2.0);
         }
     }
 
@@ -1720,18 +1783,70 @@ impl HdcLtcUnifiedNeuron {
     }
 }
 
-/// Gradients computed by BPTT `backward()` for a single closed-form step.
+/// Exact full-dimensional cosine similarity, independent of the global similarity stride.
+#[inline]
+fn cosine_similarity_full(left: &ContinuousHV, right: &ContinuousHV) -> f32 {
+    let left_norm = left.norm();
+    let right_norm = right.norm();
+    let denominator = left_norm * right_norm;
+    if denominator < 1e-10 {
+        0.0
+    } else {
+        left.dot(right) / denominator
+    }
+}
+
+/// Gradient of full-dimensional cosine similarity with respect to the left vector.
+#[inline]
+fn cosine_gradient_wrt_left(left: &ContinuousHV, right: &ContinuousHV) -> ContinuousHV {
+    let left_norm = left.norm();
+    let right_norm = right.norm();
+    if left_norm < 1e-10 || right_norm < 1e-10 {
+        return ContinuousHV::zero(left.dim());
+    }
+    let similarity = cosine_similarity_full(left, right);
+    right
+        .scale(1.0 / (left_norm * right_norm))
+        .subtract(&left.scale(similarity / (left_norm * left_norm)))
+}
+
+/// Gradient of full-dimensional cosine similarity with respect to the right vector.
+#[inline]
+fn cosine_gradient_wrt_right(left: &ContinuousHV, right: &ContinuousHV) -> ContinuousHV {
+    let left_norm = left.norm();
+    let right_norm = right.norm();
+    if left_norm < 1e-10 || right_norm < 1e-10 {
+        return ContinuousHV::zero(right.dim());
+    }
+    let similarity = cosine_similarity_full(left, right);
+    left
+        .scale(1.0 / (left_norm * right_norm))
+        .subtract(&right.scale(similarity / (right_norm * right_norm)))
+}
+
+/// One-step local gradients for the actual adaptive HDC-LTC forward map.
+///
+/// These gradients are local in time: they do not constitute BPTT through a
+/// sequence. They include the current step's equilibrium, adaptive gate, and
+/// state/input-dependent tau paths.
 #[derive(Debug, Clone)]
 pub struct HdcLtcGradients {
-    /// Gradient for `weight_hv`
+    /// Partial gradient for the state-binding hypervector `weight_hv`.
     pub dw: ContinuousHV,
-    /// Gradient for `input_mask`
+    /// Partial gradient for the input-binding hypervector `input_mask`.
     pub du: ContinuousHV,
-    /// Scalar gradient for tau (applied to `tau_modulator`)
+    /// Gradient with respect to the effective scalar time constant (diagnostic).
     pub dtau_scalar: f32,
-    /// Gradient w.r.t. the input vector (for inter-layer backpropagation).
-    /// Represents ∂L/∂u, allowing proper gradient flow to the previous layer.
+    /// Gradient for the tau-modulator hypervector, including cosine geometry.
+    pub d_tau_modulator: ContinuousHV,
+    /// Gradient for the adaptive gate-weight hypervector.
+    pub d_gate_weight: ContinuousHV,
+    /// Gradient for the per-coordinate gate-bias storage (the forward path uses its mean).
+    pub d_gate_bias: ContinuousHV,
+    /// Local derivative with respect to the input hypervector, including gate and tau paths.
     pub d_input: ContinuousHV,
+    /// Local derivative with respect to the pre-evolution state hypervector.
+    pub d_state: ContinuousHV,
 }
 
 /// Statistics for unified neuron
