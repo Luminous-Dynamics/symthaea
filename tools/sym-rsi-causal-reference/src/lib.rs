@@ -268,7 +268,7 @@ fn stable_mean(values: &[f64]) -> f64 {
     (sum + correction) / values.len() as f64
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeClass {
     Data,
@@ -515,6 +515,13 @@ pub fn validate_manifest(
     } else {
         Err(issues)
     }
+}
+
+/// Parses and structurally validates one intervention manifest JSON document.
+pub fn validate_manifest_json(input: &str) -> Result<(), String> {
+    let manifest: InterventionManifest =
+        serde_json::from_str(input).map_err(|error| format!("invalid manifest JSON: {error}"))?;
+    validate_manifest(&manifest).map_err(|issues| format!("manifest rejected: {issues:#?}"))
 }
 
 fn has_dependency_cycle(units: &BTreeMap<String, &ChangeUnit>) -> bool {
@@ -879,6 +886,14 @@ mod tests {
         );
         let report = validate_fixture_file(input).expect("reference fixture corpus should validate");
         assert_eq!(report.fixture_ids.len(), 8);
+    }
+
+    #[test]
+    fn inert_manifest_example_passes_structural_validation() {
+        let input = include_str!(
+            "../../../docs/research/fixtures/SYM_RSI_INTERVENTION_MANIFEST_V0_EXAMPLE_2026-11-06.json"
+        );
+        assert_eq!(validate_manifest_json(input), Ok(()));
     }
 
     #[test]
