@@ -6,7 +6,9 @@ mod replay_verifier;
 use rea_compat::claims::{
     ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
 };
-use replay_verifier::{ReplayErrorKind, ReplayOutcome, replay_claim_evaluation};
+use replay_verifier::{
+    MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome, replay_claim_evaluation,
+};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::process::Command;
@@ -618,5 +620,61 @@ fn replay_preserves_inferred_confidence_and_analyst_authority_without_promotion(
         ["evidence_assessments"][0];
     assert_eq!(assessment["confidence"], json!("inferred"));
     assert_eq!(assessment["authority"], json!("analyst-inference"));
+}
+
+#[test]
+fn oversized_request_evidence_reference_count_is_a_resource_limit() {
+    let mut claim = provider_claim(format!("ev_{}", "a".repeat(64)));
+    claim.evidence_ids = (0..=MAX_EVIDENCE_RECORDS)
+        .map(|index| format!("ev_{index:064x}"))
+        .collect();
+    let claim_bytes = serde_json::to_vec(&claim).unwrap();
+
+    let error = replay_claim_evaluation(&claim_bytes, &[], b"{}").unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::ResourceLimit);
+}
+
+#[test]
+fn oversized_replay_evidence_input_count_is_rejected_before_parsing() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id);
+    let claim_bytes = serde_json::to_vec(&claim).unwrap();
+    let too_many: Vec<&[u8]> = vec![b"not-json"; MAX_EVIDENCE_RECORDS + 1];
+
+    let error = replay_claim_evaluation(&claim_bytes, &too_many, b"{}").unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::ResourceLimit);
+}
+
+#[test]
+fn oversized_result_evidence_reference_count_is_a_resource_limit() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+    let mut result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    result["requested_evidence_ids"] = json!(
+        (0..=MAX_EVIDENCE_RECORDS)
+            .map(|index| format!("ev_{index:064x}"))
+            .collect::<Vec<_>>()
+    );
+
+    let oversized_result = serde_json::to_vec(&result).unwrap();
+    let error =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &oversized_result).unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::ResourceLimit);
+}
+
+#[test]
+fn cli_rejects_too_many_evidence_paths_before_opening_files() {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_rea-claim-replay"));
+    command.arg("missing-claim.json").arg("missing-result.json");
+    command.args(std::iter::repeat_n(
+        "missing-evidence.json",
+        MAX_EVIDENCE_RECORDS + 1,
+    ));
+    let output = command.output().unwrap();
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("Evidence paths"));
 }
 
