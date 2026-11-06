@@ -91,6 +91,22 @@ The new control patterns BI-N37–BI-N39 cover benchmark-input memorization, har
 
 The CEB-OPT lane adds hard gates and evidence requirements for frozen challenge-distribution digests, harness integrity review, unseen-input generalization and cache lifecycle semantics. Keep the existing three primary metrics—expert-normalized speedup, performance-regression rate and measurement variance—unchanged. Report raw measurements and integrity adjudication separately; do not introduce a hack-adjusted score until there is a validated detector and a preregistered adjudication rule. GSO Opt@1 is not numerically equivalent to CEB expert-normalized speedup.
 
+
+
+### 3.3 Specification composition and hidden-test fidelity
+
+[SpecBench](https://arxiv.org/abs/2605.21384) studies 30 systems-level coding tasks and distinguishes visible feature-level validation from hidden tests that compose behaviors already required by the specification. It defines the visible/hidden reward-hacking gap as the difference between visible-test pass and hidden spec-composition pass. The paper reports that the upper-tail gap grows by about 27 percentage points per tenfold increase in reference implementation size (the abstract rounds this to 28).
+
+The design lesson for CEB is not simply to add more hidden tests. It is to establish a traceable chain:
+
+1. A frozen specification states each required behavior and feature interaction.
+2. An interaction-coverage matrix identifies which combinations are genuinely required by that specification.
+3. Visible and hidden tests cover those obligations at the appropriate level.
+4. Hidden tests do not introduce undocumented requirements or reject valid semantic alternatives.
+5. An independent oracle review classifies uncovered composition as an unresolved task/oracle defect—not a candidate failure.
+
+BI-N40–BI-N41 and BI-P12 provide design-only control patterns for these cases. The CEB-TEST lane adds specification-obligation traceability and hidden-test fidelity gates while retaining its existing mutation kill rate, oracle false-positive rate and behavioral-coverage metrics. All controls remain unexecuted.
+
 ## 4. Scoring without hiding failure
 
 Let:
