@@ -11,10 +11,9 @@
 use std::collections::BTreeSet;
 use std::env;
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-const MANIFEST: &str =
-    include_str!("../../../../docs/research/hlb-fep-wsp-factorial-v1.json");
+const MANIFEST: &str = include_str!("../../../../docs/research/hlb-fep-wsp-factorial-v1.json");
 const EXPECTED_FACTORS: [&str; 4] = [
     "native_hdc",
     "cfc_ltc",
@@ -97,7 +96,9 @@ fn validate_manifest(manifest: &Value) -> Result<(), String> {
             return Err(format!("duplicate profile id: {id}"));
         }
         if string_field(profile, "execution_status")? != "planned_not_executed" {
-            return Err(format!("profile {id} cannot claim execution from a protocol contract"));
+            return Err(format!(
+                "profile {id} cannot claim execution from a protocol contract"
+            ));
         }
 
         let h = bool_field(profile, "native_hdc")?;
@@ -112,7 +113,9 @@ fn validate_manifest(manifest: &Value) -> Result<(), String> {
             u8::from(w)
         );
         if id != expected_id {
-            return Err(format!("profile {id} does not match factor values ({expected_id})"));
+            return Err(format!(
+                "profile {id} does not match factor values ({expected_id})"
+            ));
         }
         if !combinations.insert((h, c, f, w)) {
             return Err(format!("duplicate factorial combination: {id}"));
@@ -183,11 +186,17 @@ fn validate_manifest(manifest: &Value) -> Result<(), String> {
         .ok_or_else(|| "missing seeds".to_owned())?;
     let development = array_field(seeds, "development")?
         .iter()
-        .map(|v| v.as_u64().ok_or_else(|| "development seed must be an integer".to_owned()))
+        .map(|v| {
+            v.as_u64()
+                .ok_or_else(|| "development seed must be an integer".to_owned())
+        })
         .collect::<Result<BTreeSet<_>, _>>()?;
     let held_out = array_field(seeds, "held_out")?
         .iter()
-        .map(|v| v.as_u64().ok_or_else(|| "held-out seed must be an integer".to_owned()))
+        .map(|v| {
+            v.as_u64()
+                .ok_or_else(|| "held-out seed must be an integer".to_owned())
+        })
         .collect::<Result<BTreeSet<_>, _>>()?;
     if development.len() != 10 || held_out.len() != 20 {
         return Err(format!(
@@ -208,11 +217,21 @@ fn validate_manifest(manifest: &Value) -> Result<(), String> {
         "max_weight_program_candidates_per_fault_instance",
         "forward_pass_budget_per_candidate",
     ] {
-        if budget.get(field).and_then(Value::as_u64).filter(|n| *n > 0).is_none() {
-            return Err(format!("tuning budget field {field} must be a positive integer"));
+        if budget
+            .get(field)
+            .and_then(Value::as_u64)
+            .filter(|n| *n > 0)
+            .is_none()
+        {
+            return Err(format!(
+                "tuning budget field {field} must be a positive integer"
+            ));
         }
     }
-    if budget.get("same_candidate_count_for_all_profiles").and_then(Value::as_bool) != Some(true)
+    if budget
+        .get("same_candidate_count_for_all_profiles")
+        .and_then(Value::as_bool)
+        != Some(true)
         || budget
             .get("aggregate_validation_compute_must_be_recorded")
             .and_then(Value::as_bool)
@@ -280,7 +299,10 @@ fn main() {
         "runtime_execution": false,
         "performance_claims_permitted": false
     });
-    println!("{}", serde_json::to_string_pretty(&receipt).expect("receipt serializes"));
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&receipt).expect("receipt serializes")
+    );
 }
 
 #[cfg(test)]
@@ -318,6 +340,8 @@ mod tests {
     fn source_sha_must_be_exact_hex() {
         assert!(valid_source_sha("0123456789abcdef0123456789abcdef01234567"));
         assert!(!valid_source_sha("0123456789abcdef"));
-        assert!(!valid_source_sha("z123456789abcdef0123456789abcdef01234567"));
+        assert!(!valid_source_sha(
+            "z123456789abcdef0123456789abcdef01234567"
+        ));
     }
 }
