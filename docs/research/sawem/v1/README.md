@@ -175,7 +175,11 @@ The new `market_impact_attribution.rs` module separates two revenue calculations
 
 This distinction is not theoretical. Supagrid's September 2026 analysis examined 9.7 million NEM battery rebids and a year of results for 45 batteries. Its public methodology reports that 34/45 earned more from energy than a simple AEMO-forecast-following baseline. It also found battery self-price impact changed the median comparison against a naive perfect-information ceiling: the score rose from 69% to 77% when the ceiling was adjusted for price impact. The study says price impact was reconstructed without network effects inside a region and reports that contracts/hedges and other asset obligations were not visible in its public data. These are **NEM-specific research findings**, not universal battery performance figures and not SAWEM parameters.
 
-A peer-reviewed 2025 paper independently formulates price-maker storage bidding as a bi-level problem with decision-dependent price uncertainty; this reinforces that a price-making model is a different modelling class from a price-taking arbitrage optimizer. For fair benchmarking, compare in four distinct layers:
+A peer-reviewed 2025 paper independently formulates price-maker storage bidding as a bi-level problem with decision-dependent price uncertainty; this reinforces that a price-making model is a different modelling class from a price-taking arbitrage optimizer.
+
+A second useful reference is Supagrid's September 2026 held-out dispatch-model evaluation. It tested nine previously unseen days (12,960 five-minute regional prices) and reported 98.2% of regional prices within US$1/MWh of AEMO, 99.8% of unit outputs within 1 MW of AEMO targets, 99.9% matching of binding network limits, and network/economic curtailment differences within 0.2%. These are vendor-published results and the benchmark boundary is NEM-specific. The right use is a *replication target on the same held-out days and input boundary*, not a transferable SAWEM threshold or proof that its model covers all extreme-price/network conditions. Supagrid reports no prices above US$1,000/MWh in those nine days, so its test does not establish tail-price performance.
+
+For fair benchmarking, compare in four distinct layers:
 1. a predeclared forecast-following / rule-based implementable baseline;
 2. a price-taking perfect-information upper bound (clearly labelled non-implementable);
 3. a price-impact-adjusted upper bound using the same exogenous demand, rival offers and network assumptions; and
