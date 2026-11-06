@@ -2727,6 +2727,19 @@ fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     file.sync_all()
 }
 
+/// Flush directory-entry metadata after publishing a bundle. On non-Unix
+/// platforms Rust does not expose a portable directory fsync operation;
+/// individual file contents are still synced before publication.
+#[cfg(unix)]
+fn sync_directory(path: &Path) -> std::io::Result<()> {
+    std::fs::File::open(path)?.sync_all()
+}
+
+#[cfg(not(unix))]
+fn sync_directory(_path: &Path) -> std::io::Result<()> {
+    Ok(())
+}
+
 fn atomic_replace_file(path: &Path, bytes: &[u8], sequence: u64) -> std::io::Result<()> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     std::fs::create_dir_all(parent)?;
@@ -2897,7 +2910,15 @@ fn verify_keeper_bundle_readback(
         ));
     }
 
-    let manifest_bytes = std::fs::read(bundle_path.join(KEEPER_BUNDLE_MANIFEST_FILE))?;
+    let manifest_path = bundle_path.join(KEEPER_BUNDLE_MANIFEST_FILE);
+    let manifest_type = std::fs::symlink_metadata(&manifest_path)?.file_type();
+    if !manifest_type.is_file() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "keeper bundle manifest must be a regular file, not a symlink",
+        ));
+    }
+    let manifest_bytes = std::fs::read(&manifest_path)?;
     let manifest: KeeperArtifactManifestV1 =
         serde_json::from_slice(&manifest_bytes).map_err(std::io::Error::other)?;
     if manifest.schema_version != KEEPER_BUNDLE_SCHEMA_VERSION
@@ -3050,11 +3071,18 @@ fn persist_keeper_bundle(
         }
 
         write_keeper_bundle_manifest(&staging, audio_key, midi_available)?;
+        sync_directory(&staging)?;
 
-        // Publish the whole directory atomically, then re-open every file
-        // from the published path. A mismatch removes the bundle and
-        // fails the keep before genealogy/index metadata can commit.
+        // Publish the whole directory atomically, sync the parent directory
+        // entry on Unix, then re-open every file from the published path.
+        // A mismatch removes the bundle and fails the keep before
+        // genealogy/index metadata can commit.
         std::fs::rename(&staging, &destination)?;
+        if let Err(error) = sync_directory(root) {
+            let _ = std::fs::remove_dir_all(&destination);
+            let _ = sync_directory(root);
+            return Err(error);
+        }
         let readback = match verify_keeper_bundle_readback(&destination, audio_key) {
             Ok(verified) => verified,
             Err(error) => {
@@ -3236,6 +3264,19 @@ mod keeper_bundle_integrity_tests {
         std::fs::write(path.join(KEEPER_BUNDLE_MANIFEST_FILE), bytes).unwrap();
         assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
         let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn keeper_bundle_readback_rejects_manifest_symlink() {
+        let path = temp_bundle_path("manifest-symlink");
+        std::fs::create_dir_all(&path).unwrap();
+        let outside = temp_bundle_path("outside-manifest");
+        std::fs::write(&outside, b"{}").unwrap();
+        std::os::unix::fs::symlink(&outside, path.join(KEEPER_BUNDLE_MANIFEST_FILE)).unwrap();
+        assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
+        let _ = std::fs::remove_dir_all(path);
+        let _ = std::fs::remove_file(outside);
     }
 
     #[test]
