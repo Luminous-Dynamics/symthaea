@@ -370,7 +370,7 @@ fn evaluate_case(case: &Case, frame: &SamplingFrame) -> Result<CaseResult, Strin
     require(valid_sha256(&case.frame_coverage_receipt_sha256), "frame coverage receipt digest malformed")?;
     require(case.frame_coverage_status == "CLOSED" || case.frame_coverage_status == "INCOMPLETE", "unknown frame coverage status")?;
     let coverage_receipt = sha256_text(&format!(
-        "coverage-v1\\n{}\\n{}\\n{}\\n{}\\n",
+        "coverage-v1\n{}\n{}\n{}\n{}\n",
         case.frame_id, case.frame_coverage_status, frame.candidate_frame_sha256, frame.source_frame_receipt_sha256
     ));
     require(case.frame_coverage_receipt_sha256 == coverage_receipt, "frame coverage receipt does not bind the declared status and source frame")?;
