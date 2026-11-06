@@ -614,7 +614,7 @@ pub fn replay_claim_evaluation(
     let (reported, reported_value) = parse_result(result_json)?;
 
     let mut total_bytes = 0usize;
-    let mut evidence_by_id = HashMap::<String, VerifiedEvidence>::new();
+    let mut evidence_by_id = HashMap::<String, AdmittedEvidence>::new();
     for raw in evidence_json {
         total_bytes = total_bytes.checked_add(raw.len()).ok_or_else(|| {
             ReplayError::new(
@@ -645,10 +645,9 @@ pub fn replay_claim_evaluation(
                 ),
             ));
         }
-        if evidence_by_id
-            .insert(evidence.evidence_id.clone(), evidence)
-            .is_some()
-        {
+        let evidence_id = evidence.evidence_id.clone();
+        let admitted = admit_verified_evidence(evidence);
+        if evidence_by_id.insert(evidence_id, admitted).is_some() {
             return Err(ReplayError::new(
                 ReplayErrorKind::DuplicateEvidence,
                 "duplicate verified Evidence record supplied to replay",
@@ -689,6 +688,55 @@ enum ScopeDisposition {
     Unverifiable,
 }
 
+#[derive(Debug)]
+struct AdmittedEvidence {
+    subject_sha256: Option<String>,
+    operation: Option<String>,
+    platform: Option<String>,
+    environment_id: Option<String>,
+    predicate_type: Option<String>,
+    normalized_result: Value,
+    provider_id: Option<String>,
+    provider_name: Option<String>,
+    provider_version: Option<String>,
+    confidence: Option<String>,
+    authority: Option<String>,
+}
+
+fn admit_verified_evidence(evidence: VerifiedEvidence) -> AdmittedEvidence {
+    let mut value = evidence.value;
+    let subject_sha256 = string_at(&value, &["subject", "digest", "sha256"]).map(str::to_owned);
+    let operation = string_at(&value, &["operation"]).map(str::to_owned);
+    let platform = string_at(&value, &["environment", "platform"]).map(str::to_owned);
+    let environment_id = string_at(&value, &["environment", "id"]).map(str::to_owned);
+    let predicate_type = string_at(&value, &["predicate_type"]).map(str::to_owned);
+    let provider_id = string_at(&value, &["provider", "id"]).map(str::to_owned);
+    let provider_name = string_at(&value, &["provider", "name"]).map(str::to_owned);
+    let provider_version = string_at(&value, &["provider", "version"]).map(str::to_owned);
+    let confidence = string_at(&value, &["confidence"]).map(str::to_owned);
+    let authority = string_at(&value, &["authority"]).map(str::to_owned);
+    let normalized_result = value
+        .as_object_mut()
+        .and_then(|object| object.remove("normalized_result"))
+        .unwrap_or(Value::Null);
+
+    // The full, schema-verified Evidence value is dropped after projection.
+    // Claim inference retains only fields authorized by the v0 rule.
+    AdmittedEvidence {
+        subject_sha256,
+        operation,
+        platform,
+        environment_id,
+        predicate_type,
+        normalized_result,
+        provider_id,
+        provider_name,
+        provider_version,
+        confidence,
+        authority,
+    }
+}
+
 fn compare_optional_scope(requested: Option<&str>, observed: Option<&str>) -> ScopeDisposition {
     match (requested, observed) {
         (Some(left), Some(right)) if left == right => ScopeDisposition::Match,
@@ -706,8 +754,11 @@ fn string_at<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
     current.as_str()
 }
 
-fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition, String) {
-    match string_at(evidence, &["subject", "digest", "sha256"]) {
+fn scope_assessment(
+    claim: &ClaimRequest,
+    evidence: &AdmittedEvidence,
+) -> (ScopeDisposition, String) {
+    match evidence.subject_sha256.as_deref() {
         Some(digest) if digest == claim.scope.subject_sha256 => {}
         Some(_) => {
             return (
@@ -723,7 +774,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
         }
     }
 
-    if string_at(evidence, &["operation"]) != Some(claim.scope.operation.as_str()) {
+    if evidence.operation.as_deref() != Some(claim.scope.operation.as_str()) {
         return (
             ScopeDisposition::Inapplicable,
             "operation does not match claim scope".to_owned(),
@@ -737,10 +788,8 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
         );
     }
 
-    let platform = compare_optional_scope(
-        claim.scope.platform.as_deref(),
-        string_at(evidence, &["environment", "platform"]),
-    );
+    let platform =
+        compare_optional_scope(claim.scope.platform.as_deref(), evidence.platform.as_deref());
     if platform != ScopeDisposition::Match {
         return (
             platform,
@@ -757,7 +806,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
 
     let environment = compare_optional_scope(
         claim.scope.environment_id.as_deref(),
-        string_at(evidence, &["environment", "id"]),
+        evidence.environment_id.as_deref(),
     );
     if environment != ScopeDisposition::Match {
         return (
@@ -795,39 +844,20 @@ fn jcs_equal(left: &Value, right: &Value) -> Result<bool, ReplayError> {
     Ok(left == right)
 }
 
-fn metadata(
-    value: &Value,
-) -> (
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-) {
-    (
-        string_at(value, &["provider", "id"]).map(str::to_owned),
-        string_at(value, &["provider", "name"]).map(str::to_owned),
-        string_at(value, &["provider", "version"]).map(str::to_owned),
-        string_at(value, &["confidence"]).map(str::to_owned),
-        string_at(value, &["authority"]).map(str::to_owned),
-    )
-}
-
 fn assessment(
     evidence_id: &str,
     kind: AssessmentKind,
-    evidence: &Value,
+    evidence: &AdmittedEvidence,
     reason: impl Into<String>,
 ) -> Assessment {
-    let (provider_id, provider_name, provider_version, confidence, authority) = metadata(evidence);
     Assessment {
         evidence_id: evidence_id.to_owned(),
         kind,
-        provider_id,
-        provider_name,
-        provider_version,
-        confidence,
-        authority,
+        provider_id: evidence.provider_id.clone(),
+        provider_name: evidence.provider_name.clone(),
+        provider_version: evidence.provider_version.clone(),
+        confidence: evidence.confidence.clone(),
+        authority: evidence.authority.clone(),
         reason: reason.into(),
     }
 }
@@ -852,7 +882,7 @@ fn claim_ceiling(predicate: Predicate) -> Vec<String> {
 
 fn derive_reference_result(
     claim: &ClaimRequest,
-    evidence_by_id: &HashMap<String, VerifiedEvidence>,
+    evidence_by_id: &HashMap<String, AdmittedEvidence>,
 ) -> Result<ClaimEvaluation, ReplayError> {
     let mut assessments = Vec::new();
     let mut missing = Vec::new();
@@ -884,20 +914,20 @@ fn derive_reference_result(
             assessments.push(assessment(
                 evidence_id,
                 AssessmentKind::NotEvaluated,
-                &record.value,
+                record,
                 "no authorized inference rule evaluates this premise for the requested predicate",
             ));
             continue;
         }
 
-        let (scope, reason) = scope_assessment(claim, &record.value);
+        let (scope, reason) = scope_assessment(claim, record);
         match scope {
             ScopeDisposition::Inapplicable => {
                 inapplicable += 1;
                 assessments.push(assessment(
                     evidence_id,
                     AssessmentKind::Inapplicable,
-                    &record.value,
+                    record,
                     reason,
                 ));
                 continue;
@@ -907,7 +937,7 @@ fn derive_reference_result(
                 assessments.push(assessment(
                     evidence_id,
                     AssessmentKind::ScopeUnverifiable,
-                    &record.value,
+                    record,
                     reason,
                 ));
                 continue;
@@ -915,27 +945,23 @@ fn derive_reference_result(
             ScopeDisposition::Match => {}
         }
 
-        if string_at(&record.value, &["predicate_type"]) != claim.source_predicate_type.as_deref() {
+        if record.predicate_type.as_deref() != claim.source_predicate_type.as_deref() {
             inapplicable += 1;
             assessments.push(assessment(
                 evidence_id,
                 AssessmentKind::Inapplicable,
-                &record.value,
+                record,
                 "source predicate_type does not match the requested provider observation",
             ));
             continue;
         }
 
-        let normalized = record
-            .value
-            .get("normalized_result")
-            .unwrap_or(&Value::Null);
-        if jcs_equal(normalized, &claim.asserted_value)? {
+        if jcs_equal(&record.normalized_result, &claim.asserted_value)? {
             supports += 1;
             assessments.push(assessment(
                 evidence_id,
                 AssessmentKind::Supports,
-                &record.value,
+                record,
                 "normalized_result matches asserted_value under RFC 8785 canonical JSON semantics",
             ));
         } else {
@@ -943,7 +969,7 @@ fn derive_reference_result(
             assessments.push(assessment(
                 evidence_id,
                 AssessmentKind::Contradicts,
-                &record.value,
+                record,
                 "normalized_result differs from asserted_value",
             ));
         }
