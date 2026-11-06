@@ -115,7 +115,7 @@ impl ResourceCostQualification {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceCostUpperBound {
     pub units: ResourceUnits,
     pub currency_code: String,
