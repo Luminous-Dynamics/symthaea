@@ -49,15 +49,29 @@ Research priority: graph coloring and independent-set counting should join #3-SA
 
 [OpenAI preprint and Lean materials](https://github.com/openai/math/tree/main/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026)
 
-The preprint claims a deterministic, polynomial-space algorithm that exactly counts satisfying assignments of arbitrary fixed-width k-CNF formulas, for every fixed k >= 2, in time
+The October 25 manuscript claims a deterministic, polynomial-space algorithm that exactly counts satisfying assignments of arbitrary fixed-width k-CNF formulas, for every fixed k >= 2, in time
 
 $$
-(n+m)^{O_k(1)} 2^{n/(\log n)^{1/2+o(1)}}.
+(n+m)^{O_k(1)} 2^{O_k(n\log\log n/\sqrt{\log n})}.
 $$
 
-Since a formula is satisfiable exactly when its model count is positive, the claimed result refutes ETH and several stronger ETH-family assumptions. The paper's stated implications include ETH, SETH, Gap-ETH and NSETH.
+For sparse formulas with m <= Dn (fixed D), the manuscript states the stronger bound
 
-**Interpretation:** if correct as stated, this is a major change to fine-grained complexity and a high-priority formal-reproduction target. It is still superpolynomial; it does not give a polynomial-time SAT algorithm and does not prove P = NP. The asymptotic bound is not evidence of a practical SAT-solver speedup. The hidden constants, input-size dependence, reductions and proof-to-paper correspondence matter.
+$$
+(n+m)^{O_{k,D}(1)} 2^{O_{k,D}(n/\sqrt{\log n})}.
+$$
+
+The public Lean scope note is deliberately recorded separately: for canonical encodings of k-CNF, it states a formally proved time bound of
+
+$$
+(L+1)^{O_k(1)}2^{O_k(n(\log\log n)^2/\sqrt{\log n})},
+$$
+
+where L is the encoding bit length, with polynomially bounded visited tape cells. Do not silently replace this Lean scope by the sharper manuscript bound. A theorem-statement/comparator audit is required to establish exactly which paper statement each checked proof supports.
+
+Since a formula is satisfiable exactly when its model count is positive, the claimed manuscript algorithm refutes ETH; its fixed-k consequence also conflicts with SETH. Track any additional claimed consequences (including gap or nondeterministic variants) against their exact promise problems and reductions rather than repeating a headline list without checking the statement.
+
+**Interpretation:** if the manuscript theorem and proof correspondence are correct, this is a major change to fine-grained complexity and a high-priority formal-reproduction target. The stated algorithms remain superpolynomial; they do not give a polynomial-time SAT algorithm and do not prove P = NP. The asymptotic bound is not evidence of a practical SAT-solver speedup. Hidden constants, input encoding, instance size, reductions, proof-to-paper correspondence and practical resource use all matter.
 
 [OpenAI preprint: full version](https://github.com/openai/math/blob/main/preprints/The-Exponential-Time-Hypothesis-is-False-October-25-2026/build/main_full_version.tex)  
 [Independent community mirror and scope notes, updated 2026-11-04](https://mathcommunity.github.io/oai-math-revised/papers/The-Exponential-Time-Hypothesis-is-False-October-25-2026/)
