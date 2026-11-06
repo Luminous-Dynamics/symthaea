@@ -25,6 +25,51 @@ def valid_sha(value: Any) -> bool:
     return isinstance(value, str) and re.fullmatch(r'[0-9a-f]{64}', value) is not None
 
 
+
+def hash_field(digest: Any, value: str) -> None:
+    encoded = value.encode("utf-8")
+    digest.update(len(encoded).to_bytes(8, "big"))
+    digest.update(encoded)
+
+
+def canonical_split_sha256(train_ids: list[str], validation_ids: list[str], lockbox_ids: list[str]) -> str:
+    digest = hashlib.sha256()
+    digest.update(b"connectome-cohort-transport-split-v1")
+    for label, values in (
+        ("TRAIN", train_ids),
+        ("VALIDATION", validation_ids),
+        ("LOCKBOX", lockbox_ids),
+    ):
+        rows = sorted(values)
+        digest.update(label.encode("ascii"))
+        digest.update(len(rows).to_bytes(8, "big"))
+        for value in rows:
+            hash_field(digest, value)
+    return digest.hexdigest()
+
+
+def canonical_training_manifest_sha256(
+    model_id: str,
+    split_sha256: str,
+    training_animal_ids: list[str],
+    animals: dict[str, dict[str, Any]],
+) -> str:
+    digest = hashlib.sha256()
+    digest.update(b"connectome-cohort-training-manifest-v1")
+    hash_field(digest, model_id)
+    digest.update(split_sha256.encode("ascii"))
+    animal_rows = sorted(training_animal_ids)
+    digest.update(len(animal_rows).to_bytes(8, "big"))
+    for animal_id in animal_rows:
+        hash_field(digest, animal_id)
+    conditions = sorted({animals[animal_id]["condition_id"] for animal_id in training_animal_ids})
+    digest.update(len(conditions).to_bytes(8, "big"))
+    for condition_id in conditions:
+        hash_field(digest, condition_id)
+    return digest.hexdigest()
+
+
+
 def finite_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
@@ -60,6 +105,8 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(not (set(train_ids) & set(validation_ids)), 'train/validation animal leakage')
     require(not (set(train_ids) & set(lockbox_ids)), 'train/lockbox animal leakage')
     require(not (set(validation_ids) & set(lockbox_ids)), 'validation/lockbox animal leakage')
+    expected_split_sha = canonical_split_sha256(train_ids, validation_ids, lockbox_ids)
+    require(split['split_sha256'] == expected_split_sha, 'split digest does not bind the exact animal membership')
 
     animals_list = data['animals']
     animal_ids = [row['animal_id'] for row in animals_list]
@@ -124,6 +171,8 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         unique(model['training_animal_ids'], f"{model['model_id']} training animal IDs")
         require(set(model['training_animal_ids']).issubset(set(train_ids)), f"model {model['model_id']} uses validation or lockbox animals for training")
         require(set(model['training_animal_ids']), f"model {model['model_id']} has no training animals")
+        expected_training_sha = canonical_training_manifest_sha256(model['model_id'], split['split_sha256'], model['training_animal_ids'], animals)
+        require(model['training_manifest_sha256'] == expected_training_sha, f"model {model['model_id']} training manifest digest does not bind exact animal membership")
         support_ids = [row['condition_id'] for row in model['supported_conditions']]
         unique(support_ids, f"{model['model_id']} supported condition IDs")
         for support in model['supported_conditions']:
@@ -307,6 +356,12 @@ def run_negative_controls(data: dict[str, Any]) -> None:
     missing_prediction = copy.deepcopy(data)
     missing_prediction['predictions'].pop()
     mutations.append(('incomplete model × lockbox prediction matrix', missing_prediction))
+    stale_split = copy.deepcopy(data)
+    stale_split['split_manifest']['split_sha256'] = '0' * 64
+    mutations.append(('stale animal split digest', stale_split))
+    stale_training = copy.deepcopy(data)
+    stale_training['models'][0]['training_manifest_sha256'] = '0' * 64
+    mutations.append(('stale model training manifest digest', stale_training))
     for label, mutated in mutations:
         try:
             verify(mutated)
