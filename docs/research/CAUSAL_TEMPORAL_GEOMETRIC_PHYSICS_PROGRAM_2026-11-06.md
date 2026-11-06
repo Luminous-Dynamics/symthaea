@@ -36,8 +36,13 @@ Gap: no dedicated causal-set implementation with a sprinkling generator,
 Myrheim–Meyer estimator, longest-chain observable and Lorentz-order invariance
 suite was found in the default branch.
 
-New work: `symthaea-causal-set-lab`, initially std-only and isolated from
-the cognitive core.
+New work: `symthaea-causal-set-lab`, std-only and isolated from the cognitive
+core. The first 1+1D implementation uses a Fenwick dominance counter for
+related-pair counts and a reconstructed longest-nondecreasing-subsequence
+algorithm for longest chains; both are O(N log N) time / O(N) memory. The
+optimized implementations have brute-force differential tests on small
+quantized sets, including repeated coordinates. These Rust tests still need
+to be run on the pinned toolchain.
 
 ### Time-crystal foundation
 
@@ -284,6 +289,11 @@ Every result should carry:
 5. False-positive rate at a fixed recall, with confidence intervals.
 6. Calibration error, missing metadata and adversarial video transformations.
 7. A separate unresolved category; no forced classification.
+8. **1+1D algorithmic scaling:** compare O(N log N) observables with an
+   O(N²) brute-force oracle through at least N=2,048; then target N=10⁵ and
+   N=10⁶ for throughput and peak-memory measurements. Performance targets
+   are not claims until measured on a named machine, exact commit and input
+   seed.
 
 ## State-of-the-art comparison and strategy
 
