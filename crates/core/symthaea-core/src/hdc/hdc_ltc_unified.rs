@@ -3590,6 +3590,65 @@ mod tests {
     }
 
     #[test]
+    fn test_hdc_ltc_parameter_set_rejects_short_vector_without_mutation() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let before = neuron.parameter_values();
+        let short = &before[..before.len() - 1];
+
+        assert!(matches!(
+            neuron.try_set_parameter_values(short),
+            Err(HdcLtcParameterError::LengthMismatch { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        assert!(matches!(
+            neuron.try_replace_parameter_group(
+                &digest,
+                &HdcLtcParameterGroupId::GateWeight,
+                &[],
+            ),
+            Err(HdcLtcParameterError::GroupLengthMismatch { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_batch_rejects_late_invalid_group_atomically() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let before = neuron.parameter_values();
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        let edits = [
+            HdcLtcParameterGroupReplacement {
+                id: HdcLtcParameterGroupId::InputMask,
+                values: vec![0.1; 64],
+            },
+            HdcLtcParameterGroupReplacement {
+                id: HdcLtcParameterGroupId::GateWeight,
+                values: vec![1.0; 64],
+            },
+        ];
+
+        assert!(matches!(
+            neuron.try_apply_parameter_group_replacements(&digest, &edits),
+            Err(HdcLtcParameterError::GroupNormExceeded { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+    }
+
+    #[test]
     fn test_hdc_ltc_parameter_batch_applies_multiple_groups_atomically() {
         let mut neuron = HdcLtcUnifiedNeuron::new(
             UnifiedConfig {
