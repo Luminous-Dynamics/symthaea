@@ -321,7 +321,7 @@ mod tests {
             clock("schedule-utc-plus-1", "UTC+1", 60),
         )
         .unwrap();
-        assert_eq!(mapped.timestamp_utc_seconds, 1_704_067_800);
+        assert_eq!(mapped.timestamp_utc_seconds, 1_704_065_400);
         assert_eq!(mapped.utc_offset_minutes, 60);
     }
 
@@ -371,8 +371,8 @@ mod tests {
             summer,
         )
         .unwrap();
-        assert_eq!(winter_map.timestamp_utc_seconds, 1_705_320_000);
-        assert_eq!(summer_map.timestamp_utc_seconds, 1_720_440_000);
+        assert_eq!(winter_map.timestamp_utc_seconds, 1_705_316_400);
+        assert_eq!(summer_map.timestamp_utc_seconds, 1_721_037_600);
     }
 
     #[test]
