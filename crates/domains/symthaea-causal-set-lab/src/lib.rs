@@ -431,12 +431,21 @@ mod tests {
     }
 
     #[test]
-    fn lorentz_boost_preserves_order_invariants() {
+    fn lorentz_boost_preserves_order_invariants_and_chain_tie_breaks() {
         let causet = CausalSet2D::sprinkle_fixed_cardinality(7, 512, 3.0).unwrap();
-        let boosted = causet.lorentz_boosted(1.7).unwrap();
-        assert_eq!(causet.related_pair_count(), boosted.related_pair_count());
-        assert_eq!(causet.longest_chain_ids(), boosted.longest_chain_ids());
-        assert!((causet.ordering_fraction().unwrap() - boosted.ordering_fraction().unwrap()).abs() < 1e-12);
+        for rapidity in [-1.7, -0.4, 0.0, 0.7, 1.7] {
+            let boosted = causet.lorentz_boosted(rapidity).unwrap();
+            assert_eq!(causet.related_pair_count(), boosted.related_pair_count());
+            assert_eq!(
+                causet.longest_chain_ids(),
+                boosted.longest_chain_ids(),
+                "selected maximum chain changed under boost eta={rapidity}"
+            );
+            assert!(
+                (causet.ordering_fraction().unwrap() - boosted.ordering_fraction().unwrap()).abs()
+                    < 1e-12
+            );
+        }
     }
 
     #[test]
