@@ -221,3 +221,10 @@ The two directly relevant exchange standards are:
 - [ISO 23952:2020, QIF](https://www.iso.org/standard/77461.html), reviewed and confirmed on 14 June 2026. It defines an integrated model for manufacturing quality information and quality-workflow documents. Schema validity alone does not prove that an inspection result is bound to the correct characteristic, article, instrument or calibration.
 
 The mapping register adds three semantic contracts for profile/edition scope, semantic PMI preservation, and exact inspection-result binding. Full exchange fidelity remains MBD-INTEROP's owner; knowability evaluates whether the preserved information is sufficient to support an admissible evidence path.
+
+
+### Industry-system context
+
+NIST's [2026 AI/ML Roadmap for Smart Manufacturing](https://www.nist.gov/publications/2026-roadmap-artificial-intelligence-and-machine-learning-smart-manufacturing) explicitly identifies data-centric metrology, advanced digital twins, explainability, reliability, availability, maintainability and safety as research directions for trustworthy industrial AI. NIST's [Digital Thread for Manufacturing](https://www.nist.gov/programs-projects/digital-thread-manufacturing) describes the required feedback path: product models specify form/fit/function for inspection and in-process measurement systems, and inspection/measurement results are linked back to design. These are industrial research priorities, not validation results for this repository.
+
+The knowability benchmark specializes one part of that gap into a falsifiable agent task: preserve critical claim/feature/datum/instrument/article/calibration applicability through design, final assembly, inspection and lifecycle change. The standards-interoperability owner #10595 separately verifies whether those semantic links survive AP242/QIF/MTConnect exchange. The two benchmarks compose but do not duplicate one another.
