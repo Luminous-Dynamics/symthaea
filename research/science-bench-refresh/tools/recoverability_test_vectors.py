@@ -157,7 +157,10 @@ def classify(manifest: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
             label, route = "ReformulationRecoverable", reformulation
         elif navigation is not None:
             label, route = "NavigationRecoverable", navigation
-        elif manifest["surface_state"] == "complete_frozen_inventory":
+        elif (
+            manifest["surface_state"] == "complete_frozen_inventory"
+            and manifest.get("surface_completeness_receipt_sha256") is not None
+        ):
             label, route = "UnreachableWithinBudget", None
         else:
             label, route = "NotEvaluable", None
@@ -257,6 +260,32 @@ def main() -> int:
     model_field = copy.deepcopy(base)
     model_field["model_judgment"] = "directly_reachable"
     (out_dir / "model-field-manifest.json").write_bytes(compact(model_field) + b"\n")
+
+    # A declared complete inventory without its separate completeness receipt
+    # may prove positive routes but cannot prove absence from the route graph.
+    missing_completeness = copy.deepcopy(base_fields)
+    missing_completeness["surface_completeness_receipt_sha256"] = None
+    missing_completeness_manifest = save_manifest(
+        missing_completeness,
+        out_dir / "missing-completeness-receipt-manifest.json",
+    )
+    missing_completeness_labels = {
+        row["evidence_unit_id"]: row["recoverability"]
+        for row in (
+            classify(missing_completeness_manifest, unit)
+            for unit in missing_completeness_manifest["evidence_units"]
+        )
+    }
+    if missing_completeness_labels != {
+        "unit:direct": "DirectlyReachable",
+        "unit:rewrite": "ReformulationRecoverable",
+        "unit:navigation": "NavigationRecoverable",
+        "unit:unreachable": "NotEvaluable",
+        "unit:unknown": "NotEvaluable",
+    }:
+        raise SystemExit(
+            "missing completeness receipt did not preserve positive/negative asymmetry"
+        )
 
     # A partial surface is a valid manifest but no unit can be classed.
     partial_fields = copy.deepcopy(base_fields)
@@ -403,6 +432,7 @@ def main() -> int:
             {unit["source_family_ref"] for unit in base["evidence_units"]}
         ),
         "metamorphic_controls": {
+            "complete_inventory_requires_completeness_receipt_for_absence": True,
             "partial_surface_preserves_positive_and_blocks_negative": True,
             "unknown_surface_all_not_evaluable": True,
             "post_reformulation_retrieval_requires_prior_rewrite": True,
