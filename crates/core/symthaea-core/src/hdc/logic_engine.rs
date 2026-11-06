@@ -373,15 +373,13 @@ impl LogicEngine {
                 _ => Self::cnf_from_nnf(&Self::to_nnf(prop)),
             },
             Proposition::And(left, right) => {
-                let mut clauses =
-                    Self::cnf_from_nnf(left);
+                let mut clauses = Self::cnf_from_nnf(left);
                 clauses.extend(Self::cnf_from_nnf(right));
                 Self::normalize_cnf(clauses)
             }
-            Proposition::Or(left, right) => Self::disjoin_cnf(
-                Self::cnf_from_nnf(left),
-                Self::cnf_from_nnf(right),
-            ),
+            Proposition::Or(left, right) => {
+                Self::disjoin_cnf(Self::cnf_from_nnf(left), Self::cnf_from_nnf(right))
+            }
             // Implication and biconditional are eliminated by to_nnf.
             Proposition::Implies(_, _) | Proposition::Iff(_, _) => {
                 Self::cnf_from_nnf(&Self::to_nnf(prop))
@@ -425,9 +423,7 @@ impl LogicEngine {
     }
 
     /// Normalize a clause. None means it is tautological.
-    fn normalize_clause(
-        literals: Vec<(String, bool)>,
-    ) -> Option<Vec<(String, bool)>> {
+    fn normalize_clause(literals: Vec<(String, bool)>) -> Option<Vec<(String, bool)>> {
         let mut by_variable: HashMap<String, bool> = HashMap::new();
         for (variable, polarity) in literals {
             match by_variable.get(&variable) {
@@ -1939,10 +1935,38 @@ mod tests {
         let p = Proposition::atom("p");
         let duplicated = p.clone().or(p.clone());
         let tautology = p.clone().or(p.not());
-        assert_eq!(LogicEngine::to_cnf(&duplicated), vec![vec![("p".to_string(), true)]]);
+        assert_eq!(
+            LogicEngine::to_cnf(&duplicated),
+            vec![vec![("p".to_string(), true)]]
+        );
         assert!(LogicEngine::to_cnf(&tautology).is_empty());
         assert_cnf_equivalent(&duplicated, &["p"]);
         assert_cnf_equivalent(&tautology, &["p"]);
+    }
+
+    #[test]
+    fn test_cnf_nested_constants_preserve_boolean_identities() {
+        let p = Proposition::atom("p");
+
+        let false_or_p = Proposition::False.or(p.clone());
+        let true_and_p = Proposition::True.and(p.clone());
+        let false_and_p = Proposition::False.and(p.clone());
+        let p_and_tautology = p
+            .clone()
+            .and(p.clone().or(p.clone().not()));
+
+        assert_cnf_equivalent(&false_or_p, &["p"]);
+        assert_cnf_equivalent(&true_and_p, &["p"]);
+        assert_cnf_equivalent(&false_and_p, &["p"]);
+        assert_cnf_equivalent(&p_and_tautology, &["p"]);
+        assert_eq!(
+            LogicEngine::to_cnf(&false_and_p),
+            vec![Vec::<(String, bool)>::new()]
+        );
+        assert_eq!(
+            LogicEngine::to_cnf(&p_and_tautology),
+            vec![vec![("p".to_string(), true)]]
+        );
     }
 
     #[test]
