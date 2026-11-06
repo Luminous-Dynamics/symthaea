@@ -489,42 +489,42 @@
       "high-eig-irrelevant": 0.15,
       "cheap-confounded": 0.15,
       "orthogonal-robust": 0,
-      "infeasible-perfect": 0
+      "infeasible-perfect": null
     },
     "clairvoyant_lower_bound_by_intervention": {
       "reversal-high-eig": 0,
       "high-eig-irrelevant": 0.15,
       "cheap-confounded": 0.15,
       "orthogonal-robust": 0,
-      "infeasible-perfect": 0
+      "infeasible-perfect": null
     },
     "uncertainty_penalty_by_intervention": {
       "reversal-high-eig": 0.15,
       "high-eig-irrelevant": 0,
       "cheap-confounded": 0,
       "orthogonal-robust": 0,
-      "infeasible-perfect": 0
+      "infeasible-perfect": null
     },
     "value_per_cost_by_intervention": {
       "reversal-high-eig": 0,
       "high-eig-irrelevant": 0,
       "cheap-confounded": 0,
       "orthogonal-robust": 0.075,
-      "infeasible-perfect": 1.5
+      "infeasible-perfect": null
     },
     "vertex_min_eig_bits_by_intervention": {
       "reversal-high-eig": 0.9219280948873623,
       "high-eig-irrelevant": 0.7219280948873623,
       "cheap-confounded": 0,
       "orthogonal-robust": 0.4689955935892812,
-      "infeasible-perfect": 0.9219280948873623
+      "infeasible-perfect": null
     },
     "vertex_max_eig_bits_by_intervention": {
       "reversal-high-eig": 1.1812908992306925,
       "high-eig-irrelevant": 0.8812908992306927,
       "cheap-confounded": 0.4689955935892812,
       "orthogonal-robust": 0.6098403047164004,
-      "infeasible-perfect": 1.1812908992306925
+      "infeasible-perfect": null
     },
     "robust_certificate_by_intervention": {
       "reversal-high-eig": false,
@@ -540,14 +540,14 @@
       "high-eig-irrelevant": 0.8112781244591328,
       "cheap-confounded": 0.2441664241947461,
       "orthogonal-robust": 0.5490865765529465,
-      "infeasible-perfect": 1.061278124459133
+      "infeasible-perfect": null
     },
     "pairwise_midpoint_eig_max_bits_by_intervention": {
       "reversal-high-eig": 0.8185404758454655,
       "high-eig-irrelevant": 0.8112781244591328,
       "cheap-confounded": 0.2441664241947461,
       "orthogonal-robust": 0.5490865765529465,
-      "infeasible-perfect": 1.061278124459133
+      "infeasible-perfect": null
     }
   }
 }
