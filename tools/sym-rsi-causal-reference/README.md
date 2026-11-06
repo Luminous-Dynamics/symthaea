@@ -11,6 +11,10 @@ runtime dependency.
 From the repository root:
 
 ```sh
+cargo fmt --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- --check
+
+cargo clippy --manifest-path tools/sym-rsi-causal-reference/Cargo.toml --all-targets -- -D warnings
+
 cargo test --manifest-path tools/sym-rsi-causal-reference/Cargo.toml
 
 cargo run --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- \
