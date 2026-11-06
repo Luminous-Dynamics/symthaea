@@ -878,3 +878,30 @@ Keep the estimands separate:
 6. FIRE-Bench — execution-grounded scientific rediscovery.
 
 Do not produce a combined cross-benchmark leaderboard. Publish exact versions, model/harness identities, budgets, split and checkpoint-selection policies, independent replicate counts, per-domain outcomes, uncertainty, failures, and all costs. A higher score under a changed evaluator is not evidence of improved capability unless it survives the fixed evaluator-independent confirmation lane.
+
+
+### Clade metaproductivity and evaluator-dependent state — 2026-11-06
+
+RQGM's published technical description adds a second important mechanism beyond evaluator epochs: **Clade Metaproductivity (CMP)**. It evaluates an archive node using the productivity of its descendant subtree, rather than only its immediate task score. An ancestor that enables a better descendant can therefore remain valuable even when its own score does not improve. RQGM uses Thompson sampling over clade scores to balance exploration and exploitation, and assigns attention to the least-measured role/task to avoid concentrating evaluation on already-observed areas.
+
+The R4 follow-on is recorded in the [#10497 discussion](https://github.com/Luminous-Dynamics/symthaea/issues/10497). Symthaea should compare:
+- greedy child-fitness / single-champion selection;
+- fixed-meta Pareto archive selection;
+- CMP with uncertainty-aware Thompson sampling;
+- uniform/random lineage selection as a coverage baseline;
+- diversity-preserving CMP with a declared minimum lineage-coverage constraint.
+
+For Symthaea, define CMP as independently confirmed descendant improvement yield per complete lineage research budget, with protected-capability floors and explicit censoring/uncertainty for lineages that have had fewer opportunities. Descendants are correlated; do not count every descendant as an independent statistical replicate. Estimate uncertainty at the independent full-loop-seed/root-lineage level. Selection may use development/validation evidence only; sealed confirmation must not affect Thompson posteriors, lineage choice or stopping.
+
+RQGM's evaluator replacement procedure also discards old evaluator-dependent utility records and recomputes active clade rankings. Symthaea's stronger audit requirement should implement **selective invalidation**:
+- preserve raw historical task/evaluator/build/decision records immutably;
+- mark evaluator-dependent derived fitness, rank, posterior, CMP and selection-cache entries from the superseded evaluator stale for active selection;
+- recompute active derived values under the newly frozen evaluator from fresh evaluations or valid bridge evidence;
+- retain evaluator-independent artifacts only where their semantics and provenance remain valid;
+- never rewrite historical decisions.
+
+This prevents old utility values from steering the new epoch without deleting audit history. The explicit state-transition and proof obligations are in [#10708](https://github.com/Luminous-Dynamics/symthaea/issues/10708) and its evaluator-epoch protocol PR.
+
+RQGM references:
+- Paper (v3 posted 2026-10-08): https://arxiv.org/abs/2606.26294
+- Cambridge technical explainer: https://mlsys.cst.cam.ac.uk/publications/iacob2026-red-queen/
