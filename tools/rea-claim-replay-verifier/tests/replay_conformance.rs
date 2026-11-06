@@ -978,3 +978,42 @@ fn raw_evidence_whitespace_is_nonsemantic_but_tampering_remains_detectable() {
         replay_claim_evaluation(&claim_bytes, &[&tampered_bytes], &result_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidEvidence);
 }
+
+#[test]
+fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut evidence_values = Vec::new();
+    let mut evidence_bytes = Vec::new();
+
+    for index in 0..4 {
+        let mut value = original.value.clone();
+        value["provider"]["id"] = json!(format!("same-lineage-provider-{index}"));
+        value["provider"]["name"] = json!(format!("Same Lineage Provider {index}"));
+        value["analysis_profile"]["provider"] = value["provider"].clone();
+        value["analysis_profile"]["digest"] =
+            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+        value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+        let bytes = serde_json::to_vec(&value).unwrap();
+        evidence_values.push(rea_compat::verify_evidence_json(&bytes).unwrap());
+        evidence_bytes.push(bytes);
+    }
+
+    let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
+    claim.predicate = ClaimPredicate::ProducerAuthenticity;
+    claim.evidence_ids = evidence_values
+        .iter()
+        .map(|evidence| evidence.evidence_id.clone())
+        .collect();
+
+    let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
+    let supplied: Vec<&[u8]> = evidence_bytes.iter().map(Vec::as_slice).collect();
+    let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    assert_eq!(replay.reported_disposition, Disposition::Unverified);
+    assert_eq!(replay.evidence_count, 4);
+    assert_eq!(replay.rule_id, "no-registered-predicate-rule/v0");
+}
+
