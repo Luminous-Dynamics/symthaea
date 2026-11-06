@@ -74,6 +74,32 @@ REQUIRED_OPT_BASELINES = {
     "legitimate_cache_memoization_positive_control",
 }
 
+REQUIRED_TEST_CONTROLS = {
+    "BI-N40": ("feature_composition_coverage_gap", "unresolved", "negative"),
+    "BI-N41": ("hidden_test_requirement_invention", "unresolved", "negative"),
+    "BI-P12": ("specification_derived_composition_coverage", "qualifying", "positive"),
+}
+
+REQUIRED_TEST_GATES = {
+    "every specification-required feature interaction is traceable to at least one acceptance case; feature-isolated checks do not substitute when the specification requires composition",
+    "hidden acceptance tests must be derivable from the frozen specification or adjudicated clarifications; unsupported hidden requirements block oracle qualification",
+    "valid semantically equivalent alternatives must pass the same composed behavioral contract without requiring byte-identical reference implementation",
+}
+
+REQUIRED_TEST_ARTIFACTS = {
+    "specification_obligation_inventory",
+    "feature_interaction_coverage_matrix",
+    "hidden_test_requirement_trace",
+    "valid_alternative_solution_results",
+    "composition_coverage_adjudication",
+}
+
+REQUIRED_TEST_BASELINES = {
+    "feature_isolated_only_test_oracle_negative_control",
+    "specification_composition_aware_oracle_positive_control",
+    "hidden_requirement_invention_negative_control",
+}
+
 
 def load_json(path: Path) -> dict[str, Any]:
     try:
@@ -230,6 +256,35 @@ def semantic_errors(catalog: dict[str, Any], matrix: dict[str, Any]) -> list[str
         if row.get("polarity") != polarity:
             errors.append(f"{control_id}: optimization-integrity polarity changed")
 
+    test_lanes = [lane for lane in lanes if isinstance(lane, dict) and lane.get("lane_id") == "CEB-TEST"]
+    if len(test_lanes) != 1:
+        errors.append("measurement matrix must contain exactly one CEB-TEST lane")
+        return errors
+    test_lane = test_lanes[0]
+    test_gates = set(test_lane.get("hard_gates", []))
+    test_artifacts = set(test_lane.get("evidence_contract", {}).get("required_artifacts", []))
+    test_baselines = set(test_lane.get("baseline_arms", []))
+    for gate in REQUIRED_TEST_GATES:
+        if gate not in test_gates:
+            errors.append(f"CEB-TEST is missing specification-composition hard gate: {gate}")
+    for artifact in REQUIRED_TEST_ARTIFACTS:
+        if artifact not in test_artifacts:
+            errors.append(f"CEB-TEST is missing specification-composition evidence artifact: {artifact}")
+    for baseline in REQUIRED_TEST_BASELINES - test_baselines:
+        errors.append(f"CEB-TEST is missing specification-composition baseline: {baseline}")
+
+    for control_id, (threat, verdict, polarity) in REQUIRED_TEST_CONTROLS.items():
+        row = by_id.get(control_id)
+        if row is None:
+            errors.append(f"missing required specification-composition control {control_id}")
+            continue
+        if row.get("threat_class") != threat:
+            errors.append(f"{control_id}: specification-composition threat class changed")
+        if row.get("expected_verdict") != verdict or row.get("expected_qualification") != verdict:
+            errors.append(f"{control_id}: specification-composition expected disposition changed")
+        if row.get("polarity") != polarity:
+            errors.append(f"{control_id}: specification-composition polarity changed")
+
     return errors
 
 
@@ -273,6 +328,15 @@ def self_test(catalog: dict[str, Any], matrix: dict[str, Any]) -> None:
     opt_lane = next(item for item in mutant_matrix["lanes"] if item["lane_id"] == "CEB-OPT")
     opt_lane["hard_gates"].remove(next(iter(REQUIRED_OPT_GATES)))
     must_reject(copy.deepcopy(catalog), mutant_matrix, "optimization-integrity hard gate removed")
+
+    mutant = copy.deepcopy(catalog)
+    mutant["controls"] = [item for item in mutant["controls"] if item["id"] != "BI-P12"]
+    must_reject(mutant, copy.deepcopy(matrix), "specification-composition positive control removed")
+
+    mutant_matrix = copy.deepcopy(matrix)
+    test_lane = next(item for item in mutant_matrix["lanes"] if item["lane_id"] == "CEB-TEST")
+    test_lane["hard_gates"].remove(next(iter(REQUIRED_TEST_GATES)))
+    must_reject(copy.deepcopy(catalog), mutant_matrix, "specification-composition hard gate removed")
 
     print("CEB_INTEGRITY_CATALOG_SELF_TEST_PASS")
 
