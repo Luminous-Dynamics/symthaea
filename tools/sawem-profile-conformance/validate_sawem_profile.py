@@ -189,6 +189,7 @@ EXPECTED_CASE_IDS = {
     "REVENUE-REALIZATION-BRIDGE-001",
     "BATTERY-SOC-RAINFLOW-001",
     "FIELD-SOURCE-CLOCK-ALIGNMENT-001",
+    "MARKET-PRICE-IMPACT-001",
 }
 
 
@@ -338,6 +339,7 @@ def main() -> None:
     warranty_compliance_kernel_path = root / "tools/sawem-market-reference/src/warranty_compliance.rs"
     rainflow_cycles_kernel_path = root / "tools/sawem-market-reference/src/rainflow_cycles.rs"
     source_time_mapping_kernel_path = root / "tools/sawem-market-reference/src/source_time_mapping.rs"
+    market_impact_kernel_path = root / "tools/sawem-market-reference/src/market_impact_attribution.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
@@ -365,6 +367,7 @@ def main() -> None:
         warranty_compliance_kernel_bytes = warranty_compliance_kernel_path.read_bytes()
         rainflow_cycles_kernel_bytes = rainflow_cycles_kernel_path.read_bytes()
         source_time_mapping_kernel_bytes = source_time_mapping_kernel_path.read_bytes()
+        market_impact_kernel_bytes = market_impact_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
@@ -409,6 +412,8 @@ def main() -> None:
             + rainflow_cycles_kernel_bytes
             + b"\n"
             + source_time_mapping_kernel_bytes
+            + b"\n"
+            + market_impact_kernel_bytes
         ).decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
