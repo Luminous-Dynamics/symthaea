@@ -73,7 +73,7 @@ jobs:
             sha256sum tools/rea-claim-replay-fuzz/fuzz/corpus/claim_result/*
             sha256sum tools/rea-claim-replay-fuzz/fuzz/corpus/framed_replay/*
             echo "fuzz_seconds_per_target=$fuzz_seconds"
-          } | tee tools/rea-claim-replay-fuzz/artifacts/run-context.txt
+          } | tee tools/rea-claim-replay-fuzz/fuzz/artifacts/run-context.txt
           echo "FUZZ_SECONDS=$fuzz_seconds" >> "$GITHUB_ENV"
 
       - name: Fuzz raw claim request parser
@@ -116,10 +116,10 @@ jobs:
         if: always()
         run: |
           for target in request result replay; do
-            output="tools/rea-claim-replay-fuzz/artifacts/$target-output.txt"
-            summary="tools/rea-claim-replay-fuzz/artifacts/$target-summary.txt"
+            output="tools/rea-claim-replay-fuzz/fuzz/artifacts/$target-output.txt"
+            summary="tools/rea-claim-replay-fuzz/fuzz/artifacts/$target-summary.txt"
             if test -f "$output"; then
-              sha256sum "$output" | tee -a tools/rea-claim-replay-fuzz/artifacts/run-context.txt
+              sha256sum "$output" | tee -a tools/rea-claim-replay-fuzz/fuzz/artifacts/run-context.txt
               grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' "$output" > "$summary" || true
             fi
           done
@@ -131,7 +131,7 @@ jobs:
           name: rea-claim-replay-fuzz-run
           path: |
             tools/rea-claim-replay-fuzz/fuzz/Cargo.lock
-            tools/rea-claim-replay-fuzz/artifacts/**
+            tools/rea-claim-replay-fuzz/fuzz/artifacts/**
             tools/rea-claim-replay-fuzz/fuzz/corpus/**
           if-no-files-found: warn
           retention-days: 14
