@@ -9,10 +9,13 @@ finite-sample validation.
   This is a Poisson sprinkling conditioned on the event count (N).
 - Null-coordinate causal order: (x prec y) iff (u_x \le u_y) and
   (v_x \le v_y), with at least one strict inequality.
-- Related-pair count and Myrheim ordering fraction.
-- Myrheim–Meyer continuum-dimension estimator.
-- Longest-chain extraction.
-- Passive Lorentz-boost invariance test for order-theoretic observables.
+- Related-pair count via a 1+1D Fenwick dominance counter: O(N log N).
+- Myrheim ordering fraction and Myrheim–Meyer continuum-dimension estimator.
+- Longest-chain reconstruction via a nondecreasing-subsequence algorithm:
+  O(N log N), with identical-coordinate events grouped as incomparable.
+- Small-set brute-force cross-checks for the optimized pair and chain algorithms.
+- Passive Lorentz-boost invariance tests for order-theoretic observables,
+  including deterministic maximum-chain tie-breaking.
 - Deterministic seed and bounded-input validation.
 
 The implementation uses (u=t+x), (v=t-x). A 1+1D Alexandrov
