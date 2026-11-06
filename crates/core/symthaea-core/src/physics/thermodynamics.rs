@@ -625,6 +625,14 @@ mod tests {
     }
 
     #[test]
+    fn physical_energy_joules_rejects_non_finite_values() {
+        assert!(PhysicalEnergyJoules::new(f64::NAN).is_none());
+        assert!(PhysicalEnergyJoules::new(f64::INFINITY).is_none());
+        assert!(PhysicalEnergyJoules::new(f64::NEG_INFINITY).is_none());
+        assert_eq!(PhysicalEnergyJoules::new(1.25).unwrap().get(), 1.25);
+    }
+
+    #[test]
     fn test_validated_landauer_erasure_heat_floor_rejects_invalid_inputs() {
         let (encoder, _) = setup();
 
