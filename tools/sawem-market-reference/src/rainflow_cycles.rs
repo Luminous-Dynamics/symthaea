@@ -39,6 +39,8 @@ pub struct RainflowInputs<'a> {
     pub horizon_start_utc: i64,
     pub horizon_end_utc: i64,
     pub maximum_sample_gap_seconds: u64,
+    pub telemetry_manifest_source_ref: &'a str,
+    pub telemetry_manifest_source_sha256: &'a str,
     pub sampling_policy_source_ref: &'a str,
     pub sampling_policy_source_sha256: &'a str,
     pub samples: &'a [SocTelemetrySample<'a>],
@@ -79,6 +81,8 @@ pub struct RainflowAssessment {
     pub horizon_start_utc: i64,
     pub horizon_end_utc: i64,
     pub maximum_sample_gap_seconds: u64,
+    pub telemetry_manifest_source_ref: String,
+    pub telemetry_manifest_source_sha256: String,
     pub sampling_policy_source_ref: String,
     pub sampling_policy_source_sha256: String,
     pub sample_count: u64,
@@ -277,10 +281,15 @@ fn count_reversal_segment(
 pub fn count_soc_rainflow_cycles(
     inputs: RainflowInputs<'_>,
 ) -> Result<RainflowAssessment, RainflowError> {
-    if !nonempty(inputs.scenario_id) || !nonempty(inputs.sampling_policy_source_ref) {
+    if !nonempty(inputs.scenario_id)
+        || !nonempty(inputs.telemetry_manifest_source_ref)
+        || !nonempty(inputs.sampling_policy_source_ref)
+    {
         return Err(RainflowError::InvalidEvidenceReference);
     }
-    if !valid_sha256(inputs.sampling_policy_source_sha256) {
+    if !valid_sha256(inputs.telemetry_manifest_source_sha256)
+        || !valid_sha256(inputs.sampling_policy_source_sha256)
+    {
         return Err(RainflowError::InvalidSourceDigest);
     }
     if inputs.horizon_start_utc >= inputs.horizon_end_utc
@@ -405,6 +414,8 @@ pub fn count_soc_rainflow_cycles(
         horizon_start_utc: inputs.horizon_start_utc,
         horizon_end_utc: inputs.horizon_end_utc,
         maximum_sample_gap_seconds: inputs.maximum_sample_gap_seconds,
+        telemetry_manifest_source_ref: inputs.telemetry_manifest_source_ref.to_owned(),
+        telemetry_manifest_source_sha256: inputs.telemetry_manifest_source_sha256.to_owned(),
         sampling_policy_source_ref: inputs.sampling_policy_source_ref.to_owned(),
         sampling_policy_source_sha256: inputs.sampling_policy_source_sha256.to_owned(),
         sample_count: u64::try_from(inputs.samples.len())
@@ -448,6 +459,8 @@ mod tests {
             horizon_start_utc: samples[0].sample_time_utc,
             horizon_end_utc: samples[samples.len() - 1].sample_time_utc,
             maximum_sample_gap_seconds: 2,
+            telemetry_manifest_source_ref: "bms/trace/manifest/v1",
+            telemetry_manifest_source_sha256: SOURCE_SHA,
             sampling_policy_source_ref: "bms/sampling-policy/v1",
             sampling_policy_source_sha256: SOURCE_SHA,
             samples,
