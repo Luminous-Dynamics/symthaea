@@ -774,7 +774,7 @@ fn analyze(cohort: &Cohort, rows: &[RunRecord], input_sha256: String) -> Result<
         expected_task_count: cohort.expected_task_count,
         expected_cluster_count: cohort.expected_cluster_count,
         task_id_set_sha256: cohort.task_id_set_sha256.clone(),
-        results_jsonl_sha256: input_sha256,
+        results_jsonl_sha256: input_sha256.clone(),
         observed_task_count: by_task.len(),
         observed_cluster_count: observed_clusters.len(),
         arm_count: cohort.arms.len(),
