@@ -258,7 +258,7 @@
     },
     "pairwise_comparisons": {
       "type": "array",
-      "minItems": 2,
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -277,6 +277,10 @@
           "cluster_bootstrap_95_percentile_upper",
           "bootstrap_replicates",
           "bootstrap_seed_sha256",
+          "cluster_sign_flip_method",
+          "cluster_sign_flip_permutations",
+          "cluster_sign_flip_p_value",
+          "holm_adjusted_p_value",
           "interpretation_boundary"
         ],
         "properties": {
@@ -343,6 +347,26 @@
           "interpretation_boundary": {
             "type": "string",
             "minLength": 20
+          },
+          "cluster_sign_flip_method": {
+            "enum": [
+              "exact_cluster_sign_flip",
+              "monte_carlo_cluster_sign_flip"
+            ]
+          },
+          "cluster_sign_flip_permutations": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "cluster_sign_flip_p_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "holm_adjusted_p_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           }
         }
       }
