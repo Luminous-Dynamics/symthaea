@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "challenge_id": "append-uninformative-model-c",
+  "base_input_git_blob_sha1": "5e8c2f3fdbead5184ebb343ead297ee5b717f714",
+  "expanded_input_git_blob_sha1": "a473aee1631598c613f22e03445a7cb78c68a79d",
+  "sequential_oracle_git_blob_sha1": "b24bd3a2b37770c715402ec1b34bac789f423f7f",
+  "base_model_vertex_ids": [
+    "MODEL-A",
+    "MODEL-B"
+  ],
+  "expanded_model_vertex_ids": [
+    "MODEL-A",
+    "MODEL-B",
+    "MODEL-C"
+  ],
+  "added_model_vertex_id": "MODEL-C",
+  "added_model_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+  "expected_base_robust_loss": 0,
+  "expected_expanded_robust_loss": 0.5,
+  "expected_base_certificate": true,
+  "expected_expanded_certificate": false,
+  "certificate_tolerance": 0.01
+}
