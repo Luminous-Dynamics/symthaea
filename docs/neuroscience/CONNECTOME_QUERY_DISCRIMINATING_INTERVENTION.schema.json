@@ -383,7 +383,8 @@
         "worst_case_eig_bits",
         "decision_value_per_cost",
         "expected_selected_intervention_id",
-        "expected_entropy_greedy_intervention_id"
+        "expected_entropy_greedy_intervention_id",
+        "expected_decision_status"
       ],
       "properties": {
         "baseline_expected_query_loss": {
@@ -412,12 +413,20 @@
           }
         },
         "expected_selected_intervention_id": {
-          "type": "string",
-          "minLength": 1
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "expected_entropy_greedy_intervention_id": {
           "type": "string",
           "minLength": 1
+        },
+        "expected_decision_status": {
+          "enum": [
+            "DISCRIMINATING_INTERVENTION_AVAILABLE",
+            "NO_FEASIBLE_DISCRIMINATING_INTERVENTION"
+          ]
         }
       }
     }
