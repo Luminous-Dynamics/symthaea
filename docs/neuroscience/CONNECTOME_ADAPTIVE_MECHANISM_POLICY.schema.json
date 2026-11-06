@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_ADAPTIVE_MECHANISM_POLICY.schema.json",
+  "title": "Exact adaptive mechanism experiment policy input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "query",
+    "mechanisms",
+    "nuisance_profiles",
+    "interventions",
+    "predictions",
+    "alpha_query",
+    "alpha_mechanism",
+    "max_depth",
+    "max_frontier_vectors",
+    "fixed_bundles",
+    "known_answer"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "mechanisms": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/mechanism"
+      }
+    },
+    "nuisance_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/nuisance"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    },
+    "alpha_query": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 0.5
+    },
+    "alpha_mechanism": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 0.5
+    },
+    "max_depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "max_frontier_vectors": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000
+    },
+    "fixed_bundles": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 5,
+        "items": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "known_answer": {
+      "$ref": "#/$defs/known_answer"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "mechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism_id",
+        "mechanism_class",
+        "query_decision",
+        "prior_probability",
+        "source_evidence_sha256",
+        "model_sha256"
+      ],
+      "properties": {
+        "mechanism_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_class": {
+          "enum": [
+            "DIRECT_SYNAPTIC",
+            "POLYSYNAPTIC",
+            "EXTRASYNAPTIC_LATENT",
+            "SHARED_INPUT",
+            "CELL_INTRINSIC_STATE",
+            "OBSERVATION_ARTIFACT",
+            "MIXTURE_UNRESOLVED",
+            "OTHER"
+          ]
+        },
+        "query_decision": {
+          "type": "boolean"
+        },
+        "prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "nuisance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance_profile_id",
+        "profile_sha256",
+        "description"
+      ],
+      "properties": {
+        "nuisance_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "outcome_ids"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "outcome_ids": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "mechanism_id",
+        "nuisance_profile_id",
+        "observation_model_sha256",
+        "outcomes"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nuisance_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "known_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_status",
+        "expected_root_action_id",
+        "expected_policy",
+        "expected_policy_sha256",
+        "expected_cost_by_nuisance",
+        "expected_robust_expected_cost",
+        "expected_fixed_bundle_costs"
+      ],
+      "properties": {
+        "expected_status": {
+          "enum": [
+            "EXACT_ADAPTIVE_POLICY_FOUND",
+            "NO_ROBUST_ADAPTIVE_POLICY_WITHIN_HORIZON"
+          ]
+        },
+        "expected_root_action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected_policy": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "expected_policy_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "expected_cost_by_nuisance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "expected_robust_expected_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "expected_fixed_bundle_costs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
