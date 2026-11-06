@@ -1908,10 +1908,32 @@ fn synthetic_strategy_run(task: &SorryRecord, verified: bool, run_id: &str, stra
 }
 
 fn synthetic_proof_runs() -> Vec<ProofRun> {
-    let task = synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
+    let mut task_a = synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
+    task_a.repo.remote = "https://github.com/example/project-a".into();
+    task_a.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_a.repo.remote, task_a.repo.commit, task_a.location.path, task_a.location.start_line
+    );
+    let mut task_b = synthetic_record("task-b", "x : Nat\n⊢ x + 0 = x", "Demo/B.lean", 20);
+    task_b.repo.remote = "https://github.com/example/project-b".into();
+    task_b.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_b.repo.remote, task_b.repo.commit, task_b.location.path, task_b.location.start_line
+    );
+    let mut task_c = synthetic_record("task-c", "x : Nat\n⊢ x = x + 0", "Demo/C.lean", 5);
+    task_c.repo.remote = "https://github.com/example/project-b".into();
+    task_c.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_c.repo.remote, task_c.repo.commit, task_c.location.path, task_c.location.start_line
+    );
     vec![
-        synthetic_proof_run(&task, true, "synthetic-attempt-1"),
-        synthetic_proof_run(&task, false, "synthetic-attempt-2"),
+        synthetic_strategy_run(&task_a, true, "a-task-a-success", "strategy-a"),
+        synthetic_strategy_run(&task_a, false, "a-task-a-retry", "strategy-a"),
+        synthetic_strategy_run(&task_b, false, "a-task-b-fail", "strategy-a"),
+        synthetic_strategy_run(&task_c, true, "a-task-c-success", "strategy-a"),
+        synthetic_strategy_run(&task_a, false, "b-task-a-fail", "strategy-b"),
+        synthetic_strategy_run(&task_b, true, "b-task-b-success", "strategy-b"),
+        synthetic_strategy_run(&task_c, true, "b-task-c-success", "strategy-b"),
     ]
 }
 
@@ -2211,15 +2233,7 @@ fn synthetic_report() -> Result<Value, String> {
     };
     let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
     let evaluation_bytes = serde_json::to_vec(&evaluation).map_err(|e| e.to_string())?;
-    let proof_runs = vec![
-        synthetic_strategy_run(&task_a, true, "a-task-a-success", "strategy-a"),
-        synthetic_strategy_run(&task_a, false, "a-task-a-retry", "strategy-a"),
-        synthetic_strategy_run(&task_b, false, "a-task-b-fail", "strategy-a"),
-        synthetic_strategy_run(&task_c, true, "a-task-c-success", "strategy-a"),
-        synthetic_strategy_run(&task_a, false, "b-task-a-fail", "strategy-b"),
-        synthetic_strategy_run(&task_b, true, "b-task-b-success", "strategy-b"),
-        synthetic_strategy_run(&task_c, true, "b-task-c-success", "strategy-b"),
-    ];
+    let proof_runs = synthetic_proof_runs();
     let (verified_success_run_count, unique_successful_task_count, strategy_summaries) =
         summarize_proof_runs(&proof_runs, &evaluation)?;
     let clustered_comparisons = pairwise_clustered_comparisons(&proof_runs, &evaluation)?;
