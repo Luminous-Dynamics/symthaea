@@ -7,7 +7,9 @@ use mel_rmi_synthetic::{
     TaskSpec, TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
     assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
     run_policy_suite_v1, run_reciprocal_suite_v1, validate_partner_authority_event,
-    verify_trial_artifact_bindings,
+    verify_trial_artifact_bindings, BootstrapConfig, DimensionEffectSummary, Estimate,
+    InfluenceDirection, PairedEffectObservation, PairedEffectOutcome, PairedEffectValue,
+    summarize_paired_effects,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -342,6 +344,95 @@ fn write_record_artifact_evidence<W: Write>(
         }
     }
     Ok(rows)
+}
+
+fn format_estimate(estimate: Estimate) -> String {
+    match (estimate.mean, estimate.ci95_lower, estimate.ci95_upper) {
+        (Some(mean), Some(lower), Some(upper)) => format!("{mean:.4}[{lower:.4},{upper:.4}]"),
+        (Some(mean), _, _) => format!("{mean:.4}[CI=NA]"),
+        (None, _, _) => "NA".to_owned(),
+    }
+}
+
+fn format_direction(direction: InfluenceDirection) -> &'static str {
+    match direction {
+        InfluenceDirection::PartnerToAgent => "partner_to_agent",
+        InfluenceDirection::AgentToPartner => "agent_to_partner",
+    }
+}
+
+fn report_paired_statistics(
+    label: &str,
+    observations: &[PairedEffectObservation],
+) -> Result<(), Box<dyn Error>> {
+    let summaries = summarize_paired_effects(observations, BootstrapConfig::default())?;
+    for summary in summaries {
+        report_one_paired_summary(label, &summary);
+    }
+    Ok(())
+}
+
+fn report_one_paired_summary(label: &str, summary: &DimensionEffectSummary) {
+    eprintln!(
+        "RMI_PAIRED_BOOTSTRAP,track={},dimension={},direction={},attempted={},measured={},missing={},attempted_clusters={},measured_clusters={},targeted={},sham={},unrelated={},yoked={},targeted_minus_sham={},targeted_minus_unrelated={},targeted_minus_yoked={},input_sensitive_rate={},target_specific_rate={}",
+        label,
+        summary.dimension.as_str(),
+        format_direction(summary.direction),
+        summary.attempted_trials,
+        summary.measured_trials,
+        summary.missing_trials,
+        summary.attempted_clusters,
+        summary.measured_clusters,
+        format_estimate(summary.targeted_delta),
+        format_estimate(summary.sham_delta),
+        format_estimate(summary.unrelated_delta),
+        format_estimate(summary.yoked_delta),
+        format_estimate(summary.targeted_minus_sham),
+        format_estimate(summary.targeted_minus_unrelated),
+        format_estimate(summary.targeted_minus_yoked),
+        format_estimate(summary.input_sensitive_rate),
+        format_estimate(summary.target_specific_rate),
+    );
+}
+
+fn paired_agent_observations(records: &[TrialRecordV1]) -> Vec<PairedEffectObservation> {
+    records
+        .iter()
+        .map(|record| PairedEffectObservation {
+            cluster_id: record.manifest.session_id.clone(),
+            trial_id: record.task.task_id.clone(),
+            dimension: record.task.target_dimension,
+            direction: InfluenceDirection::PartnerToAgent,
+            domain_size: record.task.expected_response.modulus as u32,
+            outcome: PairedEffectOutcome::Measured(PairedEffectValue {
+                targeted_delta: record.contrast.targeted_delta,
+                sham_delta: record.contrast.sham_delta,
+                unrelated_delta: record.contrast.unrelated_target_delta,
+                yoked_delta: None,
+            }),
+        })
+        .collect()
+}
+
+fn paired_partner_observations(
+    records: &[ReciprocalTrialRecordV1],
+) -> Vec<PairedEffectObservation> {
+    records
+        .iter()
+        .map(|record| PairedEffectObservation {
+            cluster_id: record.agent.manifest.session_id.clone(),
+            trial_id: record.agent.task.task_id.clone(),
+            dimension: record.agent.task.target_dimension,
+            direction: InfluenceDirection::AgentToPartner,
+            domain_size: record.agent.task.expected_response.modulus as u32,
+            outcome: PairedEffectOutcome::Measured(PairedEffectValue {
+                targeted_delta: record.partner.targeted_delta,
+                sham_delta: record.partner.sham_delta,
+                unrelated_delta: record.partner.unrelated_delta,
+                yoked_delta: None,
+            }),
+        })
+        .collect()
 }
 
 fn report_policy_aggregates(records: &[TrialRecordV1]) {
@@ -864,6 +955,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
         }
         report_policy_aggregates(&records);
+        report_paired_statistics("agent", &paired_agent_observations(&records))?;
     }
 
     let mut reciprocal = run_reciprocal_suite_v1(
@@ -912,6 +1004,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
     report_reciprocal_aggregates(&reciprocal);
+    report_paired_statistics("partner", &paired_partner_observations(&reciprocal))?;
 
     let (negotiation_qualified, negotiation_rejected) = run_negotiation_conformance()?;
     if negotiation_qualified != 6 || negotiation_rejected != 5 {
