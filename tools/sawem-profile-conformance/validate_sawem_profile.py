@@ -178,6 +178,8 @@ EXPECTED_CASE_IDS = {
     "CREDIT-COVER-LIQUIDITY-WATERFALL-001",
     "FORECAST-VINTAGE-ASOF-001",
     "FORECAST-CALIBRATION-EXACT-001",
+    "FORECAST-BASELINES-001",
+    "FORECAST-COHORT-REPRESENTATIVENESS-001",
     "FORECAST-PAIRED-SKILL-001",
     "FORECAST-SKILL-BLOCK-BOOTSTRAP-001",
     "DISPATCH-EXECUTION-FIDELITY-001",
@@ -331,6 +333,8 @@ def main() -> None:
     liquidity_waterfall_kernel_path = root / "tools/sawem-market-reference/src/liquidity_waterfall.rs"
     asof_replay_kernel_path = root / "tools/sawem-market-reference/src/asof_replay.rs"
     forecast_metrics_kernel_path = root / "tools/sawem-market-reference/src/forecast_metrics.rs"
+    forecast_baselines_kernel_path = root / "tools/sawem-market-reference/src/forecast_baselines.rs"
+    forecast_cohort_kernel_path = root / "tools/sawem-market-reference/src/forecast_cohort.rs"
     forecast_skill_kernel_path = root / "tools/sawem-market-reference/src/forecast_skill.rs"
     forecast_inference_kernel_path = root / "tools/sawem-market-reference/src/forecast_inference.rs"
     execution_fidelity_kernel_path = root / "tools/sawem-market-reference/src/execution_fidelity.rs"
@@ -364,6 +368,8 @@ def main() -> None:
         liquidity_waterfall_kernel_bytes = liquidity_waterfall_kernel_path.read_bytes()
         asof_replay_kernel_bytes = asof_replay_kernel_path.read_bytes()
         forecast_metrics_kernel_bytes = forecast_metrics_kernel_path.read_bytes()
+        forecast_baselines_kernel_bytes = forecast_baselines_kernel_path.read_bytes()
+        forecast_cohort_kernel_bytes = forecast_cohort_kernel_path.read_bytes()
         forecast_skill_kernel_bytes = forecast_skill_kernel_path.read_bytes()
         forecast_inference_kernel_bytes = forecast_inference_kernel_path.read_bytes()
         execution_fidelity_kernel_bytes = execution_fidelity_kernel_path.read_bytes()
@@ -403,6 +409,10 @@ def main() -> None:
             + asof_replay_kernel_bytes
             + b"\n"
             + forecast_metrics_kernel_bytes
+            + b"\n"
+            + forecast_baselines_kernel_bytes
+            + b"\n"
+            + forecast_cohort_kernel_bytes
             + b"\n"
             + forecast_skill_kernel_bytes
             + b"\n"
