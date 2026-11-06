@@ -121,7 +121,7 @@ impl VehicleController {
         }
     }
 
-    /// Train the output projection and network weights via full BPTT.
+    /// Train the output projection and apply one-step local HDC-LTC target updates.
     pub fn train_step(
         &mut self,
         sensor_hv: &ContinuousHV,
