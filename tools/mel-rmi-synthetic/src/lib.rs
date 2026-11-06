@@ -4,7 +4,7 @@
 //! does not evaluate Melothaea, infer human musical value, or establish
 //! reciprocal interaction outside the controlled fixtures.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt;
 
 use sha2::{Digest, Sha256};
@@ -938,6 +938,9 @@ fn digest_artifact_set(
     for artifact in &payload.artifacts {
         if artifact.bytes.is_empty() || !formats.insert(artifact.format) {
             return Err(HarnessError::InvalidArtifactSet);
+        }
+        if artifact.format == ArtifactFormatV1::Midi {
+            inspect_midi_file_v1(&artifact.bytes)?;
         }
         artifacts.push(ArtifactDigestV1 {
             format: artifact.format,
@@ -1881,6 +1884,386 @@ impl<T> MetricMeasurement<T> {
     }
 }
 
+/// One parsed note interval from a Standard MIDI File track.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MidiNoteEventV1 {
+    /// Zero-based track index.
+    pub track: u16,
+    /// MIDI channel in 0..=15.
+    pub channel: u8,
+    /// MIDI pitch in 0..=127.
+    pub pitch: u8,
+    /// Note-on velocity in 1..=127.
+    pub velocity: u8,
+    /// Absolute onset tick.
+    pub start_tick: u32,
+    /// Absolute note-off tick (strictly after onset).
+    pub end_tick: u32,
+}
+
+/// Parsed tempo meta-event.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MidiTempoEventV1 {
+    /// Zero-based track index.
+    pub track: u16,
+    /// Absolute tick at which the tempo takes effect.
+    pub tick: u32,
+    /// Microseconds per quarter note; zero is invalid in SMF.
+    pub micros_per_quarter: u32,
+}
+
+/// Parsed time-signature meta-event.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MidiTimeSignatureEventV1 {
+    /// Zero-based track index.
+    pub track: u16,
+    /// Absolute tick at which the meter takes effect.
+    pub tick: u32,
+    /// Numerator of the time signature.
+    pub numerator: u8,
+    /// Denominator of the time signature.
+    pub denominator: u8,
+}
+
+/// Parsed program-change channel event.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MidiProgramChangeV1 {
+    /// Zero-based track index.
+    pub track: u16,
+    /// MIDI channel in 0..=15.
+    pub channel: u8,
+    /// General MIDI program number in 0..=127.
+    pub program: u8,
+    /// Absolute tick of the program change.
+    pub tick: u32,
+}
+
+/// Bounded semantic inspection of a Standard MIDI File format 0 or 1.
+///
+/// The parser supports the channel events and meta-events needed by the
+/// synthetic suite and safely skips other well-formed channel/meta/SysEx
+/// events. Running status is supported. System-common/realtime statuses
+/// inside an SMF track are rejected.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MidiFileInspectionV1 {
+    /// SMF format number (0 or 1).
+    pub format: u16,
+    /// Declared track count.
+    pub track_count: u16,
+    /// Pulses/ticks per quarter note.
+    pub ticks_per_quarter: u16,
+    /// Parsed and paired note intervals.
+    pub notes: Vec<MidiNoteEventV1>,
+    /// Parsed tempo events.
+    pub tempos: Vec<MidiTempoEventV1>,
+    /// Parsed time-signature events.
+    pub time_signatures: Vec<MidiTimeSignatureEventV1>,
+    /// Parsed program changes.
+    pub program_changes: Vec<MidiProgramChangeV1>,
+    /// Final absolute event tick for each track.
+    pub track_end_ticks: Vec<u32>,
+}
+
+fn read_midi_byte(bytes: &[u8], cursor: &mut usize) -> Result<u8, HarnessError> {
+    let value = *bytes.get(*cursor).ok_or(HarnessError::InvalidMidi)?;
+    *cursor += 1;
+    Ok(value)
+}
+
+fn read_midi_vlq(bytes: &[u8], cursor: &mut usize) -> Result<u32, HarnessError> {
+    let mut value = 0_u32;
+    for index in 0..4 {
+        let byte = read_midi_byte(bytes, cursor)?;
+        // Reject non-canonical leading zero continuation bytes.
+        if index == 0 && byte == 0x80 {
+            return Err(HarnessError::InvalidMidi);
+        }
+        value = value
+            .checked_shl(7)
+            .and_then(|current| current.checked_add(u32::from(byte & 0x7f)))
+            .ok_or(HarnessError::InvalidMidi)?;
+        if byte & 0x80 == 0 {
+            return Ok(value);
+        }
+    }
+    Err(HarnessError::InvalidMidi)
+}
+
+fn take_midi_data(
+    bytes: &[u8],
+    cursor: &mut usize,
+    count: usize,
+    first: Option<u8>,
+) -> Result<Vec<u8>, HarnessError> {
+    let mut data = Vec::with_capacity(count);
+    if let Some(value) = first {
+        if value > 0x7f || count == 0 {
+            return Err(HarnessError::InvalidMidi);
+        }
+        data.push(value);
+    }
+    while data.len() < count {
+        let value = read_midi_byte(bytes, cursor)?;
+        if value > 0x7f {
+            return Err(HarnessError::InvalidMidi);
+        }
+        data.push(value);
+    }
+    Ok(data)
+}
+
+fn inspect_midi_track_v1(
+    track_bytes: &[u8],
+    track_index: u16,
+    inspection: &mut MidiFileInspectionV1,
+) -> Result<u32, HarnessError> {
+    let mut cursor = 0usize;
+    let mut absolute_tick = 0_u32;
+    let mut running_status: Option<u8> = None;
+    let mut active_notes: BTreeMap<(u8, u8), VecDeque<(u32, u8)>> = BTreeMap::new();
+    let mut end_of_track = false;
+
+    while cursor < track_bytes.len() {
+        let delta = read_midi_vlq(track_bytes, &mut cursor)?;
+        absolute_tick = absolute_tick
+            .checked_add(delta)
+            .ok_or(HarnessError::InvalidMidi)?;
+
+        let first = read_midi_byte(track_bytes, &mut cursor)?;
+        let (status, first_data) = if first & 0x80 != 0 {
+            (first, None)
+        } else {
+            (running_status.ok_or(HarnessError::InvalidMidi)?, Some(first))
+        };
+
+        if (0x80..=0xef).contains(&status) {
+            running_status = Some(status);
+            let command = status & 0xf0;
+            let channel = status & 0x0f;
+            let data_len = match command {
+                0x80 | 0x90 | 0xa0 | 0xb0 | 0xe0 => 2,
+                0xc0 | 0xd0 => 1,
+                _ => return Err(HarnessError::InvalidMidi),
+            };
+            let data = take_midi_data(track_bytes, &mut cursor, data_len, first_data)?;
+            match command {
+                0x80 => {
+                    let pitch = data[0];
+                    let queue = active_notes
+                        .get_mut(&(channel, pitch))
+                        .ok_or(HarnessError::InvalidMidi)?;
+                    let (start_tick, velocity) =
+                        queue.pop_front().ok_or(HarnessError::InvalidMidi)?;
+                    if absolute_tick <= start_tick {
+                        return Err(HarnessError::InvalidMidi);
+                    }
+                    inspection.notes.push(MidiNoteEventV1 {
+                        track: track_index,
+                        channel,
+                        pitch,
+                        velocity,
+                        start_tick,
+                        end_tick: absolute_tick,
+                    });
+                    if queue.is_empty() {
+                        active_notes.remove(&(channel, pitch));
+                    }
+                }
+                0x90 => {
+                    let pitch = data[0];
+                    let velocity = data[1];
+                    if velocity == 0 {
+                        let queue = active_notes
+                            .get_mut(&(channel, pitch))
+                            .ok_or(HarnessError::InvalidMidi)?;
+                        let (start_tick, note_velocity) =
+                            queue.pop_front().ok_or(HarnessError::InvalidMidi)?;
+                        if absolute_tick <= start_tick {
+                            return Err(HarnessError::InvalidMidi);
+                        }
+                        inspection.notes.push(MidiNoteEventV1 {
+                            track: track_index,
+                            channel,
+                            pitch,
+                            velocity: note_velocity,
+                            start_tick,
+                            end_tick: absolute_tick,
+                        });
+                        if queue.is_empty() {
+                            active_notes.remove(&(channel, pitch));
+                        }
+                    } else {
+                        active_notes
+                            .entry((channel, pitch))
+                            .or_default()
+                            .push_back((absolute_tick, velocity));
+                    }
+                }
+                0xc0 => inspection.program_changes.push(MidiProgramChangeV1 {
+                    track: track_index,
+                    channel,
+                    program: data[0],
+                    tick: absolute_tick,
+                }),
+                _ => {}
+            }
+        } else {
+            match status {
+                0xff => {
+                    // SMF meta events do not reset MIDI running status.
+                    let meta_type = read_midi_byte(track_bytes, &mut cursor)?;
+                    let length = read_midi_vlq(track_bytes, &mut cursor)? as usize;
+                    let end = cursor
+                        .checked_add(length)
+                        .filter(|end| *end <= track_bytes.len())
+                        .ok_or(HarnessError::InvalidMidi)?;
+                    let data = &track_bytes[cursor..end];
+                    cursor = end;
+                    match meta_type {
+                        0x2f => {
+                            if length != 0 || cursor != track_bytes.len() {
+                                return Err(HarnessError::InvalidMidi);
+                            }
+                            end_of_track = true;
+                            break;
+                        }
+                        0x51 => {
+                            if length != 3 {
+                                return Err(HarnessError::InvalidMidi);
+                            }
+                            let micros_per_quarter = (u32::from(data[0]) << 16)
+                                | (u32::from(data[1]) << 8)
+                                | u32::from(data[2]);
+                            if micros_per_quarter == 0 {
+                                return Err(HarnessError::InvalidMidi);
+                            }
+                            inspection.tempos.push(MidiTempoEventV1 {
+                                track: track_index,
+                                tick: absolute_tick,
+                                micros_per_quarter,
+                            });
+                        }
+                        0x58 => {
+                            if length != 4 || data[0] == 0 || data[1] > 7 {
+                                return Err(HarnessError::InvalidMidi);
+                            }
+                            inspection.time_signatures.push(MidiTimeSignatureEventV1 {
+                                track: track_index,
+                                tick: absolute_tick,
+                                numerator: data[0],
+                                denominator: 1_u8
+                                    .checked_shl(u32::from(data[1]))
+                                    .ok_or(HarnessError::InvalidMidi)?,
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+                0xf0 | 0xf7 => {
+                    // Well-formed SysEx events are skipped; they cancel running status.
+                    running_status = None;
+                    let length = read_midi_vlq(track_bytes, &mut cursor)? as usize;
+                    let end = cursor
+                        .checked_add(length)
+                        .filter(|end| *end <= track_bytes.len())
+                        .ok_or(HarnessError::InvalidMidi)?;
+                    if track_bytes[cursor..end].iter().any(|byte| *byte > 0x7f) {
+                        return Err(HarnessError::InvalidMidi);
+                    }
+                    cursor = end;
+                }
+                _ => return Err(HarnessError::InvalidMidi),
+            }
+        }
+    }
+
+    if !end_of_track || !active_notes.is_empty() {
+        return Err(HarnessError::InvalidMidi);
+    }
+    Ok(absolute_tick)
+}
+
+/// Inspect a bounded Standard MIDI File format 0 or 1 without panicking on
+/// malformed/truncated input. Artifact binding invokes this before hashing
+/// any payload declared as MIDI.
+pub fn inspect_midi_file_v1(bytes: &[u8]) -> Result<MidiFileInspectionV1, HarnessError> {
+    if bytes.len() < 22 || &bytes[0..4] != b"MThd" {
+        return Err(HarnessError::InvalidMidi);
+    }
+    let header_len =
+        u32::from_be_bytes(bytes[4..8].try_into().map_err(|_| HarnessError::InvalidMidi)?);
+    let format =
+        u16::from_be_bytes(bytes[8..10].try_into().map_err(|_| HarnessError::InvalidMidi)?);
+    let track_count =
+        u16::from_be_bytes(bytes[10..12].try_into().map_err(|_| HarnessError::InvalidMidi)?);
+    let division =
+        u16::from_be_bytes(bytes[12..14].try_into().map_err(|_| HarnessError::InvalidMidi)?);
+    if header_len != 6
+        || !(format == 0 || format == 1)
+        || track_count == 0
+        || track_count > 64
+        || (format == 0 && track_count != 1)
+        || division == 0
+        || division & 0x8000 != 0
+    {
+        return Err(HarnessError::InvalidMidi);
+    }
+
+    let mut inspection = MidiFileInspectionV1 {
+        format,
+        track_count,
+        ticks_per_quarter: division,
+        notes: Vec::new(),
+        tempos: Vec::new(),
+        time_signatures: Vec::new(),
+        program_changes: Vec::new(),
+        track_end_ticks: Vec::with_capacity(track_count as usize),
+    };
+    let mut cursor = 14usize;
+    for track_index in 0..track_count {
+        let chunk_header_end = cursor.checked_add(8).ok_or(HarnessError::InvalidMidi)?;
+        if chunk_header_end > bytes.len() || &bytes[cursor..cursor + 4] != b"MTrk" {
+            return Err(HarnessError::InvalidMidi);
+        }
+        let length =
+            u32::from_be_bytes(bytes[cursor + 4..cursor + 8].try_into().map_err(|_| HarnessError::InvalidMidi)?) as usize;
+        cursor = chunk_header_end;
+        let end = cursor
+            .checked_add(length)
+            .filter(|end| *end <= bytes.len())
+            .ok_or(HarnessError::InvalidMidi)?;
+        let track_end_tick =
+            inspect_midi_track_v1(&bytes[cursor..end], track_index, &mut inspection)?;
+        inspection.track_end_ticks.push(track_end_tick);
+        cursor = end;
+    }
+    if cursor != bytes.len() {
+        return Err(HarnessError::InvalidMidi);
+    }
+    inspection.notes.sort_by_key(|note| (note.track, note.start_tick, note.channel, note.pitch));
+    inspection.tempos.sort_by_key(|event| (event.track, event.tick));
+    inspection.time_signatures.sort_by_key(|event| (event.track, event.tick));
+    inspection.program_changes.sort_by_key(|event| (event.track, event.tick, event.channel));
+    Ok(inspection)
+}
+
+/// Enforce the canonical synthetic fixture shape emitted by the synthetic
+/// MIDI renderer: SMF format 0, one track, 4/4 meter, and at least one note.
+pub fn inspect_synthetic_midi_v1(bytes: &[u8]) -> Result<MidiFileInspectionV1, HarnessError> {
+    let inspection = inspect_midi_file_v1(bytes)?;
+    if inspection.format != 0
+        || inspection.track_count != 1
+        || inspection.notes.is_empty()
+        || !inspection
+            .time_signatures
+            .iter()
+            .any(|meter| meter.numerator == 4 && meter.denominator == 4)
+    {
+        return Err(HarnessError::InvalidMidi);
+    }
+    Ok(inspection)
+}
+
 /// Render a deterministic, valid Standard MIDI File containing musical
 /// events for a target feature and a separate protected feature.
 ///
@@ -2078,6 +2461,7 @@ pub fn render_synthetic_midi_v1(
     midi.extend_from_slice(b"MTrk");
     midi.extend_from_slice(&track_len.to_be_bytes());
     midi.extend_from_slice(&track);
+    inspect_synthetic_midi_v1(&midi)?;
     Ok(midi)
 }
 
@@ -2124,6 +2508,8 @@ pub enum HarnessError {
     AuthorityExpired,
     /// Artifact evidence has already been committed to this trial.
     ArtifactAlreadyBound,
+    /// MIDI container, track, delta-time, event, or note pairing is malformed.
+    InvalidMidi,
 }
 
 impl fmt::Display for HarnessError {
