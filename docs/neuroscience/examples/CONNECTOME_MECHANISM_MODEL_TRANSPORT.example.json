@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-mechanism-model-animal-transport-v1",
+  "claim_scope": "synthetic_known_truth",
+  "mechanism_binding": {
+    "input_path": "docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json",
+    "expected_query_id": "does-effective-pathway-support-behavior",
+    "expected_query_spec_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "expected_selected_intervention_id": "orthogonal-joint",
+    "expected_query_identified": true,
+    "expected_mechanism_identified": true
+  },
+  "transport_binding": {
+    "input_path": "docs/neuroscience/examples/CONNECTOME_MECHANISM_TRANSPORT_COHORT.example.json",
+    "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "split_sha256": "d1802c333c06a7a69b88640453d50156d2bac42dc9bdf8e33996b1e2762afb9f",
+    "lockbox_animal_ids": [
+      "WT-LOCKBOX-01",
+      "WT-LOCKBOX-02",
+      "WT-LOCKBOX-03",
+      "WT-LOCKBOX-04",
+      "WT-LOCKBOX-05",
+      "UNC31-LOCKBOX-01"
+    ],
+    "target_pair_id": "RID-URX",
+    "target_pair_direct_wiring_status": "NO_DIRECT_EDGE",
+    "minimum_paired_animals": 5
+  },
+  "mechanism_model_mappings": [
+    {
+      "mechanism_id": "direct",
+      "mechanism_class": "DIRECT_SYNAPTIC",
+      "model_id": "anatomy-only",
+      "mapping_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    {
+      "mechanism_id": "extra",
+      "mechanism_class": "EXTRASYNAPTIC_LATENT",
+      "model_id": "wired-plus-extrasynaptic",
+      "mapping_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "intervention_condition_bindings": [
+    {
+      "intervention_id": "orthogonal-joint",
+      "condition_id": "WT_BACKGROUND",
+      "mapping_scope": "PRIMARY_PAIRED_CONTRAST",
+      "intervention_protocol_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "mapping_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "condition_id": "UNC31_MUTANT",
+      "mapping_scope": "OOD_ABSTENTION_CONTROL",
+      "intervention_protocol_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "mapping_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "comparison": {
+    "model_a_id": "anatomy-only",
+    "model_b_id": "wired-plus-extrasynaptic",
+    "preferred_direction": "MODEL_B_LOWER_ANIMAL_MACRO_BRIER",
+    "alpha": 0.05,
+    "sign_test_alternative": "MODEL_B_LOWER_LOSS",
+    "familywise_comparison_count": 1,
+    "scoring_rule": "PER_ANIMAL_MEAN_BRIER_ON_SHARED_DETERMINATE_OBSERVATIONS",
+    "observation_disposition": "FUNCTIONAL_CONNECTION"
+  },
+  "known_answer": {
+    "paired_evaluable_animal_count": 5,
+    "model_b_wins": 5,
+    "model_a_wins": 0,
+    "ties": 0,
+    "one_sided_exact_sign_test_p": 0.03125,
+    "expected_predictive_transport_status": "MODEL_B_FAVORED",
+    "expected_model_b_ood_abstentions_on_control_condition": 2,
+    "biological_mechanism_status": "NOT_ESTABLISHED_BY_PREDICTIVE_TRANSPORT"
+  },
+  "upstream_sources": {
+    "mechanism_commit_sha": "9cad0cbfc122791a5a34454d1543d6e0bcd3b912",
+    "mechanism_rust_git_blob_sha1": "30b71ab331b4d3dfba0e5449347a8d3690c19731",
+    "mechanism_oracle_git_blob_sha1": "e23e8c36b9ae304618bb7c92af37000c8d4539a6",
+    "transport_commit_sha": "dd8f51cf3250ba3110783067069d551644d019c7",
+    "transport_oracle_git_blob_sha1": "df232185ec19b8fc690f45a95ac588753f232aba"
+  }
+}
