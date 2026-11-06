@@ -1174,6 +1174,25 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn decision_directed_crn_refuses_partial_atomic_batch() {
+        let receipt = score_receipt(1_000, [0.85, 0.70], true);
+        let mut cfg = config(0.01, 4_001, 2);
+        cfg.robust_utility = RobustUtility::LowerTailCvar { tail_mass: 0.5 };
+        let allocation =
+            allocate_next_score_batch_decision_directed(&receipt, &cfg).unwrap();
+        assert_eq!(
+            allocation.disposition,
+            AllocationDisposition::BudgetInsufficientForAtomicBatch
+        );
+        assert!(allocation.next_batch.is_none());
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&receipt, &cfg, &allocation),
+            Ok(())
+        );
+    }
+
     #[test]
     fn decision_directed_policy_abstains_when_no_projected_batch_changes_the_gap() {
         // Both scenarios tie at the full-range Hoeffding cap. Contracting only
