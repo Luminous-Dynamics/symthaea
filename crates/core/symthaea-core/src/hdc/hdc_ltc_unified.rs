@@ -538,6 +538,110 @@ unsafe fn fused_identity_neon(
     }
 }
 
+/// Stable typed identity for a learnable hypervector in the unified HDC-LTC neuron.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HdcLtcParameterGroupId {
+    WeightHypervector,
+    InputMask,
+    TauModulator,
+    GateWeight,
+    GateBias,
+}
+
+/// Failure returned when a proposed HDC-LTC parameter-group edit is invalid.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HdcLtcParameterEditError {
+    DimensionMismatch { expected: usize, actual: usize },
+    NonFiniteValue { index: usize },
+    NormExceeded { group: HdcLtcParameterGroupId, norm_micros: u64 },
+}
+
+impl std::fmt::Display for HdcLtcParameterEditError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DimensionMismatch { expected, actual } => {
+                write!(f, "HDC-LTC parameter dimension mismatch: expected {expected}, received {actual}")
+            }
+            Self::NonFiniteValue { index } => {
+                write!(f, "HDC-LTC parameter value at index {index} is not finite")
+            }
+            Self::NormExceeded { group, norm_micros } => write!(
+                f,
+                "HDC-LTC parameter group {group:?} exceeds the norm budget: {:.6}",
+                *norm_micros as f64 / 1_000_000.0
+            ),
+        }
+    }
+}
+
+impl std::error::Error for HdcLtcParameterEditError {}
+
+/// Architecture-aware summary of one HDC-LTC parameter hypervector.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HdcLtcParameterGroupProfile {
+    pub id: HdcLtcParameterGroupId,
+    pub name: String,
+    pub dimension: usize,
+    pub norm: f32,
+    pub mean: f32,
+    pub variance: f32,
+    pub min_value: f32,
+    pub max_value: f32,
+    pub non_finite_count: usize,
+    pub saturated_count: usize,
+}
+
+/// Read-only, versioned introspection result for one HDC-LTC neuron.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HdcLtcNeuronParameterProfile {
+    pub format_version: u32,
+    pub dimension: usize,
+    pub tau_base: f32,
+    pub backbone_tau: f32,
+    pub gating_steepness: f32,
+    pub fourier_frequencies: Vec<f32>,
+    pub groups: Vec<HdcLtcParameterGroupProfile>,
+}
+
+fn profile_hypervector(
+    id: HdcLtcParameterGroupId,
+    name: &str,
+    hv: &ContinuousHV,
+) -> HdcLtcParameterGroupProfile {
+    let dimension = hv.values.len();
+    let non_finite_count = hv.values.iter().filter(|value| !value.is_finite()).count();
+    let finite_values: Vec<f32> = hv.values.iter().copied().filter(|value| value.is_finite()).collect();
+    let mean = if finite_values.is_empty() {
+        0.0
+    } else {
+        finite_values.iter().sum::<f32>() / finite_values.len() as f32
+    };
+    let variance = if finite_values.is_empty() {
+        0.0
+    } else {
+        finite_values
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f32>()
+            / finite_values.len() as f32
+    };
+    let min_value = finite_values.iter().copied().fold(f32::INFINITY, f32::min);
+    let max_value = finite_values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+
+    HdcLtcParameterGroupProfile {
+        id,
+        name: name.to_string(),
+        dimension,
+        norm: hv.norm(),
+        mean,
+        variance,
+        min_value: if finite_values.is_empty() { 0.0 } else { min_value },
+        max_value: if finite_values.is_empty() { 0.0 } else { max_value },
+        non_finite_count,
+        saturated_count: finite_values.iter().filter(|value| value.abs() >= 0.99).count(),
+    }
+}
+
 impl HdcLtcUnifiedNeuron {
     /// Create a new unified neuron with given configuration and seed.
     ///
@@ -1180,6 +1284,85 @@ impl HdcLtcUnifiedNeuron {
     // ═══════════════════════════════════════════════════════════════════════════
     // ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Return a versioned, read-only summary of all learnable HDC-LTC vectors.
+    pub fn parameter_profile(&self) -> HdcLtcNeuronParameterProfile {
+        HdcLtcNeuronParameterProfile {
+            format_version: 1,
+            dimension: self.config.dimension,
+            tau_base: self.config.tau_base,
+            backbone_tau: self.config.backbone_tau,
+            gating_steepness: self.config.gating_steepness,
+            fourier_frequencies: self.config.fourier_frequencies.clone(),
+            groups: vec![
+                profile_hypervector(
+                    HdcLtcParameterGroupId::WeightHypervector,
+                    "weight_hv",
+                    &self.weight_hv,
+                ),
+                profile_hypervector(
+                    HdcLtcParameterGroupId::InputMask,
+                    "input_mask",
+                    &self.input_mask,
+                ),
+                profile_hypervector(
+                    HdcLtcParameterGroupId::TauModulator,
+                    "tau_modulator",
+                    &self.tau_modulator,
+                ),
+                profile_hypervector(
+                    HdcLtcParameterGroupId::GateWeight,
+                    "gate_weight",
+                    &self.gate_weight,
+                ),
+                profile_hypervector(
+                    HdcLtcParameterGroupId::GateBias,
+                    "gate_bias",
+                    &self.gate_bias,
+                ),
+            ],
+        }
+    }
+
+    /// Replace one typed learnable hypervector after validating the entire payload.
+    ///
+    /// The candidate is prepared and validated before the selected live vector is
+    /// replaced. The 2.0 L2 budget matches the existing post-update norm ceiling.
+    pub fn try_replace_parameter_group(
+        &mut self,
+        id: HdcLtcParameterGroupId,
+        values: &[f32],
+    ) -> Result<(), HdcLtcParameterEditError> {
+        if values.len() != self.config.dimension {
+            return Err(HdcLtcParameterEditError::DimensionMismatch {
+                expected: self.config.dimension,
+                actual: values.len(),
+            });
+        }
+
+        if let Some(index) = values.iter().position(|value| !value.is_finite()) {
+            return Err(HdcLtcParameterEditError::NonFiniteValue { index });
+        }
+
+        let candidate = ContinuousHV::from_values(values.to_vec());
+        let norm = candidate.norm();
+        if norm > 2.0 {
+            return Err(HdcLtcParameterEditError::NormExceeded {
+                group: id,
+                norm_micros: (norm as f64 * 1_000_000.0).round() as u64,
+            });
+        }
+
+        match id {
+            HdcLtcParameterGroupId::WeightHypervector => self.weight_hv = candidate,
+            HdcLtcParameterGroupId::InputMask => self.input_mask = candidate,
+            HdcLtcParameterGroupId::TauModulator => self.tau_modulator = candidate,
+            HdcLtcParameterGroupId::GateWeight => self.gate_weight = candidate,
+            HdcLtcParameterGroupId::GateBias => self.gate_bias = candidate,
+        }
+
+        Ok(())
+    }
 
     /// Get current state
     pub fn state(&self) -> &ContinuousHV {
@@ -2974,6 +3157,77 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_parameter_profile_exposes_all_learnable_hypervectors() {
+        let neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            52,
+        );
+        let profile = neuron.parameter_profile();
+
+        assert_eq!(profile.format_version, 1);
+        assert_eq!(profile.dimension, 64);
+        assert_eq!(profile.groups.len(), 5);
+        assert_eq!(
+            profile.groups.iter().map(|group| group.id).collect::<Vec<_>>(),
+            vec![
+                HdcLtcParameterGroupId::WeightHypervector,
+                HdcLtcParameterGroupId::InputMask,
+                HdcLtcParameterGroupId::TauModulator,
+                HdcLtcParameterGroupId::GateWeight,
+                HdcLtcParameterGroupId::GateBias,
+            ]
+        );
+        assert!(profile.groups.iter().all(|group| group.non_finite_count == 0));
+    }
+
+    #[test]
+    fn test_parameter_group_replacement_is_validated_before_mutation() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            53,
+        );
+        let before = neuron.weight_hv_ref().values.clone();
+
+        let mut invalid = vec![0.0; 64];
+        invalid[7] = f32::NAN;
+        assert!(matches!(
+            neuron.try_replace_parameter_group(
+                HdcLtcParameterGroupId::WeightHypervector,
+                &invalid,
+            ),
+            Err(HdcLtcParameterEditError::NonFiniteValue { index: 7 })
+        ));
+        assert_eq!(neuron.weight_hv_ref().values, before);
+
+        assert!(matches!(
+            neuron.try_replace_parameter_group(
+                HdcLtcParameterGroupId::WeightHypervector,
+                &[0.0; 63],
+            ),
+            Err(HdcLtcParameterEditError::DimensionMismatch {
+                expected: 64,
+                actual: 63
+            })
+        ));
+        assert_eq!(neuron.weight_hv_ref().values, before);
+
+        let valid = vec![0.01; 64];
+        assert!(neuron
+            .try_replace_parameter_group(
+                HdcLtcParameterGroupId::WeightHypervector,
+                &valid,
+            )
+            .is_ok());
+        assert_eq!(neuron.weight_hv_ref().values, valid);
     }
 
     #[test]
