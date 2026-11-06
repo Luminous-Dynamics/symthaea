@@ -190,6 +190,8 @@ Recall gates require a design-aware lower confidence bound and adequate effectiv
 
 ConnectomeBench2 V2 remains the direct predictive proofreading baseline for split/merge error identification, calibration, and species/region transfer. NEURD, RoboEM and specialist VLMs remain relevant candidate-generation or reconstruction comparators.
 
+Graph-invariant stopping deserves a separate baseline. Martinez et al. (bioRxiv preprint, 4 July 2026) fit asymptotic graph-metric trajectories over proofreading snapshots and forecast remaining effort in zebrafish spinal cord and hemibrain. The authors explicitly limit those global metrics to proxying global graph stabilization; they cannot determine whether a particular scientific query is robust. We should compare their global stopping estimate with query-critical residual discovery and exact decision stability, not claim one replaces the other. Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC13345220/.
+
 This benchmark measures a different contribution: whether the full investigation workflow finds omitted alternatives that matter to a scientific conclusion, including alternatives missed by every production channel. It must not claim classifier superiority or pool its recall denominator with ConnectomeBench2's labelled decisions.
 
 ## 10. Claim ceiling and staged execution
