@@ -106,16 +106,16 @@ jobs:
         run: |
           python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py --self-test
-          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- \\
-            --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json \\
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_query_policy_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json \
             --output "$RUNNER_TEMP/adaptive-hypothesis-expansion-bound.json"
-          python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py \\
-            --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json \\
-            --report "$RUNNER_TEMP/adaptive-hypothesis-expansion-bound.json" \\
-            --binding docs/neuroscience/examples/CONNECTOME_ADAPTIVE_CHALLENGE_REPLAY_BINDING.example.json \\
-            --oracle tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py \\
-            --rust-source tools/connectomics-intake-audit/src/bin/connectome_adaptive_query_policy_audit.rs \\
-            --upstream-commit-sha "$EXPECTED_HEAD" \\
+          python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py \
+            --input docs/neuroscience/examples/CONNECTOME_ADAPTIVE_HYPOTHESIS_EXPANSION.example.json \
+            --report "$RUNNER_TEMP/adaptive-hypothesis-expansion-bound.json" \
+            --binding docs/neuroscience/examples/CONNECTOME_ADAPTIVE_CHALLENGE_REPLAY_BINDING.example.json \
+            --oracle tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py \
+            --rust-source tools/connectomics-intake-audit/src/bin/connectome_adaptive_query_policy_audit.rs \
+            --upstream-commit-sha "$EXPECTED_HEAD" \
             --receipt "$RUNNER_TEMP/adaptive-hypothesis-expansion-replay-receipt.json"
           cat "$RUNNER_TEMP/adaptive-hypothesis-expansion-replay-receipt.json"
       - name: Verify independent oracle syntax
