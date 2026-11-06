@@ -65,9 +65,14 @@ def validate_manifest_identity(binding: dict[str, Any], input_data: dict[str, An
     }
     require(actual == expected, 'base input identity does not match the frozen challenge binding')
     require(re.fullmatch(r'[0-9a-f]{40}', actual['dataset_revision_commit_sha']) is not None, 'dataset revision SHA malformed')
-    for key, value in actual.items():
-        if key != 'dataset_revision_commit_sha':
-            require(re.fullmatch(r'[0-9a-f]{64}', value) is not None, f'{key} malformed')
+    for key in (
+        'query_spec_sha256',
+        'scenario_set_sha256',
+        'action_set_sha256',
+        'joint_support_sha256',
+    ):
+        require(re.fullmatch(r'[0-9a-f]{64}', actual[key]) is not None, f'{key} malformed')
+    require(isinstance(actual['query_id'], str) and actual['query_id'].strip(), 'query_id malformed')
 
 
 def validate_challenge_semantics(binding: dict[str, Any], challenge_result: dict[str, Any], computed_challenge_sha: str) -> None:
