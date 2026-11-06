@@ -29,14 +29,25 @@ def entropy(probabilities: list[float]) -> float:
     return -sum(p * math.log2(p) for p in probabilities if p > 0.0)
 
 
+def baseline_bayes_decision_and_risk(
+    worlds: list[dict[str, Any]], query: dict[str, Any]
+) -> tuple[bool, float]:
+    p_true = sum(w["prior_probability"] for w in worlds if w["query_decision"])
+    p_false = 1.0 - p_true
+    # Predict FALSE and incur loss_false_true when the truth is TRUE.
+    risk_predict_false = p_true * query["loss_false_true"]
+    # Predict TRUE and incur loss_true_false when the truth is FALSE.
+    risk_predict_true = p_false * query["loss_true_false"]
+    # Deterministic tie-break toward TRUE; either is Bayes-optimal on a tie.
+    if risk_predict_true <= risk_predict_false:
+        return True, risk_predict_true
+    return False, risk_predict_false
+
+
 def baseline_bayes_risk(
     worlds: list[dict[str, Any]], query: dict[str, Any]
 ) -> float:
-    p_true = sum(w["prior_probability"] for w in worlds if w["query_decision"])
-    p_false = 1.0 - p_true
-    loss_if_false = query["loss_false_true"]
-    loss_if_true = query["loss_true_false"]
-    return min(p_true * loss_if_false, p_false * loss_if_true)
+    return baseline_bayes_decision_and_risk(worlds, query)[1]
 
 
 def evaluate_action(
@@ -106,6 +117,8 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(valid_sha(data["dataset_binding"]["source_access_receipt_sha256"]), "source-access receipt malformed")
     require(valid_sha(data["query"]["query_spec_sha256"]), "query digest malformed")
     require(valid_sha(data["query"]["decision_rule_sha256"]), "query decision-rule digest malformed")
+    require(math.isfinite(data["query"]["loss_false_true"]) and data["query"]["loss_false_true"] >= 0.0, "false-when-true loss must be finite and non-negative")
+    require(math.isfinite(data["query"]["loss_true_false"]) and data["query"]["loss_true_false"] >= 0.0, "true-when-false loss must be finite and non-negative")
 
     worlds = sorted(data["worlds"], key=lambda row: row["world_id"])
     interventions = sorted(data["interventions"], key=lambda row: row["intervention_id"])
@@ -115,6 +128,10 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(len({a["intervention_id"] for a in interventions}) == len(interventions), "duplicate intervention IDs")
     require(len({m["nuisance_model_id"] for m in nuisance_models}) == len(nuisance_models), "duplicate nuisance IDs")
 
+    require(
+        all(math.isfinite(w["prior_probability"]) and 0.0 <= w["prior_probability"] <= 1.0 for w in worlds),
+        "world priors must be finite probabilities",
+    )
     prior_total = sum(w["prior_probability"] for w in worlds)
     require(abs(prior_total - 1.0) <= 1e-9, "world priors must sum to one")
     require(all(w["biological_disposition"] == "ADMISSIBLE" for w in worlds), "only independently admissible worlds may enter the prior")
@@ -134,7 +151,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     for action in interventions:
         require(valid_sha(action["feasibility_receipt_sha256"]), "feasibility receipt malformed")
         require(valid_sha(action["safety_profile_sha256"]), "safety-profile digest malformed")
-        require(action["cost_units"] > 0, "intervention cost must be positive")
+        require(math.isfinite(action["cost_units"]) and action["cost_units"] > 0, "intervention cost must be finite and positive")
 
     expected_keys = {
         (action_id, world_id, nuisance_id)
@@ -153,7 +170,9 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         outcomes: dict[str, float] = {}
         for outcome in row["observations"]:
             require(outcome["outcome_id"] not in outcomes, f"duplicate outcome ID in {key}")
-            outcomes[outcome["outcome_id"]] = outcome["probability"]
+            probability = outcome["probability"]
+            require(math.isfinite(probability) and 0.0 <= probability <= 1.0, f"outcome probability outside [0,1]: {key}")
+            outcomes[outcome["outcome_id"]] = probability
         require(abs(sum(outcomes.values()) - 1.0) <= 1e-9, f"outcome probabilities do not sum to one: {key}")
         prediction_index[key] = outcomes
     require(set(prediction_index) == expected_keys, "prediction matrix is not a complete intervention × world × nuisance Cartesian product")
@@ -166,10 +185,8 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(train and validation and lockbox, "train, validation and lockbox groups must all be non-empty")
     require(not (train & validation or train & lockbox or validation & lockbox), "split leakage across independent units")
 
-    p_true = sum(w["prior_probability"] for w in worlds if w["query_decision"])
-    prior_decision = p_true >= 0.5
-    require(prior_decision == data["query"]["baseline_decision"], "declared baseline decision is not the Bayes decision under the frozen prior")
-    baseline_risk = baseline_bayes_risk(worlds, data["query"])
+    prior_decision, baseline_risk = baseline_bayes_decision_and_risk(worlds, data["query"])
+    require(prior_decision == data["query"]["baseline_decision"], "declared baseline decision is not the Bayes decision under the frozen prior and asymmetric loss")
     require(data["selection_objective"] == "WORST_CASE_EXPECTED_POSTERIOR_0_1_LOSS_REDUCTION_PER_COST", "unsupported selection objective")
 
     computed: dict[str, dict[str, float]] = {}
@@ -227,9 +244,28 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def self_test() -> None:
+    asymmetric_worlds = [
+        {"world_id": "T", "query_decision": True, "prior_probability": 0.60},
+        {"world_id": "F", "query_decision": False, "prior_probability": 0.40},
+    ]
+    asymmetric_query = {"loss_false_true": 0.10, "loss_true_false": 1.0}
+    decision, risk = baseline_bayes_decision_and_risk(asymmetric_worlds, asymmetric_query)
+    require(decision is False, "asymmetric-loss baseline should prefer FALSE despite P(TRUE)=0.60")
+    require(abs(risk - 0.06) <= 1e-12, "asymmetric-loss Bayes risk is incorrect")
+    print("asymmetric-loss and Bayes-decision negative controls: PASS")
+
+
 def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+        try:
+            self_test()
+            return 0
+        except Exception as exc:
+            print(f"intervention oracle self-test: FAIL: {exc}", file=sys.stderr)
+            return 1
     if len(sys.argv) != 2:
-        print("usage: verify_query_discriminating_intervention_oracle.py FIXTURE.json", file=sys.stderr)
+        print("usage: verify_query_discriminating_intervention_oracle.py FIXTURE.json | --self-test", file=sys.stderr)
         return 2
     try:
         raw = Path(sys.argv[1]).read_bytes()
