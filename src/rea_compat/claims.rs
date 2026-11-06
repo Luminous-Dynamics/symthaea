@@ -113,9 +113,14 @@ pub struct ClaimEvaluation {
     pub evaluator_version: String,
     pub rule_id: String,
     pub claim_id: String,
+    pub claim_request_sha256: String,
     pub predicate: ClaimPredicate,
     pub disposition: ClaimDisposition,
     pub scope: ClaimScope,
+    pub asserted_value: Value,
+    pub source_predicate_type: Option<String>,
+    pub requested_evidence_ids: Vec<String>,
+    pub assumptions: Vec<String>,
     pub evidence_assessments: Vec<EvidenceAssessment>,
     pub missing_evidence_ids: Vec<String>,
     pub unmet_obligations: Vec<String>,
@@ -527,9 +532,14 @@ struct EvaluationBody<'a> {
     evaluator_version: &'a str,
     rule_id: &'a str,
     claim_id: &'a str,
+    claim_request_sha256: &'a str,
     predicate: ClaimPredicate,
     disposition: ClaimDisposition,
     scope: &'a ClaimScope,
+    asserted_value: &'a Value,
+    source_predicate_type: &'a Option<String>,
+    requested_evidence_ids: &'a [String],
+    assumptions: &'a [String],
     evidence_assessments: &'a [EvidenceAssessment],
     missing_evidence_ids: &'a [String],
     unmet_obligations: &'a [String],
@@ -750,15 +760,26 @@ pub fn evaluate_claim(
         "no-registered-predicate-rule/v0"
     };
 
+    let claim_value = serde_json::to_value(claim)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
+    let claim_bytes = canonical_jcs_bytes(&claim_value)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
+    let claim_request_sha256 = sha256_hex(&claim_bytes);
+
     let claim_ceiling = claim_ceiling(claim.predicate);
     let body = EvaluationBody {
         schema: CLAIM_SCHEMA,
         evaluator_version: CLAIM_EVALUATOR_VERSION,
         rule_id,
         claim_id: &claim.claim_id,
+        claim_request_sha256: &claim_request_sha256,
         predicate: claim.predicate,
         disposition,
         scope: &claim.scope,
+        asserted_value: &claim.asserted_value,
+        source_predicate_type: &claim.source_predicate_type,
+        requested_evidence_ids: &claim.evidence_ids,
+        assumptions: &claim.assumptions,
         evidence_assessments: &assessments,
         missing_evidence_ids: &missing,
         unmet_obligations: &unmet,
@@ -776,9 +797,14 @@ pub fn evaluate_claim(
         evaluator_version: CLAIM_EVALUATOR_VERSION.to_owned(),
         rule_id: rule_id.to_owned(),
         claim_id: claim.claim_id.clone(),
+        claim_request_sha256,
         predicate: claim.predicate,
         disposition,
         scope: claim.scope.clone(),
+        asserted_value: claim.asserted_value.clone(),
+        source_predicate_type: claim.source_predicate_type.clone(),
+        requested_evidence_ids: claim.evidence_ids.clone(),
+        assumptions: claim.assumptions.clone(),
         evidence_assessments: assessments,
         missing_evidence_ids: missing,
         unmet_obligations: unmet,
@@ -1024,7 +1050,12 @@ mod tests {
 
         let mut changed = claim;
         changed.scope.operation = "other_operation".to_owned();
-        let different = evaluate_claim(&changed, &[evidence]).unwrap();
+        let different = evaluate_claim(&changed, &[evidence.clone()]).unwrap();
         assert_ne!(first.derivation_sha256, different.derivation_sha256);
+
+        let mut different_assertion = claim;
+        different_assertion.asserted_value["status"] = json!("a different nonmatching value");
+        let changed_assertion = evaluate_claim(&different_assertion, &[evidence]).unwrap();
+        assert_ne!(first.derivation_sha256, changed_assertion.derivation_sha256);
     }
 }
