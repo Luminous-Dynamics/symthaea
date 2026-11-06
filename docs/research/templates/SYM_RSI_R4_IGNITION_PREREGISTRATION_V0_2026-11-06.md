@@ -66,3 +66,27 @@ A five-seed paired pilot is a floor for estimating variance where feasible; it i
 - #10717 owns causal attribution of specific change units and interactions.
 
 This template is not itself an evaluator, signer, receipt, archive, statistical authority or promotion mechanism.
+
+## Semantic readiness contract (v0 extension)
+
+The companion Rust reference validator checks invariants that JSON Schema cannot express by itself:
+
+- The two arms must bind to the exact same `starting_state.shared_inner_agent` reference; their researcher references must resolve to the declared evolved/reference artifacts.
+- The backend version and frozen experimental context must match across arms. The treatment difference must remain the declared outer-loop researcher.
+- Both arms must bind to one identical, digest-identified inclusive budget envelope. Failure, invalid/rejected retries, human review/rework and confirmation/transfer costs remain inside the boundary.
+- Discovery, validation, sealed confirmation and fresh-family transfer require distinct manifest digests. A separately identified, independently reviewed disjointness audit must declare zero task-instance and task-family overlap.
+- Evaluator implementation, configuration, task contract and epoch schedule are digest-bound and shared across arms. Candidate write access to evaluator or confirmation material is forbidden.
+- Paired pilot count remains at least five, full-loop reruns at least two, and recursive-progress claims require at least two complete outer cycles.
+- All required controls, per-round development/audit fields, analysis fields and non-compensatory authority flags are checked. R4 claim dependencies are enforced.
+
+Run the offline reference checker:
+
+```sh
+cargo fmt --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- --check
+cargo clippy --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml --all-targets -- -D warnings
+cargo test --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml
+cargo run --manifest-path tools/sym-rsi-r4-prereg-reference/Cargo.toml -- docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json
+```
+
+The current repository artifact is still `TEMPLATE_NOT_PREREGISTERED`; the checker must reject it as not ready. A passing check on a future completed document means only that its declared structure and semantic invariants are internally consistent. The checker does not authenticate referenced hashes/signatures, inspect split contents, prove custody or independence, execute a model, validate scientific truth, or authorize a run/promotion. The custodian's disjointness evidence and existing independent evaluator/receipt authorities remain authoritative.
+
