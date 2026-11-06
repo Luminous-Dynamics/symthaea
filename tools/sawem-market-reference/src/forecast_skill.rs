@@ -8,8 +8,7 @@
 //! baselines or execute vendor models.
 
 use crate::forecast_metrics::{
-    ForecastCalibrationError, ForecastCalibrationMetrics, ForecastCalibrationObservation,
-    evaluate_forecast_calibration,
+    ForecastCalibrationError, ForecastCalibrationObservation, evaluate_forecast_calibration,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -19,7 +18,7 @@ pub enum ForecastSkillError {
     TargetCountMismatch,
     TargetMissingFromBaseline,
     DuplicateTarget,
-    DecisionFrontierMismatch,
+    DecisionTimestampMismatch,
     RealizedOutcomeMismatch,
     ModelIdentityNotDistinct,
     CandidateCalibrationInvalid(ForecastCalibrationError),
@@ -149,11 +148,8 @@ pub fn compare_forecast_skill<'a>(
             return Err(ForecastSkillError::DuplicateTarget);
         }
 
-        if item.decision_time_utc != other.decision_time_utc
-            || item.forecast_issued_at_utc != other.forecast_issued_at_utc
-            || item.forecast_available_at_utc != other.forecast_available_at_utc
-        {
-            return Err(ForecastSkillError::DecisionFrontierMismatch);
+        if item.decision_time_utc != other.decision_time_utc {
+            return Err(ForecastSkillError::DecisionTimestampMismatch);
         }
         if item.realized_minor_zar_per_mwh != other.realized_minor_zar_per_mwh
             || item.realized_source_ref != other.realized_source_ref
@@ -303,8 +299,12 @@ mod tests {
     #[test]
     fn candidate_regression_is_a_negative_skill_score_not_hidden_by_absolute_value() {
         let (mut candidate, baseline) = paired();
-        candidate[0].forecast_q50_minor_zar_per_mwh = 140;
-        candidate[1].forecast_q50_minor_zar_per_mwh = 240;
+        candidate[0].forecast_q10_minor_zar_per_mwh = 130;
+        candidate[0].forecast_q50_minor_zar_per_mwh = 145;
+        candidate[0].forecast_q90_minor_zar_per_mwh = 160;
+        candidate[1].forecast_q10_minor_zar_per_mwh = 230;
+        candidate[1].forecast_q50_minor_zar_per_mwh = 245;
+        candidate[1].forecast_q90_minor_zar_per_mwh = 260;
         let result = compare_forecast_skill(300, &candidate, &baseline).unwrap();
         assert_eq!(
             result.median_mae_skill,
@@ -329,7 +329,7 @@ mod tests {
         baseline[0].decision_time_utc -= 1;
         assert_eq!(
             compare_forecast_skill(300, &candidate, &baseline),
-            Err(ForecastSkillError::DecisionFrontierMismatch)
+            Err(ForecastSkillError::DecisionTimestampMismatch)
         );
     }
 
