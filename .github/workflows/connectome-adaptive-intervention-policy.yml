@@ -57,10 +57,11 @@ jobs:
       - name: Emit exact reports for all known-answer fixtures
         run: |
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py --output-dir "$RUNNER_TEMP/adaptive-intervention-policy"
-          python3 - <<'PY'
+          REPORT_DIR="$RUNNER_TEMP/adaptive-intervention-policy" python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
-          root = Path("$RUNNER_TEMP/adaptive-intervention-policy")
+          root = Path(os.environ["REPORT_DIR"])
           reports = sorted(root.glob("*.report.json"))
           assert len(reports) == 3, f"expected three reports, found {len(reports)}"
           rows = {json.loads(path.read_text())["analysis_id"]: json.loads(path.read_text()) for path in reports}
