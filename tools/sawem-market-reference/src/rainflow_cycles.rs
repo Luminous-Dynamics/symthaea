@@ -75,6 +75,12 @@ pub struct RainflowCycle {
 pub struct RainflowAssessment {
     pub scenario_id: String,
     pub method: RainflowMethod,
+    pub evaluation_as_of_utc: i64,
+    pub horizon_start_utc: i64,
+    pub horizon_end_utc: i64,
+    pub maximum_sample_gap_seconds: u64,
+    pub sampling_policy_source_ref: String,
+    pub sampling_policy_source_sha256: String,
     pub sample_count: u64,
     pub reversal_count: u64,
     pub segment_count: u64,
@@ -407,6 +413,12 @@ pub fn count_soc_rainflow_cycles(
     Ok(RainflowAssessment {
         scenario_id: inputs.scenario_id.to_owned(),
         method: RainflowMethod::AstmE1049ThreePointV1,
+        evaluation_as_of_utc: inputs.evaluation_as_of_utc,
+        horizon_start_utc: inputs.horizon_start_utc,
+        horizon_end_utc: inputs.horizon_end_utc,
+        maximum_sample_gap_seconds: inputs.maximum_sample_gap_seconds,
+        sampling_policy_source_ref: inputs.sampling_policy_source_ref.to_owned(),
+        sampling_policy_source_sha256: inputs.sampling_policy_source_sha256.to_owned(),
         sample_count: u64::try_from(inputs.samples.len())
             .map_err(|_| RainflowError::ArithmeticOverflow)?,
         reversal_count,
@@ -489,7 +501,8 @@ mod tests {
             .collect::<Vec<_>>();
         let result = count_soc_rainflow_cycles(inputs(&samples)).unwrap();
         assert_eq!(result.method, RainflowMethod::AstmE1049ThreePointV1);
-        assert_eq!(result.trace_complete, true);
+        assert!(result.trace_complete);
+        assert_eq!(result.reversal_count, 14);
         assert_eq!(result.full_cycle_count, 4);
         assert_eq!(result.half_cycle_count, 5);
         assert_eq!(result.equivalent_full_cycle_half_units, 13);
@@ -584,6 +597,18 @@ mod tests {
         assert_eq!(
             count_soc_rainflow_cycles(inputs(&duplicate_source)),
             Err(RainflowError::DuplicateSampleSourceReference)
+        );
+
+        let duplicate_id = [
+            sample("same-id", 0, 2_000),
+            SocTelemetrySample {
+                source_ref: "other-source",
+                ..sample("same-id", 1, 8_000)
+            },
+        ];
+        assert_eq!(
+            count_soc_rainflow_cycles(inputs(&duplicate_id)),
+            Err(RainflowError::DuplicateSampleId)
         );
 
         let bad_digest = [
