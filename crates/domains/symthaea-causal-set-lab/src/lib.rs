@@ -235,10 +235,16 @@ impl CausalSet2D {
         }
 
         let mut order: Vec<usize> = (0..n).collect();
+        // Lexicographic (u, v, id) is a linear extension of the causal
+        // order: if a ≺ b then u_a <= u_b and v_a <= v_b, with at least
+        // one strict. Positive rescalings u -> a*u, v -> b*v (including
+        // Lorentz boosts) preserve this ordering, so tie-breaking between
+        // multiple maximum chains is boost-invariant as well.
         order.sort_by(|&a, &b| {
             self.events[a]
-                .coordinate_time()
-                .total_cmp(&self.events[b].coordinate_time())
+                .u
+                .total_cmp(&self.events[b].u)
+                .then_with(|| self.events[a].v.total_cmp(&self.events[b].v))
                 .then_with(|| self.events[a].id.cmp(&self.events[b].id))
         });
 
