@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/cross-benchmark-frontier-v0.schema.json",
+  "title": "PITB cross-benchmark frontier registry v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of_date",
+    "title",
+    "governing_policy",
+    "benchmarks",
+    "claims_not_allowed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.cross-benchmark-frontier.v0"
+    },
+    "as_of_date": {
+      "const": "2026-11-06"
+    },
+    "title": {
+      "const": "PITB cross-benchmark competitive frontier"
+    },
+    "governing_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_pooled_score",
+        "baseline_provenance",
+        "comparison_rule",
+        "admission_rule",
+        "uncertainty_rule",
+        "target_status"
+      ],
+      "properties": {
+        "no_pooled_score": {
+          "const": true
+        },
+        "baseline_provenance": {
+          "type": "string",
+          "minLength": 40
+        },
+        "comparison_rule": {
+          "type": "string",
+          "minLength": 80
+        },
+        "admission_rule": {
+          "type": "string",
+          "minLength": 80
+        },
+        "uncertainty_rule": {
+          "type": "string",
+          "minLength": 40
+        },
+        "target_status": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    },
+    "benchmarks": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "benchmark_id",
+          "name",
+          "track",
+          "task_unit",
+          "frozen_cohort",
+          "reference_results",
+          "targets",
+          "qualification_gates",
+          "comparability_boundary",
+          "sources"
+        ],
+        "properties": {
+          "benchmark_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]+$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2
+          },
+          "track": {
+            "type": "string",
+            "minLength": 5
+          },
+          "task_unit": {
+            "type": "string",
+            "minLength": 15
+          },
+          "frozen_cohort": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "reference_results": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "system",
+                "metric",
+                "condition",
+                "source_url",
+                "source_date"
+              ],
+              "properties": {
+                "system": {
+                  "type": "string",
+                  "minLength": 2
+                },
+                "metric": {
+                  "type": "string",
+                  "minLength": 2
+                },
+                "solved": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "denominator": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "condition": {
+                  "type": "string",
+                  "minLength": 10
+                },
+                "source_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "source_date": {
+                  "type": "string",
+                  "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "required": [
+                      "solved"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "denominator",
+                      "value"
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "targets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metric",
+                "comparison"
+              ],
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "minLength": 3
+                },
+                "minimum_solved": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "denominator": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "minimum_value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "maximum_value": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "maximum_relative_cost": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "maximum_success_rate_regression": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "comparison": {
+                  "type": "string",
+                  "minLength": 10
+                }
+              }
+            }
+          },
+          "qualification_gates": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "string",
+              "minLength": 20
+            }
+          },
+          "comparability_boundary": {
+            "type": "string",
+            "minLength": 40
+          },
+          "sources": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "claims_not_allowed": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 30
+      }
+    }
+  }
+}
