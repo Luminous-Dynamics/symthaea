@@ -103,9 +103,7 @@ fn exact_skill(candidate: u128, baseline: u128) -> Result<ExactLossSkill, Foreca
     }
     let improvement = i128::try_from(baseline)
         .map_err(|_| ForecastSkillError::ArithmeticOverflow)?
-        .checked_sub(
-            i128::try_from(candidate).map_err(|_| ForecastSkillError::ArithmeticOverflow)?,
-        )
+        .checked_sub(i128::try_from(candidate).map_err(|_| ForecastSkillError::ArithmeticOverflow)?)
         .ok_or(ForecastSkillError::ArithmeticOverflow)?;
     Ok(ExactLossSkill::Defined {
         improvement_numerator: improvement,
@@ -123,8 +121,8 @@ fn per_observation_wis_numerator(
     let median_error = (actual - q50)
         .checked_abs()
         .ok_or(ForecastSkillError::ArithmeticOverflow)?;
-    let interval_width = u128::try_from(q90 - q10)
-        .map_err(|_| ForecastSkillError::ArithmeticOverflow)?;
+    let interval_width =
+        u128::try_from(q90 - q10).map_err(|_| ForecastSkillError::ArithmeticOverflow)?;
     let outside_distance = if actual < q10 {
         q10 - actual
     } else if actual > q90 {
@@ -346,12 +344,52 @@ mod tests {
     ) {
         (
             [
-                forecast("candidate-1", 100, 110, "candidate-v1", CANDIDATE_SHA, 90, 100, 110, 105),
-                forecast("candidate-2", 200, 210, "candidate-v1", CANDIDATE_SHA, 190, 200, 210, 205),
+                forecast(
+                    "candidate-1",
+                    100,
+                    110,
+                    "candidate-v1",
+                    CANDIDATE_SHA,
+                    90,
+                    100,
+                    110,
+                    105,
+                ),
+                forecast(
+                    "candidate-2",
+                    200,
+                    210,
+                    "candidate-v1",
+                    CANDIDATE_SHA,
+                    190,
+                    200,
+                    210,
+                    205,
+                ),
             ],
             [
-                forecast("baseline-1", 100, 110, "persistence-v1", BASELINE_SHA, 70, 90, 110, 105),
-                forecast("baseline-2", 200, 210, "persistence-v1", BASELINE_SHA, 170, 190, 210, 205),
+                forecast(
+                    "baseline-1",
+                    100,
+                    110,
+                    "persistence-v1",
+                    BASELINE_SHA,
+                    70,
+                    90,
+                    110,
+                    105,
+                ),
+                forecast(
+                    "baseline-2",
+                    200,
+                    210,
+                    "persistence-v1",
+                    BASELINE_SHA,
+                    170,
+                    190,
+                    210,
+                    205,
+                ),
             ],
         )
     }
