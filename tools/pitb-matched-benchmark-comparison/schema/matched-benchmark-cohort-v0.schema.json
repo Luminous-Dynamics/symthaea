@@ -24,6 +24,7 @@
     "require_vacuity_audit",
     "require_assumption_audit",
     "bootstrap_replicates",
+    "cluster_sign_flip_replicates",
     "bootstrap_seed_sha256",
     "arms"
   ],
@@ -141,6 +142,11 @@
         "repository",
         "repository_file"
       ]
+    },
+    "cluster_sign_flip_replicates": {
+      "type": "integer",
+      "minimum": 10000,
+      "maximum": 100000
     }
   }
 }
