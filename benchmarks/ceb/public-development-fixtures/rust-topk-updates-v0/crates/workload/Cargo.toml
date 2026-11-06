@@ -1,0 +1,9 @@
+[package]
+name = "ceb-topk-update-workload"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ceb-topk-rank-contract = { path = "../rank-contract" }
+ceb-topk-core = { path = "../topk-core" }
