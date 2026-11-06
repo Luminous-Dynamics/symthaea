@@ -179,6 +179,7 @@ EXPECTED_CASE_IDS = {
     "FORECAST-VINTAGE-ASOF-001",
     "FORECAST-CALIBRATION-EXACT-001",
     "FORECAST-PAIRED-SKILL-001",
+    "FORECAST-SKILL-BLOCK-BOOTSTRAP-001",
     "DISPATCH-EXECUTION-FIDELITY-001",
     "BMS-SOC-CAPABILITY-ENVELOPE-001",
     "BMS-CAPABILITY-CELL-CALIBRATION-001",
@@ -330,6 +331,7 @@ def main() -> None:
     asof_replay_kernel_path = root / "tools/sawem-market-reference/src/asof_replay.rs"
     forecast_metrics_kernel_path = root / "tools/sawem-market-reference/src/forecast_metrics.rs"
     forecast_skill_kernel_path = root / "tools/sawem-market-reference/src/forecast_skill.rs"
+    forecast_inference_kernel_path = root / "tools/sawem-market-reference/src/forecast_inference.rs"
     execution_fidelity_kernel_path = root / "tools/sawem-market-reference/src/execution_fidelity.rs"
     bms_calibration_kernel_path = root / "tools/sawem-market-reference/src/bms_calibration.rs"
     bms_capability_kernel_path = root / "tools/sawem-market-reference/src/bms_capability.rs"
@@ -361,6 +363,7 @@ def main() -> None:
         asof_replay_kernel_bytes = asof_replay_kernel_path.read_bytes()
         forecast_metrics_kernel_bytes = forecast_metrics_kernel_path.read_bytes()
         forecast_skill_kernel_bytes = forecast_skill_kernel_path.read_bytes()
+        forecast_inference_kernel_bytes = forecast_inference_kernel_path.read_bytes()
         execution_fidelity_kernel_bytes = execution_fidelity_kernel_path.read_bytes()
         bms_calibration_kernel_bytes = bms_calibration_kernel_path.read_bytes()
         bms_capability_kernel_bytes = bms_capability_kernel_path.read_bytes()
@@ -399,6 +402,8 @@ def main() -> None:
             + forecast_metrics_kernel_bytes
             + b"\n"
             + forecast_skill_kernel_bytes
+            + b"\n"
+            + forecast_inference_kernel_bytes
             + b"\n"
             + execution_fidelity_kernel_bytes
             + b"\n"
