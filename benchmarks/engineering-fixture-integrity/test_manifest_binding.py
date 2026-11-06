@@ -168,6 +168,28 @@ class ManifestBindingTests(unittest.TestCase):
             if outside.exists():
                 outside.unlink()
 
+    def test_internal_symlink_is_rejected(self) -> None:
+        target = self.root / self.cad_cases[0]["variants"][0]["artifact"]
+        link = self.root / "cad" / "internal-link.step"
+        link.symlink_to(target)
+        try:
+            variant = self.cad_cases[0]["variants"][0]
+            variant["artifact"] = "cad/internal-link.step"
+            variant["sha256"] = digest(target.read_bytes())
+            self.write_manifest()
+            with self.assertRaisesRegex(AUDIT.AuditError, "Symlinked package path forbidden"):
+                AUDIT.load_manifest_subjects(self.root)
+        finally:
+            link.unlink(missing_ok=True)
+
+    def test_manifest_cannot_be_reused_as_cad_artifact(self) -> None:
+        variant = self.cad_cases[0]["variants"][0]
+        variant["artifact"] = "materialization-manifest.json"
+        variant["sha256"] = "0" * 64
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "Duplicate canonical CAD artifact path"):
+            AUDIT.load_manifest_subjects(self.root)
+
     def test_duplicate_fixture_id_is_rejected(self) -> None:
         self.cad_cases[1]["fixture_id"] = self.cad_cases[0]["fixture_id"]
         self.write_manifest()
