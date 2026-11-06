@@ -749,3 +749,57 @@ These lanes must never be collapsed into one unqualified "RSI score". For each r
 - This branch adds the bounded-score empirical-Bernstein confidence kernel and per-round decision path as a draft implementation of #10668.
 - Both branches remain non-authorizing numerical kernels. The independent evaluator service, authenticated immutable history, feedback firewall, source-to-executable provenance, sampling-frame qualification, and multi-metric error allocation remain required before any real RSI promotion claim.
 - Source-authored tests are not test execution. Focused CI must pass at the exact PR head, and root-workspace integration must be qualified separately.
+
+
+## 15. Benchmark integrity and transfer-distance update — 2026-11-06
+
+### AI4AI-Bench: preserve the result, qualify the benchmark
+
+AI4AI-Bench (arXiv:2608.20318) is an important first reference for algorithmic RSI because it asks agents to edit training algorithms, then applies the source patch in a fresh container and trains from scratch. The paper reports mean normalized score 0.166 and best 0.250 across 29 configurations.
+
+Do **not** use 0.250 as an uncontested SOTA target. An independent full audit published 2026-11-03 reviewed all 10 task contracts/evaluators and 290 result pages, and classified the reviewed v1 as flawed:
+- Four of ten tasks had confirmed score-changing defects: visible/reused RAGEN held-out seed and substantial train/final-board overlap; DDPO reward optimization that collapsed alignment/diversity; NPO's declared optimum exceeded the actual metric ceiling; BTRM's single-run baseline sat within seed variation.
+- All tasks selected the best of up to three checkpoints on the final test metric; best and last differed in 148 of 271 completed cells.
+- There was one run per configuration, without independent seed replications.
+- The audit classified zero cells as novel research under its rubric and 49% as no gain over the shipped recipe.
+
+This is a third-party audit, not infallible ground truth. Retain the paper's published measurements and the audit's corrected analyses as separate evidence records. The right response is an audited replication/successor benchmark, not silently replacing the paper's published score or ignoring the defects.
+
+The follow-on is [SYM-RSI-ALGO-ROBUST-001 #10691](https://github.com/Luminous-Dynamics/symthaea/issues/10691). It requires source-backed classification of algorithm/config/harness changes, clean-start training, repeated seeds, validation-only checkpoint selection, independently held confirmation data, reachable metric optima, anti-scorer-gaming guardrails, and cost matching. It must reuse #10569/#10573 and existing receipt/statistics owners rather than create another evaluator or receipt contract.
+
+Sources:
+- AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+- Independent 2026-11-03 full audit: https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+
+### Generalization ladder: make the transfer distance explicit
+
+SelfImprove-Bench (arXiv:2611.02797, submitted 2026-11-02) organizes Exploring, Planning and Reasoning tasks and introduces G0-G4 generalization evaluation. It reports that gains from existing RSI methods vary inconsistently across generalization levels.
+
+For Symthaea, use the following explicit operational ladder, while extending beyond game scenarios to code, scientific research and training-algorithm design:
+
+| Level | Operational meaning | Symthaea evidence |
+|---|---|---|
+| G0 | Replay original discovery conditions | Reproducibility only; not generalization |
+| G1 | Fresh instances/seeds, same task family and difficulty | Unseen task instances |
+| G2 | Higher difficulty within the same task family | Difficulty extrapolation |
+| G3 | Different task family within the same capability | Cross-family transfer |
+| G4 | Different capability or application domain | Cross-domain transfer |
+
+This table is Symthaea's operational mapping of transfer distance, not a claim that game task performance alone establishes general research capability. Every RSI report must publish the full G0-G4 vector and per-task results; no endpoint aggregate can conceal a G0 gain with a G3/G4 regression.
+
+Source: https://arxiv.org/abs/2611.02797
+
+### Benchmark claim discipline
+
+Every external result should carry:
+- the exact benchmark revision and task-family split;
+- baseline and checkpoint-selection rules;
+- model/checkpoint, harness, toolchain and source identities;
+- number of independent full-loop and training replications;
+- whether test data affected candidate or checkpoint selection;
+- raw per-domain outcomes, uncertainty and all resource costs;
+- an independent benchmark-validity review for scorer bounds, leakage, construct validity and missing outcomes.
+
+An aggregate RSI-Index such as RSIGym's 0.4809 remains a useful within-suite reference, not a universal measure of self-improvement or an unseen-population guarantee. RSIGym's own repository says final evaluations reuse tasks available during development and separately bills research-agent inference/final evaluation from platform-service budget. Report known-suite optimization separately from fresh-task and fresh-family transfer.
+
+Source: https://github.com/evolvent-ai/RSIGym
