@@ -37,7 +37,7 @@ fn take_payload<'a>(
     if length > maximum {
         return None;
     }
-    let end = cursor.checked_add(length)?;
+    let end = (*cursor).checked_add(length)?;
     let payload = input.get(*cursor..end)?;
     *cursor = end;
     Some(payload)
