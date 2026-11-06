@@ -3,11 +3,10 @@ mod rea_compat;
 #[path = "../src/lib.rs"]
 mod replay_verifier;
 
-use rea_compat::claims::{
-    ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
-};
+use rea_compat::claims::{ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim};
 use replay_verifier::{
-    MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome, replay_claim_evaluation,
+    Disposition, MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome,
+    replay_claim_evaluation,
 };
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -55,14 +54,14 @@ fn oracle_label(case_id: &str, field: &str) -> String {
         .to_owned()
 }
 
-fn oracle_disposition(case_id: &str) -> ClaimDisposition {
+fn oracle_disposition(case_id: &str) -> Disposition {
     match oracle_label(case_id, "expected_disposition").as_str() {
-        "supported_within_scope" => ClaimDisposition::SupportedWithinScope,
-        "refuted_within_scope" => ClaimDisposition::RefutedWithinScope,
-        "underdetermined" => ClaimDisposition::Underdetermined,
-        "conflicted" => ClaimDisposition::Conflicted,
-        "inapplicable" => ClaimDisposition::Inapplicable,
-        "unverified" => ClaimDisposition::Unverified,
+        "supported_within_scope" => Disposition::SupportedWithinScope,
+        "refuted_within_scope" => Disposition::RefutedWithinScope,
+        "underdetermined" => Disposition::Underdetermined,
+        "conflicted" => Disposition::Conflicted,
+        "inapplicable" => Disposition::Inapplicable,
+        "unverified" => Disposition::Unverified,
         other => panic!("unknown frozen expected disposition '{other}'"),
     }
 }
@@ -239,7 +238,7 @@ fn forged_result_disposition_does_not_pass_on_a_self_digest_alone() {
 fn changed_request_cannot_reuse_an_old_result() {
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
-    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+    let (_claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
     let mut changed = claim;
     changed.falsification_condition = "A different falsification condition".to_owned();
@@ -642,7 +641,7 @@ fn replay_preserves_inferred_confidence_and_analyst_authority_without_promotion(
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
-        ClaimDisposition::SupportedWithinScope
+        Disposition::SupportedWithinScope
     );
 
     let assessment =
@@ -748,11 +747,11 @@ fn request_and_derivation_digest_mutations_fail_replay_even_when_disposition_is_
     assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
     assert_eq!(
         error.expected_disposition,
-        ClaimDisposition::SupportedWithinScope
+        Disposition::SupportedWithinScope
     );
     assert_eq!(
         error.reported_disposition,
-        ClaimDisposition::SupportedWithinScope
+        Disposition::SupportedWithinScope
     );
 
     let mut wrong_derivation_digest = original;
@@ -766,11 +765,11 @@ fn request_and_derivation_digest_mutations_fail_replay_even_when_disposition_is_
     assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
     assert_eq!(
         error.expected_disposition,
-        ClaimDisposition::SupportedWithinScope
+        Disposition::SupportedWithinScope
     );
     assert_eq!(
         error.reported_disposition,
-        ClaimDisposition::SupportedWithinScope
+        Disposition::SupportedWithinScope
     );
 }
 
@@ -789,7 +788,7 @@ fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
 
     let mut claim = provider_claim(first.evidence_id.clone());
     claim.evidence_ids.push(second.evidence_id.clone());
-    let (claim_bytes, result_bytes) = produce(&claim, &[first.clone(), second.clone()]);
+    let (_claim_bytes, result_bytes) = produce(&claim, &[first.clone(), second.clone()]);
 
     let mut reordered = claim;
     reordered.evidence_ids.reverse();
