@@ -149,7 +149,7 @@ fn changed_request_cannot_reuse_an_old_result() {
     let changed_bytes = serde_json::to_vec(&changed).unwrap();
     let replay = replay_claim_evaluation(&changed_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
-    assert_ne!(replay.claim_request_sha256, replay.recomputed_derivation_sha256);
+    assert_ne!(replay.reported_derivation_sha256, replay.recomputed_derivation_sha256);
 }
 
 #[test]
