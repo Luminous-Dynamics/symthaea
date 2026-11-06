@@ -58,8 +58,8 @@ pub use network::{
 
 // Weight-space programming
 pub use weight_program_adapter::{
-    CfCFunctionalProbe, CfCHiddenUnitAlignment, CfCPermutationAlignmentError,
-    CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
+    CfCActivationSignatureSet, CfCFunctionalProbe, CfCHiddenUnitAlignment,
+    CfCPermutationAlignmentError, CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
     align_cfc_hidden_unit_signatures, cfc_hidden_unit_activation_signatures,
     cfc_weight_model_snapshot, materialize_cfc_weight_program,
 };
