@@ -320,10 +320,8 @@ pub fn audit_forecast_calibration_cohort(
 mod tests {
     use super::*;
 
-    const SOURCE_SHA: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const PLAN_SHA: &str =
-        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const PLAN_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     fn population() -> [CohortPopulationAsset<'static>; 3] {
         [
@@ -411,7 +409,10 @@ mod tests {
             CohortObjective::FullPopulation,
         ))
         .unwrap();
-        assert_eq!(result.claim_class, ForecastCohortClaimClass::PopulationGeneralization);
+        assert_eq!(
+            result.claim_class,
+            ForecastCohortClaimClass::PopulationGeneralization
+        );
         assert_eq!(result.population_coverage_bps, 10_000);
         assert!(result.full_population_generalization_claim_allowed);
         assert!(!result.selection_bias_warning);
@@ -513,7 +514,10 @@ mod tests {
             CohortObjective::SensitivitySubset,
         ))
         .unwrap();
-        assert_eq!(result.claim_class, ForecastCohortClaimClass::SensitivityOnly);
+        assert_eq!(
+            result.claim_class,
+            ForecastCohortClaimClass::SensitivityOnly
+        );
         assert!(result.selection_bias_warning);
         assert!(!result.full_population_generalization_claim_allowed);
         assert_eq!(result.performance_outlier_excluded_count, 1);
