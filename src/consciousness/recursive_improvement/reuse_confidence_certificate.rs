@@ -52,7 +52,10 @@ impl std::fmt::Display for ReuseCertificateError {
                 )
             }
             Self::InvalidBoundedDifference => {
-                write!(f, "bounded paired difference must be finite and within [-1, 1]")
+                write!(
+                    f,
+                    "bounded paired difference must be finite and within [-1, 1]"
+                )
             }
             Self::InvalidSuccessCount { successes, trials } => {
                 write!(f, "success count {successes} exceeds trial count {trials}")
@@ -227,7 +230,6 @@ pub fn pass_fail_confidence_certificate(
     })
 }
 
-
 /// Audit-only lower confidence certificate for bounded normalized scores.
 ///
 /// Implements Appendix A.1 of Sun et al. (arXiv:2609.33180): for paired
@@ -319,13 +321,11 @@ pub fn bounded_score_confidence_certificate(
     let empirical_second_moment = square_sum / n as f64;
     // log(2 / delta), evaluated without a potentially overflowing division.
     let log_term = std::f64::consts::LN_2 - delta.ln();
-    let upper_second_moment =
-        upper_second_moment(empirical_second_moment, n, log_term)?;
+    let upper_second_moment = upper_second_moment(empirical_second_moment, n, log_term)?;
 
     // Appendix A.1, equations (6) and (7).
     let linear = 2.0 * log_term / (3.0 * n as f64);
-    let radicand = linear * linear
-        + 2.0 * upper_second_moment * log_term / n as f64;
+    let radicand = linear * linear + 2.0 * upper_second_moment * log_term / n as f64;
     if !empirical_mean.is_finite()
         || !empirical_second_moment.is_finite()
         || !log_term.is_finite()
@@ -576,13 +576,14 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod bounded_score_tests {
     use super::*;
 
     fn repeated_fixture(positive: f64, n: usize) -> Vec<f64> {
-        (0..n).map(|i| if i % 4 == 3 { -0.1 } else { positive }).collect()
+        (0..n)
+            .map(|i| if i % 4 == 3 { -0.1 } else { positive })
+            .collect()
     }
 
     #[test]
@@ -619,15 +620,13 @@ mod bounded_score_tests {
         assert!(zeros.upper_second_moment() > 0.0);
         assert!(zeros.lower_bound() < 0.0);
 
-        let all_positive =
-            bounded_score_confidence_certificate(&vec![1.0; 1_000], 0.05).unwrap();
+        let all_positive = bounded_score_confidence_certificate(&vec![1.0; 1_000], 0.05).unwrap();
         assert_eq!(all_positive.empirical_mean(), 1.0);
         assert_eq!(all_positive.upper_second_moment(), 1.0);
         assert!(all_positive.lower_bound() < 1.0);
         assert!(all_positive.lower_bound() > 0.0);
 
-        let all_negative =
-            bounded_score_confidence_certificate(&vec![-1.0; 1_000], 0.05).unwrap();
+        let all_negative = bounded_score_confidence_certificate(&vec![-1.0; 1_000], 0.05).unwrap();
         assert_eq!(all_negative.empirical_mean(), -1.0);
         assert_eq!(all_negative.upper_second_moment(), 1.0);
         assert!(all_negative.lower_bound() < -1.0);
