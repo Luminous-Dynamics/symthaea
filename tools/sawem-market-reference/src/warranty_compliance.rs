@@ -184,13 +184,13 @@ fn validate_envelope(envelope: WarrantyEnvelope<'_>) -> Result<(), WarrantyCompl
             (envelope.minimum_soc_bps, envelope.maximum_soc_bps),
             (Some(minimum), Some(maximum)) if minimum > maximum
         )
-        || envelope.maximum_cell_temperature_milli_c.is_some_and(|value| value < -273_150)
+        || envelope
+            .maximum_cell_temperature_milli_c
+            .is_some_and(|value| value < -273_150)
     {
         return Err(WarrantyComplianceError::InvalidWarrantyTerms);
     }
-    if envelope.maximum_cumulative_throughput_wh.is_some()
-        && envelope.throughput_basis.is_none()
-    {
+    if envelope.maximum_cumulative_throughput_wh.is_some() && envelope.throughput_basis.is_none() {
         return Err(WarrantyComplianceError::InvalidWarrantyTerms);
     }
     Ok(())
@@ -332,7 +332,9 @@ pub fn evaluate_warranty_compliance<'a>(
             .checked_sub(previous_end)
             .ok_or(WarrantyComplianceError::ArithmeticOverflow)?;
         uncovered_seconds = uncovered_seconds
-            .checked_add(u64::try_from(gap).map_err(|_| WarrantyComplianceError::ArithmeticOverflow)?)
+            .checked_add(
+                u64::try_from(gap).map_err(|_| WarrantyComplianceError::ArithmeticOverflow)?,
+            )
             .ok_or(WarrantyComplianceError::ArithmeticOverflow)?;
         let duration = sample
             .interval_end_utc
@@ -360,10 +362,7 @@ pub fn evaluate_warranty_compliance<'a>(
                 (Some(_), _, None, _) => soc_missing = soc_missing.saturating_add(1),
                 _ => {}
             }
-            match (
-                envelope.maximum_soc_bps,
-                sample.maximum_soc_bps,
-            ) {
+            match (envelope.maximum_soc_bps, sample.maximum_soc_bps) {
                 (Some(maximum), Some(observed_maximum)) => {
                     soc_checked = soc_checked.saturating_add(1);
                     if observed_maximum > maximum {
@@ -416,7 +415,8 @@ pub fn evaluate_warranty_compliance<'a>(
             );
             let required_discharge = matches!(
                 basis,
-                WarrantyThroughputBasis::DischargeOnly | WarrantyThroughputBasis::ChargePlusDischarge
+                WarrantyThroughputBasis::DischargeOnly
+                    | WarrantyThroughputBasis::ChargePlusDischarge
             );
             if sample.charge_energy_wh.is_none() {
                 charge_energy_complete = false;
@@ -437,17 +437,21 @@ pub fn evaluate_warranty_compliance<'a>(
             let selected_throughput = match basis {
                 WarrantyThroughputBasis::ChargeOnly => u128::from(charge),
                 WarrantyThroughputBasis::DischargeOnly => u128::from(discharge),
-                WarrantyThroughputBasis::ChargePlusDischarge => {
-                    u128::from(charge).checked_add(u128::from(discharge))
-                        .ok_or(WarrantyComplianceError::ArithmeticOverflow)?
-                }
+                WarrantyThroughputBasis::ChargePlusDischarge => u128::from(charge)
+                    .checked_add(u128::from(discharge))
+                    .ok_or(WarrantyComplianceError::ArithmeticOverflow)?,
             };
-            let previous = period_energy.get(sample.warranty_period_id).copied().unwrap_or(0);
+            let previous = period_energy
+                .get(sample.warranty_period_id)
+                .copied()
+                .unwrap_or(0);
             period_energy.insert(
                 sample.warranty_period_id,
                 checked_add_u128(previous, selected_throughput)?,
             );
-            period_energy_complete.entry(sample.warranty_period_id).or_insert(true);
+            period_energy_complete
+                .entry(sample.warranty_period_id)
+                .or_insert(true);
         }
 
         previous_start = Some(sample.interval_start_utc);
@@ -459,7 +463,9 @@ pub fn evaluate_warranty_compliance<'a>(
         .checked_sub(previous_end)
         .ok_or(WarrantyComplianceError::ArithmeticOverflow)?;
     uncovered_seconds = uncovered_seconds
-        .checked_add(u64::try_from(trailing_gap).map_err(|_| WarrantyComplianceError::ArithmeticOverflow)?)
+        .checked_add(
+            u64::try_from(trailing_gap).map_err(|_| WarrantyComplianceError::ArithmeticOverflow)?,
+        )
         .ok_or(WarrantyComplianceError::ArithmeticOverflow)?;
 
     let soc = WarrantyMetricAssessment {
@@ -503,7 +509,8 @@ pub fn evaluate_warranty_compliance<'a>(
             discharge_power_violations,
         ),
         checked_sample_count: discharge_power_checked,
-        missing_sample_count: discharge_power_missing.saturating_add(u64::from(uncovered_seconds > 0)),
+        missing_sample_count: discharge_power_missing
+            .saturating_add(u64::from(uncovered_seconds > 0)),
         violation_count: discharge_power_violations,
     };
 
@@ -547,15 +554,20 @@ pub fn evaluate_warranty_compliance<'a>(
     let mut period_budget_indeterminate_count = 0_u64;
     for budget in inputs.period_budgets {
         let observed = period_energy.get(budget.period_id).copied();
-        let complete = period_energy_complete.get(budget.period_id).copied().unwrap_or(false)
+        let complete = period_energy_complete
+            .get(budget.period_id)
+            .copied()
+            .unwrap_or(false)
             && uncovered_seconds == 0;
         match (observed, complete) {
             (Some(value), true) if value > u128::from(budget.maximum_throughput_wh) => {
                 period_budget_exceeded_count = period_budget_exceeded_count.saturating_add(1);
             }
             (Some(_), true) => {}
-            _ => period_budget_indeterminate_count =
-                period_budget_indeterminate_count.saturating_add(1),
+            _ => {
+                period_budget_indeterminate_count =
+                    period_budget_indeterminate_count.saturating_add(1)
+            }
         }
     }
     let period_throughput = WarrantyMetricAssessment {
@@ -575,7 +587,14 @@ pub fn evaluate_warranty_compliance<'a>(
         violation_count: period_budget_exceeded_count,
     };
 
-    let metrics = [soc, temperature, charge_power, discharge_power, cumulative, period_throughput];
+    let metrics = [
+        soc,
+        temperature,
+        charge_power,
+        discharge_power,
+        cumulative,
+        period_throughput,
+    ];
     let has_limit = metrics
         .iter()
         .any(|metric| metric.status != WarrantyMetricStatus::NotSpecified);
@@ -625,8 +644,7 @@ pub fn evaluate_warranty_compliance<'a>(
 mod tests {
     use super::*;
 
-    const SOURCE_SHA: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     fn envelope() -> WarrantyEnvelope<'static> {
         WarrantyEnvelope {
@@ -702,7 +720,10 @@ mod tests {
             maximum_throughput_wh: 30_000,
         }];
         let result = evaluate_warranty_compliance(inputs(&samples, &budgets)).unwrap();
-        assert_eq!(result.overall_status, WarrantyOverallStatus::WithinSuppliedLimits);
+        assert_eq!(
+            result.overall_status,
+            WarrantyOverallStatus::WithinSuppliedLimits
+        );
         assert_eq!(result.covered_seconds, 200);
         assert_eq!(result.uncovered_seconds, 0);
         assert_eq!(result.measured_warranty_throughput_wh, Some(25_000));
@@ -726,7 +747,10 @@ mod tests {
             ..sample("breach", 100, 300, 0, 0)
         }];
         let result = evaluate_warranty_compliance(inputs(&breached, &[])).unwrap();
-        assert_eq!(result.overall_status, WarrantyOverallStatus::ExceededSuppliedLimits);
+        assert_eq!(
+            result.overall_status,
+            WarrantyOverallStatus::ExceededSuppliedLimits
+        );
         assert_eq!(result.state_of_charge.violation_count, 2);
         assert_eq!(result.cell_temperature.violation_count, 1);
         assert_eq!(result.charge_power.violation_count, 1);
