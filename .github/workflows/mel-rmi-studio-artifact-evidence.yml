@@ -47,6 +47,7 @@ jobs:
           cp tools/mel-rmi-studio-evidence-harness/src/rmi_artifact_evidence.rs "$staged/src/rmi_artifact_evidence.rs"
           cp tools/mel-rmi-studio-evidence-harness/protocol/Cargo.toml "$staged/protocol/Cargo.toml"
           cp tools/mel-rmi-studio-evidence-harness/protocol/src/lib.rs "$staged/protocol/src/lib.rs"
+          cp crates/domains/symthaea-muse-protocol/src/catalog.rs "$staged/protocol/src/catalog.rs"
           echo "MEL_RMI_STUDIO_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
           echo "MEL_RMI_STUDIO_DIR=$staged" >> "$GITHUB_ENV"
       - name: Format isolated verifier harness and exact production module
@@ -65,6 +66,7 @@ jobs:
           sha256sum "$evidence/Cargo.lock" | tee "$evidence/Cargo.lock.sha256"
           printf 'production_module_sha256=%s\n' "$(sha256sum crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs | cut -d' ' -f1)" > "$evidence/source-identities.txt"
           printf 'protocol_module_sha256=%s\n' "$(sha256sum crates/domains/symthaea-muse-protocol/src/lib.rs | cut -d' ' -f1)" >> "$evidence/source-identities.txt"
+          printf 'protocol_catalog_sha256=%s\n' "$(sha256sum crates/domains/symthaea-muse-protocol/src/catalog.rs | cut -d' ' -f1)" >> "$evidence/source-identities.txt"
       - name: Upload isolated verifier test evidence
         uses: actions/upload-artifact@v4
         with:
