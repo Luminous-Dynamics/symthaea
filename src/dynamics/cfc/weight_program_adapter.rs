@@ -351,6 +351,13 @@ pub fn cfc_hidden_unit_activation_signatures(
     })
 }
 
+fn is_lowercase_hex_digest(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 fn cfc_probe_set_digest(layer_index: usize, probes: &[CfCFunctionalProbe]) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-cfc-functional-probes-v1\\0");
@@ -399,6 +406,13 @@ pub enum CfCPermutationAlignmentError {
     EmptyHiddenUnitSet,
     #[error("source and candidate have different hidden-unit counts: {source} vs {candidate}")]
     HiddenUnitCountMismatch { source: usize, candidate: usize },
+    #[error("{side} activation signature set has unsupported format version {version}")]
+    UnsupportedSignatureVersion { side: &'static str, version: u32 },
+    #[error("{side} activation signature set has an invalid {field} digest")]
+    InvalidSignatureDigest {
+        side: &'static str,
+        field: &'static str,
+    },
     #[error("activation signature set for {side} is empty")]
     EmptySignatureSet { side: &'static str },
     #[error("{side} activation signature {unit_index} has {actual} probes, expected {expected}")]
@@ -460,8 +474,28 @@ pub fn align_cfc_hidden_unit_signatures(
     source_signature_set: &CfCActivationSignatureSet,
     candidate_signature_set: &CfCActivationSignatureSet,
 ) -> Result<CfCHiddenUnitAlignment, CfCPermutationAlignmentError> {
-    if source_signature_set.format_version != 1 || candidate_signature_set.format_version != 1 {
-        return Err(CfCPermutationAlignmentError::NoFeasibleAssignment);
+    for (side, signature_set) in [
+        ("source", source_signature_set),
+        ("candidate", candidate_signature_set),
+    ] {
+        if signature_set.format_version != 1 {
+            return Err(CfCPermutationAlignmentError::UnsupportedSignatureVersion {
+                side,
+                version: signature_set.format_version,
+            });
+        }
+        if !is_lowercase_hex_digest(&signature_set.model_digest) {
+            return Err(CfCPermutationAlignmentError::InvalidSignatureDigest {
+                side,
+                field: "model",
+            });
+        }
+        if !is_lowercase_hex_digest(&signature_set.probe_digest) {
+            return Err(CfCPermutationAlignmentError::InvalidSignatureDigest {
+                side,
+                field: "probe",
+            });
+        }
     }
     if source_signature_set.probe_digest != candidate_signature_set.probe_digest {
         return Err(CfCPermutationAlignmentError::ProbeSetMismatch {
