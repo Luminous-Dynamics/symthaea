@@ -1,0 +1,7 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/domain-types",
+    "crates/async-contract",
+    "crates/worker-adapter",
+]
