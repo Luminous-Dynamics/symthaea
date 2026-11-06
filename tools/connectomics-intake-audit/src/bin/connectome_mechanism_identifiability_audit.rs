@@ -183,7 +183,9 @@ fn require_sha(value: &str, label: &str) -> Result<(), String> {
     if valid_sha(value) {
         Ok(())
     } else {
-        Err(format!("{label} must be 64 lowercase hexadecimal characters"))
+        Err(format!(
+            "{label} must be 64 lowercase hexadecimal characters"
+        ))
     }
 }
 
@@ -196,7 +198,9 @@ where
     for value in values {
         let value = value.into();
         if value.trim().is_empty() || !seen.insert(value.clone()) {
-            return Err(format!("{label} contains an empty or duplicate identity: {value}"));
+            return Err(format!(
+                "{label} contains an empty or duplicate identity: {value}"
+            ));
         }
     }
     Ok(())
@@ -264,8 +268,14 @@ fn validate_input<'a>(
         return Err("run_id and query_id must be non-empty".into());
     }
     require_sha(&input.query.query_spec_sha256, "query specification digest")?;
-    require_sha(&input.query.decision_rule_sha256, "query decision-rule digest")?;
-    require_sha(&input.replicate_design.split_manifest_sha256, "split-manifest digest")?;
+    require_sha(
+        &input.query.decision_rule_sha256,
+        "query decision-rule digest",
+    )?;
+    require_sha(
+        &input.replicate_design.split_manifest_sha256,
+        "split-manifest digest",
+    )?;
     if input.replicate_design.independence_scope != "SYNTHETIC_IID_KNOWN_TRUTH"
         || input.replicate_design.independent_unit != "synthetic_replicate"
     {
@@ -386,9 +396,8 @@ fn validate_input<'a>(
         intervention_map.insert(action.intervention_id.as_str().to_string(), action);
     }
 
-    let expected_cells = input.interventions.len()
-        * input.mechanisms.len()
-        * input.nuisance_profiles.len();
+    let expected_cells =
+        input.interventions.len() * input.mechanisms.len() * input.nuisance_profiles.len();
     if input.predictions.len() != expected_cells {
         return Err(format!(
             "prediction matrix has {} cells; expected complete Cartesian product of {expected_cells}",
@@ -469,9 +478,7 @@ fn validate_input<'a>(
         if (vector.iter().sum::<f64>() - 1.0).abs() > 1e-9 {
             return Err(format!(
                 "prediction probabilities do not sum to one for intervention {} mechanism {} profile {}",
-                prediction.intervention_id,
-                prediction.mechanism_id,
-                prediction.nuisance_profile_id
+                prediction.intervention_id, prediction.mechanism_id, prediction.nuisance_profile_id
             ));
         }
         if predictions.insert(key.clone(), vector).is_some() {
@@ -523,10 +530,8 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
                     .values()
                     .copied()
                     .fold(f64::INFINITY, f64::min);
-                let worst_case_testing_error = error_by_profile
-                    .values()
-                    .copied()
-                    .fold(0.0, f64::max);
+                let worst_case_testing_error =
+                    error_by_profile.values().copied().fold(0.0, f64::max);
                 let key = pair_key(
                     &action.intervention_id,
                     &left_mechanism.mechanism_id,
@@ -556,10 +561,12 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             .iter()
             .filter(|row| row.different_mechanism_class)
             .collect::<Vec<_>>();
-        let query_identified = !query_pairs.is_empty()
-            && query_pairs.iter().all(|row| row.pair_identified_at_budget);
+        let query_identified =
+            !query_pairs.is_empty() && query_pairs.iter().all(|row| row.pair_identified_at_budget);
         let mechanism_identified = !mechanism_pairs.is_empty()
-            && mechanism_pairs.iter().all(|row| row.pair_identified_at_budget);
+            && mechanism_pairs
+                .iter()
+                .all(|row| row.pair_identified_at_budget);
         let status = if query_identified && mechanism_identified {
             "QUERY_AND_MECHANISM_IDENTIFIED"
         } else if query_identified {
@@ -612,7 +619,9 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
         if actual.query_identified != expected.query_identified
             || actual.mechanism_identified != expected.mechanism_identified
         {
-            return Err(format!("known-answer status mismatch for action {action_id}"));
+            return Err(format!(
+                "known-answer status mismatch for action {action_id}"
+            ));
         }
     }
     for (key, expected) in &input.known_answer.expected_pairwise_risk {
@@ -620,7 +629,9 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             .get(key)
             .ok_or_else(|| format!("known answer references missing pairwise result {key}"))?;
         if (actual - expected).abs() > 1e-8 {
-            return Err(format!("known-answer pairwise risk mismatch for {key}: {actual} != {expected}"));
+            return Err(format!(
+                "known-answer pairwise risk mismatch for {key}: {actual} != {expected}"
+            ));
         }
     }
     if intervention_map[expected_selected].feasibility_status != "FEASIBLE" {
@@ -712,10 +723,7 @@ mod tests {
         let action = &report.action_reports["query-probe"];
         assert!(action.query_identified);
         assert!(!action.mechanism_identified);
-        assert_eq!(
-            action.status,
-            "QUERY_IDENTIFIED_MECHANISM_UNIDENTIFIED"
-        );
+        assert_eq!(action.status, "QUERY_IDENTIFIED_MECHANISM_UNIDENTIFIED");
     }
 
     #[test]
@@ -724,10 +732,7 @@ mod tests {
         let action = &report.action_reports["selective-pathway"];
         assert!(!action.query_identified);
         assert!(!action.mechanism_identified);
-        assert_eq!(
-            action.pairwise_results[0].robust_minimum_tv,
-            0.0
-        );
+        assert_eq!(action.pairwise_results[0].robust_minimum_tv, 0.0);
     }
 
     #[test]
@@ -758,14 +763,17 @@ mod tests {
     fn missing_prediction_cell_is_rejected() {
         let mut value = fixture();
         value["predictions"].as_array_mut().unwrap().pop();
-        assert!(run_value(value).unwrap_err().contains("complete Cartesian product"));
+        assert!(
+            run_value(value)
+                .unwrap_err()
+                .contains("complete Cartesian product")
+        );
     }
 
     #[test]
     fn duplicate_mechanism_identity_is_rejected() {
         let mut value = fixture();
-        value["mechanisms"][1]["mechanism_id"] =
-            value["mechanisms"][0]["mechanism_id"].clone();
+        value["mechanisms"][1]["mechanism_id"] = value["mechanisms"][0]["mechanism_id"].clone();
         assert!(run_value(value).unwrap_err().contains("duplicate identity"));
     }
 
@@ -780,7 +788,11 @@ mod tests {
     fn malformed_probability_is_rejected() {
         let mut value = fixture();
         value["predictions"][0]["outcomes"][0]["probability"] = serde_json::json!(1.5);
-        assert!(run_value(value).unwrap_err().contains("invalid probability"));
+        assert!(
+            run_value(value)
+                .unwrap_err()
+                .contains("invalid probability")
+        );
     }
 
     #[test]
