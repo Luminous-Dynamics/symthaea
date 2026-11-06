@@ -326,7 +326,7 @@ fn build_near_groups(
         let right_exact_set: BTreeSet<&str> = right_exact_counts.keys().copied().collect();
         let left_exact_set: BTreeSet<&str> = left_exact_counts.keys().copied().collect();
         let left_candidates: Vec<&IndexedTask> = if right_exact_set.len() > 1 {
-            left_tasks.iter().copied().collect()
+            left_tasks.to_vec()
         } else {
             let only_right_exact = *right_exact_set
                 .iter()
@@ -339,7 +339,7 @@ fn build_near_groups(
                 .collect()
         };
         let right_candidates: Vec<&IndexedTask> = if left_exact_set.len() > 1 {
-            right_tasks.iter().copied().collect()
+            right_tasks.to_vec()
         } else {
             let only_left_exact = *left_exact_set
                 .iter()
