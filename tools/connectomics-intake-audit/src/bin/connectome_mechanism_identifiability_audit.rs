@@ -859,6 +859,8 @@ mod tests {
         {
             row["mechanism_identified"] = serde_json::json!(true);
         }
+        value["known_answer"]["expected_selected_intervention_id"] =
+            serde_json::json!("query-probe");
         let report = run_value(value).unwrap();
         assert!(report.action_reports.values().all(|row| row.mechanism_identified));
     }
