@@ -1,0 +1,38 @@
+name: DOPRI Minimum-Step Verification
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/dynamics/ode_solvers.rs"
+      - "src/dynamics/mod.rs"
+      - "src/cognitive_loop/fep_module.rs"
+      - "research/dopri-min-step-termination-v0/**"
+      - ".github/workflows/dopri-verify-v0.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dopri-min-step-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  numerical-verification:
+    name: Isolated DOPRI numerical verification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/dopri-min-step-termination-v0/Cargo.toml -- --check
+      - name: Run numerical tests
+        run: cargo test --manifest-path research/dopri-min-step-termination-v0/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/dopri-min-step-termination-v0/Cargo.toml --locked --all-targets -- -D warnings
