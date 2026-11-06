@@ -615,7 +615,7 @@ mod tests {
             (state >> 11) as f64 / ((1_u64 << 53) as f64)
         };
         for _campaign in 0..256 {
-            let mut c = MultiThresholdContract {
+            let c = MultiThresholdContract {
                 action_ids: (0..32).collect(),
                 constraints: vec![
                     ConstraintThreshold { constraint_id: 1, direction: ConstraintDirection::AtLeast, threshold: 2.0 * next_unit() - 1.0 },
@@ -641,7 +641,6 @@ mod tests {
             all.sort_unstable();
             all.dedup();
             assert_eq!(all, (0_u32..32).collect::<Vec<_>>());
-            c.action_ids.reverse();
         }
     }
 }
