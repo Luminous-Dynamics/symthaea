@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/matched-benchmark-cohort-v0.schema.json",
+  "title": "PITB matched benchmark cohort v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "snapshot_id",
+    "split_id",
+    "split_role",
+    "split_manifest_sha256",
+    "expected_task_count",
+    "expected_cluster_count",
+    "task_id_set_sha256",
+    "budget_policy_sha256",
+    "max_attempts_per_task",
+    "max_wall_ms_per_task",
+    "max_cost_microusd_per_task",
+    "require_source_reproduction",
+    "require_specification_audit",
+    "require_vacuity_audit",
+    "require_assumption_audit",
+    "bootstrap_replicates",
+    "bootstrap_seed_sha256",
+    "arms"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.matched-benchmark-cohort.v0"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split_role": {
+      "const": "test"
+    },
+    "split_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "expected_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expected_cluster_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "task_id_set_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "budget_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "max_attempts_per_task": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_wall_ms_per_task": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "max_cost_microusd_per_task": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "require_source_reproduction": {
+      "type": "boolean"
+    },
+    "require_specification_audit": {
+      "type": "boolean"
+    },
+    "require_vacuity_audit": {
+      "type": "boolean"
+    },
+    "require_assumption_audit": {
+      "type": "boolean"
+    },
+    "bootstrap_replicates": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 100000
+    },
+    "bootstrap_seed_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "arm_id",
+          "model_id",
+          "model_version",
+          "scaffold_sha256",
+          "implementation_sha256"
+        ],
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scaffold_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "implementation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}
