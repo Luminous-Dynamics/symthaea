@@ -402,6 +402,19 @@ pub struct CfCHiddenUnitAlignment {
     pub minimum_assignment_margin: Option<f64>,
 }
 
+
+/// Acceptance thresholds required before a caller uses an inferred unit mapping
+/// to transform parameter groups. These are task-calibrated tolerances, not
+/// universal constants.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCAlignmentAcceptancePolicy {
+    /// Maximum allowed mean squared activation-signature error.
+    pub max_mean_squared_activation_error: f64,
+    /// Minimum allowed gap to the best alternative complete assignment.
+    /// A value of zero only rejects malformed/non-finite ambiguity metadata.
+    pub min_assignment_margin: f64,
+}
+
 /// Fail-closed errors for functional hidden-unit correspondence.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum CfCPermutationAlignmentError {
@@ -464,7 +477,15 @@ pub enum CfCPermutationAlignmentError {
         layer_index: usize,
         unit_index: usize,
         probe_index: usize,
-    },
+    },    #[error("alignment acceptance policy requires finite non-negative thresholds")]
+    InvalidAcceptancePolicy,
+    #[error("alignment receipt is malformed: {field}")]
+    MalformedAlignmentReceipt { field: &'static str },
+    #[error("alignment error {measured} exceeds maximum {maximum}")]
+    ActivationErrorAboveThreshold { measured: f64, maximum: f64 },
+    #[error("alignment assignment margin {measured:?} is below required minimum {minimum}")]
+    AssignmentAmbiguous { measured: Option<f64>, minimum: f64 },
+
 }
 
 /// Infer a one-to-one hidden-unit correspondence from frozen activation probes.
@@ -589,6 +610,92 @@ pub fn align_cfc_hidden_unit_signatures(
         mean_squared_activation_error: best_total_cost / unit_count as f64,
         minimum_assignment_margin,
     })
+}
+
+/// Fail-closed gate for using an activation alignment in parameter transfer.
+///
+/// The alignment must be a well-formed, versioned receipt with valid source,
+/// candidate, and probe digests; a one-to-one complete mapping; finite error;
+/// and an unambiguous assignment satisfying the caller's task-calibrated
+/// tolerances. This validates evidence only: it does not apply or authorize an
+/// edit by itself.
+pub fn validate_cfc_alignment_for_parameter_transfer(
+    alignment: &CfCHiddenUnitAlignment,
+    policy: CfCAlignmentAcceptancePolicy,
+) -> Result<(), CfCPermutationAlignmentError> {
+    if !policy.max_mean_squared_activation_error.is_finite()
+        || policy.max_mean_squared_activation_error < 0.0
+        || !policy.min_assignment_margin.is_finite()
+        || policy.min_assignment_margin < 0.0
+    {
+        return Err(CfCPermutationAlignmentError::InvalidAcceptancePolicy);
+    }
+    if alignment.format_version != 1 {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "format_version",
+        });
+    }
+    if !is_lowercase_hex_digest(&alignment.source_model_digest) {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "source_model_digest",
+        });
+    }
+    if !is_lowercase_hex_digest(&alignment.candidate_model_digest) {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "candidate_model_digest",
+        });
+    }
+    if !is_lowercase_hex_digest(&alignment.probe_digest) {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "probe_digest",
+        });
+    }
+    let unit_count = alignment.source_to_candidate.len();
+    if unit_count == 0 {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "source_to_candidate",
+        });
+    }
+    let mut seen = vec![false; unit_count];
+    for candidate_unit in alignment.source_to_candidate.iter().copied() {
+        if candidate_unit >= unit_count || seen[candidate_unit] {
+            return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+                field: "source_to_candidate",
+            });
+        }
+        seen[candidate_unit] = true;
+    }
+    if !alignment.mean_squared_activation_error.is_finite()
+        || alignment.mean_squared_activation_error < 0.0
+    {
+        return Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+            field: "mean_squared_activation_error",
+        });
+    }
+    if alignment.mean_squared_activation_error > policy.max_mean_squared_activation_error {
+        return Err(CfCPermutationAlignmentError::ActivationErrorAboveThreshold {
+            measured: alignment.mean_squared_activation_error,
+            maximum: policy.max_mean_squared_activation_error,
+        });
+    }
+
+    // A one-unit layer has no alternative permutation. Every larger layer
+    // must carry a finite measured assignment margin.
+    if unit_count > 1 {
+        let Some(margin) = alignment.minimum_assignment_margin else {
+            return Err(CfCPermutationAlignmentError::AssignmentAmbiguous {
+                measured: None,
+                minimum: policy.min_assignment_margin,
+            });
+        };
+        if !margin.is_finite() || margin < policy.min_assignment_margin {
+            return Err(CfCPermutationAlignmentError::AssignmentAmbiguous {
+                measured: Some(margin),
+                minimum: policy.min_assignment_margin,
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Compute the smallest cost increase of any reassignment that forbids one
