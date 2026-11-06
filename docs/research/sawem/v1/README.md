@@ -154,6 +154,20 @@ Actions can diverge after the scenario information nodes diverge. The evaluator 
 
 This is intentionally a **policy audit**, not a stochastic optimizer. It does not prove that the policy is profitable or lower-regret; it prevents a perfect-foresight backtest from being mislabeled as implementable. Candidate policies still need matched scenario trees, common price/availability vintages, out-of-sample tests and regret/CVaR reporting. Benchmark case: `NON-ANTICIPATIVITY-POLICY-AUDIT-001`.
 
+### Non-anticipative policy regret and EVPI
+
+The new `decision_regret.rs` module closes the next gap after non-anticipativity auditing: it measures the **cost of imperfect foresight** without confusing it with forecast error.
+
+For a frozen scenario tree it requires:
+- an independently source-bound, non-anticipative policy action history;
+- scenario probabilities available by each policy decision time;
+- one policy net-cash result and one perfect-information result for every scenario;
+- the same market-rule profile, asset constraints, network topology and settlement basis for both result sets.
+
+It reports exact probability-weighted expected policy cash, perfect-information cash, expected regret / EVPI, worst-case regret and upper-tail regret VaR/CVaR. The policy is separately audited so scenarios sharing the same information node, digest and timestamp cannot choose different actions. Actions may diverge only after the information frontier branches.
+
+The perfect-information result is intentionally labelled a **non-implementable mathematical upper bound**. EVPI measures the maximum value of learning the future under the declared scenario/constraint assumptions; it is not forecast error, not the regret of a best implementable policy, and not an achievable revenue forecast. Real policy evaluation still requires out-of-sample scenario trees, calibrated probabilities and matched vendor baselines. Benchmark case: `DECISION-REGRET-EVPI-001`.
+
 ### Probabilistic forecast calibration with exact scoring
 
 The new `forecast_metrics.rs` module evaluates a single immutable model build against realized prices that became available by a later evaluation timestamp. It consumes q10/q50/q90 forecasts in minor ZAR/MWh, the frozen decision time, forecast issue/available-at times, target Trading Period, realized observation/available-at times, and exact model/source digests.
@@ -295,7 +309,7 @@ Sources:
 - [Synthetic comparator roster](sawem-bess-comparator-manifest-v1.synthetic.json)
 - [Matched-engine benchmark protocol](COMPARATOR_PROTOCOL_V1.md)
 - [Reserve economics and collateral liquidity crosswalk](RESERVE_ECONOMICS_AND_COLLATERAL_V1.md)
-- [Machine-readable 30-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
+- [Machine-readable 47-case benchmark corpus](sawem-bess-benchmark-corpus-v1.json)
 - [Benchmark corpus JSON Schema](sawem-bess-benchmark-corpus-v1.schema.json)
 
 The JSON Schema uses Draft 2020-12. The synthetic fixture contains fictional project identifiers, ratings, energy declarations, dispatch, metered response, balancing components and credit-cover amounts. It is only a schema and interface example.
