@@ -266,7 +266,7 @@ def evaluate(data: dict[str, Any], input_sha256: str) -> dict[str, Any]:
     prediction_index: dict[tuple[str, str, str], dict[str, float]] = {}
     for model in models:
         for field in ('causal_model_sha256', 'observation_model_sha256'):
-            require(valid_sha(model[field]), f'{field} malformed for {model[\"model_vertex_id\"]}')
+            require(valid_sha(model[field]), f"{field} malformed for {model['model_vertex_id']}")
         ensure_unique(model['dependence_group_ids'], 'model dependence group IDs')
         prior_rows = model['prior']
         ensure_unique([row['world_id'] for row in prior_rows], f"{model['model_vertex_id']} prior world IDs")
