@@ -1754,6 +1754,9 @@ pub mod scenario_dgp;
 /// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
 pub mod score_bounds;
 
+/// Deterministic interval bounds and exact small-K oracles for few-for-many portfolios.
+pub mod few_for_many;
+
 /// Robust indifference-zone certificates for Monte Carlo design selection.
 pub mod ranking;
 
