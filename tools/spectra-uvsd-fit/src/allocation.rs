@@ -1226,6 +1226,46 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn crn_projection_cache_matches_direct_projection_for_every_action_candidate() {
+        let receipt = score_receipt(1_000, [0.85, 0.70], true);
+        let mut cfg = config(0.01, 5_000, 2);
+        cfg.robust_utility = RobustUtility::LowerTailCvar { tail_mass: 0.5 };
+        let allocation =
+            allocate_next_score_batch_decision_directed(&receipt, &cfg).unwrap();
+        let remaining_budget = cfg.max_total_replications - allocation.current_total_replications;
+
+        for scenario_id in [10_u16, 20_u16] {
+            let candidates = allocation
+                .cell_priorities
+                .iter()
+                .filter(|cell| cell.scenario_id == scenario_id && cell.competitive)
+                .collect::<Vec<_>>();
+            assert!(!candidates.is_empty());
+            let first = candidates[0];
+            let cached_tuple = (
+                first.priority,
+                first.certificate_gap_contraction,
+                first.projected_batch_cost,
+                first.projected_regret_upper_bound,
+            );
+            for candidate in candidates {
+                let direct = project_decision_directed_batch(
+                    &receipt,
+                    &allocation.certificate,
+                    &cfg,
+                    candidate.action_id,
+                    scenario_id,
+                    candidate.sample_count,
+                    remaining_budget,
+                )
+                .unwrap();
+                assert_eq!(direct, cached_tuple);
+            }
+        }
+    }
+
     #[test]
     fn decision_directed_crn_refuses_partial_atomic_batch() {
         let receipt = score_receipt(1_000, [0.85, 0.70], true);
