@@ -214,13 +214,26 @@ The new `forecast_metrics.rs` module evaluates a single immutable model build ag
 
 The output retains exact integer accumulators rather than rounding early:
 - median absolute error sum, signed bias sum and squared-error sum;
-- pinball-loss numerators for q10, q50 and q90;
+- pinball-loss numerators for q10, q50 and q90, normalized by the full sample-count denominator;
 - actual observations at/below each forecast quantile;
 - empirical coverage error numerators and central-80% interval coverage;
 - central-80% interval width sum; and
 - weighted interval score for median plus the central 80% interval.
 
 Forecasts that were not available at the decision time, realized data not available at evaluation time, decisions after the target interval began, target periods with invalid timing, quantile crossing, mixed model builds and duplicate targets are rejected. Each build must be evaluated separately. The module does not train a forecasting model and does not claim a measured calibration improvement. The new case `FORECAST-CALIBRATION-EXACT-001` is a synthetic known-answer/hostile-control benchmark; real rolling-origin and project/time holdout comparisons against Chronos, HOMER and baselines remain `not_run`.
+
+### Paired forecast skill against simple baselines
+
+The new `forecast_skill.rs` module makes the calibration metrics decision-useful by comparing a candidate forecast with one explicit baseline over the same target periods and realized source evidence. Initial baselines should be:
+- **Persistence:** the most recent price observation available by the decision timestamp.
+- **Seasonal persistence:** the corresponding Trading Period from a prior day/week, only where that history was available at decision time.
+- **Training-only climatology:** season/hour/regime quantiles calculated only from the training partition, never from the evaluation period.
+
+The comparator pairs on series and Trading Period, requires the same decision timestamp and identical realized value/source digest/observation/availability timestamps, but permits candidate and baseline forecasts to have different issue and availability times provided both passed the same decision-time cutoff. It reports exact paired median-MAE and central-80% weighted-interval skill as `(baseline loss - candidate loss) / baseline loss`; negative skill remains negative. A zero-loss baseline is an explicit special disposition, not a division-by-zero or an invented score.
+
+This is still a deterministic paired scorer, not a significance test. A credible SOTA comparison must additionally use project/time-blocked rolling-origin evaluation, HAC or block-bootstrap confidence intervals for loss differences, regime stratification (scarcity spikes, negative prices, ramps, high-renewables and calm periods), multiple forecast horizons, forecast-to-dispatch value and inference/runtime cost. Do not rank models solely by one aggregate average.
+
+Benchmark case: `FORECAST-PAIRED-SKILL-001`. The tests use synthetic pairs only. No Chronos, HOMER, persistence, seasonal-persistence or climatology model has yet been run on the same rights-cleared South African data.
 
 ### Dispatch execution: from optimal schedules to delivered energy
 
