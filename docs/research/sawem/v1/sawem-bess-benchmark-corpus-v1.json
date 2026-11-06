@@ -1786,7 +1786,7 @@
       "case_id": "SCHEDULE-POWER-TRACE-RECONCILIATION-001",
       "track": "physical_execution_and_metering",
       "title": "Exact raw power-trace to signed schedule reconciliation",
-      "scenario": "Integrate a source-bound raw signed power trace over exactly one optimized schedule interval and compare the exact rational milli-Wh energy with the signed scheduled milli-Wh amount without rounding the trace. Preserve import/export direction, absolute deviation, under-delivery and over-delivery separately. Withhold fulfilment metrics when the trace is missing endpoints or contains an excessive gap. Reject a schedule published after delivery begins, mismatched horizons and future-known trace data.",
+      "scenario": "Integrate a source-bound raw signed power trace over exactly one optimized schedule interval and compare the exact rational milli-Wh energy with the signed scheduled milli-Wh amount without rounding the trace. Preserve import/export direction, absolute deviation, under-delivery and over-delivery separately. Withhold fulfilment metrics when the trace is missing endpoints or contains an excessive gap. Reject a schedule published after delivery begins, mismatched horizons and future-known trace data. A zero-energy schedule has no fulfilment ratio; any measured flow remains visible through absolute deviation rather than a misleading 100% score.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1797,7 +1797,8 @@
         "import_schedule_uses_the_same_signed_directional_reconciliation",
         "opposite_direction_energy_cannot_satisfy_the_schedule",
         "incomplete_trace_returns_partial_energy_but_withholds_fulfilment",
-        "late_schedule_wrong_trace_horizon_and_future_trace_are_rejected"
+        "late_schedule_wrong_trace_horizon_and_future_trace_are_rejected",
+        "zero_energy_schedule_has_no_fulfilment_ratio_but_keeps_meter_deviation"
       ],
       "required_evidence": [
         "frozen schedule source ref/digest, issue time and available-at time",
