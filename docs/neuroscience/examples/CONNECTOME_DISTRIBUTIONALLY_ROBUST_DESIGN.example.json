@@ -534,6 +534,20 @@
       "infeasible-perfect": false
     },
     "expected_selected_intervention_id": "orthogonal-robust",
-    "expected_vertex_min_eig_greedy_intervention_id": "reversal-high-eig"
+    "expected_vertex_min_eig_greedy_intervention_id": "reversal-high-eig",
+    "pairwise_midpoint_eig_min_bits_by_intervention": {
+      "reversal-high-eig": 0.8185404758454655,
+      "high-eig-irrelevant": 0.8112781244591328,
+      "cheap-confounded": 0.2441664241947461,
+      "orthogonal-robust": 0.5490865765529465,
+      "infeasible-perfect": 1.061278124459133
+    },
+    "pairwise_midpoint_eig_max_bits_by_intervention": {
+      "reversal-high-eig": 0.8185404758454655,
+      "high-eig-irrelevant": 0.8112781244591328,
+      "cheap-confounded": 0.2441664241947461,
+      "orthogonal-robust": 0.5490865765529465,
+      "infeasible-perfect": 1.061278124459133
+    }
   }
 }
