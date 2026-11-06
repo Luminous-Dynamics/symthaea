@@ -1,15 +1,15 @@
 use mel_rmi_synthetic::{
     ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
-    ArtifactPayloadV1, ArtifactSetEvidenceV1, Condition, Dimension, Feature, FixedResponsePolicy,
-    HarnessError, ImitationOnlyPolicy, NegotiatedResponseContractV1, NegotiationChoiceV1,
-    Observation, OneWayPromptPolicy, PartnerAuthorityEventV1, PartnerAuthorityV1,
-    PartnerCausalContrast, ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy,
-    TaskSpec, TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
-    assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
-    run_policy_suite_v1, run_reciprocal_suite_v1, validate_partner_authority_event,
-    verify_trial_artifact_bindings, BootstrapConfig, DimensionEffectSummary, Estimate,
-    InfluenceDirection, PairedEffectObservation, PairedEffectOutcome, PairedEffectValue,
-    summarize_paired_effects,
+    ArtifactPayloadV1, ArtifactSetEvidenceV1, BootstrapConfig, Condition, Dimension,
+    DimensionEffectSummary, Estimate, Feature, FixedResponsePolicy, HarnessError,
+    ImitationOnlyPolicy, InfluenceDirection, NegotiatedResponseContractV1, NegotiationChoiceV1,
+    Observation, OneWayPromptPolicy, PairedEffectObservation, PairedEffectOutcome,
+    PairedEffectValue, PartnerAuthorityEventV1, PartnerAuthorityV1, PartnerCausalContrast,
+    ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1,
+    TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation, assess_scoped_negotiation,
+    bind_verified_artifacts, canonical_fixture_replicates_v1, run_policy_suite_v1,
+    run_reciprocal_suite_v1, summarize_paired_effects, validate_partner_authority_event,
+    verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
