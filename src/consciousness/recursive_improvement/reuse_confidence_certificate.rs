@@ -277,6 +277,29 @@ impl BoundedScoreConfidenceCertificate {
     }
 }
 
+
+/// Neumaier compensated summation for bounded-score vectors.
+///
+/// These vectors may contain large positive and negative paired differences
+/// with a much smaller genuine net effect. Ordinary left-to-right summation
+/// can erase that effect even when every input is finite and bounded.
+pub(crate) fn compensated_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+
+    for value in values {
+        let next = sum + value;
+        if sum.abs() >= value.abs() {
+            correction += (sum - next) + value;
+        } else {
+            correction += (value - next) + sum;
+        }
+        sum = next;
+    }
+
+    sum + correction
+}
+
 /// Compute the Appendix A.1 empirical-Bernstein lower confidence bound for
 /// paired bounded-score differences Z_i = candidate_score_i - incumbent_score_i.
 ///
@@ -307,18 +330,16 @@ pub fn bounded_score_confidence_certificate(
         });
     }
 
-    let mut sum = 0.0_f64;
-    let mut square_sum = 0.0_f64;
     for &difference in paired_differences {
         if !difference.is_finite() || !(-1.0..=1.0).contains(&difference) {
             return Err(ReuseCertificateError::InvalidBoundedDifference);
         }
-        sum += difference;
-        square_sum += difference * difference;
     }
 
-    let empirical_mean = sum / n as f64;
-    let empirical_second_moment = square_sum / n as f64;
+    let empirical_mean = compensated_sum(paired_differences.iter().copied()) / n as f64;
+    let empirical_second_moment =
+        compensated_sum(paired_differences.iter().map(|difference| difference * difference))
+            / n as f64;
     // log(2 / delta), evaluated without a potentially overflowing division.
     let log_term = std::f64::consts::LN_2 - delta.ln();
     let upper_second_moment = upper_second_moment(empirical_second_moment, n, log_term)?;
@@ -610,6 +631,21 @@ mod bounded_score_tests {
         assert!((cert.upper_second_moment() - 0.050_078_923_133_324_536).abs() < 2e-10);
         assert!((cert.deviation() - 0.021_837_543_565_560_76).abs() < 2e-10);
         assert!((cert.lower_bound() - 0.103_162_456_434_439_25).abs() < 2e-10);
+    }
+
+    #[test]
+    fn bounded_lcb_preserves_small_effect_under_cancellation() {
+        let paired = (0..1_000)
+            .flat_map(|_| [1.0_f64, 1e-16_f64, -1.0_f64])
+            .collect::<Vec<_>>();
+        let certificate = bounded_score_confidence_certificate(&paired, 0.05).unwrap();
+        let expected_mean = 1e-16 / 3.0;
+        assert!(
+            (certificate.empirical_mean() - expected_mean).abs() < 1e-22,
+            "compensated mean {:?} differs from {:?}",
+            certificate.empirical_mean(),
+            expected_mean
+        );
     }
 
     #[test]
