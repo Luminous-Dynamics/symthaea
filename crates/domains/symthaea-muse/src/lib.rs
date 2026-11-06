@@ -43,6 +43,7 @@ pub mod analyst;
 pub mod audio_analyzer;
 #[cfg(feature = "theory")]
 pub mod blinded_study;
+pub mod benchmark_registry;
 pub mod choreography;
 #[cfg(feature = "clap-fad")]
 pub mod clap_embed;
