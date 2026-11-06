@@ -246,13 +246,18 @@ impl VarianceAdaptiveSubGaussianCs {
             + 20.0_f64.ln()
             - alpha.ln();
         let b = 1.0 / (5.0 * s);
+        // Compute (g / (2*s^3*n))^(1/3) without forming s^3*n:
+        // the direct product can overflow even when the cube-root is finite.
+        let cube_root_cap = (g * 0.5).cbrt() / (s * n.cbrt());
         let lambda_star = b
             .min((2.0 * g / variance_charge).sqrt())
-            .min((g / (2.0 * s * s * s * n)).cbrt());
+            .min(cube_root_cap);
         if !g.is_finite()
             || g <= 0.0
             || !b.is_finite()
             || b <= 0.0
+            || !cube_root_cap.is_finite()
+            || cube_root_cap <= 0.0
             || !lambda_star.is_finite()
             || lambda_star <= 0.0
         {
@@ -449,6 +454,30 @@ mod tests {
             cs.current_interval(),
             Err(VarianceAdaptiveCsError::NoObservations)
         );
+    }
+
+    #[test]
+    fn cube_root_bet_cap_avoids_intermediate_proxy_times_count_overflow() {
+        let mut cs = VarianceAdaptiveSubGaussianCs::new(
+            0.0,
+            2.0e100,
+            0.05,
+        )
+        .unwrap();
+        // Numeric stress state: s^3 is finite, but 2*s^3*n overflows
+        // for this count. The algebraically equivalent cube-root cap
+        // remains finite and the confidence sequence is still representable.
+        cs.sample_count = u64::MAX;
+        cs.mean = 1.0e100;
+        cs.centered_sum_squares = 0.0;
+        cs.harmonic_sum = 1.0 + (u64::MAX as f64).ln();
+
+        let interval = cs.current_interval().unwrap();
+        assert!(interval.half_width.is_finite());
+        assert!(interval.lower_bound.is_finite());
+        assert!(interval.upper_bound.is_finite());
+        assert!(interval.lower_bound <= interval.point_estimate);
+        assert!(interval.point_estimate <= interval.upper_bound);
     }
 
     #[test]
