@@ -331,4 +331,23 @@ fn duplicate_evidence_input_is_rejected_even_when_both_records_are_valid() {
     assert_eq!(error.kind, ReplayErrorKind::DuplicateEvidence);
 }
 
+#[test]
+fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let mut result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    // The claim and derivation use 42; this result re-encoding uses 42.0.
+    // RFC 8785 maps both through ECMAScript binary64 serialization, so this
+    // representation-only change must not break deterministic replay.
+    result["asserted_value"]["entries"][0]["size"] = json!(42.0);
+    let equivalent_bytes = serde_json::to_vec(&result).unwrap();
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &equivalent_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
+}
+
 }
