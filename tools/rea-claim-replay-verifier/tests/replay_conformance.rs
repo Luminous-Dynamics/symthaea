@@ -873,6 +873,11 @@ fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
     let mut claim = provider_claim(first.evidence_id.clone());
     claim.evidence_ids.push(second.evidence_id.clone());
     let (_claim_bytes, result_bytes) = produce(&claim, &[first.clone(), second.clone()]);
+    let reported_result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    let original_request_sha256 = reported_result["claim_request_sha256"]
+        .as_str()
+        .unwrap()
+        .to_owned();
 
     let mut reordered = claim;
     reordered.evidence_ids.reverse();
@@ -884,7 +889,11 @@ fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
     )
     .unwrap();
     assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
-    assert_ne!(error.claim_request_sha256, error.reported_derivation_sha256);
+    assert_ne!(error.claim_request_sha256, original_request_sha256);
+    assert_ne!(
+        error.recomputed_derivation_sha256,
+        error.reported_derivation_sha256
+    );
 }
 
 #[test]
