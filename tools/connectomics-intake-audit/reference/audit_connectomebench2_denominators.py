@@ -83,11 +83,24 @@ def validate_manifest(data: dict[str, Any]) -> dict[str, Any]:
     else:
         raise ValueError('unsupported V2 identity status')
 
-    coverage_types = {row['sample_type'] for row in data['em_coverage']}
-    require(coverage_types == {row['category'] for row in sample_rows}, 'EM coverage categories do not match sample types')
+    coverage_type_rows = [row['sample_type'] for row in data['em_coverage']]
+    unique(coverage_type_rows, 'EM coverage sample types')
+    coverage_types = set(coverage_type_rows)
+    sample_type_names = {row['category'] for row in sample_rows}
+    require(coverage_types == sample_type_names, 'EM coverage categories do not match sample types')
     task_ids = [row['task_id'] for row in data['task_contract']]
     unique(task_ids, 'task IDs')
     require(set(task_ids) == {'false_split_correction', 'false_merge_identification', 'split_mask_generation'}, 'task contract coverage is incomplete')
+    expected_tasks = {
+        'false_split_correction': (['merge_edit', 'synapse_control', 'adjacent_control'], 'has_dual_mask', 'dual_segment'),
+        'false_merge_identification': (['split_edit', 'junction_control'], 'has_single_mask', 'single_segment'),
+        'split_mask_generation': (['split_edit'], 'has_single_mask', 'single_segment_input_with_dual_target'),
+    }
+    for task in data['task_contract']:
+        expected = expected_tasks[task['task_id']]
+        actual = (task['sample_types'], task['mask_requirement'], task['geometry_view'])
+        require(actual == expected, f"task eligibility contract changed for {task['task_id']}")
+    require(len(data.get('leakage_controls', [])) >= 4, 'required leakage controls are incomplete')
 
     return {
         'schema_version': 1,
