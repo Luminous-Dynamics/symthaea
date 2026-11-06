@@ -576,6 +576,33 @@ mod tests {
             interval(3, 10, 0.6, 0.8), interval(3, 20, 0.4, 0.5),
         ];
         assert_eq!(classify_multi_threshold_constraints(&full, &bad_threshold), Err(MultiThresholdError::InvalidThreshold));
+
+        let mut invalid_interval = full.clone();
+        invalid_interval[0].lower_bound = f64::NEG_INFINITY;
+        assert_eq!(
+            classify_multi_threshold_constraints(&invalid_interval, &c),
+            Err(MultiThresholdError::InvalidInterval)
+        );
+        let mut inverted_interval = full.clone();
+        inverted_interval[0].lower_bound = 0.95;
+        inverted_interval[0].upper_bound = 0.80;
+        assert_eq!(
+            classify_multi_threshold_constraints(&inverted_interval, &c),
+            Err(MultiThresholdError::InvalidInterval)
+        );
+
+        let mut duplicate_action = c.clone();
+        duplicate_action.action_ids[1] = duplicate_action.action_ids[0];
+        assert_eq!(
+            classify_multi_threshold_constraints(&full, &duplicate_action),
+            Err(MultiThresholdError::DuplicateActionId)
+        );
+        let mut duplicate_constraint = c.clone();
+        duplicate_constraint.constraints[1].constraint_id = duplicate_constraint.constraints[0].constraint_id;
+        assert_eq!(
+            classify_multi_threshold_constraints(&full, &duplicate_constraint),
+            Err(MultiThresholdError::DuplicateConstraintId)
+        );
     }
 
     #[test]
