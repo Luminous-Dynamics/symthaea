@@ -18,6 +18,8 @@ This is not the addition of another metrology engine. It is an evaluation of whe
 
 The benchmark should reward a system that discovers *before design freeze* that a critical property cannot be observed on the final article, and then proposes a technically admissible redesign, a different inspection method, or a narrower claim. It must not reward a fabricated measurement path.
 
+It must also preserve the exact design/feature/datum/PMI identities and inspection-result links across declared exchange surfaces. Compose with [MBD-INTEROP-001 #10595](https://github.com/Luminous-Dynamics/symthaea/issues/10595), which owns the AP242 Edition 4 ↔ QIF / ISO 23952 ↔ MTConnect semantic round-trip benchmark. Do not duplicate its translator, schema, GUID or semantic-coverage implementation. A visually intact PMI annotation with a lost feature/datum association is a hard failure for the co-design task.
+
 ## Why the field is ready for this shift
 
 ### External engineering-agent benchmarks
@@ -35,6 +37,7 @@ These are complete model-plus-agent systems, not model-only scores. Their scores
 ### Standards and industrial direction
 
 - NIST's [Digital Thread for Manufacturing](https://www.nist.gov/programs-projects/digital-thread-manufacturing) describes design/product-definition data flowing to manufacturing and quality systems, with inspection and measurement results feeding back to design. STEP, QIF and MTConnect are part of the standards landscape.
+ - NIST's [2026 AI/ML Roadmap for Smart Manufacturing](https://www.nist.gov/publications/2026-roadmap-artificial-intelligence-and-machine-learning-smart-manufacturing) explicitly includes data-centric metrology, advanced digital twins, explainability, reliability, availability, maintainability and safety among industrial AI research directions.
 - NIST's [2026 AI/ML Roadmap for Smart Manufacturing](https://www.nist.gov/publications/2026-roadmap-artificial-intelligence-and-machine-learning-smart-manufacturing) explicitly includes data-centric metrology, advanced digital twins, explainability and reliability among the research directions for industrial AI.
 - The 2024 NORDDESIGN paper, [Design for Inspectability: Identifying Its Requirements and Underpinning Enabling Technologies](https://datainformed.designsociety.org/download-publication/47632/Design%2Bfor%2BInspectability%3A%2BIdentifying%2BIts%2BRequirements%2Band%2BUnderpinning%2BEnabling%2BTechnologies), defines DfI as a design-for-X concern and identifies nine requirements plus four enabling technology families. It is a conceptual/design-method contribution, not a public agent benchmark.
 - An August 2026 review of [smart metrology in Industry 4.0–5.0](https://www.sciencedirect.com/science/article/pii/S2665917426000279) highlights interoperability, real-time uncertainty evaluation and trustworthy/auditable AI as outstanding challenges.
