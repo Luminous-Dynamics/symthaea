@@ -208,9 +208,6 @@ fn validate_supersession_graph(
             {
                 return Err(RuleApplicabilityError::CrossScopeSupersession);
             }
-            if revision.effective_from_utc < parent.effective_from_utc {
-                return Err(RuleApplicabilityError::InvalidEffectiveWindow);
-            }
         }
     }
 
@@ -228,6 +225,19 @@ fn validate_supersession_graph(
                 return Err(RuleApplicabilityError::MissingSupersededRevision);
             };
             current = revisions[parent_index];
+        }
+    }
+
+    // Check chronological effective ordering only after cycle detection so a
+    // cyclic graph reports its structural defect, not a contingent date error.
+    for revision in revisions.iter().copied() {
+        if let Some(parent_id) = revision.supersedes_revision_id {
+            let Some(parent_index) = find_revision_index(revisions, parent_id) else {
+                return Err(RuleApplicabilityError::MissingSupersededRevision);
+            };
+            if revision.effective_from_utc < revisions[parent_index].effective_from_utc {
+                return Err(RuleApplicabilityError::InvalidEffectiveWindow);
+            }
         }
     }
     Ok(())
@@ -434,8 +444,8 @@ mod tests {
     #[test]
     fn later_publication_does_not_rewrite_prepublication_replay() {
         let rules = [
-            revision("v1", "code/rev1", OLD_SHA, 90, 92, 100, Some(200), None),
-            revision("v2", "code/rev2", NEW_SHA, 210, 215, 200, None, Some("v1")),
+            revision("v1", "code/rev1", OLD_SHA, 90, 92, 100, Some(220), None),
+            revision("v2", "code/rev2", NEW_SHA, 216, 210, 220, None, Some("v1")),
         ];
         let result = resolve_applicable_rule(query(220, 205), &rules).unwrap();
         assert_eq!(
