@@ -185,6 +185,7 @@ The specification must pin the public observable contract, not a preferred macro
 **Canonical family:** `issue-reproduction-debugging`.  
 **Provisional theme:** reproduce a stateful defect through a bounded retry/replay schedule, isolate its root cause and verify the repair. The idempotence and crash/replay requirements below are the defect domain, not a new family label.  
 **Provisional difficulty:** High.  
+**Public source-only fixture:** [`benchmarks/ceb/public-development-fixtures/rust-event-replay-v0/`](../../benchmarks/ceb/public-development-fixtures/rust-event-replay-v0/). The three-crate, eight-file workspace contains a deterministic in-memory duplicate-delivery defect. It does not model persistence, crash/restart, acknowledgement atomicity or concurrency; it is not compiled, tested or executed and is not a complete fixture for the full specification.  
 **Synthetic workspace outline:**
 
 ```text
@@ -539,7 +540,7 @@ No new CEB lane, primary metric, score, receipt, task schema, task registry, tru
 |---|---|
 | Six candidate specifications authored | Design-only |
 | Exact mapping to #10617 fault-family labels | Confirmed one-to-one against the canonical six family IDs; no sampling slots assigned |
-| Public Rust source fixtures | Two workspaces: 10-file/four-crate API migration and 8-file/three-crate async trait boundary; source-only, neither compiled or executed |
+| Public Rust source fixtures | Three workspaces: 10-file/four-crate API migration, 8-file/three-crate async trait boundary, and 8-file/three-crate in-memory event replay; source-only, none compiled or executed |
 | Reference patches | Not created |
 | Independent grader implementations | Not created |
 | Oracle case blueprints | 37 machine-readable cases across 37 requirements; no executable oracle or test suite |
@@ -551,4 +552,4 @@ No new CEB lane, primary metric, score, receipt, task schema, task registry, tru
 | Independent regrade qualification | Not performed; blocked by #10369 |
 | Performance or SOTA comparison | None |
 
-**Honest claim:** the six candidate domains now have canonical family mappings and machine-readable requirement/oracle traceability, and one has a concrete public source-only workspace. The workspace has not been compiled, tested or executed. No candidate has a qualified oracle, task admission, benchmark result or sealed holdout, and no superiority claim is supported.
+**Honest claim:** the six candidate domains now have canonical family mappings and machine-readable requirement/oracle traceability, and three have concrete public source-only workspaces. None has been compiled, tested or executed. No candidate has a qualified oracle, task admission, benchmark result or sealed holdout, and no superiority claim is supported.
