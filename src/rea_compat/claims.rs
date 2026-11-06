@@ -6,7 +6,7 @@
 //! causal correctness, provider independence, or security-control compliance.
 
 use super::{
-    canonical_jcs_bytes, sha256_hex, verify_evidence_value, VerifiedEvidence, EVIDENCE_ID_PREFIX,
+    EVIDENCE_ID_PREFIX, VerifiedEvidence, canonical_jcs_bytes, sha256_hex, verify_evidence_value,
 };
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize as SerdeDeserialize, Serialize};
@@ -219,11 +219,7 @@ pub fn validate_claim(claim: &ClaimRequest) -> Result<(), ClaimError> {
 
     match claim.predicate {
         ClaimPredicate::ProviderReportedObservation => {
-            if !claim
-                .source_predicate_type
-                .as_deref()
-                .is_some_and(nonempty)
-            {
+            if !claim.source_predicate_type.as_deref().is_some_and(nonempty) {
                 return Err(invalid(
                     "provider_reported_observation requires source_predicate_type",
                 ));
@@ -266,16 +262,36 @@ pub fn parse_claim_json(input: &[u8]) -> Result<ClaimRequest, ClaimError> {
     }
 
     let mut deserializer = serde_json::Deserializer::from_slice(input);
-    let parsed = UniqueJsonValue::deserialize(&mut deserializer).map_err(|error| {
-        ClaimError::new(ClaimErrorKind::InvalidJson, error.to_string())
-    })?;
-    deserializer.end().map_err(|error| {
-        ClaimError::new(ClaimErrorKind::InvalidJson, error.to_string())
-    })?;
+    let parsed = UniqueJsonValue::deserialize(&mut deserializer)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::InvalidJson, error.to_string()))?;
+    deserializer
+        .end()
+        .map_err(|error| ClaimError::new(ClaimErrorKind::InvalidJson, error.to_string()))?;
 
-    let claim: ClaimRequest = serde_json::from_value(parsed.0).map_err(|error| {
-        ClaimError::new(ClaimErrorKind::InvalidClaim, error.to_string())
+    let root = parsed.0.as_object().ok_or_else(|| {
+        ClaimError::new(ClaimErrorKind::InvalidClaim, "claim must be a JSON object")
     })?;
+    for required in [
+        "schema",
+        "claim_id",
+        "predicate",
+        "scope",
+        "asserted_value",
+        "source_predicate_type",
+        "evidence_ids",
+        "assumptions",
+        "falsification_condition",
+    ] {
+        if !root.contains_key(required) {
+            return Err(ClaimError::new(
+                ClaimErrorKind::InvalidClaim,
+                format!("missing required claim field: {required}"),
+            ));
+        }
+    }
+
+    let claim: ClaimRequest = serde_json::from_value(parsed.0)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::InvalidClaim, error.to_string()))?;
     validate_claim(&claim)?;
     Ok(claim)
 }
@@ -388,10 +404,7 @@ enum ScopeResult {
     Unverifiable,
 }
 
-fn compare_optional_scope(
-    requested: Option<&str>,
-    observed: Option<&str>,
-) -> ScopeResult {
+fn compare_optional_scope(requested: Option<&str>, observed: Option<&str>) -> ScopeResult {
     match (requested, observed) {
         (Some(left), Some(right)) if left == right => ScopeResult::Match,
         (Some(_), Some(_)) => ScopeResult::Inapplicable,
@@ -401,10 +414,7 @@ fn compare_optional_scope(
 }
 
 fn assess_scope(claim: &ClaimRequest, evidence: &Value) -> (ScopeResult, String) {
-    let observed_subject = optional_string(
-        evidence,
-        &["subject", "digest", "sha256"],
-    );
+    let observed_subject = optional_string(evidence, &["subject", "digest", "sha256"]);
     match observed_subject.as_deref() {
         Some(value) if value != claim.scope.subject_sha256 => {
             return (
@@ -469,10 +479,21 @@ fn assess_scope(claim: &ClaimRequest, evidence: &Value) -> (ScopeResult, String)
         );
     }
 
-    (ScopeResult::Match, "exact subject, operation and represented environment scope match".to_owned())
+    (
+        ScopeResult::Match,
+        "exact subject, operation and represented environment scope match".to_owned(),
+    )
 }
 
-fn provider_fields(evidence: &Value) -> (Option<String>, Option<String>, Option<String>, Option<String>, Option<String>) {
+fn provider_fields(
+    evidence: &Value,
+) -> (
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
     (
         optional_string(evidence, &["provider", "id"]),
         optional_string(evidence, &["provider", "name"]),
@@ -533,7 +554,10 @@ pub fn evaluate_claim(
         let verified = verify_evidence_value(&supplied.value).map_err(|error| {
             ClaimError::new(
                 ClaimErrorKind::InvalidEvidence,
-                format!("Evidence {} failed re-verification: {error}", supplied.evidence_id),
+                format!(
+                    "Evidence {} failed re-verification: {error}",
+                    supplied.evidence_id
+                ),
             )
         })?;
         if verified.evidence_id != supplied.evidence_id {
@@ -644,7 +668,8 @@ pub fn evaluate_claim(
                 provider_version,
                 confidence,
                 authority,
-                reason: "source predicate_type does not match the requested provider observation".to_owned(),
+                reason: "source predicate_type does not match the requested provider observation"
+                    .to_owned(),
             });
             continue;
         }
@@ -681,7 +706,12 @@ pub fn evaluate_claim(
     } else if supporting > 0 && contradicting > 0 {
         ClaimDisposition::Conflicted
     } else if unverifiable_scope > 0 || !missing.is_empty() {
-        if supporting == 0 && contradicting == 0 && inapplicable > 0 && unverifiable_scope == 0 && missing.is_empty() {
+        if supporting == 0
+            && contradicting == 0
+            && inapplicable > 0
+            && unverifiable_scope == 0
+            && missing.is_empty()
+        {
             ClaimDisposition::Inapplicable
         } else {
             ClaimDisposition::Underdetermined
@@ -700,13 +730,18 @@ pub fn evaluate_claim(
         unmet.push("no Evidence IDs were supplied".to_owned());
     }
     if unverifiable_scope > 0 {
-        unmet.push("one or more scope dimensions are not represented by the supplied REA Evidence records".to_owned());
+        unmet.push(
+            "one or more scope dimensions are not represented by the supplied REA Evidence records"
+                .to_owned(),
+        );
     }
     if !missing.is_empty() {
         unmet.push("one or more referenced Evidence IDs are missing".to_owned());
     }
     if supporting == 0 && contradicting == 0 && inapplicable == 0 && unverifiable_scope == 0 {
-        unmet.push("no applicable premise established or contradicted the asserted value".to_owned());
+        unmet.push(
+            "no applicable premise established or contradicted the asserted value".to_owned(),
+        );
     }
 
     let rule_id = if claim.predicate.has_v0_evaluator() && claim.assumptions.is_empty() {
@@ -730,12 +765,10 @@ pub fn evaluate_claim(
         falsification_condition: &claim.falsification_condition,
         claim_ceiling: &claim_ceiling,
     };
-    let body_value = serde_json::to_value(body).map_err(|error| {
-        ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string())
-    })?;
-    let canonical = canonical_jcs_bytes(&body_value).map_err(|error| {
-        ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string())
-    })?;
+    let body_value = serde_json::to_value(body)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
+    let canonical = canonical_jcs_bytes(&body_value)
+        .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
     let derivation_sha256 = sha256_hex(&canonical);
 
     Ok(ClaimEvaluation {
@@ -774,7 +807,8 @@ mod tests {
             claim_id: "claim-0001".to_owned(),
             predicate,
             scope: ClaimScope {
-                subject_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+                subject_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    .to_owned(),
                 operation: "inspect_artifact".to_owned(),
                 platform: None,
                 platform_version: None,
@@ -791,20 +825,32 @@ mod tests {
             },
             evidence_ids,
             assumptions: Vec::new(),
-            falsification_condition: "A same-scope verified Evidence record has a different normalized_result".to_owned(),
+            falsification_condition:
+                "A same-scope verified Evidence record has a different normalized_result".to_owned(),
         }
     }
 
     #[test]
     fn exact_provider_report_is_supported_but_not_promoted_to_artifact_truth() {
         let evidence = verified_fixture();
-        let claim = claim(ClaimPredicate::ProviderReportedObservation, vec![evidence.evidence_id.clone()]);
+        let claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
         let result = evaluate_claim(&claim, &[evidence]).unwrap();
 
         assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
-        assert!(result.claim_ceiling.iter().any(|line| line.contains("does not prove the underlying real-world proposition")));
+        assert!(
+            result
+                .claim_ceiling
+                .iter()
+                .any(|line| line.contains("does not prove the underlying real-world proposition"))
+        );
         assert_eq!(result.evidence_assessments.len(), 1);
-        assert_eq!(result.evidence_assessments[0].kind, EvidenceAssessmentKind::Supports);
+        assert_eq!(
+            result.evidence_assessments[0].kind,
+            EvidenceAssessmentKind::Supports
+        );
         assert!(valid_sha256(&result.derivation_sha256));
     }
 
@@ -815,15 +861,18 @@ mod tests {
         second_value["provider"]["id"] = json!("independent-looking-provider");
         second_value["provider"]["name"] = json!("Another Provider");
         second_value["analysis_profile"]["provider"] = second_value["provider"].clone();
-        second_value["analysis_profile"]["digest"] =
-            json!(super::super::analysis_profile_digest(&second_value["analysis_profile"]).unwrap());
-        second_value["normalized_result"]["status"] = json!("partial");
-        second_value["evidence_id"] = json!(
-            super::super::compute_evidence_id(&second_value).unwrap()
+        second_value["analysis_profile"]["digest"] = json!(
+            super::super::analysis_profile_digest(&second_value["analysis_profile"]).unwrap()
         );
+        second_value["normalized_result"]["status"] = json!("partial");
+        second_value["evidence_id"] =
+            json!(super::super::compute_evidence_id(&second_value).unwrap());
         let second = verify_evidence_value(&second_value).unwrap();
 
-        let mut contradicted = claim(ClaimPredicate::ProviderReportedObservation, vec![second.evidence_id.clone()]);
+        let mut contradicted = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![second.evidence_id.clone()],
+        );
         contradicted.asserted_value["status"] = json!("complete");
         let result = evaluate_claim(&contradicted, &[second.clone()]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::RefutedWithinScope);
@@ -835,11 +884,19 @@ mod tests {
         let result = evaluate_claim(&conflict, &[first, second]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Conflicted);
         assert_eq!(
-            result.evidence_assessments.iter().filter(|item| item.kind == EvidenceAssessmentKind::Supports).count(),
+            result
+                .evidence_assessments
+                .iter()
+                .filter(|item| item.kind == EvidenceAssessmentKind::Supports)
+                .count(),
             1
         );
         assert_eq!(
-            result.evidence_assessments.iter().filter(|item| item.kind == EvidenceAssessmentKind::Contradicts).count(),
+            result
+                .evidence_assessments
+                .iter()
+                .filter(|item| item.kind == EvidenceAssessmentKind::Contradicts)
+                .count(),
             1
         );
     }
@@ -847,12 +904,19 @@ mod tests {
     #[test]
     fn wrong_subject_and_operation_are_not_applied_to_claim_scope() {
         let evidence = verified_fixture();
-        let mut claim = claim(ClaimPredicate::ProviderReportedObservation, vec![evidence.evidence_id.clone()]);
-        claim.scope.subject_sha256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
+        let mut claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
+        claim.scope.subject_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
         let result = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Inapplicable);
 
-        let mut claim = claim(ClaimPredicate::ProviderReportedObservation, vec![evidence.evidence_id.clone()]);
+        let mut claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
         claim.scope.operation = "verify_signature".to_owned();
         let result = evaluate_claim(&claim, &[evidence]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Inapplicable);
@@ -865,30 +929,53 @@ mod tests {
         claim.scope.platform_version = Some("Android 17 / API 37".to_owned());
         let result = evaluate_claim(&claim, &[evidence]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Underdetermined);
-        assert!(result.unmet_obligations.iter().any(|item| item.contains("platform_version")));
+        assert!(
+            result
+                .unmet_obligations
+                .iter()
+                .any(|item| item.contains("platform_version"))
+        );
     }
 
     #[test]
     fn unimplemented_semantic_predicates_fail_closed() {
         let evidence = verified_fixture();
-        let claim = claim(ClaimPredicate::ProducerAuthenticity, vec![evidence.evidence_id.clone()]);
+        let claim = claim(
+            ClaimPredicate::ProducerAuthenticity,
+            vec![evidence.evidence_id.clone()],
+        );
         let result = evaluate_claim(&claim, &[evidence]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Unverified);
-        assert!(result.unmet_obligations.iter().any(|item| item.contains("no predicate-specific verifier")));
-        assert!(result.evidence_assessments.iter().all(|item| item.kind == EvidenceAssessmentKind::NotEvaluated));
+        assert!(
+            result
+                .unmet_obligations
+                .iter()
+                .any(|item| item.contains("no predicate-specific verifier"))
+        );
+        assert!(
+            result
+                .evidence_assessments
+                .iter()
+                .all(|item| item.kind == EvidenceAssessmentKind::NotEvaluated)
+        );
     }
 
     #[test]
     fn missing_evidence_and_assumptions_never_create_positive_support() {
         let missing_id = format!("ev_{}", "b".repeat(64));
-        let mut claim = claim(ClaimPredicate::ProviderReportedObservation, vec![missing_id.clone()]);
+        let mut claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![missing_id.clone()],
+        );
         let empty = evaluate_claim(&claim, &[]).unwrap();
         assert_eq!(empty.disposition, ClaimDisposition::Underdetermined);
         assert_eq!(empty.missing_evidence_ids, vec![missing_id]);
 
         let evidence = verified_fixture();
         claim.evidence_ids = vec![evidence.evidence_id.clone()];
-        claim.assumptions.push("the scanner database is complete".to_owned());
+        claim
+            .assumptions
+            .push("the scanner database is complete".to_owned());
         let result = evaluate_claim(&claim, &[evidence]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Unverified);
     }
@@ -897,7 +984,10 @@ mod tests {
     fn forged_verified_evidence_metadata_is_rechecked() {
         let mut evidence = verified_fixture();
         evidence.evidence_id = format!("ev_{}", "f".repeat(64));
-        let claim = claim(ClaimPredicate::ProviderReportedObservation, vec![evidence.evidence_id.clone()]);
+        let claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
         let error = evaluate_claim(&claim, &[evidence]).unwrap_err();
         assert_eq!(error.kind, ClaimErrorKind::InvalidEvidence);
     }
@@ -924,7 +1014,10 @@ mod tests {
     #[test]
     fn derivation_commitment_is_deterministic_and_changes_with_evidence_scope() {
         let evidence = verified_fixture();
-        let claim = claim(ClaimPredicate::ProviderReportedObservation, vec![evidence.evidence_id.clone()]);
+        let claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
         let first = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
         let second = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
         assert_eq!(first.derivation_sha256, second.derivation_sha256);
