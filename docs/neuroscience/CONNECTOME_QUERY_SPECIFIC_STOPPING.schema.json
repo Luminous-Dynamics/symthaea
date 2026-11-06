@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_QUERY_SPECIFIC_STOPPING.schema.json",
+  "title": "Question-specific connectome proofreading stopping run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "preregistration",
+    "query_binding",
+    "sampling_frames",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "preregistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preregistration_sha256",
+        "frozen_before_sampling"
+      ],
+      "properties": {
+        "preregistration_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "frozen_before_sampling": {
+          "const": true
+        }
+      }
+    },
+    "query_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_loss_sha256",
+        "baseline_decision"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_loss_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "baseline_decision": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sampling_frames": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/frame"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frame_id",
+        "source_frame_receipt_sha256",
+        "candidate_frame_sha256",
+        "candidate_unit_ids",
+        "sampling_design",
+        "sample_size",
+        "sampled_unit_set_sha256",
+        "sample_outcome_ledger_sha256",
+        "sampling_receipt_sha256",
+        "sampled_units"
+      ],
+      "properties": {
+        "frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_frame_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "candidate_frame_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "candidate_unit_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "sampling_design": {
+          "const": "SRS_WITHOUT_REPLACEMENT"
+        },
+        "sample_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "sampled_unit_set_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "sample_outcome_ledger_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "sampling_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "sampled_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sample_unit"
+          }
+        }
+      }
+    },
+    "sample_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_id",
+        "outcome",
+        "inclusion_probability"
+      ],
+      "properties": {
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "enum": [
+            "QUERY_FLIP",
+            "NO_QUERY_FLIP",
+            "UNRESOLVED"
+          ]
+        },
+        "inclusion_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "dataset_revision_sha256",
+        "frame_id",
+        "frame_coverage_status",
+        "frame_coverage_receipt_sha256",
+        "global_stop_policy",
+        "snapshots",
+        "worlds",
+        "confidence_level",
+        "residual_query_flip_tolerance",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame_coverage_status": {
+          "enum": [
+            "CLOSED",
+            "INCOMPLETE"
+          ]
+        },
+        "frame_coverage_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "global_stop_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "relative_delta_tolerance",
+            "consecutive_stable_transitions"
+          ],
+          "properties": {
+            "relative_delta_tolerance": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "consecutive_stable_transitions": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "snapshots": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/snapshot"
+          }
+        },
+        "worlds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/world"
+          }
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "residual_query_flip_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "edit_count",
+        "graph_invariants"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edit_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "graph_invariants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/invariant"
+          }
+        }
+      }
+    },
+    "invariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invariant_id",
+        "value"
+      ],
+      "properties": {
+        "invariant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "biological_disposition",
+        "query_decision"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "biological_disposition": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE",
+            "INDETERMINATE",
+            "DISPUTED"
+          ]
+        },
+        "query_decision": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "global_stop_snapshot_id",
+        "query_world_agreement",
+        "residual_upper_count",
+        "residual_upper_prevalence",
+        "query_stop_status",
+        "joint_disposition"
+      ],
+      "properties": {
+        "global_stop_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "query_world_agreement": {
+          "type": "boolean"
+        },
+        "residual_upper_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "residual_upper_prevalence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "query_stop_status": {
+          "enum": [
+            "QUERY_ROBUST_WITHIN_DECLARED_FRAME",
+            "QUERY_UNRESOLVED",
+            "FRAME_INCOMPLETE",
+            "NOT_ESTIMABLE"
+          ]
+        },
+        "joint_disposition": {
+          "enum": [
+            "GLOBAL_ONLY",
+            "QUERY_ROBUST_WITHIN_DECLARED_FRAME",
+            "QUERY_UNRESOLVED",
+            "FRAME_INCOMPLETE",
+            "NOT_ESTIMABLE"
+          ]
+        }
+      }
+    }
+  }
+}
