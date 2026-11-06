@@ -284,6 +284,31 @@ pub fn certify_exact_bounded_portfolio_family(
         contract.max_portfolio_size,
         max_candidates,
     )?;
+    certify_portfolio_family(intervals, contract, portfolios)
+}
+
+/// Paper-matched small-K family certificate over exactly L representatives.
+/// Use this for direct AFM / few-for-many replication; the at-most-L API is a
+/// separate deployment-cap contract.
+pub fn certify_exact_size_portfolio_family(
+    intervals: &[ActionObjectiveInterval],
+    contract: &FewForManyPortfolioContract,
+    exact_portfolio_size: usize,
+    max_candidates: usize,
+) -> Result<FewForManyPortfolioFamilyCertificate, FewForManyPortfolioError> {
+    let portfolios = enumerate_exact_size_portfolios(
+        &contract.feasible_action_ids,
+        exact_portfolio_size,
+        max_candidates,
+    )?;
+    certify_portfolio_family(intervals, contract, portfolios)
+}
+
+fn certify_portfolio_family(
+    intervals: &[ActionObjectiveInterval],
+    contract: &FewForManyPortfolioContract,
+    portfolios: Vec<Vec<u32>>,
+) -> Result<FewForManyPortfolioFamilyCertificate, FewForManyPortfolioError> {
     let portfolio_count = portfolios.len();
     let mut bounds = Vec::with_capacity(portfolio_count);
     for portfolio in portfolios {
@@ -360,6 +385,42 @@ pub fn enumerate_bounded_portfolios(
     for size in 1..=limit {
         enumerate_combinations(&ids, size, 0, &mut Vec::with_capacity(size), &mut output);
     }
+    Ok(output)
+}
+
+/// Paper-matched exact-size-L small-K oracle. Returns every combination
+/// of exactly exact_portfolio_size action IDs in lexicographic order.
+pub fn enumerate_exact_size_portfolios(
+    action_ids: &[u32],
+    exact_portfolio_size: usize,
+    max_candidates: usize,
+) -> Result<Vec<Vec<u32>>, FewForManyPortfolioError> {
+    if action_ids.is_empty() {
+        return Err(FewForManyPortfolioError::EmptyEnumerationUniverse);
+    }
+    if exact_portfolio_size == 0 || exact_portfolio_size > action_ids.len() || max_candidates == 0 {
+        return Err(FewForManyPortfolioError::InvalidEnumerationLimit);
+    }
+
+    let mut ids = action_ids.to_vec();
+    ids.sort_unstable();
+    if ids.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Err(FewForManyPortfolioError::DuplicateEnumerationAction);
+    }
+
+    let total = binomial(ids.len(), exact_portfolio_size)?;
+    if total > max_candidates {
+        return Err(FewForManyPortfolioError::EnumerationBudgetExceeded);
+    }
+
+    let mut output = Vec::with_capacity(total);
+    enumerate_combinations(
+        &ids,
+        exact_portfolio_size,
+        0,
+        &mut Vec::with_capacity(exact_portfolio_size),
+        &mut output,
+    );
     Ok(output)
 }
 
@@ -682,6 +743,35 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn exact_size_l_enumerator_matches_paper_candidate_family() {
+        assert_eq!(
+            enumerate_exact_size_portfolios(&[3, 1, 2], 2, 3).unwrap(),
+            vec![vec![1, 2], vec![1, 3], vec![2, 3]]
+        );
+        assert_eq!(
+            enumerate_exact_size_portfolios(&[1, 2, 3], 0, 10),
+            Err(FewForManyPortfolioError::InvalidEnumerationLimit)
+        );
+        assert_eq!(
+            enumerate_exact_size_portfolios(&[1, 2, 3], 4, 10),
+            Err(FewForManyPortfolioError::InvalidEnumerationLimit)
+        );
+        assert_eq!(
+            enumerate_exact_size_portfolios(&[1, 2, 3], 2, 2),
+            Err(FewForManyPortfolioError::EnumerationBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn exact_size_l_family_certificate_identifies_the_paper_matched_optimum() {
+        let result =
+            certify_exact_size_portfolio_family(&points(), &contract(2, 0.0), 2, 3).unwrap();
+        assert_eq!(result.portfolio_count, 3);
+        assert_eq!(result.selected_candidate.portfolio_action_ids, vec![1, 2]);
+        assert_eq!(result.status, PortfolioFamilyOptimalityStatus::CertifiedOptimal);
+    }
+
     #[test]
     fn exact_portfolio_family_certifies_the_unique_point_interval_optimum() {
         let result = certify_exact_bounded_portfolio_family(&points(), &contract(2, 0.0), 6).unwrap();
