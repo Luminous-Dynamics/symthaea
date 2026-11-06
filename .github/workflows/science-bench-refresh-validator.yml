@@ -881,7 +881,7 @@ jobs:
             > /tmp/sbr-recoverability/valid-report.json
           jq -e '.valid == true and .manifest_commitment_matches == true and .model_free == true' \
             /tmp/sbr-recoverability/valid-report.json >/dev/null
-          jq -e '.evidence_unit_count == 5 and .distinct_source_family_count == 4' \
+          jq -e '.evidence_unit_count == 5 and .distinct_declared_source_family_ref_count == 4' \
             /tmp/sbr-recoverability/valid-report.json >/dev/null
           jq -e '.class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.UnreachableWithinBudget == 1 and .class_counts.NotEvaluable == 1' \
             /tmp/sbr-recoverability/valid-report.json >/dev/null
