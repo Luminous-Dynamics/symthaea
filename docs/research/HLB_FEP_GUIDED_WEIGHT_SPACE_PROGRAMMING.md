@@ -253,9 +253,21 @@ Use role–filler, nested relation, temporal order, and held-out composition tas
 Primary outcomes: held-out compositional success, retrieval precision/recall, capacity as a function of dimension and load, false retrieval, calibration, and memory cost.
 
 ### D. Irregular-time dynamics and regime changes
-Use fixed datasets and synthetic systems with nonuniform (Delta t), missing observations, input interpolation, and controlled regime changes. Report error by elapsed interval and wall-clock cost.
+
+Use fixed datasets and synthetic systems with nonuniform `\Delta t`, missing observations, input interpolation, and controlled regime changes. Report error by elapsed interval and wall-clock cost.
 
 Primary outcomes: forecast error, rollout stability, time-to-recover after shifts, error against high-accuracy references, and end-to-end latency.
+
+### E. Function-preserving parameter symmetries
+
+Generate small CfC networks and exact hidden-unit permutations that preserve their input/output function when every coupled parameter group is permuted consistently. Pair these healthy equivalents with genuinely faulty models and held-out permutations.
+
+Primary outcomes: functional-equivalence error, false fault/false edit rate on permutation-only controls, and repair transfer across parameterizations.
+
+Diagnostics: alignment precision, activation/functional probe budget, weight-distance versus function-distance, changed parameter count, candidate evaluation cost, and preservation on independent input sequences.
+
+Compare raw flattened-weight inspection, activation-probe alignment, permutation-equivariant weight-space editors, SWI's typed group alignment, and a labelled oracle-alignment upper bound. The oracle is verifier-only. A permutation-only change must not be called a defect; a repair must still be evaluated using native model fingerprints and actual behavior.
+
 
 ## 6. Baselines and fairness requirements
 
@@ -384,6 +396,8 @@ For healthy-model false-edit rate, report exact binomial confidence intervals. D
 
 - Takehi, Teoh, Zhang & Khattab (2026), *Sparks of Weight-Space Programming: LLMs can natively read & write neural network weights* (MIT CSAIL research blog, 2 Nov 2026): https://rikiyat.github.io/blog/weight-space-programming/
 - Han et al. (2026), *A Survey of Weight Space Learning: Understanding, Representation, and Generation*: https://arxiv.org/abs/2603.10090
+- Dayan, Eitan & Maron (2026), *On the Expressive Power of Permutation-Equivariant Weight-Space Networks*, ICML 2026: https://proceedings.mlr.press/v306/dayan26a.html
+- Wang, Wang & Wang (2026), *Position: Weight Space Should Be a First-Class Generative AI Modality*, ICML 2026: https://proceedings.mlr.press/v306/wang26mc.html
 - Nusrat & Nusrat (2026), *Can LLMs Reliably Audit Clinical Decision Networks?*: https://arxiv.org/abs/2611.05341
 - Vergés et al. (2025), *Classification using hyperdimensional computing: a review with comparative analysis*: https://doi.org/10.1007/s10462-025-11181-2
 - Hasani et al. (2022), *Closed-form continuous-time neural networks*: https://doi.org/10.1038/s42256-022-00556-7
