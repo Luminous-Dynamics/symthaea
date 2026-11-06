@@ -113,12 +113,12 @@ def run_openscad(
         line for line in log.splitlines()
         if "CGAL Polyhedrons in cache:" in line
     ]
-    cache_match = re.search(r"^CGAL Polyhedrons in cache:\\s*(\\d+)\\s*$", log, re.MULTILINE)
+    cache_match = re.search(r"^CGAL Polyhedrons in cache:\s*(\d+)\s*$", log, re.MULTILINE)
     require(
         cache_match is not None and int(cache_match.group(1)) == 1,
         f"Expected exactly one CGAL polyhedron conversion: {mesh_path.name}: {log[-2000:]}",
     )
-    simple_match = re.search(r"^\\s*Simple:\\s*yes\\s*$", log, re.MULTILINE)
+    simple_match = re.search(r"^\s*Simple:\s*yes\s*$", log, re.MULTILINE)
     require(
         simple_match is not None,
         f"OpenSCAD CGAL output was not simple: {mesh_path.name}: {log[-2000:]}",
@@ -131,11 +131,8 @@ def run_openscad(
     return {
         "command": command,
         "return_code": completed.returncode,
-        "cgal_polyhedron_cache_line": cache_lines[0].strip(),
-        "simple_line": next(
-            (line.strip() for line in log.splitlines() if "Simple:" in line),
-            None,
-        ),
+        "cgal_polyhedron_cache_line": cache_match.group(0).strip(),
+        "simple_line": simple_match.group(0).strip(),
         "facets_line": next(
             (line.strip() for line in log.splitlines() if "Facets:" in line),
             None,
@@ -508,11 +505,7 @@ def main() -> int:
             "validation, not AP242 conformance and not physical validation."
         ),
         "toolchain": {
-            "cadquery": version("cadquery"),
-            "cadquery_ocp_distribution": version("cadquery-ocp"),
-            "opencascade_engine": getattr(OCP, "__version__", "unknown"),
-            "trimesh": version("trimesh"),
-            "openscad": version_label,
+            **toolchain,
             "geometry_engine_after_tessellation": "CGAL through OpenSCAD",
         },
         "tessellation": {
