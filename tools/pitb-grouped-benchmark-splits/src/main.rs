@@ -243,7 +243,7 @@ fn parse_dataset(bytes: &[u8]) -> Result<Vec<RepositoryGroup>, String> {
             file_clusters: BTreeSet::new(),
         });
         group.commit_pairs.insert(format!("{}@{}", group.repository_key, task.repo.commit));
-        group.file_clusters.insert(format!("{}@{}", task.repo.commit, task.location.path));
+        group.file_clusters.insert(task.location.path.clone());
         group.task_ids.push(task.id);
     }
 
