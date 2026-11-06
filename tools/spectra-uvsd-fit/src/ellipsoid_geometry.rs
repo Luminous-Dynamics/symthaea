@@ -74,6 +74,8 @@ pub enum EllipsoidGeometryError {
     NonFiniteShapeFactor,
     ShapeFactorNotLowerTriangular,
     ShapeFactorNotPositiveDefinite,
+    ShapeMatrixNotSymmetric,
+    ShapeMatrixNotPositiveDefinite,
     InvalidRadius,
     EmptyDirectionId,
     InvalidDirectionDimension,
@@ -97,6 +99,8 @@ impl fmt::Display for EllipsoidGeometryError {
             Self::NonFiniteShapeFactor => "ellipsoid shape factor must contain only finite values",
             Self::ShapeFactorNotLowerTriangular => "ellipsoid shape factor must be lower triangular",
             Self::ShapeFactorNotPositiveDefinite => "ellipsoid shape factor diagonal must be strictly positive",
+            Self::ShapeMatrixNotSymmetric => "ellipsoid shape matrix must be exactly symmetric",
+            Self::ShapeMatrixNotPositiveDefinite => "ellipsoid shape matrix must be positive definite",
             Self::InvalidRadius => "ellipsoid radius must be finite and nonnegative",
             Self::EmptyDirectionId => "direction ID must be nonempty",
             Self::InvalidDirectionDimension => "direction dimension does not match ellipsoid coordinates",
@@ -112,6 +116,73 @@ impl fmt::Display for EllipsoidGeometryError {
 impl std::error::Error for EllipsoidGeometryError {}
 
 impl EllipsoidGeometry {
+    /// Build geometry from an explicitly symmetric positive-definite shape matrix.
+    ///
+    /// This performs a strict Cholesky factorization. It does not add jitter,
+    /// clip eigenvalues or regularize singular inputs; those operations change
+    /// the inferential set and belong to the upstream statistical method.
+    pub fn from_shape_matrix(
+        coordinate_ids: Vec<String>,
+        center: Vec<f64>,
+        shape_matrix: &[Vec<f64>],
+        radius: f64,
+    ) -> Result<Self, EllipsoidGeometryError> {
+        let dimension = coordinate_ids.len();
+        if dimension == 0 {
+            return Err(EllipsoidGeometryError::EmptyCoordinates);
+        }
+        if shape_matrix.len() != dimension {
+            return Err(EllipsoidGeometryError::ShapeDimensionMismatch);
+        }
+        if shape_matrix.iter().any(|row| row.len() != dimension) {
+            return Err(EllipsoidGeometryError::ShapeRowDimensionMismatch);
+        }
+        if shape_matrix.iter().flatten().any(|value| !value.is_finite()) {
+            return Err(EllipsoidGeometryError::NonFiniteShapeFactor);
+        }
+        for row in 0..dimension {
+            for col in 0..row {
+                if shape_matrix[row][col] != shape_matrix[col][row] {
+                    return Err(EllipsoidGeometryError::ShapeMatrixNotSymmetric);
+                }
+            }
+        }
+
+        let mut lower = vec![vec![0.0; dimension]; dimension];
+        for row in 0..dimension {
+            for col in 0..=row {
+                let mut value = shape_matrix[row][col];
+                for index in 0..col {
+                    value -= lower[row][index] * lower[col][index];
+                }
+                if !value.is_finite() {
+                    return Err(EllipsoidGeometryError::NumericFailure);
+                }
+                if row == col {
+                    if value <= 0.0 {
+                        return Err(EllipsoidGeometryError::ShapeMatrixNotPositiveDefinite);
+                    }
+                    lower[row][col] = value.sqrt();
+                } else {
+                    let factor = value / lower[col][col];
+                    if !factor.is_finite() {
+                        return Err(EllipsoidGeometryError::NumericFailure);
+                    }
+                    lower[row][col] = factor;
+                }
+            }
+        }
+
+        let geometry = Self {
+            coordinate_ids,
+            center,
+            lower_shape_factor: lower,
+            radius,
+        };
+        geometry.validate()?;
+        Ok(geometry)
+    }
+
     pub fn validate(&self) -> Result<(), EllipsoidGeometryError> {
         let dimension = self.coordinate_ids.len();
         if dimension == 0 {
@@ -312,6 +383,52 @@ mod tests {
         assert_eq!(result.interval.support_radius, 24.0);
         assert_eq!(result.interval.lower_bound, -16.0);
         assert_eq!(result.interval.upper_bound, 32.0);
+    }
+
+    #[test]
+    fn shape_matrix_constructor_recovers_correlated_cholesky_factor() {
+        let geometry = EllipsoidGeometry::from_shape_matrix(
+            vec!["latency".to_owned(), "utility".to_owned()],
+            vec![1.0, -1.0],
+            &[vec![4.0, 2.0], vec![2.0, 10.0]],
+            0.5,
+        )
+        .unwrap();
+        assert_eq!(geometry.lower_shape_factor, vec![vec![2.0, 0.0], vec![1.0, 3.0]]);
+        let result = geometry.support(&direction("correlated", &[1.0, 2.0])).unwrap();
+        assert!((result.interval.support_radius - 0.5 * 52.0_f64.sqrt()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn shape_matrix_constructor_rejects_asymmetric_singular_and_indefinite_inputs() {
+        let ids = vec!["x".to_owned(), "y".to_owned()];
+        assert_eq!(
+            EllipsoidGeometry::from_shape_matrix(
+                ids.clone(),
+                vec![0.0, 0.0],
+                &[vec![2.0, 0.1], vec![0.2, 1.0]],
+                1.0,
+            ),
+            Err(EllipsoidGeometryError::ShapeMatrixNotSymmetric)
+        );
+        assert_eq!(
+            EllipsoidGeometry::from_shape_matrix(
+                ids.clone(),
+                vec![0.0, 0.0],
+                &[vec![1.0, 1.0], vec![1.0, 1.0]],
+                1.0,
+            ),
+            Err(EllipsoidGeometryError::ShapeMatrixNotPositiveDefinite)
+        );
+        assert_eq!(
+            EllipsoidGeometry::from_shape_matrix(
+                ids,
+                vec![0.0, 0.0],
+                &[vec![1.0, 2.0], vec![2.0, 1.0]],
+                1.0,
+            ),
+            Err(EllipsoidGeometryError::ShapeMatrixNotPositiveDefinite)
+        );
     }
 
     #[test]
