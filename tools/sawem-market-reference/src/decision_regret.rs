@@ -167,12 +167,6 @@ pub fn evaluate_decision_regret<'a>(
     for (reference, digest) in basis_refs.into_iter().zip(basis_hashes) {
         validate_ref_and_hash(reference, digest)?;
     }
-    for (index, reference) in basis_refs.iter().enumerate() {
-        if basis_refs[..index].contains(reference) {
-            return Err(DecisionRegretError::InvalidEvidenceReference);
-        }
-    }
-
     let mut declared = BTreeSet::new();
     for scenario_id in inputs.declared_scenario_ids.iter().copied() {
         if !nonempty(scenario_id) {
