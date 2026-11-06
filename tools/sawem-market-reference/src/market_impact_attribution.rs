@@ -541,6 +541,7 @@ mod tests {
                 interval_end_utc: 900,
                 energy_record_id: "energy/002",
                 energy_source_ref: "energy/002",
+                reference_price_record_id: "reference-price/interval-2",
                 impact_price_record_id: "impact/002",
                 impact_price_source_ref: "impact/002",
                 ..interval("TP-002", "energy/002", "impact/002", 1, 10, 9)
