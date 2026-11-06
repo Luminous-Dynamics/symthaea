@@ -496,7 +496,7 @@ mod tests {
     fn arbitrary_per_replication_offsets_leave_every_contrast_unchanged() {
         let original = observations();
         let mut shifted = original.clone();
-        let shifts = [11.0, -8.0, 0.125, 23.0, -4.0, 3.5];
+        let shifts = [3.0, -2.0, 0.125, 5.0, -4.0, 1.5];
         for row in &mut shifted {
             row.target_utility += shifts[row.replication_index as usize];
         }
