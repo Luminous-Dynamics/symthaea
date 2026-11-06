@@ -109,6 +109,31 @@
       "id": "jcs-equivalent-result-reencoding",
       "expected_replay_outcome": "replay_match",
       "rationale": "Representation-only numeric token differences in the serialized result are equivalent under RFC 8785 canonicalization."
+    },
+    {
+      "id": "malformed-requested-result-evidence-id",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "result.requested_evidence_ids contains a malformed Evidence ID"
+    },
+    {
+      "id": "unrequested-result-assessment-id",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "result evidence assessments must refer only to request premises"
+    },
+    {
+      "id": "duplicate-result-assessment-id",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "result assessment identifiers must be unique"
+    },
+    {
+      "id": "unrequested-missing-result-evidence-id",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "result missing IDs must be members of the exact request premise set"
+    },
+    {
+      "id": "evidence-id-marked-assessed-and-missing",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "a result Evidence ID cannot be both assessed and missing"
     }
   ]
 }
