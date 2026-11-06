@@ -714,6 +714,8 @@ pub struct RunReceipt {
     pub dataset_catalog_sha256: String,
     pub dataset_payload_sha256: Vec<String>,
     pub split_manifest_sha256: String,
+    /// SHA-256 of the exact ground-truth/adjudication manifest used for this run.
+    pub ground_truth_manifest_sha256: String,
     pub code_sha256: String,
     pub model_sha256: Option<String>,
     pub configuration_sha256: String,
@@ -767,6 +769,7 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
     for (path, digest) in [
         ("$.dataset_catalog_sha256", receipt.dataset_catalog_sha256.as_str()),
         ("$.split_manifest_sha256", receipt.split_manifest_sha256.as_str()),
+        ("$.ground_truth_manifest_sha256", receipt.ground_truth_manifest_sha256.as_str()),
         ("$.code_sha256", receipt.code_sha256.as_str()),
         ("$.configuration_sha256", receipt.configuration_sha256.as_str()),
         ("$.environment_sha256", receipt.environment_sha256.as_str()),
@@ -898,7 +901,7 @@ pub struct PayloadArtifact<'a> {
 /// split manifest, and imported payload bytes.
 ///
 /// This checks:
-/// - the catalogue and split SHA-256 values over exact original bytes;
+/// - the catalogue, split and ground-truth manifest SHA-256 values over exact original bytes;
 /// - the split's exact dataset ID and pinned version against the catalogue;
 /// - that the selected dataset is imported under reviewed rights;
 /// - every declared payload path and digest against supplied raw bytes;
@@ -910,6 +913,7 @@ pub fn verify_run_receipt_input_bindings(
     receipt_input: &str,
     catalog_bytes: &[u8],
     split_bytes: &[u8],
+    ground_truth_manifest_bytes: &[u8],
     payloads: &[PayloadArtifact<'_>],
 ) -> Result<ReceiptSummary, ValidationError> {
     let summary = validate_run_receipt(receipt_input)?;
@@ -926,6 +930,16 @@ pub fn verify_run_receipt_input_bindings(
         &receipt.split_manifest_sha256,
         "$.split_manifest_sha256",
     )?;
+    verify_sha256(
+        ground_truth_manifest_bytes,
+        &receipt.ground_truth_manifest_sha256,
+        "$.ground_truth_manifest_sha256",
+    )?;
+    serde_json::from_slice::<serde_json::Value>(ground_truth_manifest_bytes)
+        .map_err(|error| ValidationError::new(
+            "$.ground_truth_manifest",
+            format!("ground-truth manifest is not valid JSON: {error}"),
+        ))?;
 
     let catalog_text = std::str::from_utf8(catalog_bytes)
         .map_err(|error| ValidationError::new("$.dataset_catalog", format!("catalogue is not UTF-8: {error}")))?;
@@ -1295,6 +1309,7 @@ mod tests {
             "dataset_catalog_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "dataset_payload_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
             "split_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "ground_truth_manifest_sha256": "abababababababababababababababababababababababababababababababab",
             "code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "model_sha256": null,
             "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -1325,6 +1340,7 @@ mod tests {
             "dataset_catalog_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "dataset_payload_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
             "split_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "ground_truth_manifest_sha256": "abababababababababababababababababababababababababababababababab",
             "code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "model_sha256": null,
             "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -1349,7 +1365,7 @@ mod tests {
         assert!(error.to_string().contains("must differ"));
     }
 
-    fn bound_run_fixture() -> (String, String, String) {
+    fn bound_run_fixture() -> (String, String, String, String) {
         let payload = b"synthetic-receiver-payload-v1";
         let payload_sha256 = sha256_hex(payload);
         let catalog = json!({
@@ -1389,6 +1405,11 @@ mod tests {
                 {"record_id":"test-1","split":"test","event_group":"event-test","recording_group":"recording-test","receiver_group":"rx-test","campaign_group":"campaign-test","location_group":"site-test"}
             ]
         }).to_string();
+        let ground_truth = json!({
+            "schema": "emsr.ground-truth-manifest",
+            "version": "0.1.0",
+            "status": "synthetic_only"
+        }).to_string();
         let receipt = json!({
             "schema": RECEIPT_SCHEMA,
             "version": RECEIPT_VERSION,
@@ -1399,6 +1420,7 @@ mod tests {
             "dataset_catalog_sha256": sha256_hex(catalog.as_bytes()),
             "dataset_payload_sha256": [payload_sha256],
             "split_manifest_sha256": sha256_hex(split.as_bytes()),
+            "ground_truth_manifest_sha256": sha256_hex(ground_truth.as_bytes()),
             "code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "model_sha256": null,
             "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
@@ -1418,12 +1440,12 @@ mod tests {
                 "report_sha256":"abababababababababababababababababababababababababababababababab"
             }
         }).to_string();
-        (catalog, split, receipt)
+        (catalog, split, ground_truth, receipt)
     }
 
     #[test]
     fn verifies_exact_receipt_catalog_split_and_payload_bindings() {
-        let (catalog, split, receipt) = bound_run_fixture();
+        let (catalog, split, ground_truth, receipt) = bound_run_fixture();
         let payloads = [PayloadArtifact {
             path: "receiver.bin",
             bytes: b"synthetic-receiver-payload-v1",
@@ -1432,6 +1454,7 @@ mod tests {
             &receipt,
             catalog.as_bytes(),
             split.as_bytes(),
+            ground_truth.as_bytes(),
             &payloads,
         ).expect("exact input bindings should verify");
         assert_eq!(summary.run_id, "bound-run-1");
@@ -1440,7 +1463,7 @@ mod tests {
 
     #[test]
     fn rejects_payload_bytes_that_do_not_match_catalogue_digest() {
-        let (catalog, split, receipt) = bound_run_fixture();
+        let (catalog, split, ground_truth, receipt) = bound_run_fixture();
         let payloads = [PayloadArtifact {
             path: "receiver.bin",
             bytes: b"tampered-receiver-payload",
@@ -1449,14 +1472,32 @@ mod tests {
             &receipt,
             catalog.as_bytes(),
             split.as_bytes(),
+            ground_truth.as_bytes(),
             &payloads,
         ).expect_err("payload tampering must fail closed");
         assert!(error.to_string().contains("SHA-256 mismatch"));
     }
 
     #[test]
+    fn rejects_ground_truth_manifest_bytes_that_do_not_match_receipt() {
+        let (catalog, split, ground_truth, receipt) = bound_run_fixture();
+        let altered_ground_truth = ground_truth.replace("synthetic_only", "model_inferred");
+        let error = verify_run_receipt_input_bindings(
+            &receipt,
+            catalog.as_bytes(),
+            split.as_bytes(),
+            altered_ground_truth.as_bytes(),
+            &[PayloadArtifact {
+                path: "receiver.bin",
+                bytes: b"synthetic-receiver-payload-v1",
+            }],
+        ).expect_err("altered oracle manifest must fail digest verification");
+        assert!(error.to_string().contains("ground_truth_manifest_sha256"));
+    }
+
+    #[test]
     fn rejects_split_version_that_does_not_match_exact_catalogue() {
-        let (catalog, split, receipt) = bound_run_fixture();
+        let (catalog, split, ground_truth, receipt) = bound_run_fixture();
         let wrong_split = split.replace("fixture-v1", "fixture-v2");
         let mut receipt_value: serde_json::Value =
             serde_json::from_str(&receipt).expect("valid run receipt fixture");
@@ -1467,6 +1508,7 @@ mod tests {
             &rebound_receipt,
             catalog.as_bytes(),
             wrong_split.as_bytes(),
+            ground_truth.as_bytes(),
             &[PayloadArtifact {
                 path: "receiver.bin",
                 bytes: b"synthetic-receiver-payload-v1",
@@ -1487,6 +1529,7 @@ mod tests {
             "dataset_catalog_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "dataset_payload_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
             "split_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "ground_truth_manifest_sha256": "abababababababababababababababababababababababababababababababab",
             "code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "model_sha256": null,
             "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
