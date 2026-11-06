@@ -2122,6 +2122,29 @@ fn run_self_tests() -> Result<(), String> {
     }
     println!("SELF_TEST_PASS repository and nested file bootstrap are deterministic");
 
+    let mut mismatched_budget = cluster_runs.clone();
+    mismatched_budget[4].budget_policy_sha256 = sha256(b"larger-budget-for-strategy-b");
+    if pairwise_clustered_comparisons(&mismatched_budget, &cluster_eval).is_ok() {
+        return Err("pairwise strategy comparison accepted mismatched resource budgets".into());
+    }
+    println!("SELF_TEST_PASS pairwise comparisons reject unequal resource-budget policies");
+
+    let mut mismatched_condition = cluster_runs.clone();
+    mismatched_condition[4].evaluation_condition_sha256 = sha256(b"source-free-condition-for-strategy-b");
+    if pairwise_clustered_comparisons(&mismatched_condition, &cluster_eval).is_ok() {
+        return Err("pairwise strategy comparison accepted mismatched evaluation conditions".into());
+    }
+    println!("SELF_TEST_PASS pairwise comparisons reject unequal source/tool evaluation conditions");
+
+    let mut different_build = cluster_runs.clone();
+    different_build[0].strategy.implementation_sha256 = sha256(b"strategy-a-different-build");
+    different_build[0].strategy.execution_stack_sha256 = sha256(b"strategy-a-different-stack");
+    let separated = pairwise_clustered_comparisons(&different_build, &cluster_eval)?;
+    if separated.len() != 3 {
+        return Err(format!("different implementation builds were incorrectly merged into one strategy: {}", separated.len()));
+    }
+    println!("SELF_TEST_PASS implementation and execution-stack changes create distinct strategy identities");
+
     let holm = holm_adjusted_p_values(&[0.01, 0.04, 0.03]);
     if holm.len() != 3
         || (holm[0] - 0.03).abs() > 1e-12
