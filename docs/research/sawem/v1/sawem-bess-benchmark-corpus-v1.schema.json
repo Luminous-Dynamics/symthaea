@@ -69,7 +69,9 @@
             "evidence_and_lifecycle",
             "forecast_and_decision_replay",
             "physical_execution_and_settlement",
-            "bankability_and_realized_cash"
+            "bankability_and_realized_cash",
+            "field_execution_and_time_integrity",
+            "market_replay_and_policy_comparison"
           ]
         },
         "title": {
