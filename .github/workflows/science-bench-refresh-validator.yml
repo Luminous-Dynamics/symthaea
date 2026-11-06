@@ -913,7 +913,7 @@ jobs:
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
             audit-recoverability-manifest /tmp/sbr-recoverability/unknown-surface-manifest.json \
             > /tmp/sbr-recoverability/unknown-report.json
-          jq -e '.valid == true and .class_counts.NotEvaluable == 5 and .records | all(.recoverability == "NotEvaluable")' \
+          jq -e '.valid == true and .class_counts.NotEvaluable == 5 and ([.records[].recoverability] | all(. == "NotEvaluable"))' \
             /tmp/sbr-recoverability/unknown-report.json >/dev/null
 
           # Reduced route budget cannot make navigation easier; added route can improve only its target.
