@@ -1,0 +1,72 @@
+name: Connectome mechanism identifiability
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_MECHANISM_IDENTIFIABILITY_V1.md"
+      - "docs/neuroscience/CONNECTOME_MECHANISM_IDENTIFIABILITY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json"
+      - "tools/connectomics-intake-audit/src/bin/connectome_mechanism_identifiability_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_mechanism_identifiability_oracle.py"
+      - ".github/workflows/connectome-mechanism-identifiability.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_MECHANISM_IDENTIFIABILITY_V1.md"
+      - "docs/neuroscience/CONNECTOME_MECHANISM_IDENTIFIABILITY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json"
+      - "tools/connectomics-intake-audit/src/bin/connectome_mechanism_identifiability_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_mechanism_identifiability_oracle.py"
+      - ".github/workflows/connectome-mechanism-identifiability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-mechanism-identifiability:
+    name: Exact finite-sample mechanism identifiability and independent oracle
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Check mechanism audit formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_mechanism_identifiability_audit.rs
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_mechanism_identifiability_audit -- -D warnings
+      - name: Run Rust tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_mechanism_identifiability_audit
+      - name: Produce Rust mechanism-identifiability report
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_mechanism_identifiability_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json \
+            --output "$RUNNER_TEMP/mechanism-identifiability-report.json"
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate schema, fixture and independent report oracle
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_mechanism_identifiability_oracle.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_MECHANISM_IDENTIFIABILITY.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert len(fixture["predictions"]) == 30
+          print("Draft 2020-12 schema and 30-cell known-answer fixture: PASS")
+          PY
+          python3 tools/connectomics-intake-audit/reference/verify_mechanism_identifiability_oracle.py \
+            docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json \
+            --self-test \
+            --compare-report "$RUNNER_TEMP/mechanism-identifiability-report.json"
