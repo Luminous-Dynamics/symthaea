@@ -100,7 +100,12 @@
       "source_ids": [
         "cb2_hf_main",
         "cb2_hf_main_commit"
-      ]
+      ],
+      "sample_type_count_reconciliation": {
+        "reported_sum": 401461,
+        "delta_vs_row_count": 291,
+        "status": "SOURCE_REPORTED_COUNTS_DO_NOT_RECONCILE"
+      }
     },
     {
       "revision_id": "V2_PAPER_REVISION",
@@ -119,7 +124,12 @@
         "cb2_hf_main",
         "cb2_paper",
         "vlm_preprint_2609_36492"
-      ]
+      ],
+      "sample_type_count_reconciliation": {
+        "reported_sum": null,
+        "delta_vs_row_count": null,
+        "status": "NOT_REPORTED"
+      }
     }
   ],
   "v2_full_test": {
@@ -184,10 +194,34 @@
   },
   "v2_model_results": [
     {
+      "model": "Qwen3.5-9B",
+      "training_regime": "LoRA adapter trained on V2 train and validation",
+      "split_error_balanced_accuracy_percent": 94.6,
+      "merge_error_balanced_accuracy_percent": 90.2,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    },
+    {
+      "model": "InternVL3-8B",
+      "training_regime": "LoRA adapter trained on V2 train and validation",
+      "split_error_balanced_accuracy_percent": 93.9,
+      "merge_error_balanced_accuracy_percent": 90.1,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    },
+    {
       "model": "Gemma 4 12B",
-      "training_regime": "LoRA; balanced mouse/fly training, unchanged transfer to held-out species",
-      "split_error_balanced_accuracy_percent": 79.4,
-      "merge_error_balanced_accuracy_percent": 77.3,
+      "training_regime": "LoRA adapter trained on V2 train and validation",
+      "split_error_balanced_accuracy_percent": 95,
+      "merge_error_balanced_accuracy_percent": 90.9,
+      "dataset_revision_id": "V2_PAPER_REVISION",
+      "table": "TABLE_2_FULL_V2_TEST"
+    },
+    {
+      "model": "ConnectomeBench2 ViT-B",
+      "training_regime": "EM-only source-paper reference",
+      "split_error_balanced_accuracy_percent": 94.2,
+      "merge_error_balanced_accuracy_percent": 91.1,
       "dataset_revision_id": "V2_PAPER_REVISION",
       "table": "TABLE_2_FULL_V2_TEST"
     }
