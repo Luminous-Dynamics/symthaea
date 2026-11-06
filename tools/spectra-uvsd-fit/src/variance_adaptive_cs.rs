@@ -313,7 +313,13 @@ impl VarianceAdaptiveSubGaussianCs {
     }
 
     pub fn point_estimate(&self) -> Option<f64> {
-        (self.sample_count > 0 || self.subgaussian_proxy == 0.0).then_some(self.mean)
+        if self.sample_count > 0 {
+            Some(self.mean)
+        } else if self.subgaussian_proxy == 0.0 {
+            Some(self.range_lower)
+        } else {
+            None
+        }
     }
 
     pub fn two_sided_alpha(&self) -> f64 {
@@ -362,6 +368,7 @@ mod tests {
         let before = cs.current_interval().unwrap();
         assert_eq!(before.lower_bound, 3.0);
         assert_eq!(before.upper_bound, 3.0);
+        assert_eq!(cs.point_estimate(), Some(3.0));
         let after = cs.update(3.0).unwrap();
         assert_eq!(after.lower_bound, 3.0);
         assert_eq!(after.upper_bound, 3.0);
