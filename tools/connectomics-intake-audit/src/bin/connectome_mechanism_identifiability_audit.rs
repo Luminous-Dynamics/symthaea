@@ -6,7 +6,6 @@
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -167,8 +166,7 @@ struct Report {
     status: String,
 }
 
-type PredictionKey = (String, String, String);
-type PredictionMap = BTreeMap<PredictionKey, Vec<f64>>;
+type PredictionMap = BTreeMap<(String, String, String), Vec<f64>>;
 
 fn sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
@@ -253,7 +251,9 @@ fn total_variation(left: &[f64], right: &[f64]) -> f64 {
         .sum::<f64>()
 }
 
-fn validate_input(input: &Input) -> Result<(PredictionMap, BTreeMap<String, &Intervention>), String> {
+fn validate_input<'a>(
+    input: &'a Input,
+) -> Result<(PredictionMap, BTreeMap<String, &'a Intervention>), String> {
     if input.schema_version != 1 {
         return Err("schema_version must equal 1".into());
     }
@@ -772,28 +772,28 @@ mod tests {
     #[test]
     fn underpowered_single_replicate_does_not_retain_known_answer() {
         let mut value = fixture();
-        value["replicate_design"]["replicate_count"] = json!(1);
+        value["replicate_design"]["replicate_count"] = serde_json::json!(1);
         assert!(run_value(value).is_err());
     }
 
     #[test]
     fn malformed_probability_is_rejected() {
         let mut value = fixture();
-        value["predictions"][0]["outcomes"][0]["probability"] = json!(1.5);
+        value["predictions"][0]["outcomes"][0]["probability"] = serde_json::json!(1.5);
         assert!(run_value(value).unwrap_err().contains("invalid probability"));
     }
 
     #[test]
     fn probabilities_must_sum_to_one() {
         let mut value = fixture();
-        value["predictions"][0]["outcomes"][0]["probability"] = json!(0.5);
+        value["predictions"][0]["outcomes"][0]["probability"] = serde_json::json!(0.5);
         assert!(run_value(value).unwrap_err().contains("do not sum to one"));
     }
 
     #[test]
     fn infeasible_action_cannot_be_promoted_after_status_mutation() {
         let mut value = fixture();
-        value["interventions"][4]["feasibility_status"] = json!("FEASIBLE");
+        value["interventions"][4]["feasibility_status"] = serde_json::json!("FEASIBLE");
         assert!(run_value(value).is_err());
     }
 
