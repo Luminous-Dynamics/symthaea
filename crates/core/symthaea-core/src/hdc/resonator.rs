@@ -542,7 +542,70 @@ impl ResonatorNetwork {
         constraints: &[MultiConstraint],
         max_iter: Option<usize>,
     ) -> Result<HashMap<String, ResonatorSolution>> {
+        if unknowns.is_empty() {
+            anyhow::bail!("Resonator system requires at least one unknown");
+        }
+        if constraints.is_empty() {
+            anyhow::bail!("Resonator system requires at least one constraint");
+        }
+
+        let unknown_names: HashSet<&str> = unknowns.iter().copied().collect();
+        if unknown_names.len() != unknowns.len() {
+            anyhow::bail!("Resonator system contains duplicate unknown names");
+        }
+        if unknowns.iter().any(|name| name.trim().is_empty()) {
+            anyhow::bail!("Resonator unknown names must not be empty");
+        }
+
+        let validate_factor = |factor: &Factor| -> Result<()> {
+            match factor {
+                Factor::Known(vector) => {
+                    if vector.len() != self.dimension {
+                        anyhow::bail!("Known factor dimension does not match resonator dimension");
+                    }
+                    if vector.iter().any(|value| !value.is_finite()) {
+                        anyhow::bail!("Known factor contains non-finite values");
+                    }
+                }
+                Factor::Symbol(name) => {
+                    if !self.symbol_names.contains_key(name) {
+                        anyhow::bail!("Unknown symbol in resonator constraint: {name}");
+                    }
+                }
+                Factor::Unknown(name) => {
+                    if !unknown_names.contains(name.as_str()) {
+                        anyhow::bail!("Constraint references undeclared unknown: {name}");
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        let mut constrained_unknowns = HashSet::new();
+        for constraint in constraints {
+            if !constraint.weight.is_finite() || constraint.weight <= 0.0 {
+                anyhow::bail!("Resonator system constraint weights must be finite and positive");
+            }
+            validate_factor(&constraint.left)?;
+            validate_factor(&constraint.right)?;
+            match &constraint.unknown {
+                Factor::Unknown(name) if unknown_names.contains(name.as_str()) => {
+                    constrained_unknowns.insert(name.as_str());
+                }
+                Factor::Unknown(name) => {
+                    anyhow::bail!("Constraint solves undeclared unknown: {name}");
+                }
+                _ => anyhow::bail!("Each multi-constraint must identify an unknown to update"),
+            }
+        }
+        for name in unknowns {
+            if !constrained_unknowns.contains(name) {
+                anyhow::bail!("Unknown has no solving constraint: {name}");
+            }
+        }
+
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        self.energy_history.clear();
 
         // Initialize estimates for all unknowns
         let mut estimates: HashMap<String, Vec<f32>> = unknowns
@@ -582,7 +645,11 @@ impl ResonatorNetwork {
             .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
             .collect();
 
-        for _iteration in 0..max_iterations {
+        let mut iterations_run = 0usize;
+        let mut converged = false;
+
+        for iteration in 0..max_iterations {
+            iterations_run = iteration + 1;
             // Compute updates for each unknown
             let mut updates: HashMap<String, Vec<f32>> = unknowns
                 .iter()
@@ -694,7 +761,9 @@ impl ResonatorNetwork {
             }
 
             if all_converged {
-                // Mark all states as converged
+                converged = true;
+                // Mark all states as converged only after the whole system
+                // satisfies the fixed-point criterion in the same iteration.
                 for state in &mut self.states {
                     state.converged = true;
                 }
@@ -711,7 +780,7 @@ impl ResonatorNetwork {
                     .expect("estimates map must contain all unknowns");
                 (
                     name.to_string(),
-                    self.create_solution(estimate, max_iterations, true),
+                    self.create_solution(estimate, iterations_run, converged),
                 )
             })
             .collect();
