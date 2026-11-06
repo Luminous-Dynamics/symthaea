@@ -765,6 +765,59 @@ mod tests {
     }
 
     #[test]
+    fn activation_signature_receipt_binds_probe_order_and_is_repeatable() {
+        let config = CfCNetworkConfig {
+            input_dim: 1,
+            hidden_dim: 2,
+            num_layers: 1,
+            output_dim: 1,
+            cell_config: CfCConfig {
+                input_dim: 1,
+                hidden_dim: 2,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-cfc-probe-digest-test-v1",
+        );
+        let network = CfCNetwork::from_genesis(config, &genesis, "probe-digest");
+        let probes = vec![
+            CfCFunctionalProbe {
+                input: vec![0.2],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.7],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9],
+                dt: 0.1,
+            },
+        ];
+        let first =
+            cfc_hidden_unit_activation_signatures(&network, 0, &probes).expect("first receipt");
+        let repeated =
+            cfc_hidden_unit_activation_signatures(&network, 0, &probes).expect("repeat receipt");
+        let mut reordered_probes = probes.clone();
+        reordered_probes.reverse();
+        let reordered =
+            cfc_hidden_unit_activation_signatures(&network, 0, &reordered_probes)
+                .expect("reordered receipt");
+
+        assert_eq!(first.probe_digest, repeated.probe_digest);
+        assert_ne!(first.probe_digest, reordered.probe_digest);
+        assert_eq!(first.model_digest, reordered.model_digest);
+        assert_eq!(first.signatures, repeated.signatures);
+    }
+
+    #[test]
     fn alternating_cycle_margin_matches_small_exact_assignment_fixture() {
         let costs = vec![
             vec![0.0, 4.0, 9.0],
