@@ -46,12 +46,13 @@ For each required, pinned evidence unit, a finite graph binds the initial state 
 
 A direct route takes precedence over a reformulation or navigation route; reformulation takes precedence over navigation. Both reformulation and navigation must begin after an initial retrieval attempt: rewrites or structural actions that occur before the first-pass miss do not count as recovery. The report includes the deterministic shortest route witness and route cost. These witnesses and gold artifact references are evaluator-side only. The reported family-reference count is descriptive: this module does not resolve opaque source-family references against Mycelix provenance, and it must not be interpreted as an independent-source count.
 
-A ReformulationRecoverable route must perform InitialRetrieval first, then QueryReformulation, then PostReformulationRetrieval. Query rewriting before any first-pass retrieval, or retrieval before the rewrite, does not qualify. The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. Reachability is asymmetric: a concrete pinned route is positive evidence even when the observed surface is partial; a missing route is not evidence of unreachability unless the declared finite surface and route inventory are frozen and complete. Thus a partial surface can preserve DirectlyReachable, ReformulationRecoverable, or NavigationRecoverable witnesses, but an item with no observed route becomes NotEvaluable. An entirely unknown surface makes every item NotEvaluable.
+A ReformulationRecoverable route must perform InitialRetrieval first, then QueryReformulation, then PostReformulationRetrieval. Query rewriting before any first-pass retrieval, or retrieval before the rewrite, does not qualify. The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. Reachability is asymmetric: a concrete pinned route is positive evidence even when the observed surface is partial; a missing route is not evidence of unreachability unless the declared finite surface and route inventory are frozen and complete. For `UnreachableWithinBudget`, the manifest must also bind `surface_completeness_receipt_sha256`, a digest reference to a separately reviewed receipt asserting that the exact corpus snapshot, search surface, route policy, and finite route inventory are complete. Without that reference, a partial or nominally complete inventory can still preserve DirectlyReachable, ReformulationRecoverable, or NavigationRecoverable witnesses, but an item with no observed route becomes NotEvaluable. An entirely unknown surface makes every item NotEvaluable. The evaluator records the receipt digest but does not verify the receipt's issuer, content, or completeness theorem; independent verification and pre-run anchoring are a separate qualification gate.
 
 ## Executable contract
 
 Implementation lives in research/science-bench-refresh/src/recoverability.rs. The typed manifest contains:
 - pinned corpus, search-surface and route-policy SHA-256 digests;
+- optional `surface_completeness_receipt_sha256`, required for negative reachability labels and independently verified outside this evaluator;
 - start node, finite positive route budget and unit;
 - bounded nodes and typed operation edges;
 - required evidence-unit IDs, artifact digests, declared source-family refs and availability state;
@@ -91,7 +92,7 @@ The initial synthetic fixture covers:
 - unknown artifact availability;
 - duplicate artifact mirrors with a shared source family.
 
-Metamorphic checks verify that reducing budget never improves reachability, adding a concrete first-pass edge can improve only the target unit, partial surfaces preserve positive route witnesses while blocking negative claims, unknown surfaces yield only NotEvaluable, post-retrieval-before-rewrite is rejected, rewriting-before-first-retrieval is rejected, and a tampered manifest commitment yields no route labels. An independent Python reference is compared against Rust for every classification and shortest-route witness. A model-supplied judgment field is rejected as an unknown property.
+Metamorphic checks verify that reducing budget never improves reachability, adding a concrete first-pass edge can improve only the target unit, partial surfaces preserve positive route witnesses while blocking negative claims, missing completeness receipts block negative labels while preserving positive routes, unknown surfaces yield only NotEvaluable, post-retrieval-before-rewrite is rejected, rewriting-before-first-retrieval is rejected, and a tampered manifest commitment yields no route labels. An independent Python reference is compared against Rust for every classification and shortest-route witness. A model-supplied judgment field is rejected as an unknown property.
 
 ## Benchmark strategy and target comparisons
 
@@ -111,6 +112,7 @@ Metrics remain separate: Recall@k, evidence-family recall, path completion and r
 - 100% monotonicity on the frozen budget/route mutation suite.
 - 0 model-dependent recoverability labels.
 - 0 evaluator route witnesses/gold labels in policy-visible task input.
+- 0 `UnreachableWithinBudget` labels without an independently verified completeness receipt for the exact surface, corpus, route policy, and budget.
 - 100% of evidence digests preserved by re-presentation controls.
 - A2 is credited with an agency-specific gain only when A2−A1 is positive on preregistered recoverability strata at matched budgets, after paired uncertainty and family-wise correction.
 - Baseline-only pilot and power analysis precede choosing any minimum empirical effect size.
@@ -127,7 +129,7 @@ This evaluator uses a proof asymmetry that is easy to miss in ordinary retrieval
 - One valid, pinned route witness proves that the benchmark's declared search surface permits access to that exact evidence unit.
 - Failure to find a route proves nothing unless the benchmark has enumerated the complete route space for its exact declared finite surface and operation policy.
 - Unknown or incomplete route inventories can therefore establish positive reachability, but cannot establish negative reachability.
-- Even a complete graph only supports `UnreachableWithinBudget` inside its committed snapshot and budget; it says nothing about the open web or the world.
+- Even a graph with an externally verified completeness receipt only supports `UnreachableWithinBudget` inside its committed snapshot and budget; it says nothing about the open web or the world. A receipt digest pointer alone is not proof until the referenced receipt is independently verified.
 
 This is especially important for scientific and multilingual retrieval: partial API access, unpinned index state, rights restrictions, provider outages, or missing source versions must not be laundered into evidence absence.
 
