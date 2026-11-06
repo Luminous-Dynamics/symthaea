@@ -13,6 +13,7 @@ inductive EvidenceClass where
   | BoundedModel
   | RuntimeObservation
   | SourceAudit
+  | ProviderObservation
   | RefinementProof
   | TemporalProof
   deriving DecidableEq, Repr
