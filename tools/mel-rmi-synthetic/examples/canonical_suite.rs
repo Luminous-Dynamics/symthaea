@@ -7,8 +7,9 @@ use mel_rmi_synthetic::{
     PairedEffectValue, PartnerAuthorityEventV1, PartnerAuthorityV1, PartnerCausalContrast,
     ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy, TaskSpec, TrialRecordV1,
     TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation, assess_scoped_negotiation,
-    bind_verified_artifacts, canonical_fixture_replicates_v1, run_policy_suite_v1,
-    run_reciprocal_suite_v1, summarize_paired_effects, validate_partner_authority_event,
+    bind_verified_artifacts, canonical_fixture_replicates_v1, measure_partner_contrast,
+    run_policy_suite_v1, run_reciprocal_suite_v1, summarize_paired_effects,
+    validate_partner_authority_event,
     verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
@@ -37,13 +38,25 @@ impl AgentPolicy for YokedSuitePolicy {
         {
             return Err(HarnessError::InvalidYoke);
         }
-        let value = match task.target_dimension {
-            Dimension::Motif => 9,
-            Dimension::Rhythm => 3,
-            Dimension::Tempo => 8,
-            Dimension::Role => 2,
-            Dimension::Texture => 4,
-        };
+        // A deterministic, condition-independent synthetic replay from a
+        // distinct prior-session bank. It is keyed only by frozen task/session
+        // identity—not by the currently intervened musical feature.
+        let mut state = observation.seed
+            ^ self
+                .source_session_id
+                .bytes()
+                .chain(task.task_id.bytes())
+                .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+                    (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01B3)
+                });
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        state = (state ^ (state >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        state = (state ^ (state >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        state ^= state >> 31;
+        if task.expected_response.modulus <= 1 {
+            return Err(HarnessError::InvalidTask);
+        }
+        let value = (state % task.expected_response.modulus as u64) as i32;
         Ok(AgentAction {
             event_id: format!("{}::yoked::action", observation.event_id),
             source_event_id: observation.event_id.clone(),
@@ -410,10 +423,33 @@ fn report_one_paired_summary(label: &str, summary: &DimensionEffectSummary) {
     );
 }
 
-fn paired_agent_observations(records: &[TrialRecordV1]) -> Vec<PairedEffectObservation> {
-    records
-        .iter()
-        .map(|record| PairedEffectObservation {
+fn paired_agent_observations(
+    records: &[TrialRecordV1],
+    yoked_records: &[TrialRecordV1],
+) -> Result<Vec<PairedEffectObservation>, Box<dyn Error>> {
+    if records.len() != yoked_records.len() {
+        return Err("candidate/yoke suite length mismatch".into());
+    }
+    let mut observations = Vec::with_capacity(records.len());
+    for (record, yoke) in records.iter().zip(yoked_records.iter()) {
+        if record.task.task_id != yoke.task.task_id
+            || record.manifest.session_id != yoke.manifest.session_id
+            || record.manifest.task_seed != yoke.manifest.task_seed
+            || record.manifest.input_event_ids != yoke.manifest.input_event_ids
+            || record.manifest.condition_order != yoke.manifest.condition_order
+            || yoke.manifest.policy_id != "yoked"
+            || yoke.actions.iter().any(|action| action.mechanism != ActionMechanism::Yoked)
+        {
+            return Err("candidate/yoke trial identity mismatch".into());
+        }
+        // Yoke effect is the treatment-vs-control change in the replay arm,
+        // not the absolute distance between an unrelated response and the
+        // candidate's control action.
+        let yoked_delta = record.task.expected_response.distance(
+            yoke.actions[0].feature.value,
+            yoke.actions[1].feature.value,
+        )?;
+        observations.push(PairedEffectObservation {
             cluster_id: record.manifest.session_id.clone(),
             trial_id: record.task.task_id.clone(),
             dimension: record.task.target_dimension,
@@ -423,18 +459,38 @@ fn paired_agent_observations(records: &[TrialRecordV1]) -> Vec<PairedEffectObser
                 targeted_delta: record.contrast.targeted_delta,
                 sham_delta: record.contrast.sham_delta,
                 unrelated_delta: record.contrast.unrelated_target_delta,
-                yoked_delta: None,
+                yoked_delta: Some(yoked_delta),
             }),
-        })
-        .collect()
+        });
+    }
+    Ok(observations)
 }
 
 fn paired_partner_observations(
     records: &[ReciprocalTrialRecordV1],
-) -> Vec<PairedEffectObservation> {
-    records
-        .iter()
-        .map(|record| PairedEffectObservation {
+    yoked_records: &[TrialRecordV1],
+    partner_policy: &dyn mel_rmi_synthetic::ControlledPartner,
+) -> Result<Vec<PairedEffectObservation>, Box<dyn Error>> {
+    if records.len() != yoked_records.len() {
+        return Err("reciprocal/yoke suite length mismatch".into());
+    }
+    let mut observations = Vec::with_capacity(records.len());
+    for (record, yoke) in records.iter().zip(yoked_records.iter()) {
+        if record.agent.task.task_id != yoke.task.task_id
+            || record.agent.manifest.session_id != yoke.manifest.session_id
+            || record.agent.manifest.input_event_ids != yoke.manifest.input_event_ids
+            || yoke.manifest.policy_id != "yoked"
+        {
+            return Err("reciprocal/yoke trial identity mismatch".into());
+        }
+        let yoke_partner = measure_partner_contrast(
+            partner_policy,
+            record.agent.interventions.control.initial_partner_feature,
+            &yoke.actions,
+            &record.agent.task,
+            &record.agent.interventions,
+        )?;
+        observations.push(PairedEffectObservation {
             cluster_id: record.agent.manifest.session_id.clone(),
             trial_id: record.agent.task.task_id.clone(),
             dimension: record.agent.task.target_dimension,
@@ -444,10 +500,11 @@ fn paired_partner_observations(
                 targeted_delta: record.partner.targeted_delta,
                 sham_delta: record.partner.sham_delta,
                 unrelated_delta: record.partner.unrelated_delta,
-                yoked_delta: None,
+                yoked_delta: Some(yoke_partner.targeted_delta),
             }),
-        })
-        .collect()
+        });
+    }
+    Ok(observations)
 }
 
 fn report_policy_aggregates(records: &[TrialRecordV1]) {
@@ -945,9 +1002,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         "record_type,task_id,policy_id,dimension,agent_targeted_delta,agent_sham_delta,agent_unrelated_delta,agent_input_sensitive,agent_target_specific,agent_oracle_rule_match,agent_qualified,partner_targeted_delta,partner_sham_delta,partner_unrelated_delta,partner_input_sensitive,partner_target_specific,partner_oracle_rule_match,reciprocal_qualified"
     );
 
+    let yoked_source_session_id = "prior-session-bank-v1";
+    let yoked_policy = YokedSuitePolicy {
+        source_session_id: yoked_source_session_id.to_owned(),
+    };
+    let yoked_config = TrialRunConfig {
+        policy_version: format!(
+            "canonical-fixture-yoke-v1;source_session={yoked_source_session_id}"
+        ),
+        code_revision: config.code_revision.clone(),
+    };
+    let yoked_records = run_policy_suite_v1(&fixtures, &yoked_policy, &yoked_config)?;
+
     let mut artifact_bindings_verified = 0usize;
     for policy in policies {
-        let mut records = run_policy_suite_v1(&fixtures, policy.as_ref(), &config)?;
+        let mut records = if policy.policy_id() == "yoked" {
+            yoked_records.clone()
+        } else {
+            run_policy_suite_v1(&fixtures, policy.as_ref(), &config)?
+        };
         for record in &mut records {
             bind_and_verify_synthetic_artifacts(record)?;
             artifact_bindings_verified += 1;
@@ -970,17 +1043,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
         }
         report_policy_aggregates(&records);
-        report_paired_statistics("agent", &paired_agent_observations(&records))?;
+        report_paired_statistics(
+            "agent",
+            &paired_agent_observations(&records, &yoked_records)?,
+        )?;
     }
 
+    let responsive_partner = ResponsivePartnerPolicy {
+        id: "responsive-partner".to_owned(),
+    };
     let mut reciprocal = run_reciprocal_suite_v1(
         &fixtures,
         &RuleBasedPolicy {
             id: "rule-positive".to_owned(),
         },
-        &ResponsivePartnerPolicy {
-            id: "responsive-partner".to_owned(),
-        },
+        &responsive_partner,
         &config,
     )?;
     for record in &mut reciprocal {
@@ -1019,7 +1096,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
     report_reciprocal_aggregates(&reciprocal);
-    report_paired_statistics("partner", &paired_partner_observations(&reciprocal))?;
+    report_paired_statistics(
+        "partner",
+        &paired_partner_observations(&reciprocal, &yoked_records, &responsive_partner)?,
+    )?;
 
     let (negotiation_qualified, negotiation_rejected) = run_negotiation_conformance()?;
     if negotiation_qualified != 6 || negotiation_rejected != 5 {
