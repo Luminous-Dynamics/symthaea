@@ -146,6 +146,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         require(reproduction['paper_source_tables_sha256'] is None, 'unverified paper tables carry a verification digest')
     if reproduction['q_method_reproduced']:
         require('STIMULATED_RAW_RECORDINGS' in components and components['STIMULATED_RAW_RECORDINGS']['availability'] == 'MATERIALIZED_AND_HASHED', 'q method cannot be reproduced without materialized stimulated recordings')
+        require('UNSTIMULATED_NULL_CONTROLS' in components and components['UNSTIMULATED_NULL_CONTROLS']['availability'] == 'MATERIALIZED_AND_HASHED', 'q method cannot be reproduced without materialized unstimulated null controls')
     if reproduction['qeq_method_reproduced']:
         require('UNSTIMULATED_NULL_CONTROLS' in components and components['UNSTIMULATED_NULL_CONTROLS']['availability'] == 'MATERIALIZED_AND_HASHED', 'q_eq method cannot be reproduced without materialized unstimulated null controls')
         require(reproduction['qeq_epsilon_sigma'] is not None and abs(float(reproduction['qeq_epsilon_sigma']) - 1.2) <= 1e-12, 'q_eq reproduction must pin the paper epsilon=1.2 sigma')
@@ -164,7 +165,17 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     inferred_tier = infer_reproduction_tier(data)
     tier_order = {tier: index for index, tier in enumerate(TIERS)}
     require(data['declared_reproduction_tier'] == inferred_tier, f"declared reproduction tier {data['declared_reproduction_tier']} exceeds or differs from evidence-supported tier {inferred_tier}")
-    require(inferred_tier != 'FULL_RAW_REPRODUCED' or reproduction['q_method_reproduced'] and reproduction['qeq_method_reproduced'], 'full tier requires independent q and q_eq reproduction')
+    require(inferred_tier != 'FULL_RAW_REPRODUCED' or (
+        reproduction['q_method_reproduced']
+        and reproduction['qeq_method_reproduced']
+        and reproduction['event_exclusion_lineage_complete']
+        and reproduction['neuron_identity_lineage_complete']
+        and reproduction['analysis_code_commit_sha'] is not None
+    ), 'full tier requires independent q/q_eq reproduction, complete source lineage and a pinned analysis commit')
+    require(
+        data['claim_scope'] != 'metadata_inventory' or inferred_tier == 'METADATA_ONLY',
+        'metadata_inventory claim scope cannot promote a response-reanalysis or reproduction tier'
+    )
 
     return {
         'schema_version': 1,
@@ -211,6 +222,12 @@ def run_negative_controls(data: dict[str, Any]) -> None:
     stale_inventory['dandi_release']['inventory_state'] = 'VERIFIED_EXACT'
     stale_inventory['dandi_release']['inventory_manifest_sha256'] = 'a' * 64
     cases.append(('verified exact DANDI inventory without all assets', stale_inventory))
+    false_q = copy.deepcopy(data)
+    false_q['reproduction_evidence']['q_method_reproduced'] = True
+    cases.append(('q method claimed without materialized raw/null data', false_q))
+    false_claim_scope = copy.deepcopy(data)
+    false_claim_scope['claim_scope'] = 'full_raw_reproduction'
+    cases.append(('metadata-only evidence with full-reproduction claim scope', false_claim_scope))
     for label, mutated in cases:
         try:
             verify(mutated)
