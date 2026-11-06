@@ -70,7 +70,6 @@ fn claim_value(subject_sha256: &str, operation: &str, asserted_value: Value, evi
 }
 
 fn underdetermined_seed() -> Vec<u8> {
-    let subject_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     let claim = claim_value("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "inspect_artifact", json!({"status":"complete"}), Vec::new());
     let claim_request_sha256 = digest(&claim);
@@ -158,18 +157,47 @@ fn supporting_seed(evidence_bytes: &[u8]) -> Vec<u8> {
 
 fn main() -> io::Result<()> {
     let mode = std::env::args().nth(1).unwrap_or_else(|| "support".to_owned());
+    let evidence = include_bytes!(
+        "../../../../crates/domains/symthaea-rea-compat/tests/fixtures/rea-evidence-v1.json"
+    );
     let seed = match mode.as_str() {
-        "support" => {
-            let evidence = include_bytes!(
-                "../../../../crates/domains/symthaea-rea-compat/tests/fixtures/rea-evidence-v1.json"
-            );
-            supporting_seed(evidence)
-        }
+        "support" => supporting_seed(evidence),
         "underdetermined" => underdetermined_seed(),
+        "self-consistent-false-disposition" => {
+            let mut seed = supporting_seed(evidence);
+            // Frame parsing is intentionally local to the deterministic seed tool.
+            // Replace the disposition in the serialized result and recompute its
+            // unkeyed JCS digest, preserving a structurally valid forged result.
+            let mut cursor = 0usize;
+            let claim_len = u32::from_le_bytes(seed[cursor..cursor + 4].try_into().unwrap()) as usize;
+            cursor += 4;
+            let result_len = u32::from_le_bytes(seed[cursor..cursor + 4].try_into().unwrap()) as usize;
+            cursor += 4;
+            let count = seed[cursor] as usize;
+            cursor += 1 + count * 4;
+            let result_start = cursor + claim_len;
+            let result_end = result_start + result_len;
+            let mut result: Value = serde_json::from_slice(&seed[result_start..result_end]).unwrap();
+            result["disposition"] = json!("refuted_within_scope");
+            let mut body = result.clone();
+            body.as_object_mut().unwrap().remove("derivation_sha256");
+            result["derivation_sha256"] = json!(digest(&body));
+            let result_bytes = serde_json::to_vec(&result).unwrap();
+            let mut rebuilt = Vec::with_capacity(seed.len() + 64);
+            rebuilt.extend_from_slice(&(claim_len as u32).to_le_bytes());
+            rebuilt.extend_from_slice(&(result_bytes.len() as u32).to_le_bytes());
+            rebuilt.push(count as u8);
+            rebuilt.extend_from_slice(&seed[9..9 + count * 4]);
+            rebuilt.extend_from_slice(&seed[cursor..result_start]);
+            rebuilt.extend_from_slice(&result_bytes);
+            rebuilt.extend_from_slice(&seed[result_end..]);
+            seed = rebuilt;
+            seed
+        }
         _ => {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "expected seed mode: support or underdetermined",
+                "expected seed mode: support, underdetermined or self-consistent-false-disposition",
             ));
         }
     };
