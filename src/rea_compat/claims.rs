@@ -1171,5 +1171,4 @@ mod tests {
         let error = evaluate_claim(&claim, &[]).unwrap_err();
         assert_eq!(error.kind, ClaimErrorKind::ResourceLimit);
     }
-
 }
