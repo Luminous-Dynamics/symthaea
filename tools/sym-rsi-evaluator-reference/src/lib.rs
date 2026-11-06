@@ -222,13 +222,13 @@ pub fn validate_fixture_pack(pack: &FixturePack) -> ValidationReport {
         );
     }
 
-    let mut fixture_ids = BTreeSet::new();
-    let mut control_ids = BTreeSet::new();
+    let mut fixture_ids: BTreeSet<String> = BTreeSet::new();
+    let mut control_ids: BTreeSet<String> = BTreeSet::new();
     let mut observed_negative = 0usize;
     let mut observed_positive = 0usize;
 
     for fixture in &pack.fixtures {
-        if !fixture_ids.insert(fixture.fixture_id.as_str()) {
+        if !fixture_ids.insert(fixture.fixture_id.clone()) {
             report.issue("DUPLICATE_FIXTURE_ID", &fixture.fixture_id);
         }
         if !non_empty(Some(&fixture.scenario)) {
@@ -259,7 +259,7 @@ pub fn validate_fixture_pack(pack: &FixturePack) -> ValidationReport {
                     report.issue("NEGATIVE_CONTROL_ID_MISSING", &fixture.fixture_id);
                     continue;
                 };
-                if !control_ids.insert(control_id) {
+                if !control_ids.insert(control_id.to_owned()) {
                     report.issue("DUPLICATE_CONTROL_ID", control_id);
                 }
                 if !non_empty(fixture.threat_category.as_deref()) {
