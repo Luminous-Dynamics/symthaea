@@ -81,9 +81,8 @@ mod adaptive_null_simulation {
         let z2 = WILSON_Z_95 * WILSON_Z_95;
         let denominator = 1.0 + z2 / n;
         let center = (p + z2 / (2.0 * n)) / denominator;
-        let half_width = WILSON_Z_95
-            * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
-            / denominator;
+        let half_width =
+            WILSON_Z_95 * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
         center + half_width
     }
 
@@ -95,8 +94,7 @@ mod adaptive_null_simulation {
 
         for round_index in 0..ROUNDS {
             let round = round_index + 1;
-            let candidate_index =
-                adaptive_candidate_index(round, prior_promotions, last_decision);
+            let candidate_index = adaptive_candidate_index(round, prior_promotions, last_decision);
             let second_index = (candidate_index + 1) % POOL_WIDTH;
             let candidates = [
                 ReuseCandidateEvidence::new(pool[round_index][candidate_index].clone()).unwrap(),
