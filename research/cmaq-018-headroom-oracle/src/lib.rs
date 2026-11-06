@@ -1470,6 +1470,54 @@ mod tests {
     }
 
     #[test]
+    fn industry_candidate_ladder_includes_k64_without_changing_selection_semantics() {
+        let candidate_ids = (0..64)
+            .map(|index| format!("candidate-{index:03}"))
+            .collect::<Vec<_>>();
+        let selection_ids = (0..17)
+            .map(|index| format!("selection-{index:02}"))
+            .collect::<Vec<_>>();
+        let evaluation_ids = (0..17)
+            .map(|index| format!("evaluation-{index:02}"))
+            .collect::<Vec<_>>();
+        let candidates = candidate_ids
+            .iter()
+            .enumerate()
+            .map(|(index, id)| candidate(id, &[index as i64; 17]))
+            .collect::<Vec<_>>();
+        let evaluation = candidate_ids
+            .iter()
+            .enumerate()
+            .map(|(index, id)| candidate(id, &[index as i64; 17]))
+            .collect::<Vec<_>>();
+
+        let design = HeadroomDesign {
+            candidate_ids: candidate_ids.clone(),
+            baseline_candidate_id: candidate_ids[0].clone(),
+            selection: ContinuationBatch {
+                continuation_ids: selection_ids,
+                candidates,
+                coupling: shared(),
+            },
+            evaluation: ContinuationBatch {
+                continuation_ids: evaluation_ids,
+                candidates: evaluation,
+                coupling: shared(),
+            },
+        };
+
+        let report = evaluate_headroom(&design).unwrap();
+        assert_eq!(report.candidate_count, 64);
+        assert_eq!(report.selection_continuation_count, 17);
+        assert_eq!(report.evaluation_continuation_count, 17);
+        assert_eq!(
+            report.repeated_in_sample_oracle.selected_candidate_id,
+            "candidate-063"
+        );
+        assert_eq!(report.heldout_repeated_oracle.heldout_gain, 63.0);
+    }
+
+    #[test]
     fn positive_common_noise_covariance_reduces_difference_variance() {
         let design = HeadroomDesign {
             candidate_ids: vec!["baseline".to_owned(), "candidate-a".to_owned()],

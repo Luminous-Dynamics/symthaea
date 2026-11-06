@@ -53,6 +53,7 @@ This is a **support-gated reference rule**, not the learned D3 selector and not 
 The tests include:
 - A noise-only selection trap: one-shot best-of-three appears to gain 10 units, while repeated and held-out oracle gain is zero.
 - A genuine candidate effect that survives held-out scoring.
+- A 64-candidate / 17-selection-continuation / 17-held-out-continuation fixture, matching the K=64 operating point used by PlanWAM and World4Scorer.
 - A selection case where the one-shot winner differs from the repeated winner; the one-shot held-out share is scored on its own selected candidate.
 - Candidate × continuation rank reversal where all candidate main effects are zero and all candidate-distinguishing variation is interaction; paired CRN fixtures where positive covariance reduces variance and negative covariance increases it.
 - Uncoupled and sensitivity-only pairing, both of which refuse primary variance reduction claims; single-continuation batches do not report sample variance.
