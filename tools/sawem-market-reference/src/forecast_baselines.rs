@@ -174,9 +174,7 @@ pub fn build_forecast_baseline<'a>(
         if !valid_sha256(item.source_sha256) {
             return Err(ForecastBaselineError::InvalidSourceDigest);
         }
-        if item.valid_period_start_utc >= item.valid_period_end_utc
-            || item.available_at_utc < 0
-        {
+        if item.valid_period_start_utc >= item.valid_period_end_utc || item.available_at_utc < 0 {
             return Err(ForecastBaselineError::InvalidTargetPeriod);
         }
         if history[..index]
@@ -219,84 +217,85 @@ pub fn build_forecast_baseline<'a>(
         .collect::<Vec<_>>();
     eligible.sort_by_key(|item| (item.valid_period_start_utc, item.record_id));
 
-    let (q10, q50, q90, used): (i64, i64, i64, Vec<&HistoricalPriceObservation<'a>>) =
-        match query.method {
-            ForecastBaselineMethod::PersistenceWithEmpiricalIncrements => {
-                let Some(latest) = eligible.iter().max_by_key(|item| item.valid_period_end_utc) else {
-                    return Ok(ForecastBaselineResult::Indeterminate {
-                        reason: "no price observation is eligible by the training cutoff",
-                    });
-                };
-                let mut increments = Vec::new();
-                let mut used_points = Vec::new();
-                for pair in eligible.windows(2) {
-                    if pair[0].valid_period_end_utc != pair[1].valid_period_start_utc {
-                        continue;
-                    }
-                    let change = i128::from(pair[1].realized_price_minor_zar_per_mwh)
-                        .checked_sub(i128::from(pair[0].realized_price_minor_zar_per_mwh))
-                        .ok_or(ForecastBaselineError::ArithmeticOverflow)?;
-                    increments.push(
-                        i64::try_from(change).map_err(|_| ForecastBaselineError::ArithmeticOverflow)?,
-                    );
-                    used_points.push(pair[0]);
-                    used_points.push(pair[1]);
+    let (q10, q50, q90, used): (i64, i64, i64, Vec<&HistoricalPriceObservation<'a>>) = match query
+        .method
+    {
+        ForecastBaselineMethod::PersistenceWithEmpiricalIncrements => {
+            let Some(latest) = eligible.iter().max_by_key(|item| item.valid_period_end_utc) else {
+                return Ok(ForecastBaselineResult::Indeterminate {
+                    reason: "no price observation is eligible by the training cutoff",
+                });
+            };
+            let mut increments = Vec::new();
+            let mut used_points = Vec::new();
+            for pair in eligible.windows(2) {
+                if pair[0].valid_period_end_utc != pair[1].valid_period_start_utc {
+                    continue;
                 }
-                if increments.len() < query.minimum_training_samples as usize {
-                    return Ok(ForecastBaselineResult::Indeterminate {
-                        reason: "too few contiguous historical price changes for persistence baseline",
-                    });
-                }
-                let delta_q10 = nearest_rank_quantile(&increments, 1_000)?;
-                let delta_q50 = nearest_rank_quantile(&increments, 5_000)?;
-                let delta_q90 = nearest_rank_quantile(&increments, 9_000)?;
-                let latest_price = i128::from(latest.realized_price_minor_zar_per_mwh);
-                let q10 = i64::try_from(
-                    latest_price
-                        .checked_add(i128::from(delta_q10))
-                        .ok_or(ForecastBaselineError::ArithmeticOverflow)?,
-                )
-                .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
-                let q50 = i64::try_from(
-                    latest_price
-                        .checked_add(i128::from(delta_q50))
-                        .ok_or(ForecastBaselineError::ArithmeticOverflow)?,
-                )
-                .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
-                let q90 = i64::try_from(
-                    latest_price
-                        .checked_add(i128::from(delta_q90))
-                        .ok_or(ForecastBaselineError::ArithmeticOverflow)?,
-                )
-                .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
-                used_points.push(*latest);
-                used_points.sort_by_key(|item| (item.valid_period_start_utc, item.record_id));
-                used_points.dedup_by_key(|item| item.record_id);
-                (q10, q50, q90, used_points)
+                let change = i128::from(pair[1].realized_price_minor_zar_per_mwh)
+                    .checked_sub(i128::from(pair[0].realized_price_minor_zar_per_mwh))
+                    .ok_or(ForecastBaselineError::ArithmeticOverflow)?;
+                increments.push(
+                    i64::try_from(change).map_err(|_| ForecastBaselineError::ArithmeticOverflow)?,
+                );
+                used_points.push(pair[0]);
+                used_points.push(pair[1]);
             }
-            ForecastBaselineMethod::SeasonalBucketClimatology => {
-                let selected = eligible
-                    .iter()
-                    .copied()
-                    .filter(|item| item.seasonal_bucket_id == query.seasonal_bucket_id)
-                    .collect::<Vec<_>>();
-                if selected.len() < query.minimum_training_samples as usize {
-                    return Ok(ForecastBaselineResult::Indeterminate {
-                        reason: "too few training observations in the target seasonal bucket",
-                    });
-                }
-                let values = selected
-                    .iter()
-                    .map(|item| item.realized_price_minor_zar_per_mwh)
-                    .collect::<Vec<_>>();
-                (
-                    nearest_rank_quantile(&values, 1_000)?,
-                    nearest_rank_quantile(&values, 5_000)?,
-                    nearest_rank_quantile(&values, 9_000)?,
-                    selected,
-                )
+            if increments.len() < query.minimum_training_samples as usize {
+                return Ok(ForecastBaselineResult::Indeterminate {
+                    reason: "too few contiguous historical price changes for persistence baseline",
+                });
             }
-        };
+            let delta_q10 = nearest_rank_quantile(&increments, 1_000)?;
+            let delta_q50 = nearest_rank_quantile(&increments, 5_000)?;
+            let delta_q90 = nearest_rank_quantile(&increments, 9_000)?;
+            let latest_price = i128::from(latest.realized_price_minor_zar_per_mwh);
+            let q10 = i64::try_from(
+                latest_price
+                    .checked_add(i128::from(delta_q10))
+                    .ok_or(ForecastBaselineError::ArithmeticOverflow)?,
+            )
+            .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
+            let q50 = i64::try_from(
+                latest_price
+                    .checked_add(i128::from(delta_q50))
+                    .ok_or(ForecastBaselineError::ArithmeticOverflow)?,
+            )
+            .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
+            let q90 = i64::try_from(
+                latest_price
+                    .checked_add(i128::from(delta_q90))
+                    .ok_or(ForecastBaselineError::ArithmeticOverflow)?,
+            )
+            .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
+            used_points.push(*latest);
+            used_points.sort_by_key(|item| (item.valid_period_start_utc, item.record_id));
+            used_points.dedup_by_key(|item| item.record_id);
+            (q10, q50, q90, used_points)
+        }
+        ForecastBaselineMethod::SeasonalBucketClimatology => {
+            let selected = eligible
+                .iter()
+                .copied()
+                .filter(|item| item.seasonal_bucket_id == query.seasonal_bucket_id)
+                .collect::<Vec<_>>();
+            if selected.len() < query.minimum_training_samples as usize {
+                return Ok(ForecastBaselineResult::Indeterminate {
+                    reason: "too few training observations in the target seasonal bucket",
+                });
+            }
+            let values = selected
+                .iter()
+                .map(|item| item.realized_price_minor_zar_per_mwh)
+                .collect::<Vec<_>>();
+            (
+                nearest_rank_quantile(&values, 1_000)?,
+                nearest_rank_quantile(&values, 5_000)?,
+                nearest_rank_quantile(&values, 9_000)?,
+                selected,
+            )
+        }
+    };
 
     if q10 > q50 || q50 > q90 {
         return Err(ForecastBaselineError::ArithmeticOverflow);
@@ -316,26 +315,28 @@ pub fn build_forecast_baseline<'a>(
     let training_sample_count = u32::try_from(training_sources.len())
         .map_err(|_| ForecastBaselineError::ArithmeticOverflow)?;
 
-    Ok(ForecastBaselineResult::Determined(ForecastBaselineReceipt {
-        baseline_model_id: query.baseline_model_id,
-        baseline_model_sha256: query.baseline_model_sha256,
-        method: query.method,
-        series_id: query.series_id,
-        seasonal_bucket_id: query.seasonal_bucket_id,
-        target_period_start_utc: query.target_period_start_utc,
-        target_period_end_utc: query.target_period_end_utc,
-        forecast_issued_at_utc: query.decision_time_utc,
-        forecast_available_at_utc: query.decision_time_utc,
-        training_cutoff_utc: query.training_cutoff_utc,
-        q10_minor_zar_per_mwh: q10,
-        q50_minor_zar_per_mwh: q50,
-        q90_minor_zar_per_mwh: q90,
-        training_sample_count,
-        future_or_post_cutoff_excluded_count,
-        training_manifest_source_ref: query.training_manifest_source_ref,
-        training_manifest_sha256: query.training_manifest_sha256,
-        training_sources,
-    }))
+    Ok(ForecastBaselineResult::Determined(
+        ForecastBaselineReceipt {
+            baseline_model_id: query.baseline_model_id,
+            baseline_model_sha256: query.baseline_model_sha256,
+            method: query.method,
+            series_id: query.series_id,
+            seasonal_bucket_id: query.seasonal_bucket_id,
+            target_period_start_utc: query.target_period_start_utc,
+            target_period_end_utc: query.target_period_end_utc,
+            forecast_issued_at_utc: query.decision_time_utc,
+            forecast_available_at_utc: query.decision_time_utc,
+            training_cutoff_utc: query.training_cutoff_utc,
+            q10_minor_zar_per_mwh: q10,
+            q50_minor_zar_per_mwh: q50,
+            q90_minor_zar_per_mwh: q90,
+            training_sample_count,
+            future_or_post_cutoff_excluded_count,
+            training_manifest_source_ref: query.training_manifest_source_ref,
+            training_manifest_sha256: query.training_manifest_sha256,
+            training_sources,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -480,7 +481,10 @@ mod tests {
             ..observation("bad", 0, 15, 100, 15, "weekday/18:00")
         }];
         assert_eq!(
-            build_forecast_baseline(query(ForecastBaselineMethod::SeasonalBucketClimatology), &bad_digest),
+            build_forecast_baseline(
+                query(ForecastBaselineMethod::SeasonalBucketClimatology),
+                &bad_digest
+            ),
             Err(ForecastBaselineError::InvalidSourceDigest)
         );
 
@@ -489,7 +493,10 @@ mod tests {
             observation("same", 15, 30, 110, 30, "weekday/18:00"),
         ];
         assert_eq!(
-            build_forecast_baseline(query(ForecastBaselineMethod::SeasonalBucketClimatology), &duplicate_id),
+            build_forecast_baseline(
+                query(ForecastBaselineMethod::SeasonalBucketClimatology),
+                &duplicate_id
+            ),
             Err(ForecastBaselineError::DuplicateRecordId)
         );
 
@@ -498,7 +505,10 @@ mod tests {
             observation("second", 0, 15, 110, 16, "weekday/18:00"),
         ];
         assert_eq!(
-            build_forecast_baseline(query(ForecastBaselineMethod::SeasonalBucketClimatology), &duplicate_period),
+            build_forecast_baseline(
+                query(ForecastBaselineMethod::SeasonalBucketClimatology),
+                &duplicate_period
+            ),
             Err(ForecastBaselineError::DuplicateHistoricalPeriod)
         );
     }
