@@ -147,7 +147,7 @@ pub fn evaluate_scheduled_power_trace<'a>(
             .map_err(|_| ScheduledPowerTraceError::ArithmeticOverflow)?;
 
         let fulfilment = if scheduled_directional == 0 {
-            Some(10_000)
+            None
         } else {
             let delivered = scheduled_directional
                 .checked_sub(
@@ -299,6 +299,24 @@ mod tests {
         );
         assert_eq!(result.overdelivery_energy_numerator_milli_wh, Some(0));
         assert_eq!(result.schedule_fulfilment_bps, Some(0));
+    }
+
+    #[test]
+    fn zero_energy_schedule_has_no_fulfilment_ratio_but_keeps_meter_deviation() {
+        let samples = [
+            sample("start", 100, 100_000),
+            sample("end", 3_700, 100_000),
+        ];
+        let result = evaluate_scheduled_power_trace(inputs(&samples, 0)).unwrap();
+        assert_eq!(result.schedule_fulfilment_bps, None);
+        assert_eq!(
+            result.absolute_deviation_numerator_milli_wh,
+            Some(720_000_000)
+        );
+        assert_eq!(
+            result.unfulfilled_scheduled_energy_numerator_milli_wh,
+            Some(0)
+        );
     }
 
     #[test]
