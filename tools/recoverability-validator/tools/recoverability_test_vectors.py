@@ -73,8 +73,8 @@ def shortest_route(
         initial,
         reformulated,
         post_retrieval,
-        navigated,
         pending_reformulation,
+        navigated,
     )
     queue: list[tuple[int, tuple[str, ...], tuple[Any, ...]]] = [(0, (), start_state)]
     best: dict[tuple[Any, ...], tuple[int, tuple[str, ...]]] = {start_state: (0, ())}
@@ -93,8 +93,8 @@ def shortest_route(
             used_initial,
             used_reform,
             used_post,
-            used_navigation,
             pending_reformulation,
+            used_navigation,
         ) = state
         qualifies = (
             (mode == "direct" and used_initial and not used_reform and not used_navigation)
