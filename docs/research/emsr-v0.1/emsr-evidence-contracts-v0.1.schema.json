@@ -245,15 +245,13 @@
           },
           "then": {
             "properties": {
+              "payload_files": {
+                "minItems": 1
+              },
               "rights": {
                 "properties": {
                   "state": {
                     "const": "reviewed"
-                  },
-                  "permitted_uses": {
-                    "contains": {
-                      "const": "research"
-                    }
                   }
                 }
               }
@@ -374,10 +372,7 @@
         "record_id",
         "split",
         "event_group",
-        "recording_group",
-        "receiver_group",
-        "campaign_group",
-        "location_group"
+        "recording_group"
       ],
       "properties": {
         "record_id": {
@@ -760,6 +755,64 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/sourceProfile"
+      }
+    },
+    "pairwiseIndependence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "left_source_id",
+        "right_source_id",
+        "relation",
+        "shared_failure_domains"
+      ],
+      "properties": {
+        "left_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "right_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": [
+            "no_declared_common_domain",
+            "shared_failure_domain",
+            "unknown"
+          ]
+        },
+        "shared_failure_domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "independenceGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sources",
+        "pairs"
+      ],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceProfile"
+          }
+        },
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pairwiseIndependence"
+          }
+        }
       }
     }
   }
