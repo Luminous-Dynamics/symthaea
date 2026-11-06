@@ -569,6 +569,305 @@ pub struct GenealogyManifest {
     pub created_at_unix_ms: u64,
 }
 
+/// Versioned multi-parent lineage graph schema. This is additive to
+/// [`GenealogyManifest`], whose V1 single-parent wire shape remains unchanged.
+pub const GENEALOGY_DAG_SCHEMA_VERSION_V1: u16 = 1;
+
+/// Exact artifact classes accepted by the multi-parent lineage graph.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenealogyDagArtifactKindV1 {
+    /// Serialized recipe or composition intent.
+    Recipe,
+    /// Symbolic score bytes.
+    SymbolicScore,
+    /// Performed MIDI bytes.
+    PerformedMidi,
+    /// Rendered audio bytes.
+    RenderedAudio,
+    /// Composition/listen bundle bytes.
+    CompositionBundle,
+    /// Performance bundle bytes.
+    PerformanceBundle,
+}
+
+/// One exact content-addressed node in a collaborative lineage graph.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenealogyDagArtifactNodeV1 {
+    /// Content identity in sha256:<lowercase-hex> form.
+    pub artifact_id: String,
+    /// Event that produced or imported this artifact.
+    pub event_id: String,
+    /// Artifact content class.
+    pub kind: GenealogyDagArtifactKindV1,
+    /// Exact media type of the committed bytes.
+    pub media_type: String,
+    /// Exact committed byte length.
+    pub byte_len: u64,
+}
+
+/// Typed derivation represented by an edge. The edge records influence, not
+/// exclusive legal authorship or ownership.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenealogyDagDerivationV1 {
+    /// New harmony applied while preserving one or more source structures.
+    Reharmonization,
+    /// A motif or phrase is varied from a source artifact.
+    MotifVariation,
+    /// The same composition is realized with a different instrumentation.
+    Reorchestration,
+    /// A composition is performed as a new rendition.
+    NewPerformance,
+    /// A human or software agent makes a declared manual revision.
+    ManualRevision,
+    /// A score is assembled or adapted from imported material.
+    ImportedArrangement,
+    /// A contributor deliberately creates a branch while preserving the source.
+    Branch,
+    /// Two or more source artifacts contribute to one resulting artifact.
+    Merge,
+}
+
+/// Contribution role retained on each derivation edge.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GenealogyContributionRoleV1 {
+    /// Original composition or material contribution.
+    Composer,
+    /// Performance contribution.
+    Performer,
+    /// Arrangement or orchestration contribution.
+    Arranger,
+    /// Editing or revision contribution.
+    Editor,
+    /// Production or realization contribution.
+    Producer,
+    /// Review or annotation contribution.
+    Reviewer,
+    /// Software-agent contribution, without a claim of legal authorship.
+    Agent,
+    /// Another explicitly recorded contribution role.
+    Other,
+}
+
+/// Pseudonymous contribution evidence attached to one derivation edge.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenealogyDagContributorV1 {
+    /// Authenticated actor reference or study pseudonym; never a display name.
+    pub contributor_ref: String,
+    /// Exact event recording this contributor's influence.
+    pub contribution_event_id: String,
+    /// Declared contribution role.
+    pub role: GenealogyContributionRoleV1,
+    /// Reference to the purpose-specific consent receipt.
+    ///
+    /// This identifier is a reference only; a trusted verifier must validate
+    /// signature, scope, expiry and revocation before treating it as authority.
+    pub consent_receipt_ref: String,
+}
+
+/// Directed influence edge from one source artifact to one resulting artifact.
+/// Multiple edges may target the same result, preserving multiple parents.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenealogyDagEdgeV1 {
+    /// Unique stable edge/event-ledger identity.
+    pub edge_id: String,
+    /// Existing source artifact identity.
+    pub source_artifact_id: String,
+    /// Result artifact identity.
+    pub result_artifact_id: String,
+    /// Event that supplied the source artifact.
+    pub source_event_id: String,
+    /// Event that committed the result artifact.
+    pub result_event_id: String,
+    /// Declared derivation relationship.
+    pub derivation: GenealogyDagDerivationV1,
+    /// Every contributor remains separately visible on this edge.
+    pub contributors: Vec<GenealogyDagContributorV1>,
+}
+
+/// Explicit multi-parent artifact DAG. Existing V1 single-parent genealogy
+/// manifests can remain as compatibility projections; this graph is the
+/// authoritative representation when several artifacts contribute to a result.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenealogyDagManifestV1 {
+    /// Schema version.
+    pub schema_version: u16,
+    /// Durable transaction or graph identity.
+    pub graph_id: String,
+    /// Exact content-addressed artifacts represented in the graph.
+    pub nodes: Vec<GenealogyDagArtifactNodeV1>,
+    /// Directed source-to-result influence edges.
+    pub edges: Vec<GenealogyDagEdgeV1>,
+}
+
+impl GenealogyDagManifestV1 {
+    /// Validate content IDs, event bindings, contribution receipts and acyclicity.
+    ///
+    /// The validator does not authenticate actors or consent receipt references.
+    /// Those remain a separate operation-time trust-provider responsibility.
+    pub fn validate(&self) -> Result<(), GenealogyDagValidationErrorV1> {
+        use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+        if self.schema_version != GENEALOGY_DAG_SCHEMA_VERSION_V1
+            || self.graph_id.trim().is_empty()
+            || self.nodes.is_empty()
+        {
+            return Err(GenealogyDagValidationErrorV1::InvalidManifest);
+        }
+
+        let mut nodes = BTreeMap::new();
+        for node in &self.nodes {
+            if !valid_genealogy_sha256_id(&node.artifact_id) {
+                return Err(GenealogyDagValidationErrorV1::InvalidArtifactId);
+            }
+            if node.event_id.trim().is_empty() || node.media_type.trim().is_empty() || node.byte_len == 0 {
+                return Err(GenealogyDagValidationErrorV1::InvalidArtifactNode);
+            }
+            if nodes.insert(node.artifact_id.as_str(), node).is_some() {
+                return Err(GenealogyDagValidationErrorV1::DuplicateArtifactId);
+            }
+        }
+
+        let mut edge_ids = BTreeSet::new();
+        let mut adjacency: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        let mut indegree: BTreeMap<String, usize> = nodes
+            .keys()
+            .map(|artifact_id| ((*artifact_id).to_owned(), 0))
+            .collect();
+
+        for edge in &self.edges {
+            if edge.edge_id.trim().is_empty()
+                || edge.source_event_id.trim().is_empty()
+                || edge.result_event_id.trim().is_empty()
+            {
+                return Err(GenealogyDagValidationErrorV1::InvalidEdge);
+            }
+            if !edge_ids.insert(edge.edge_id.as_str()) {
+                return Err(GenealogyDagValidationErrorV1::DuplicateEdgeId);
+            }
+            if edge.source_artifact_id == edge.result_artifact_id {
+                return Err(GenealogyDagValidationErrorV1::SelfEdge);
+            }
+
+            let source = nodes
+                .get(edge.source_artifact_id.as_str())
+                .ok_or(GenealogyDagValidationErrorV1::UnknownArtifact)?;
+            let result = nodes
+                .get(edge.result_artifact_id.as_str())
+                .ok_or(GenealogyDagValidationErrorV1::UnknownArtifact)?;
+            if source.event_id != edge.source_event_id || result.event_id != edge.result_event_id {
+                return Err(GenealogyDagValidationErrorV1::EventBindingMismatch);
+            }
+
+            if edge.contributors.is_empty() {
+                return Err(GenealogyDagValidationErrorV1::MissingContributors);
+            }
+            let mut contributor_keys = BTreeSet::new();
+            for contributor in &edge.contributors {
+                if contributor.contributor_ref.trim().is_empty()
+                    || contributor.contribution_event_id.trim().is_empty()
+                    || contributor.consent_receipt_ref.trim().is_empty()
+                {
+                    return Err(GenealogyDagValidationErrorV1::InvalidContributor);
+                }
+                let key = (
+                    contributor.contributor_ref.as_str(),
+                    contributor.contribution_event_id.as_str(),
+                    contributor.role,
+                );
+                if !contributor_keys.insert(key) {
+                    return Err(GenealogyDagValidationErrorV1::DuplicateContributor);
+                }
+            }
+
+            adjacency
+                .entry(edge.source_artifact_id.clone())
+                .or_default()
+                .push(edge.result_artifact_id.clone());
+            let degree = indegree
+                .get_mut(&edge.result_artifact_id)
+                .ok_or(GenealogyDagValidationErrorV1::UnknownArtifact)?;
+            *degree += 1;
+        }
+
+        // Kahn's algorithm: parallel edges are counted independently and
+        // decremented independently; all nodes must be consumed.
+        let mut ready: VecDeque<String> = indegree
+            .iter()
+            .filter(|(_, degree)| **degree == 0)
+            .map(|(artifact_id, _)| artifact_id.clone())
+            .collect();
+        let mut visited = 0usize;
+        while let Some(artifact_id) = ready.pop_front() {
+            visited += 1;
+            if let Some(results) = adjacency.get(&artifact_id) {
+                for result_id in results {
+                    let degree = indegree
+                        .get_mut(result_id)
+                        .ok_or(GenealogyDagValidationErrorV1::UnknownArtifact)?;
+                    *degree -= 1;
+                    if *degree == 0 {
+                        ready.push_back(result_id.clone());
+                    }
+                }
+            }
+        }
+        if visited != self.nodes.len() {
+            return Err(GenealogyDagValidationErrorV1::CycleDetected);
+        }
+
+        Ok(())
+    }
+}
+
+fn valid_genealogy_sha256_id(artifact_id: &str) -> bool {
+    let Some(hex) = artifact_id.strip_prefix("sha256:") else {
+        return false;
+    };
+    hex.len() == 64
+        && hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Fail-closed validation errors for the additive multi-parent lineage graph.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum GenealogyDagValidationErrorV1 {
+    /// Unsupported schema or missing top-level identity/nodes.
+    InvalidManifest,
+    /// Artifact identity is not sha256:<64 lowercase hex>.
+    InvalidArtifactId,
+    /// Artifact event, media type or byte length is invalid.
+    InvalidArtifactNode,
+    /// Duplicate content identity in the node set.
+    DuplicateArtifactId,
+    /// Missing or malformed edge identity/event bindings.
+    InvalidEdge,
+    /// Duplicate edge identity.
+    DuplicateEdgeId,
+    /// An edge attempts to derive an artifact from itself.
+    SelfEdge,
+    /// Edge references an artifact not present in the graph.
+    UnknownArtifact,
+    /// Edge event IDs do not match their referenced artifact nodes.
+    EventBindingMismatch,
+    /// Every derivation edge must retain at least one contributor.
+    MissingContributors,
+    /// Contributor identity, event or consent receipt reference is absent.
+    InvalidContributor,
+    /// Same contributor/event/role was duplicated on one edge.
+    DuplicateContributor,
+    /// The graph contains a directed cycle.
+    CycleDetected,
+}
+
+
 /// A non-fatal limitation attached to a versioned bundle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BundleWarning {
