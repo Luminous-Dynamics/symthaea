@@ -396,6 +396,34 @@ Use TSPLIB for TSP, CO-Bench for broad CO coverage, and public scheduling/VRP/gr
 - **Theory gate:** proof of worst-case bound, parameter assumptions and reduction direction; experiments alone do not establish asymptotic complexity.
 - **Promotion gate:** queued != pass; a candidate remains experimental until all required independent evidence is present.
 
+## Quantified targets: how to beat SOTA without benchmark theatre
+
+The SAT Competition 2026 Main Track provides a useful fixed reference: the best listed single solver, `kissat-sc2024`, solved 306 instances; the per-instance virtual-best-solver oracle solved 347. We should use the 41-instance difference as a **portfolio opportunity estimate**, not as a claim that an online selector can automatically attain it.
+
+Set staged targets:
+
+| Stage | Target | Admission rule |
+|---|---|---|
+| T0: semantic trust | 100% agreement on exhaustive small formula/graph corpora; zero invalid SAT models | Any false SAT/UNSAT or invalid witness blocks promotion |
+| T1: baseline reproduction | Reproduce pinned Kissat/CaDiCaL and selected model-counter results within 1% on repeated same-machine runs | Compare exact binaries, flags, benchmark manifests and resource limits |
+| T2: selector utility | On held-out families, beat the best individual portfolio component by at least 3 additional solved instances **or** 5% PAR-2, with selector overhead <=5% | No held-out family may have a statistically/materially significant catastrophic regression hidden by aggregate score |
+| T3: first competition-grade SAT target | Reach >=316 solved in the same 2026 Main Track corpus/resource setup (close at least 10 of the 41-instance VBS gap), while maintaining valid models and Main Track UNSAT proofs | This is an aspirational threshold, not a result or guarantee; report SAT/UNSAT subtotals and per-instance receipts |
+| T4: strong portfolio target | Reach >=330 solved in that same corpus without hindsight oracle information | Requires robust OOD performance and fair, deployable pre-run selection |
+| T5: theory breakthrough | Publish an improved worst-case upper bound, FPT result or approximation guarantee with a complete proof and exact assumptions | Benchmarks are supporting evidence, never a substitute for proof |
+
+For AutoModSAT reproduction, do not target its paper's reported 30% speedup as a universal expected outcome. First reproduce its 11-family setup, then use an entirely held-out family split. Report which families win and lose; its authors explicitly report a case where parameter-tuned Kissat beats AutoModSAT and note the human-in-the-loop baseline preparation.
+
+For model counting, maintain separate target tables for exact non-projected, exact projected, approximate and weighted counting. The appropriate comparator set includes SharpSAT-TD, D4, ExactMC, Ganak/GPMC and ApproxMC, selected according to each task's semantics. A claim to beat one exact counter on a projected task is not meaningful unless both solve the same projected-counting contract.
+
+For operational optimization, define the practical target by Pareto improvement or an agreed SLA:
+- no feasibility regressions;
+- a statistically meaningful objective-gap reduction at the same wall-clock budget, or the same quality at lower latency/energy;
+- bounded replan time after graph/constraint changes;
+- independently validated solution and bounds;
+- explicit cost/time/energy/risk trade-offs rather than one hidden scalar score.
+
+Use confidence intervals or paired instance-level tests where appropriate. Report failed/timeout instances individually, use PAR-2 only where its competition semantics apply, and never average away invalid outputs.
+
 ## Work packages
 
 ### WP0 — semantic repair and reference tests (first)
