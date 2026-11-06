@@ -176,7 +176,12 @@
         "bootstrap_probability_left_better",
         "left_cost_per_qualified_task_microusd",
         "right_cost_per_qualified_task_microusd",
-        "interpretation"
+        "interpretation",
+        "paired_cost_per_qualified_task_difference_microusd",
+        "bootstrap_cost_valid_replicates",
+        "bootstrap_cost_ci_95_low_microusd",
+        "bootstrap_cost_ci_95_high_microusd",
+        "bootstrap_probability_left_cheaper"
       ],
       "properties": {
         "left_strategy_id": {
@@ -276,6 +281,52 @@
         "interpretation": {
           "type": "string",
           "minLength": 50
+        },
+        "paired_cost_per_qualified_task_difference_microusd": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "bootstrap_cost_valid_replicates": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bootstrap_cost_ci_95_low_microusd": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "bootstrap_cost_ci_95_high_microusd": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number"
+            }
+          ]
+        },
+        "bootstrap_probability_left_cheaper": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          ]
         }
       },
       "allOf": [
