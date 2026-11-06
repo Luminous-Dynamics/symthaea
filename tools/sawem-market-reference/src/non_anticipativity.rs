@@ -226,7 +226,14 @@ mod tests {
             decision("price-high", "root", INFO_SHA_A, 90, 100, ACTION_A),
             decision("price-low", "root", INFO_SHA_A, 90, 100, ACTION_A),
             decision("outage", "root", INFO_SHA_A, 90, 100, ACTION_A),
-            decision("price-high", "after-price-high", INFO_SHA_B, 110, 120, ACTION_A),
+            decision(
+                "price-high",
+                "after-price-high",
+                INFO_SHA_B,
+                110,
+                120,
+                ACTION_A,
+            ),
             decision(
                 "price-low",
                 "after-price-low",
@@ -357,10 +364,7 @@ mod tests {
         let duplicate_scenario_decisions =
             [decision("case-a", "root", INFO_SHA_A, 90, 100, ACTION_A)];
         assert_eq!(
-            audit_non_anticipative_policy(
-                &duplicate_scenarios,
-                &duplicate_scenario_decisions
-            ),
+            audit_non_anticipative_policy(&duplicate_scenarios, &duplicate_scenario_decisions),
             Err(NonAnticipativityError::DuplicateScenarioId)
         );
 
