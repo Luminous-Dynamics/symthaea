@@ -1,0 +1,770 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-evaluator-research-preregistration-v0"
+    },
+    "document_status": {
+      "type": "string",
+      "enum": [
+        "TEMPLATE_NOT_PREREGISTERED",
+        "PREREGISTERED"
+      ]
+    },
+    "warning": {
+      "type": "string",
+      "minLength": 1
+    },
+    "experiment": {
+      "type": "object",
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preregistered_at_utc": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preregistration_commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "experiment_id",
+        "protocol_version",
+        "preregistered_at_utc",
+        "preregistration_commit",
+        "reviewers",
+        "question"
+      ],
+      "additionalProperties": false
+    },
+    "target_portfolio": {
+      "type": "object",
+      "properties": {
+        "portfolio_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_benchmarks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "benchmark_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version_or_commit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metric_definition_digest": {
+                "type": "string",
+                "minLength": 1
+              },
+              "authority_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "custodian_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "benchmark_id",
+              "domain",
+              "task_family",
+              "version_or_commit",
+              "metric_definition_digest",
+              "authority_ref",
+              "custodian_ref"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "target_pairwise_disagreement": {
+          "type": "object",
+          "properties": {
+            "candidate_pair_population_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pairwise_agreement_estimate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "disagreement_ceiling_estimate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "adjudication_method_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "human_adjudicator_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uncertainty_method": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "candidate_pair_population_digest",
+            "pairwise_agreement_estimate",
+            "disagreement_ceiling_estimate",
+            "adjudication_method_digest",
+            "human_adjudicator_ref",
+            "uncertainty_method"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "portfolio_digest",
+        "target_benchmarks",
+        "target_pairwise_disagreement"
+      ],
+      "additionalProperties": false
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "arm_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "researcher_artifact_digest": {
+            "type": "string",
+            "minLength": 1
+          },
+          "researcher_config_digest": {
+            "type": "string",
+            "minLength": 1
+          },
+          "information_access_digest": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "arm_id",
+          "researcher_artifact_digest",
+          "researcher_config_digest",
+          "information_access_digest"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "matched_conditions": {
+      "type": "object",
+      "properties": {
+        "shared_budget_envelope_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "same_total_budget_for_all_arms": {
+          "const": true
+        },
+        "same_discovery_materials": {
+          "type": "boolean"
+        },
+        "same_model_candidate_panel": {
+          "type": "boolean"
+        },
+        "same_target_portfolio": {
+          "type": "boolean"
+        },
+        "same_output_and_tool_contract": {
+          "type": "boolean"
+        },
+        "all_human_active_and_review_time_costed": {
+          "const": true
+        },
+        "arm_specific_differences": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "shared_budget_envelope_digest",
+        "same_total_budget_for_all_arms",
+        "same_discovery_materials",
+        "same_model_candidate_panel",
+        "same_target_portfolio",
+        "same_output_and_tool_contract",
+        "all_human_active_and_review_time_costed",
+        "arm_specific_differences"
+      ],
+      "additionalProperties": false
+    },
+    "splits": {
+      "type": "object",
+      "properties": {
+        "discovery": {
+          "type": "object",
+          "properties": {
+            "manifest_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accessible_to_researcher": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "manifest_digest",
+            "accessible_to_researcher"
+          ],
+          "additionalProperties": false
+        },
+        "development": {
+          "type": "object",
+          "properties": {
+            "manifest_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accessible_to_researcher": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "manifest_digest",
+            "accessible_to_researcher"
+          ],
+          "additionalProperties": false
+        },
+        "calibration": {
+          "type": "object",
+          "properties": {
+            "manifest_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "access_policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "manifest_digest",
+            "access_policy"
+          ],
+          "additionalProperties": false
+        },
+        "sealed_target": {
+          "type": "object",
+          "properties": {
+            "manifest_commitment": {
+              "type": "string",
+              "minLength": 1
+            },
+            "custodian_independent_of_researcher": {
+              "type": "string",
+              "minLength": 1
+            },
+            "one_shot_policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "manifest_commitment",
+            "custodian_independent_of_researcher",
+            "one_shot_policy"
+          ],
+          "additionalProperties": false
+        },
+        "fresh_family_transfer": {
+          "type": "object",
+          "properties": {
+            "manifest_commitment": {
+              "type": "string",
+              "minLength": 1
+            },
+            "custodian_independent_of_researcher": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retuning_prohibited": {
+              "const": true
+            }
+          },
+          "required": [
+            "manifest_commitment",
+            "custodian_independent_of_researcher",
+            "retuning_prohibited"
+          ],
+          "additionalProperties": false
+        },
+        "disjointness_audit": {
+          "type": "object",
+          "properties": {
+            "audit_method_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "audit_report_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "independent_auditor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expected_overlap_count": {
+              "const": 0
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "audit_method_digest",
+            "audit_report_digest",
+            "independent_auditor",
+            "expected_overlap_count",
+            "unit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "discovery",
+        "development",
+        "calibration",
+        "sealed_target",
+        "fresh_family_transfer",
+        "disjointness_audit"
+      ],
+      "additionalProperties": false
+    },
+    "evaluator_artifact": {
+      "type": "object",
+      "properties": {
+        "frozen_source_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grader_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score_aggregation_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "freeze_commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frozen_before_sealed_scoring": {
+          "const": true
+        },
+        "researcher_can_change_after_freeze": {
+          "const": false
+        }
+      },
+      "required": [
+        "frozen_source_digest",
+        "executable_digest",
+        "configuration_digest",
+        "task_manifest_digest",
+        "grader_digest",
+        "score_aggregation_digest",
+        "freeze_commit",
+        "frozen_before_sealed_scoring",
+        "researcher_can_change_after_freeze"
+      ],
+      "additionalProperties": false
+    },
+    "adversarial_controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fixture_manifest_digest": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "adjudication_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "control_id",
+          "fixture_manifest_digest",
+          "expected_disposition",
+          "adjudication_ref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "properties": {
+        "primary": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "definition": {
+              "type": "string",
+              "minLength": 1
+            },
+            "decision_unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cluster_unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "practical_effect_threshold": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "name",
+            "definition",
+            "decision_unit",
+            "cluster_unit",
+            "practical_effect_threshold"
+          ],
+          "additionalProperties": false
+        },
+        "secondary": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "noncompensatory_gates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "primary",
+        "secondary",
+        "noncompensatory_gates"
+      ],
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "currency_and_price_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_budget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budget_envelope_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "per_arm_shared_caps": {
+          "type": "object",
+          "properties": {
+            "researcher_tokens": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model_calls": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evaluator_calls": {
+              "type": "string",
+              "minLength": 1
+            },
+            "wall_clock_hours": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cpu_hours": {
+              "type": "string",
+              "minLength": 1
+            },
+            "accelerator_hours_by_type": {
+              "type": "string",
+              "minLength": 1
+            },
+            "peak_memory": {
+              "type": "string",
+              "minLength": 1
+            },
+            "energy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "human_active_minutes": {
+              "type": "string",
+              "minLength": 1
+            },
+            "human_review_and_rework_minutes": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "researcher_tokens",
+            "model_calls",
+            "evaluator_calls",
+            "wall_clock_hours",
+            "cpu_hours",
+            "accelerator_hours_by_type",
+            "peak_memory",
+            "energy",
+            "human_active_minutes",
+            "human_review_and_rework_minutes"
+          ],
+          "additionalProperties": false
+        },
+        "failure_accounting_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "currency_and_price_basis",
+        "total_budget",
+        "budget_envelope_digest",
+        "per_arm_shared_caps",
+        "failure_accounting_policy"
+      ],
+      "additionalProperties": false
+    },
+    "analysis_plan": {
+      "type": "object",
+      "properties": {
+        "statistical_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clustered_dependence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paired_candidate_sampling": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_level": {
+          "type": "string",
+          "minLength": 1
+        },
+        "multiplicity_and_sequential_looks": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missingness_and_failure_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sensitivity_analyses": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_code_commit": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "statistical_unit",
+        "clustered_dependence",
+        "paired_candidate_sampling",
+        "uncertainty_method",
+        "confidence_level",
+        "multiplicity_and_sequential_looks",
+        "missingness_and_failure_policy",
+        "stopping_rule",
+        "sensitivity_analyses",
+        "analysis_code_commit"
+      ],
+      "additionalProperties": false
+    },
+    "governance": {
+      "type": "object",
+      "properties": {
+        "sealed_target_candidate_access": {
+          "const": false
+        },
+        "target_material_write_access": {
+          "const": false
+        },
+        "candidate_can_modify_frozen_evaluator": {
+          "const": false
+        },
+        "independent_custodian_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_epoch_owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promotion_authority": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_receipt_owners": {
+          "type": "string",
+          "minLength": 1
+        },
+        "final_claim_authority": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "sealed_target_candidate_access",
+        "target_material_write_access",
+        "candidate_can_modify_frozen_evaluator",
+        "independent_custodian_ref",
+        "evaluator_epoch_owner",
+        "promotion_authority",
+        "canonical_receipt_owners",
+        "final_claim_authority"
+      ],
+      "additionalProperties": false
+    },
+    "reporting": {
+      "type": "object",
+      "properties": {
+        "raw_pairwise_judgments_required": {
+          "const": true
+        },
+        "all_candidate_and_failed_runs_retained": {
+          "const": true
+        },
+        "grader_logs_and_truncation_required": {
+          "type": "boolean"
+        },
+        "cost_ledger_required": {
+          "const": true
+        },
+        "target_disagreement_reported": {
+          "type": "boolean"
+        },
+        "per_domain_breakdown_required": {
+          "type": "boolean"
+        },
+        "sealed_and_transfer_results_reported_separately": {
+          "const": true
+        }
+      },
+      "required": [
+        "raw_pairwise_judgments_required",
+        "all_candidate_and_failed_runs_retained",
+        "grader_logs_and_truncation_required",
+        "cost_ledger_required",
+        "target_disagreement_reported",
+        "per_domain_breakdown_required",
+        "sealed_and_transfer_results_reported_separately"
+      ],
+      "additionalProperties": false
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "document_status",
+    "warning",
+    "experiment",
+    "target_portfolio",
+    "arms",
+    "matched_conditions",
+    "splits",
+    "evaluator_artifact",
+    "adversarial_controls",
+    "outcomes",
+    "resources",
+    "analysis_plan",
+    "governance",
+    "reporting",
+    "claim_ceiling"
+  ],
+  "additionalProperties": false
+}
