@@ -191,6 +191,11 @@ def main() -> int:
     tampered_path = out_dir / "tampered-manifest.json"
     tampered_path.write_bytes(compact(tampered) + b"\n")
 
+    # An agent/model annotation is not part of the model-free manifest contract.
+    model_field = copy.deepcopy(base)
+    model_field["model_judgment"] = "directly_reachable"
+    (out_dir / "model-field-manifest.json").write_bytes(compact(model_field) + b"\n")
+
     # A partial surface is a valid manifest but no unit can be classed.
     partial_fields = copy.deepcopy(base_fields)
     partial_fields["surface_state"] = "partial"
