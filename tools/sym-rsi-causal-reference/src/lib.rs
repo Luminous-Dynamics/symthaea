@@ -171,7 +171,7 @@ pub fn summarize_equal_cluster_blocks(
         }
 
         match expected_context {
-            Some(context) if context != block.evaluation_context_digest => {
+            Some(context) if context != block.evaluation_context_digest.as_str() => {
                 return Err(ContrastError::EvaluationContextMismatch);
             }
             None => expected_context = Some(&block.evaluation_context_digest),
@@ -256,7 +256,8 @@ fn stable_mean(values: &[f64]) -> f64 {
 
     let mut sum = 0.0;
     let mut correction = 0.0;
-    for value in values {
+    for raw_value in values {
+        let value = *raw_value;
         let next = sum + value;
         if sum.abs() >= value.abs() {
             correction += (sum - next) + value;
@@ -391,11 +392,11 @@ pub fn validate_manifest(
         }
     }
 
-    let mut parents = BTreeSet::new();
+    let mut parents: BTreeSet<String> = BTreeSet::new();
     for parent in &manifest.parent_candidate_ids {
         if parent.trim().is_empty() {
             issues.push(ManifestIssue::EmptyField("parent_candidate_ids"));
-        } else if !parents.insert(parent.as_str()) {
+        } else if !parents.insert(parent.clone()) {
             issues.push(ManifestIssue::DuplicateParent(parent.clone()));
         }
     }
@@ -415,8 +416,8 @@ pub fn validate_manifest(
         }
     }
 
-    let unit_ids: BTreeSet<&str> = units.keys().map(String::as_str).collect();
-    let mut coupled_groups: BTreeMap<&str, usize> = BTreeMap::new();
+    let unit_ids: BTreeSet<String> = units.keys().cloned().collect();
+    let mut coupled_groups: BTreeMap<String, usize> = BTreeMap::new();
 
     for (id, unit) in &units {
         if matches!(unit.class, ChangeClass::EvaluatorOrTaskContract) {
@@ -444,7 +445,7 @@ pub fn validate_manifest(
                     target: dependency.clone(),
                 });
             }
-            if !unit_ids.contains(dependency.as_str()) {
+            if !unit_ids.contains(dependency) {
                 issues.push(ManifestIssue::UnknownRequiredUnit {
                     unit: id.clone(),
                     required: dependency.clone(),
@@ -464,7 +465,7 @@ pub fn validate_manifest(
                     target: conflicting.clone(),
                 });
             }
-            if !unit_ids.contains(conflicting.as_str()) {
+            if !unit_ids.contains(conflicting) {
                 issues.push(ManifestIssue::UnknownConflictingUnit {
                     unit: id.clone(),
                     conflicting: conflicting.clone(),
@@ -482,7 +483,7 @@ pub fn validate_manifest(
             if group.trim().is_empty() {
                 issues.push(ManifestIssue::EmptyCoupledGroup { unit: id.clone() });
             } else {
-                *coupled_groups.entry(group).or_default() += 1;
+                *coupled_groups.entry(group.to_owned()).or_default() += 1;
             }
         }
     }
@@ -502,7 +503,7 @@ pub fn validate_manifest(
 
     for (group, count) in coupled_groups {
         if count < 2 {
-            issues.push(ManifestIssue::SingletonCoupledGroup(group.to_owned()));
+            issues.push(ManifestIssue::SingletonCoupledGroup(group));
         }
     }
 
@@ -738,7 +739,7 @@ fn validate_fixture(fixture: &Fixture) -> Result<(), FixtureValidationError> {
         Some("identified") => {
             let observed = fixture.observed.as_ref().ok_or_else(|| fail("missing observed outcomes"))?;
             let values = [observed.y00, observed.y10, observed.y01, observed.y11];
-            if values.iter().any(Option::is_none) {
+            if values.iter().any(|value| value.is_none()) {
                 return Err(fail("identified fixture has a missing counterfactual"));
             }
             let outcomes = Factorial2x2 {
@@ -762,7 +763,7 @@ fn validate_fixture(fixture: &Fixture) -> Result<(), FixtureValidationError> {
         Some("not_identified") => {
             let observed = fixture.observed.as_ref().ok_or_else(|| fail("missing observed record"))?;
             let values = [observed.y00, observed.y10, observed.y01, observed.y11];
-            if values.iter().all(Option::is_some) {
+            if values.iter().all(|value| value.is_some()) {
                 return Err(fail("not_identified fixture contains all four outcomes"));
             }
             if fixture.expected.reason.as_deref() != Some("missing_required_counterfactual")
