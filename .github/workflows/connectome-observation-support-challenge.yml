@@ -2,6 +2,7 @@ name: Connectome observation support challenge envelope
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_observation_support_challenge_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_observation_support_challenge_oracle.py"
@@ -28,6 +29,7 @@ permissions:
 jobs:
   exact-support-expansion-audit:
     name: Exact support expansion audit and independent oracle
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
