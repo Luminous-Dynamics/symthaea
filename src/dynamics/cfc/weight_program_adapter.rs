@@ -301,11 +301,9 @@ pub fn cfc_hidden_unit_activation_signatures(
     let mut signatures = vec![Vec::with_capacity(probes.len()); hidden_dim];
 
     for (probe_index, probe) in probes.iter().enumerate() {
-        let expected_input_dim = if layer_index == 0 {
-            network.config().input_dim
-        } else {
-            network.config().hidden_dim
-        };
+        // Probes always enter through the network's external input interface.
+        // The requested layer is observed after the preceding layers propagate them.
+        let expected_input_dim = network.config().input_dim;
         if probe.input.len() != expected_input_dim {
             return Err(CfCPermutationAlignmentError::ProbeInputDimensionMismatch {
                 probe_index,
@@ -876,12 +874,12 @@ mod tests {
         };
         let network = CfCNetwork::from_genesis(config, &genesis, "two-layer-probe");
         let probes = vec![CfCFunctionalProbe {
-            input: vec![0.2, -0.3, 0.7, 0.1],
+            input: vec![0.2, -0.3, 0.7],
             dt: 0.05,
         }];
         let signatures =
             cfc_hidden_unit_activation_signatures(&network, 1, &probes)
-                .expect("layer one accepts hidden-sized input");
+                .expect("layer one is observed after external input propagation");
         assert_eq!(signatures.signatures.len(), 4);
         assert!(signatures
             .signatures
@@ -889,14 +887,14 @@ mod tests {
             .all(|signature| signature.len() == 1));
 
         let invalid = vec![CfCFunctionalProbe {
-            input: vec![0.2, -0.3, 0.7],
+            input: vec![0.2, -0.3, 0.7, 0.1],
             dt: 0.05,
         }];
         assert!(matches!(
             cfc_hidden_unit_activation_signatures(&network, 1, &invalid),
             Err(CfCPermutationAlignmentError::ProbeInputDimensionMismatch {
-                expected: 4,
-                actual: 3,
+                expected: 3,
+                actual: 4,
                 ..
             })
         ));
