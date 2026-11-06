@@ -134,7 +134,7 @@ log p(data | reduced model) / p(data | full model)
   = log E_q(theta | data, full)[p(theta | reduced) / p(theta | full)]
 ```
 
-The implementation currently supports independent diagonal-Gaussian coordinates. It uses the analytic Gaussian integral, rejects non-integrable ratios, rejects malformed dimensions/variances and unnormalized model priors, and returns posterior model probabilities plus model-posterior entropy. Tests include an independent one-dimensional quadrature reference, additive independent-coordinate checks, parameter-order invariance, zero-prior behavior, and invalid-input controls.
+The implementation currently supports independent diagonal-Gaussian coordinates. Each posterior/prior object carries a 64-character lowercase SHA-256 `parameterization_digest`; the full posterior, full prior, and every reduced prior must match exactly. The digest is required to bind a canonical ordered parameterization (coordinate names, roles, shapes, and order), so equal vector lengths cannot silently compare different parameter spaces. The implementation uses the analytic Gaussian integral, rejects non-integrable ratios, malformed dimensions/variances, invalid digests, mismatched parameterization digests, and unnormalized model priors, then returns posterior model probabilities plus model-posterior entropy. Tests include an independent one-dimensional quadrature reference, additive independent-coordinate checks, parameter-order invariance under a separately consistent coordinate digest, zero-prior behavior, and same-width/different-coordinate negative controls.
 
 **Scope matters:**
 - With an exact full-model posterior and nested prior-only reductions, this is an exact marginal-likelihood ratio.
@@ -146,7 +146,7 @@ The implementation currently supports independent diagonal-Gaussian coordinates.
 
 The intended combination is: prospective action selection evaluates the expected information in possible outcomes; after observing an outcome, the posterior is updated and BMR can compare prior-restricted model structures. Do not add BMR log evidence ratios to mutual information as though they were independent reward terms. They operate at different stages and answer different questions.
 
-Future work should add correlated Gaussian priors/posteriors, prove numerical stability against Cholesky-based reference calculations, and bind reduced-model priors to explicit architecture/configuration provenance. Only then should the operator become part of an FEP model-structure adapter.
+Future work should provide a canonical digest-construction helper over native manifests/configuration (the present function requires callers to supply a digest), add correlated Gaussian priors/posteriors, and prove numerical stability against Cholesky-based reference calculations. Only then should the operator become part of an FEP model-structure adapter.
 
 ### 2.4 WSP must pass exact-protocol replication, not headline comparison
 
