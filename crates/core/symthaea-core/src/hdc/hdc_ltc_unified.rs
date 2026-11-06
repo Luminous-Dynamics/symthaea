@@ -1324,6 +1324,34 @@ impl HdcLtcUnifiedNeuron {
         }
     }
 
+    /// Return an immutable reference to one typed learnable parameter vector.
+    pub fn parameter_group(
+        &self,
+        id: HdcLtcParameterGroupId,
+    ) -> &ContinuousHV {
+        match id {
+            HdcLtcParameterGroupId::WeightHypervector => &self.weight_hv,
+            HdcLtcParameterGroupId::InputMask => &self.input_mask,
+            HdcLtcParameterGroupId::TauModulator => &self.tau_modulator,
+            HdcLtcParameterGroupId::GateWeight => &self.gate_weight,
+            HdcLtcParameterGroupId::GateBias => &self.gate_bias,
+        }
+    }
+
+    /// Read a bounded immutable window from a named parameter vector.
+    ///
+    /// Returns None for an out-of-range window. This is the preferred inspection
+    /// boundary for tools that should not materialize a complete HDC vector.
+    pub fn parameter_group_window(
+        &self,
+        id: HdcLtcParameterGroupId,
+        offset: usize,
+        length: usize,
+    ) -> Option<&[f32]> {
+        let end = offset.checked_add(length)?;
+        self.parameter_group(id).values.get(offset..end)
+    }
+
     /// Replace one typed learnable hypervector after validating the entire payload.
     ///
     /// The candidate is prepared and validated before the selected live vector is
@@ -3184,6 +3212,23 @@ mod tests {
             ]
         );
         assert!(profile.groups.iter().all(|group| group.non_finite_count == 0));
+    }
+
+    #[test]
+    fn test_parameter_group_window_is_bounded_and_read_only() {
+        let neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            54,
+        );
+        let id = HdcLtcParameterGroupId::WeightHypervector;
+        let expected = &neuron.parameter_group(id).values[8..16];
+
+        assert_eq!(neuron.parameter_group_window(id, 8, 8), Some(expected));
+        assert!(neuron.parameter_group_window(id, 60, 8).is_none());
+        assert!(neuron.parameter_group_window(id, usize::MAX, 8).is_none());
     }
 
     #[test]
