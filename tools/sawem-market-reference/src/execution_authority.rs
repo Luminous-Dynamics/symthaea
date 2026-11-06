@@ -111,6 +111,9 @@ pub struct ExecutionAuthorityInputs<'a> {
     /// Digest of the exact bid/offer payload including participant, product,
     /// Trading Period, direction, price, quantity and relevant declarations.
     pub bid_manifest_sha256: &'a str,
+    /// When the sender is an automated principal, the human reviewer must be
+    /// a different identity. None means no automated principal is declared.
+    pub automation_principal_id: Option<&'a str>,
     pub human_approval: Option<HumanBidApproval<'a>>,
     /// Separate verified internal simulation access, not external admission.
     pub internal_simulation_access: EvidenceStatus,
@@ -145,6 +148,8 @@ pub enum ExecutionAuthorityReason {
     HumanReviewerNotAuthorised,
     HumanApprovalAfterEvaluationTime,
     HumanApprovalEvidenceInvalid,
+    HumanReviewSatisfied,
+    SubmissionAuthorityVerified,
     InternalSimulationAccessUnverified,
 }
 
@@ -408,6 +413,7 @@ pub fn evaluate_execution_authority<'a>(
             }
             if approval.participant_id != inputs.participant.participant_id
                 || approval.bid_manifest_sha256 != inputs.bid_manifest_sha256
+                || inputs.automation_principal_id == Some(approval.reviewer_id)
             {
                 return Ok(blocked(
                     inputs,
@@ -434,10 +440,13 @@ pub fn evaluate_execution_authority<'a>(
                 ));
             }
             validate_evidence(approval.approval_evidence, inputs.evaluation_time_utc)?;
+            if approval.approval_evidence.available_at_utc < approval.reviewed_at_utc {
+                return Err(ExecutionAuthorityError::InvalidEvidenceTimestamp);
+            }
             Ok(ExecutionAuthorityDecision {
                 disposition:
                     ExecutionAuthorityDisposition::CommercialSubmissionPermittedWithHumanReview,
-                reason: ExecutionAuthorityReason::HumanReviewerNotAuthorised,
+                reason: ExecutionAuthorityReason::HumanReviewSatisfied,
                 participant_id: inputs.participant.participant_id,
                 bid_manifest_sha256: inputs.bid_manifest_sha256,
                 regulatory_instrument_id: profile.instrument_id,
@@ -445,20 +454,10 @@ pub fn evaluate_execution_authority<'a>(
             })
         }
         SubmissionControlMode::AutonomousSubmissionExplicitlyPermitted => {
-            if inputs.human_approval.is_some() {
-                return Ok(ExecutionAuthorityDecision {
-                    disposition:
-                        ExecutionAuthorityDisposition::CommercialSubmissionPermittedWithHumanReview,
-                    reason: ExecutionAuthorityReason::NonSubmissionAction,
-                    participant_id: inputs.participant.participant_id,
-                    bid_manifest_sha256: inputs.bid_manifest_sha256,
-                    regulatory_instrument_id: profile.instrument_id,
-                    human_approval_id: inputs.human_approval.map(|approval| approval.approval_id),
-                });
-            }
             Ok(ExecutionAuthorityDecision {
-                disposition: ExecutionAuthorityDisposition::CommercialSubmissionPermittedByExplicitRule,
-                reason: ExecutionAuthorityReason::NonSubmissionAction,
+                disposition:
+                    ExecutionAuthorityDisposition::CommercialSubmissionPermittedByExplicitRule,
+                reason: ExecutionAuthorityReason::SubmissionAuthorityVerified,
                 participant_id: inputs.participant.participant_id,
                 bid_manifest_sha256: inputs.bid_manifest_sha256,
                 regulatory_instrument_id: profile.instrument_id,
@@ -525,6 +524,7 @@ mod tests {
                 evidence: Some(evidence("rule/final", SHA_B)),
             },
             bid_manifest_sha256: SHA_A,
+            automation_principal_id: Some("agent/sawem"),
             human_approval: None,
             internal_simulation_access: EvidenceStatus::Verified,
             internal_simulation_evidence: Some(evidence("internal/simulation-access", SHA_A)),
@@ -657,6 +657,51 @@ mod tests {
         assert_eq!(
             evaluate_execution_authority(inputs).unwrap().reason,
             ExecutionAuthorityReason::HumanApprovalDoesNotMatchBid
+        );
+    }
+
+    #[test]
+    fn automated_principal_cannot_self_approve_and_approval_receipt_cannot_predate_review() {
+        let stages = accreditation();
+        let mut inputs = base_inputs(
+            MarketEnvironment::ExternalCommercial,
+            TradingWorkflowAction::SubmitBidOrOffer,
+            SubmissionControlMode::HumanReviewRequired,
+        );
+        inputs.participant.accreditation_stages = &stages;
+        inputs.human_approval = Some(HumanBidApproval {
+            approval_id: "approval/self",
+            participant_id: "participant/001",
+            bid_manifest_sha256: SHA_A,
+            reviewer_id: "agent/sawem",
+            reviewer_role: "automated-agent",
+            reviewer_authority: EvidenceStatus::Verified,
+            reviewer_authority_evidence: Some(evidence("reviewer/authority", SHA_A)),
+            reviewed_at_utc: 80,
+            approval_evidence: evidence("approval/receipt", SHA_A),
+        });
+        assert_eq!(
+            evaluate_execution_authority(inputs).unwrap().reason,
+            ExecutionAuthorityReason::HumanApprovalDoesNotMatchBid
+        );
+
+        inputs.human_approval = Some(HumanBidApproval {
+            approval_id: "approval/chronology",
+            participant_id: "participant/001",
+            bid_manifest_sha256: SHA_A,
+            reviewer_id: "reviewer/001",
+            reviewer_role: "authorised-trader",
+            reviewer_authority: EvidenceStatus::Verified,
+            reviewer_authority_evidence: Some(evidence("reviewer/authority", SHA_A)),
+            reviewed_at_utc: 80,
+            approval_evidence: GateEvidenceRef {
+                available_at_utc: 70,
+                ..evidence("approval/receipt", SHA_A)
+            },
+        });
+        assert_eq!(
+            evaluate_execution_authority(inputs),
+            Err(ExecutionAuthorityError::InvalidEvidenceTimestamp)
         );
     }
 
