@@ -84,6 +84,9 @@ jobs:
           paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,' "$summary")"
           agent_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=agent,' "$summary")"
           partner_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=partner,' "$summary")"
+          paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,' "$summary")"
+          agent_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=agent,' "$summary")"
+          partner_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=partner,' "$summary")"
           test "$rule_count" -eq 160
           test "$fixed_passes" -eq 0
           test "$imitation_passes" -eq 0
@@ -104,6 +107,9 @@ jobs:
           test "$event_report_bad_rows" -eq 0
           test "$agent_summary_count" -eq 30
           test "$partner_summary_count" -eq 5
+          test "$paired_summary_count" -eq 35
+          test "$agent_paired_summary_count" -eq 30
+          test "$partner_paired_summary_count" -eq 5
           test "$paired_summary_count" -eq 35
           test "$agent_paired_summary_count" -eq 30
           test "$partner_paired_summary_count" -eq 5
