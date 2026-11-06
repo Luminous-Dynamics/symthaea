@@ -426,6 +426,9 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
         .collect()
 }
 
+const EMPTY_TRANSCRIPT_ERROR: &str =
+    "No speech transcript available; microphone capture or lexical ASR is not configured, or no speech was detected";
+
 fn transcript_has_content(text: &str) -> bool {
     !text.trim().is_empty()
 }
@@ -1426,7 +1429,7 @@ impl ServiceState {
                                 confidence: None,
                             },
                             Ok(_) => Response::Error {
-                                message: "No speech transcript available; microphone capture or lexical ASR is not configured, or no speech was detected".into(),
+                                message: EMPTY_TRANSCRIPT_ERROR.into(),
                             },
                             Err(e) => Response::Error {
                                 message: format!("STT error: {}", e),
@@ -1470,7 +1473,7 @@ impl ServiceState {
 
                     if !transcript_has_content(&user_said) {
                         return Response::Error {
-                            message: "No speech transcript available; microphone capture or lexical ASR is not configured, or no speech was detected".into(),
+                            message: EMPTY_TRANSCRIPT_ERROR.into(),
                         };
                     }
 
