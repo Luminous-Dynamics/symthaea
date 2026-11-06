@@ -4,7 +4,7 @@ use std::process::Command;
 #[test]
 fn benchmark_smoke_emits_all_workload_cells_and_three_distinct_operations() {
     let output = Command::new(env!("CARGO_BIN_EXE_rea-claim-replay-bench"))
-        .arg("1")
+        .arg("--smoke")
         .output()
         .expect("run replay benchmark smoke");
 
@@ -21,7 +21,7 @@ fn benchmark_smoke_emits_all_workload_cells_and_three_distinct_operations() {
         "luminous.rea.claim-replay-performance.v0"
     );
     assert_eq!(receipt["sample_count_per_operation"], 1);
-    assert_eq!(receipt["warmup_samples_per_operation"], 3);
+    assert_eq!(receipt["warmup_samples_per_operation"], 0);
     assert_eq!(receipt["percentile_method"], "nearest-rank");
     assert_eq!(receipt["timed_operations"].as_array().unwrap().len(), 3);
 
