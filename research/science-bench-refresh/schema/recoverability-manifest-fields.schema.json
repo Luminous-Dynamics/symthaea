@@ -43,6 +43,7 @@
       "$ref": "#/$defs/digest"
     },
     "surface_state": {
+      "description": "CompleteFrozenInventory means the route graph exhaustively enumerates permitted operations under the exact committed finite surface and route policy; PartialObserved supports only positive route witnesses; Unknown supports no reachability classification.",
       "enum": [
         "complete_frozen_inventory",
         "partial_observed",
