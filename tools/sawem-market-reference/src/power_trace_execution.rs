@@ -277,7 +277,10 @@ mod tests {
 
     #[test]
     fn import_schedule_uses_the_same_signed_directional_reconciliation() {
-        let samples = [sample("start", 100, -800_000), sample("end", 3_700, -800_000)];
+        let samples = [
+            sample("start", 100, -800_000),
+            sample("end", 3_700, -800_000),
+        ];
         let result = evaluate_scheduled_power_trace(inputs(&samples, -1_000_000)).unwrap();
         assert_eq!(
             result.unfulfilled_scheduled_energy_numerator_milli_wh,
@@ -303,10 +306,7 @@ mod tests {
 
     #[test]
     fn zero_energy_schedule_has_no_fulfilment_ratio_but_keeps_meter_deviation() {
-        let samples = [
-            sample("start", 100, 100_000),
-            sample("end", 3_700, 100_000),
-        ];
+        let samples = [sample("start", 100, 100_000), sample("end", 3_700, 100_000)];
         let result = evaluate_scheduled_power_trace(inputs(&samples, 0)).unwrap();
         assert_eq!(result.schedule_fulfilment_bps, None);
         assert_eq!(
