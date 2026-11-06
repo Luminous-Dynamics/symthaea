@@ -505,6 +505,10 @@ pub fn validate_split_manifest(input: &str) -> Result<SplitSummary, ValidationEr
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvidenceSourceProfile {
+    /// Immutable dependency-graph/evidence snapshot shared by this assessment.
+    pub snapshot_id: String,
+    /// Canonical source-provided as-of timestamp for the snapshot.
+    pub as_of: String,
     pub source_id: String,
     pub failure_domains: Vec<String>,
     pub dependencies_complete: bool,
@@ -531,8 +535,11 @@ pub struct PairwiseIndependence {
     pub shared_failure_domains: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct IndependenceSummary {
+    pub snapshot_id: String,
+    pub as_of: String,
     pub source_count: usize,
     pub pair_count: usize,
     pub no_declared_common_domain_pairs: usize,
@@ -550,9 +557,27 @@ pub struct IndependenceSummary {
 pub fn assess_common_mode_independence(
     sources: &[EvidenceSourceProfile],
 ) -> Result<IndependenceSummary, ValidationError> {
+    if sources.is_empty() {
+        return Err(ValidationError::new("$.sources", "at least one source profile is required"));
+    }
+    let snapshot_id = &sources[0].snapshot_id;
+    let as_of = &sources[0].as_of;
+    if !nonempty(snapshot_id) || !nonempty(as_of) {
+        return Err(ValidationError::new(
+            "$.sources[0]",
+            "snapshot ID and as-of time are required",
+        ));
+    }
+
     let mut source_ids = HashSet::new();
     for (index, source) in sources.iter().enumerate() {
         let path = format!("$.sources[{index}]");
+        if source.snapshot_id != *snapshot_id || source.as_of != *as_of {
+            return Err(ValidationError::new(
+                &path,
+                "all source profiles must bind the same dependency snapshot ID and as-of time",
+            ));
+        }
         if !nonempty(&source.source_id) || !source_ids.insert(source.source_id.as_str()) {
             return Err(ValidationError::new(
                 format!("{path}.source_id"),
@@ -571,6 +596,8 @@ pub fn assess_common_mode_independence(
     }
 
     let mut summary = IndependenceSummary {
+        snapshot_id: snapshot_id.clone(),
+        as_of: as_of.clone(),
         source_count: sources.len(),
         pair_count: 0,
         no_declared_common_domain_pairs: 0,
@@ -1124,16 +1151,22 @@ mod tests {
     fn common_mode_graph_does_not_overcount_shared_clock_sources() {
         let sources = vec![
             EvidenceSourceProfile {
+                snapshot_id: "dependency-snapshot-001".to_owned(),
+                as_of: "2026-11-06T00:00:00Z".to_owned(),
                 source_id: "rx-a".to_owned(),
                 failure_domains: vec!["clock:shared".to_owned(), "power:a".to_owned()],
                 dependencies_complete: true,
             },
             EvidenceSourceProfile {
+                snapshot_id: "dependency-snapshot-001".to_owned(),
+                as_of: "2026-11-06T00:00:00Z".to_owned(),
                 source_id: "rx-b".to_owned(),
                 failure_domains: vec!["clock:shared".to_owned(), "power:b".to_owned()],
                 dependencies_complete: true,
             },
             EvidenceSourceProfile {
+                snapshot_id: "dependency-snapshot-001".to_owned(),
+                as_of: "2026-11-06T00:00:00Z".to_owned(),
                 source_id: "rx-c".to_owned(),
                 failure_domains: vec!["clock:independent".to_owned(), "power:c".to_owned()],
                 dependencies_complete: true,
@@ -1159,11 +1192,15 @@ mod tests {
     fn common_mode_graph_returns_unknown_for_incomplete_dependency_inventory() {
         let sources = vec![
             EvidenceSourceProfile {
+                snapshot_id: "dependency-snapshot-001".to_owned(),
+                as_of: "2026-11-06T00:00:00Z".to_owned(),
                 source_id: "rx-a".to_owned(),
                 failure_domains: vec!["clock:a".to_owned()],
                 dependencies_complete: true,
             },
             EvidenceSourceProfile {
+                snapshot_id: "dependency-snapshot-001".to_owned(),
+                as_of: "2026-11-06T00:00:00Z".to_owned(),
                 source_id: "rx-b".to_owned(),
                 failure_domains: vec!["power:b".to_owned()],
                 dependencies_complete: false,
@@ -1176,6 +1213,29 @@ mod tests {
             summary.pairs[0].relation,
             PairwiseRelation::Unknown
         );
+    }
+
+    #[test]
+    fn common_mode_graph_rejects_mixed_snapshots_or_as_of_times() {
+        let sources = vec![
+            EvidenceSourceProfile {
+                snapshot_id: "snapshot-a".to_owned(),
+                as_of: "2026-11-06T00:00:00Z".to_owned(),
+                source_id: "rx-a".to_owned(),
+                failure_domains: vec!["clock:a".to_owned()],
+                dependencies_complete: true,
+            },
+            EvidenceSourceProfile {
+                snapshot_id: "snapshot-b".to_owned(),
+                as_of: "2026-11-06T00:01:00Z".to_owned(),
+                source_id: "rx-b".to_owned(),
+                failure_domains: vec!["clock:b".to_owned()],
+                dependencies_complete: true,
+            },
+        ];
+        let error = assess_common_mode_independence(&sources)
+            .expect_err("profiles from different snapshots cannot be combined");
+        assert!(error.to_string().contains("same dependency snapshot"));
     }
 
     #[test]
