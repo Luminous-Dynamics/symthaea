@@ -65,7 +65,7 @@ V1 uses deterministic binary decision maps because a support/refute scientific c
 
 Report information gain for every supplied vertex separately and publish its minimum/maximum across those vertices as a **vertex sensitivity range**. Do not call the minimum vertex EIG a guaranteed lower bound over the convex hull: mutual information is nonlinear in the joint distribution, and an interior mixture can have less information than any listed endpoint.
 
-The benchmark may include prespecified interior-mixture checks as diagnostics, but they are not a global optimization certificate. The primary selection criterion remains robust decision loss under a shared policy.
+The benchmark includes pairwise 50/50 joint-distribution mixtures as diagnostics, but these are not a global optimization certificate. In the reversal fixture, the endpoint minimum EIG is approximately 0.921928 bits, while the midpoint-mixture EIG is approximately 0.818540 bits. This directly demonstrates why the minimum EIG across supplied vertices is not a guaranteed lower bound over the convex hull. The primary selection criterion remains robust decision loss under a shared policy.
 
 ## 5. Synthetic known-answer fixture
 
@@ -85,7 +85,7 @@ Five interventions are declared:
 | `high-eig-irrelevant` | Separates the high-prior true world from a group containing both query decisions | Feasible |
 | `cheap-confounded` | Separates decisions under M1, but M2 collapses all outcomes into Q | Feasible |
 | `orthogonal-robust` | Outcome labels differ between vertices, but within each vertex true and false query classes remain separable by one shared map | Feasible |
-| `infeasible-perfect` | Perfectly separates the query in every vertex | Disallowed |
+| `infeasible-perfect` | Perfectly separates the query in every vertex | Disallowed; excluded before optimization |
 
 Expected exact results:
 
@@ -103,7 +103,7 @@ Expected exact results:
 | Selected action by minimum vertex EIG among feasible actions (diagnostic only) | `reversal-high-eig` |
 | Robust certificate tolerance | 0.01 |
 
-The crucial result is the gap between `reversal-high-eig`'s zero clairvoyant bound and 0.15 robust policy loss. A per-model optimiser can decode each model perfectly; one policy that does not know the model cannot.
+The crucial result is the gap between `reversal-high-eig`'s zero clairvoyant bound and 0.15 robust policy loss. A per-model optimiser can decode each model perfectly; one policy that does not know the model cannot. The infeasible perfect action receives no policy, risk, EIG or value-per-cost result because it is removed before optimization.
 
 ## 6. Required invariants
 
