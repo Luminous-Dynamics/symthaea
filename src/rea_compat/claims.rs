@@ -1155,4 +1155,21 @@ mod tests {
         let changed_assertion = evaluate_claim(&different_assertion, &[evidence]).unwrap();
         assert_ne!(first.derivation_sha256, changed_assertion.derivation_sha256);
     }
+    #[test]
+    fn unreferenced_evidence_is_rejected_instead_of_silently_ignored() {
+        let evidence = verified_fixture();
+        let claim = claim(ClaimPredicate::ProviderReportedObservation, Vec::new());
+        let error = evaluate_claim(&claim, &[evidence]).unwrap_err();
+        assert_eq!(error.kind, ClaimErrorKind::UnexpectedEvidence);
+    }
+
+    #[test]
+    fn claim_evidence_count_is_bounded_before_evaluation() {
+        let mut claim = claim(ClaimPredicate::ProviderReportedObservation, Vec::new());
+        let id = format!("ev_{}", "a".repeat(64));
+        claim.evidence_ids = vec![id; MAX_CLAIM_EVIDENCE_RECORDS + 1];
+        let error = evaluate_claim(&claim, &[]).unwrap_err();
+        assert_eq!(error.kind, ClaimErrorKind::ResourceLimit);
+    }
+
 }
