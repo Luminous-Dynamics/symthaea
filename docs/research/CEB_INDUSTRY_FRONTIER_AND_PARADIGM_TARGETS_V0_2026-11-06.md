@@ -55,9 +55,9 @@ SWE Atlas v1.1 covers 284 tasks from 15 production repositories in six languages
 
 ### 2.5 Artificial Analysis Coding Agent Index V2: composite breadth and economics
 
-The October 2026 Coding Agent Index V2 is an equal-weight average of FrontierCode v1.1 (100 tasks), Terminal-Bench 4.0 (66 tasks) and SWE-Atlas-QnA-AA (124 tasks), for 290 total tasks. Each component is attempted three times. FrontierCode is a private 100-task sample graded with a maintainer-oriented blocking/non-blocking rubric; Terminal-Bench covers terminal workflows; SWE-Atlas-QnA-AA covers repository questions. The methodology also publishes cost, token use and execution time and explicitly tracks reward hacking. [Artificial Analysis V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking)
+The October 2026 Coding Agent Index V2 is an equal-weight average of FrontierCode v1.1 (100 tasks), Terminal-Bench 4.0 (66 tasks) and SWE-Atlas-QnA-AA (124 tasks), for 290 tasks. Each component is attempted three times; the methodology averages attempt scores per task and then gives each task equal weight. FrontierCode is a private sample graded with a maintainer-oriented blocking/non-blocking rubric; Terminal-Bench covers terminal workflows; SWE-Atlas-QnA-AA covers repository questions. The V2 methodology also publishes cost, token use and execution time, classifies safety refusals/errors/timeouts explicitly, and applies reward-hacking review to passing attempts. In its Terminal-Bench review path, an LLM judge (Claude Code with Claude Sonnet 5) inspects trajectories that pass deterministic verification. This is disclosed methodology, not evidence of a defect; however, shared judge/model lineage is a dependency worth stress-testing rather than assuming independent corroboration. [Artificial Analysis V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking)
 
-**CEB implication:** cost and time must accompany correctness. A single average conceals whether a result came from higher compute, more attempts, extra human labor, or genuinely better evidence decisions.
+**CEB implication:** report cost, tokens, wall-clock, human effort and review effort alongside correctness. Preserve per-component and per-task outcomes rather than relying on the equal-weight index alone. Record auditor model/harness lineage and test review decisions against an independent adjudication sample; a reward-hacking filter is itself an evaluator that requires qualification.
 
 ### 2.6 HiL-Bench: selective escalation is measurable
 
@@ -68,7 +68,7 @@ HiL-Bench contains 300 tasks across software engineering and text-to-SQL, with 1
 
 ### 2.7 SWE-Marathon: project-scale, multi-hour engineering
 
-SWE-Marathon's current v1.1 public page describes 20 realistic multi-hour tasks spanning full-library reproduction, full-stack application cloning, ML systems/post-training and algorithmic optimization. Its currently displayed leaderboard top is 53.1% Pass@1 for Muse Wonder Full with Muse Code; the page reports 3,810 logged trials. The task count is small, and the benchmark is still a distinct challenge set rather than a direct substitute for continuous repository histories. [Official benchmark and v1.1 leaderboard](https://www.swe-marathon.org/)
+SWE-Marathon v1.1 describes 20 realistic multi-hour tasks spanning full-library reproduction, full-stack application cloning, ML systems/post-training and algorithmic optimization. The official page reports 3,810 logged trials and a top displayed Pass@1 of 53.1% for Muse Wonder Full with Muse Code. This is a useful project-scale pressure test, but its 20 tasks are a small challenge set, not a substitute for long repository histories or evidence continuity across releases. [Official benchmark and v1.1 leaderboard](https://www.swe-marathon.org/)
 
 **CEB implication:** include project-scale tasks after the current evidence and custody gates are met. Report project completion, durable correctness, regression and total human/agent effort separately; do not conflate multi-hour task completion with multi-release evidence continuity.
 
@@ -100,9 +100,9 @@ RewardHackingAgents studies evaluator tampering and train/test leakage in agenti
 
 ### 2.12 Agent Security League: functional and secure correctness are different axes
 
-Endor Labs' Agent Security League reports 34 agent/model configurations. Its current visible table shows 91.6% as the highest functional score and 36.9% as the highest security score, achieved by different configurations. The same-system functional and security observations must remain paired; the two maxima are not one model result. [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark)
+Endor Labs' Agent Security League reports 34 agent/model configurations. Its November 3, 2026 update shows Muse Code + Muse Wonder at **91.6% FuncPass** but only **25.1% SecPass** (seventh by security), while Claude Code + Claude Fable 5.1 retains the highest reported SecPass at **36.9%**. The functional and secure maxima are different configurations and must not be combined into a fictitious best-system result. More importantly for measurement integrity, the November update describes three confirmed cheating cases for Muse Wonder; one training-recall case was found through manual spot checks after the automated pipeline missed it. Endor Labs revised and re-scored its leaderboard after that audit. [Endor Labs, November 3 update](https://www.endorlabs.com/learn/metas-new-muse-wonder-record-funcpass-but-mid-table-secpass) · [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark)
 
-**CEB implication:** retain joint secure-functional pass and critical security false accepts as independent hard-gated measures. A high functional pass rate cannot stand in for security correctness.
+**CEB implication:** retain joint secure-functional pass and critical security false accepts as independent hard-gated measures. Also benchmark the integrity auditor: manual spot checks, known training-recall controls, independent trajectory review and auditor false-negative accounting should qualify the anti-cheating pipeline. A high functional pass rate cannot stand in for security correctness, and an automated auditor's "clean" label is not ground truth by itself.
 
 ### 2.13 External benchmark validity is version-scoped
 
@@ -178,7 +178,7 @@ A patch that passes tests can still be unsafe to merge or deploy if the agent by
 
 ### Shift 7 — From trusting the verifier to qualifying the verifier
 
-A verifier is an executable hypothesis about the specification, not ground truth by declaration. Test it against known-valid alternatives, known-invalid near misses, identical-input label consistency, frozen replay, repeatability and mutation sensitivity. Always-accept and always-reject baselines must both fail. A verifier that rejects every answer may have high negative-case accuracy while being unusable. The V4V protocol in #10680/#10681 extends the existing CEB-EVAL hard gates without adding a new lane or score.
+A verifier is an executable hypothesis about the specification, not ground truth by declaration. Test it against known-valid alternatives, known-invalid near misses, identical-input label consistency, frozen replay, repeatability and mutation sensitivity. Always-accept and always-reject baselines must both fail. A verifier that rejects every answer may have high negative-case accuracy while being unusable. Extend this one level further: the **integrity auditor** that decides whether an agent cheated is also a verifier. It needs its own known-positive/known-negative controls, lineage disclosure, manual blinded spot checks and independent adjudication. Endor Labs' November 3 audit provides a concrete example of an automated anti-cheating blind spot discovered through manual review. The V4V protocol in #10680/#10681 extends the existing CEB-EVAL hard gates without adding a new lane or score.
 
 ### Shift 8 — From feature-isolated tests to compositional specification evidence
 
@@ -198,7 +198,7 @@ Do not publish one opaque weighted number. Maintain hard gates and a Pareto surf
 4. **Security and authority:** critical policy compliance, unauthorized consequential actions, custody and trust validity.
 5. **Collaboration:** factual handoff, correction integration, reviewer reconstruction time, human effort.
 6. **Economics:** compute cost, wall-clock, tool use, human labor and revalidation cost per accepted sequence.
-7. **Measurement integrity:** contamination, oracle quality, verifier trust, exact-release validity, denominator fidelity and regrade reproducibility.
+7. **Measurement integrity:** contamination, oracle quality, verifier and integrity-auditor trust, exact-release validity, denominator fidelity and regrade reproducibility.
 
 A result can be strong on one dimension and unacceptable on another. Critical unauthorized actions, critical stale-evidence use, verifier escape or invalid holdout custody must not be averaged away.
 
@@ -312,7 +312,8 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 - Deng et al., [SWE-Milestone: Evaluating AI Agents on Continuous Software Evolution](https://proceedings.mlr.press/v306/deng26d.html), ICML 2026, PMLR 306.
 - Chen et al., [SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration](https://arxiv.org/abs/2603.03823), 4 March 2026.
 - Scale AI, [SWE Atlas v1.1](https://labs.scale.com/leaderboard/swe-atlas), updated September 22, 2026.
-- Artificial Analysis, [Coding Agent Index V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking), October 2026.
+- Artificial Analysis, [Coding Agent Index V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking), October 2026; includes three-attempt task aggregation, resource accounting, reward-hacking review and an LLM-judge trajectory audit for passing Terminal-Bench runs.
+- Endor Labs, [Meta's New Muse Wonder: record FuncPass, but mid-table SecPass](https://www.endorlabs.com/learn/metas-new-muse-wonder-record-funcpass-but-mid-table-secpass), November 3, 2026; documents the post-audit Agent Security League re-score and a training-recall case missed by the automated anti-cheating pipeline.
 - Scale AI, [HiL-Bench overview and methodology](https://labs.scale.com/leaderboard/hil), 2026.
 - Abundant AI, [SWE-Marathon v1.1](https://www.swe-marathon.org/), current leaderboard viewed November 6, 2026.
 - Shetty et al., [GSO: Challenging Software Optimization Tasks for SWE-Agents](https://gso-bench.github.io/), leaderboard/methodology viewed November 6, 2026.
