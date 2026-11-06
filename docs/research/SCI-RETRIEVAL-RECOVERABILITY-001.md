@@ -46,7 +46,7 @@ For each required, pinned evidence unit, a finite graph binds the initial state 
 
 A direct route takes precedence over a reformulation or navigation route; reformulation takes precedence over navigation. The report includes the deterministic shortest route witness and route cost. These witnesses and gold artifact references are evaluator-side only.
 
-The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. A partial/unknown surface yields NotEvaluable, not an unreachable label.
+The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. Reachability is asymmetric: a concrete pinned route is positive evidence even when the observed surface is partial; a missing route is not evidence of unreachability unless the declared finite surface and route inventory are frozen and complete. Thus a partial surface can preserve DirectlyReachable, ReformulationRecoverable, or NavigationRecoverable witnesses, but an item with no observed route becomes NotEvaluable. An entirely unknown surface makes every item NotEvaluable.
 
 ## Executable contract
 
@@ -91,7 +91,7 @@ The initial synthetic fixture covers:
 - unknown artifact availability;
 - duplicate artifact mirrors with a shared source family.
 
-Metamorphic checks verify that reducing budget never improves reachability, adding a concrete first-pass edge can improve only the target unit, partial search surfaces yield only NotEvaluable, and a tampered manifest commitment yields no route labels. A model-supplied judgment field is rejected as an unknown property.
+Metamorphic checks verify that reducing budget never improves reachability, adding a concrete first-pass edge can improve only the target unit, partial surfaces preserve positive route witnesses while blocking negative claims, unknown surfaces yield only NotEvaluable, and a tampered manifest commitment yields no route labels. An independent Python reference is compared against Rust for every classification and shortest-route witness. A model-supplied judgment field is rejected as an unknown property.
 
 ## Benchmark strategy and target comparisons
 
@@ -118,3 +118,28 @@ Metrics remain separate: Recall@k, evidence-family recall, path completion and r
 ## Claim ceiling
 
 A passing synthetic graph contract establishes only deterministic classification of its frozen graph and budget. It does not prove live retrieval accuracy, open-world search completeness, source truth/authenticity, model evidence use, benchmark independence, language parity, or SOTA. No model-performance result is claimed by this implementation.
+
+
+## New paradigm: evidence-asymmetric reachability
+
+This evaluator uses a proof asymmetry that is easy to miss in ordinary retrieval metrics:
+
+- One valid, pinned route witness proves that the benchmark's declared search surface permits access to that exact evidence unit.
+- Failure to find a route proves nothing unless the benchmark has enumerated the complete route space for its exact declared finite surface and operation policy.
+- Unknown or incomplete route inventories can therefore establish positive reachability, but cannot establish negative reachability.
+- Even a complete graph only supports `UnreachableWithinBudget` inside its committed snapshot and budget; it says nothing about the open web or the world.
+
+This is especially important for scientific and multilingual retrieval: partial API access, unpinned index state, rights restrictions, provider outages, or missing source versions must not be laundered into evidence absence.
+
+## Research comparisons
+
+The current literature gives us concrete evaluation priorities:
+
+- REALM 2026 recommends a model-free recoverability diagnostic and a one-shot / fixed-loop / full-agent ablation ladder. In its studied corpora, headline gain varied from -0.21 to +0.30 by recoverability regime, and fixed iteration recovered 65–96% of the apparent agency gain on reformulation-recoverable corpora. These are paper-specific findings, not Symthaea results: https://aclanthology.org/2026.realm-1.47/
+- Retrieval Myopia found up to 46.2% of examples answered incorrectly despite gold evidence already being present in retrieved results; clean-format re-presentation recovered up to 48.9% of those cases without weight updates. We therefore measure reader-format gain separately from retrieval and agentic gain: https://aclanthology.org/2026.findings-emnlp.1713/
+- RDQA reports 24.0% adjusted accuracy for its best generic agent against 41.1% for a process-aware baseline across document, video and audio tasks, with parametric leakage as high as 96% in the studied conditions. This argues for source-grounded, modality-aware controls rather than answer-only scoring: https://aclanthology.org/2026.emnlp-main.1855/
+- TEMPO reports 32.0 nDCG@10 and 71.4% Temporal Coverage@10 for the best evaluated system in its 16-system comparison, showing that topical relevance can coexist with missing required periods: https://aclanthology.org/2026.emnlp-main.291/
+- AfrIFact covers ten African languages plus English and reports persistent cross-lingual retrieval weakness for leading embeddings. We should evaluate South African language/document slices directly rather than extrapolate parity from English: https://aclanthology.org/2026.emnlp-main.133/
+- Agentic-R reports improvements over strong baselines on seven single-hop and multi-hop QA benchmarks using a retriever trained around multi-turn utility. It is a competitive retrieval baseline to include, not proof that agentic retrieval is universally superior: https://aclanthology.org/2026.findings-acl.785/
+
+The comparison ladder is therefore BM25, dense multilingual retrieval, hybrid retrieval, standard reranking, fixed multi-query/iterative RAG, Agentic-R-style retrievers, and the full agent. All must use matched corpus snapshots, models, tool/action budgets, retrieval depths, evidence-token ceilings, cost and latency accounting. The primary claim should be incremental value over the fixed-loop baseline, not merely a win over one-shot RAG.
