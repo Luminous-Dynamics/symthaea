@@ -343,6 +343,19 @@ The framework is an attribution ledger, not a forecast model, causal-identificat
 
 Reference: https://docs.modoenergy.com/pages/oct-2026/uk-europe/gb/model-calibration/
 
+### Effective-dated rule applicability and historical replay
+
+The new `rule_applicability.rs` module resolves a published rule revision against two independent timestamps:
+
+- **Valid time:** the project, transaction or obligation date to which the rule is being applied.
+- **Knowledge time:** the evidence timestamp frozen for the historical investment or operating decision.
+
+A revision is selected only when it matches the exact authority, jurisdiction, instrument and rule/product scope; is published; is effective at valid time; and its source was available by knowledge time. Effective windows are start-inclusive/end-exclusive. Publication and source-availability timestamps are retained separately.
+
+Supersession is explicit. The resolver validates a complete predecessor chain, requires the same authority/jurisdiction/instrument/scope, rejects cycles and missing predecessors, and selects a unique maximal revision when overlapping versions are linked. Independent overlapping amendment branches are ambiguous. A future-effective published rule does not displace the currently effective revision before its start time. When an applicable successor is effective but was not yet available at the historical knowledge frontier, the result is indeterminate rather than a retroactive rewrite.
+
+Benchmark case: `RULE-SUPERSESSION-001` now maps 14 synthetic Rust tests. This is a rule-version selection engine, not legal interpretation. It does not infer transitional provisions, determine the meaning of a clause, authenticate the regulator, or prove participant/product admission. Mycelix's source authority/provenance verification and downstream product eligibility must remain separate stages.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
