@@ -3172,6 +3172,46 @@ mod tests {
     }
 
     #[test]
+    fn test_backward_matches_radial_state_bound_projection() {
+        const DIM: usize = 64;
+        const DT: f32 = 0.13;
+        const EPSILON: f32 = 1e-2;
+
+        let config = UnifiedConfig {
+            dimension: DIM,
+            tau_base: 0.25,
+            backbone_tau: 0.3,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron.set_state(ContinuousHV::random(DIM, 22).scale(3.0));
+        neuron.set_evolution_clock(0.0, 0);
+
+        let input = ContinuousHV::random(DIM, 23).scale(0.2);
+        let target = ContinuousHV::random(DIM, 24).scale(0.1);
+        let gradients = neuron.backward(&input, &target, DT);
+
+        let mut evolved = neuron.clone();
+        evolved.evolve_closed_form(DT, &input);
+        assert!(
+            (evolved.state().norm() - 5.0).abs() < 1e-4,
+            "test must exercise radial state projection, got norm={}",
+            evolved.state().norm()
+        );
+
+        let index = 17;
+        let numerical = central_difference_parameter(
+            &neuron,
+            &input,
+            &target,
+            DT,
+            EPSILON,
+            |candidate, delta| candidate.state.values[index] += delta,
+        );
+        assert_finite_difference_close("state_bound_projection", gradients.d_state.values[index], numerical);
+    }
+
+    #[test]
     fn test_set_fourier_frequencies_neuron() {
         let config = UnifiedConfig {
             fourier_frequencies: vec![1.0, 2.0],
