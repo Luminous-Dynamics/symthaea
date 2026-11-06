@@ -169,3 +169,58 @@ Numerical targets must be revisited after a reproducible pilot and power analysi
 - Change-impact / proof maintenance: tools/pitb-proof-impact/
 
 None of these components, by itself, demonstrates a measured SOTA gain. Their purpose is to make later gains reproducible, falsifiable and safe to claim.
+
+## External baseline update (6 November 2026)
+
+The component-level comparison frontier is now clearer. These published figures are useful targets, but each belongs to its own benchmark and must be reproduced under its own task and resource contract.
+
+### Retrieval and proof-support systems
+
+- **DAPS** reports mean Recall@32 of 89.25 on Mathlib4-Heldout, +11.41 over LeanHammer, and reports downstream gains on miniF2F and IMO-ProofBench. It contributes a structural neighborhood encoder, group-level contrastive learning, Mathlib-to-Blueprint adaptation, 53 mined Blueprint projects and 3,805 manually curated informal/formal nodes. This is a high bar for candidate retrieval—not a proof completion score. [DAPS paper](https://arxiv.org/abs/2610.41536)
+- **LeanGraphSearch** reports on the shared 810-query MathlibQR subset nDCG@10 0.629 and Recall@10 0.794, compared with LeanSearch v2 Standard at 0.616 and 0.765. On MathlibMPR, complete-route coverage@50 is 44.2% vs 41.3% for LeanSearch v2 Reasoning. Its iterative proving integration reports gains up to 10% over LeanSearch v2 in some settings. PITB's retrieval target remains >=0.65 nDCG@10, >=0.82 Recall@10 and >=50% complete-route coverage@50, followed by a matched downstream proof-success comparison. [LeanGraphSearch paper](https://arxiv.org/abs/2610.22339) · [project tables](https://pluslabnlp.github.io/LeanGraphSearch/)
+- **TheoremGraph** reports 11.7M informal mathematical statements and 18.3M candidate informal dependency edges, alongside 388,105 formal Lean declarations and 11.3M typed Lean dependency edges across 25 projects. Its informal edges are extractor-proposed candidates; the formal graph and the cross-formality links have distinct evidence levels. PITB should ingest this as a provenance-rich candidate source, never flatten its informal edge hypotheses into observed Lean dependencies. [TheoremGraph](https://www.theoremsearch.com/theorem-graph) · [dataset summary](https://huggingface.co/datasets/uw-math-ai/math-graph)
+- **CoCo-Prover** is an especially relevant orchestration comparator: its two-level AND/OR proof graphs and metalevel routing optimize the success-cost frontier, reporting up to 30.9% lower cost than a strong baseline on five Lean program-verification benchmarks. PITB's opportunity is to combine this cost-aware action selection with evidence-qualified support routes and maintenance obligations, then compare under identical budgets. [CoCo-Prover paper](https://arxiv.org/abs/2610.09681)
+- **FVSpec** broadens the target beyond mathematics: 11,039 scraped property-based tests, 9,415 Lean challenges from 2,772 PBTs, 333 source repositories, and 62% classified as hard. Published model baselines average 70% on a random 100-problem easy sample and 49% on a random 100-problem hard sample—not on the entire 9,415-task corpus. A PITB software-assurance track must score both translation fidelity and proof validity against the original PBT semantics. [FVSpec leaderboard](https://fvspec.galois.com/) · [paper](https://arxiv.org/abs/2606.01008)
+
+### Current SorryDB reproduction witness
+
+On the exact PR head, the sorrydb-snapshot-integrity job completed every step, including one end-to-end source replay:
+
+- selected a task from the pinned SorryDB_2601 evaluation split;
+- checked out its immutable repository commit ddcb6542f2b62883c8642d3db4ecc115afcce33e;
+- verified the source-file, lean-toolchain and Lake-manifest Git blob identities;
+- installed Lean 4.26.0 and successfully built the source project;
+- verified that the exact committed span at PrimeNumberTheoremAnd/FioriKadiriSwidinsky.lean:44:137-142 is the stored sorry token;
+- replayed the live Lean goal and matched it to the frozen SorryDB goal, retaining goal, manifest and replay-log digests.
+
+This is one real source/build/goal-replay witness. It does not estimate the percentage of all 1,000 tasks that can be reproduced, and it is not a theorem-solving success. The remaining evaluation tasks still need source reproduction and semantic-gate evidence before their proof outcomes can enter an assurance-qualified denominator.
+
+### General matched-comparison engine
+
+The standalone Rust comparison engine is being qualified separately in [PR #10732](https://github.com/Luminous-Dynamics/symthaea/pull/10732). Its exact-head workflow now passes five Rust tests and the cohort/run/report schemas. The synthetic paired cohort demonstrates the intended separation: four kernel-verified challenger proofs, but only three assurance-qualified completions because one task lacks its required specification audit. It requires exact task-set identity, repository revision, Lean version, environment, arm/scaffold/implementation, budget policy and declared repository or repository-file bootstrap unit.
+
+The SorryDB-specific audit already has its own paired cluster bootstrap, nested source-file sensitivity, cluster-level sign-flip tests and Holm correction. The general engine provides a common interface for matched results from SorryDB, formalization, software-property translation and other tracks; it does not pool their scores.
+
+## What PITB should build beyond the current SOTA
+
+The next genuine architectural leap is an **assurance-constrained proof operations controller**. Its planning state should be a typed AND/OR route graph, not a flat list of candidate premises. At each step it should choose among:
+
+1. expand the typed retrieval frontier (BM25, LeanSearch v2, LeanGraphSearch, DAPS, TheoremGraph or a union);
+2. test an alternative support bundle against an exact-target prover budget;
+3. invoke a bounded specialist prover or tactic search;
+4. request a counterfactual support ablation when route necessity or complementarity is uncertain;
+5. revalidate/rebuild a stale proof after a source, dependency, instance, import or toolchain mutation;
+6. spend a human-review budget where source/intent ambiguity makes automation unsafe.
+
+The controller should maximize expected **assurance-qualified unique completions** per unit cost, subject to hard constraints: no task/split leakage, no weakened gate, no stale receipt, no proof accepted against a changed target, and no uncertain external edge promoted into a formal dependency. Each action needs a predicted value of information, a measured resource cost, a termination condition and an independently checked result. An action that improves retrieval recall but not exact-target verified completion should lose budget to one that closes real proof routes.
+
+Evaluation should compare four layers on the same frozen task IDs and total budget: (A) strongest standalone prover; (B) standalone prover plus strongest retrieval; (C) typed multi-source retrieval plus support-antichain route planning; (D) assurance-constrained adaptive controller with proof-maintenance checks. Report both the raw and assurance-adjusted frontier, the system union, route sufficiency, failure reasons, project-cluster uncertainty and cost per verified completion. Reserve project-disjoint and chronological cohorts for confirmation, not tuning.
+
+**Near-term qualification gates:**
+- SorryDB: reproduce the strongest public baseline that can actually be run on the exact 1,000 tasks and same resource policy; then target +5 percentage points with a repository-cluster 95% interval above zero. Treat the current public 57.2% Aleph Pass@1 result and 63.2% union coverage as external references, not matched controls. [Leaderboard](https://sorrydb.org/)
+- AutoformBench: reproduce the published GPT-6 Astra 281/341 source-present result before claiming a gain; 299/341 is the first integer threshold above +5 percentage points, 316/341 above +10 points. Preserve the release's CC BY-NC 4.0 evaluation-only restriction. [Release](https://github.com/facebookresearch/autoformbench)
+- Retrieval: beat the strongest matched retrieval baseline on complete support-route coverage, then demonstrate a downstream exact-target completion gain under the same prover, tool, reflection and token budgets.
+- Proof maintenance: 100% invalidation recall on registered critical mutations and zero stale-proof acceptance; then show at least 20% lower revalidation/rebuild cost than full rebuild at non-inferior safety.
+- Assurance: no known vacuous proposition, goal mismatch, or unapproved axiom may be counted as an assurance-qualified success; independently authenticate every source/build/checker/semantic receipt that enters the public score.
+
+These thresholds are research targets, not current PITB scores. A public claim of superiority requires a matched baseline, a frozen split, the exact-head receipt chain, and uncertainty analysis at the project cluster level.
