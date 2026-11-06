@@ -449,7 +449,10 @@
         "robust_loss_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1
           }
@@ -457,7 +460,10 @@
         "clairvoyant_lower_bound_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1
           }
@@ -465,7 +471,10 @@
         "uncertainty_penalty_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1
           }
@@ -473,21 +482,30 @@
         "value_per_cost_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0
           }
         },
         "vertex_min_eig_bits_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0
           }
         },
         "vertex_max_eig_bits_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0
           }
         },
@@ -508,14 +526,20 @@
         "pairwise_midpoint_eig_min_bits_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0
           }
         },
         "pairwise_midpoint_eig_max_bits_by_intervention": {
           "type": "object",
           "additionalProperties": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0
           }
         }
