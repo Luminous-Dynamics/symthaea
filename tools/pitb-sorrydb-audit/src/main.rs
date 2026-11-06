@@ -2142,6 +2142,16 @@ fn run_self_tests() -> Result<(), String> {
         return Err("pairwise strategy comparison accepted mismatched resource budgets".into());
     }
     println!("SELF_TEST_PASS pairwise comparisons reject unequal resource-budget policies");
+    let mut one_strategy_mixed_budget = cluster_runs
+        .iter()
+        .filter(|run| run.strategy.name == "strategy-a")
+        .cloned()
+        .collect::<Vec<_>>();
+    one_strategy_mixed_budget[1].budget_policy_sha256 = sha256(b"different-budget-within-strategy-a");
+    if summarize_proof_runs(&one_strategy_mixed_budget, &cluster_eval).is_ok() {
+        return Err("single-strategy summary accepted mixed resource budgets".into());
+    }
+    println!("SELF_TEST_PASS single-strategy summaries reject mixed budget identities");
 
     let mut mismatched_condition = cluster_runs.clone();
     mismatched_condition[4].evaluation_condition_sha256 = sha256(b"source-free-condition-for-strategy-b");
