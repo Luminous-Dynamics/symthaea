@@ -49,6 +49,8 @@ jobs:
           jq empty tools/recoverability-validator/schema/recoverability-manifest-fields.schema.json
 
           python3 tools/recoverability-validator/tools/recoverability_test_vectors.py /tmp/recoverability-vectors
+          jq -e '.metamorphic_controls.post_retrieval_requires_prior_reformulation == true' \
+            /tmp/recoverability-vectors/summary.json >/dev/null
 
           rust_commitment="$(cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
             commit-recoverability-manifest /tmp/recoverability-vectors/fields.json \
