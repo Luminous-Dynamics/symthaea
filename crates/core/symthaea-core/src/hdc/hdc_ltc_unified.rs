@@ -1363,7 +1363,7 @@ impl HdcLtcUnifiedNeuron {
         let manifest_digest = blake3::hash(&manifest_bytes).to_hex().to_string();
 
         let mut architecture_hasher = blake3::Hasher::new();
-        architecture_hasher.update(b"symthaea-hdc-ltc-architecture-v1\\0");
+        architecture_hasher.update(b"symthaea-hdc-ltc-architecture-v1\0");
         architecture_hasher.update(&config_bytes);
         architecture_hasher.update(&manifest_bytes);
         let architecture_digest = architecture_hasher.finalize().to_hex().to_string();
@@ -1375,7 +1375,7 @@ impl HdcLtcUnifiedNeuron {
         let parameter_digest = parameter_hasher.finalize().to_hex().to_string();
 
         let mut model_hasher = blake3::Hasher::new();
-        model_hasher.update(b"symthaea-hdc-ltc-model-v1\\0");
+        model_hasher.update(b"symthaea-hdc-ltc-model-v1\0");
         model_hasher.update(architecture_digest.as_bytes());
         model_hasher.update(manifest_digest.as_bytes());
         model_hasher.update(parameter_digest.as_bytes());
@@ -3414,6 +3414,215 @@ mod tests {
             relative_error < 1e-2,
             "{name}: analytic={analytic:.8e}, numerical={numerical:.8e}, relative error={relative_error:.3e}"
         );
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_manifest_matches_flat_layout() {
+        let neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let manifest = neuron.parameter_manifest();
+        let values = neuron.parameter_values();
+
+        assert_eq!(manifest.format_version, 1);
+        assert_eq!(manifest.dimension, 64);
+        assert_eq!(manifest.total_parameters, values.len());
+        assert_eq!(manifest.groups.len(), 5);
+
+        let expected_names = [
+            "weight_hv",
+            "input_mask",
+            "tau_modulator",
+            "gate_weight",
+            "gate_bias",
+        ];
+        let mut expected_offset = 0usize;
+        for (group, expected_name) in manifest.groups.iter().zip(expected_names) {
+            assert_eq!(group.name, expected_name);
+            assert_eq!(group.offset, expected_offset);
+            assert_eq!(group.shape, vec![64]);
+            assert_eq!(group.len, 64);
+            assert_eq!(group.max_norm, 2.0);
+            expected_offset += group.len;
+        }
+        assert_eq!(expected_offset, values.len());
+    }
+
+    #[test]
+    fn test_hdc_ltc_fingerprint_binds_parameters_and_architecture() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let original = neuron.parameter_fingerprint().unwrap();
+        let mut values = neuron.parameter_values();
+        values[3] += 0.05;
+        neuron.try_set_parameter_values(&values).unwrap();
+        let changed = neuron.parameter_fingerprint().unwrap();
+
+        assert_eq!(original.architecture_digest, changed.architecture_digest);
+        assert_eq!(original.manifest_digest, changed.manifest_digest);
+        assert_ne!(original.parameter_digest, changed.parameter_digest);
+        assert_ne!(original.model_digest, changed.model_digest);
+    }
+
+    #[test]
+    fn test_hdc_ltc_typed_group_edit_is_bounded_and_digest_bound() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let before = neuron.parameter_values();
+        let manifest = neuron.parameter_manifest();
+        let group = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::GateWeight)
+            .unwrap()
+            .clone();
+        let replacement = vec![0.1; group.len];
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+
+        neuron
+            .try_replace_parameter_group(&digest, &group.id, &replacement)
+            .unwrap();
+
+        let after = neuron.parameter_values();
+        assert_eq!(
+            &after[group.offset..group.offset + group.len],
+            replacement.as_slice()
+        );
+        for index in 0..before.len() {
+            if !(group.offset..group.offset + group.len).contains(&index) {
+                assert_eq!(after[index], before[index], "unexpected parameter change at {index}");
+            }
+        }
+
+        let current = neuron.parameter_values();
+        assert!(matches!(
+            neuron.try_replace_parameter_group(
+                &digest,
+                &HdcLtcParameterGroupId::InputMask,
+                &vec![0.0; 64],
+            ),
+            Err(HdcLtcParameterError::StaleModelFingerprint { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), current);
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_batch_rejects_invalid_payloads_without_mutation() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        let before = neuron.parameter_values();
+
+        let manifest = neuron.parameter_manifest();
+        let gate = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::GateWeight)
+            .unwrap();
+
+        let duplicate = HdcLtcParameterGroupReplacement {
+            id: gate.id.clone(),
+            values: vec![0.0; gate.len],
+        };
+        assert!(matches!(
+            neuron.try_apply_parameter_group_replacements(
+                &digest,
+                &[duplicate.clone(), duplicate]
+            ),
+            Err(HdcLtcParameterError::DuplicateParameterGroup { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+
+        let mut non_finite = before.clone();
+        non_finite[0] = f32::NAN;
+        assert!(matches!(
+            neuron.try_set_parameter_values(&non_finite),
+            Err(HdcLtcParameterError::NonFiniteValue { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+
+        let too_large = vec![1.0; 64];
+        assert!(matches!(
+            neuron.try_replace_parameter_group(&digest, &gate.id, &too_large),
+            Err(HdcLtcParameterError::GroupNormExceeded { .. })
+        ));
+        assert_eq!(neuron.parameter_values(), before);
+    }
+
+    #[test]
+    fn test_hdc_ltc_parameter_batch_applies_multiple_groups_atomically() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let manifest = neuron.parameter_manifest();
+        let digest = neuron.parameter_fingerprint().unwrap().model_digest;
+        let before = neuron.parameter_values();
+
+        let weight = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::WeightHdc)
+            .unwrap();
+        let gate_bias = manifest
+            .groups
+            .iter()
+            .find(|group| group.id == HdcLtcParameterGroupId::GateBias)
+            .unwrap();
+        let edits = [
+            HdcLtcParameterGroupReplacement {
+                id: weight.id.clone(),
+                values: vec![0.1; weight.len],
+            },
+            HdcLtcParameterGroupReplacement {
+                id: gate_bias.id.clone(),
+                values: vec![-0.1; gate_bias.len],
+            },
+        ];
+
+        neuron
+            .try_apply_parameter_group_replacements(&digest, &edits)
+            .unwrap();
+        let after = neuron.parameter_values();
+
+        for edit in &edits {
+            let group = manifest.groups.iter().find(|group| &group.id == &edit.id).unwrap();
+            assert_eq!(
+                &after[group.offset..group.offset + group.len],
+                edit.values.as_slice()
+            );
+        }
+        for index in 0..before.len() {
+            let edited = edits.iter().any(|edit| {
+                let group = manifest.groups.iter().find(|group| &group.id == &edit.id).unwrap();
+                (group.offset..group.offset + group.len).contains(&index)
+            });
+            if !edited {
+                assert_eq!(after[index], before[index], "unexpected parameter change at {index}");
+            }
+        }
     }
 
     #[test]
