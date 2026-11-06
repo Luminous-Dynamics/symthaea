@@ -704,4 +704,84 @@ fn replay_projects_only_claim_authorized_fields_after_full_evidence_verification
         oracle_disposition("basic-provider-report-support")
     );
 }
+#[test]
+fn request_and_derivation_digest_mutations_fail_replay_even_when_disposition_is_unchanged() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let original: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(
+        original["disposition"],
+        json!("supported_within_scope")
+    );
+
+    let mut wrong_request_digest = original.clone();
+    wrong_request_digest["claim_request_sha256"] =
+        json!(format!("{}{}", "b".repeat(63), "c"));
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&wrong_request_digest).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
+    assert_eq!(
+        error.expected_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
+    assert_eq!(
+        error.reported_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
+
+    let mut wrong_derivation_digest = original;
+    wrong_derivation_digest["derivation_sha256"] =
+        json!(format!("{}{}", "d".repeat(63), "e"));
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes()],
+        &serde_json::to_vec(&wrong_derivation_digest).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
+    assert_eq!(
+        error.expected_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
+    assert_eq!(
+        error.reported_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
+}
+
+#[test]
+fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
+    let first = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut second_value = first.value.clone();
+    second_value["provider"]["id"] = json!("second-ordering-provider");
+    second_value["provider"]["name"] = json!("Second Ordering Provider");
+    second_value["analysis_profile"]["provider"] = second_value["provider"].clone();
+    second_value["analysis_profile"]["digest"] =
+        json!(rea_compat::analysis_profile_digest(&second_value["analysis_profile"]).unwrap());
+    second_value["evidence_id"] = json!(rea_compat::compute_evidence_id(&second_value).unwrap());
+    let second_bytes = serde_json::to_vec(&second_value).unwrap();
+    let second = rea_compat::verify_evidence_json(&second_bytes).unwrap();
+
+    let mut claim = provider_claim(first.evidence_id.clone());
+    claim.evidence_ids.push(second.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[first.clone(), second.clone()]);
+
+    let mut reordered = claim;
+    reordered.evidence_ids.reverse();
+    let reordered_bytes = serde_json::to_vec(&reordered).unwrap();
+    let error = replay_claim_evaluation(
+        &reordered_bytes,
+        &[fixture_bytes(), &second_bytes],
+        &result_bytes,
+    )
+    .unwrap();
+    assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
+    assert_ne!(error.claim_request_sha256, error.reported_derivation_sha256);
+}
 
