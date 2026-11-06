@@ -299,7 +299,7 @@ mod tests {
         compare_forecast_skill(300, &candidate, &baseline).unwrap()
     }
 
-    fn plan(starts: &'static [u32], block_length: u32) -> CircularBlockBootstrapPlan<'static> {
+    fn plan<'a>(starts: &'a [u32], block_length: u32) -> CircularBlockBootstrapPlan<'a> {
         CircularBlockBootstrapPlan {
             plan_id: "bootstrap/predeclared/001",
             plan_source_ref: "benchmark/holdout/bootstrap-plan",
@@ -314,8 +314,7 @@ mod tests {
     #[test]
     fn positive_lower_bound_supports_paired_improvement() {
         let starts = [0_u32, 1].repeat(MIN_BOOTSTRAP_DRAWS as usize);
-        let starts: &'static [u32] = Box::leak(starts.into_boxed_slice());
-        let result = evaluate_forecast_skill_inference(&skill(), plan(starts, 1)).unwrap();
+        let result = evaluate_forecast_skill_inference(&skill(), plan(&starts, 1)).unwrap();
         assert!(result.mae.improvement_supported);
         assert!(result.weighted_interval.improvement_supported);
         assert_eq!(result.mae.lower_improvement_numerator, 20);
@@ -365,9 +364,8 @@ mod tests {
         let mut assessment = skill();
         assessment.paired_loss_deltas[1].series_id = "OTHER/SERIES";
         let starts = [0_u32, 1].repeat(MIN_BOOTSTRAP_DRAWS as usize);
-        let starts: &'static [u32] = Box::leak(starts.into_boxed_slice());
         assert_eq!(
-            evaluate_forecast_skill_inference(&assessment, plan(starts, 1)),
+            evaluate_forecast_skill_inference(&assessment, plan(&starts, 1)),
             Err(ForecastInferenceError::MixedSeriesForBootstrap)
         );
 
@@ -383,7 +381,7 @@ mod tests {
     fn invalid_bootstrap_plan_metadata_and_indexes_fail_closed() {
         let starts = [0_u32, 1].repeat(MIN_BOOTSTRAP_DRAWS as usize);
         let starts: &'static [u32] = Box::leak(starts.into_boxed_slice());
-        let base = plan(starts, 1);
+        let base = plan(&starts, 1);
         assert_eq!(
             evaluate_forecast_skill_inference(
                 &skill(),
