@@ -67,8 +67,15 @@ def shortest_route(
     }[mode]
     start = manifest["start_node_ref"]
     # State flags make the route definition explicit and deterministic.
-    initial = reformulated = post_retrieval = navigated = False
-    start_state = (start, initial, reformulated, post_retrieval, navigated)
+    initial = reformulated = post_retrieval = navigated = pending_reformulation = False
+    start_state = (
+        start,
+        initial,
+        reformulated,
+        post_retrieval,
+        navigated,
+        pending_reformulation,
+    )
     queue: list[tuple[int, tuple[str, ...], tuple[Any, ...]]] = [(0, (), start_state)]
     best: dict[tuple[Any, ...], tuple[int, tuple[str, ...]]] = {start_state: (0, ())}
     adjacency: dict[str, list[dict[str, Any]]] = {}
@@ -81,13 +88,21 @@ def shortest_route(
         cost, route, state = heapq.heappop(queue)
         if best.get(state) != (cost, route):
             continue
-        node, used_initial, used_reform, used_post, used_navigation = state
+        (
+            node,
+            used_initial,
+            used_reform,
+            used_post,
+            used_navigation,
+            pending_reformulation,
+        ) = state
         qualifies = (
             (mode == "direct" and used_initial and not used_reform and not used_navigation)
             or (
                 mode == "reformulation"
                 and used_reform
                 and used_post
+                and not pending_reformulation
                 and not used_navigation
             )
             or (mode == "navigation" and used_navigation)
@@ -99,6 +114,8 @@ def shortest_route(
             operation = edge["operation"]
             if allowed is not None and operation not in allowed:
                 continue
+            if operation == "post_reformulation_retrieval" and not pending_reformulation:
+                continue
             next_cost = cost + edge["cost"]
             if next_cost > manifest["max_route_cost"]:
                 continue
@@ -107,6 +124,13 @@ def shortest_route(
                 used_initial or operation == "initial_retrieval",
                 used_reform or operation == "query_reformulation",
                 used_post or operation == "post_reformulation_retrieval",
+                (
+                    True
+                    if operation == "query_reformulation"
+                    else False
+                    if operation == "post_reformulation_retrieval"
+                    else pending_reformulation
+                ),
                 used_navigation
                 or operation
                 in {
@@ -243,6 +267,38 @@ def main() -> int:
     if added_row["recoverability"] != "DirectlyReachable":
         raise SystemExit("adding a valid direct route did not improve reachability")
 
+    # A post-reformulation retrieval cannot occur before the rewrite it depends on.
+    out_of_order = copy.deepcopy(base_fields)
+    out_of_order["nodes"].append({"node_ref": "evidence:orphan-post-retrieval"})
+    out_of_order["edges"].append(
+        {
+            "edge_ref": "route:orphan-post-retrieval",
+            "from_node_ref": "state:start",
+            "to_node_ref": "evidence:orphan-post-retrieval",
+            "operation": "post_reformulation_retrieval",
+            "cost": 1,
+        }
+    )
+    out_of_order["evidence_units"].append(
+        {
+            "evidence_unit_id": "unit:orphan-post-retrieval",
+            "target_node_ref": "evidence:orphan-post-retrieval",
+            "artifact_sha256": "6" * 64,
+            "source_family_ref": "family:five",
+            "artifact_availability": "present_pinned",
+        }
+    )
+    out_of_order_manifest = save_manifest(
+        out_of_order, out_dir / "out-of-order-reformulation-manifest.json"
+    )
+    orphan = next(
+        classify(out_of_order_manifest, unit)
+        for unit in out_of_order_manifest["evidence_units"]
+        if unit["evidence_unit_id"] == "unit:orphan-post-retrieval"
+    )
+    if orphan["recoverability"] != "UnreachableWithinBudget":
+        raise SystemExit("post-reformulation retrieval succeeded without a prior rewrite")
+
     summary = {
         "schema": "symthaea.science_bench_refresh_recoverability_python_vectors.v1",
         "expected_manifest_commitment_sha256": expected_commitment,
@@ -255,6 +311,7 @@ def main() -> int:
             "partial_surface_all_not_evaluable": True,
             "lower_budget_never_improves": True,
             "added_direct_route_improves_unreachable_unit": True,
+            "post_retrieval_requires_prior_reformulation": True,
             "model_free_reference_classifier": True,
         },
     }
