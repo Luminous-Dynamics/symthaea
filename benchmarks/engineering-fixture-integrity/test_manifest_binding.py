@@ -113,7 +113,6 @@ class ManifestBindingTests(unittest.TestCase):
     def test_parent_path_traversal_is_rejected(self) -> None:
         self.cad_cases[0]["variants"][0]["artifact"] = "../outside.step"
         self.cad_cases[0]["variants"][0]["sha256"] = digest(b"outside")
-        (self.root.parent / "outside.step").write_bytes(b"outside")
         self.write_manifest()
         with self.assertRaisesRegex(AUDIT.AuditError, "Parent traversal forbidden"):
             AUDIT.load_manifest_subjects(self.root)
