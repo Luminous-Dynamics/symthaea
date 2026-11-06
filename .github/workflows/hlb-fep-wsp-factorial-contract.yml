@@ -12,6 +12,7 @@ on:
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
       - "crates/core/symthaea-core/src/weight_space_program.rs"
       - "src/dynamics/cfc/weight_program_adapter.rs"
       - "src/dynamics/cfc/mod.rs"
@@ -26,6 +27,7 @@ on:
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
       - "crates/core/symthaea-core/src/weight_space_program.rs"
       - "src/dynamics/cfc/weight_program_adapter.rs"
       - "src/dynamics/cfc/mod.rs"
@@ -85,6 +87,7 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
@@ -105,7 +108,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
+          sha256sum docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
