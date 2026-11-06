@@ -436,7 +436,9 @@
         "vertex_max_eig_bits_by_intervention",
         "robust_certificate_by_intervention",
         "expected_selected_intervention_id",
-        "expected_vertex_min_eig_greedy_intervention_id"
+        "expected_vertex_min_eig_greedy_intervention_id",
+        "pairwise_midpoint_eig_min_bits_by_intervention",
+        "pairwise_midpoint_eig_max_bits_by_intervention"
       ],
       "properties": {
         "baseline_robust_loss": {
@@ -502,6 +504,20 @@
         "expected_vertex_min_eig_greedy_intervention_id": {
           "type": "string",
           "minLength": 1
+        },
+        "pairwise_midpoint_eig_min_bits_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "pairwise_midpoint_eig_max_bits_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
         }
       }
     }
