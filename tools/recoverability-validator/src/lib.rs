@@ -203,6 +203,7 @@ struct SearchState {
     used_initial_retrieval: bool,
     used_reformulation: bool,
     used_post_reformulation_retrieval: bool,
+    reformulation_pending: bool,
     used_navigation: bool,
 }
 
@@ -389,6 +390,7 @@ fn find_route(
         used_initial_retrieval: false,
         used_reformulation: false,
         used_post_reformulation_retrieval: false,
+        reformulation_pending: false,
         used_navigation: false,
     };
     let mut best: BTreeMap<SearchState, (u32, Vec<String>)> = BTreeMap::new();
@@ -409,6 +411,7 @@ fn find_route(
             RouteMode::Reformulation => {
                 state.used_reformulation
                     && state.used_post_reformulation_retrieval
+                    && !state.reformulation_pending
                     && !state.used_navigation
             }
             RouteMode::Navigation => state.used_navigation,
@@ -434,7 +437,10 @@ fn find_route(
                 ),
                 RouteMode::Navigation => true,
             };
-            if !allowed {
+            if !allowed
+                || (edge.operation == RouteOperationV1::PostReformulationRetrieval
+                    && !state.reformulation_pending)
+            {
                 continue;
             }
             let Some(next_cost) = cost.checked_add(edge.cost) else {
@@ -454,6 +460,11 @@ fn find_route(
                     || edge.operation == RouteOperationV1::QueryReformulation,
                 used_post_reformulation_retrieval: state.used_post_reformulation_retrieval
                     || edge.operation == RouteOperationV1::PostReformulationRetrieval,
+                reformulation_pending: match edge.operation {
+                    RouteOperationV1::QueryReformulation => true,
+                    RouteOperationV1::PostReformulationRetrieval => false,
+                    _ => state.reformulation_pending,
+                },
                 used_navigation: state.used_navigation || edge.operation.is_navigation(),
             };
             let candidate = (next_cost, next_path.clone());
@@ -779,6 +790,39 @@ mod tests {
             RecoverabilityClassV1::UnreachableWithinBudget
         );
         assert_eq!(actual["unit:unknown"], RecoverabilityClassV1::NotEvaluable);
+    }
+
+    #[test]
+    fn post_reformulation_retrieval_requires_a_prior_reformulation() {
+        let mut fields = base_fields();
+        fields.nodes.push(RecoverabilityNodeV1 {
+            node_ref: "evidence:orphan-post-retrieval".into(),
+        });
+        fields.edges.push(RecoverabilityEdgeV1 {
+            edge_ref: "route:orphan-post-retrieval".into(),
+            from_node_ref: "state:start".into(),
+            to_node_ref: "evidence:orphan-post-retrieval".into(),
+            operation: RouteOperationV1::PostReformulationRetrieval,
+            cost: 1,
+        });
+        fields.evidence_units.push(RequiredEvidenceUnitV1 {
+            evidence_unit_id: "unit:orphan-post-retrieval".into(),
+            target_node_ref: "evidence:orphan-post-retrieval".into(),
+            artifact_sha256: digest('6'),
+            source_family_ref: "family:five".into(),
+            artifact_availability: ArtifactAvailabilityV1::PresentPinned,
+        });
+
+        let result = report(fields);
+        let record = result
+            .records
+            .iter()
+            .find(|item| item.evidence_unit_id == "unit:orphan-post-retrieval")
+            .unwrap();
+        assert_eq!(
+            record.recoverability,
+            RecoverabilityClassV1::UnreachableWithinBudget
+        );
     }
 
     #[test]
