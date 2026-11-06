@@ -347,7 +347,10 @@ fn build_report(
     // assignment ledger is explicit and independently checkable.
     let dataset = parse_dataset(source_bytes)?;
     let task_to_repo: BTreeMap<String, String> = dataset.into_iter()
-        .flat_map(|g| g.task_ids.into_iter().map(move |id| (id, g.repository_key.clone())))
+        .flat_map(|g| {
+            let repository_key = g.repository_key;
+            g.task_ids.into_iter().map(move |id| (id, repository_key.clone()))
+        })
         .collect();
     for fold in &folds {
         for task_id in &fold.task_ids {
