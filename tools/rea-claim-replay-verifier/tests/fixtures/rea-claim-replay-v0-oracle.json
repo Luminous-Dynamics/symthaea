@@ -1,0 +1,114 @@
+{
+  "schema": "luminous.rea.claim-replay-oracle.v0",
+  "oracle_version": "rea-claim-replay-oracle/2026-11-06.1",
+  "status": "frozen_public_seed",
+  "provenance": {
+    "authored_independently_of_production_evaluator": true,
+    "expected_labels_are_not_generated_from_evaluator_outputs": true,
+    "scope": "finite v0 public seed corpus; hidden holdout remains a separate future deliverable",
+    "rule_version": "rea-claim-evaluator/v0"
+  },
+  "cases": [
+    {
+      "id": "basic-provider-report-support",
+      "expected_disposition": "supported_within_scope",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "A semantically verified Evidence record reports the exact JCS-normalized value under matching subject, operation and represented environment scope."
+    },
+    {
+      "id": "jcs-number-42-equals-42-point-0",
+      "expected_disposition": "supported_within_scope",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "RFC 8785 canonicalization gives JSON number tokens 42 and 42.0 the same ECMAScript binary64 serialization."
+    },
+    {
+      "id": "numeric-near-miss-42-point-0001",
+      "expected_disposition": "refuted_within_scope",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "The same scope and predicate report a different normalized numeric value."
+    },
+    {
+      "id": "same-scope-disagreement",
+      "expected_disposition": "conflicted",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "One same-scope premise supports while another contradicts; no majority vote or provider-count uplift is permitted."
+    },
+    {
+      "id": "wrong-subject-digest",
+      "expected_disposition": "inapplicable",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "The evidence subject digest differs from the requested subject."
+    },
+    {
+      "id": "wrong-operation",
+      "expected_disposition": "inapplicable",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "The operation differs from the requested operation."
+    },
+    {
+      "id": "platform-version-not-represented",
+      "expected_disposition": "underdetermined",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "REA Evidence v1 does not encode platform_version, so a version-specific claim cannot be supported."
+    },
+    {
+      "id": "referenced-evidence-missing",
+      "expected_disposition": "underdetermined",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "The claim references a valid Evidence ID that was not supplied for replay."
+    },
+    {
+      "id": "producer-authenticity-rule-unimplemented",
+      "expected_disposition": "unverified",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "A v0 Evidence observation is not an authenticity proof; no positive rule exists for this predicate."
+    },
+    {
+      "id": "unverified-assumption-present",
+      "expected_disposition": "unverified",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "The evaluator has no verifier for the stated assumption, so it cannot produce positive support."
+    },
+    {
+      "id": "forged-disposition-with-valid-shaped-digest",
+      "expected_replay_outcome": "replay_mismatch",
+      "rationale": "Changing a supported result's disposition to refuted must be rejected even when the old derivation digest remains well-formed."
+    },
+    {
+      "id": "changed-falsification-condition-old-result",
+      "expected_replay_outcome": "replay_mismatch",
+      "rationale": "The exact request digest binds the falsification condition; an old result cannot be replayed against a changed request."
+    },
+    {
+      "id": "duplicate-key-in-nested-asserted-value",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "Raw claim parsing rejects duplicate JSON keys recursively before schema interpretation."
+    },
+    {
+      "id": "missing-nullable-result-provider-version",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "A nullable result field must be explicitly present; omitted is not equivalent to null."
+    },
+    {
+      "id": "unknown-result-field",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "Result schemas are closed and reject unrecognized fields."
+    },
+    {
+      "id": "duplicate-evidence-record-input",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "The same semantic Evidence ID cannot be supplied twice to the replay set."
+    },
+    {
+      "id": "unreferenced-evidence-input",
+      "expected_replay_outcome": "invalid_input",
+      "rationale": "Replay cannot silently expand the exact premise set beyond the claim's ordered Evidence references."
+    },
+    {
+      "id": "jcs-equivalent-result-reencoding",
+      "expected_replay_outcome": "replay_match",
+      "rationale": "Representation-only numeric token differences in the serialized result are equivalent under RFC 8785 canonicalization."
+    }
+  ],
+  "corpus_contract": "Each case carries an independently authored expected disposition and/or replay outcome. The test suite may use production evaluation to create a candidate serialized result, but must not derive oracle labels from that result."
+}
