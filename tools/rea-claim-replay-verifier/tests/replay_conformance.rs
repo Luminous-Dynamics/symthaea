@@ -5,8 +5,7 @@ mod replay_verifier;
 
 use rea_compat::claims::{ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim};
 use replay_verifier::{
-    Disposition, MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome,
-    replay_claim_evaluation,
+    Disposition, MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome, replay_claim_evaluation,
 };
 use serde_json::{Value, json};
 use std::path::PathBuf;
