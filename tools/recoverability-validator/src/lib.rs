@@ -659,7 +659,8 @@ pub fn verify_recoverability_manifest(
             "a route witness does not establish that a model actually followed the route",
             "unreachable within budget is not world-level or open-web unavailability",
             "pinned artifact identity does not establish source authenticity or factual truth",
-            "the manifest commitment requires independent pre-run anchoring",
+            "completeness evidence references are opaque pointers and are not independently verified by this evaluator",
+            "the manifest commitment and completeness evidence require independent pre-run anchoring",
             "this evaluator does not prove the absence of unlogged tools or network channels",
         ],
     })
@@ -939,6 +940,15 @@ mod tests {
             record.recoverability == RecoverabilityClassV1::NotEvaluable
                 && record.route_edge_refs.is_empty()
         }));
+    }
+
+    #[test]
+    fn audit_report_preserves_completeness_evidence_references() {
+        let result = report(base_fields());
+        assert_eq!(
+            result.surface_completeness_evidence_refs,
+            vec!["inventory-evidence:synthetic-complete-route-table-v1".to_string()]
+        );
     }
 
     #[test]
