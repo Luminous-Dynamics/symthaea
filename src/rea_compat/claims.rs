@@ -505,22 +505,22 @@ fn assess_scope(claim: &ClaimRequest, evidence: &Value) -> (ScopeResult, String)
     )
 }
 
-fn provider_fields(
-    evidence: &Value,
-) -> (
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-    Option<String>,
-) {
-    (
-        optional_string(evidence, &["provider", "id"]),
-        optional_string(evidence, &["provider", "name"]),
-        optional_string(evidence, &["provider", "version"]),
-        optional_string(evidence, &["confidence"]),
-        optional_string(evidence, &["authority"]),
-    )
+struct ProviderFields {
+    provider_id: Option<String>,
+    provider_name: Option<String>,
+    provider_version: Option<String>,
+    confidence: Option<String>,
+    authority: Option<String>,
+}
+
+fn provider_fields(evidence: &Value) -> ProviderFields {
+    ProviderFields {
+        provider_id: optional_string(evidence, &["provider", "id"]),
+        provider_name: optional_string(evidence, &["provider", "name"]),
+        provider_version: optional_string(evidence, &["provider", "version"]),
+        confidence: optional_string(evidence, &["confidence"]),
+        authority: optional_string(evidence, &["authority"]),
+    }
 }
 
 fn canonical_json_equal(left: &Value, right: &Value) -> Result<bool, ClaimError> {
@@ -649,8 +649,13 @@ pub fn evaluate_claim(
             continue;
         };
 
-        let (provider_id, provider_name, provider_version, confidence, authority) =
-            provider_fields(&evidence.value);
+        let ProviderFields {
+            provider_id,
+            provider_name,
+            provider_version,
+            confidence,
+            authority,
+        } = provider_fields(&evidence.value);
 
         if !claim.predicate.has_v0_evaluator() || !claim.assumptions.is_empty() {
             assessments.push(EvidenceAssessment {
@@ -930,7 +935,7 @@ mod tests {
             vec![evidence.evidence_id.clone()],
         );
         numeric_claim.asserted_value["entries"][0]["size"] = json!(42.0);
-        let result = evaluate_claim(&numeric_claim, &[evidence.clone()]).unwrap();
+        let result = evaluate_claim(&numeric_claim, std::slice::from_ref(&evidence)).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
 
         numeric_claim.asserted_value["entries"][0]["size"] = json!(42.0001);
@@ -958,7 +963,7 @@ mod tests {
             vec![second.evidence_id.clone()],
         );
         contradicted.asserted_value["status"] = json!("complete");
-        let result = evaluate_claim(&contradicted, &[second.clone()]).unwrap();
+        let result = evaluate_claim(&contradicted, std::slice::from_ref(&second)).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::RefutedWithinScope);
 
         let conflict = claim(
@@ -994,7 +999,7 @@ mod tests {
         );
         wrong_subject_claim.scope.subject_sha256 =
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
-        let result = evaluate_claim(&wrong_subject_claim, &[evidence.clone()]).unwrap();
+        let result = evaluate_claim(&wrong_subject_claim, std::slice::from_ref(&evidence)).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Inapplicable);
 
         let mut wrong_operation_claim = claim(
@@ -1139,13 +1144,13 @@ mod tests {
             ClaimPredicate::ProviderReportedObservation,
             vec![evidence.evidence_id.clone()],
         );
-        let first = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
-        let second = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
+        let first = evaluate_claim(&claim, std::slice::from_ref(&evidence)).unwrap();
+        let second = evaluate_claim(&claim, std::slice::from_ref(&evidence)).unwrap();
         assert_eq!(first.derivation_sha256, second.derivation_sha256);
 
         let mut changed = claim.clone();
         changed.scope.operation = "other_operation".to_owned();
-        let different = evaluate_claim(&changed, &[evidence.clone()]).unwrap();
+        let different = evaluate_claim(&changed, std::slice::from_ref(&evidence)).unwrap();
         assert_ne!(first.derivation_sha256, different.derivation_sha256);
 
         let mut different_assertion = claim;
