@@ -136,13 +136,15 @@ pub struct ClaimEvaluation {
     pub derivation_sha256: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ReplayOutcome {
     ReplayMatch,
     ReplayMismatch,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct ReplayReceipt {
     pub outcome: ReplayOutcome,
     pub expected_disposition: Disposition,
