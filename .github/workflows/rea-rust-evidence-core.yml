@@ -11,6 +11,7 @@ on:
       - "src/rea_compat/**"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-evidence-compat-harness/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   push:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - "src/rea_compat/**"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-evidence-compat-harness/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   workflow_dispatch:
 
