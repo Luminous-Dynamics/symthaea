@@ -265,6 +265,15 @@ pub struct HdcLtcUnifiedNeuron {
     update_count: u64,
 }
 
+#[inline]
+fn sanitize_hdc_ltc_dt(dt: f32) -> f32 {
+    if dt.is_finite() {
+        dt.max(0.0)
+    } else {
+        0.0
+    }
+}
+
 /// Fast rational approximation of `tanh(x)` that auto-vectorizes on AVX2.
 ///
 /// Uses `tanh(x) ≈ x * (27 + x²) / (27 + 9x²)` for |x| < 4.97.
@@ -893,26 +902,32 @@ impl HdcLtcUnifiedNeuron {
         1.0 / (1.0 + (-activation * self.config.gating_steepness).exp())
     }
 
-    /// Compute gating/interpolation factor σ for closed-form solution.
+    /// Compute the continuous-time interpolation factor.
+    ///
+    /// The learned gate scales the inverse time constant:
+    /// sigma = 1 - exp(-dt * gate(input, state) / tau).
+    /// Unlike an additive interpolation floor, this satisfies sigma(0) = 0.
     #[inline]
     fn compute_gating(&self, input: &ContinuousHV, dt: f32) -> f32 {
+        let dt = sanitize_hdc_ltc_dt(dt);
         let tau = self.compute_tau(input);
-        let sigma_base = self.compute_gate_base(input);
-        let decay = (-dt / tau).exp();
-        (1.0 - decay * (1.0 - sigma_base)).clamp(0.0, 1.0)
+        let gate_rate = self.compute_gate_base(input);
+        let exponent = -dt * gate_rate / tau;
+        (-exponent.exp_m1()).clamp(0.0, 1.0)
     }
 
-    /// Evolve neuron using Euler integration
+    /// Evolve the same gated liquid ODE with forward Euler integration.
     ///
-    /// dx/dt = (-x + x_∞) / τ
-    /// x(t+dt) = x(t) + dt × dx/dt
+    /// dx/dt = gate_rate(x,u) * (x_inf(x,u,t) - x) / tau(x,u)
     pub fn evolve(&mut self, dt: f32, input: &ContinuousHV) {
         self.clear_pre_evolution_state();
+        let dt = sanitize_hdc_ltc_dt(dt);
         let x_inf = self.compute_equilibrium(input);
         let tau = self.compute_tau(input);
+        let gate_rate = self.compute_gate_base(input);
 
-        // Compute derivative: dx/dt = (x_∞ - x) / τ
-        let derivative = x_inf.subtract(&self.state).scale(1.0 / tau);
+        // dx/dt = gate_rate(x,u) * (x_inf(x,u) - x) / tau(x,u)
+        let derivative = x_inf.subtract(&self.state).scale(gate_rate / tau);
 
         // Euler step
         let delta = derivative.scale(dt);
@@ -928,32 +943,30 @@ impl HdcLtcUnifiedNeuron {
     /// Evolve neuron using RK4 integration (more accurate)
     pub fn evolve_rk4(&mut self, dt: f32, input: &ContinuousHV) {
         self.clear_pre_evolution_state();
-        let h = dt;
+        let h = sanitize_hdc_ltc_dt(dt);
+        let start_time = self.total_time;
 
-        // k1
-        let k1 = self.compute_derivative(input, &self.state);
+        // Each RK stage evaluates the same state/input/time-dependent vector field.
+        let k1 = self.compute_derivative(input, &self.state, start_time);
 
-        // k2
         let state_k2 = self.state.add(&k1.scale(h / 2.0));
-        let k2 = self.compute_derivative(input, &state_k2);
+        let k2 = self.compute_derivative(input, &state_k2, start_time + (h / 2.0) as f64);
 
-        // k3
         let state_k3 = self.state.add(&k2.scale(h / 2.0));
-        let k3 = self.compute_derivative(input, &state_k3);
+        let k3 = self.compute_derivative(input, &state_k3, start_time + (h / 2.0) as f64);
 
-        // k4
         let state_k4 = self.state.add(&k3.scale(h));
-        let k4 = self.compute_derivative(input, &state_k4);
+        let k4 = self.compute_derivative(input, &state_k4, start_time + h as f64);
 
         // Combine: x += (k1 + 2k2 + 2k3 + k4) * h/6
         let sum = k1.add(&k2.scale(2.0)).add(&k3.scale(2.0)).add(&k4);
         self.state = self.state.add(&sum.scale(h / 6.0));
 
         self.apply_state_bounds();
-        self.update_stats(dt);
+        self.update_stats(h);
     }
 
-    /// **CLOSED-FORM EVOLUTION** - O(1) temporal jump to any time horizon
+    /// **Frozen-coefficient liquid update** - O(D) one-step temporal update
     ///
     /// This is the key innovation enabling efficient temporal reasoning.
     ///
@@ -966,17 +979,20 @@ impl HdcLtcUnifiedNeuron {
     /// x(t+Δt) = x_∞ + (x(t) - x_∞) × exp(-Δt/τ)
     /// ```
     ///
-    /// With adaptive gating (CfC-style):
+    /// With a learned positive rate multiplier g(x,u):
     /// ```text
+    /// σ = 1 - exp(-Δt * g(x,u) / τ(x,u))
     /// x(t+Δt) = σ × x_∞ + (1-σ) × x(t)
     /// ```
-    /// where σ = σ(Δt, x, u) is the interpolation factor
+    /// so σ(0)=0 and the zero-duration map is the identity. The frozen
+    /// equilibrium is still a one-step approximation to the nonlinear ODE.
     ///
     /// ## Complexity
     ///
     /// O(D) where D is hypervector dimension - independent of Δt!
     #[inline]
     pub fn evolve_closed_form(&mut self, dt: f32, input: &ContinuousHV) {
+        let dt = sanitize_hdc_ltc_dt(dt);
         self.capture_pre_evolution_state(dt);
         // Compute equilibrium state
         let x_inf = self.compute_equilibrium(input);
@@ -1006,6 +1022,7 @@ impl HdcLtcUnifiedNeuron {
     /// Mathematically equivalent to `evolve_closed_form` within ~0.4% tolerance.
     #[inline]
     pub fn evolve_closed_form_fused(&mut self, dt: f32, input: &ContinuousHV) {
+        let dt = sanitize_hdc_ltc_dt(dt);
         // The fused kernels use an approximate activation in their SIMD paths
         // and do not share the exact scalar forward map used by backward().
         self.clear_pre_evolution_state();
@@ -1208,7 +1225,8 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// ## Mathematical Basis
     ///
-    /// For the ODE: dx/dt = (x_∞ - x) / τ with CONSTANT x_∞
+    /// For the frozen-coefficient ODE:
+    /// dx/dt = gate_rate * (x_∞ - x) / τ with CONSTANT x_∞, tau and gate_rate
     ///
     /// The exact analytical solution is:
     /// ```text
@@ -1225,22 +1243,17 @@ impl HdcLtcUnifiedNeuron {
     /// which sub-steps to handle the changing equilibrium.
     pub fn evolve_closed_form_exact(&mut self, dt: f32, input: &ContinuousHV) {
         self.clear_pre_evolution_state();
-        // Compute equilibrium state (NOTE: this depends on current state!)
+        let dt = sanitize_hdc_ltc_dt(dt);
+
+        // Freeze the state-dependent equilibrium, tau, and gate at the start
+        // of the interval; integrate that local linear system analytically.
         let x_inf = self.compute_equilibrium(input);
-
-        // Compute effective tau
         let tau = self.compute_tau(input);
+        let gate_rate = self.compute_gate_base(input);
+        let exponent = -dt * gate_rate / tau;
+        let sigma = (-exponent.exp_m1()).clamp(0.0, 1.0);
 
-        // Pure exponential decay: σ = 1 - exp(-dt/τ)
-        // Clamp exponent to prevent f32 underflow (ln(f32::MIN_POSITIVE) ≈ -87.3)
-        let decay = (-dt / tau).max(-87.0).exp();
-        let sigma = 1.0 - decay;
-
-        // Analytical solution (exact only if x_∞ were constant)
-        let weighted_equilibrium = x_inf.scale(sigma);
-        let weighted_current = self.state.scale(1.0 - sigma);
-        self.state = weighted_equilibrium.add(&weighted_current);
-
+        self.state.lerp_in_place(&x_inf, 1.0 - sigma, sigma);
         self.apply_state_bounds();
         self.update_stats(dt);
     }
@@ -1252,9 +1265,9 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// ## Strategy
     ///
-    /// 1. Split large dt into smaller sub-steps (at most tau/10 per step)
-    /// 2. Apply closed-form exponential decay for each sub-step
-    /// 3. Recompute equilibrium after each sub-step
+    /// 1. Split large dt into smaller sub-steps (at most nominal tau/10 per step)
+    /// 2. Recompute time-dependent Fourier basis, equilibrium, tau and gate
+    /// 3. Apply the matching frozen-coefficient exponential update per sub-step
     ///
     /// This achieves O(dt/tau) complexity instead of O(1) but provides accuracy
     /// comparable to RK4 integration.
@@ -1265,50 +1278,48 @@ impl HdcLtcUnifiedNeuron {
     /// - `input`: Input hypervector (assumed constant during evolution)
     pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
         self.clear_pre_evolution_state();
-        // Determine sub-step size based on tau
-        // Using tau/10 gives high accuracy for the nonlinear dynamics (<1% error)
-        let base_tau = self.config.tau_base;
-        let max_substep = base_tau / 10.0;
-
-        // Calculate number of sub-steps needed
+        let dt = sanitize_hdc_ltc_dt(dt);
+        let max_substep = (self.config.tau_base / 10.0).max(1e-5);
         let n_steps = ((dt / max_substep).ceil() as usize).max(1);
         let sub_dt = dt / n_steps as f32;
+        let start_time = self.total_time;
 
-        // Apply closed-form evolution iteratively
-        for _ in 0..n_steps {
-            // Recompute equilibrium at current state
-            let x_inf = self.compute_equilibrium(input);
-            let tau = self.compute_tau(input);
-
-            // Apply exponential decay (clamped to prevent f32 underflow)
-            let decay = (-sub_dt / tau).max(-87.0).exp();
-            let weighted_equilibrium = x_inf.scale(1.0 - decay);
-            let weighted_current = self.state.scale(decay);
-            self.state = weighted_equilibrium.add(&weighted_current);
+        for step in 0..n_steps {
+            let step_time = start_time + (step as f64 * sub_dt as f64);
+            let equilibrium = self.config.activation.apply(
+                &self.compute_pre_activation_at(&self.state, input, step_time),
+            );
+            let tau = self.compute_tau_unclamped_at(&self.state, input).clamp(0.01, 10.0);
+            let gate_activation = self.compute_gate_activation_at(&self.state, input);
+            let gate_rate = 1.0
+                / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
+            let exponent = -sub_dt * gate_rate / tau;
+            let sigma = (-exponent.exp_m1()).clamp(0.0, 1.0);
+            self.state.lerp_in_place(&equilibrium, 1.0 - sigma, sigma);
         }
 
         self.apply_state_bounds();
         self.update_stats(dt);
     }
 
-    /// Compute derivative dx/dt for given state (used by RK4)
-    fn compute_derivative(&self, input: &ContinuousHV, state: &ContinuousHV) -> ContinuousHV {
-        // Temporarily use the provided state for equilibrium computation
-        let transformed_state = self.weight_hv.bind(state);
-        let masked_input = self.input_mask.bind(input);
-        let combined = ContinuousHV::bundle(&[&transformed_state, &masked_input]);
-        let x_inf = self.config.activation.apply(&combined);
+    /// Evaluate the same continuous-time vector field at an explicit state/time.
+    /// This is the numerical reference used by RK4.
+    fn compute_derivative(
+        &self,
+        input: &ContinuousHV,
+        state: &ContinuousHV,
+        time: f64,
+    ) -> ContinuousHV {
+        let equilibrium = self.config.activation.apply(
+            &self.compute_pre_activation_at(state, input, time),
+        );
+        let tau = self.compute_tau_unclamped_at(state, input).clamp(0.01, 10.0);
+        let gate_activation = self.compute_gate_activation_at(state, input);
+        let gate_rate = 1.0
+            / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
 
-        // Compute tau with temporary state
-        let state_norm = state.norm();
-        let input_adjustment = input.similarity(&self.tau_modulator);
-        let tau = self.config.tau_base
-            * (1.0 + self.config.backbone_tau * state_norm)
-            * (1.0 + 0.2 * input_adjustment);
-        let tau = tau.clamp(0.01, 10.0);
-
-        // dx/dt = (x_∞ - x) / τ
-        x_inf.subtract(state).scale(1.0 / tau)
+        // dx/dt = gate_rate(state,input) * (equilibrium(state,input,time) - state) / tau(state,input)
+        equilibrium.subtract(state).scale(gate_rate / tau)
     }
 
     /// Apply soft state bounds to prevent numerical explosion
@@ -1829,8 +1840,8 @@ impl HdcLtcUnifiedNeuron {
     ) -> HdcLtcGradients {
         let dim = self.config.dimension;
 
-        // The local derivative is evaluated at the PRE-EVOLUTION state.
-        // Call backward() before evolve_closed_form() for this input and dt.
+        // The local derivative is evaluated at the exact state/time used by
+        // the forward prediction. backward() supplies the retained context.
         let z = self.compute_pre_activation_at(state, input, state_time);
         let equilibrium = self.config.activation.apply(&z);
         let tau_unclamped = self.compute_tau_unclamped_at(state, input);
@@ -1839,8 +1850,10 @@ impl HdcLtcUnifiedNeuron {
         let gate_activation = self.compute_gate_activation_at(state, input);
         let gate_base =
             1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
-        let decay = (-dt / tau).exp();
-        let sigma = (1.0 - decay * (1.0 - gate_base)).clamp(0.0, 1.0);
+        let dt = sanitize_hdc_ltc_dt(dt);
+        let exponent = -dt * gate_base / tau;
+        let decay = exponent.exp();
+        let sigma = (-exponent.exp_m1()).clamp(0.0, 1.0);
         let new_state = equilibrium
             .scale(sigma)
             .add(&state.scale(1.0 - sigma));
@@ -1877,7 +1890,7 @@ impl HdcLtcUnifiedNeuron {
 
         // Exact derivative of sigma with respect to the effective scalar tau.
         let dsigma_dtau = if tau_gradient_active {
-            -decay * (1.0 - gate_base) * dt / (tau * tau)
+            -decay * gate_base * dt / (tau * tau)
         } else {
             0.0
         };
@@ -1911,6 +1924,7 @@ impl HdcLtcUnifiedNeuron {
             state.add(input).scale(0.5);
         let dloss_dgate_activation = dloss_dsigma
             * decay
+            * (dt / tau)
             * self.config.gating_steepness
             * gate_base
             * (1.0 - gate_base);
