@@ -676,6 +676,29 @@ mod tests {
     }
 
     #[test]
+    fn mismatched_full_prior_parameterization_digest_is_rejected() {
+        let posterior = gaussian(&[0.0, 0.2], &[1.0, 0.5]);
+        let full_prior = gaussian_with_digest(&[0.0, 0.0], &[1.0, 1.0], 'b');
+        let reduced_prior = gaussian(&[0.0, 0.1], &[0.5, 0.5]);
+        let result = reduce_models(
+            &posterior,
+            &full_prior,
+            &[ReducedModelHypothesis {
+                model_id: "mismatched-full-prior".into(),
+                prior_probability: 1.0,
+                parameter_prior: reduced_prior,
+            }],
+        );
+        assert!(matches!(
+            result,
+            Err(BayesianModelReductionError::ParameterizationMismatch {
+                distribution: "full prior",
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn mismatched_parameterization_digest_is_rejected_even_when_dimensions_match() {
         let posterior = gaussian(&[0.0, 0.2], &[1.0, 0.5]);
         let full_prior = gaussian(&[0.0, 0.0], &[1.0, 1.0]);
