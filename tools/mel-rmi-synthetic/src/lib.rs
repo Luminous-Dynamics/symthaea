@@ -2113,7 +2113,8 @@ fn inspect_midi_track_v1(
         } else {
             match status {
                 0xff => {
-                    // SMF meta events do not reset MIDI running status.
+                    // Standard MIDI Files cancel running status at meta-events.
+                    running_status = None;
                     let meta_type = read_midi_byte(track_bytes, &mut cursor)?;
                     let length = read_midi_vlq(track_bytes, &mut cursor)? as usize;
                     let end = cursor
@@ -3657,6 +3658,21 @@ mod tests {
         assert_eq!(generic.notes[0].start_tick, generic.notes[0].end_tick);
         assert_eq!(
             inspect_synthetic_midi_v1(&midi),
+            Err(HarnessError::InvalidMidi)
+        );
+    }
+
+    #[test]
+    fn midi_meta_event_cancels_running_status() {
+        let track = [
+            0x00, 0x90, 60, 80, // establish channel running status
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, // tempo meta-event clears it
+            0x60, 61, 0, // invalid: data bytes cannot reuse pre-meta status
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let midi = smf_format0_with_track(&track);
+        assert_eq!(
+            inspect_midi_file_v1(&midi),
             Err(HarnessError::InvalidMidi)
         );
     }
