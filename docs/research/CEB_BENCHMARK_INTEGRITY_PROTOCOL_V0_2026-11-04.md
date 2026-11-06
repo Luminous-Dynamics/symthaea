@@ -36,7 +36,7 @@ The most important change is to reject the idea that a better aggregate can comp
 
 ## 3. Corpus design
 
-The initial catalog contains **36 negative/adversarial controls** and **10 positive/valid-state controls**, exceeding the initial minimum of 20 negative and 5 positive cases. The new controls extend the original grader/custody attacks with verifier-of-verifiers (V4V) checks.
+The current design catalog contains **39 negative/adversarial controls** and **11 positive/valid-state controls**, exceeding the initial minimum of 20 negative and 5 positive cases. The new controls extend the original grader/custody attacks with verifier-of-verifiers (V4V) checks.
 
 Negative controls cover:
 - grader result channels, grader/test mutation and hidden-test access;
@@ -115,7 +115,7 @@ Do not hide false accepts inside an accuracy/F1 score. Do not weight away critic
 
 | Dimension | Target |
 |---|---:|
-| Initial hand-authored corpus | >=20 negative and >=5 positive controls; current design catalog has 36 negative and 10 positive |
+| Initial hand-authored corpus | >=20 negative and >=5 positive controls; current design catalog has 39 negative and 11 positive |
 | Qualification campaign | >=300 distinct negative and >=300 distinct positive instantiations |
 | Fault-family diversity | >=39 distinct negative fault families |
 | Critical false accepts | 0 permitted |
