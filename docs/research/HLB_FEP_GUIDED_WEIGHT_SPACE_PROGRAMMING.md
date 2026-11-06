@@ -60,25 +60,22 @@ PR #8394 adds an isolated model-hypothesis mutual-information primitive. It is m
 
 For hypotheses (M), candidate diagnostic action (a), and possible outcome (o):
 
-[
-p(omid a)=sum_m p(m)p(omid m,a)
-]
+```text
+p(o | a) = sum_m p(m) p(o | m, a)
 
-[
-p(mmid o,a)=rac{p(m)p(omid m,a)}{p(omid a)}
-]
+p(m | o, a) = p(m) p(o | m, a) / p(o | a)
 
-[
-I(M;Omid a)=H(M)-sum_o p(omid a)H(Mmid o,a)
-]
+I(M; O | a) = H(M) - sum_o p(o | a) H(M | o, a)
+```
 
-A candidate action score may take the explicitly scoped form
+A candidate action score may take the explicitly scoped form:
 
-[
-J(a)=mathbb{E}[L_{mathrm{task}}mid a]
-+lambda_c C(a)+lambda_s R_{mathrm{safety}}(a)
--lambda_i I(M;Omid a)
-]
+```text
+J(a) = E[L_task | a]
+     + lambda_cost * C(a)
+     + lambda_risk * R_safety(a)
+     - lambda_info * I(M; O | a)
+```
 
 where lower is better, (C(a)) is observation/action cost, and (R_{mathrm{safety}}) is a separately measured risk term. This is a benchmark decision rule, not a claim that the equation alone is a complete expected-free-energy implementation. The full policy must declare preferences, horizon, model uncertainty, and action constraints.
 
