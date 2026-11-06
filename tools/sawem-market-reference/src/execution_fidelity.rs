@@ -652,6 +652,8 @@ mod tests {
             ExecutionInterval {
                 meter: Some(MeteredEnergyEvidence {
                     source_ref: "meter/source/same",
+                    observed_at_utc: 300,
+                    available_at_utc: 310,
                     ..meter("meter-id-two", 5_000)
                 }),
                 ..interval("interval-two", 200, 300, 5_000, None, None)
@@ -683,6 +685,7 @@ mod tests {
             ExecutionInterval {
                 settlement: Some(BalancingSettlementEvidence {
                     source_ref: "settlement/source/same",
+                    available_at_utc: 320,
                     ..settlement("settlement-id-two", 10)
                 }),
                 ..interval(
@@ -690,7 +693,11 @@ mod tests {
                     200,
                     300,
                     5_000,
-                    Some(meter("meter-two", 5_000)),
+                    Some(MeteredEnergyEvidence {
+                        observed_at_utc: 300,
+                        available_at_utc: 310,
+                        ..meter("meter-two", 5_000)
+                    }),
                     None,
                 )
             },
