@@ -832,4 +832,35 @@ mod tests {
         let report = run(&bytes).unwrap();
         assert_eq!(report.input_sha256, sha256(&bytes));
     }
+    #[test]
+    fn unanimous_query_decision_is_already_identified() {
+        let mut value = fixture();
+        value["mechanisms"][2]["query_decision"] = serde_json::json!(true);
+        for row in value["known_answer"]["expected_action_statuses"]
+            .as_object_mut()
+            .unwrap()
+            .values_mut()
+        {
+            row["query_identified"] = serde_json::json!(true);
+        }
+        let report = run_value(value).unwrap();
+        assert!(report.action_reports.values().all(|row| row.query_identified));
+    }
+
+    #[test]
+    fn unanimous_mechanism_class_is_already_identified() {
+        let mut value = fixture();
+        value["mechanisms"][1]["mechanism_class"] = serde_json::json!("DIRECT_SYNAPTIC");
+        value["mechanisms"][2]["mechanism_class"] = serde_json::json!("DIRECT_SYNAPTIC");
+        for row in value["known_answer"]["expected_action_statuses"]
+            .as_object_mut()
+            .unwrap()
+            .values_mut()
+        {
+            row["mechanism_identified"] = serde_json::json!(true);
+        }
+        let report = run_value(value).unwrap();
+        assert!(report.action_reports.values().all(|row| row.mechanism_identified));
+    }
+
 }
