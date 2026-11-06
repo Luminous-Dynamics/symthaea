@@ -437,9 +437,22 @@ fn validate_group(
     }
 
     match &group.target {
-        WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { .. }) => {
-            if group.role != ParameterGroupRole::TimeConstant
-                || !group.constraints.min_value.is_some_and(|minimum| minimum > 0.0)
+        WeightProgramTarget::CfC(id) => {
+            let expected_role = match id {
+                CfCWeightGroupId::CellInputProjection { .. }
+                | CfCWeightGroupId::CellRecurrentProjection { .. }
+                | CfCWeightGroupId::CellBackboneWeight { .. }
+                | CfCWeightGroupId::OutputProjection => ParameterGroupRole::Projection,
+                CfCWeightGroupId::CellHiddenBias { .. }
+                | CfCWeightGroupId::CellBackboneBias { .. }
+                | CfCWeightGroupId::OutputBias => ParameterGroupRole::Bias,
+                CfCWeightGroupId::CellTimeConstant { .. } => ParameterGroupRole::TimeConstant,
+            };
+            if group.role != expected_role {
+                return Err(WeightProgramError::InvalidConstraints);
+            }
+            if matches!(id, CfCWeightGroupId::CellTimeConstant { .. })
+                && !group.constraints.min_value.is_some_and(|minimum| minimum > 0.0)
             {
                 return Err(WeightProgramError::InvalidConstraints);
             }
@@ -449,7 +462,7 @@ fn validate_group(
         {
             return Err(WeightProgramError::InvalidConstraints);
         }
-        _ => {}
+        WeightProgramTarget::HdcLtc(_) => {}
     }
     Ok(())
 }
