@@ -572,8 +572,8 @@ fn paired_difference(
                 weight += 1.0;
                 left_cost = left_cost.saturating_add(l.cost_microusd as u128);
                 right_cost = right_cost.saturating_add(r.cost_microusd as u128);
-                left_qualified += u64::from(l.solved);
-                right_qualified += u64::from(r.solved);
+                left_qualified += if l.solved { 1 } else { 0 };
+                right_qualified += if r.solved { 1 } else { 0 };
             }
         }
     }
@@ -852,16 +852,27 @@ fn run_self_tests() -> Result<(), String> {
         || report.comparison.right_unique_qualified_tasks != 2
         || (report.comparison.paired_pass_rate_difference - 0.2).abs() > 1e-12
         || report.comparison.bootstrap_replicates != 500
+        || report.comparison.bootstrap_cost_valid_replicates == 0
+        || report.comparison.paired_cost_per_qualified_task_difference_microusd
+            .map_or(true, |delta| (delta + 50.0).abs() > 1e-12)
+        || report.comparison.bootstrap_cost_ci_95_low_microusd
+            .zip(report.comparison.bootstrap_cost_ci_95_high_microusd)
+            .map_or(true, |(low, high)| low > high)
+        || report.comparison.bootstrap_probability_left_cheaper.is_none()
     {
-        return Err("paired assurance-adjusted comparison control failed".into());
+        return Err("paired assurance-adjusted or cost-efficiency comparison control failed".into());
     }
     let again = compare(&split_bytes, runs_bytes.as_bytes(), &task_map, &strategies, &left_id, &right_id, 500, 12345)?;
     if report.comparison.bootstrap_ci_95_low != again.comparison.bootstrap_ci_95_low
         || report.comparison.bootstrap_ci_95_high != again.comparison.bootstrap_ci_95_high
+        || report.comparison.bootstrap_cost_ci_95_low_microusd != again.comparison.bootstrap_cost_ci_95_low_microusd
+        || report.comparison.bootstrap_cost_ci_95_high_microusd != again.comparison.bootstrap_cost_ci_95_high_microusd
+        || report.comparison.bootstrap_probability_left_cheaper != again.comparison.bootstrap_probability_left_cheaper
     {
-        return Err("fixed-seed bootstrap is not deterministic".into());
+        return Err("fixed-seed pass-rate or cost bootstrap is not deterministic".into());
     }
     println!("SELF_TEST_PASS paired assurance-adjusted delta and deterministic cluster bootstrap");
+    println!("SELF_TEST_PASS retry-charged cost-per-qualified-task bootstrap and uncertainty interval");
 
     let mut bad = runs.clone();
     bad[0].source_path = "different.lean".into();
