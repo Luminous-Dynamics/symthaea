@@ -216,6 +216,14 @@ pub struct HdcLtcUnifiedNeuron {
     /// Current state (hypervector)
     state: ContinuousHV,
 
+    /// State and Fourier phase immediately before the last standard adaptive
+    /// closed-form step. Used by backward() when the caller trains after forward.
+    /// This is ephemeral execution state and is intentionally not serialized.
+    #[serde(skip)]
+    pre_evolution_state: Option<ContinuousHV>,
+    #[serde(skip)]
+    pre_evolution_time: f64,
+
     /// Weight hypervector for state transformation (W)
     /// Replaces weight MATRIX with single HV - uses binding
     weight_hv: ContinuousHV,
@@ -655,6 +663,8 @@ impl HdcLtcUnifiedNeuron {
 
         Self {
             state: ContinuousHV::zero(dim),
+            pre_evolution_state: None,
+            pre_evolution_time: 0.0,
             weight_hv: ortho[0].clone(),
             input_mask: ortho[1].clone(),
             tau_modulator: ortho[2].clone(),
@@ -732,12 +742,28 @@ impl HdcLtcUnifiedNeuron {
         Self::new(UnifiedConfig::default(), seed)
     }
 
-    /// Compute a Fourier basis HV from configured frequencies and current total_time.
+    /// Retain the state and Fourier phase before the next adaptive closed-form step.
     ///
-    /// For each frequency f, sin(2πf·t) and cos(2πf·t) are distributed across
-    /// the dimension via a strided pattern. Scaled by `fourier_amplitude`.
-    /// Returns None when `fourier_frequencies` is empty.
-    fn compute_fourier_basis(&self) -> Option<ContinuousHV> {
+    /// Reuses the same allocation after the first capture so steady-state evolution
+    /// does not allocate an additional hypervector on every frame.
+    fn capture_pre_evolution_state(&mut self) {
+        self.pre_evolution_time = self.total_time;
+        match self.pre_evolution_state.as_mut() {
+            Some(previous) => previous.values.copy_from_slice(&self.state.values),
+            None => self.pre_evolution_state = Some(self.state.clone()),
+        }
+    }
+
+    /// Clear the local-gradient snapshot when a different integrator or an
+    /// external state mutation makes the adaptive one-step derivative inapplicable.
+    fn clear_pre_evolution_state(&mut self) {
+        self.pre_evolution_state = None;
+    }
+
+    /// Compute a Fourier basis HV from configured frequencies at an explicit
+    /// evolution time. The explicit time is required when differentiating a
+    /// forward step after the neuron's live clock has advanced.
+    fn compute_fourier_basis_at(&self, time: f64) -> Option<ContinuousHV> {
         let freqs = &self.config.fourier_frequencies;
         if freqs.is_empty() {
             return None;
@@ -745,19 +771,13 @@ impl HdcLtcUnifiedNeuron {
 
         let dim = self.config.dimension;
         let amp = self.config.fourier_amplitude;
-        let t = self.total_time;
         let mut values = vec![0.0f32; dim];
         let two_pi = 2.0 * std::f32::consts::PI;
-
-        // Distribute sin/cos pairs across dimension with striding
-        // Each frequency gets 2 channels (sin + cos), striped across dim
         let total_channels = freqs.len() * 2;
 
         for (fi, &freq) in freqs.iter().enumerate() {
-            let sin_val = (two_pi * freq * t as f32).sin() * amp;
-            let cos_val = (two_pi * freq * t as f32).cos() * amp;
-
-            // Stride: sin channel at offset 2*fi, cos at 2*fi+1
+            let sin_val = (two_pi * freq * time as f32).sin() * amp;
+            let cos_val = (two_pi * freq * time as f32).cos() * amp;
             let sin_channel = 2 * fi;
             let cos_channel = 2 * fi + 1;
 
@@ -774,20 +794,32 @@ impl HdcLtcUnifiedNeuron {
         Some(ContinuousHV::from_vec(values))
     }
 
-    /// Pre-activation shared by forward evolution and its local gradient.
-    ///
-    /// Keeping this in one place prevents the learning path from silently using
-    /// a different HDC bundle (or omitting the optional Fourier component).
     #[inline]
-    fn compute_pre_activation(&self, input: &ContinuousHV) -> ContinuousHV {
-        let transformed_state = self.weight_hv.bind(&self.state);
+    fn compute_fourier_basis(&self) -> Option<ContinuousHV> {
+        self.compute_fourier_basis_at(self.total_time)
+    }
+
+    /// Pre-activation shared by forward evolution and local gradients.
+    #[inline]
+    fn compute_pre_activation_at(
+        &self,
+        state: &ContinuousHV,
+        input: &ContinuousHV,
+        time: f64,
+    ) -> ContinuousHV {
+        let transformed_state = self.weight_hv.bind(state);
         let masked_input = self.input_mask.bind(input);
 
-        if let Some(ref fourier) = self.compute_fourier_basis() {
+        if let Some(ref fourier) = self.compute_fourier_basis_at(time) {
             ContinuousHV::bundle(&[&transformed_state, &masked_input, fourier])
         } else {
             ContinuousHV::bundle(&[&transformed_state, &masked_input])
         }
+    }
+
+    #[inline]
+    fn compute_pre_activation(&self, input: &ContinuousHV) -> ContinuousHV {
+        self.compute_pre_activation_at(&self.state, input, self.total_time)
     }
 
     /// Compute the equilibrium state x_∞ for the current state and input.
@@ -800,13 +832,18 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// Time constant adapts to both state complexity and input
     #[inline]
-    fn compute_tau_unclamped(&self, input: &ContinuousHV) -> f32 {
-        let state_norm = self.state.norm();
+    fn compute_tau_unclamped_at(&self, state: &ContinuousHV, input: &ContinuousHV) -> f32 {
+        let state_norm = state.norm();
         let input_adjustment = cosine_similarity_full(input, &self.tau_modulator);
 
         self.config.tau_base
             * (1.0 + self.config.backbone_tau * state_norm)
             * (1.0 + 0.2 * input_adjustment)
+    }
+
+    #[inline]
+    fn compute_tau_unclamped(&self, input: &ContinuousHV) -> f32 {
+        self.compute_tau_unclamped_at(&self.state, input)
     }
 
     #[inline]
@@ -819,7 +856,7 @@ impl HdcLtcUnifiedNeuron {
     /// This is factored out so forward evolution and local gradients use exactly
     /// the same gate definition.
     #[inline]
-    fn compute_gate_activation(&self, input: &ContinuousHV) -> f32 {
+    fn compute_gate_activation_at(&self, state: &ContinuousHV, input: &ContinuousHV) -> f32 {
         let dim = self.config.dimension;
         let mut dot = 0.0f32;
         let mut bundle_norm_sq = 0.0f32;
@@ -827,7 +864,7 @@ impl HdcLtcUnifiedNeuron {
         let mut bias_sum = 0.0f32;
 
         for i in 0..dim {
-            let bundled = (self.state.values[i] + input.values[i]) * 0.5;
+            let bundled = (state.values[i] + input.values[i]) * 0.5;
             let gate = self.gate_weight.values[i];
             dot += bundled * gate;
             bundle_norm_sq += bundled * bundled;
@@ -838,6 +875,11 @@ impl HdcLtcUnifiedNeuron {
         let denominator = (bundle_norm_sq * gate_norm_sq).sqrt();
         let similarity = if denominator < 1e-10 { 0.0 } else { dot / denominator };
         similarity + bias_sum / dim as f32
+    }
+
+    #[inline]
+    fn compute_gate_activation(&self, input: &ContinuousHV) -> f32 {
+        self.compute_gate_activation_at(&self.state, input)
     }
 
     /// Return the base sigmoid gate before the time-scaled interpolation.
@@ -861,6 +903,7 @@ impl HdcLtcUnifiedNeuron {
     /// dx/dt = (-x + x_∞) / τ
     /// x(t+dt) = x(t) + dt × dx/dt
     pub fn evolve(&mut self, dt: f32, input: &ContinuousHV) {
+        self.clear_pre_evolution_state();
         let x_inf = self.compute_equilibrium(input);
         let tau = self.compute_tau(input);
 
@@ -880,6 +923,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Evolve neuron using RK4 integration (more accurate)
     pub fn evolve_rk4(&mut self, dt: f32, input: &ContinuousHV) {
+        self.clear_pre_evolution_state();
         let h = dt;
 
         // k1
@@ -929,6 +973,7 @@ impl HdcLtcUnifiedNeuron {
     /// O(D) where D is hypervector dimension - independent of Δt!
     #[inline]
     pub fn evolve_closed_form(&mut self, dt: f32, input: &ContinuousHV) {
+        self.capture_pre_evolution_state();
         // Compute equilibrium state
         let x_inf = self.compute_equilibrium(input);
 
@@ -957,6 +1002,13 @@ impl HdcLtcUnifiedNeuron {
     /// Mathematically equivalent to `evolve_closed_form` within ~0.4% tolerance.
     #[inline]
     pub fn evolve_closed_form_fused(&mut self, dt: f32, input: &ContinuousHV) {
+        if self.config.fourier_frequencies.is_empty() {
+            self.capture_pre_evolution_state();
+        } else {
+            // The fused kernels currently omit Fourier-basis injection, so their
+            // gradient must not borrow a Fourier-aware pre-state contract.
+            self.clear_pre_evolution_state();
+        }
         // Compute gating FIRST (reads self.state immutably, no mutation)
         let sigma = self.compute_gating(input, dt);
         let one_minus_sigma = 1.0 - sigma;
@@ -1172,6 +1224,7 @@ impl HdcLtcUnifiedNeuron {
     /// For accurate results with nonlinear dynamics, use `evolve_closed_form_iterative`
     /// which sub-steps to handle the changing equilibrium.
     pub fn evolve_closed_form_exact(&mut self, dt: f32, input: &ContinuousHV) {
+        self.clear_pre_evolution_state();
         // Compute equilibrium state (NOTE: this depends on current state!)
         let x_inf = self.compute_equilibrium(input);
 
@@ -1211,6 +1264,7 @@ impl HdcLtcUnifiedNeuron {
     /// - `dt`: Total time to evolve
     /// - `input`: Input hypervector (assumed constant during evolution)
     pub fn evolve_closed_form_iterative(&mut self, dt: f32, input: &ContinuousHV) {
+        self.clear_pre_evolution_state();
         // Determine sub-step size based on tau
         // Using tau/10 gives high accuracy for the nonlinear dynamics (<1% error)
         let base_tau = self.config.tau_base;
@@ -1399,11 +1453,13 @@ impl HdcLtcUnifiedNeuron {
 
     /// Get mutable state reference
     pub fn state_mut(&mut self) -> &mut ContinuousHV {
+        self.clear_pre_evolution_state();
         &mut self.state
     }
 
     /// Set state directly
     pub fn set_state(&mut self, state: ContinuousHV) {
+        self.clear_pre_evolution_state();
         self.state = state;
     }
 
@@ -1414,6 +1470,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Reset state to zero
     pub fn reset(&mut self) {
+        self.clear_pre_evolution_state();
         self.state = ContinuousHV::zero(self.config.dimension);
         self.total_time = 0.0;
         self.update_count = 0;
@@ -1725,8 +1782,47 @@ impl HdcLtcUnifiedNeuron {
     /// Returns one-step local derivatives at the current state; it is not
     /// temporal BPTT through a sequence. Since HDC binding is Hadamard product,
     /// ∂(A⊙B)/∂A = B element-wise.
+    /// Compute one-step local gradients for the most recent adaptive
+    /// closed-form evolution. When called after evolve_closed_form(), this
+    /// reconstructs the exact pre-evolution state and Fourier phase while the
+    /// caller supplies the target in the post-evolution output space.
+    ///
+    /// This is local credit assignment for one step, not temporal BPTT.
     pub fn backward(
         &self,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        dt: f32,
+    ) -> HdcLtcGradients {
+        match self.pre_evolution_state.as_ref() {
+            Some(previous) => self.backward_from_state(
+                previous,
+                self.pre_evolution_time,
+                input,
+                target,
+                dt,
+            ),
+            None => self.backward_at_current(input, target, dt),
+        }
+    }
+
+    /// Compute the same one-step local gradient at the neuron's current state.
+    ///
+    /// Use this before evolving when the learning objective is explicitly
+    /// current-state/local-target training (e.g. train_local_target_step).
+    pub fn backward_at_current(
+        &self,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        dt: f32,
+    ) -> HdcLtcGradients {
+        self.backward_from_state(&self.state, self.total_time, input, target, dt)
+    }
+
+    fn backward_from_state(
+        &self,
+        state: &ContinuousHV,
+        state_time: f64,
         input: &ContinuousHV,
         target: &ContinuousHV,
         dt: f32,
@@ -1735,26 +1831,26 @@ impl HdcLtcUnifiedNeuron {
 
         // The local derivative is evaluated at the PRE-EVOLUTION state.
         // Call backward() before evolve_closed_form() for this input and dt.
-        let z = self.compute_pre_activation(input);
+        let z = self.compute_pre_activation_at(state, input, state_time);
         let equilibrium = self.config.activation.apply(&z);
-        let tau_unclamped = self.compute_tau_unclamped(input);
+        let tau_unclamped = self.compute_tau_unclamped_at(state, input);
         let tau = tau_unclamped.clamp(0.01, 10.0);
         let tau_gradient_active = tau_unclamped > 0.01 && tau_unclamped < 10.0;
-        let gate_activation = self.compute_gate_activation(input);
+        let gate_activation = self.compute_gate_activation_at(state, input);
         let gate_base =
             1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
         let decay = (-dt / tau).exp();
         let sigma = (1.0 - decay * (1.0 - gate_base)).clamp(0.0, 1.0);
         let new_state = equilibrium
             .scale(sigma)
-            .add(&self.state.scale(1.0 - sigma));
+            .add(&state.scale(1.0 - sigma));
 
         // Mean-squared-error derivative at the one-step prediction.
         let dh = new_state.subtract(target).scale(2.0 / dim as f32);
         let dloss_dsigma: f32 = dh
             .values
             .iter()
-            .zip(equilibrium.values.iter().zip(self.state.values.iter()))
+            .zip(equilibrium.values.iter().zip(state.values.iter()))
             .map(|(&error, (&eq, &state))| error * (eq - state))
             .sum();
 
@@ -1776,7 +1872,7 @@ impl HdcLtcUnifiedNeuron {
         );
 
         // Direct equilibrium-path derivatives (binding is Hadamard product).
-        let dw = dz.bind(&self.state);
+        let dw = dz.bind(&state);
         let du = dz.bind(input);
 
         // Exact derivative of sigma with respect to the effective scalar tau.
@@ -1789,7 +1885,7 @@ impl HdcLtcUnifiedNeuron {
 
         // tau = tau_base * (1 + backbone_tau * ||state||)
         //                 * (1 + 0.2 * cosine(input, tau_modulator)).
-        let state_norm = self.state.norm();
+        let state_norm = state.norm();
         let input_tau_similarity = cosine_similarity_full(input, &self.tau_modulator);
         let tau_mod_coefficient =
             self.config.tau_base * (1.0 + self.config.backbone_tau * state_norm) * 0.2;
@@ -1802,7 +1898,7 @@ impl HdcLtcUnifiedNeuron {
             * self.config.backbone_tau
             * (1.0 + 0.2 * input_tau_similarity);
         let d_state_tau = if state_norm > 1e-10 {
-            self.state
+            state
                 .scale(tau_state_coefficient / state_norm)
                 .scale(dloss_dtau)
         } else {
@@ -1812,7 +1908,7 @@ impl HdcLtcUnifiedNeuron {
         // The adaptive gate is based on cosine(bundle(state, input), gate_weight)
         // plus the mean gate bias. Differentiate this path as well.
         let bundled_state_input =
-            self.state.add(input).scale(0.5);
+            state.add(input).scale(0.5);
         let dloss_dgate_activation = dloss_dsigma
             * decay
             * self.config.gating_steepness
@@ -2337,7 +2433,7 @@ impl HdcLtcUnifiedNetwork {
             };
 
             for neuron in &mut self.layers[layer_idx] {
-                let gradients = neuron.backward(&layer_input, target, dt);
+                let gradients = neuron.backward_at_current(&layer_input, target, dt);
                 neuron.apply_gradients_no_decay(&gradients, learning_rate);
                 neuron.evolve_closed_form(dt, &layer_input);
             }
