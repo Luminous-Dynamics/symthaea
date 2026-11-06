@@ -111,6 +111,39 @@ theorem provider_observation_support_binds_full_request
     receipt.binding = obligation.binding := by
   exact hs.1
 
+/-- A changed producer derivation commitment cannot reuse a prior formal result. -/
+theorem changed_derivation_digest_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hDigest : receipt.binding.derivationDigest ≠ obligation.binding.derivationDigest) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hDigest (congrArg ClaimBinding.derivationDigest hs.1)
+
+/-- A changed human-facing claim ID cannot reuse a prior formal result. -/
+theorem changed_claim_id_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hClaim : receipt.binding.claimId ≠ obligation.binding.claimId) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hClaim (congrArg ClaimBinding.claimId hs.1)
+
+/-- A changed exact subject digest cannot reuse a prior formal result. -/
+theorem changed_subject_digest_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hSubject : receipt.binding.subjectSha256 ≠ obligation.binding.subjectSha256) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hSubject (congrArg ClaimBinding.subjectSha256 hs.1)
+
 /-- A changed canonical request digest cannot reuse a prior result. -/
 theorem changed_claim_digest_cannot_support
     (refinements : List RefinementWitness)
@@ -424,6 +457,9 @@ theorem provider_aliases_do_not_create_independence
     leftObligation.base rightObligation.base hSameRoot
 
 #print axioms provider_observation_support_binds_full_request
+#print axioms changed_derivation_digest_cannot_support
+#print axioms changed_claim_id_cannot_support
+#print axioms changed_subject_digest_cannot_support
 #print axioms changed_claim_digest_cannot_support
 #print axioms changed_request_schema_cannot_support
 #print axioms changed_result_schema_cannot_support
