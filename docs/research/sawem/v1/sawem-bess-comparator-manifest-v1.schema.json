@@ -1,0 +1,904 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/sawem/v1/sawem-bess-comparator-manifest-v1.schema.json",
+  "title": "SAWEM BESS Comparator Run Manifest v1",
+  "description": "Reproducibility and comparability contract for matched storage-underwriting model runs. Schema validity does not imply that any model has been executed or a product is market-ready.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "manifest_state",
+    "benchmark_id",
+    "case_id",
+    "run_state",
+    "market_context",
+    "decision_information",
+    "scenario",
+    "asset_model",
+    "network_model",
+    "input_packages",
+    "policy_baseline",
+    "engine_roster",
+    "matching_contract",
+    "reported_metrics",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "1.0"
+    },
+    "manifest_state": {
+      "enum": [
+        "synthetic_protocol_example",
+        "frozen_for_execution",
+        "executed_and_reproduced"
+      ]
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_state": {
+      "enum": [
+        "not_run",
+        "running",
+        "completed",
+        "failed",
+        "not_comparable"
+      ]
+    },
+    "market_context": {
+      "$ref": "#/$defs/marketContext"
+    },
+    "decision_information": {
+      "$ref": "#/$defs/informationFrontier"
+    },
+    "scenario": {
+      "$ref": "#/$defs/scenario"
+    },
+    "asset_model": {
+      "$ref": "#/$defs/assetModel"
+    },
+    "network_model": {
+      "$ref": "#/$defs/networkModel"
+    },
+    "input_packages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/inputPackage"
+      }
+    },
+    "policy_baseline": {
+      "$ref": "#/$defs/policyBaseline"
+    },
+    "engine_roster": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/engine"
+      }
+    },
+    "matching_contract": {
+      "$ref": "#/$defs/matchingContract"
+    },
+    "reported_metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/metric"
+      }
+    },
+    "execution_receipt": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/executionReceipt"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 40
+    }
+  },
+  "$defs": {
+    "sha256OrNull": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "publisher",
+        "url",
+        "source_class",
+        "retrieved_at",
+        "raw_artifact_sha256"
+      ],
+      "properties": {
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "source_class": {
+          "enum": [
+            "official_documentation",
+            "official_release_note",
+            "open_source_documentation",
+            "secondary_source",
+            "synthetic_assumption"
+          ]
+        },
+        "retrieved_at": {
+          "$ref": "#/$defs/utc"
+        },
+        "raw_artifact_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        }
+      }
+    },
+    "marketContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "market_id",
+        "jurisdiction",
+        "market_code_revision",
+        "publication_state",
+        "effective_status",
+        "participant_admission",
+        "commercial_operation",
+        "rule_profile_sha256",
+        "interpretation_note"
+      ],
+      "properties": {
+        "market_id": {
+          "const": "SAWEM"
+        },
+        "jurisdiction": {
+          "const": "ZA"
+        },
+        "market_code_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_state": {
+          "enum": [
+            "draft",
+            "consultation",
+            "published",
+            "approved",
+            "superseded",
+            "unknown"
+          ]
+        },
+        "effective_status": {
+          "enum": [
+            "unknown",
+            "not_yet_effective",
+            "effective_in_part",
+            "effective",
+            "suspended",
+            "superseded"
+          ]
+        },
+        "participant_admission": {
+          "enum": [
+            "unknown",
+            "not_admitted",
+            "test_admitted",
+            "commercially_admitted",
+            "suspended"
+          ]
+        },
+        "commercial_operation": {
+          "enum": [
+            "unknown",
+            "not_open",
+            "pre_launch_testing",
+            "limited_live",
+            "live",
+            "suspended"
+          ]
+        },
+        "rule_profile_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "interpretation_note": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "informationFrontier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_time_utc",
+        "forecast_vintage_cutoff_utc",
+        "actual_outcome_window_end_utc",
+        "no_lookahead_enforced",
+        "timezone"
+      ],
+      "properties": {
+        "decision_time_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "forecast_vintage_cutoff_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "actual_outcome_window_end_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "no_lookahead_enforced": {
+          "type": "boolean"
+        },
+        "timezone": {
+          "const": "Africa/Johannesburg"
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_family",
+        "scenario_seed",
+        "interval_minutes",
+        "interval_basis",
+        "horizon_start_utc",
+        "horizon_end_utc",
+        "scenario_count",
+        "uncertainty_dimensions",
+        "stress_tags"
+      ],
+      "properties": {
+        "scenario_family": {
+          "enum": [
+            "synthetic_base",
+            "historical_replay",
+            "historical_stress",
+            "stochastic_scenario_tree",
+            "out_of_distribution_stress"
+          ]
+        },
+        "scenario_seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "interval_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "interval_basis": {
+          "enum": [
+            "market_code_defined",
+            "operator_data_defined",
+            "synthetic_not_market_default",
+            "source_unverified"
+          ]
+        },
+        "horizon_start_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "horizon_end_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "scenario_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "uncertainty_dimensions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "energy_price",
+              "reserve_price",
+              "renewable_output",
+              "load",
+              "curtailment",
+              "network_outage",
+              "asset_availability",
+              "degradation",
+              "settlement_delay",
+              "credit_cover",
+              "fx",
+              "weather"
+            ]
+          }
+        },
+        "stress_tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "assetModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_class",
+        "data_class",
+        "charge_power_mw",
+        "discharge_power_mw",
+        "energy_capacity_mwh",
+        "min_soc_fraction",
+        "max_soc_fraction",
+        "round_trip_efficiency",
+        "degradation_model_id",
+        "warranty_model_id",
+        "constraint_manifest_sha256"
+      ],
+      "properties": {
+        "asset_class": {
+          "enum": [
+            "standalone_bess",
+            "pv_bess_hybrid"
+          ]
+        },
+        "data_class": {
+          "enum": [
+            "synthetic",
+            "vendor_declared",
+            "registered",
+            "operator_certified",
+            "measured"
+          ]
+        },
+        "charge_power_mw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "discharge_power_mw": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "energy_capacity_mwh": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "min_soc_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_soc_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "round_trip_efficiency": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "degradation_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "warranty_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        }
+      }
+    },
+    "networkModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data_class",
+        "topology_id",
+        "topology_sha256",
+        "point_of_connection_id",
+        "network_constraint_model",
+        "constraint_enforcement"
+      ],
+      "properties": {
+        "data_class": {
+          "enum": [
+            "synthetic",
+            "operator_published",
+            "licensed_dataset",
+            "measured"
+          ]
+        },
+        "topology_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "topology_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "point_of_connection_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network_constraint_model": {
+          "enum": [
+            "none",
+            "single_export_cap",
+            "transport_model",
+            "linearized_power_flow",
+            "ac_power_flow",
+            "security_constrained_power_flow"
+          ]
+        },
+        "constraint_enforcement": {
+          "enum": [
+            "hard",
+            "soft_penalty",
+            "post_process_only",
+            "not_enforced"
+          ]
+        }
+      }
+    },
+    "inputPackage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "package_id",
+        "role",
+        "data_class",
+        "source_vintage_utc",
+        "content_sha256",
+        "source",
+        "licence_state"
+      ],
+      "properties": {
+        "package_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "market_prices",
+            "reserve_prices",
+            "weather",
+            "renewable_profile",
+            "load",
+            "network_topology",
+            "outages",
+            "asset_constraints",
+            "warranty",
+            "market_rules",
+            "contracts",
+            "metering",
+            "settlement",
+            "credit_cover"
+          ]
+        },
+        "data_class": {
+          "enum": [
+            "synthetic",
+            "public",
+            "licensed",
+            "participant_record",
+            "operator_record",
+            "audited"
+          ]
+        },
+        "source_vintage_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "source": {
+          "$ref": "#/$defs/source"
+        },
+        "licence_state": {
+          "enum": [
+            "not_applicable_synthetic",
+            "public_reuse_confirmed",
+            "licensed_access_confirmed",
+            "access_not_confirmed"
+          ]
+        }
+      }
+    },
+    "policyBaseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_class",
+        "implementable",
+        "forecast_policy",
+        "objective_version",
+        "risk_measure",
+        "oracle_use"
+      ],
+      "properties": {
+        "policy_class": {
+          "enum": [
+            "perfect_information_oracle",
+            "deterministic_forecast_dispatch",
+            "stochastic_non_anticipative_policy",
+            "rolling_horizon_policy",
+            "rule_based_baseline",
+            "human_underwritten_case"
+          ]
+        },
+        "implementable": {
+          "type": "boolean"
+        },
+        "forecast_policy": {
+          "enum": [
+            "realized_future_not_allowed",
+            "single_forecast_vintage",
+            "ensemble_forecast",
+            "scenario_tree_non_anticipative",
+            "no_forecast"
+          ]
+        },
+        "objective_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_measure": {
+          "enum": [
+            "expected_value",
+            "worst_case",
+            "var",
+            "cvar",
+            "distributionally_robust",
+            "multi_objective"
+          ]
+        },
+        "oracle_use": {
+          "enum": [
+            "lower_bound_only",
+            "upper_bound_only",
+            "not_used",
+            "reported_as_competitor"
+          ]
+        }
+      }
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "engine_id",
+        "vendor_or_project",
+        "product",
+        "version",
+        "build_or_commit",
+        "engine_class",
+        "execution_state",
+        "adapter_state",
+        "license_state",
+        "capability_claims"
+      ],
+      "properties": {
+        "engine_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vendor_or_project": {
+          "type": "string",
+          "minLength": 1
+        },
+        "product": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "build_or_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "engine_class": {
+          "enum": [
+            "commercial",
+            "open_source",
+            "internal_reference",
+            "human_process"
+          ]
+        },
+        "execution_state": {
+          "enum": [
+            "not_run",
+            "executed",
+            "failed",
+            "not_available"
+          ]
+        },
+        "adapter_state": {
+          "enum": [
+            "none",
+            "manual_import_export",
+            "api_adapter",
+            "direct_native_integration",
+            "unknown"
+          ]
+        },
+        "license_state": {
+          "enum": [
+            "licensed_access_confirmed",
+            "open_source",
+            "evaluation_access",
+            "not_available",
+            "unknown"
+          ]
+        },
+        "capability_claims": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capabilityClaim"
+          }
+        }
+      }
+    },
+    "capabilityClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "status",
+        "source"
+      ],
+      "properties": {
+        "capability": {
+          "enum": [
+            "battery_physics",
+            "degradation",
+            "energy_dispatch",
+            "reserve_cooptimization",
+            "network_constraints",
+            "rolling_horizon",
+            "stochastic_non_anticipative",
+            "market_price_forecast",
+            "revenue_stacking",
+            "contract_obligations",
+            "sa_wem_code_semantics",
+            "participant_admission",
+            "settlement_reconciliation",
+            "credit_cover_liquidity",
+            "evidence_provenance",
+            "independent_receipts"
+          ]
+        },
+        "status": {
+          "enum": [
+            "documented",
+            "not_documented",
+            "not_evaluated",
+            "not_comparable",
+            "not_available"
+          ]
+        },
+        "source": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/source"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "matchingContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_group_id",
+        "shared_input_manifest_sha256",
+        "dimensions",
+        "mismatch_policy",
+        "oracle_separation_required"
+      ],
+      "properties": {
+        "comparison_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shared_input_manifest_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "dimensions": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "dimension",
+              "status",
+              "note"
+            ],
+            "properties": {
+              "dimension": {
+                "enum": [
+                  "market_rule_version",
+                  "information_frontier",
+                  "price_vintage",
+                  "scenario_seed",
+                  "topology",
+                  "asset_constraints",
+                  "warranty",
+                  "time_resolution",
+                  "objective_function",
+                  "risk_measure",
+                  "settlement_rules",
+                  "participant_eligibility"
+                ]
+              },
+              "status": {
+                "enum": [
+                  "matched",
+                  "mismatched",
+                  "not_comparable",
+                  "not_assessed"
+                ]
+              },
+              "note": {
+                "type": "string",
+                "minLength": 5
+              }
+            }
+          }
+        },
+        "mismatch_policy": {
+          "enum": [
+            "exclude_from_head_to_head",
+            "report_separately",
+            "normalize_with_documented_transform"
+          ]
+        },
+        "oracle_separation_required": {
+          "const": true
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "unit",
+        "value",
+        "comparison_status",
+        "definition"
+      ],
+      "properties": {
+        "metric_id": {
+          "enum": [
+            "feasible_dispatch_violations",
+            "reserve_shortfall_mwh",
+            "energy_delivery_mwh",
+            "imbalance_mwh",
+            "gross_market_revenue_zar",
+            "net_revenue_after_degradation_zar",
+            "degradation_cost_zar",
+            "credit_cover_peak_zar",
+            "working_capital_peak_zar",
+            "cvar_95_loss_zar",
+            "rolling_horizon_regret_pct",
+            "forecast_wape_pct",
+            "forecast_crps",
+            "calibration_error",
+            "false_safe_rate",
+            "material_risk_recall_pct",
+            "reviewer_minutes",
+            "decision_runtime_seconds"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "comparison_status": {
+          "enum": [
+            "comparable",
+            "not_comparable",
+            "not_run",
+            "not_available"
+          ]
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "executionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_commit",
+        "manifest_sha256",
+        "engine_output_sha256",
+        "solver_log_sha256",
+        "environment_id",
+        "cpu_model",
+        "memory_gib",
+        "started_at_utc",
+        "completed_at_utc",
+        "exit_state"
+      ],
+      "properties": {
+        "source_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "engine_output_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "solver_log_sha256": {
+          "$ref": "#/$defs/sha256OrNull"
+        },
+        "environment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "memory_gib": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "started_at_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "completed_at_utc": {
+          "$ref": "#/$defs/utc"
+        },
+        "exit_state": {
+          "enum": [
+            "success",
+            "failure",
+            "timeout",
+            "cancelled"
+          ]
+        }
+      }
+    }
+  }
+}

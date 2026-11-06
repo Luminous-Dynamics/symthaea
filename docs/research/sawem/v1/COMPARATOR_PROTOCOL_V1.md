@@ -1,0 +1,382 @@
+# SAWEM BESS Benchmark and Comparator Protocol v1
+
+**Status:** research protocol / synthetic comparator roster / no comparative execution claimed.  
+**Parent:** Symthaea [#10512 SAWEM-BESS-UNDERWRITE-001](https://github.com/Luminous-Dynamics/symthaea/issues/10512).  
+**Profile:** [SAWEM BESS profile v1](README.md).  
+**Purpose:** produce defensible, repeatable comparisons between battery-project models, market simulators, physical-system models and evidence-qualified underwriting workflows.
+
+## 1. The strategic boundary: do not rebuild the wrong thing
+
+The industry already has strong, specialized tools. Published documentation describes:
+
+- **PLEXOS 12:** market and system modelling; its August 2026 R04 update lists storage SOC targets, battery build-duration/aggregation optimisation, degradation and maintenance logic, congestion analytics, and improved AC power-flow interoperability. Sources: [PLEXOS](https://www.energyexemplar.com/plexos), [August 2026 updates](https://www.energyexemplar.com/product-news/whats-new-august-2026).
+- **Aurora Chronos:** battery dispatch and valuation, degradation cases, balancing-market analysis, site-specific modelling and revenue stacking. Aurora's current global-presence menu lists South Africa in EMEA, but that does not prove a specific South African price dataset or feature entitlement is included in a given licence. Source: [Chronos](https://auroraer.com/software/chronos).
+- **EnCompass:** zonal capacity expansion, production-cost modelling and embedded nodal power flow; its product materials describe single-pass co-optimisation of energy, capacity and ancillary services, storage/hybrid representations, congestion and deliverability analysis. Source: [EnCompass](https://www.yesenergy.com/products/encompass).
+- **HOMER Front 1.6:** released 19 October 2026; official release notes describe imperfect price foresight, multiple simultaneous ToD contracts, multi-year participation assumptions, real-time volume controls and other storage/hybrid modelling improvements. Sources: [Front 1.6](https://homerenergy.com/homer-v16), [release notes](https://homerenergy.com/homer-front/releases), [changelog](https://support.homerenergy.com/docs/changelog).
+- **SAM:** detailed PV-battery and generic system-battery models; front-of-meter PPA and merchant financial models; dispatch and degradation. It does not expose a dedicated standalone-battery model, though NREL documents a generic-battery configuration for that use. Source: [SAM battery storage](https://sam.nlr.gov/index.php?Itemid=360&id=94&option=com_content&view=article).
+- **PyPSA:** economic dispatch, unit commitment, storage, linear network-constrained OPF, security-constrained LOPF and rolling-horizon optimisation. Sources: [PyPSA](https://github.com/PyPSA/PyPSA), [optimisation API](https://docs.pypsa.org/latest/api/networks/optimize/).
+- **GridPath:** current documentation (v2026.14.0) describes production-cost, capacity-expansion, asset-valuation and reliability modelling; storage energy tracking; upward/downward reserve headroom and footroom; and network constraints. Its documentation also distinguishes open-source capabilities from features that may require additional access. Pin the source release, local build and feature entitlements before execution. Sources: [GridPath introduction](https://gridpath.readthedocs.io/en/stable/introduction.html), [functionality](https://gridpath.readthedocs.io/en/latest/functionality.html), [Sylvan overview](https://www.sylvan.energy/gridpath).
+- **Supagrid market replay / bidding research:** use its public NEM work as an empirical reference for rebid families, the AEMO-forecast-following baseline, hindsight ceilings and own-price impact. Its September 2026 analysis examined 9.7m battery rebids and a year of results for 45 batteries; it explicitly notes that price-impact reconstruction omitted intra-region network effects and public records did not reveal contracts/hedges. This is an external reference study, not a drop-in South African market simulator. Source: [The machines that bid our batteries](https://www.supagrid.com.au/research/machines-that-bid-our-batteries).
+
+These platforms are not interchangeable, do not necessarily use South African market rules, and may require licensed datasets or specialist configuration. A published feature list is not evidence that a specific product/version supports every detail in this protocol.
+
+**Differentiation hypothesis to test:** Symthaea + Symtropy + Sol-Atlas + Mycelix should add an evidence-qualified decision layer around these specialized engines:
+- Mycelix: source, authority, evidence lifecycle, contract, access and receipt provenance;
+- Sol-Atlas: POC, topology, grid constraints, locational deliverability and source coverage;
+- Symtropy: physical battery/PV envelope, warranty, degradation and response evidence;
+- Symthaea: market-rule composition, scenarios, non-anticipative policy, cash-flow/credit exposure, uncertainty and underwriting decision.
+
+Do not claim superior market clearing, dispatch optimisation, price forecasting or battery degradation until a matched benchmark demonstrates it.
+
+## 2. Benchmark tracks
+
+Keep five distinct tracks and report their scores separately.
+
+### Track A — physical feasibility and battery fidelity
+
+Question: does a policy remain feasible under the same physical battery and grid constraints?
+
+Metrics:
+- hard constraint violations (target: **zero**);
+- SOC and usable-energy conservation error;
+- charge/discharge efficiency and auxiliary load;
+- ramp, minimum stable charge and mode-transition violations;
+- reserve headroom/footroom from the scheduled net injection point, including both reducing charge and increasing discharge (up) and reducing discharge and increasing charge (down);
+- product-specific response and sustain checks for regulating, instantaneous and ten-minute reserve;\n- all six directed mode transitions and cross-checks between physical transition time, product deadline and asset response evidence;
+- temperature, state-of-health, throughput, cycle life and warranty-envelope violations;
+- network export/import and congestion-limit violations;
+- model-to-meter energy deviation, unfulfilled scheduled energy and overdelivery, with schedule/meter/settlement coverage reported separately;
+- SOC-dependent charge/discharge capability-envelope error across the calibrated SOC range; never extrapolate beyond field-measured or manufacturer-guaranteed breakpoints;
+- multi-dimensional SOC × temperature × SOH cell coverage, per-cell sample-count adequacy and lower-quantile calibration; no operational use outside evidenced cells;
+- load-dependent inverter/transformer efficiency and BMS curtailment residuals, once synchronized field measurements exist;
+- source-bound meter record and settlement line-item reconciliation, with incomplete coverage withheld rather than scored as zero.
+
+Do not count vendor targets or simulated response as independently measured capability.
+
+### Track B — market-rule and settlement conformance
+
+Question: does the engine or integration implement the correct rule version and settlement semantics?
+
+Finite corpus target: **100% pass** for every frozen Code/Rule example; no tolerated false-safe.
+
+Cover:
+1. published vs approved vs effective vs superseded status;
+2. participant and Trading Unit eligibility;
+3. storage registration data, including charge capability, energy basis, efficiency and transition times;
+4. daily, next-six-day and seven-day energy constraints;
+5. unconstrained vs network-constrained day-ahead schedule;
+6. reserve products and co-optimization without double-counting;
+7. six-hour intra-day re-declarations only under the applicable rule version;
+8. dispatch instruction vs authenticated meter outcome;
+9. imbalance direction and cumulative balancing-payment components;
+10. settlement statement revisions, queries, invoices, due dates and reruns;
+11. actual vs undefined-potential credit-cover exposure and recalculation;
+12. rule, contract, participant or source revocation/supersession during a project life.
+
+A passing synthetic fixture is only conformance to its declared corpus. It does not prove real operator integration or legal interpretation.
+
+### Track C — dispatch, forecast and decision quality
+
+Compare:
+- deterministic forecast dispatch;
+- scenario-tree non-anticipative dispatch;
+- rolling-horizon dispatch;
+- rule-based operating baseline;
+- human-underwritten baseline;
+- perfect-information oracle, reported separately as a mathematical bound only.
+
+Metrics:
+- net revenue after market charges, balancing, degradation and replacement;
+- delivered energy and reserve shortfall;
+- realized imbalance;
+- CVaR 95% / worst-case downside;
+- forecast MAE/WAPE, q10/q50/q90 pinball loss, empirical quantile coverage, CRPS where a full predictive distribution exists, and weighted interval score;
+- calibration error and interval coverage, scored only on forecasts available by the historical decision timestamp and realized observations available by evaluation time;
+- leakage rate: future-known forecast/realized records excluded / records matching the target set; target: **zero leakage**;
+- schedule fulfilment, unfulfilled MWh and booked balancing cost / gross trading revenue on the same field trace;
+- rolling-horizon regret against the best **implementable non-anticipative** policy;
+- non-anticipativity violations: **zero** across all shared information nodes; allow divergence only after the information frontier branches;
+- runtime, memory and solver gap;
+- strategy robustness under regime shift and distribution shift.
+- **Own-price impact:** report a price-taking value series and a policy-specific market-impact-adjusted value series; attribute their difference separately from forecast regret, execution loss and balancing settlement.
+- **Price-maker model fidelity:** evaluate clearing-price and dispatch replay on sealed dates against published prices, unit targets and binding network constraints before trusting any counterfactual policy-value comparison.
+- **Matched impact-adjusted policy comparison:** hold the no-self-impact reference-price path, interval census, scenario, forecast vintage, network assumptions and exact market-impact model build fixed between candidate and comparator; compare self-impact changes separately.
+- **Impact robustness:** stratify by region, concentration/market depth, net injection size and dispatch regime; report uncertainty intervals and cases where the price-taking assumption is adequate versus materially wrong.
+
+Do not compare an implementable forecast policy against a perfect-foresight oracle and call the difference model error. Do not give a model realized future data before its decision frontier.
+
+#### Decision-quality ladder: keep three comparisons separate
+
+A credible comparison must report three different objects:
+
+1. **Perfect-information oracle (PI):** selects the best action after the realized future is known. It is a non-implementable upper bound for a maximization objective. The policy-to-PI gap is expected value of perfect information (EVPI) under the declared scenario distribution; it is not forecast error, not achievable project revenue, and not proof that the candidate policy is suboptimal among implementable policies.
+2. **Best implementable non-anticipative policy (BINP):** an implementable reference that obeys the same information frontier, physical limits, market rules and settlement basis. It may be produced by a scenario-tree optimizer, a rolling-horizon solver or an independently implemented benchmark. This is the relevant policy-quality comparator.
+3. **Candidate policy:** the proposed Symthaea policy or a vendor/rule-based policy, evaluated on the exact same frozen scenario tree and realized outcomes.
+
+Report at least:
+- expected net-cash gap to PI (EVPI) and expected net-cash gap to BINP (implementable-policy regret);
+- upper-tail regret VaR/CVaR at 95% and worst-case regret;
+- share of PI value retained by the candidate, with the denominator and sign conventions shown;
+- non-anticipativity violations (must be zero);
+- feasibility violations, reserve shortfall, delivered-energy shortfall and settlement coverage;
+- runtime, memory, solver gap and policy-quality cost.
+
+The current Rust `decision_regret.rs` evaluator computes the first gap only: it scores candidate outcomes against a source-matched PI bound and audits the candidate's shared-information actions. It does **not** find or certify the BINP. A separate implementable-policy comparator and out-of-sample solver benchmark remain required before saying the candidate is near-optimal or has lower regret than industry.
+
+Scenario probabilities must themselves be calibrated or independently justified; the evaluator only checks that supplied probabilities are source-bound, known by the decision time and sum to 100%. Publish expected values together with distributional downside and probability uncertainty. A perfect-foresight bound using a miscalibrated scenario distribution is not a bankability conclusion.
+
+#### Paired policy comparison: the actual competitive test
+
+The new `paired_policy_comparison.rs` evaluator is the policy-to-policy counterpart to EVPI. It compares two implementable policies with:
+- one identical scenario census and probability manifest;
+- exactly the same market-rule, asset, topology and settlement source/digest basis;
+- identical decision coverage and information-node IDs, hashes and availability timestamps;
+- independent non-anticipativity audits for both policies;
+- paired outcome records with separate candidate/comparator source receipts.
+
+It reports candidate-minus-comparator expected net cash, candidate/comparator/tie probability, best and worst paired outcomes, and lower-tail delta VaR/CVaR. A positive delta favours the candidate. A negative lower-tail CVaR exposes downside hidden by the expected delta.
+
+This is the required comparison contract for external engines, but not an execution adapter: no PLEXOS, Aurora Chronos, HOMER, SAM, PyPSA or GridPath output has yet been imported or scored by this module. A vendor comparison remains `not_run` until each engine's version/build, feature entitlements, source data, solver and run receipts are frozen and the paired outputs are independently reproduced.
+
+### Track D — bankability, liquidity and lifecycle risk
+
+Metrics:
+- net present value, IRR and debt-service metrics under common finance assumptions;
+- peak credit cover and collateral calls;
+- peak working capital before settlement receipts;
+- settlement cash-conversion time and late/revised statements;
+- counterparty default / downgrade scenario;
+- warranty exclusions and replacement/augmentation liability;
+- FX, inflation, tax, fees and financing sensitivity;
+- risk-adjusted NPV and downside distribution.
+- realized-net / theoretical-gross retention, shown by cohort and forecast horizon;
+- evidence-attributed bridge coverage (% of gross-to-net difference backed by unique source references);
+- unexplained residual in currency and as a percentage of gross revenue; never force the residual to zero;
+- category-level forecast regret, availability loss, execution deviation, balancing, fees, degradation/warranty, financing/collateral and contract effects, with overlap adjudication;
+- attribution completeness and source duplication rate (target: 100% required-category coverage, 0 duplicated adjustment sources).
+
+A market-revenue forecast is not an executed offtake contract. A credit-cover estimate is not a collateral notice. An expected insurance/warranty recovery is not certain cash.
+
+### Track E — evidence and reviewer productivity
+
+Measure whether the underwriting conclusion can be reproduced and challenged.
+
+Metrics:
+- source claim coverage (% material claims linked to content-addressed source);
+- authority and licence verification coverage;
+- decision-time validity and known_at correctness, including distinct forecast issue, publication/availability and target valid timestamps;
+- model build identity and digest binding for every forecast comparator;
+- meter/settlement source coverage and duplicate-record rejection;
+- missing/contradictory evidence detection;
+- stale/revoked evidence invalidation latency;
+- false-safe rate and material-risk recall;
+- independent reproduction success;
+- reviewer minutes per completed case;
+- percentage of findings with exact source/line/page and model-input lineage.
+
+Target **zero false-safe** for the finite hostile corpus; report false-blocks and indeterminate decisions separately rather than silently lowering the gate.
+
+## 2A. Public field-data anchors and staged-validation ladder
+
+Published field results are reference targets, not Luminous results. The M5BAT Applied Energy study (DOI: [10.1016/j.apenergy.2025.127340](https://doi.org/10.1016/j.apenergy.2025.127340); dataset record DOI: [10.18154/RWTH-2025-06555](https://doi.org/10.18154/RWTH-2025-06555)) reports two schedule-execution tests over 61 hours for its selected LMO subsystem: unfulfilled energy fell from **1,094 kWh** under the reference parametrization to **238 kWh** under data-driven parametrization (**78.2%** reduction); balancing-energy cost fell by **71.7%**, and Test 2 balancing costs were **1.8% of trading revenue**. Those figures are specific to the study's asset/test scope, not universal targets and not Symthaea results.
+
+The [Public Battery Field Data registry](https://github.com/Astrolabe-Analytics/public-battery-field-data) version 1.2.0 (registry commit `04803c0606facc96e899b2d648759646b989c609`) lists 35 releases, 3,187 batteries, 3,040 unit-years, 115.6 MWh and 331,704 observation-hours. It is a discovery catalogue; its aggregate totals are not themselves a benchmark result. Raw data are not redistributed by that registry.
+
+Use the following staged cohorts without mixing incompatible units, chemistries, licenses or time resolutions:
+
+| Dataset | Appropriate role | Boundary |
+|---|---|---|
+| M5BAT Applied Energy Test 1/Test 2 archive | Primary schedule-execution reproduction and blind validation | Acquire from the cited DOI record; preserve the exact archive and Test 1/Test 2 split; do not substitute the separate April 2023 registry release |
+| M5BAT April 2023 operational release | 1-second POC and unit-level power/SOC/mode/context replay | CC BY 4.0; 10 units, 6.714 MWh subset; the Pb1 string is separately counted under m5bat-pbacid |
+| M5BAT Pb1 / flooded lead-acid release | Multi-year degradation and operational-state robustness | CC BY 4.0; one 1.066 MWh string; processed data with documented forward-fill and counter-reset caveats |
+| PNNL/EPRI stationary storage | External cross-technology validation | CC BY 4.0; 11 systems; nine have rated/computed energy values; chemistry and rating provenance stay stratified |
+| Aitio sub-Saharan African lead-acid fleets | Transferability research for African distributed/backup storage | CC BY-NC 4.0; non-commercial only unless separately licensed; not a grid-scale BESS dispatch comparator |
+
+The M5BAT registry release and the Applied Energy Test 1/Test 2 dataset are distinct source records. Do not claim they are the same experiment unless the publisher archive manifests demonstrate identity. Keep all raw archives outside the public source repository; retain the untouched archive and member hashes, license/attribution, source retrieval time, timestamp/offset provenance, data-column map, missing-data report and an immutable extraction manifest before fitting or evaluating any model.
+
+First gate: reproduce the paper's published Test 1 and Test 2 values within the documented rounding/tolerance. Only after reproduction may a candidate be evaluated against the stretch gates in `m5bat-field-benchmark-v1.json`. A failure to reproduce the published baseline blocks superiority claims rather than being repaired by changing the cohort or cleaning rules.
+
+## 2B. Price-taking versus price-making evaluation
+
+A battery may change the clearing price through its own charge/discharge offer, especially in shallow, concentrated or constrained regions. A price-taking model treats market prices as exogenous; a price-making model lets the candidate action affect price formation. They answer different questions and must not be collapsed into one revenue figure.
+
+Every relevant benchmark must keep four values distinct:
+1. **Forecast-following implementable policy:** a baseline with only forecast vintages available at each historical decision time.
+2. **Price-taking perfect-information bound:** a non-implementable upper bound under exogenous realized prices.
+3. **Price-impact-adjusted perfect-information bound:** a non-implementable upper bound where the same policy's net injection changes the clearing price through a frozen market-impact model.
+4. **Paired implementable policies:** candidate and comparator evaluated through the same frozen price-making engine, inputs, network, scenario census and known-at frontier.
+
+The price-impact model must be calibrated/validated separately from the policy. For each frozen test period, report:
+- reference-price path and impact-adjusted clearing-price path;
+- energy revenue at each price path, with signed charge/import and discharge/export cashflows;
+- own-price-impact adjustment and uncertainty interval;
+- price and dispatch replay error against market records;
+- network constraint, regional separation and curtailment errors;
+- candidate/comparator delta under the same simulator build;
+- sensitivity by region, injection scale, market concentration and market regime.
+
+A model may not claim better bidding from a price difference caused by a different reference-price path, market simulator version, scenario distribution, dispatch horizon, network boundary, contract/hedge assumption or evidence timestamp. The exact reference-price source records and their available-at timestamps are part of the paired input identity.
+
+The Supagrid September 2026 NEM analysis provides a useful external reference: it examined 9.7 million battery rebids and one year of results for 45 batteries, compared to an AEMO-forecast-following baseline, and reported that accounting for own-price impact changed the median hindsight-ceiling score from 69% to 77%. The study's own methodology says the price-impact reconstruction excluded within-region network effects and did not observe asset contracts/hedges. Those findings motivate the benchmark design; they are not South African calibration constants and must not be copied into SAWEM expected revenues.
+
+The reference Rust kernel market_impact_attribution.rs performs exact revenue arithmetic on externally supplied prices. It does not clear the market, infer elasticity or replace PLEXOS / an independent market simulator. MARKET-PRICE-IMPACT-001 is synthetic until a rights-cleared historical price and offer archive plus a frozen market model are available.
+
+## 3. Paired-comparison protocol
+
+A head-to-head claim is allowed only if all material dimensions are matched or a documented transform is applied:
+
+| Dimension | Required matching evidence |
+|---|---|
+| Market/rule version | Same effective-dated Code/Rules, products, settlement and eligibility assumptions |
+| Information frontier | Same decision timestamp; no inputs published after that time |
+| Forecast vintage | Same forecast issuance time and source vintage, not just same realized series |
+| Scenario | Same scenario seed, probabilities, stress draws and actual-outcome window |
+| Network | Same node/POC, topology, ratings, outage state, losses and constraint enforcement |
+| Battery | Same charge/discharge powers, usable energy, SOC limits, efficiency, auxiliary load and modes |
+| Warranty | Same warranty/augmentation envelope and cost assumptions |
+| Time resolution | Same market/technical intervals or explicit conservative aggregation with a documented transform |
+| Objective | Same revenue/constraint treatment, terminal SOC and risk preference |
+| Finance | Same inflation, FX, tax, debt, fees, COD and settlement timing |
+| Settlement | Same actual/indicative/final status, balancing formulas and credit-cover assumptions |
+| Eligibility | Same rule/participant/product eligibility; unknown is not eligible |
+
+Each dimension must be marked matched, mismatched, not_comparable or not_assessed. A mismatched dimension must either exclude the case from a head-to-head score or be reported as its own comparison. Never fill missing model capability with an invented default.
+
+The machine-readable [comparator manifest schema](sawem-bess-comparator-manifest-v1.schema.json) and [synthetic roster](sawem-bess-comparator-manifest-v1.synthetic.json) make model version, source vintage, information frontier, topology, constraints, licence, adapter and output evidence explicit.
+
+## 4. Baseline tiers and comparator roster
+
+| Tier | Comparator | What to compare | Claim boundary |
+|---|---|---|---|
+| Market/system optimisation | PLEXOS 12 | Production-cost/dispatch, network constraints, storage and reserves | Compare only a matched SAWEM-like case; do not assume SAWEM rule support |
+| Battery valuation | Aurora Chronos | Dispatch, degradation, balancing performance, revenue stacking | Require matched geography, market data and licensed configuration |
+| Market/system planning | EnCompass | Nodal/zonal model, power flow, storage/ancillary co-optimisation | Compare network/economic outputs, not evidence-ledger functions |
+| Project/hybrid economics | HOMER Front 1.6 | Imperfect foresight, simultaneous contracts, multi-year BESS assumptions | Its new feature set makes it a close project-economics comparator |
+| Battery technical / financial | SAM | PV/BESS performance, degradation, merchant/PPA cash flows | Preserve its documented scope and standalone-battery modelling workaround |
+| Transparent open reference | PyPSA | Dispatch, unit commitment, storage, network and rolling horizon | Exact environment and solver pinned |
+| Additional open planning reference | GridPath | Production-cost, planning and storage case where supported | Add only after version, licence and feature mapping are frozen |
+| Independent human reference | Two independent SA market/finance reviewers | Risk detection, eligibility, cash-flow assumptions and decision quality | Blind review with adjudication protocol |
+| Luminous composition | Four-system workflow | Evidence lineage, policy/contract/physical integration and decision certificate | No superiority claim before matched execution |
+| Revenue-realization calibration | Modo Energy GB model-vs-realized calibration | Compare only on same GB cohort, horizon and gross/net definitions; 82% central with 77%/87% low/high in Oct 2026 methodology | Calibration-practice comparator, not a SAWEM performance target |
+
+For commercial software, record exact version/build, solver, licence/feature entitlements, adapter, machine and runtime. For open-source tools, record exact commit, dependency lock, solver build and execution environment.
+
+## 5. Oracle and information-leakage rules
+
+Three policies must never be conflated:
+
+- **Perfect-information oracle:** sees realized future prices, outage and availability outcomes. Non-implementable; report only as a lower/upper bound depending on objective.
+- **Forecast-informed policy:** only sees data available by the declared information frontier.
+- **Rolling-horizon / stochastic non-anticipative policy:** makes each decision from the then-available information; future scenarios may shape policy, but the implemented action must not use future realized outcomes.
+
+Every forecast and external dataset must retain source_vintage_utc, issue/receipt time, content digest, and decision_time_utc. A backtest using latest revised data instead of what was available then is not a valid historical decision replay.
+
+## 6. Scenario corpus
+
+Start with a small, exact, hand-auditable corpus before scaling to thousands of stochastic runs.
+
+- **BASE-001:** normal standalone BESS; no binding network outage; day-ahead + constrained + intraday schedule.
+- **PVHYBRID-001:** PV+BESS with limited export and source-of-charge tracking.
+- **SOC-FLOOR-001:** reserve request conflicts with minimum SOC.
+- **SOC-CEILING-001:** otherwise-curtailed charging conflicts with upper SOC.
+- **POWER-HEADROOM-001:** reserve and energy commitment exceed discharge MW.
+- **MODE-TRANSITION-001:** charging/discharging reversal violates transition time.
+- **DAILY-LIMIT-001:** daily MWh limit binds.
+- **ROLLING-WEEK-001:** seven-day MWh total binds across day boundaries.
+- **NETWORK-CHARGE-001:** charging is restricted while local surplus is available.
+- **NETWORK-DISCHARGE-001:** discharge recreates the network constraint.
+- **INTRADAY-GATE-001:** re-declaration arrives after gate closure.
+- **INSTRUCTION-METER-001:** instructed energy differs from authenticated metered output.
+- **CUMULATIVE-BALANCING-001:** simultaneous applicable balancing-payment components.
+- **SETTLEMENT-RERUN-001:** M+1 revision changes a prior cash-flow assumption.
+- **CREDIT-COVER-001:** actual and undefined-potential exposure require collateral before invoice settlement.
+- **WARRANTY-001:** dispatch maximizes short-term revenue but breaches warranty envelope.
+- **PRICE-SPIKE-001:** forecast misses a rare price/negative-price period.
+- **FORECAST-SHIFT-001:** forecast regime shifts after model selection.
+- **AVAILABILITY-001:** forced outage removes a previously declared service.
+- **RULE-SUPERSESSION-001:** new rule or effective date invalidates prior eligibility assumptions.
+- **RESERVE-UP-CHARGE-REDUCTION-001:** upward reserve is provided by reducing charging before increasing discharge.
+- **RESERVE-DOWN-DISCHARGE-REDUCTION-001:** downward reserve is provided by reducing discharge before increasing charging.
+- **RESERVE-DEADBAND-001:** reserve target falls into the minimum-stable-charge deadband.
+- **RESERVE-PRODUCT-DURATION-001:** regulating, instantaneous and ten-minute products use separate response/sustain requirements.
+- **RESERVE-UNKNOWN-SUSTAIN-001:** missing operator/contract sustain profile remains indeterminate when the Code definition is silent.
+- **RESERVE-TRANSITION-001:** claimed full activation conflicts with the registered mode-transition path.
+- **RESERVE-PAYMENT-QUALIFICATION-001:** contracted MW, effective available MW and capacity qualifying for payment differ.
+- **RESERVE-LOST-OPPORTUNITY-001:** product-specific reserve price uses the correct piecewise price-curve elbow selection.
+- **CONSTRAINED-SCHEDULE-COMPENSATION-001:** unconstrained-to-constrained schedule adjustment changes the constrained purchase/sales payment.
+- **CREDIT-COVER-LIQUIDITY-TIMELINE-001:** daily credit-cover recalculation triggers a working-day-specific posting deadline and liquidity need.
+- **CREDIT-COVER-LIQUIDITY-STRESS-001 / CREDIT-COVER-LIQUIDITY-WATERFALL-001:** distinguish point-in-time treasury headroom from dated committed/forecast/stress cash paths; preserve peak cover shortfall and first operating-floor breach.
+- **FORECAST-VINTAGE-ASOF-001:** replay only forecast vintages actually available at a frozen decision timestamp; reject future publication and ambiguous/model-unscoped vintages.
+- **FORECAST-CALIBRATION-EXACT-001:** score one exact model build against later-known realized prices using exact median errors, quantile pinball loss, coverage and interval scores.
+- **NON-ANTICIPATIVITY-POLICY-AUDIT-001:** enforce identical actions across scenario paths sharing a source-digested decision-time information set; diverge only after the information tree branches.
+- **DISPATCH-EXECUTION-FIDELITY-001:** compare signed scheduled export/import energy with meter records and booked balancing settlement lines over a complete horizon.
+- **BMS-SOC-CAPABILITY-ENVELOPE-001:** assess charge/discharge power against separate conservative SOC-dependent capability curves; reject extrapolation and synthetic operational claims.
+- **BMS-MULTIDIM-CAPABILITY-SURFACE-001:** evaluate direction-specific power in a complete SOC × temperature × SOH cell grid; reject missing cells, duplicate evidence, out-of-range states and unsupported sample counts.
+- **BMS-CAPABILITY-CELL-CALIBRATION-001:** fit a deterministic lower empirical power quantile per cell from BMS available-power telemetry or explicit capability-limit tests; reject ordinary delivered power, insufficient samples and future-known evidence.
+- **BMS-CAPABILITY-CELL-CALIBRATION-001:** fit a deterministic lower empirical order statistic per cell from BMS available-power telemetry or explicit capability tests; reject ordinary delivered power and future-known samples.
+- **REVENUE-REALIZATION-BRIDGE-001:** reconcile theoretical gross revenue to realized net cash using source-bound adjustments by forecast regret, availability, execution, balancing, market fees, degradation/warranty, financing/collateral and contract/curtailment; withhold a complete residual when a required category is missing.
+
+For each case, freeze expected feasible/infeasible state, violated constraint IDs, settlement direction, exposure and evidence disposition. Independent reviewers adjudicate the golden expected outcome.
+
+## 7. Proposed target thresholds
+
+These are **research targets**, not measured current performance or industry-certified thresholds.
+
+| Dimension | Initial acceptance target | Mature target |
+|---|---:|---:|
+| Finite rule/settlement conformance | 100% | 100% |
+| Hard physical/network violations | 0 | 0 |
+| Double-counted energy/reserve MWh | 0 | 0 |
+| False acceptance of unknown/ineligible participant | 0 | 0 |
+| Forecast calibration | Publish by horizon and regime | Stable under measured distribution shift |
+| Matched policy regret | Report baseline and variance | 5% or less vs best implementable reference in agreed corpus |
+| Material-risk recall | At least 95% on independently adjudicated corpus | 99%+ |
+| False-safe rate | 0 on finite hostile corpus | 0 on release gate; confidence intervals on field sample |
+| Forecast look-ahead leakage | 0 | 0 |
+| Shared-information action divergence | 0 violations | 0 violations on all scenario-tree nodes |
+| Execution evidence completeness | Report schedule, meter and settlement coverage independently | 100% for a scored complete field replay |
+| Unfulfilled energy delivery | Reproduce published M5BAT 238 kWh / 61-hour result on the same input trace | ≤ 120 kWh on the same 61-hour trace |
+| Balancing cost / trading revenue | Reproduce published 1.8% result on the same tariff and settlement scope | ≤ 1.0% on the same trace |
+| System RTE model error | Reproduce published 2.2 percentage-point deviation | ≤ 1.0 pp |
+| Inverter efficiency error | Reproduce published 0.55 percentage-point deviation | ≤ 0.30 pp |
+| SOC capability extrapolation | 0 | 0; all decisions stay inside measured/certified coverage |
+| Multi-dimensional capability cell coverage | 100% of states scored must map to an evidenced cell | 100%; no unmeasured state fallback |
+| BMS per-cell sample sufficiency | 100% of field cells meet declared minimum sample count | 100%, with separate calibration/validation campaigns |
+| Revenue bridge required-category coverage | 100% of declared applicable categories or incomplete status | 100% on source-complete historical case |
+| Revenue adjustment source duplication | 0 | 0 |
+| Revenue bridge unexplained residual | Always report in currency and % gross | Explain ≥ 95% of absolute gross-to-net difference; residual remains visible |
+| Independent receipt reproduction | 100% | 100% |
+| Source/authority coverage | 100% of material claims | 100%, with stale-source invalidation |
+| Reviewer time | Establish baseline | 50% reduction without reduced risk recall |
+
+A 5% regret target is only meaningful if the policy reference is implementable, the objective is common, and the scenario distribution is independently frozen. Report absolute cash impact alongside percentage regret.
+
+## 8. Execution phases
+
+1. **P0 — Freeze the contract:** schema, scenario corpus, input/forecast manifest, objective and exact model versions.
+2. **P1 — Build an open reference:** implement the synthetic storage/market case using PyPSA or a small independent reference model, with no vendor adapter needed.
+3. **P2 — Verify equations:** hand-check SOC, energy limits, mode switching, reserve headroom, network/export feasibility, dispatch instructions and balancing/settlement formulas.
+4. **P3 — Vendor runs:** execute only when licensed products and the identical input/feature configuration are available.
+5. **P4 — Human blind review:** two independent reviewers, hidden model identity, adjudicated false-safe/false-blocks and review time.
+6. **P5 — Historical shadow replay:** use lawfully obtained operator/participant data with frozen source vintages and no lookahead.
+7. **P6 — Prospective shadow mode:** compare expected outcomes with actual schedules, meters, settlement and credit-cover records before any operational use.
+8. **P7 — Continuous re-underwriting:** invalidate and recompute decisions when rules, contracts, equipment, network topology, source authority, warranty or counterparties change.
+
+The first open reference and finite cases should precede expensive vendor licences. Runners are not a prerequisite for writing the model-independent test oracle.
+
+## 9. Decision gates
+
+A result can be:
+- pass — the declared finite test and evidence requirements pass;
+- fail — a hard rule, physical or evidence invariant fails;
+- indeterminate — inputs or authority are unavailable;
+- not_comparable — engine scopes or inputs cannot be matched;
+- not_run — no execution occurred.
+
+Never turn indeterminate, not_comparable or not_run into a numerical zero or a pass. Never rank engines by a single weighted score before publishing hard constraints, false-safe rate, downside, runtime and comparability dimensions separately.
+
+## 10. Current status
+
+The synthetic vendor roster remains **not executed**. Product capability claims are literature/documentation signals, not independent feature verification. Product versions, vendor access, solver builds and common adapters are not yet fully pinned. The benchmark corpus currently contains 57 cases: 49 kernel-tested and 8 `not_run`; 250 unique Rust test names are mapped to source-level tests. The latest exact-head CI receipt is not yet available for this expanded corpus. The prior exact-head receipt passed 229 Rust tests on commit `cd4de82`; subsequent commits have integrated 26 additional tests: six forecast-baseline tests, eight cohort-audit tests, six raw power-trace integration tests and six exact power-trace/schedule bridge tests. The M5BAT field dataset has been identified but not staged; its field replay remains `not_run`. The public M5BAT field dataset is identified (RWTH DOI 10.18154/RWTH-2025-06555), but its ZIP has not yet been staged, so the field replay and all M5BAT performance targets remain `not_run`. The Modo revenue-realization comparison is methodology-only; no same-cohort backtest has been executed. The current SAWEM rule profile keeps effective status, participant admission and commercial trading unknown.
+
+The next useful result is a complete, independently hand-verified open reference case—not an ungrounded claim that one platform beats the market.
