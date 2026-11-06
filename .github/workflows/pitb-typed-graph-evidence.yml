@@ -1,0 +1,144 @@
+name: PITB Typed Graph Evidence
+
+on:
+  pull_request:
+    paths:
+      - "tools/pitb-graph-evidence/**"
+      - ".github/workflows/pitb-typed-graph-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graph-evidence-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/jsonschema-venv"
+          "$RUNNER_TEMP/jsonschema-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage verifier outside the production workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-graph-evidence"
+          mkdir -p "$staged/src"
+          cp tools/pitb-graph-evidence/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-graph-evidence/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-graph-evidence/src/main.rs "$staged/src/main.rs"
+          echo "PITB_GRAPH_EVIDENCE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_GRAPH_EVIDENCE_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format staged Rust source and verify formatter output
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_GRAPH_EVIDENCE_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
+
+      - name: Compile and test isolated Rust verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST"
+
+      - name: Validate schema and synthetic fixture
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/jsonschema-venv/bin/python" - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("tools/pitb-graph-evidence/schema/proof-graph-evidence-v0.schema.json").read_text())
+          fixture = json.loads(Path("tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(Draft202012Validator(schema).iter_errors(fixture), key=lambda e: list(e.path))
+          if errors:
+              raise SystemExit("\n".join(f"{list(e.path)}: {e.message}" for e in errors))
+          import copy
+          def must_reject(label, mutate):
+              candidate = copy.deepcopy(fixture)
+              mutate(candidate)
+              if not list(Draft202012Validator(schema).iter_errors(candidate)):
+                  raise SystemExit(f"schema accepted invalid control: {label}")
+              print(f"SCHEMA_NEGATIVE_CONTROL_PASS {label}")
+
+          must_reject(
+              "formal declaration requires formal name",
+              lambda x: x["nodes"][0].update(formal_name=None),
+          )
+          must_reject(
+              "relation requires matching evidence class",
+              lambda x: x["edges"][0].update(evidence_class="llm_alignment"),
+          )
+          must_reject(
+              "observed status cannot label informal candidate edge",
+              lambda x: x["edges"][5].update(status="observed", confidence=None),
+          )
+          must_reject(
+              "candidate status cannot label formal type edge",
+              lambda x: x["edges"][0].update(status="candidate", confidence=0.8),
+          )
+          must_reject(
+              "human-reviewed edge requires review artifact and key",
+              lambda x: x["edges"][4].update(review_artifact_id=None, reviewer_key_id=None),
+          )
+          must_reject(
+              "candidate confidence must stay in [0,1]",
+              lambda x: x["edges"][5].update(confidence=1.01),
+          )
+          print("PITB_GRAPH_EVIDENCE_SCHEMA_PASS")
+          PY
+
+      - name: Run evidence-byte and adversarial self-tests
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST" -- \
+            --self-test \
+            tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
+            tools/pitb-graph-evidence/fixtures/evidence
+
+      - name: Emit canonical synthetic summary
+        run: |
+          set -euo pipefail
+          cargo run --manifest-path "$PITB_GRAPH_EVIDENCE_MANIFEST" -- \
+            --verify \
+            tools/pitb-graph-evidence/fixtures/graph-evidence.synthetic.json \
+            tools/pitb-graph-evidence/fixtures/evidence \
+            > "$RUNNER_TEMP/pitb-graph-evidence-summary.json"
+          cat "$RUNNER_TEMP/pitb-graph-evidence-summary.json"
+
+      - name: Retain rustfmt-normalized source for exact patch review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-typed-graph-evidence-build-inputs
+          path: |
+            ${{ runner.temp }}/pitb-graph-evidence/src/main.rs
+            ${{ runner.temp }}/pitb-graph-evidence/Cargo.lock
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Retain synthetic graph summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-typed-graph-evidence-summary
+          path: ${{ runner.temp }}/pitb-graph-evidence-summary.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,1 @@
+theorem Demo.target : Demo.P
