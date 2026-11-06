@@ -2367,7 +2367,10 @@
         "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
         "https://github.com/Luminous-Dynamics/symthaea/issues/10630",
         "https://github.com/Luminous-Dynamics/symthaea/issues/10673",
-        "https://github.com/Luminous-Dynamics/symthaea/pull/10710"
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10710",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10713",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10368",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10526"
       ],
       "objective": "Qualify whether an investigator's typed conclusion is entailed by exact, scoped, dependency-aware evidence; preserve contradictions, missing evidence, inapplicability and unknown provenance instead of turning them into confidence or majority votes.",
       "principle": "Evidence does not vote; claims must be entailed within declared scope. Receipt validity, cryptographic validity, signer trust, package authorization, completeness, runtime behavior and semantic truth are distinct propositions.",
@@ -2436,7 +2439,21 @@
         "cli_emits_machine_readable_replay_receipt",
         "cli_exit_code_zero_for_match_one_for_semantic_mismatch_two_for_invalid_io_or_resource_failure",
         "cli_rejects_per_input_and_aggregate_oversize_before_unbounded_read",
-        "replay_reference_implementation_does_not_call_production_disposition_or_scope_helpers"
+        "replay_reference_implementation_does_not_call_production_disposition_or_scope_helpers",
+        "member_integrity_positive_claim_requires_receipt_schema_and_cross_field_validation",
+        "member_integrity_positive_claim_requires_independent_replay_against_exact_archive_bytes",
+        "receipt_digest_or_valid_json_without_independent_replay_does_not_support_member_integrity",
+        "member_claim_binds_archive_sha_occurrence_index_and_raw_filename_bytes_not_filename_only",
+        "same_raw_filename_at_two_occurrences_never_collapses_to_one_claim_subject",
+        "duplicate_name_archive_abstains_when_independent_oracle_cannot_map_occurrence",
+        "zip64_or_prefixed_archive_abstains_until_independent_oracle_qualifies_layout",
+        "sealed_snapshot_replay_does_not_claim_atomic_source_snapshot_during_concurrent_mutation",
+        "archive_repacked_with_identical_member_payload_does_not_reuse_archive_scoped_claim",
+        "verified_member_content_does_not_imply_whole_archive_completeness",
+        "member_sha_crc_and_replay_do_not_imply_producer_authenticity_or_signature_trust",
+        "attestation_reference_without_trust_policy_does_not_upgrade_member_integrity_claim",
+        "receipt_replay_under_wrong_archive_or_wrong_request_is_rejected",
+        "member_payload_sha_size_crc_and_verifier_profile_are_all_bound_in_positive_claim"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2471,7 +2488,17 @@
         "duplicate_or_unreferenced_premise_rejection_rate",
         "cli_exit_code_accuracy",
         "resource_limit_failure_classification_accuracy",
-        "replay_checker_independent_code_path_audit_coverage"
+        "replay_checker_independent_code_path_audit_coverage",
+        "member_integrity_false_positive_rate_by_receipt_fault_family",
+        "archive_occurrence_misbinding_rate",
+        "duplicate_name_abstention_accuracy",
+        "unsupported_zip64_and_prefix_abstention_accuracy",
+        "receipt_schema_valid_but_replay_invalid_false_accept_rate",
+        "cross_archive_receipt_substitution_rejection_rate",
+        "receipt_attestation_trust_laundering_rate",
+        "source_snapshot_atomicity_overclaim_rate",
+        "member_to_archive_completeness_promotion_rate",
+        "member_integrity_replay_latency_and_peak_rss"
       ],
       "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.; first frozen public seed contains 18 labeled cases; do not generalize the finite conformance result to unseen artifacts or semantic predicates.",
       "protocol": [
@@ -2501,7 +2528,15 @@
         "require a forged disposition with a recomputed unkeyed derivation digest to be rejected by independent semantic replay",
         "test canonicalization representation invariance for complete result objects separately from semantic mutations",
         "include a read-only CLI with bounded reads and distinct stable exit codes; exercise it as a subprocess in tests",
-        "review independence at the semantic implementation level; disclose shared Evidence identity and JCS primitives rather than claiming cryptographic diversity"
+        "review independence at the semantic implementation level; disclose shared Evidence identity and JCS primitives rather than claiming cryptographic diversity",
+        "member_content_integrity remains unverified until a verifier-owned proof object is produced by receipt semantic validation plus independent replay against the exact captured archive bytes",
+        "the positive proof must bind whole-archive SHA-256, central-directory occurrence index, exact raw filename bytes, offsets, codec/flags, declared sizes/CRC, observed size/CRC, payload SHA-256, limits, verifier commit and dependency lock digest",
+        "a receipt's schema validity, canonical digest, producer signature or envelope reference alone does not support member_content_integrity; independently replay the raw archive and verify exact occurrence",
+        "the current independent zip-rs oracle abstains on duplicate raw names, ZIP64 and prefixed/self-extracting layouts; preserve Unsupported until an occurrence-preserving independent oracle qualifies those cases",
+        "a sealed memfd makes captured parser input immutable after sealing but does not prove that source acquisition was an atomic point-in-time snapshot during concurrent mutation",
+        "one member-integrity proof cannot establish whole-archive traversal/completeness, producer authenticity, signature validity/trust, package authorization, installability, runtime behavior, benignness or MASVS control pass",
+        "repacking may preserve payload hash but changes archive digest; bind both archive and member occurrence identities",
+        "receipt proof types must have no unchecked public constructor; JSON Value and self-reported SHA-256 fields are not trusted proof objects"
       ],
       "claim_boundaries": {
         "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
@@ -2526,6 +2561,15 @@
         "seed_cases": 18,
         "verifier_design": "separate scope/disposition code; same pinned REA Evidence ID verifier and RFC 8785 canonicalization primitive",
         "qualification_status": "draft; exact-head workflow not yet qualified"
+      },
+      "member_receipt_composition": {
+        "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10713",
+        "member_receipt_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10477",
+        "sealed_snapshot_replay_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/10591",
+        "receipt_schema": "docs/research/rea-zip-content-verification-receipt-v0.schema.json",
+        "current_positive_claim_status": "not implemented; member_content_integrity remains fail-closed/unverified",
+        "current_replay_subset": "single-disk, non-ZIP64, no-prefix, unique raw-name Stored/Deflate archives on Linux sealed memfd",
+        "claim_ceiling": "one exact occurrence's decompressed bytes in the exact captured archive byte sequence; no atomic source snapshot, authenticity, completeness, signature/trust, installability, runtime or MASVS claims"
       }
     }
   ],
