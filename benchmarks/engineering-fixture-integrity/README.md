@@ -44,11 +44,12 @@ A 2026-11-05 development run reported:
 
 Those are observations from the prior v0.4 development run. The current
 manifest-binding verifier revision has not been rerun against the v0.4 ZIP in
-this execution environment. Eighteen manifest preflight/negative-control unit
-tests have been authored. A local isolated replay of the 18 branch-equivalent
-test cases passed 18/18. The exact checked-in test module has not yet completed
-its dedicated GitHub workflow. The full 19-subject replay remains open because
-the v0.4 ZIP was not available in this execution session.
+this execution environment. Twenty manifest preflight/negative-control unit
+tests are authored. A local isolated replay of an earlier 18-test
+branch-equivalent version passed 18/18; the two newest internal-symlink and
+manifest-alias controls have not yet been executed locally. The exact checked-in
+20-test module is awaiting its dedicated GitHub workflow. The full 19-subject
+replay remains open because the v0.4 ZIP was not available in this session.
 
 ## Claim boundary
 
