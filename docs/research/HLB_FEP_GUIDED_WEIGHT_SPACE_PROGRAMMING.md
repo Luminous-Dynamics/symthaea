@@ -126,7 +126,32 @@ The current Symthaea model-information-gain primitive computes `I(Model; Outcome
 
 **Proposed research shift:** implement a hierarchical *epistemic controller* with explicit fast state inference, slower parameter learning, and slower still model-structure selection. Use the structure-level information term to choose discriminating probes; use evidence thresholds and model evidence to decide whether to retain, reduce, or replace a model. A probe ranking does not automatically authorize model replacement.
 
-### 2.5 WSP must pass exact-protocol replication, not headline comparison
+### 2.3.1 Bayesian Model Reduction as a separate model-selection operator
+
+The branch now contains an isolated diagonal-Gaussian Bayesian Model Reduction primitive in `crates/core/symthaea-fep/src/bayesian_model_reduction.rs`.
+
+Given an approximate or exact posterior under a full model, a full-model Gaussian prior, and reduced models that differ only by Gaussian parameter priors over the same parameterization, it computes:
+
+```text
+log p(data | reduced model) / p(data | full model)
+  = log E_q(theta | data, full)[p(theta | reduced) / p(theta | full)]
+```
+
+The implementation currently supports independent diagonal-Gaussian coordinates. It uses the analytic Gaussian integral, rejects non-integrable ratios, rejects malformed dimensions/variances and unnormalized model priors, and returns posterior model probabilities plus model-posterior entropy. Tests include an independent one-dimensional quadrature reference, additive independent-coordinate checks, parameter-order invariance, zero-prior behavior, and invalid-input controls.
+
+**Scope matters:**
+- With an exact full-model posterior and nested prior-only reductions, this is an exact marginal-likelihood ratio.
+- With a variational Gaussian posterior, it is a variational BMR approximation.
+- It is not a general comparison between arbitrary architectures with different parameterizations.
+- It is posterior model selection after evidence, not prospective expected information gain.
+- It does not choose observations, include preferences/cost/risk, or authorize actions.
+- It is not connected to the production FEP selector.
+
+The intended combination is: prospective action selection evaluates the expected information in possible outcomes; after observing an outcome, the posterior is updated and BMR can compare prior-restricted model structures. Do not add BMR log evidence ratios to mutual information as though they were independent reward terms. They operate at different stages and answer different questions.
+
+Future work should add correlated Gaussian priors/posteriors, prove numerical stability against Cholesky-based reference calculations, and bind reduced-model priors to explicit architecture/configuration provenance. Only then should the operator become part of an FEP model-structure adapter.
+
+### 2.4 WSP must pass exact-protocol replication, not headline comparison
 
 An important reproducibility update appeared on 6 November 2026. The independent [OpenWSP replication](https://github.com/openwsp/openwsp) reports that its recorded live Experiment 8 edit scored **12.9% on MATH-500**, versus the MIT authors' reported 48.1% and OpenWSP's local calibration of the released edit at 50.6%. OpenWSP reports that 84.25% of its live MATH-500 generations hit the token limit, and that its live evaluation used four samples per problem while the local calibration used one. GSM8K and IFEval were still pending in that repository snapshot.
 
@@ -144,7 +169,7 @@ For every WSP result, bind and report:
 
 The SWI benchmark must reproduce the published WSP protocol where it can, then compare it with SWI-constrained typed edits under equal budgets. The original MIT result is a motivating baseline, not an assumed performance floor or a verified guarantee.
 
-### 2.4 Weight-space reasoning must account for parameter symmetries
+### 2.5 Weight-space reasoning must account for parameter symmetries
 
 A raw parameter vector is not a unique description of a learned function. Hidden-unit permutations can produce different serialized weight arrays with exactly equivalent behavior when the corresponding incoming, outgoing, bias, and state-associated parameters are permuted consistently. Similar equivalences can arise from architecture-specific rescalings or other reparameterizations.
 
