@@ -117,7 +117,7 @@ Metrics remain separate: Recall@k, evidence-family recall, path completion and r
 
 ## Claim ceiling
 
-A passing synthetic graph contract establishes only deterministic classification of its frozen graph and budget. It does not prove live retrieval accuracy, open-world search completeness, source truth/authenticity, model evidence use, benchmark independence, language parity, or SOTA. No model-performance result is claimed by this implementation.
+A passing synthetic graph contract establishes only deterministic classification of its explicitly complete finite route inventory, or positive witness retention under a partial inventory, within the pinned budget. It does not prove live retrieval accuracy, open-world search completeness, source truth/authenticity, model evidence use, benchmark independence, language parity, or SOTA. No model-performance result is claimed by this implementation.
 
 
 ## New paradigm: evidence-asymmetric reachability
