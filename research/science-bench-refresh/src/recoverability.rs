@@ -856,6 +856,7 @@ mod tests {
     fn partial_surface_preserves_positive_routes_but_never_claims_unreachable() {
         let mut fields = base_fields();
         fields.surface_state = SearchSurfaceStateV1::PartialObserved;
+        fields.surface_completeness_receipt_sha256 = None;
         let result = report(fields);
         assert!(result.valid);
         let actual: BTreeMap<_, _> = result
@@ -924,6 +925,7 @@ mod tests {
     fn unknown_search_surface_makes_even_observed_route_untrusted() {
         let mut fields = base_fields();
         fields.surface_state = SearchSurfaceStateV1::Unknown;
+        fields.surface_completeness_receipt_sha256 = None;
         let result = report(fields);
         assert!(result.valid);
         assert!(result.records.iter().all(|record| {
