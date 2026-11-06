@@ -66,11 +66,11 @@ def shortest_route(
         "navigation": None,
     }[mode]
     start = manifest["start_node_ref"]
-    # State flags make the route definition explicit and deterministic.
     initial = reformulated = post_retrieval = navigated = False
     start_state = (start, initial, reformulated, post_retrieval, navigated)
-    queue: list[tuple[int, tuple[str, ...], tuple[Any, ...]]] = [(0, (), start_state)]
-    best: dict[tuple[Any, ...], tuple[int, tuple[str, ...]]] = {start_state: (0, ())}
+    queue: list[tuple[int, tuple[Any, ...]]] = [(0, start_state)]
+    best: dict[tuple[Any, ...], int] = {start_state: 0}
+    predecessors: dict[tuple[Any, ...], tuple[tuple[Any, ...], str]] = {}
     adjacency: dict[str, list[dict[str, Any]]] = {}
     for edge in manifest["edges"]:
         adjacency.setdefault(edge["from_node_ref"], []).append(edge)
@@ -78,8 +78,8 @@ def shortest_route(
         edges.sort(key=lambda edge: edge["edge_ref"])
 
     while queue:
-        cost, route, state = heapq.heappop(queue)
-        if best.get(state) != (cost, route):
+        cost, state = heapq.heappop(queue)
+        if best.get(state) != cost:
             continue
         node, used_initial, used_reform, used_post, used_navigation = state
         qualifies = (
@@ -93,7 +93,14 @@ def shortest_route(
             or (mode == "navigation" and used_navigation)
         )
         if node == target and qualifies:
-            return cost, route
+            route: list[str] = []
+            current = state
+            while current != start_state:
+                previous, edge_ref = predecessors[current]
+                route.append(edge_ref)
+                current = previous
+            route.reverse()
+            return cost, tuple(route)
 
         for edge in adjacency.get(node, []):
             operation = edge["operation"]
@@ -118,11 +125,10 @@ def shortest_route(
                     "in_document_find",
                 },
             )
-            next_route = route + (edge["edge_ref"],)
-            candidate = (next_cost, next_route)
-            if next_state not in best or candidate < best[next_state]:
-                best[next_state] = candidate
-                heapq.heappush(queue, (next_cost, next_route, next_state))
+            if next_state not in best or next_cost < best[next_state]:
+                best[next_state] = next_cost
+                predecessors[next_state] = (state, edge["edge_ref"])
+                heapq.heappush(queue, (next_cost, next_state))
     return None
 
 
