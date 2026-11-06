@@ -5,6 +5,7 @@
 //! plan's pre-run timestamp, or decide whether a claim follows from a source.
 //! The plan commitment must be anchored independently before the first trial.
 
+use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -413,6 +414,7 @@ mod tests {
             .iter()
             .map(|value| (*value).to_owned())
             .collect::<Vec<_>>();
+        let seed_digest_chars = ['7', '8', '9', 'a', 'b', 'c'];
         let trials = CONDITIONS
             .iter()
             .enumerate()
@@ -420,9 +422,9 @@ mod tests {
                 trial_id: format!("trial-{index}"),
                 condition: (*condition).to_owned(),
                 policy_input_sha256: digest(char::from(b'a' + index as u8)),
-                evidence_manifest_sha256: digest(char::from(b'g' + index as u8)),
+                evidence_manifest_sha256: digest(char::from(b'1' + index as u8)),
                 randomization_order: index as u32,
-                seed_commitment_sha256: digest(char::from(b'm' + index as u8)),
+                seed_commitment_sha256: digest(seed_digest_chars[index]),
             })
             .collect();
         EvidenceInterventionPlanFieldsV1 {

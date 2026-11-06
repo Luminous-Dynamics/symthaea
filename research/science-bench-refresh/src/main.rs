@@ -16,40 +16,43 @@ use science_bench_refresh_validator::leakage_audit::audit_policy_input_overlap;
 use science_bench_refresh_validator::lineage_audit::audit_lineage_overlap;
 use science_bench_refresh_validator::search_exposure::verify_search_exposure_receipt;
 use science_bench_refresh_validator::search_exposure_match::verify_search_exposure_match_report;
+use science_bench_refresh_validator::recoverability::{
+    compute_recoverability_manifest_commitment, verify_recoverability_manifest,
+};
 use serde_json::json;
 use std::env;
 use std::fs;
 use std::process::ExitCode;
 
 fn usage(program: &str) {
-    eprintln!(
-        concat!(
-            "usage:\n",
-            "  {program} MANIFEST.json [--require-scoring|--require-sealed]\n",
-            "  {program} audit-overlap LEFT_LABEL LEFT_TASK_SET.json RIGHT_LABEL RIGHT_TASK_SET.json\n",
-            "  {program} audit-lineage LEFT_TASK_SET.json LEFT_LEDGER.json\n",
-            "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
-            "  {program} verify-search-receipt RECEIPT.json\n",
-            "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
-            "  {program} commit-evidence-intervention-plan PLAN_FIELDS.json\n",
-            "  {program} verify-evidence-intervention-plan PLAN.json\n",
-            "  {program} commit-evidence-outcomes PLAN.json OUTCOME_FIELDS.json\n",
-            "  {program} verify-evidence-outcomes PLAN.json OUTCOME_REPORT.json\n",
-            "  {program} commit-protected-index INDEX_FIELDS.json\n",
-            "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
-            "  {program} verify-search-exact-matches RECEIPT.json\n",
-            "    PROTECTED_INDEX.json MATCH_REPORT.json\n",
-            "  {program} protocol-commit MANIFEST.json\n",
-            "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
-            "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
-            "  {program} generate-task-set MANIFEST.json SEED_FILE\n",
-            "    GENERATOR_CONFIG.json OUTPUT.json\n",
-            "  {program} verify-regeneration MANIFEST.json SEED_FILE\n",
-            "    GENERATOR_CONFIG.json TASK_SET.json"
-        )
+    let usage = concat!(
+        "usage:\n",
+        "  {program} MANIFEST.json [--require-scoring|--require-sealed]\n",
+        "  {program} audit-overlap LEFT_LABEL LEFT_TASK_SET.json RIGHT_LABEL RIGHT_TASK_SET.json\n",
+        "  {program} audit-lineage LEFT_TASK_SET.json LEFT_LEDGER.json\n",
+        "    RIGHT_TASK_SET.json RIGHT_LEDGER.json\n",
+        "  {program} verify-search-receipt RECEIPT.json\n",
+        "  {program} verify-search-matches RECEIPT.json MATCH_REPORT.json\n",
+        "  {program} commit-evidence-intervention-plan PLAN_FIELDS.json\n",
+        "  {program} verify-evidence-intervention-plan PLAN.json\n",
+        "  {program} commit-evidence-outcomes PLAN.json OUTCOME_FIELDS.json\n",
+        "  {program} verify-evidence-outcomes PLAN.json OUTCOME_REPORT.json\n",
+        "  {program} commit-recoverability-manifest MANIFEST_FIELDS.json\n",
+        "  {program} audit-recoverability-manifest MANIFEST.json\n",
+        "  {program} commit-protected-index INDEX_FIELDS.json\n",
+        "  {program} match-search-exact RECEIPT.json PROTECTED_INDEX.json\n",
+        "  {program} verify-search-exact-matches RECEIPT.json\n",
+        "    PROTECTED_INDEX.json MATCH_REPORT.json\n",
+        "  {program} protocol-commit MANIFEST.json\n",
+        "  {program} artifact-commit MANIFEST.json seed|task-set ARTIFACT_FILE\n",
+        "  {program} verify-reveal MANIFEST.json SEED_FILE TASK_SET_FILE\n",
+        "  {program} generate-task-set MANIFEST.json SEED_FILE\n",
+        "    GENERATOR_CONFIG.json OUTPUT.json\n",
+        "  {program} verify-regeneration MANIFEST.json SEED_FILE\n",
+        "    GENERATOR_CONFIG.json TASK_SET.json"
     );
+    eprintln!("{}", usage.replace("{program}", program));
 }
-
 fn read(path: &str, label: &str) -> Result<Vec<u8>, ExitCode> {
     fs::read(path).map_err(|error| {
         eprintln!("cannot read {label} {path}: {error}");
@@ -63,6 +66,64 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     match args[0].as_str() {
+        "commit-recoverability-manifest" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let fields_bytes = match read(&args[1], "recoverability manifest fields") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            match compute_recoverability_manifest_commitment(&fields_bytes) {
+                Ok(commitment) => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&json!({
+                            "schema": "symthaea.science_bench_refresh_recoverability_commitment.v1",
+                            "manifest_commitment_sha256": commitment
+                        }))
+                        .expect("recoverability commitment serializes")
+                    );
+                    ExitCode::SUCCESS
+                }
+                Err(errors) => {
+                    for error in errors {
+                        eprintln!("{error}");
+                    }
+                    ExitCode::from(2)
+                }
+            }
+        }
+        "audit-recoverability-manifest" => {
+            if args.len() != 2 {
+                usage("science-bench-refresh-validator");
+                return ExitCode::from(2);
+            }
+            let manifest_bytes = match read(&args[1], "recoverability manifest") {
+                Ok(bytes) => bytes,
+                Err(code) => return code,
+            };
+            let report = match verify_recoverability_manifest(&manifest_bytes) {
+                Ok(report) => report,
+                Err(errors) => {
+                    for error in errors {
+                        eprintln!("{error}");
+                    }
+                    return ExitCode::from(2);
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report)
+                    .expect("recoverability audit report serializes")
+            );
+            if report.valid {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(11)
+            }
+        }
         "commit-evidence-outcomes" => {
             if args.len() != 3 {
                 usage("science-bench-refresh-validator");

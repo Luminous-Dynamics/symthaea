@@ -258,13 +258,13 @@ fn validate_record_contract(
                 ));
                 valid = false;
             }
-            if record.match_method == "exact_digest" {
-                if record.match_score_micros != MAX_SCORE_MICROS {
-                    issues.push(format!(
-                        "records[{index}] exact_digest must carry score 1,000,000"
-                    ));
-                    valid = false;
-                }
+            if record.match_method == "exact_digest"
+                && record.match_score_micros != MAX_SCORE_MICROS
+            {
+                issues.push(format!(
+                    "records[{index}] exact_digest must carry score 1,000,000"
+                ));
+                valid = false;
             }
         }
         "benchmark_metadata" | "question_context" | "explicit_answer" => {
@@ -535,6 +535,7 @@ mod tests {
             generation_id: receipt.generation_id,
             receipt_sha256: sha256_hex(receipt_bytes),
             receipt_commitment_sha256: receipt.receipt_commitment_sha256,
+            protected_index_sha256: sha256_hex(b"test-protected-index"),
             matcher_revision_sha256: sha256_hex(b"matcher"),
             decision_rules_sha256: sha256_hex(b"frozen-decisions"),
             expected_event_count: 1,

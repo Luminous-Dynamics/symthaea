@@ -6,7 +6,8 @@
 //! revision still has to identify the exact source snapshot used for a run.
 
 use crate::{
-    BUILT_GENERATOR_SOURCE_REVISION, GenerationManifestV1, compute_artifact_commitment, sha256_hex,
+    BUILT_GENERATOR_SOURCE_REVISION, GenerationManifestV1, compute_artifact_commitment,
+    compute_protocol_commitment, sha256_hex,
     validate_manifest_bytes, verify_reveal,
 };
 use serde::Deserialize;
@@ -933,7 +934,7 @@ mod tests {
 
     #[test]
     fn verify_regeneration_accepts_exact_replay_and_task_commitment() {
-        let (manifest, seed, config, generated) = complete_manifest_and_tasks();
+        let (manifest, seed, _config, generated) = complete_manifest_and_tasks();
         let final_manifest =
             manifest_with_task_commitment(&manifest, &generated);
         let report = verify_regeneration(&final_manifest, &seed, &config, &generated).unwrap();
