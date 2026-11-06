@@ -886,6 +886,11 @@ jobs:
           jq -e '.class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.UnreachableWithinBudget == 1 and .class_counts.NotEvaluable == 1' \
             /tmp/sbr-recoverability/valid-report.json >/dev/null
 
+          # Compare complete classifications and shortest route witnesses to the independent Python oracle.
+          jq -S '.records' /tmp/sbr-recoverability/valid-report.json > /tmp/sbr-recoverability/rust-records.json
+          jq -S '.expected_records' /tmp/sbr-recoverability/summary.json > /tmp/sbr-recoverability/python-records.json
+          cmp /tmp/sbr-recoverability/rust-records.json /tmp/sbr-recoverability/python-records.json
+
           # Changed bytes with the old commitment cannot yield route labels.
           set +e
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
@@ -901,8 +906,15 @@ jobs:
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
             audit-recoverability-manifest /tmp/sbr-recoverability/partial-surface-manifest.json \
             > /tmp/sbr-recoverability/partial-report.json
-          jq -e '.valid == true and .class_counts.NotEvaluable == 5' \
+          jq -e '.valid == true and .class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.NotEvaluable == 2 and .class_counts.UnreachableWithinBudget == null' \
             /tmp/sbr-recoverability/partial-report.json >/dev/null
+
+          # A completely unknown surface makes even apparent route edges non-evaluable.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-recoverability-manifest /tmp/sbr-recoverability/unknown-surface-manifest.json \
+            > /tmp/sbr-recoverability/unknown-report.json
+          jq -e '.valid == true and .class_counts.NotEvaluable == 5 and .records | all(.recoverability == "NotEvaluable")' \
+            /tmp/sbr-recoverability/unknown-report.json >/dev/null
 
           # Reduced route budget cannot make navigation easier; added route can improve only its target.
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
