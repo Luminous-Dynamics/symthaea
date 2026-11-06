@@ -291,9 +291,9 @@ pub fn audit_forecast_calibration_cohort(
     };
     let selection_bias_warning = inputs.objective == CohortObjective::SensitivitySubset
         || performance_outlier > 0
+        || incomplete_telemetry > 0
         || post_hoc > 0
-        || (inputs.objective == CohortObjective::FullPopulation
-            && (incomplete_telemetry > 0 || contracted_revenue > 0));
+        || (inputs.objective == CohortObjective::FullPopulation && contracted_revenue > 0);
     let full_population_generalization_claim_allowed = inputs.objective
         == CohortObjective::FullPopulation
         && coverage_bps == 10_000
