@@ -4,7 +4,7 @@
   "base_fixture_path": "docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json",
   "challenged_fixture_path": "docs/neuroscience/examples/CONNECTOME_QUERY_INTERVENTION_MODEL_CHALLENGE.example.json",
   "base_fixture_git_blob_sha1": "a49b56d571527a1cd656a460ad045c61b666c055",
-  "challenged_fixture_git_blob_sha1": "811ca5e4031fa9157d4b7ec3794894f2e3a1387b",
+  "challenged_fixture_git_blob_sha1": "63a58213b6344f5ddde8fbc5328af5b728f61aef",
   "challenger_model": {
     "nuisance_model_id": "challenger-unmodelled-overlap",
     "model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
