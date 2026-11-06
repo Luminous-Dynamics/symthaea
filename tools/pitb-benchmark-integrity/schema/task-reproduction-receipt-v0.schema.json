@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/task-reproduction-receipt-v0.schema.json",
+  "title": "PITB exact Lean task reproduction receipt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "task_record_sha256",
+    "checkout_commit",
+    "lean_toolchain",
+    "lean_toolchain_sha256",
+    "environment_sha256",
+    "source_file_sha256",
+    "checkout_receipt_sha256",
+    "build_receipt_sha256",
+    "goal_capture_receipt_sha256",
+    "build_passed",
+    "sorry_anchor_found",
+    "observed_goal_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.task-reproduction-receipt.v0"
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_record_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checkout_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_toolchain": {
+      "type": "string",
+      "minLength": 1
+    },
+    "lean_toolchain_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "environment_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checkout_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "build_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "goal_capture_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "build_passed": {
+      "type": "boolean"
+    },
+    "sorry_anchor_found": {
+      "type": "boolean"
+    },
+    "observed_goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitSha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    }
+  }
+}

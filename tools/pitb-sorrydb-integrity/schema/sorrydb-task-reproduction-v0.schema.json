@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-task-reproduction-v0.schema.json",
+  "title": "PITB SorryDB task reproduction receipt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "repo_remote",
+    "repo_commit",
+    "lean_version",
+    "source_path",
+    "start_line",
+    "start_column",
+    "end_line",
+    "end_column",
+    "debug_goal_sha256",
+    "source_file_sha256",
+    "source_range_sha256",
+    "elaborated_goal_sha256",
+    "lean_toolchain_sha256",
+    "lake_manifest_sha256",
+    "source_location_reproduced",
+    "sorry_marker_verified",
+    "goal_extracted",
+    "goal_is_prop",
+    "project_build_passed",
+    "goal_alignment",
+    "goal_alignment_review_sha256",
+    "environment_receipt_sha256",
+    "source_receipt_sha256",
+    "semantic_audit_status",
+    "semantic_audit_receipt_sha256",
+    "vacuity_audit_status",
+    "vacuity_audit_receipt_sha256",
+    "assumption_audit_status",
+    "assumption_audit_receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-task-reproduction.v0"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo_remote": {
+      "type": "string",
+      "pattern": "^https://github\\.com/"
+    },
+    "repo_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "start_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "debug_goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_range_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "elaborated_goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lean_toolchain_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "lake_manifest_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "source_location_reproduced": {
+      "type": "boolean"
+    },
+    "sorry_marker_verified": {
+      "type": "boolean"
+    },
+    "goal_extracted": {
+      "type": "boolean"
+    },
+    "goal_is_prop": {
+      "type": "boolean"
+    },
+    "project_build_passed": {
+      "type": "boolean"
+    },
+    "goal_alignment": {
+      "enum": [
+        "exact",
+        "normalized",
+        "reviewed",
+        "mismatch"
+      ]
+    },
+    "goal_alignment_review_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "environment_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_audit_status": {
+      "enum": [
+        "passed",
+        "finding",
+        "not_run"
+      ]
+    },
+    "semantic_audit_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "vacuity_audit_status": {
+      "enum": [
+        "passed",
+        "finding",
+        "not_run"
+      ]
+    },
+    "vacuity_audit_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "assumption_audit_status": {
+      "enum": [
+        "passed",
+        "finding",
+        "not_run"
+      ]
+    },
+    "assumption_audit_receipt_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "goal_alignment": {
+            "enum": [
+              "normalized",
+              "reviewed"
+            ]
+          }
+        },
+        "required": [
+          "goal_alignment"
+        ]
+      },
+      "then": {
+        "properties": {
+          "goal_alignment_review_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "semantic_audit_status": {
+            "enum": [
+              "passed",
+              "finding"
+            ]
+          }
+        },
+        "required": [
+          "semantic_audit_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "semantic_audit_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "vacuity_audit_status": {
+            "enum": [
+              "passed",
+              "finding"
+            ]
+          }
+        },
+        "required": [
+          "vacuity_audit_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "vacuity_audit_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assumption_audit_status": {
+            "enum": [
+              "passed",
+              "finding"
+            ]
+          }
+        },
+        "required": [
+          "assumption_audit_status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "assumption_audit_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

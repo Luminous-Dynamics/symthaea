@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-proof-run-v0.schema.json",
+  "title": "PITB SorryDB assurance-adjusted proof-run receipt v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "task_id",
+    "repo_commit",
+    "lean_version",
+    "source_path",
+    "start_line",
+    "start_column",
+    "end_line",
+    "end_column",
+    "goal_sha256",
+    "target_is_prop",
+    "declaration_signature_after_sha256",
+    "declaration_signature_before_sha256",
+    "source_file_sha256",
+    "replacement_patch_sha256",
+    "proof_artifact_sha256",
+    "checker_receipt_sha256",
+    "semantic_gate_receipt_sha256",
+    "source_binding_receipt_sha256",
+    "strategy",
+    "outcome",
+    "proof_inserted",
+    "exact_sorry_replaced",
+    "sorry_absent_after_replacement",
+    "target_sorry_ax_absent",
+    "build_passed",
+    "kernel_passed",
+    "semantic_gate_passed",
+    "source_binding_passed",
+    "vacuity_gate_passed",
+    "axiom_delta_zero",
+    "new_sorry_delta_zero",
+    "wall_time_ms",
+    "input_tokens",
+    "output_tokens",
+    "cost_microusd",
+    "failure_type",
+    "budget_policy_sha256",
+    "evaluation_condition_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-proof-run.v0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "lean_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "start_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "end_line": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "end_column": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "goal_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "replacement_patch_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "proof_artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "checker_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "semantic_gate_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_binding_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "strategy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "implementation_sha256",
+        "model_id",
+        "model_version",
+        "execution_stack_sha256",
+        "checkpoint_sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "implementation_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "model_id": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "model_version": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "execution_stack_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "checkpoint_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        }
+      }
+    },
+    "outcome": {
+      "enum": [
+        "verified_success",
+        "non_solve",
+        "infrastructure_failure",
+        "invalid_target"
+      ]
+    },
+    "proof_inserted": {
+      "type": "boolean"
+    },
+    "exact_sorry_replaced": {
+      "type": "boolean"
+    },
+    "sorry_absent_after_replacement": {
+      "type": "boolean"
+    },
+    "build_passed": {
+      "type": "boolean"
+    },
+    "kernel_passed": {
+      "type": "boolean"
+    },
+    "semantic_gate_passed": {
+      "type": "boolean"
+    },
+    "source_binding_passed": {
+      "type": "boolean"
+    },
+    "vacuity_gate_passed": {
+      "type": "boolean"
+    },
+    "axiom_delta_zero": {
+      "type": "boolean"
+    },
+    "new_sorry_delta_zero": {
+      "type": "boolean"
+    },
+    "wall_time_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "input_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "output_tokens": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cost_microusd": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failure_type": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "declaration_signature_before_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "declaration_signature_after_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "target_is_prop": {
+      "type": "boolean"
+    },
+    "target_sorry_ax_absent": {
+      "type": "boolean"
+    },
+    "budget_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_condition_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "verified_success"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "proof_inserted": {
+            "const": true
+          },
+          "exact_sorry_replaced": {
+            "const": true
+          },
+          "sorry_absent_after_replacement": {
+            "const": true
+          },
+          "build_passed": {
+            "const": true
+          },
+          "kernel_passed": {
+            "const": true
+          },
+          "semantic_gate_passed": {
+            "const": true
+          },
+          "source_binding_passed": {
+            "const": true
+          },
+          "vacuity_gate_passed": {
+            "const": true
+          },
+          "axiom_delta_zero": {
+            "const": true
+          },
+          "new_sorry_delta_zero": {
+            "const": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "infrastructure_failure"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "failure_type": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}

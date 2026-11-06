@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-snapshot-provenance-v0.schema.json",
+  "title": "PITB SorryDB frozen snapshot provenance v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "database_git_blob_sha1",
+    "evaluation_split_git_blob_sha1",
+    "expected_database_task_count",
+    "expected_evaluation_task_count",
+    "evaluation_split_role",
+    "license",
+    "paper_url",
+    "documented_database_task_count"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-snapshot-provenance.v0"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_repository": {
+      "type": "string",
+      "pattern": "^https://github\\.com/"
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "database_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "expected_database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expected_evaluation_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_split_role": {
+      "const": "test"
+    },
+    "license": {
+      "const": "Apache-2.0"
+    },
+    "paper_url": {
+      "type": "string",
+      "pattern": "^https://proceedings\\.mlr\\.press/"
+    },
+    "documented_database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

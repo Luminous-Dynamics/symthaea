@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/sorrydb-integrity-report-v0.schema.json",
+  "title": "PITB SorryDB integrity report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "upstream_repository",
+    "upstream_repository_commit",
+    "database_git_blob_sha1",
+    "evaluation_split_git_blob_sha1",
+    "database_raw_sha256",
+    "evaluation_split_raw_sha256",
+    "database_task_count",
+    "evaluation_task_count",
+    "repository_commit_count",
+    "receipt_count",
+    "reproducible_task_count",
+    "goal_alignment_counts",
+    "semantic_audit_counts",
+    "vacuity_audit_counts",
+    "assumption_audit_counts",
+    "unqualified_task_ids",
+    "scheduler_admission",
+    "receipt_authentication_boundary",
+    "semantic_integrity_boundary",
+    "documented_database_task_count",
+    "full_count_documentation_drift",
+    "assurance_qualified_task_count",
+    "assurance_disqualified_task_ids",
+    "assurance_unreviewed_task_ids"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.sorrydb-integrity-report.v0"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_repository": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream_repository_commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "database_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "evaluation_split_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "database_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "evaluation_split_raw_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evaluation_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository_commit_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "receipt_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reproducible_task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "goal_alignment_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "semantic_audit_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "vacuity_audit_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "assumption_audit_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "unqualified_task_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "scheduler_admission": {
+      "const": false
+    },
+    "receipt_authentication_boundary": {
+      "type": "string",
+      "minLength": 30
+    },
+    "semantic_integrity_boundary": {
+      "type": "string",
+      "minLength": 30
+    },
+    "documented_database_task_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "full_count_documentation_drift": {
+      "type": "boolean"
+    },
+    "assurance_qualified_task_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "assurance_disqualified_task_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "assurance_unreviewed_task_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

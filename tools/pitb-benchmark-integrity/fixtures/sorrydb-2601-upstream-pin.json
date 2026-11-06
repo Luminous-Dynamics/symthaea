@@ -1,0 +1,31 @@
+{
+  "schema_version": "pitb.external-benchmark-pin.v0",
+  "benchmark_id": "sorrydb",
+  "benchmark_version": "SorryDB_2601",
+  "evaluation_split": {
+    "path": "data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json",
+    "git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7",
+    "declared_task_count": 1000
+  },
+  "full_snapshot": {
+    "path": "data/SorryDB_2601/SorryDB_2601.json",
+    "git_blob_sha1": "5fafddac467af6d30d8f5c8731d6edec9c273a47",
+    "declared_task_count": 2601
+  },
+  "upstream": {
+    "repository": "SorryDB/SorryDB",
+    "repository_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+    "repository_license": "Apache-2.0",
+    "license_file_blob_sha1": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "database_format_document_blob_sha1": "a3a589eb3171f0545f09c056c433a06ece82b16a",
+    "strategies_document_blob_sha1": "cdb52b074289d18db017c1009e020cc42aa4d185"
+  },
+  "references": {
+    "paper": "https://proceedings.mlr.press/v306/letson26a.html",
+    "leaderboard": "https://sorrydb.org/",
+    "upstream_repository": "https://github.com/SorryDB/SorryDB",
+    "upstream_data_repository": "https://github.com/austinletson/sorrydb-data"
+  },
+  "data_rights_boundary": "The SorryDB repository root license is Apache-2.0. Source projects represented by individual benchmark tasks retain their own licenses and authorship. This pin file stores identities only; PITB does not redistribute task source files, proof text or private repository contents.",
+  "trust_boundary": "Upstream Git blob IDs and repository commit are pinned. The normalized task manifest, live goal captures, build receipts, proof patches and verification receipts must be separately hashed and independently reproduced before scoring."
+}
