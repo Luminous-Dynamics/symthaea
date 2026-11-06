@@ -22,7 +22,7 @@
       "WT-LOCKBOX-01",
       "UNC31-LOCKBOX-01"
     ],
-    "split_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "split_sha256": "4319e21e5b6c066f5390b994b29e36d12880d62bbea8c84e2119bb83716c30cb",
     "lockbox_frozen_before_prediction": true
   },
   "animals": [
@@ -155,7 +155,7 @@
       "model_id": "anatomy-only",
       "model_kind": "ANATOMY_ONLY",
       "implementation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-      "training_manifest_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "training_manifest_sha256": "cd89f8ebae9496c2502c659dcc32d41c3842084c2579ff9e7d341c686acf0ec3",
       "training_animal_ids": [
         "WT-TRAIN-01"
       ],
@@ -176,7 +176,7 @@
       "model_id": "state-aware",
       "model_kind": "STATE_HISTORY_AWARE",
       "implementation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "training_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "training_manifest_sha256": "4930af4887ff496286b1b6a6e4ffc5278804456c8786499d9063eb1922db9dc1",
       "training_animal_ids": [
         "WT-TRAIN-01"
       ],
