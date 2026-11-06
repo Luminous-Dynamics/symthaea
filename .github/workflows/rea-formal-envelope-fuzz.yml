@@ -1,0 +1,122 @@
+name: REA Formal Provider Observation Envelope Fuzz
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+  pull_request:
+    paths:
+      - "tools/rea-formal-envelope-fuzz-support/**"
+      - "src/rea_compat.rs"
+      - "src/rea_compat/**"
+      - "crates/domains/symthaea-rea-compat/**"
+      - ".github/workflows/rea-formal-envelope-fuzz.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-formal-envelope-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  formal-envelope-fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact PR head or dispatched revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned nightly Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: nightly-2026-11-03
+          components: llvm-tools-preview
+
+      - name: Install pinned cargo-fuzz
+        run: cargo +nightly-2026-11-03 install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Resolve isolated support lockfile
+        run: cargo +nightly-2026-11-03 generate-lockfile --manifest-path tools/rea-formal-envelope-fuzz-support/Cargo.toml
+
+      - name: Resolve nested cargo-fuzz lockfile
+        run: cargo +nightly-2026-11-03 generate-lockfile --manifest-path tools/rea-formal-envelope-fuzz-support/fuzz/Cargo.toml
+
+      - name: Audit fuzz dependency graph
+        run: cargo +nightly-2026-11-03 tree --manifest-path tools/rea-formal-envelope-fuzz-support/fuzz/Cargo.toml --locked -e normal,dev
+
+      - name: Run deterministic seed generation and parser tests
+        run: |
+          cargo +nightly-2026-11-03 test --manifest-path tools/rea-formal-envelope-fuzz-support/Cargo.toml --locked
+          mkdir -p tools/rea-formal-envelope-fuzz-support/fuzz/artifacts
+          cargo +nightly-2026-11-03 run \
+            --manifest-path tools/rea-formal-envelope-fuzz-support/Cargo.toml \
+            --locked --bin generate_seed \
+            > tools/rea-formal-envelope-fuzz-support/fuzz/corpus/formal_envelope/seed-valid.json
+          test -s tools/rea-formal-envelope-fuzz-support/fuzz/corpus/formal_envelope/seed-valid.json
+
+      - name: Record exact fuzz context and generated seed
+        run: |
+          expected_commit="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out_commit="$(git rev-parse HEAD)"
+          test "$checked_out_commit" = "$expected_commit"
+          if test "$GITHUB_EVENT_NAME" = "pull_request"; then
+            fuzz_seconds=60
+          else
+            fuzz_seconds=180
+          fi
+          {
+            echo "tested_tree_commit=$checked_out_commit"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "pull_request_head_sha=$expected_commit"
+            echo "rust_toolchain=nightly-2026-11-03"
+            rustc +nightly-2026-11-03 --version --verbose
+            cargo +nightly-2026-11-03 --version
+            cargo +nightly-2026-11-03 fuzz --version
+            uname -a
+            sha256sum tools/rea-formal-envelope-fuzz-support/Cargo.lock
+            sha256sum tools/rea-formal-envelope-fuzz-support/fuzz/Cargo.lock
+            sha256sum tools/rea-formal-envelope-fuzz-support/fuzz/corpus/formal_envelope/*
+            echo "fuzz_seconds=$fuzz_seconds"
+          } | tee tools/rea-formal-envelope-fuzz-support/fuzz/artifacts/run-context.txt
+          echo "FUZZ_SECONDS=$fuzz_seconds" >> "$GITHUB_ENV"
+
+      - name: Fuzz formal provider-observation envelopes
+        working-directory: tools/rea-formal-envelope-fuzz-support/fuzz
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run formal_envelope -- \
+            -artifact_prefix=artifacts/formal-envelope- \
+            -max_total_time="$FUZZ_SECONDS" \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -timeout=5 \
+            -print_final_stats=1 2>&1 | tee artifacts/formal-envelope-output.txt
+
+      - name: Bind final statistics to exact run
+        if: always()
+        run: |
+          output="tools/rea-formal-envelope-fuzz-support/fuzz/artifacts/formal-envelope-output.txt"
+          if test -f "$output"; then
+            sha256sum "$output" | tee -a tools/rea-formal-envelope-fuzz-support/fuzz/artifacts/run-context.txt
+            grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' "$output" \
+              > tools/rea-formal-envelope-fuzz-support/fuzz/artifacts/formal-envelope-summary.txt || true
+          fi
+
+      - name: Upload formal envelope fuzz evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-formal-envelope-fuzz-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/rea-formal-envelope-fuzz-support/Cargo.lock
+            tools/rea-formal-envelope-fuzz-support/fuzz/Cargo.lock
+            tools/rea-formal-envelope-fuzz-support/fuzz/corpus/formal_envelope/**
+            tools/rea-formal-envelope-fuzz-support/fuzz/artifacts/**
+          if-no-files-found: warn
+          retention-days: 14

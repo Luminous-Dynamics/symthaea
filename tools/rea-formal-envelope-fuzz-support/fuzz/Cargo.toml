@@ -1,0 +1,23 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
+[package]
+name = "rea-formal-envelope-fuzz"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+rea-formal-envelope-fuzz-support = { path = ".." }
+
+[[bin]]
+name = "formal_envelope"
+path = "fuzz_targets/formal_envelope.rs"
+test = false
+doc = false
+bench = false
