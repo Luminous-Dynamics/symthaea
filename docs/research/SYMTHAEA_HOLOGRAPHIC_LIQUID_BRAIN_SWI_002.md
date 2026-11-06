@@ -46,13 +46,14 @@ Its equilibrium is composed from:
 The scalar time constant depends on state norm and input similarity:
 `tau = clamp(tau_base * (1 + backbone_tau * ||state||) * (1 + 0.2 * cosine(input, tau_modulator)), 0.01, 10.0)`.
 
-The adaptive gate depends on cosine similarity between the mean-bundled state/input vector and `gate_weight`, plus the mean of `gate_bias`. The interpolation factor is:
-`sigma = 1 - exp(-dt / tau) * (1 - sigmoid(gating_steepness * gate_activation))`.
+The adaptive gate depends on cosine similarity between the mean-bundled state/input vector and `gate_weight`, plus the mean of `gate_bias`. **SWI-001 initially used an additive gate floor in the interpolation formula, but the zero-time audit found that this made `sigma(dt=0)=gate` rather than zero.** That is incompatible with a continuous-time flow.
 
-The forward update is:
+The current branch defines the sigmoid gate as a positive rate multiplier:
+`gate_rate = sigmoid(gating_steepness * gate_activation)`
+`sigma = 1 - exp(-dt * gate_rate / tau)`
 `state_next = (1 - sigma) * state + sigma * equilibrium`.
 
-This is a useful adaptive liquid-state update, but it is not the exact solution of a general nonlinear ODE: equilibrium, tau and gate all depend on the state and input.
+This satisfies the essential identity `F(0, x) = x`. The learned gate changes the effective rate rather than injecting an instantaneous state jump. The frozen-equilibrium step remains an approximation to the nonlinear, time-varying ODE; RK4 and iterative substeps now evaluate the same gate-scaled vector field and Fourier phase.
 
 ### 2.2 Standalone HDC-LTC neuron
 
@@ -148,6 +149,21 @@ These numbers are repository-specific measurements, not universal error bounds. 
 - the system should report its error/cost tradeoff and not claim an exact closed-form solution.
 
 A September 2026 IEEE TNNLS paper, *Rederived Closed-Form Continuous-Time Neural Networks*, proposes NIALIM using Lagrange interpolation of the input-dependent integral, derives a bound on approximation error, and introduces DFA-CfN and PRDFA-CfN variants evaluated across six tasks. This is directly relevant to Symthaea’s next integrator experiment. Compare against the paper’s actual datasets, splits, metrics, and implementation—not the headline “up to 69.2% improvement” across heterogeneous tasks.
+
+### 3.4 Continuous-time identity correction
+
+A deeper audit found that the previous gate formula,
+`sigma = 1 - exp(-dt / tau) * (1 - gate)`,
+did not satisfy the identity map at zero elapsed time: `sigma(0) = gate`. That allowed a nonzero state jump at `dt = 0`.
+
+The branch now makes the learned sigmoid gate a positive rate multiplier:
+`sigma = 1 - exp(-dt * gate_rate / tau)`.
+The exact and iterative frozen-coefficient paths use this same rate. Euler and RK4 use the corresponding vector field:
+`dx/dt = gate_rate(x,u) * (equilibrium(x,u,t) - x) / tau(x,u)`.
+
+The RK4 stages now evaluate the Fourier basis at their own stage times. The iterative path recomputes Fourier phase, equilibrium, tau and gate on every substep. Non-finite and negative dt values are normalized to zero at the neuron integration boundary. Tests assert zero-time identity across all integrators and finite-difference agreement against the post-forward retained context.
+
+This correction makes the model a better-defined continuous-time system. It does not make the frozen-coefficient update an exact solution of the nonlinear ODE; numerical fidelity still needs to be measured against RK4 and a higher-accuracy reference.
 
 ### 3.4 SWI branch implementation increments
 
@@ -291,8 +307,9 @@ Baselines:
 
 Test each binding backend over:
 - Hadamard continuous binding (current default);
-- bipolar MAP/Hadamard and BSC/XOR (new comparison backends to implement);
+- bipolar MAP/Hadamard and BSC/XOR (comparison backends still to implement);
 - HRR circular convolution with unitary and non-unitary roles (unitary HRR operator now implemented);
+- FHRR complex phase binding as a separate comparator;
 - D = 256, 1,024, 4,096, 16,384, 65,536;
 - bundle load (number of stored items);
 - comparison/query count;
@@ -307,6 +324,8 @@ Metrics:
 - calibration / abstention when retrieval is ambiguous;
 - capacity versus dimension, bundle load, and number of comparisons;
 - memory and energy per stored/query item.
+
+For multi-factor factorization, report three terminal states separately: correct convergence, spurious convergence, and non-convergence. Also report updates-to-correct-convergence conditioned on success. A recent 2026 resonator study demonstrates that cleanup rules (sign, softmax, ReLU, polynomial) can trade correct convergence against spurious attractors and timeout; the fastest successful subset is not the same as the most reliable algorithm. Its matched-dimension bipolar/FHRR analysis should be a baseline for HLB-HDC.
 
 Do not treat capacity as a function of bundle load alone: query/comparison count changes the probability of false retrieval.
 
@@ -426,7 +445,8 @@ This is a research hypothesis. To claim superiority, Symthaea must reproduce sel
 ### P2 — architecture experiments
 - Implement a small HDC-LTC structured-mixer prototype behind a feature/configuration gate.
 - Add HRR circular-convolution as a separate binding backend and compare to current Hadamard/MAP.
-- Add a cleanup-memory / resonator retrieval test harness.
+- Add a cleanup-memory / resonator retrieval test harness with explicit correct/spurious/non-convergence outcomes.
+- Benchmark role/filler HRR record retrieval across load and dimension, not just the exact one-role inverse.
 
 ### P3 — learning and full HLB
 - Add eligibility traces after the temporal benchmark validator is run.
@@ -451,6 +471,7 @@ The ignored phoneme training test remains ignored. No new phoneme accuracy, nume
 8. *Vector Symbolic Architectures as a Computing Framework for Emerging Hardware.* https://pmc.ncbi.nlm.nih.gov/articles/PMC10588678/
 9. NIALIM / DFA-CfN implementation release: https://github.com/nuist-xf/DFA-CfNs
 10. *Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration.* DATE 2026. DOI: https://doi.org/10.23919/DATE69613.2026.11539261
+11. Yeung, C., Poduval, P. and Imani, M. (2026). *A comparative study of nonlinear cleanup rules in resonator networks.* Frontiers in Artificial Intelligence, 9, 1793314. DOI: https://doi.org/10.3389/frai.2026.1793314.
 
 ---
 
