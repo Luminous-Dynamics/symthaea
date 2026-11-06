@@ -347,10 +347,19 @@ fn write_record_artifact_evidence<W: Write>(
 }
 
 fn format_estimate(estimate: Estimate) -> String {
-    match (estimate.mean, estimate.ci95_lower, estimate.ci95_upper) {
-        (Some(mean), Some(lower), Some(upper)) => format!("{mean:.4}[{lower:.4},{upper:.4}]"),
-        (Some(mean), _, _) => format!("{mean:.4}[CI=NA]"),
-        (None, _, _) => "NA".to_owned(),
+    match (
+        estimate.mean,
+        estimate.ci95_lower,
+        estimate.ci95_upper,
+        estimate.bootstrap_seed,
+    ) {
+        (Some(mean), Some(lower), Some(upper), Some(seed)) => format!(
+            "{mean:.4}[{lower:.4},{upper:.4}];clusters={};resamples={};seed={seed:016x}",
+            estimate.clusters,
+            estimate.bootstrap_resamples,
+        ),
+        (Some(mean), _, _, _) => format!("{mean:.4}[CI=NA];clusters={}", estimate.clusters),
+        (None, _, _, _) => "NA".to_owned(),
     }
 }
 
