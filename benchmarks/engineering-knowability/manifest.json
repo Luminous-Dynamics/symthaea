@@ -91,7 +91,12 @@
         "uncertainty relative to case-specific tolerance",
         "requalification after edit"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "ISO 10360-2:2009",
+        "JCGM 100:2008/Amd.1:2026"
+      ]
     },
     {
       "id": "KNOW-P02",
@@ -108,7 +113,11 @@
         "pre-closure vs post-closure evidence scope",
         "measurement back-action and access constraints"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026"
+      ]
     },
     {
       "id": "KNOW-P03",
@@ -125,7 +134,11 @@
         "access constraints",
         "contact evidence vs physical conformity distinction"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "JCGM 106:2012"
+      ]
     },
     {
       "id": "KNOW-P04",
@@ -143,7 +156,11 @@
         "measurement uncertainty",
         "fresh evidence/currentness obligations"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 10360-2:2009",
+        "ISO 14253-1:2017"
+      ]
     },
     {
       "id": "KNOW-P05",
@@ -161,7 +178,11 @@
         "separate observations vs independent evidence",
         "unknown where dependence cannot be resolved"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026"
+      ]
     },
     {
       "id": "KNOW-P06",
@@ -180,7 +201,13 @@
         "decision boundary",
         "method resolution/capability profile"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 14253-1:2017",
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026",
+        "JCGM 106:2012"
+      ]
     },
     {
       "id": "KNOW-P07",
@@ -198,7 +225,8 @@
         "power state and safe test conditions",
         "unknown when no routed board exists"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": []
     },
     {
       "id": "KNOW-P08",
@@ -217,7 +245,11 @@
         "reopened measurements and obligations",
         "preserved vs stale evidence distinction"
       ],
-      "seeded_fault": null
+      "seeded_fault": null,
+      "standard_refs": [
+        "ISO 10360-2:2009",
+        "ISO 14253-1:2017"
+      ]
     },
     {
       "id": "KNOW-N01",
@@ -233,7 +265,10 @@
         "admissible alternative or explicit Unknown",
         "narrowed claim if needed"
       ],
-      "seeded_fault": "Remove all post-closure inspection access while retaining a candidate claim that the hidden cavity was measured after closure."
+      "seeded_fault": "Remove all post-closure inspection access while retaining a candidate claim that the hidden cavity was measured after closure.",
+      "standard_refs": [
+        "ISO 14253-1:2017"
+      ]
     },
     {
       "id": "KNOW-N02",
@@ -249,7 +284,11 @@
         "article/fixture binding",
         "Unknown/stale disposition"
       ],
-      "seeded_fault": "Substitute an expired calibration reference or another instrument identity without changing the displayed measurement."
+      "seeded_fault": "Substitute an expired calibration reference or another instrument identity without changing the displayed measurement.",
+      "standard_refs": [
+        "ISO 10360-2:2009",
+        "ISO 14253-1:2017"
+      ]
     },
     {
       "id": "KNOW-N03",
@@ -266,7 +305,8 @@
         "missing sensor/test-point information",
         "Unknown/needs-evidence disposition"
       ],
-      "seeded_fault": "Ask for a physical board test result from a logical netlist-only fixture with no routed board, test points or instrument profile."
+      "seeded_fault": "Ask for a physical board test result from a logical netlist-only fixture with no routed board, test points or instrument profile.",
+      "standard_refs": []
     },
     {
       "id": "KNOW-N04",
@@ -282,7 +322,11 @@
         "admissible measurement envelope",
         "review/alternative method disposition"
       ],
-      "seeded_fault": "Use a high-force contact measurement on a thin/compliant feature without modelling the induced deformation."
+      "seeded_fault": "Use a high-force contact measurement on a thin/compliant feature without modelling the induced deformation.",
+      "standard_refs": [
+        "JCGM 100:2008/Amd.1:2026",
+        "JCGM GUM-5:2026"
+      ]
     }
   ],
   "limitations": [
@@ -290,6 +334,46 @@
     "The referenced CAD and assembly objects are synthetic development fixtures. Their materialization does not establish instrument or measurement-system capability.",
     "ECAD-P01 is a logical netlist only, not a routed PCB; physical testability is intentionally Unknown without additional EDA and instrumentation artifacts.",
     "No real article, calibration certificate, instrument, supplier or production record is included.",
-    "No measurement plan proposal is evidence admission, engineering approval, product qualification or physical execution authority."
+    "No measurement plan proposal is evidence admission, engineering approval, product qualification or physical execution authority.",
+    "ISO 10360-2:2009 is scoped to Cartesian CMMs using contacting discrete-point probing for linear dimensions; it is not a generic optical-scanner, laser tracker, CT or non-Cartesian instrument qualification rule.",
+    "ISO 14253-1:2017 decision rules apply to in-scope quantity-valued characteristics/specifications and take measurement uncertainty into account; no universal uncertainty-to-tolerance ratio is assumed.",
+    "JCGM guidance supports measurement-model and uncertainty reasoning but does not establish the capability, calibration, repeatability or fitness of any actual fixture/instrument."
+  ],
+  "standards": [
+    {
+      "id": "ISO 14253-1:2017",
+      "role": "Decision rules for conformity/nonconformity of quantity-valued workpiece and measuring-equipment characteristics, taking measurement uncertainty into account",
+      "scope_limit": "Not a general observability standard and not a universal uncertainty-to-tolerance ratio; apply only where the declared characteristic and specification are in scope",
+      "source_uri": "https://www.iso.org/standard/70137.html",
+      "status_note": "Last reviewed and confirmed in 2023; current at retrieval 2026-11-06"
+    },
+    {
+      "id": "ISO 10360-2:2009",
+      "role": "Acceptance and reverification performance tests for Cartesian CMMs using contacting discrete-point probing to measure linear dimensions",
+      "scope_limit": "Does not explicitly apply to optical probing or non-Cartesian CMMs; must not be used as a generic optical-scan or all-metrology calibration requirement",
+      "source_uri": "https://www.iso.org/standard/40954.html",
+      "status_note": "Last reviewed and confirmed in 2026; current at retrieval 2026-11-06"
+    },
+    {
+      "id": "JCGM 100:2008/Amd.1:2026",
+      "role": "GUM amendment addressing nonlinearity in measurement models",
+      "scope_limit": "Guidance for uncertainty evaluation; does not certify any instrument, fixture or measurement system",
+      "source_uri": "https://www.bipm.org/documents/20126/2071204/JCGM_100_Amd1_2026.pdf/",
+      "status_note": "Published 2026"
+    },
+    {
+      "id": "JCGM GUM-5:2026",
+      "role": "Worked examples for evaluating and reporting measurement uncertainty",
+      "scope_limit": "Illustrative examples, not a universal measurement procedure or proof of capability for the benchmark fixture",
+      "source_uri": "https://www.bipm.org/en/web/guest/publications/guides",
+      "status_note": "Published 2026"
+    },
+    {
+      "id": "JCGM 106:2012",
+      "role": "Role of measurement uncertainty in conformity assessment",
+      "scope_limit": "Use as guidance for uncertainty-aware conformity decisions, not as a replacement for the applicable product specification or decision rule",
+      "source_uri": "https://www.bipm.org/en/web/guest/publications/guides",
+      "status_note": "Listed in BIPM JCGM guides catalogue at retrieval 2026-11-06"
+    }
   ]
 }
