@@ -232,7 +232,7 @@ mod tests {
                 source_sha256: SOURCE_SHA,
                 horizon_start_utc_seconds: 100,
                 horizon_end_utc_seconds: 3_700,
-                maximum_integrable_gap_seconds: 1_800,
+                maximum_integrable_gap_seconds: 3_600,
                 samples,
             },
         }
