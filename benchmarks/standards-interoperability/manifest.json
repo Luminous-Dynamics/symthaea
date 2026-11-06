@@ -268,5 +268,33 @@
     "Candidate execution, untrusted execution, and physical testing remain unauthorized.",
     "Any later scoring requires independent adjudication, frozen toolchains, and separate evaluator custody.",
     "MTConnect public version labels are not yet reconciled across the standard-download page, normative SysML model releases, model documentation, and generated XML schemas. No MTConnect adapter is eligible for scoring until exact XMI, XSD, agent and protocol revisions are separately pinned and compatibility is independently reviewed."
-  ]
+  ],
+  "mtconnect_execution_gate": {
+    "status": "blocked_until_compatibility_tuple_frozen",
+    "eligible_for_candidate_execution": false,
+    "eligible_for_scoring": false,
+    "observed_public_version_labels": {
+      "official_standard_download_page": "2.5",
+      "normative_sysml_model_release": "2.7",
+      "normative_model_documentation": "2.8",
+      "published_xml_schema_bundle": "2.7"
+    },
+    "sources": {
+      "official_standard_download_page": "https://mtconnect.squarespace.com/standard-download20181",
+      "normative_sysml_model_releases": "https://github.com/mtconnect/mtconnect_sysml_model/releases",
+      "normative_model_documentation": "https://model.mtconnect.org/Version2.8/",
+      "published_xml_schema_index": "https://schemas.mtconnect.org/"
+    },
+    "required_frozen_tuple": [
+      "official normative model/XMI release identity and SHA-256",
+      "exact XSD bundle files and SHA-256 digests",
+      "agent implementation and exact version",
+      "protocol/adaptor implementation and exact version",
+      "supported profile/capability declaration",
+      "schema validator implementation and exact version",
+      "independent compatibility witness linking the selected model, XSD, agent and protocol"
+    ],
+    "phase_policy": "The first executable exchange tranche is AP242 Edition 4 ↔ QIF ISO 23952:2020 only. MTConnect event cases remain blueprint-only and may not be executed or scored until the complete compatibility tuple is frozen and independently reviewed.",
+    "rejection_rule": "Any unresolved version mismatch, absent digest, unsupported schema/profile or missing compatibility witness is Unsupported/Unknown, never Pass."
+  }
 }
