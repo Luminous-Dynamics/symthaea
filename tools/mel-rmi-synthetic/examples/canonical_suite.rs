@@ -374,13 +374,20 @@ fn report_paired_statistics(
 
 fn report_one_paired_summary(label: &str, summary: &DimensionEffectSummary) {
     eprintln!(
-        "RMI_PAIRED_BOOTSTRAP,track={},dimension={},direction={},attempted={},measured={},missing={},attempted_clusters={},measured_clusters={},targeted={},sham={},unrelated={},yoked={},targeted_minus_sham={},targeted_minus_unrelated={},targeted_minus_yoked={},input_sensitive_rate={},target_specific_rate={}",
+        "RMI_PAIRED_BOOTSTRAP,track={},dimension={},direction={},attempted={},measured={},missing={},missing_abstained={},missing_timeout={},missing_invalid_output={},missing_artifact={},missing_adapter_unavailable={},missing_withdrawal={},missing_other={},attempted_clusters={},measured_clusters={},targeted={},sham={},unrelated={},yoked={},targeted_minus_sham={},targeted_minus_unrelated={},targeted_minus_yoked={},input_sensitive_rate={},target_specific_rate={}",
         label,
         summary.dimension.as_str(),
         format_direction(summary.direction),
         summary.attempted_trials,
         summary.measured_trials,
         summary.missing_trials,
+        summary.missing_by_reason.abstained,
+        summary.missing_by_reason.timeout,
+        summary.missing_by_reason.invalid_output,
+        summary.missing_by_reason.missing_artifact,
+        summary.missing_by_reason.adapter_unavailable,
+        summary.missing_by_reason.participant_withdrawal,
+        summary.missing_by_reason.other,
         summary.attempted_clusters,
         summary.measured_clusters,
         format_estimate(summary.targeted_delta),
