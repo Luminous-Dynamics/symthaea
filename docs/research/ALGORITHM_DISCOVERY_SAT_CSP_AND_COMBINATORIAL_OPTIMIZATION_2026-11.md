@@ -184,7 +184,7 @@ A single “accuracy” metric cannot compare these classes. The type of guarant
 
 ## State of practice: competition and benchmark baselines
 
-- [SAT Competition 2026](https://satcompetition.github.io/2026/): Main, Parallel, Experimental and Cloud tracks, with AI-generated/AI-tuned subtracks. Main-track proof-checker support and proof-checking rules are especially relevant. Use the published benchmark list, per-instance outcomes, solver sources and result logs.
+- [SAT Competition 2026](https://satcompetition.github.io/2026/): Main, Parallel, Experimental and Cloud tracks, including AI-generated/AI-tuned participation. The rules require a model for SAT instances in all tracks and UNSAT proof certificates in the Main Track; source code and a 1–2 page system description are required, including disclosure of AI-authored code and AI-tuned heuristics. Pure portfolios combining solvers developed by different groups are restricted outside the Cloud Track, so an internal portfolio benchmark is not automatically a valid competition submission. Use the published benchmark list, per-instance outcomes, solver sources and result logs.
 - [SAT Competition 2026 results](https://github.com/satcompetition/2026/blob/main/results.html): compare SAT and UNSAT solved counts and scores separately; portfolio/VBS results are an upper-bound reference, not a single executable solver.
 - [MaxSAT Evaluation 2026](https://maxsat-evaluations.github.io/2026/): exact, anytime and incremental tracks, with unweighted and weighted variants. Use its benchmark collection, metadata, solver sources and logs.
 - [CO-Bench / LACE benchmark implementation](https://github.com/PJ-NTU/LACE): a broad set of combinatorial optimization tasks, useful for transfer and cross-domain evaluation.
