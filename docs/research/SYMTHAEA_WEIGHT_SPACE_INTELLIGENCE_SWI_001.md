@@ -135,7 +135,7 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
 
-Twenty-five tests were added across the CfC, HDC-LTC, structured-mixer/HRR, and async training modules. They cover manifest/layout; model fingerprints; typed and transactional edits; malformed payloads; initialization scale/orthogonality; HDC parameter profiling and bounded windows; adaptive one-step gradient finite differences (including Fourier, gate, tau, input and state paths); local target updates; and valid/invalid asynchronous swaps. The tests have not been executed here; do not describe them as passing until run on the exact branch head.
+Regression tests are included across the CfC, HDC-LTC, structured-mixer/HRR, and async training modules. They cover manifest/layout; model fingerprints; typed and transactional edits; malformed payloads; initialization scale/orthogonality; HDC parameter profiling and bounded windows; adaptive one-step gradient finite differences (including Fourier, gate, tau, input and state paths); local target updates; and valid/invalid asynchronous swaps. The tests have not been executed here; do not describe them as passing until run on the exact branch head.
 
 ### 4.2 HDC-LTC: novel representation-space target
 
