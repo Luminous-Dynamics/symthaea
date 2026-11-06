@@ -208,7 +208,7 @@ struct SearchState {
     used_initial_retrieval: bool,
     used_reformulation: bool,
     used_post_reformulation_retrieval: bool,
-    used_navigation: bool,
+    used_navigation_after_initial_retrieval: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -410,7 +410,7 @@ fn find_route(
         used_initial_retrieval: false,
         used_reformulation: false,
         used_post_reformulation_retrieval: false,
-        used_navigation: false,
+        used_navigation_after_initial_retrieval: false,
     };
     // Dijkstra expands equal-cost states in stable structural order. The first
     // equal-cost predecessor wins; adjacency lists are sorted by edge_ref.
@@ -429,15 +429,17 @@ fn find_route(
         let reached = state.node_ref == target_node_ref;
         let qualifies = match mode {
             RouteMode::Direct => {
-                state.used_initial_retrieval && !state.used_reformulation && !state.used_navigation
+                state.used_initial_retrieval && !state.used_reformulation && !state.used_navigation_after_initial_retrieval
             }
             RouteMode::Reformulation => {
                 state.used_initial_retrieval
                     && state.used_reformulation
                     && state.used_post_reformulation_retrieval
-                    && !state.used_navigation
+                    && !state.used_navigation_after_initial_retrieval
             }
-            RouteMode::Navigation => state.used_navigation,
+            RouteMode::Navigation => {
+                state.used_initial_retrieval && state.used_navigation_after_initial_retrieval
+            },
         };
         if reached && qualifies {
             return Some(RouteWitness {
@@ -480,7 +482,8 @@ fn find_route(
                 used_post_reformulation_retrieval: state.used_post_reformulation_retrieval
                     || (state.used_reformulation
                         && edge.operation == RouteOperationV1::PostReformulationRetrieval),
-                used_navigation: state.used_navigation || edge.operation.is_navigation(),
+                used_navigation_after_initial_retrieval: state.used_navigation_after_initial_retrieval
+                    || (state.used_initial_retrieval && edge.operation.is_navigation()),
             };
 
             let improve = best_costs
@@ -698,7 +701,7 @@ mod tests {
                 },
                 RecoverabilityEdgeV1 {
                     edge_ref: "route:open-document".into(),
-                    from_node_ref: "state:start".into(),
+                    from_node_ref: "state:first-pass-miss".into(),
                     to_node_ref: "document:known".into(),
                     operation: RouteOperationV1::OpenDocument,
                     cost: 1,
@@ -954,6 +957,55 @@ mod tests {
             .records
             .iter()
             .find(|record| record.evidence_unit_id == "unit:rewrite")
+            .unwrap();
+        assert_eq!(
+            row.recoverability,
+            RecoverabilityClassV1::UnreachableWithinBudget
+        );
+    }
+
+    #[test]
+    fn navigation_before_first_pass_miss_does_not_qualify_as_recovery() {
+        let mut fields = base_fields();
+        fields.edges.retain(|edge| {
+            edge.edge_ref != "route:open-document"
+                && edge.edge_ref != "route:paginate"
+                && edge.edge_ref != "route:find"
+        });
+        fields.nodes.push(RecoverabilityNodeV1 {
+            node_ref: "document:opened-too-early".into(),
+        });
+        fields.nodes.push(RecoverabilityNodeV1 {
+            node_ref: "page:opened-too-early".into(),
+        });
+        fields.edges.extend([
+            RecoverabilityEdgeV1 {
+                edge_ref: "route:open-before-first-pass".into(),
+                from_node_ref: "state:start".into(),
+                to_node_ref: "document:opened-too-early".into(),
+                operation: RouteOperationV1::OpenDocument,
+                cost: 1,
+            },
+            RecoverabilityEdgeV1 {
+                edge_ref: "route:paginate-before-first-pass".into(),
+                from_node_ref: "document:opened-too-early".into(),
+                to_node_ref: "page:opened-too-early".into(),
+                operation: RouteOperationV1::Pagination,
+                cost: 1,
+            },
+            RecoverabilityEdgeV1 {
+                edge_ref: "route:initial-after-navigation".into(),
+                from_node_ref: "page:opened-too-early".into(),
+                to_node_ref: "evidence:navigation".into(),
+                operation: RouteOperationV1::InitialRetrieval,
+                cost: 1,
+            },
+        ]);
+        let result = report(fields);
+        let row = result
+            .records
+            .iter()
+            .find(|record| record.evidence_unit_id == "unit:navigation")
             .unwrap();
         assert_eq!(
             row.recoverability,
