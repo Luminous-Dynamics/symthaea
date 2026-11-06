@@ -159,7 +159,7 @@ def validate(data: dict[str, Any]) -> dict[str, Any]:
     require(rare['earliest_query_safe_checkpoint']['checkpoint_id'] == 'A2', 'query-conditioned rare-path stop must wait until A2')
     require(early is not None and early['earliest_query_safe_checkpoint']['checkpoint_id'] == 'B0', 'query-specific policy must be able to stop at B0 before global convergence')
     require(early['certificate_invalidation_event_count'] == 1, 'late query-changing alternative invalidation control is missing')
-    require(early['false_safe_global_stop_count'] == 0, 'query-specific early-stop track must not create a false global stop')
+    require(early['false_safe_global_stop_checkpoint_ids'] == ['B3'], 'late query-changing alternative must expose the stale global-only stop at B3')
 
     return {
         'status': 'SYNTHETIC_QUERY_CONDITIONED_STOPPING_CONTRACT_VALIDATED',
