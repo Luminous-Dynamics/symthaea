@@ -628,7 +628,25 @@
           "why_spec_derived": "The declared matrix requires this simultaneous feature, target and environment combination."
         }
       ],
-      "unresolved_before_fixture": "Freeze Rust toolchain, exact feature matrix, supported targets, optional dependency versions, cross-compilation environment and clean-build assumptions."
+      "unresolved_before_fixture": "Freeze Rust toolchain, exact feature matrix, supported targets, optional dependency versions, cross-compilation environment and clean-build assumptions.",
+      "source_fixture": {
+        "path": "benchmarks/ceb/public-development-fixtures/rust-feature-target-matrix-v0/",
+        "status": "public_source_only_not_compiled_or_executed",
+        "file_count": 11,
+        "has_cargo_lock": false,
+        "reference_patch_present": false,
+        "executable_oracle_present": false,
+        "task_manifest_present": false,
+        "demonstrated_scope": [
+          "declared feature not forwarded to dependency",
+          "platform modules included without target-specific cfg"
+        ],
+        "excluded_scope": [
+          "qualified cross-target build",
+          "full supported feature matrix",
+          "environment leakage"
+        ]
+      }
     },
     {
       "candidate_key": "bounded-topk",
@@ -770,6 +788,16 @@
       "file_count": 8,
       "purpose": "Minimal three-crate workspace whose in-memory event processor intentionally applies duplicate delivery twice under a deterministic replay scenario.",
       "limitation": "Demonstrates only in-process duplicate replay. It does not model durable commit, acknowledgement atomicity, crash/restart, concurrent processing, or ordering guarantees.",
+      "admission_status": "not_admitted",
+      "holdout_eligible": false
+    },
+    {
+      "candidate_key": "feature-target-matrix",
+      "path": "benchmarks/ceb/public-development-fixtures/rust-feature-target-matrix-v0/",
+      "status": "public_source_only_not_compiled_or_executed",
+      "file_count": 11,
+      "purpose": "Three-crate workspace with an intentionally unforwarded client feature and Unix/Windows modules included without target cfg gating.",
+      "limitation": "No target cross-compilation or feature builds have been run; the exact supported feature/target matrix must be frozen before task admission.",
       "admission_status": "not_admitted",
       "holdout_eligible": false
     }
