@@ -31,6 +31,12 @@ Unknown cost is not zero. Each of the six dimensions must be explicitly qualifie
 
 The upper-cost envelope should include fixed setup, simulator initialization, data transfer, retries, orchestration, verification and other costs that are actually incurred by the experiment. The library cannot independently authenticate this evidence.
 
+
+
+### Wall-time accounting boundary
+
+CPU/GPU milliseconds, replications, human seconds and currency are additive charges. In v0.1, wall_millis is also treated as an additive charged duration under a frozen serialized execution plan. It is not a parallel-job makespan estimator. If jobs execute concurrently, an adapter must compute the schedule-level maximum elapsed path (including dependencies, queues and retries) separately; it must not sum parallel task durations and call the result wall-clock elapsed time.
+
 ## Pareto definition
 
 For candidate i, benefit b_i, upper cost vector c_i, and remaining budget B:
