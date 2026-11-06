@@ -323,8 +323,10 @@ pub fn evaluate_decision_regret<'a>(
     }
 
     let evpi_share_bps = if oracle_expected_numerator > 0 {
+        let probability_basis = i128::try_from(PROBABILITY_BPS)
+            .map_err(|_| DecisionRegretError::ArithmeticOverflow)?;
         let numerator = regret_expected_numerator
-            .checked_mul(i128::from(PROBABILITY_BPS))
+            .checked_mul(probability_basis)
             .ok_or(DecisionRegretError::ArithmeticOverflow)?;
         Some(
             u64::try_from(numerator / oracle_expected_numerator)
@@ -591,17 +593,13 @@ mod tests {
             Err(DecisionRegretError::ProbabilitiesDoNotSumToOne)
         );
 
+        let invalid_basis_outcomes = [
+            outcome("low", 5_000, 80, 100),
+            outcome("high", 5_000, 50, 70),
+        ];
         let invalid_basis = DecisionRegretInputs {
             network_topology_source_ref: "asset/limits/v1",
-            ..inputs(
-                &declared,
-                &decisions,
-                &[
-                    outcome("low", 5_000, 80, 100),
-                    outcome("high", 5_000, 50, 70),
-                ],
-                5_000,
-            )
+            ..inputs(&declared, &decisions, &invalid_basis_outcomes, 5_000)
         };
         assert_eq!(
             evaluate_decision_regret(invalid_basis),
