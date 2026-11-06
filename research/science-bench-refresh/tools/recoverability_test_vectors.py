@@ -270,7 +270,8 @@ def main() -> int:
             {unit["source_family_ref"] for unit in base["evidence_units"]}
         ),
         "metamorphic_controls": {
-            "partial_surface_all_not_evaluable": True,
+            "partial_surface_preserves_positive_and_blocks_negative": True,
+            "unknown_surface_all_not_evaluable": True,
             "lower_budget_never_improves": True,
             "added_direct_route_improves_unreachable_unit": True,
             "model_free_reference_classifier": True,
