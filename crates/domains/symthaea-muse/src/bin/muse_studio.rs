@@ -2757,6 +2757,7 @@ fn persist_keeper_bundle(
     wav: &[u8],
     recipe_bytes: &[u8],
     score_bytes: &[u8],
+    score: &Score,
     recipe_object_sha256: &str,
     spec: &CompositionSpec,
     seed: u64,
@@ -2779,11 +2780,7 @@ fn persist_keeper_bundle(
 
         let midi_path = staging.join("performance.mid");
         let midi_available = symthaea_muse::midi_export::export_performance_midi(
-            // The score used to create the WAV is the exact symbolic source
-            // whose canonical JSON bytes are bound in score.json.
-            &serde_json::from_slice::<Score>(score_bytes).map_err(|error| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, error)
-            })?,
+            score,
             spec,
             seed,
             state,
@@ -3124,6 +3121,7 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         &wav,
         &recipe_bytes,
         &score_bytes,
+        &score,
         &recipe_sha256,
         &spec,
         seed,
