@@ -1893,7 +1893,7 @@ pub fn render_synthetic_midi_v1(
     protected: Feature,
     event_tag: &[u8],
 ) -> Result<Vec<u8>, HarnessError> {
-    if target.dimension == protected.dimension || event_tag.len() > 64 {
+    if target.dimension == protected.dimension || event_tag.len() > 100 {
         return Err(HarnessError::InvalidTask);
     }
 
