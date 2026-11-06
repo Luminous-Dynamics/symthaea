@@ -198,17 +198,19 @@ Do not execute candidate code, open sealed holdouts, or claim causal validity fr
 
 ## 12. Research landscape and Symthaea's differentiator
 
-| Work | Established contribution | Symthaea extension |
+| Work | Current result / design (paper or project reported) | Symthaea extension and caveat |
 |---|---|---|
-| HyperAgents (Meta, 2026) | Makes the meta-improvement procedure editable and reports cross-domain improvement of meta-level behavior | Same-start matched budgets, intervention-level attribution, and independent confirmation |
-| RSIGym (2026) | Shared research infrastructure and Data / Harness / Joint optimization tracks | Separate known-suite gains from fresh-family transfer and parent/change-level causal effects |
-| RSI-Env (2026) | Persistent model/harness improvement with an independent Host Controller | Explicit causal variants, mechanism tests and cross-domain transfer of inherited changes |
-| RSIBench (2026) | Fixed-model harness RSI, frozen tasks/verifiers/budgets, rollback and keep-one ablation | Multi-parent interactions, clean transplant/rescue and learning-algorithm mechanisms |
-| SelfImprove-Bench (2026) | G0–G4 generalization-distance evaluation | Carry the ladder into software engineering, scientific research and algorithm design |
-| AI4AI-Bench (2026) | Direct training-algorithm design task suite | Audit-resistant clean-start replication and causal evidence for the actual changed learning computation |
-| FIRE-Bench (ICML 2026) | Execution-based rediscovery of established scientific insights | Separate rediscovery from novelty and use independent intervention/replication evidence |
-| AIDE² (2026) | Reports seven successive self-improvements in an autonomous 8-day run and transfer to four held-out benchmarks, including an out-of-distribution weather-forecasting task | Include as a close R4 baseline; independently test same-start budget parity, inherited mechanisms and replication |
-| METR Anthropic R&D assessment (2026-11-05) | Estimates 1.9× growth in Anthropic AECI benchmark capability since October 2025 (95% CI 1.5–2.8×); attributes much of the acceleration to AI-assisted R&D, while reporting no evidence yet of highly significant fully autonomous contributions to the most important training stages | Measure AI-assisted research productivity separately from autonomous recursive self-improvement |
+| Darwin Gödel Machine | Open-ended coding-agent self-modification with an archive of candidate variants | Do not claim novelty for self-editing or archive search; require fresh-family transfer, causality and independent confirmation |
+| HyperAgents (Meta, 2026) | Editable task agent and meta-agent in one self-referential program; reports meta-procedural improvement across coding, paper review, robotics reward design and proof grading | Same-start matched budgets, patch-level causal attribution, and independent confirmation are the differentiators—not editable meta-code alone |
+| RSIGym (2026) | Reports a leading RSI-Index of 0.4809 (Opus 5) across five benchmarks and a $500 platform-service budget per run; 29/30 Joint runs improve | Treat 0.4809 as a known-suite infrastructure result, not direct unseen-transfer evidence: final evaluations reuse development-available tasks, each configuration is run once, and researcher inference/official evaluation are billed separately |
+| RSI-Env (2026) | Persistent model/harness improvement with an independent Host Controller. Its Open-General Self setting reports GPQA Diamond 65.2→73.2 and AIME 2026 53.3→56.7; Knowledge Self reports SimpleQA 82→85→88 across updates | Measure cross-capability retention and task-family transfer under the same start and full cost boundary; published results are not independent Symthaea replications |
+| RSIBench (2026) | Fixed-model harness evolution over five rounds, 84 train and 84 test tasks across six domains; frozen verifiers/budgets and rollback/keep-one ablations | Strong harness-causality comparator; Symthaea adds multi-parent interaction, clean transplant/rescue and clean-start learning-algorithm mechanisms. RSIBench has no validation split, so reproduce its protocol but do not inherit that limitation for Symthaea's confirmatory design |
+| SelfImprove-Bench (2026) | G0–G4 generalization ladder across Exploring/Planning/Reasoning game scenarios; reports inconsistent transfer across levels | Carry the ladder into software engineering, scientific research and algorithm design; game-only transfer is not general R&D competence |
+| AI4AI-Bench (2026) | Ten training-algorithm repositories; paper reports mean 0.166 and best system 0.250, and method-changing submissions average 0.226 vs 0.126 for configuration-only changes | Useful algorithm-design starting point, but do not treat 0.250 as uncontested SOTA: an independent audit classified v1 as flawed, with score-changing defects in 4/10 tasks and final-test checkpoint selection; preserve paper and audit evidence as separate records |
+| Red Queen Gödel Machine (2026) | Co-evolves agents and evaluators using frozen utility within epochs and controlled evaluator changes at boundaries | #10708 already owns this paradigm; #10717 must consume its independent anchor/confirmation authority, not create a second evaluator |
+| AIDE² (2026) | Paper reports seven successive self-improvements in an autonomous eight-day run and transfer to four held-out benchmarks, including OOD weather forecasting | Close R4 comparator: reproduce same-start swaps, matched total resources, inherited meta-level changes, fresh-family transfer and independent replication |
+| FIRE-Bench (ICML 2026) | Execution-grounded rediscovery of documented scientific insights by designing/running experiments and comparing conclusions with published findings | Add it as a scientific-process/rediscovery baseline; rediscovery is not novelty, and LLM-judge prose quality is not enough |
+| METR Anthropic R&D assessment (2026-11-05) | Estimates 1.9× growth in Anthropic AECI benchmark capability since October 2025 (95% CI 1.5–2.8×); judges much of the acceleration likely AI-assisted while noting no highly significant fully autonomous contribution to the most important training stages yet | Measure AI-assisted R&D productivity separately from autonomous recursion; the estimate is high-uncertainty, benchmark-scoped and partly informed by redacted evidence |
 
 ### Human-supervised productivity is not autonomous RSI
 
@@ -228,9 +230,16 @@ Symthaea should not claim novelty for “an agent that edits itself,” “an ed
 
 ### External references
 
-- HyperAgents: https://arxiv.org/abs/2603.19461 and https://ai.meta.com/research/publications/hyperagents/
+- Darwin Gödel Machine: https://arxiv.org/abs/2505.22954
+- HyperAgents: https://ai.meta.com/research/publications/hyperagents/
 - RSIGym: https://arxiv.org/abs/2610.10310 and https://github.com/evolvent-ai/RSIGym
 - RSI-Env: https://arxiv.org/abs/2611.01736
+- RSIGym results and limitations: https://github.com/evolvent-ai/RSIGym
+- AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+- Independent AI4AI-Bench audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+- RSIBench protocol: https://harness-rsibench.com/docs/
+- Red Queen Gödel Machine: https://arxiv.org/abs/2606.26294
+- METR R&D acceleration assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
 - RSIBench protocol: https://harness-rsibench.com/docs/
 - SelfImprove-Bench: https://arxiv.org/abs/2611.02797
 - AI4AI-Bench: https://arxiv.org/abs/2608.20318
