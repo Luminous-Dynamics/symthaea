@@ -529,8 +529,44 @@ mod tests {
         duplicate[1] = duplicate[0];
         assert_eq!(classify_multi_threshold_constraints(&duplicate, &c), Err(MultiThresholdError::DuplicateActionConstraintInterval));
 
-        let unknown = [interval(99, 10, 0.8, 0.9)];
-        assert_eq!(classify_multi_threshold_constraints(&unknown, &c), Err(MultiThresholdError::IncompleteIntervalGrid));
+        let unknown_action = [
+            interval(99, 10, 0.8, 0.9),
+            interval(1, 20, 0.1, 0.2),
+            interval(2, 10, 0.2, 0.3),
+            interval(2, 20, 0.2, 0.4),
+            interval(3, 10, 0.6, 0.8),
+            interval(3, 20, 0.4, 0.5),
+        ];
+        assert_eq!(
+            classify_multi_threshold_constraints(&unknown_action, &c),
+            Err(MultiThresholdError::UnknownActionId)
+        );
+        let unknown_constraint = [
+            interval(1, 99, 0.8, 0.9),
+            interval(1, 20, 0.1, 0.2),
+            interval(2, 10, 0.2, 0.3),
+            interval(2, 20, 0.2, 0.4),
+            interval(3, 10, 0.6, 0.8),
+            interval(3, 20, 0.4, 0.5),
+        ];
+        assert_eq!(
+            classify_multi_threshold_constraints(&unknown_constraint, &c),
+            Err(MultiThresholdError::UnknownConstraintId)
+        );
+        assert_eq!(
+            classify_multi_threshold_constraints(&[], &MultiThresholdContract {
+                action_ids: vec![],
+                constraints: c.constraints.clone(),
+            }),
+            Err(MultiThresholdError::EmptyActionSet)
+        );
+        assert_eq!(
+            classify_multi_threshold_constraints(&[], &MultiThresholdContract {
+                action_ids: vec![1],
+                constraints: vec![],
+            }),
+            Err(MultiThresholdError::EmptyConstraintSet)
+        );
 
         let mut bad_threshold = c.clone();
         bad_threshold.constraints[0].threshold = f64::NAN;
