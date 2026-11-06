@@ -16,8 +16,6 @@ fn bundle_root_adapter_exports_public_contract() {
     > = rea_bundle_compat::verify_evidence_bundle_value;
     let _target_projection: fn(&Value, &str) -> Result<Value, rea_bundle_compat::BundleError> =
         rea_bundle_compat::evidence_bundle_for_target;
-    type ClosureAudit = fn(
-        &Value,
-    ) -> Result<Vec<(String, String)>, rea_bundle_compat::BundleError>;
+    type ClosureAudit = fn(&Value) -> Result<Vec<(String, String)>, rea_bundle_compat::BundleError>;
     let _closure_audit: ClosureAudit = rea_bundle_compat::audit_evidence_link_closure;
 }
