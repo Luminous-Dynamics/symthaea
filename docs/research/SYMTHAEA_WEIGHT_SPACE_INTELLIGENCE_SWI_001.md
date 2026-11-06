@@ -1,7 +1,7 @@
 # SWI-001: Symthaea Weight-Space Intelligence
 ## Research programme, implementation contract, and benchmark specification v0.1
 
-**Status:** Research programme approved for implementation; CfC weight-ingestion hardening, asynchronous-update rejection, a named-parameter manifest, typed named-group replacement, and content-addressed model fingerprints committed on the working branch.  
+**Status:** Research programme approved for implementation; CfC and HDC-LTC introspection, transactional weight editing, content-addressed fingerprints, corrected HDC-LTC local gradients, deterministic initialization, and bounded parameter inspection committed on the working branch.  
 **Branch:** research/swi-001-weight-space-introspection  
 **Base:** main at ed9d3462e73cd3d435c89f65fe4b5834f34bc184  
 **Scope:** weight-space programming (WSP), weight-space learning (WSL), architecture-aware introspection, controlled repair, and eventually staged substrate evolution.  
@@ -135,14 +135,14 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
 
-Thirteen tests were added across the CfC and async training modules: manifest/layout; architecture-versus-parameter fingerprint identity; typed-group replacement; stale model-digest rejection; duplicate batch rejection; atomic multi-group replacement; malformed/valid parameter loading; and valid/invalid asynchronous weight-swap handling. The new tests have not been executed here; do not describe them as passing until run on the exact branch head.
+Twenty-one tests were added across the CfC, HDC-LTC, and async training modules. They cover manifest/layout; model fingerprints; typed and transactional edits; malformed payloads; initialization scale/orthogonality; HDC parameter profiling and bounded windows; adaptive one-step gradient finite differences (including Fourier, gate, tau, input and state paths); local target updates; and valid/invalid asynchronous swaps. The tests have not been executed here; do not describe them as passing until run on the exact branch head.
 
 ### 4.2 HDC-LTC: novel representation-space target
 
 Relevant file:
 - crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
 
-The unified HDC-LTC neuron stores private hypervector parameters including:
+The unified HDC-LTC neuron stores hypervector parameters including:
 - weight_hv
 - input_mask
 - tau_modulator
@@ -150,9 +150,11 @@ The unified HDC-LTC neuron stores private hypervector parameters including:
 - gate_bias
 - momentum and running-statistic state
 
-It exposes closed-form evolution and Hebbian / contrastive learning updates. This is not a conventional dense tensor space. An SWI representation must preserve the semantics of binding, bundling, normalization, and state-dependent temporal behavior.
+It exposes closed-form evolution and Hebbian / contrastive updates, and now has one-step local gradients for its equilibrium, adaptive gate, cosine-based tau modulation, input, and pre-evolution state. These are **not temporal BPTT**. The core and standalone `symthaea-hdc-ltc` implementations have different scalar versus per-coordinate tau/gate semantics and should remain explicit variants until a shared mathematical specification exists.
 
-Do not flatten these hypervectors and pretend every coordinate has an independent neuron-level interpretation. The initial manifest should record the algebraic role, dimension, normalization contract, and binding position of each vector.
+SWI-001 now exposes `HdcLtcParameterGroupId`, `HdcLtcNeuronParameterProfile`, bounded read-only parameter windows, and a validated replacement API for the five learnable hypervectors. The profile reports dimension, norm, mean, variance, extrema, non-finite count, and saturation count. Genesis initialization is now normalized and orthogonalized to match the unit-norm seeded constructor.
+
+Do not flatten these hypervectors and pretend every coordinate has an independent neuron-level interpretation. The manifest/profile must record algebraic role, dimension, normalization contract, and binding position. See [SWI-002 Holographic Liquid Brain](./SYMTHAEA_HOLOGRAPHIC_LIQUID_BRAIN_SWI_002.md) for the full HDC/CfC architecture and benchmark programme.
 
 ### 4.3 Broca: projection parameters and metamorphic updates
 
@@ -516,8 +518,9 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 - Add no-edit, analytic, random, gradient, and oracle baselines.
 - Report confidence intervals and held-out results.
 
-### P3 — HDC-LTC and Broca manifests
-- Define HDC parameter-group roles and algebraic invariants.
+### P3 — extend architecture-aware editing
+- HDC-LTC now has typed parameter-group IDs, profiles, bounded windows, and validated replacement for its five learnable hypervectors.
+- Validate HDC local gradients against finite differences on the exact branch head.
 - Define typed Broca projection/expert group IDs.
 - Replace string target selection at the SWI boundary with typed selectors.
 - Add model-specific preservation suites.
@@ -599,4 +602,4 @@ This is a deliberately modest first experiment. It tests whether SWI has a genui
 
 ---
 
-**Decision:** proceed with SWI as a research programme, not as an unrestricted self-modification feature. The highest-value near-term contribution is a public, reproducible CfC fault-repair benchmark with architecture-aware manifests, transactional typed edits, and an independent verifier.
+**Decision:** proceed with SWI as a research programme, not as an unrestricted self-modification feature. The next decisive milestone is a reproducible CfC/HDC-LTC fault-and-dynamics benchmark with architecture-aware manifests, transactional typed edits, finite-difference verification, and an independent verifier.
