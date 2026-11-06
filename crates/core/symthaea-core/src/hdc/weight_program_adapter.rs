@@ -16,9 +16,8 @@ use crate::hdc::hdc_ltc_unified::{
     HdcLtcParameterEditError, HdcLtcParameterGroupId, HdcLtcUnifiedNeuron,
 };
 use crate::weight_space_program::{
-    ParameterGroupConstraints, ParameterGroupRole, ParameterGroupSnapshot,
-    WeightModelSnapshot, WeightProgram, WeightProgramError, WeightProgramReceipt,
-    WeightProgramTarget,
+    ParameterGroupConstraints, ParameterGroupRole, ParameterGroupSnapshot, WeightModelSnapshot,
+    WeightProgram, WeightProgramError, WeightProgramReceipt, WeightProgramTarget,
 };
 
 const HDC_GROUPS: [(HdcLtcParameterGroupId, &str); 5] = [
@@ -70,10 +69,7 @@ pub fn hdc_ltc_weight_model_snapshot(
 ) -> Result<WeightModelSnapshot, HdcLtcWeightProgramAdapterError> {
     let config_bytes = serde_json::to_vec(neuron.config())
         .map_err(|error| HdcLtcWeightProgramAdapterError::Fingerprint(error.to_string()))?;
-    let architecture_digest = domain_hash(
-        b"symthaea-hdc-ltc-architecture-v1\0",
-        &config_bytes,
-    );
+    let architecture_digest = domain_hash(b"symthaea-hdc-ltc-architecture-v1\0", &config_bytes);
 
     let manifest = HDC_GROUPS
         .iter()
@@ -180,9 +176,9 @@ fn domain_hash(domain: &[u8], payload: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hdc::hdc_ltc_unified::HdcLtcParameterGroupId;
     use crate::hdc::hdc_ltc_unified::UnifiedConfig;
     use crate::hdc::unified_hv::ContinuousHV;
-    use crate::hdc::hdc_ltc_unified::HdcLtcParameterGroupId;
     use crate::weight_space_program::WeightProgramOperation;
 
     fn digest(byte: char) -> String {
@@ -203,10 +199,7 @@ mod tests {
     fn hdc_ltc_candidate_is_detached_and_resets_ephemeral_state() {
         let mut source = neuron();
         source.set_state(ContinuousHV::from_values(vec![0.1; 64]));
-        source.evolve_closed_form(
-            0.05,
-            &ContinuousHV::from_values(vec![-0.2; 64]),
-        );
+        source.evolve_closed_form(0.05, &ContinuousHV::from_values(vec![-0.2; 64]));
         let source_stats_before = source.stats();
         let task_digest = digest('d');
         let snapshot =
@@ -237,26 +230,37 @@ mod tests {
             }],
         };
 
-        let candidate =
-            materialize_hdc_ltc_weight_program(&source, task_digest, &program)
-                .expect("isolated candidate");
+        let candidate = materialize_hdc_ltc_weight_program(&source, task_digest, &program)
+            .expect("isolated candidate");
         assert_eq!(
             hdc_ltc_weight_model_snapshot(&source, digest('d'))
                 .expect("source after edit")
                 .model_digest,
             snapshot.model_digest
         );
-        assert_ne!(candidate.candidate_model_digest, candidate.base_model_digest);
+        assert_ne!(
+            candidate.candidate_model_digest,
+            candidate.base_model_digest
+        );
         assert_eq!(source.stats().state_norm, source_stats_before.state_norm);
-        assert_eq!(source.stats().running_mean, source_stats_before.running_mean);
+        assert_eq!(
+            source.stats().running_mean,
+            source_stats_before.running_mean
+        );
         assert_eq!(candidate.neuron.stats().state_norm, 0.0);
         assert_eq!(candidate.neuron.stats().running_mean, 0.0);
         assert_eq!(candidate.neuron.stats().running_std, 1.0);
         assert_eq!(candidate.neuron.stats().total_time, 0.0);
         assert_eq!(candidate.neuron.stats().update_count, 0);
-        let edited = candidate.neuron.parameter_group(HdcLtcParameterGroupId::GateBias);
+        let edited = candidate
+            .neuron
+            .parameter_group(HdcLtcParameterGroupId::GateBias);
         assert!(
-            edited.values.iter().zip(original_values.iter()).any(|(a, b)| a != b)
+            edited
+                .values
+                .iter()
+                .zip(original_values.iter())
+                .any(|(a, b)| a != b)
         );
     }
 
@@ -293,8 +297,7 @@ mod tests {
     #[test]
     fn stale_task_digest_is_rejected() {
         let source = neuron();
-        let snapshot =
-            hdc_ltc_weight_model_snapshot(&source, digest('d')).expect("snapshot");
+        let snapshot = hdc_ltc_weight_model_snapshot(&source, digest('d')).expect("snapshot");
         let program = WeightProgram {
             format_version: 1,
             architecture_digest: snapshot.architecture_digest.clone(),
