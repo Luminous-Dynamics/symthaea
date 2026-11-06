@@ -1,0 +1,75 @@
+name: Question-specific connectome stopping contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_QUERY_SPECIFIC_STOPPING_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_QUERY_SPECIFIC_STOPPING.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_SPECIFIC_STOPPING.example.json"
+      - "tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_query_specific_connectome_stopping.py"
+      - ".github/workflows/connectome-query-specific-stopping.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_QUERY_SPECIFIC_STOPPING_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_QUERY_SPECIFIC_STOPPING.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_QUERY_SPECIFIC_STOPPING.example.json"
+      - "tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs"
+      - "tools/connectomics-intake-audit/reference/verify_query_specific_connectome_stopping.py"
+      - ".github/workflows/connectome-query-specific-stopping.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  question-specific-stopping:
+    name: Exact global and query-specific stopping audit
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and synthetic fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_QUERY_SPECIFIC_STOPPING.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_QUERY_SPECIFIC_STOPPING.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert fixture["preregistration"]["frozen_before_sampling"] is True
+          print("question-specific stopping Draft 2020-12 contract: PASS")
+          PY
+      - name: Check Rust formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_question_specific_stopping_audit -- -D warnings
+      - name: Run Rust known-answer and exactness tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_question_specific_stopping_audit
+      - name: Run Rust production stopping audit
+        run: |
+          cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_question_specific_stopping_audit -- \
+            --input docs/neuroscience/examples/CONNECTOME_QUERY_SPECIFIC_STOPPING.example.json \
+            --output "$RUNNER_TEMP/query-specific-stopping-report.json"
+      - name: Independently replay and compare the Rust report
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_query_specific_connectome_stopping.py
+          python3 tools/connectomics-intake-audit/reference/verify_query_specific_connectome_stopping.py --self-test
+          python3 tools/connectomics-intake-audit/reference/verify_query_specific_connectome_stopping.py \
+            docs/neuroscience/examples/CONNECTOME_QUERY_SPECIFIC_STOPPING.example.json \
+            --report "$RUNNER_TEMP/query-specific-stopping-report.json"
+          cat "$RUNNER_TEMP/query-specific-stopping-report.json"
