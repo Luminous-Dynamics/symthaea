@@ -49,7 +49,7 @@ jobs:
           jq empty tools/recoverability-validator/schema/recoverability-manifest-fields.schema.json
 
           python3 tools/recoverability-validator/tools/recoverability_test_vectors.py /tmp/recoverability-vectors
-          jq -e '.metamorphic_controls.post_retrieval_requires_prior_reformulation == true and .metamorphic_controls.reformulation_requires_prior_initial_retrieval == true and .metamorphic_controls.navigation_requires_prior_initial_retrieval == true and .metamorphic_controls.partial_surface_preserves_positive_routes_only == true and .metamorphic_controls.unknown_surface_all_not_evaluable == true' \
+          jq -e '.metamorphic_controls.post_retrieval_requires_prior_reformulation == true and .metamorphic_controls.reformulation_requires_prior_initial_retrieval == true and .metamorphic_controls.navigation_requires_prior_initial_retrieval == true and .metamorphic_controls.partial_surface_preserves_positive_routes_only == true and .metamorphic_controls.unknown_surface_all_not_evaluable == true and .metamorphic_controls.complete_inventory_requires_evidence_refs == true' \
             /tmp/recoverability-vectors/summary.json >/dev/null
 
           rust_commitment="$(cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
@@ -63,6 +63,8 @@ jobs:
             > /tmp/recoverability-vectors/valid-report.json
 
           jq -e '.valid == true and .manifest_commitment_matches == true and .model_free == true' \
+            /tmp/recoverability-vectors/valid-report.json >/dev/null
+          jq -e '.surface_completeness_evidence_refs == ["inventory-evidence:synthetic-complete-route-table-v1"]' \
             /tmp/recoverability-vectors/valid-report.json >/dev/null
           jq -e '.evidence_unit_count == 5 and .distinct_source_family_count == 4' \
             /tmp/recoverability-vectors/valid-report.json >/dev/null
@@ -78,6 +80,18 @@ jobs:
               route_edge_refs
             }] == $expected[0].expected_records
           ' /tmp/recoverability-vectors/valid-report.json >/dev/null
+
+          # A negative/unreachable label cannot rely on a bare complete-inventory boolean.
+          set +e
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/no-completeness-evidence-manifest.json \
+            > /tmp/recoverability-vectors/no-completeness-evidence-report.json \
+            2> /tmp/recoverability-vectors/no-completeness-evidence-stderr.txt
+          completeness_exit=$?
+          set -e
+          test "$completeness_exit" -eq 2
+          grep -q 'complete inventory requires at least one evaluator-side evidence reference' \
+            /tmp/recoverability-vectors/no-completeness-evidence-stderr.txt
 
           set +e
           cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
