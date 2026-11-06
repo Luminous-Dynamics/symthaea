@@ -59,6 +59,8 @@ These candidates are not a claim that six tasks are sufficient for the 48-task p
 **Canonical family:** `multi-crate-api-regression`.  
 **Provisional theme:** Rust API compatibility and type-system correctness.  
 **Provisional difficulty:** Medium.  
+**Public source-only fixture:** [`benchmarks/ceb/public-development-fixtures/rust-api-migration-v0/`](../../benchmarks/ceb/public-development-fixtures/rust-api-migration-v0/). The four-crate workspace has 10 files and is not compiled, tested or executed; it has no task manifest, reference patch, grader, Cargo.lock or admission status.
+
 **Synthetic workspace outline:**
 
 ```text
