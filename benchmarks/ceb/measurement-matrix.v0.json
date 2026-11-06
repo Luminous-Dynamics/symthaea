@@ -745,7 +745,10 @@
         "compiler_optimization_flags",
         "expert_reference_patch",
         "same_model_optimization_agent",
-        "CEB_profile_and_dependency_guided_optimizer"
+        "CEB_profile_and_dependency_guided_optimizer",
+        "known_input_memorization_negative_control",
+        "benchmark_harness_detection_negative_control",
+        "legitimate_cache_memoization_positive_control"
       ],
       "evidence_contract": {
         "required_artifacts": [
@@ -756,7 +759,12 @@
           "candidate_measurements",
           "statistical_analysis",
           "semantic_test_report",
-          "expert_patch_digest"
+          "expert_patch_digest",
+          "frozen_challenge_workload_distribution_digest",
+          "benchmark_harness_integrity_review",
+          "optimization_cache_semantics_test_evidence",
+          "unseen_input_generalization_results",
+          "optimization_integrity_adjudication"
         ],
         "independent_adjudication": true,
         "unresolved_state_required": true,
@@ -767,7 +775,11 @@
         "same_hardware_and_workload",
         "semantics_non_regression",
         "resource_and_cost_accounting",
-        "preregistered_measurement_noise_policy"
+        "preregistered_measurement_noise_policy",
+        "candidate must not detect benchmark invocation or alter, bypass or short-circuit the measurement harness",
+        "held-out inputs cover preregistered in-spec sizes and distributions not disclosed to the candidate",
+        "memoization and caching are accepted only when permitted by contract and correct under invalidation, collision, cold-start, unseen-input and resource controls",
+        "raw optimization measurements and integrity-adjudicated status must be reported separately"
       ],
       "holdout_design": "Repository, workload and bottleneck-family disjoint; hold out input sizes, data distributions and microarchitecture."
     },
