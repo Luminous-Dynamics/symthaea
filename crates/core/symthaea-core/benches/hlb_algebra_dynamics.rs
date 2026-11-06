@@ -11,8 +11,9 @@
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use symthaea_core::hdc::{
-    ContinuousHV, HDC_DIMENSION, HdcHrrRole, HdcLtcUnifiedNeuron, HdcStructuredMixer,
-    HdcStructuredMixerKind, UnifiedConfig, circular_convolution, circular_correlation,
+    ContinuousHV, HDC_DIMENSION, HdcHrrCleanupPolicy, HdcHrrCodebook, HdcHrrRole,
+    HdcLtcUnifiedNeuron, HdcStructuredMixer, HdcStructuredMixerKind, UnifiedConfig,
+    circular_convolution, circular_correlation,
 };
 
 fn bench_hdc_algebra(c: &mut Criterion) {
@@ -83,7 +84,7 @@ fn bench_hdc_algebra(c: &mut Criterion) {
             BenchmarkId::new("hrr_general_correlation", dimension),
             &dimension,
             |b, _| {
-                b.iter(|| black_box(circular_correlation(black_box(&bound), black_box(&hrr_role.vector())).unwrap()))
+                b.iter(|| black_box(circular_correlation(black_box(&bound), black_box(hrr_role.vector())).unwrap()))
             },
         );
     }
@@ -171,20 +172,17 @@ fn bench_hrr_record_retrieval(c: &mut Criterion) {
         for (role, filler) in roles.iter().zip(fillers.iter()) {
             record = record.add(&role.bind(filler).unwrap());
         }
+        let codebook = HdcHrrCodebook::new(fillers.clone()).unwrap();
+        let policy = HdcHrrCleanupPolicy::new(0.0, 0.0);
 
         group.bench_with_input(
-            BenchmarkId::new("unbind_and_codebook_search", load),
+            BenchmarkId::new("unbind_and_confidence_cleanup", load),
             &load,
             |b, _| {
                 b.iter(|| {
                     let decoded = roles[0].unbind(black_box(&record)).unwrap();
-                    let best = fillers
-                        .iter()
-                        .enumerate()
-                        .map(|(index, candidate)| (index, decoded.similarity(candidate)))
-                        .max_by(|left, right| left.1.total_cmp(&right.1))
-                        .unwrap();
-                    black_box(best)
+                    let result = codebook.cleanup(black_box(&decoded), policy).unwrap();
+                    black_box((result.index, result.similarity, result.margin, result.accepted))
                 })
             },
         );
