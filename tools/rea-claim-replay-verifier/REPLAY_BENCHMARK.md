@@ -23,6 +23,8 @@ The production evaluator runs once before timing to create a valid serialized re
 
 Each cell performs three warmup iterations followed by the requested number of samples (default: 50). It reports nearest-rank p50/p95/p99, minimum and maximum nanoseconds. It emits one JSON receipt to stdout.
 
+For a fast CI wiring/schema smoke, invoke the binary with `--smoke`. This executes all 12 cells with one measured sample and zero warmups. It verifies that every workload is admissible, every replay returns `ReplayMatch`, and the three-stage receipt is well-formed; it is **not** a performance measurement and must not be compared across revisions. Normal runs omit the flag or pass a positive sample count and retain three warmups.
+
 ## Reproducible run
 
 From the repository root:
