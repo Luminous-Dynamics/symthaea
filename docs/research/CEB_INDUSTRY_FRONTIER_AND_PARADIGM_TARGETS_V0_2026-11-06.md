@@ -146,6 +146,16 @@ Google Research's 2026 taxonomy synthesizes **91 sets of developer-defined agent
 
 **CEB implication:** use these categories as a content-validity cross-check for the existing #10637/#10640 collaboration protocol. Map each episode to a concrete behavior and observable consequence—authority compliance, process adherence, correction integration, factual handoff or reviewer burden. Do not create a new rubric registry or claim population validity from 15 interviews alone.
 
+### 2.19 Agentic coding needs proactivity, not just autonomy
+
+Google Research's 2026 paper argues that coding agents should be evaluated not only by their ability to act autonomously, but by their **insight policy**: what they notice, what evidence supports it, whether to surface it to a human, and how they adapt after feedback. It distinguishes three behavior levels—Reactive, Scheduled and Situation-Aware—and sketches an active-user-simulation protocol with three proposed constructs: Insight Decision Quality (IDQ), Context Grounding Score (CGS) and Learning Lift (LL). This is a research proposal and taxonomy, not yet a broadly validated engineering benchmark or a CEB result. [Bui and Evangelopoulos, Google Research (2026)](https://research.google/pubs/agentic-coding-needs-proactivity-not-just-autonomy/)
+
+**CEB implication:** operationalize proactivity as a policy for allocating scarce human attention, not as message frequency or extra autonomous actions. A CEB agent should decide whether to surface, defer, bundle, ask, prepare a reversible proposal or remain silent. The existing CEB portfolio already owns the relevant evidence and authority primitives: #10630/#10631 continuity, #10637/#10640 collaboration, #10612/#10613 selective escalation, #9112 decision-use validity, #10173 repository change impact and #10610/#10611 release lifecycle. New work should compose these contracts rather than add an insight store or scheduler.
+
+A fair experiment should compare reactive-only, scheduled digest, transparent severity/recency heuristics, unconstrained model-only proactivity, evidence-aware proactivity, and evidence-aware proactivity with feedback adaptation. Use identical event streams, source visibility, user preferences, horizons and total resource budgets. Include positive signals and no-op, irrelevant, stale, already-resolved, contradictory, defer/mute and authority-boundary cases. Measure actionable insight using existing CEB blocker/question/continuity/collaboration outcomes, while separately accounting for compute, human interruption, duplicate alerts, false alarms, missed consequential signals and reviewer reconstruction effort. Do not adopt IDQ/CGS/LL as new CEB primary metrics until a measurement review establishes operational definitions and proves the existing matrix cannot express the required outcomes.
+
+The next runner-independent work is tracked in [#10727 — evidence-grounded proactive engineering insights](https://github.com/Luminous-Dynamics/symthaea/issues/10727). It is design-only and explicitly includes consent, preference, interruption and authority safeguards.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -159,6 +169,7 @@ Google Research's 2026 taxonomy synthesizes **91 sets of developer-defined agent
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
 | Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
+| Proactive coding-agent behavior | Google Research's Reactive / Scheduled / Situation-Aware taxonomy and proposed IDQ / CGS / LL constructs | Evidence-grounded insight surfacing, timing, defer/silence decisions, feedback adaptation and interruption cost, mapped to existing CEB-HUMAN / CONTINUITY / COLLAB outcomes |
 | SWE-Marathon | Multi-hour, project-scale engineering across 20 tasks | Durable multi-milestone correctness, selective evidence refresh and human-effort accounting |
 | Rust-SWE-bench | Rust-specific repository repair across 500 tasks / 34 repositories; type/trait semantics and issue reproduction | Matched CEB ablations for repository understanding, type/trait reasoning, causal reproduction and evidence continuity |
 | SWE-bench-Live | Continuously refreshed tasks across languages, repositories and operating systems | Task-admission quality, license/contamination disclosure, stable release denominators and evidence lifecycle |
@@ -230,6 +241,10 @@ Treat task provenance, contamination, oracle validity, denominators, environment
 ### Shift 10 — From one task horizon to a multi-horizon engineering ecology
 
 One-shot issue repair, multi-hour projects and multi-release maintenance are different experimental horizons. A benchmark should not treat one as a proxy for the others. CEB should build nested comparisons where a common set of declared invariants is tested at three horizons: (a) patch-level repair, (b) project-scale integration, and (c) sequential evolution with changing dependencies, configurations and policies. The same claim/evidence contracts should travel across the horizons, while cost and task-native outcomes remain separately reported. This is an experimental composition over existing lanes, not a new lane or composite score.
+
+### Shift 11 — From autonomy to bounded, evidence-grounded proactivity
+
+Autonomy asks whether an agent can act without step-by-step direction. Proactivity asks whether it can notice something useful before being asked, ground that insight in current evidence, choose the right time and channel, adapt to feedback, and remain silent when the expected value is low. The scarce resource is human attention, not agent message throughput. Evaluate reactive, scheduled and situation-aware policies under matched event streams and total cost; include no-op events, deferred/muted notifications, false alarms, missed urgent signals and authority-boundary controls. Reuse #10727 and the existing continuity, collaboration and escalation contracts; do not create a new CEB metric lane, notification scheduler or user-memory system.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
@@ -346,6 +361,8 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 **The honest present claim:** CEB has a more developed design for evaluating engineering evidence, continuity and collaboration. It has not yet demonstrated that Symthaea outperforms any industry system on these dimensions.
 
 ## 10. Sources and comparison notes
+
+- Bui and Evangelopoulos, [Agentic Coding Needs Proactivity, Not Just Autonomy](https://research.google/pubs/agentic-coding-needs-proactivity-not-just-autonomy/), Google Research, 2026 (to appear).
 
 - Microsoft Research, [CRBugBench: (When) Should a Software Factory be Lights-off?](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/), October 2026; [arXiv:2610.13668](https://arxiv.org/abs/2610.13668).
 - PREreview, [review of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026 (reviewer summary of human/agent complementarity and a proposed, not tested, skeptical second-reviewer arm).
