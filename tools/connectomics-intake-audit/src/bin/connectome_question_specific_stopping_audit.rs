@@ -560,9 +560,10 @@ fn evaluate_case(case: &Case, frame: &SamplingFrame) -> Result<CaseResult, Strin
     } else {
         "QUERY_UNRESOLVED"
     };
-    let joint = if query_status == "QUERY_ROBUST_WITHIN_DECLARED_FRAME" {
-        query_status
-    } else if query_status == "FRAME_INCOMPLETE" || query_status == "NOT_ESTIMABLE" {
+    let joint = if matches!(
+        query_status,
+        "QUERY_ROBUST_WITHIN_DECLARED_FRAME" | "FRAME_INCOMPLETE" | "NOT_ESTIMABLE"
+    ) {
         query_status
     } else if global_snapshot.is_some() {
         "GLOBAL_ONLY"
