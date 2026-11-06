@@ -52,12 +52,12 @@ chain length and order relation were unchanged. The cause was selecting a
 linear extension by coordinate time (t=(u+v)/2), which is not invariant
 under boosts.
 
-The Rust implementation was corrected to sort by lexicographic ((u,v,id)).
-This is a linear extension of the null-coordinate partial order and is
-preserved under positive rescalings (u\mapsto a u), (v\mapsto b v),
-including Lorentz boosts. The regression test now checks rapidities
-(-1.7,-0.4,0,0.7,1.7) for related-pair count, ordering fraction and the
-selected maximum-chain IDs.
+The Rust implementation was corrected to sort by lexicographic (u,v,id).
+The optimized pair counter and chain reconstruction both use that ordering.
+It is preserved under positive rescalings u -> a*u, v -> b*v, including
+Lorentz boosts. The regression test now checks rapidities -1.7, -0.4, 0,
+0.7 and 1.7 for related-pair count, ordering fraction and selected maximum
+chain IDs.
 
 ## What these results do and do not establish
 
