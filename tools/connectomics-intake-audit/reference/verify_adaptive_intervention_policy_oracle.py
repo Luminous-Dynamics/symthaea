@@ -173,6 +173,42 @@ def solve_adaptive(worlds: list[dict], nuisance: list[dict], actions: list[dict]
     return (None if result is None else {'worst_case_effort_units': result[0], 'policy_tree': result[1]}), len(memo_states)
 
 
+def verify_policy_tree(node: dict, states: tuple[tuple[str, str], ...], used: tuple[str, ...], world_by_id: dict, action_by_id: dict, outcomes: dict) -> int:
+    decisions = {world_by_id[world_id]["query_decision"] for world_id, _nuisance_id in states}
+    require(node.get("node_kind") in {"STOP", "INTERVENE"}, "policy node has unknown kind")
+    if node["node_kind"] == "STOP":
+        require(len(decisions) == 1, "STOP leaf retains opposite-query biological worlds")
+        require(node.get("query_decision") == next(iter(decisions)), "STOP leaf declares the wrong query decision")
+        require(node.get("remaining_world_ids") == sorted({world_id for world_id, _nuisance_id in states}), "STOP leaf world set is incorrect")
+        require(node.get("remaining_latent_state_count") == len(states), "STOP leaf latent-state count is incorrect")
+        return 0
+
+    action_id = node.get("action_id")
+    require(action_id in action_by_id, "policy references an unknown action")
+    action = action_by_id[action_id]
+    require(action["feasibility_status"] == FEASIBLE, "policy uses an infeasible action")
+    require(action_id not in used, "policy repeats an intervention on one path")
+    expected_branches: dict[str, list[tuple[str, str]]] = {}
+    for state in states:
+        expected_branches.setdefault(outcomes[state][action_id], []).append(state)
+    actual_branches = node.get("branches")
+    require(isinstance(actual_branches, list), "intervention node branches are not an array")
+    actual_by_outcome = {row.get("outcome_id"): row.get("child") for row in actual_branches}
+    require(len(actual_by_outcome) == len(actual_branches), "policy repeats an outcome branch")
+    require(set(actual_by_outcome) == set(expected_branches), "policy has missing or unsupported outcome branches")
+    next_used = tuple(sorted((*used, action_id)))
+    child_costs = []
+    for outcome_id in sorted(expected_branches):
+        child_states = tuple(sorted(expected_branches[outcome_id]))
+        child_costs.append(
+            verify_policy_tree(actual_by_outcome[outcome_id], child_states, next_used, world_by_id, action_by_id, outcomes)
+        )
+    exact_cost = action["effort_units"] + max(child_costs, default=0)
+    require(node.get("effort_units") == action["effort_units"], "policy action cost differs from the frozen action set")
+    require(node.get("worst_case_subtree_effort_units") == exact_cost, "policy subtree cost is incorrect")
+    return exact_cost
+
+
 def solve_fixed(worlds: list[dict], nuisance: list[dict], actions: list[dict], outcomes: dict) -> dict | None:
     world_by_id = {row['world_id']: row for row in worlds}
     feasible = sorted((row for row in actions if row['feasibility_status'] == FEASIBLE), key=lambda row: row['action_id'])
@@ -212,6 +248,14 @@ def build_report(raw: bytes, data: dict) -> dict:
             'claim_scope': 'synthetic_known_truth',
         }
     fixed = solve_fixed(worlds, nuisance, actions, outcomes)
+    if adaptive is not None:
+        state_set = tuple(sorted((world["world_id"], nuisance_row["nuisance_model_id"]) for world in worlds for nuisance_row in nuisance))
+        world_by_id = {world["world_id"]: world for world in worlds}
+        action_by_id = {action["action_id"]: action for action in actions}
+        replayed_cost = verify_policy_tree(
+            adaptive["policy_tree"], state_set, tuple(), world_by_id, action_by_id, outcomes
+        )
+        require(replayed_cost == adaptive["worst_case_effort_units"], "independent policy-tree replay cost differs from optimizer cost")
     adaptive_cost = None if adaptive is None else adaptive['worst_case_effort_units']
     fixed_cost = None if fixed is None else fixed['minimum_effort_units']
     savings = None if adaptive_cost is None or fixed_cost is None else fixed_cost - adaptive_cost
@@ -309,6 +353,62 @@ def self_test(fixtures: list[Path]) -> None:
         pass
     else:
         raise AssertionError('infeasible screening action was incorrectly retained in the expected policy')
+
+    # Row order must not change the canonical set digests or exact optima.
+    permuted = json.loads(json.dumps(data))
+    for field in ("worlds", "nuisance_models", "actions", "potential_outcomes"):
+        permuted[field].reverse()
+    permuted_report = build_report(json.dumps(permuted).encode(), permuted)
+    for field in (
+        "world_set_sha256",
+        "nuisance_set_sha256",
+        "action_set_sha256",
+        "potential_outcome_table_sha256",
+        "adaptive_worst_case_effort_units",
+        "fixed_minimum_effort_units",
+        "adaptive_root_action_id",
+    ):
+        require(permuted_report[field] == reports[0][field], f"row permutation changed {field}")
+
+    # A cheap but disallowed perfect action must not enter either optimum.
+    decoy = json.loads(json.dumps(data))
+    decoy_action = {
+        "action_id": "perfect-decoy",
+        "intervention_kind": "SIMULATED",
+        "effort_units": 1,
+        "feasibility_status": "DISALLOWED",
+        "feasibility_receipt_sha256": "d" * 64,
+        "safety_profile_sha256": "e" * 64,
+    }
+    decoy["actions"].append(decoy_action)
+    for potential in decoy["potential_outcomes"]:
+        potential["observations"].append({
+            "action_id": "perfect-decoy",
+            "outcome_id": "decoy-" + potential["world_id"] + "-" + potential["nuisance_model_id"],
+        })
+    decoy_report = build_report(json.dumps(decoy).encode(), decoy)
+    require(decoy_report["adaptive_worst_case_effort_units"] == 3, "disallowed action changed adaptive optimum")
+    require(decoy_report["fixed_minimum_effort_units"] == 4, "disallowed action changed fixed optimum")
+    require("perfect-decoy" not in decoy_report["fixed_action_ids"], "fixed plan used a disallowed action")
+
+    # Increasing one action cost cannot reduce either exact optimum.
+    more_expensive = json.loads(json.dumps(data))
+    next(row for row in more_expensive["actions"] if row["action_id"] == "resolve-a")["effort_units"] += 3
+    w2, n2, a2, o2 = validate_input(more_expensive)
+    adaptive2, _count2 = solve_adaptive(
+        w2, n2, a2, o2, more_expensive["search_limits"]["max_memo_states"], more_expensive["search_limits"]["max_policy_depth"]
+    )
+    fixed2 = solve_fixed(w2, n2, a2, o2)
+    require(adaptive2 is not None and adaptive2["worst_case_effort_units"] >= reports[0]["adaptive_worst_case_effort_units"], "increasing an action cost lowered adaptive optimum")
+    require(fixed2 is not None and fixed2["minimum_effort_units"] >= reports[0]["fixed_minimum_effort_units"], "increasing an action cost lowered fixed optimum")
+
+    # A deliberately exhausted state budget is incomplete, never exact or no-policy.
+    capped = json.loads(json.dumps(data))
+    capped["search_limits"]["max_memo_states"] = 1
+    capped_raw = json.dumps(capped).encode()
+    capped_report = build_report(capped_raw, capped)
+    require(capped_report["status"] == "INCOMPLETE_SEARCH_BUDGET_EXCEEDED", "exhausted search budget was not fail-closed")
+    require(capped_report["search_complete"] is False, "exhausted search was marked complete")
 
     broken = json.loads(json.dumps(data))
     broken['potential_outcomes'][0]['observations'][0]['outcome_id'] = 'invented-outcome'
