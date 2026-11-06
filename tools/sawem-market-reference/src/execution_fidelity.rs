@@ -889,7 +889,9 @@ fn trace_add_u128(total: u128, value: u128) -> Result<u128, TraceBackedExecution
 }
 
 fn trace_add_i128(total: i128, value: i128) -> Result<i128, TraceBackedExecutionError> {
-    total.checked_add(value).ok_or(TraceBackedExecutionError::ArithmeticOverflow)
+    total
+        .checked_add(value)
+        .ok_or(TraceBackedExecutionError::ArithmeticOverflow)
 }
 
 /// Reconcile a full ordered schedule from raw meter traces. Shared source files
@@ -1474,10 +1476,26 @@ mod trace_backed_tests {
             sample("b-end", 7_300, 1_000_000),
         ];
         let duplicate = [
-            item("tp-a", "schedule-a", "meter/day-file", &samples_a, 100, 3_700, 900_000,
-                Some(settlement("settle-a", "settlement/same", 10, 3_720))),
-            item("tp-b", "schedule-b", "meter/day-file", &samples_b, 3_700, 7_300, 1_100_000,
-                Some(settlement("settle-b", "settlement/same", 20, 7_320))),
+            item(
+                "tp-a",
+                "schedule-a",
+                "meter/day-file",
+                &samples_a,
+                100,
+                3_700,
+                900_000,
+                Some(settlement("settle-a", "settlement/same", 10, 3_720)),
+            ),
+            item(
+                "tp-b",
+                "schedule-b",
+                "meter/day-file",
+                &samples_b,
+                3_700,
+                7_300,
+                1_100_000,
+                Some(settlement("settle-b", "settlement/same", 20, 7_320)),
+            ),
         ];
         assert_eq!(
             evaluate_trace_backed_execution(TraceBackedExecutionInputs {
@@ -1490,11 +1508,20 @@ mod trace_backed_tests {
             Err(TraceBackedExecutionError::DuplicateSettlementSourceReference)
         );
 
-        let incomplete = [sample("b-mid", 4_000, 1_000_000), sample("b-end", 7_300, 1_000_000)];
-        let intervals = [
-            item("tp-b", "schedule-b", "meter/day-file", &incomplete, 3_700, 7_300, 1_100_000,
-                Some(settlement("settle-b", "settlement/b", 20, 7_320))),
+        let incomplete = [
+            sample("b-mid", 4_000, 1_000_000),
+            sample("b-end", 7_300, 1_000_000),
         ];
+        let intervals = [item(
+            "tp-b",
+            "schedule-b",
+            "meter/day-file",
+            &incomplete,
+            3_700,
+            7_300,
+            1_100_000,
+            Some(settlement("settle-b", "settlement/b", 20, 7_320)),
+        )];
         assert_eq!(
             evaluate_trace_backed_execution(TraceBackedExecutionInputs {
                 scenario_id: "golden/settle-incomplete",
@@ -1507,4 +1534,3 @@ mod trace_backed_tests {
         );
     }
 }
-
