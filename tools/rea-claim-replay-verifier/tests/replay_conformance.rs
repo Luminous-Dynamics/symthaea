@@ -25,11 +25,38 @@ fn frozen_oracle_corpus_has_independent_expected_labels() {
         corpus["provenance"]["authored_independently_of_production_evaluator"],
         json!(true)
     );
-    assert_eq!(
-        corpus["cases"].as_array().unwrap().len(),
-        23,
-        "the frozen public seed has exactly 23 independently labeled cases"
-    );
+    let actual_ids: Vec<&str> = corpus["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|case| case["id"].as_str().unwrap())
+        .collect();
+    let expected_ids = vec![
+        "basic-provider-report-support",
+        "jcs-number-42-equals-42-point-0",
+        "numeric-near-miss-42-point-0001",
+        "same-scope-disagreement",
+        "wrong-subject-digest",
+        "wrong-operation",
+        "platform-version-not-represented",
+        "referenced-evidence-missing",
+        "producer-authenticity-rule-unimplemented",
+        "unverified-assumption-present",
+        "forged-disposition-with-valid-shaped-digest",
+        "changed-falsification-condition-old-result",
+        "duplicate-key-in-nested-asserted-value",
+        "missing-nullable-result-provider-version",
+        "unknown-result-field",
+        "duplicate-evidence-record-input",
+        "unreferenced-evidence-input",
+        "jcs-equivalent-result-reencoding",
+        "malformed-requested-result-evidence-id",
+        "unrequested-result-assessment-id",
+        "duplicate-result-assessment-id",
+        "unrequested-missing-result-evidence-id",
+        "evidence-id-marked-assessed-and-missing",
+    ];
+    assert_eq!(actual_ids, expected_ids, "the frozen 23-case oracle ID set and order are part of the public contract");
 }
 
 fn fixture_bytes() -> &'static [u8] {
@@ -283,6 +310,7 @@ fn changed_request_cannot_reuse_an_old_result() {
 
 #[test]
 fn duplicate_json_keys_are_rejected_recursively_in_claims_and_results() {
+    assert_eq!(oracle_label("duplicate-key-in-nested-asserted-value", "expected_replay_outcome"), "invalid_input");
     let raw_claim = br#"{
         "schema":"luminous.rea.claim.v0",
         "claim_id":"c1",
@@ -313,6 +341,7 @@ fn duplicate_json_keys_are_rejected_recursively_in_claims_and_results() {
 
 #[test]
 fn omitted_nullable_result_field_is_not_silently_defaulted() {
+    assert_eq!(oracle_label("missing-nullable-result-provider-version", "expected_replay_outcome"), "invalid_input");
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
@@ -329,6 +358,7 @@ fn omitted_nullable_result_field_is_not_silently_defaulted() {
 
 #[test]
 fn unreferenced_evidence_is_not_silently_added_to_the_replay_set() {
+    assert_eq!(oracle_label("unreferenced-evidence-input", "expected_replay_outcome"), "invalid_input");
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
@@ -424,6 +454,7 @@ fn recorded_assumptions_cannot_make_a_claim_supported() {
 
 #[test]
 fn result_schema_and_rule_version_mutations_are_rejected_before_replay() {
+    assert_eq!(oracle_label("unknown-result-field", "expected_replay_outcome"), "invalid_input");
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
@@ -445,6 +476,7 @@ fn result_schema_and_rule_version_mutations_are_rejected_before_replay() {
 
 #[test]
 fn duplicate_evidence_input_is_rejected_even_when_both_records_are_valid() {
+    assert_eq!(oracle_label("duplicate-evidence-record-input", "expected_replay_outcome"), "invalid_input");
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
@@ -460,6 +492,7 @@ fn duplicate_evidence_input_is_rejected_even_when_both_records_are_valid() {
 
 #[test]
 fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
+    assert_eq!(oracle_label("jcs-equivalent-result-reencoding", "expected_replay_outcome"), "replay_match");
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
