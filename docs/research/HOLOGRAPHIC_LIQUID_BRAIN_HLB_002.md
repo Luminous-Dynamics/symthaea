@@ -349,7 +349,7 @@ No SOTA claim until a common benchmark, strong baselines, and reproducible artif
 
 The HDC/CfC neuron now has an initial first-class SWI parameter surface on this branch: `HdcLtcParameterManifest`, typed group IDs and roles, exact flattened parameter values, BLAKE3 architecture/manifest/parameter/model fingerprints, digest-bound typed group replacement, and transactional batch application. The setter validates exact length, finite values, destination-vector dimensions, and the per-group norm bound before mutation; successful edits reset stale W/U momentum.
 
-This is a first introspection/edit boundary, not a complete proof-carrying evolution system. The tests for manifest layout, fingerprinting, group edits, stale digests, invalid norm, wrong lengths, duplicate targets, and batch rollback have been added but have not been run. The neuron should only become a trusted SWI substrate once the actual gradient and algebraic-invariant tests pass on the exact head.
+This is a first introspection/edit boundary, not a complete proof-carrying evolution system. The tests for manifest layout, fingerprinting, group edits, stale digests, invalid norm, wrong lengths, duplicate targets, batch rollback, optimizer updates across all five groups, and finite-difference gradients have been added but have not been run. The neuron should only become a trusted SWI substrate once the actual gradient and algebraic-invariant tests pass on the exact head.
 
 The HDC-specific SWI manifest records:
 - typed group identity and mathematical role;
