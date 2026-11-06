@@ -1,0 +1,422 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-query-discriminating-intervention-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_binding": {
+    "dataset_id": "synthetic-connectome-world-fixture",
+    "dataset_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "species": "synthetic",
+    "evidence_tier": "SYNTHETIC",
+    "same_specimen_registration": false,
+    "source_access_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "query": {
+    "query_id": "does-critical-path-exist",
+    "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "decision_rule_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "baseline_decision": true,
+    "loss_false_true": 1,
+    "loss_true_false": 1
+  },
+  "worlds": [
+    {
+      "world_id": "H-PLUS",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true,
+      "prior_probability": 0.1
+    },
+    {
+      "world_id": "H-MINUS",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false,
+      "prior_probability": 0.1
+    },
+    {
+      "world_id": "H-SAME",
+      "graph_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true,
+      "prior_probability": 0.8
+    }
+  ],
+  "nuisance_models": [
+    {
+      "nuisance_model_id": "nominal",
+      "model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observation_model_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "description": "Nominal response gain and indicator kernel."
+    },
+    {
+      "nuisance_model_id": "indicator-saturation",
+      "model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "description": "Saturation nuisance collapses the cheap-confounded response classes."
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "intervention_kind": "SIMULATED",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "safety_profile_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "intervention_kind": "optogenetic",
+      "cost_units": 0.5,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "safety_profile_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "intervention_kind": "ELECTRICAL",
+      "cost_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "safety_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "intervention_kind": "SIMULATED",
+      "cost_units": 0.1,
+      "feasibility_status": "DISALLOWED",
+      "feasibility_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "safety_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "predictions": [
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "high-eig-irrelevant",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "cheap-confounded",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-robust",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "nominal",
+      "trajectory_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "observations": [
+        {
+          "outcome_id": "Z",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "world_id": "H-PLUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observations": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "world_id": "H-MINUS",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observations": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "world_id": "H-SAME",
+      "nuisance_model_id": "indicator-saturation",
+      "trajectory_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observations": [
+        {
+          "outcome_id": "Z",
+          "probability": 1
+        }
+      ]
+    }
+  ],
+  "split_manifest": {
+    "split_unit": "synthetic_unit",
+    "train_units": [
+      "synthetic-unit-train-01"
+    ],
+    "validation_units": [
+      "synthetic-unit-validation-01"
+    ],
+    "lockbox_units": [
+      "synthetic-unit-lockbox-01"
+    ],
+    "split_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "selection_objective": "WORST_CASE_EXPECTED_POSTERIOR_0_1_LOSS_REDUCTION_PER_COST",
+  "oracle_expectations": {
+    "baseline_expected_query_loss": 0.1,
+    "worst_case_expected_posterior_query_loss": {
+      "high-eig-irrelevant": 0.1,
+      "cheap-confounded": 0.1,
+      "orthogonal-robust": 0,
+      "infeasible-perfect": 0
+    },
+    "worst_case_eig_bits": {
+      "high-eig-irrelevant": 0.7219280948873623,
+      "cheap-confounded": 0,
+      "orthogonal-robust": 0.4689955935892812,
+      "infeasible-perfect": 0.9219280948873623
+    },
+    "decision_value_per_cost": {
+      "high-eig-irrelevant": 0,
+      "cheap-confounded": 0,
+      "orthogonal-robust": 0.05,
+      "infeasible-perfect": 1
+    },
+    "expected_selected_intervention_id": "orthogonal-robust",
+    "expected_entropy_greedy_intervention_id": "high-eig-irrelevant"
+  }
+}
