@@ -706,7 +706,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
     )?
     .qualified;
-    eprintln!("authority_scope,valid_event,{valid}");
+    eeprintln!("authority_scope,valid_event,{valid}");
     let mut qualified = usize::from(valid);
     let mut rejected = 0usize;
 
@@ -719,7 +719,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         150,
     );
     let passed = wrong_source.is_err();
-    println!("authority_scope,cross_event_rejected,{passed}");
+    eprintln!("authority_scope,cross_event_rejected,{passed}");
     if passed {
         rejected += 1;
     } else {
@@ -736,7 +736,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         150,
     );
     let passed = stale_sequence.is_err();
-    println!("authority_scope,stale_sequence_rejected,{passed}");
+    eprintln!("authority_scope,stale_sequence_rejected,{passed}");
     if passed {
         rejected += 1;
     } else {
@@ -747,7 +747,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
     let wrong_clock =
         validate_partner_authority_event(&event, &observation, 7, "different-clock-origin", 150);
     let passed = wrong_clock.is_err();
-    println!("authority_scope,clock_origin_rejected,{passed}");
+    eprintln!("authority_scope,clock_origin_rejected,{passed}");
     if passed {
         rejected += 1;
     } else {
@@ -762,7 +762,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         99,
     );
     let passed = not_effective.is_err();
-    println!("authority_scope,not_yet_effective_rejected,{passed}");
+    eprintln!("authority_scope,not_yet_effective_rejected,{passed}");
     if passed {
         rejected += 1;
     } else {
@@ -777,7 +777,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         200,
     );
     let passed = expired.is_err();
-    println!("authority_scope,expired_rejected,{passed}");
+    eprintln!("authority_scope,expired_rejected,{passed}");
     if passed {
         rejected += 1;
     } else {
@@ -793,7 +793,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         150,
     );
     let passed = missing_receipt.is_err();
-    println!("authority_scope,missing_receipt_rejected,{passed}");
+    eprintln!("authority_scope,missing_receipt_rejected,{passed}");
     if passed {
         rejected += 1;
     } else {
