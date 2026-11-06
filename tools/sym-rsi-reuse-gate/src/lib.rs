@@ -118,16 +118,13 @@ mod adaptive_null_simulation {
 
             match decision {
                 ReuseRoundDecision::RejectAll => last_decision = 0,
-                ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
-                | ReuseRoundDecision::PromoteCandidate { candidate_number: 2 } => {
+                ReuseRoundDecision::PromoteCandidate { candidate_number } => {
+                    assert!((1..=CANDIDATES_PER_ROUND).contains(&candidate_number));
                     // Every candidate is population-neutral, so every
                     // promotion in this simulation is false by construction.
                     any_false_promotion = true;
                     prior_promotions += 1;
-                    last_decision = decision.candidate_number();
-                }
-                ReuseRoundDecision::PromoteCandidate { candidate_number } => {
-                    panic!("unexpected candidate index {candidate_number}");
+                    last_decision = candidate_number;
                 }
             }
         }
@@ -168,14 +165,11 @@ mod adaptive_null_simulation {
 
             match decision {
                 ReuseRoundDecision::RejectAll => last_decision = 0,
-                ReuseRoundDecision::PromoteCandidate { candidate_number: 1 }
-                | ReuseRoundDecision::PromoteCandidate { candidate_number: 2 } => {
+                ReuseRoundDecision::PromoteCandidate { candidate_number } => {
+                    assert!((1..=CANDIDATES_PER_ROUND).contains(&candidate_number));
                     any_false_promotion = true;
                     prior_promotions += 1;
-                    last_decision = decision.candidate_number();
-                }
-                ReuseRoundDecision::PromoteCandidate { candidate_number } => {
-                    panic!("unexpected candidate index {candidate_number}");
+                    last_decision = candidate_number;
                 }
             }
         }
