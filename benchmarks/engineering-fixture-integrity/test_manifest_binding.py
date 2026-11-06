@@ -160,7 +160,7 @@ class ManifestBindingTests(unittest.TestCase):
             variant["artifact"] = "cad/outside-link.step"
             variant["sha256"] = digest(b"outside artifact")
             self.write_manifest()
-            with self.assertRaisesRegex(AUDIT.AuditError, "Path escapes package root"):
+            with self.assertRaisesRegex(AUDIT.AuditError, "Symlinked package path forbidden"):
                 AUDIT.load_manifest_subjects(self.root)
         finally:
             if link.is_symlink():
