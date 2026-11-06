@@ -148,6 +148,40 @@ The intended combination is: prospective action selection evaluates the expected
 
 Future work should provide a canonical digest-construction helper over native manifests/configuration (the present function requires callers to supply a digest), add correlated Gaussian priors/posteriors, and prove numerical stability against Cholesky-based reference calculations. Only then should the operator become part of an FEP model-structure adapter.
 
+### 2.3.2 Dirichlet BMR for categorical active-inference models
+
+The diagonal-Gaussian BMR primitive above is appropriate only when the reduced hypotheses are Gaussian-prior restrictions over one shared continuous parameterization. It is **not** the correct conjugate BMR primitive for categorical likelihood tensors such as the three-ball task.
+
+A separate implementation now exists in `crates/core/symthaea-fep/src/dirichlet_model_reduction.rs`. For full prior concentrations \\(a_0\\), full posterior concentrations \\(a\\), and reduced prior concentrations \\(a_m^0\\), the reduced posterior is
+
+\\[
+a_m = a + a_m^0 - a_0
+\\]
+
+For independent categorical likelihood columns, the log evidence ratio is
+
+\\[
+\\log \\frac{p(D\\mid m)}{p(D\\mid M)}
+= \\sum_j
+\\left[
+\\log B(a_{0,j}) + \\log B(a_{m,j})
+- \\log B(a_j) - \\log B(a^0_{m,j})
+\\right]
+\\]
+
+where \\(B\\) is the multivariate beta function. The implementation accumulates these log ratios across columns, incorporates prior model probabilities in log space, and returns posterior model probabilities, entropy, and winner-to-runner-up log odds.
+
+**Contract and boundary:**
+- Full posterior, full prior, and every reduced prior must carry the same 64-character parameterization digest, binding the ordered likelihood columns, factor dimensions, outcome order, and coordinates.
+- All concentrations must be finite and strictly positive. Exact-zero concentrations define a support-restricted / point-mass structure rather than an ordinary proper Dirichlet. That requires a separate explicit structural-support representation; this implementation rejects zeros and negatives instead of pretending they are proper Dirichlets.
+- Reduced posterior concentrations must remain strictly positive. If the data accumulated under the full model make a proposed reduction non-integrable, the candidate is rejected.
+- Independent columns factorize exactly. Correlated or hierarchical Dirichlet structures are outside the present implementation.
+- The Gaussian and Dirichlet BMR modules are complementary primitives, not interchangeable approximations.
+
+Tests include the exact Beta-Binomial evidence ratio for a Beta(1,1) full prior and Beta(2,1) reduced prior (reduced/full evidence ratio \\(4/3\\)), additivity across independent likelihood columns, model-prior odds, ordered-parameterization binding, and negative controls for zero concentrations and incompatible reduced posteriors.
+
+This is the appropriate BMR substrate for the [2026 three-ball active structure-learning paper](https://doi.org/10.1038/s41467-026-77209-5), whose categorical likelihood parameters are represented by Dirichlet counts. It remains a primitive: the complete POMDP, policy evaluator, model-space construction, and prospective model expected-information-gain adapter are not yet wired into Symthaea's production selector.
+
 ### 2.4 WSP must pass exact-protocol replication, not headline comparison
 
 An important reproducibility update appeared on 6 November 2026. The independent [OpenWSP replication](https://github.com/openwsp/openwsp) reports that its recorded live Experiment 8 edit scored **12.9% on MATH-500**, versus the MIT authors' reported 48.1% and OpenWSP's local calibration of the released edit at 50.6%. OpenWSP reports that 84.25% of its live MATH-500 generations hit the token limit, and that its live evaluation used four samples per problem while the local calibration used one. GSM8K and IFEval were still pending in that repository snapshot.
@@ -317,24 +351,30 @@ Compare raw flattened-weight inspection, activation-probe alignment, permutation
 **Executable anchor now present on this branch:** `src/dynamics/cfc/weight_program_adapter.rs::consistent_hidden_unit_permutation_preserves_cfc_function` materializes the equivalence-preserving permutation through the actual `WeightProgram → materialize_cfc_weight_program → cloned SWI candidate` path. It checks that the native fingerprint changes while a four-step temporal probe sequence remains equivalent. The paired partial-permutation negative control changes only the input-projection rows and must change the output sequence. The fixture is intentionally narrow: one small, one-layer, no-backbone CfC network. It validates one exact symmetry family, not arbitrary multi-layer/backbone transformations or an alignment algorithm.
 
 
-### F. Partial-observation rule discovery
+### F. Partial-observation rule discovery: the three-ball reproduction target
 
-Add a three-ball-style rule-discovery task with hidden object attributes, competing rule/likelihood mappings, and restricted observations. The agent must choose which object/outcome to inspect before it can know the latent scene or rule. This gives the new state-, parameter-, and model-structure information terms a concrete active-reasoning test rather than treating them as abstract metrics.
+Use Friston et al. (2026), [*Active inference and artificial reasoning*](https://doi.org/10.1038/s41467-026-77209-5), as a bounded model-structure learning benchmark. The exact task includes:
 
-Friston et al. (2026) use a three-ball paradigm to illustrate active sampling for rule discovery. Their paper explicitly assumes a known generative-model family and focuses on selecting observations that distinguish its candidate likelihood mappings; it does not solve general perception-to-world-model construction or arbitrary ARC-style reasoning. Symthaea should preserve that limitation.
+- Five latent factors: the colours of left, centre, and right balls (red/green/blue each); a controllable gaze location (start/left/centre/right); and a controllable choice (no-choice/red/blue/green).
+- Two outcome modalities: vision (nothing/red/green/blue) and feedback (no-feedback/correct/incorrect).
+- Gaze and choice are action-controlled; ball colours are sampled randomly at trial start. Each trial permits six decision time points.
+- Feedback preferences are softmax([0, 2, -6]) nats in the order no-feedback/correct/incorrect.
+- The planted context-dependent rule maps centre-ball red to the left ball, green to the centre ball, and blue to the right ball as the criterion for the correct colour choice.
+- The symmetry-constrained candidate model family contains 81 mappings (79 unique after degeneracies), with rule 65 as the planted ground truth.
+- Crucially, the generative model is assumed known except for the feedback likelihood tensor. The paper evaluates active selection among candidate rule structures; it does **not** solve perception-to-world-model construction or unconstrained ARC-style rule invention.
 
-The paper's concrete rule is: if the centre ball is green, choose green; if the centre is red, choose the colour of the left ball; if the centre is blue, choose the colour of the right ball. The agent only sees the colour of a ball after foveating its location, so it must choose where to look as well as which colour to report. Feedback is correct or incorrect, with a no-response option. The stated prior log probabilities for (no feedback, correct, incorrect) are (0, 2, -6) nats. Under the paper's symmetry-constrained rule family, the candidate likelihood space contains 81 models; the fully observed state/response combination count is 3×3×3×4 = 108. These concrete facts anchor our reproduction/adaptation, but the exact generative-model tensor layout, Dirichlet priors, policy horizon, and all supplement-specific numerical settings still need a line-by-line transcription before we label a run an exact reproduction.
+The paper reports model commitment when the winning model's log-odds crosses 16 nats in its illustrative setup. Treat this as a reproduction metric, not a universal confidence threshold. Report both time to threshold and false-commitment rate under alternative planted rules and prior misspecification.
 
-Two evaluation tracks must remain separate:
+Two tracks remain separate:
 
-1. **Exact reproduction:** transcribe and independently verify the paper/supplement's state space, rule set, observation and outcome likelihoods, action constraints, preference distribution, horizon, and model-commitment stopping rule. Record the source/supplement revision and all choices.
-2. **Task adaptation:** any modified ball count, rule family, feedback mapping, preference, or observation mechanism must be labelled an adaptation, not a reproduction.
+1. **Exact reproduction:** independently verify the state factors, observation/feedback likelihoods, transition structure, candidate model-generation algorithm, Dirichlet prior counts, action horizon, preference vector, and selection rule from the paper and supplement. Pin the source/supplement revision and all implementation choices.
+2. **Task adaptation:** any change to factors, outcomes, ball count, rule family, preferences, horizon, likelihood model, or hypothesis-space constraints must be labelled an adaptation.
 
-Primary outcomes: rule-identification accuracy, trials to model selection, model-choice Brier score, decision regret, and observation cost. Diagnostics: prospective information gain at state/parameter/model levels, realized model-entropy reduction, BMR log-evidence ratios, posterior model odds, and the trial at which the selection threshold is crossed.
+Primary outcomes: ground-truth rule posterior probability, rule-identification accuracy, trials to 16-nat model log-odds, model-choice Brier score, decision regret, and observation cost. Diagnostics: state/parameter/model-structure information gain, realized model-entropy reduction, Dirichlet BMR log evidence, posterior winner/runner-up odds, false commitment, and calibration under prior misspecification.
 
-Compare random legal observation, reward-greedy without model information, state-only and parameter-only information policies, hierarchical model EIG, and an analysis-only oracle. Keep rewards, observation cost, action availability, and horizon identical across ablations. The model-information channel-off control must remove model-disambiguating information without changing preferences or the reward channel.
+The categorical likelihood BMR baseline must use the Dirichlet primitive in `crates/core/symthaea-fep/src/dirichlet_model_reduction.rs`, not the diagonal-Gaussian BMR primitive. Compare random legal observation, reward/pragmatic-greedy without model information, state-only and parameter-only information policies, hierarchical model EIG with Dirichlet BMR, and an analysis-only oracle. Keep preferences, observation cost, legal actions, model priors, and horizon identical across ablations.
 
-BMR is evaluated **after** an observation updates the posterior. It must not be added directly to prospective expected information gain or pragmatic value. Report whether the posterior is exact or variational, and whether the reduced models share the same parameterization.
+BMR is evaluated after evidence updates the full-model Dirichlet posterior. It must not be added directly to prospective expected information gain or pragmatic value. The state/parameter/model information terms remain separate and their chain rule must be checked.
 
 ## 6. Baselines and fairness requirements
 
