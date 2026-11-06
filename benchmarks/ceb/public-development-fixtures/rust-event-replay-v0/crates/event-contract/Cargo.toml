@@ -1,0 +1,5 @@
+[package]
+name = "ceb-event-replay-contract"
+version = "0.1.0"
+edition = "2021"
+publish = false
