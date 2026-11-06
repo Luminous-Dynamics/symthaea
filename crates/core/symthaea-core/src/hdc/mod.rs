@@ -564,7 +564,8 @@ pub use structured_mixer::{
     HdcStructuredMixer, HdcStructuredMixerError, HdcStructuredMixerKind,
 };
 pub use hrr::{
-    circular_convolution, circular_correlation, HdcHrrError, HdcHrrRole,
+    circular_convolution, circular_correlation, HdcHrrCleanupPolicy,
+    HdcHrrCleanupResult, HdcHrrCodebook, HdcHrrError, HdcHrrRole,
 };
 
 // Re-export configuration types (dimension unification)
