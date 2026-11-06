@@ -1,6 +1,6 @@
 # REA claim replay fuzz qualification
 
-This is a standalone cargo-fuzz workspace. It is not a production dependency and does not change claim evaluation semantics.
+This is a standalone fuzz support crate with a nested cargo-fuzz workspace under fuzz/. Neither is a production dependency, and neither changes claim evaluation semantics.
 
 ## Targets
 
@@ -9,6 +9,8 @@ This is a standalone cargo-fuzz workspace. It is not a production dependency and
 - framed_replay: parses a small ASCII length-framed envelope and invokes the full replay API with bounded request, result and Evidence slices.
 
 ## Frame format
+
+Run the cargo-fuzz targets from tools/rea-claim-replay-fuzz; cargo-fuzz reads the manifest at fuzz/Cargo.toml. The support crate at the package root owns the deterministic frame parser and its unit tests.
 
 The framed target accepts:
 
