@@ -68,6 +68,7 @@ The objective is not to reproduce every market optimizer. The objective is to qu
 | NREL SAM | Detailed PV/storage performance and front-of-meter financial modelling. | Qualify technology assumptions, degradation, replacement, cash-flow lineage and model applicability. |
 | NREL REopt | Techno-economic sizing/dispatch and resilience/cost optimisation for sites, campuses, communities and microgrids. | Extend the underwriting evidence graph across contracts, participant rights, grid capacity, collateral and financing. |
 | PyPSA / GridPath | Transparent, inspectable energy-system and network optimisation formulations. | Use as open reference formulations and independent feasibility comparators where the model boundary matches. |
+| Supagrid market replay / bidding research | Empirical rebid-family analysis, battery-vs-AEMO-forecast baselines, and a price-impact-adjusted hindsight ceiling across 45 NEM batteries. | Treat price-taking and price-making results separately; test market-model fidelity, own-price effects, location/contract stratification and matched policy results. |
 
 Primary vendor references:
 - PLEXOS August 2026 product update: https://www.energyexemplar.com/product-news/whats-new-august-2026
@@ -167,6 +168,27 @@ The new `paired_policy_comparison.rs` module is the competitive-evaluation count
 It reports exact candidate-minus-comparator expected net cash, probability that the candidate wins, probability that the comparator wins, tie probability, worst/best paired delta and lower-tail delta VaR/CVaR. A positive delta favours the candidate; a negative tail CVaR identifies a downside that an average-value comparison can hide.
 
 This is an evaluation adapter contract, not an external-engine runner. PLEXOS, Chronos, HOMER, SAM, PyPSA and GridPath have not yet been executed or scored through this module. The benchmark case `PAIRED-POLICY-COMPARISON-001` has four synthetic known-answer/negative-control tests. No vendor superiority or real project value improvement is claimed.
+
+### Price-taking is not price-making: model the battery's own market impact
+
+The new `market_impact_attribution.rs` module separates two revenue calculations for a submitted policy: value at an exogenous reference-price path, and value at a policy-specific market-clearing price path. It reports the own-price-impact adjustment and compares candidate/comparator only when both use the same scenario, evaluation timestamp, horizon, Trading Period census, reference-price records/availability vintages and exact market-impact model build. The policy-specific clearing prices must come from an external market replay; this module does not solve market clearing, estimate elasticity or assume every BESS is a price-maker.
+
+This distinction is not theoretical. Supagrid's September 2026 analysis examined 9.7 million NEM battery rebids and a year of results for 45 batteries. Its public methodology reports that 34/45 earned more from energy than a simple AEMO-forecast-following baseline. It also found battery self-price impact changed the median comparison against a naive perfect-information ceiling: the score rose from 69% to 77% when the ceiling was adjusted for price impact. The study says price impact was reconstructed without network effects inside a region and reports that contracts/hedges and other asset obligations were not visible in its public data. These are **NEM-specific research findings**, not universal battery performance figures and not SAWEM parameters.
+
+A peer-reviewed 2025 paper independently formulates price-maker storage bidding as a bi-level problem with decision-dependent price uncertainty; this reinforces that a price-making model is a different modelling class from a price-taking arbitrage optimizer. For fair benchmarking, compare in four distinct layers:
+1. a predeclared forecast-following / rule-based implementable baseline;
+2. a price-taking perfect-information upper bound (clearly labelled non-implementable);
+3. a price-impact-adjusted upper bound using the same exogenous demand, rival offers and network assumptions; and
+4. a paired comparison of two implementable policies on the same simulator, scenarios and source frontier.
+
+Report reference-price revenue, impact-adjusted revenue, own-price impact, network/region sensitivity, contract/hedge exclusions and uncertainty separately. Do not attribute a price gap to the bidding algorithm when it can be explained by location, network congestion, contract obligations or the market-impact model.
+
+Benchmark case: `MARKET-PRICE-IMPACT-001`. The six synthetic tests verify signed export/import revenue, negative-price charging, equal reference-price path and availability-vintage matching, fixed simulator identity and temporal completeness. Real price-maker replay and SAWEM field measurement remain `not_run`.
+
+Sources:
+- Supagrid, *The machines that bid our batteries* (September 2026): https://www.supagrid.com.au/research/machines-that-bid-our-batteries
+- Garcia & Martinez, *Optimal bidding strategy for price maker battery energy storage systems in energy and regulation reserves markets*, Electric Power Systems Research 242 (2025), article 111461: https://doi.org/10.1016/j.epsr.2025.111461
+- Prakash, Bruce & MacGill, *The scheduling role of future pricing information in electricity markets with rising deployments of energy storage*, Energy Economics 142 (2025), article 108191: https://doi.org/10.1016/j.eneco.2025.108191
 
 ### Non-anticipative policy regret and EVPI
 
