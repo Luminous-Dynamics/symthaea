@@ -331,7 +331,7 @@ fn omitted_nullable_result_field_is_not_silently_defaulted() {
 fn unreferenced_evidence_is_not_silently_added_to_the_replay_set() {
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
-    let (claim_bytes, result_bytes) = produce(&claim, &[evidence.clone()]);
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
 
     let mut unrelated = evidence.value.clone();
     unrelated["provider"]["id"] = json!("unreferenced-provider");
