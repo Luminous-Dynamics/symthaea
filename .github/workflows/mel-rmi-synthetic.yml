@@ -38,6 +38,7 @@ jobs:
           set -euo pipefail
           staged="$RUNNER_TEMP/mel-rmi-synthetic"
           mkdir -p "$staged/src" "$staged/examples"
+          cp tools/mel-rmi-synthetic/src/statistics.rs "$staged/src/statistics.rs"
           cp tools/mel-rmi-synthetic/Cargo.toml "$staged/Cargo.toml"
           cp tools/mel-rmi-synthetic/Cargo.lock "$staged/Cargo.lock"
           cp tools/mel-rmi-synthetic/src/lib.rs "$staged/src/lib.rs"
