@@ -17,6 +17,7 @@ pub mod credit_cover;
 pub mod decision_regret;
 pub mod execution_fidelity;
 pub mod forecast_metrics;
+pub mod forecast_skill;
 pub mod intraday_gate;
 pub mod liquidity_options;
 pub mod liquidity_stress;
