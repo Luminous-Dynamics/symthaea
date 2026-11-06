@@ -30,7 +30,8 @@
       "evaluator rule generation and rule identifier",
       "subject and generic closure claim identities",
       "operation and represented environment",
-      "ordered premises and assumptions through full request digest"
+      "ordered premises and assumptions through full request digest",
+      "exact optional platform and platform-version identity; no absent-versus-present scope collapse"
     ],
     "descriptors": {
       "confidence": [
@@ -51,6 +52,13 @@
   },
   "theorem_targets": [
     "provider_observation_support_binds_full_request",
+    "changed_claim_digest_cannot_support",
+    "changed_request_schema_cannot_support",
+    "changed_result_schema_cannot_support",
+    "changed_rule_generation_cannot_support",
+    "changed_platform_cannot_support",
+    "changed_platform_version_cannot_support",
+    "changed_environment_cannot_support",
     "provider_observation_is_a_distinct_evidence_class",
     "provider_observation_support_has_exact_predicate",
     "provider_observation_cannot_promote_to_other_predicate",
