@@ -368,14 +368,15 @@ pub fn compute_recoverability_manifest_commitment(
 
 fn reconstruct_route(
     start: &SearchState,
-    mut current: &SearchState,
+    target: &SearchState,
     predecessors: &BTreeMap<SearchState, (SearchState, String)>,
 ) -> Option<Vec<String>> {
     let mut edge_refs = Vec::new();
-    while current != start {
-        let (previous, edge_ref) = predecessors.get(current)?;
+    let mut current = target.clone();
+    while &current != start {
+        let (previous, edge_ref) = predecessors.get(&current)?;
         edge_refs.push(edge_ref.clone());
-        current = previous;
+        current = previous.clone();
     }
     edge_refs.reverse();
     Some(edge_refs)
