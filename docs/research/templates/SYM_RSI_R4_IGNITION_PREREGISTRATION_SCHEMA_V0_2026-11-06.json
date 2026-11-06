@@ -427,6 +427,66 @@
         },
         "failure_accounting": {
           "type": "string"
+        },
+        "shared_envelope_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "same_envelope_for_all_arms": {
+          "const": true
+        },
+        "inclusive_cost_boundary": {
+          "const": true
+        },
+        "includes_failed_invalid_retries": {
+          "const": true
+        },
+        "includes_human_review_and_rework": {
+          "const": true
+        },
+        "arm_budget_bindings": {
+          "type": "object",
+          "properties": {
+            "evolved_outer_loop": {
+              "type": "object",
+              "properties": {
+                "envelope_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "inclusive": {
+                  "const": true
+                }
+              },
+              "required": [
+                "envelope_digest",
+                "inclusive"
+              ],
+              "additionalProperties": false
+            },
+            "reference_outer_loop": {
+              "type": "object",
+              "properties": {
+                "envelope_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "inclusive": {
+                  "const": true
+                }
+              },
+              "required": [
+                "envelope_digest",
+                "inclusive"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "evolved_outer_loop",
+            "reference_outer_loop"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -434,7 +494,13 @@
         "total_budget",
         "currency_and_price_basis",
         "per_arm_caps",
-        "failure_accounting"
+        "failure_accounting",
+        "shared_envelope_digest",
+        "same_envelope_for_all_arms",
+        "inclusive_cost_boundary",
+        "includes_failed_invalid_retries",
+        "includes_human_review_and_rework",
+        "arm_budget_bindings"
       ],
       "additionalProperties": false
     },
@@ -590,6 +656,37 @@
             "reviewer"
           ],
           "additionalProperties": false
+        },
+        "disjointness_audit": {
+          "type": "object",
+          "properties": {
+            "overlap_unit": {
+              "const": "task_instance_id_and_task_family_id"
+            },
+            "expected_overlap_count": {
+              "const": 0
+            },
+            "audit_method_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "independent_auditor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "overlap_unit",
+            "expected_overlap_count",
+            "audit_method_digest",
+            "independent_auditor",
+            "evidence_ref"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -597,7 +694,8 @@
         "validation",
         "sealed_confirmation",
         "fresh_family_transfer",
-        "access_audit"
+        "access_audit",
+        "disjointness_audit"
       ],
       "additionalProperties": false
     },
@@ -642,6 +740,10 @@
         },
         "all_trajectories_retained": {
           "type": "boolean"
+        },
+        "minimum_complete_outer_cycles": {
+          "type": "integer",
+          "minimum": 2
         }
       },
       "required": [
@@ -653,7 +755,8 @@
         "confirmatory_power_or_precision_analysis_ref",
         "randomization_plan_digest",
         "independent_full_loop_reruns_required",
-        "all_trajectories_retained"
+        "all_trajectories_retained",
+        "minimum_complete_outer_cycles"
       ],
       "additionalProperties": false
     },
@@ -890,6 +993,46 @@
         "limitations_and_unidentified_effects_required"
       ],
       "additionalProperties": false
+    },
+    "evaluator_binding": {
+      "type": "object",
+      "properties": {
+        "implementation_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "task_contract_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "epoch_manifest_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "shared_across_arms": {
+          "const": true
+        },
+        "candidate_write_access": {
+          "const": false
+        },
+        "confirmation_material_write_access": {
+          "const": false
+        }
+      },
+      "required": [
+        "implementation_digest",
+        "configuration_digest",
+        "task_contract_digest",
+        "epoch_manifest_digest",
+        "shared_across_arms",
+        "candidate_write_access",
+        "confirmation_material_write_access"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -910,7 +1053,8 @@
     "controls",
     "analysis_plan",
     "governance",
-    "reporting"
+    "reporting",
+    "evaluator_binding"
   ],
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema",
