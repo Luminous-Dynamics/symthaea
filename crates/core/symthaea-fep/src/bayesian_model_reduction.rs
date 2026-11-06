@@ -118,7 +118,10 @@ impl std::fmt::Display for BayesianModelReductionError {
                 f,
                 "{distribution} has mean length {mean_len} and variance length {variance_len}; expected {expected}"
             ),
-            Self::NonFiniteMean { distribution, index } => {
+            Self::NonFiniteMean {
+                distribution,
+                index,
+            } => {
                 write!(f, "{distribution} mean at index {index} is non-finite")
             }
             Self::InvalidVariance {
@@ -201,9 +204,7 @@ pub fn reduce_models(
                 model.model_id.clone(),
             ));
         }
-        if !model.prior_probability.is_finite()
-            || !(0.0..=1.0).contains(&model.prior_probability)
-        {
+        if !model.prior_probability.is_finite() || !(0.0..=1.0).contains(&model.prior_probability) {
             return Err(BayesianModelReductionError::InvalidModelPrior {
                 model_id: model.model_id.clone(),
                 probability: model.prior_probability,
@@ -213,9 +214,7 @@ pub fn reduce_models(
         validate_gaussian(&model.parameter_prior, "reduced prior", dimension)?;
     }
     if (prior_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(BayesianModelReductionError::ModelPriorMassNotNormalized {
-            sum: prior_sum,
-        });
+        return Err(BayesianModelReductionError::ModelPriorMassNotNormalized { sum: prior_sum });
     }
 
     let mut log_weights = Vec::with_capacity(reduced_models.len());
@@ -270,20 +269,21 @@ pub fn reduce_models(
         .copied()
         .skip(1)
         .find(|index| posterior[*index] > 0.0);
-    let log_posterior_odds_over_runner_up = runner_up.map(|runner_index| {
-        log_weights[best_index] - log_weights[runner_index]
-    });
+    let log_posterior_odds_over_runner_up =
+        runner_up.map(|runner_index| log_weights[best_index] - log_weights[runner_index]);
 
     let models = reduced_models
         .iter()
         .zip(log_evidence_ratios.iter().copied())
         .zip(posterior.iter().copied())
-        .map(|((model, log_evidence_ratio), posterior_probability)| ReducedModelEvidence {
-            model_id: model.model_id.clone(),
-            prior_probability: model.prior_probability,
-            log_evidence_ratio,
-            posterior_probability,
-        })
+        .map(
+            |((model, log_evidence_ratio), posterior_probability)| ReducedModelEvidence {
+                model_id: model.model_id.clone(),
+                prior_probability: model.prior_probability,
+                log_evidence_ratio,
+                posterior_probability,
+            },
+        )
         .collect();
 
     Ok(BayesianModelReductionResult {
@@ -334,11 +334,9 @@ fn diagonal_gaussian_log_evidence_ratio(
             });
         }
 
-        let constant = 0.5 * (v0.ln() - vr.ln())
-            - (mq - mr).powi(2) * (0.5 * inverse_reduced)
+        let constant = 0.5 * (v0.ln() - vr.ln()) - (mq - mr).powi(2) * (0.5 * inverse_reduced)
             + (mq - m0).powi(2) * (0.5 * inverse_full);
-        let contribution = constant - 0.5 * denominator.ln()
-            + 0.5 * vq * b.powi(2) / denominator;
+        let contribution = constant - 0.5 * denominator.ln() + 0.5 * vq * b.powi(2) / denominator;
         if !contribution.is_finite() {
             return Err(BayesianModelReductionError::NonFiniteEvidenceRatio {
                 model_id: model_id.to_owned(),
@@ -361,9 +359,7 @@ fn validate_gaussian(
     distribution: &'static str,
     expected_dimension: usize,
 ) -> Result<(), BayesianModelReductionError> {
-    if gaussian.mean.len() != expected_dimension
-        || gaussian.variance.len() != expected_dimension
-    {
+    if gaussian.mean.len() != expected_dimension || gaussian.variance.len() != expected_dimension {
         return Err(BayesianModelReductionError::ParameterDimensionMismatch {
             distribution,
             mean_len: gaussian.mean.len(),
@@ -373,7 +369,10 @@ fn validate_gaussian(
     }
     for (index, mean) in gaussian.mean.iter().copied().enumerate() {
         if !mean.is_finite() {
-            return Err(BayesianModelReductionError::NonFiniteMean { distribution, index });
+            return Err(BayesianModelReductionError::NonFiniteMean {
+                distribution,
+                index,
+            });
         }
     }
     for (index, variance) in gaussian.variance.iter().copied().enumerate() {
@@ -434,9 +433,7 @@ mod tests {
         )
         .expect("integrable Gaussian ratio");
         // Reference value independently checked by numerical integration.
-        assert!(
-            (result.models[0].log_evidence_ratio - 0.3500401567802551).abs() < 1e-11
-        );
+        assert!((result.models[0].log_evidence_ratio - 0.3500401567802551).abs() < 1e-11);
     }
 
     #[test]
@@ -502,8 +499,7 @@ mod tests {
             }],
         )
         .expect("second coordinate");
-        let expected =
-            first.models[0].log_evidence_ratio + second.models[0].log_evidence_ratio;
+        let expected = first.models[0].log_evidence_ratio + second.models[0].log_evidence_ratio;
         assert!((both.models[0].log_evidence_ratio - expected).abs() < 1e-12);
     }
 
@@ -604,8 +600,7 @@ mod tests {
         )
         .expect("permuted coordinate order");
         assert!(
-            (result_a.models[0].log_evidence_ratio - result_b.models[0].log_evidence_ratio)
-                .abs()
+            (result_a.models[0].log_evidence_ratio - result_b.models[0].log_evidence_ratio).abs()
                 < 1e-12
         );
     }
