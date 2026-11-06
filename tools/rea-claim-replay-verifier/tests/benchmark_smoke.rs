@@ -44,8 +44,7 @@ fn benchmark_smoke_emits_all_workload_cells_and_three_distinct_operations() {
 
         for operation in ["admission", "producer_evaluation", "independent_replay"] {
             assert_eq!(
-                scenario[operation]["sample_count"],
-                1,
+                scenario[operation]["sample_count"], 1,
                 "{operation} must report the requested sample count"
             );
             for percentile in ["p50_ns", "p95_ns", "p99_ns", "min_ns", "max_ns"] {
