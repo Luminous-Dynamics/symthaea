@@ -91,6 +91,7 @@ pub enum UnderwritingCertificateError {
     EvidenceKnownAfterDecision,
     EvaluatorReceiptMissing,
     QualifiedClaimWithoutEvidence,
+    ConditionalClaimWithoutEvidence,
     ConditionalClaimWithoutCondition,
     ClaimOutsideValidityWindow,
     ReceiptDigestInvalid,
@@ -267,6 +268,11 @@ pub fn evaluate_underwriting_certificate<'a>(
             && obligation.evidence_receipts.is_empty()
         {
             return Err(UnderwritingCertificateError::QualifiedClaimWithoutEvidence);
+        }
+        if obligation.disposition == ProofDisposition::Conditional
+            && obligation.evidence_receipts.is_empty()
+        {
+            return Err(UnderwritingCertificateError::ConditionalClaimWithoutEvidence);
         }
         if obligation.disposition == ProofDisposition::Conditional
             && obligation.invalidation_conditions.is_empty()
@@ -621,6 +627,26 @@ mod tests {
         assert_eq!(
             evaluate_underwriting_certificate(inputs(&obligations)),
             Err(UnderwritingCertificateError::EvaluatorReceiptMissing)
+        );
+    }
+
+    #[test]
+    fn conditional_claims_require_both_supporting_evidence_and_invalidation_conditions() {
+        let mut obligations = base_obligations();
+        obligations[1].disposition = ProofDisposition::Conditional;
+        obligations[1].invalidation_conditions = &["Await signed allocation"];
+        obligations[1].evidence_receipts = &[];
+        assert_eq!(
+            evaluate_underwriting_certificate(inputs(&obligations)),
+            Err(UnderwritingCertificateError::ConditionalClaimWithoutEvidence)
+        );
+
+        obligations = base_obligations();
+        obligations[1].disposition = ProofDisposition::Conditional;
+        obligations[1].invalidation_conditions = &[];
+        assert_eq!(
+            evaluate_underwriting_certificate(inputs(&obligations)),
+            Err(UnderwritingCertificateError::ConditionalClaimWithoutCondition)
         );
     }
 
