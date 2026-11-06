@@ -195,6 +195,22 @@ Do not execute candidate code, open sealed holdouts, or claim causal validity fr
 | SelfImprove-Bench (2026) | G0–G4 generalization-distance evaluation | Carry the ladder into software engineering, scientific research and algorithm design |
 | AI4AI-Bench (2026) | Direct training-algorithm design task suite | Audit-resistant clean-start replication and causal evidence for the actual changed learning computation |
 | FIRE-Bench (ICML 2026) | Execution-based rediscovery of established scientific insights | Separate rediscovery from novelty and use independent intervention/replication evidence |
+| AIDE² (2026) | Reports seven successive self-improvements in an autonomous 8-day run and transfer to four held-out benchmarks, including an out-of-distribution weather-forecasting task | Include as a close R4 baseline; independently test same-start budget parity, inherited mechanisms and replication |
+| METR Anthropic R&D assessment (2026-11-05) | Estimates 1.9× growth in Anthropic AECI benchmark capability since October 2025 (95% CI 1.5–2.8×); attributes much of the acceleration to AI-assisted R&D, while reporting no evidence yet of highly significant fully autonomous contributions to the most important training stages | Measure AI-assisted research productivity separately from autonomous recursive self-improvement |
+
+### Human-supervised productivity is not autonomous RSI
+
+METR's November 5, 2026 assessment is strategically important but must be interpreted carefully. It estimates that Anthropic's benchmark capability progress since October 2025 has proceeded at about 1.9× the prior rate, with a 95% interval of 1.5–2.8×. METR judges that a majority of current acceleration is likely attributable to AI use in R&D, but the report is high-uncertainty, includes substantial redactions, focuses on well-specified capability tasks, and says AI is not yet making highly significant fully autonomous contributions to the most important parts of model training.
+
+This motivates a separate **R&D productivity frontier**, not a relaxation of the R4 definition. Compare at least:
+1. Human-only researcher.
+2. Human researcher with a fixed AI assistant.
+3. Human researcher with a meta-improving Symthaea co-researcher.
+4. Bounded autonomous Symthaea research loop with independent human/evaluator gates.
+
+Measure independently confirmed research artifacts, accepted improvements, human active minutes and review/rework, compute/tokens, wall time, evaluation cost and cost per valid discovery. Publish quality-versus-human-time and quality-versus-total-resource frontiers. Keep expert oversight and intervention visible; self-reported speedup, code volume and faster patch production are not substitutes for independently confirmed research output.
+
+AIDE² should be treated as a particularly relevant comparison: its paper reports seven successive improvements during an autonomous eight-day run and transfer to four held-out benchmarks, including an out-of-distribution weather-forecasting task. Those are the paper's reported results, not an independent replication by Symthaea. Our comparison should therefore use the same-start swap, matched total budget, inherited meta-level changes, fresh-family transfer and independent confirmation rather than claiming superiority from a different task suite.
 
 Symthaea should not claim novelty for “an agent that edits itself,” “an editable meta-agent,” “a multi-parent archive,” or “rollback ablation.” The stronger contribution is a common, auditable method that ties **exact change → randomized intervention → mechanism prediction → independent replication → transfer** to the candidate's inherited research process.
 
