@@ -305,6 +305,9 @@ pub fn evaluate_forecast_calibration<'a>(
             })
             .ok_or(ForecastCalibrationError::ArithmeticOverflow)
     };
+    let pinball_denominator = i128::from(n)
+        .checked_mul(BASIS_POINTS)
+        .ok_or(ForecastCalibrationError::ArithmeticOverflow)?;
     let wis_denominator = u128::from(n)
         .checked_mul(15)
         .ok_or(ForecastCalibrationError::ArithmeticOverflow)?;
@@ -320,7 +323,7 @@ pub fn evaluate_forecast_calibration<'a>(
         pinball_q10_numerator: pinball_q10,
         pinball_q50_numerator: pinball_q50,
         pinball_q90_numerator: pinball_q90,
-        pinball_denominator: BASIS_POINTS,
+        pinball_denominator,
         actual_at_or_below_q10_count: at_or_below_q10,
         actual_at_or_below_q50_count: at_or_below_q50,
         actual_at_or_below_q90_count: at_or_below_q90,
@@ -459,6 +462,26 @@ mod tests {
         assert_eq!(result.q10_coverage_error_numerator, 10_000);
         assert_eq!(result.q50_coverage_error_numerator, 10_000);
         assert_eq!(result.q90_coverage_error_numerator, -10_000);
+    }
+
+    #[test]
+    fn pinball_denominator_includes_sample_count_for_mean_loss() {
+        let observations = [
+            observation("pinball-a", 100, 200, 300, 350),
+            ForecastCalibrationObservation {
+                valid_period_start_utc: 200,
+                valid_period_end_utc: 300,
+                decision_time_utc: 150,
+                forecast_issued_at_utc: 140,
+                forecast_available_at_utc: 145,
+                realized_observed_at_utc: 305,
+                realized_available_at_utc: 310,
+                ..observation("pinball-b", 100, 200, 300, 350)
+            },
+        ];
+        let result = evaluate_forecast_calibration(320, &observations).unwrap();
+        assert_eq!(result.pinball_denominator, 20_000);
+        assert_eq!(result.pinball_q50_numerator, 1_500_000);
     }
 
     #[test]
