@@ -1080,6 +1080,96 @@ mod tests {
     }
 
     #[test]
+    fn alignment_transfer_gate_accepts_well_separated_mapping() {
+        let source = signature_set(
+            vec![vec![0.0, 0.2, 0.8], vec![1.0, -0.4, 0.3], vec![-0.5, 0.6, -0.1]],
+            'a',
+            'c',
+        );
+        let candidate = signature_set(
+            vec![source.signatures[2].clone(), source.signatures[0].clone(), source.signatures[1].clone()],
+            'b',
+            'c',
+        );
+        let alignment =
+            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+        validate_cfc_alignment_for_parameter_transfer(
+            &alignment,
+            CfCAlignmentAcceptancePolicy {
+                max_mean_squared_activation_error: 1e-12,
+                min_assignment_margin: 1e-6,
+            },
+        )
+        .expect("well-separated correspondence is acceptable");
+    }
+
+    #[test]
+    fn alignment_transfer_gate_rejects_ambiguous_or_malformed_receipts() {
+        let ambiguous_source =
+            signature_set(vec![vec![0.0, 1.0], vec![0.0, 1.0]], 'a', 'c');
+        let ambiguous_candidate =
+            signature_set(vec![vec![0.0, 1.0], vec![0.0, 1.0]], 'b', 'c');
+        let ambiguous = align_cfc_hidden_unit_signatures(
+            &ambiguous_source,
+            &ambiguous_candidate,
+        )
+        .expect("ambiguous alignment is still diagnosable");
+        assert!(matches!(
+            validate_cfc_alignment_for_parameter_transfer(
+                &ambiguous,
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: 1e-12,
+                    min_assignment_margin: 1e-8,
+                }
+            ),
+            Err(CfCPermutationAlignmentError::AssignmentAmbiguous { .. })
+        ));
+
+        let mut malformed = ambiguous.clone();
+        malformed.source_to_candidate = vec![0, 0];
+        assert!(matches!(
+            validate_cfc_alignment_for_parameter_transfer(
+                &malformed,
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: 1.0,
+                    min_assignment_margin: 0.0,
+                }
+            ),
+            Err(CfCPermutationAlignmentError::MalformedAlignmentReceipt {
+                field: "source_to_candidate"
+            })
+        ));
+    }
+
+    #[test]
+    fn alignment_transfer_gate_rejects_activation_error_and_invalid_policy() {
+        let source = signature_set(vec![vec![0.0, 1.0], vec![1.0, 0.0]], 'a', 'c');
+        let candidate = signature_set(vec![vec![0.1, 1.1], vec![1.1, 0.1]], 'b', 'c');
+        let alignment =
+            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+        assert!(matches!(
+            validate_cfc_alignment_for_parameter_transfer(
+                &alignment,
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: 0.0,
+                    min_assignment_margin: 0.0,
+                }
+            ),
+            Err(CfCPermutationAlignmentError::ActivationErrorAboveThreshold { .. })
+        ));
+        assert!(matches!(
+            validate_cfc_alignment_for_parameter_transfer(
+                &alignment,
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: f64::NAN,
+                    min_assignment_margin: 0.0,
+                }
+            ),
+            Err(CfCPermutationAlignmentError::InvalidAcceptancePolicy)
+        ));
+    }
+
+    #[test]
     fn activation_signature_alignment_exposes_ambiguous_units() {
         let source = vec![vec![0.0, 1.0], vec![0.0, 1.0], vec![2.0, 3.0]];
         let candidate = vec![vec![2.0, 3.0], vec![0.0, 1.0], vec![0.0, 1.0]];
