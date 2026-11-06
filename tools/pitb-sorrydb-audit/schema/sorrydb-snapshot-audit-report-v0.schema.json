@@ -405,7 +405,15 @@
           "repository_cluster_sign_flip_p_value",
           "holm_adjusted_p_value",
           "deterministic_seed_sha256",
-          "inference_note"
+          "inference_note",
+          "strategy_a_implementation_sha256",
+          "strategy_a_execution_stack_sha256",
+          "strategy_a_checkpoint_sha256",
+          "strategy_b_implementation_sha256",
+          "strategy_b_execution_stack_sha256",
+          "strategy_b_checkpoint_sha256",
+          "budget_policy_sha256",
+          "evaluation_condition_sha256"
         ],
         "properties": {
           "strategy_a_name": {
@@ -576,6 +584,52 @@
           "inference_note": {
             "type": "string",
             "minLength": 20
+          },
+          "strategy_a_implementation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "strategy_a_execution_stack_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "strategy_a_checkpoint_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "strategy_b_implementation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "strategy_b_execution_stack_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "strategy_b_checkpoint_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "budget_policy_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "evaluation_condition_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }
