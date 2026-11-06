@@ -393,7 +393,8 @@
         "url",
         "revision_status",
         "commit_sha",
-        "license"
+        "license",
+        "observed_ref"
       ],
       "properties": {
         "repository_id": {
@@ -402,7 +403,8 @@
             "wormdatamodel",
             "wormbrain",
             "leifer-lab-to-nwb",
-            "other"
+            "other",
+            "mistofrutta"
           ]
         },
         "url": {
@@ -431,6 +433,10 @@
             "string",
             "null"
           ]
+        },
+        "observed_ref": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "allOf": [
