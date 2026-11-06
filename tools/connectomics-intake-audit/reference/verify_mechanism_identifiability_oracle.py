@@ -232,6 +232,20 @@ def self_test(data: dict[str, Any]) -> None:
     else:
         raise AssertionError("known-answer mutation unexpectedly passed after feasibility change")
 
+    unanimous_query = copy.deepcopy(data)
+    unanimous_query["mechanisms"][2]["query_decision"] = True
+    for status in unanimous_query["known_answer"]["expected_action_statuses"].values():
+        status["query_identified"] = True
+    verify_mutation(unanimous_query)
+
+    unanimous_mechanism = copy.deepcopy(data)
+    unanimous_mechanism["mechanisms"][1]["mechanism_class"] = "DIRECT_SYNAPTIC"
+    unanimous_mechanism["mechanisms"][2]["mechanism_class"] = "DIRECT_SYNAPTIC"
+    for status in unanimous_mechanism["known_answer"]["expected_action_statuses"].values():
+        status["mechanism_identified"] = True
+    unanimous_mechanism["known_answer"]["expected_selected_intervention_id"] = "query-probe"
+    verify_mutation(unanimous_mechanism)
+
     underpowered = copy.deepcopy(data)
     underpowered["replicate_design"]["replicate_count"] = 1
     try:
