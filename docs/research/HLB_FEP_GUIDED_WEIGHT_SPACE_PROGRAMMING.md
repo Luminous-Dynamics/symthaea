@@ -119,7 +119,7 @@ I(M, Θ, S; O | a)
 
 Here M is model structure, Θ its parameters, S latent state, O the prospective observation, and a a candidate information action. This is a decomposition of a joint information quantity; it is **not** permission to add arbitrary entropy deltas that double-count uncertainty. The adapter must declare its factorization, posterior approximation, and which terms it can calculate. Unavailable terms remain unavailable rather than being replaced by novelty.
 
-The current Symthaea model-information-gain primitive computes `I(Model; Outcome | action)` from supplied hypothesis priors and action-conditioned outcome distributions. It is a useful structure-information primitive, but it does not by itself implement state or parameter information gain, BMR over a learned model family, or a complete expected-free-energy policy. Those require their own model and posterior contracts.
+The current Symthaea model-information-gain primitive computes `I(Model; Outcome | action)` from supplied hypothesis priors and action-conditioned outcome distributions. The branch now also contains a separate diagonal-Gaussian BMR primitive for prior-only reductions under a shared parameterization. Together, these provide research primitives for prospective model-structure information and post-observation model evidence comparison; they do not yet implement a learned model-family bridge, state/parameter information-gain adapters, or a complete expected-free-energy policy. Production integration still requires provenance-bound predictive and posterior contracts.
 
 **Proposed research shift:** implement a hierarchical *epistemic controller* with explicit fast state inference, slower parameter learning, and slower still model-structure selection. Use the structure-level information term to choose discriminating probes; use evidence thresholds and model evidence to decide whether to retain, reduce, or replace a model. A probe ranking does not automatically authorize model replacement.
 
@@ -360,7 +360,7 @@ The analytical/oracle baseline is an upper bound, never a tuning signal. Weights
 - Zero-duration identity: (|F(0,x)-x|) at numerical precision.
 - Semigroup/composition error: compare (F(t_1+t_2,x)) with (F(t_2,F(t_1,x))) under controlled constant-input conditions.
 - Local and long-horizon error against a high-accuracy solver.
-- Boundedness, stability, and error by (Delta t/	au).
+- Boundedness, stability, and error as a function of the dimensionless elapsed interval \`Delta t / tau\`.
 - Latency, allocation count, state bytes, and energy only with documented device/method.
 
 ### HDC
@@ -410,7 +410,7 @@ For healthy-model false-edit rate, report exact binomial confidence intervals. D
 ### Stage 0 — contracts and reproducibility
 - Preserve the existing SWI-001 and HLB-002 semantics; do not merge their two HDC-LTC parameterizations by name alone.
 - Freeze typed manifests, parameter role metadata and exact digest preconditions.
-- Keep the FEP information-gain primitive isolated until real outcome-model adapters exist.
+- Keep the hierarchical information-gain and diagonal-Gaussian BMR primitives research-only until real outcome-model and posterior adapters exist; do not wire either directly into production action selection.
 - Add this 4-factor protocol and validate it independently of the runtime.
 
 ### Stage 1 — deterministic fault and diagnostic environment
