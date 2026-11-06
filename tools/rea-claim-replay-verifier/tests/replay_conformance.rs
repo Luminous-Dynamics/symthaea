@@ -331,7 +331,7 @@ fn omitted_nullable_result_field_is_not_silently_defaulted() {
 fn unreferenced_evidence_is_not_silently_added_to_the_replay_set() {
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
     let claim = provider_claim(evidence.evidence_id.clone());
-    let (claim_bytes, result_bytes) = produce(&claim, &[evidence.clone()]);
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
 
     let mut unrelated = evidence.value.clone();
     unrelated["provider"]["id"] = json!("unreferenced-provider");
@@ -900,3 +900,84 @@ fn evidence_transport_order_does_not_change_bound_claim_replay() {
         replay.reported_derivation_sha256
     );
 }
+
+#[test]
+fn evidence_transport_order_is_commutative_for_a_fixed_claim_reference_order() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut evidence_values = Vec::new();
+    let mut evidence_bytes = Vec::new();
+    for index in 0..3 {
+        let mut value = original.value.clone();
+        let provider_id = format!("permutation-provider-{index}");
+        value["provider"]["id"] = json!(provider_id);
+        value["provider"]["name"] = json!(format!("Permutation Provider {index}"));
+        value["analysis_profile"]["provider"] = value["provider"].clone();
+        value["analysis_profile"]["digest"] =
+            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+        value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+        let bytes = serde_json::to_vec(&value).unwrap();
+        let verified = rea_compat::verify_evidence_json(&bytes).unwrap();
+        evidence_values.push(verified);
+        evidence_bytes.push(bytes);
+    }
+
+    let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
+    claim.evidence_ids = evidence_values
+        .iter()
+        .map(|evidence| evidence.evidence_id.clone())
+        .collect();
+    let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
+
+    // Six transport permutations, while claim.evidence_ids remain in the same
+    // order. Replay must be set-based at the transport boundary and
+    // deterministic at the derivation boundary.
+    let permutations = [
+        [0usize, 1usize, 2usize],
+        [0, 2, 1],
+        [1, 0, 2],
+        [1, 2, 0],
+        [2, 0, 1],
+        [2, 1, 0],
+    ];
+    for permutation in permutations {
+        let supplied: Vec<&[u8]> = permutation
+            .iter()
+            .map(|index| evidence_bytes[*index].as_slice())
+            .collect();
+        let replay =
+            replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+        assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+        assert_eq!(
+            replay.expected_disposition,
+            ClaimDisposition::SupportedWithinScope
+        );
+        assert_eq!(
+            replay.recomputed_derivation_sha256,
+            replay.reported_derivation_sha256
+        );
+    }
+}
+
+#[test]
+fn raw_evidence_whitespace_is_nonsemantic_but_tampering_remains_detectable() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+
+    let pretty = serde_json::to_vec_pretty(&evidence.value).unwrap();
+    let pretty_verified = rea_compat::verify_evidence_json(&pretty).unwrap();
+    assert_eq!(pretty_verified.evidence_id, evidence.evidence_id);
+    assert_ne!(pretty_verified.raw_file_sha256, evidence.raw_file_sha256);
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&pretty], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+
+    let mut tampered: Value = serde_json::from_slice(fixture_bytes()).unwrap();
+    tampered["normalized_result"]["entries"][0]["size"] = json!(4200);
+    let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
+    let error = replay_claim_evaluation(&claim_bytes, &[&tampered_bytes], &result_bytes)
+        .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidEvidence);
+}
+
