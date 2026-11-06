@@ -601,24 +601,10 @@ impl From<ReuseCertificateError> for BoundedScoreRoundError {
     }
 }
 
-/// Allocate the per-comparison REUSE error budget for one adaptive round.
-///
-/// Arguments:
-/// - alpha: global family-wise false-promotion budget, fixed before search;
-/// - round: one-based round number;
-/// - prior_promotions: number of earlier accepted promotions;
-/// - candidates_per_round: preregistered maximum K proposed candidates;
-/// - rho: fraction of this allocation assigned to the paired test. The
-///   remaining (1-rho) is assigned to the cumulative lower-bound certificate.
-///
-/// This function validates arithmetic inputs only. It does not know whether
-/// alpha, K, the promotion history or rho were frozen by an independent
-/// authority, and it cannot enforce that the proposer sees only a decision.
-/// Do not use this function alone to authorize promotion or claim the REUSE
-/// simultaneous guarantee.
 /// Compute the complete per-comparison REUSE allocation before any rho split.
-/// Used by the bounded-score route, which spends the complete allocation on
-/// its single lower-confidence-bound decision.
+///
+/// The bounded-score route spends this complete allocation on its single
+/// lower-confidence-bound decision.
 fn compute_reuse_total_error_budget(
     alpha: f64,
     round: usize,
@@ -663,6 +649,20 @@ fn compute_reuse_total_error_budget(
 }
 
 /// Allocate the per-comparison REUSE error budget for one adaptive pass/fail round.
+///
+/// Arguments:
+/// - alpha: global family-wise false-promotion budget, fixed before search;
+/// - round: one-based round number;
+/// - prior_promotions: number of earlier accepted promotions;
+/// - candidates_per_round: preregistered maximum K proposed candidates;
+/// - rho: fraction of this allocation assigned to the paired test. The
+///   remaining (1-rho) is assigned to the cumulative lower-bound certificate.
+///
+/// This function validates arithmetic inputs only. It does not know whether
+/// alpha, K, the promotion history or rho were frozen by an independent
+/// authority, and it cannot enforce that the proposer sees only a decision.
+/// Do not use this function alone to authorize promotion or claim the REUSE
+/// simultaneous guarantee.
 pub fn allocate_reuse_error_budget(
     alpha: f64,
     round: usize,
@@ -670,6 +670,9 @@ pub fn allocate_reuse_error_budget(
     candidates_per_round: usize,
     rho: f64,
 ) -> Result<ReuseErrorAllocation, ReuseBudgetError> {
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(ReuseBudgetError::InvalidAlpha);
+    }
     if !rho.is_finite() || rho <= 0.0 || rho >= 1.0 {
         return Err(ReuseBudgetError::InvalidRho);
     }
