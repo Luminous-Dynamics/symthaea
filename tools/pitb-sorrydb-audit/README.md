@@ -35,6 +35,9 @@ When proof-run receipts from two or more strategies are supplied, the report inc
 - A nested bootstrap resamples source-file clusters inside each sampled repository (10,000 replicates).
 - A paired cluster sign-flip test flips all task outcomes within each repository (50,000 replicates); the resulting family of pairwise p-values receives Holm correction.
 - Every random stream is deterministically seeded from the frozen snapshot and strategy identities; the seed digest is retained in the report.
+- A strategy identity includes its name/version, model ID/version, implementation SHA-256, execution-stack SHA-256, and optional exact checkpoint SHA-256. A changed build/checkpoint is a distinct strategy, never merged by display name.
+- Every proof-run receipt also binds `budget_policy_sha256` and `evaluation_condition_sha256`. The former covers configured wall/CPU/GPU/token/tool-call ceilings and stopping policy; the latter covers source visibility, tool access, scaffold, verifier mode and other benchmark conditions. One strategy cannot mix these digests across tasks, and pairwise comparisons fail closed unless both systems share the same budget-policy and evaluation-condition digests.
+- Actual resource use (wall time, tokens and recorded cost) is reported separately from the configured budget identity.
 
 The task-level split contains all 78 repositories; it is not project-disjoint. The repository-clustered interval quantifies uncertainty on this particular mixture of projects. It does **not** establish generalization to unseen repositories. The nested file bootstrap checks sensitivity to shared source-file context, but must not be presented as a substitute for a project-disjoint or temporal holdout.
 
