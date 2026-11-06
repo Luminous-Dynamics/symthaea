@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-query-conditioned-stopping-v1",
+  "claim_scope": "synthetic_known_answer",
+  "source_reproduction": {
+    "source_id": "martinez-2026-global-graph-invariant-stopping",
+    "source_version": "bioRxiv v1, 2026-07-04, DOI 10.64898/2026.06.30.735414",
+    "publication_status": "preprint",
+    "snapshot_pin_status": "SYNTHETIC",
+    "exact_data_reproduction": false
+  },
+  "query_stop_rule": {
+    "maximum_missed_candidate_upper_bound": 0,
+    "requires_closed_boundary": true,
+    "requires_identifiable_observation_model": true,
+    "world_frame_claim_ceiling": "DECLARED_SCOPE_ONLY"
+  },
+  "global_baseline": {
+    "baseline_id": "GLOBAL_GRAPH_INVARIANT_ASYMPTOTIC_STOPPING",
+    "invariant_count": 15,
+    "fit_method": "Monotone asymptotic families with BIC model selection (synthetic status labels only; not a reproduction)",
+    "checkpoint_protocol": "Frozen progressive edit-history snapshots; synthetic known-answer protocol",
+    "claim_scope": "GLOBAL_STABILIZATION_PROXY_NOT_QUERY_CERTIFICATE"
+  },
+  "tracks": [
+    {
+      "track_id": "rare-path-global-false-stop",
+      "query_id": "is-critical-path-present",
+      "query_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "maximum_missed_candidate_upper_bound": 0,
+      "snapshots": [
+        {
+          "checkpoint_id": "A0",
+          "cumulative_edits": 10000,
+          "snapshot_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_NOT_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-true",
+              "world-false"
+            ],
+            "query_decisions": [
+              true,
+              false
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_UNSTABLE",
+            "safe_to_stop_for_query": false,
+            "certificate_sha256": null,
+            "certificate_generation": 0,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
+          }
+        },
+        {
+          "checkpoint_id": "A1",
+          "cumulative_edits": 50000,
+          "snapshot_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-true",
+              "world-false"
+            ],
+            "query_decisions": [
+              true,
+              false
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_UNSTABLE",
+            "safe_to_stop_for_query": false,
+            "certificate_sha256": null,
+            "certificate_generation": 0,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
+          }
+        },
+        {
+          "checkpoint_id": "A2",
+          "cumulative_edits": 60000,
+          "snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-true"
+            ],
+            "query_decisions": [
+              true
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
+            "safe_to_stop_for_query": true,
+            "certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "certificate_generation": 1,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
+          }
+        }
+      ],
+      "certificate_invalidation_events": []
+    },
+    {
+      "track_id": "query-specific-early-stop-and-late-invalidation",
+      "query_id": "does-region-b-have-required-motif",
+      "query_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "maximum_missed_candidate_upper_bound": 0,
+      "snapshots": [
+        {
+          "checkpoint_id": "B0",
+          "cumulative_edits": 5000,
+          "snapshot_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_NOT_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-b",
+              "world-b-unresolved-graph"
+            ],
+            "query_decisions": [
+              false,
+              false
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
+            "safe_to_stop_for_query": true,
+            "certificate_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "certificate_generation": 1,
+            "unresolved_graph_world_count": 1,
+            "unresolved_query_decision_world_count": 0
+          }
+        },
+        {
+          "checkpoint_id": "B1",
+          "cumulative_edits": 20000,
+          "snapshot_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_NOT_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-b",
+              "world-b-unresolved-graph"
+            ],
+            "query_decisions": [
+              false,
+              false
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
+            "safe_to_stop_for_query": true,
+            "certificate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "certificate_generation": 2,
+            "unresolved_graph_world_count": 1,
+            "unresolved_query_decision_world_count": 0
+          }
+        },
+        {
+          "checkpoint_id": "B2",
+          "cumulative_edits": 50000,
+          "snapshot_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-b",
+              "world-b-unresolved-graph"
+            ],
+            "query_decisions": [
+              false,
+              false
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
+            "safe_to_stop_for_query": true,
+            "certificate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "certificate_generation": 3,
+            "unresolved_graph_world_count": 1,
+            "unresolved_query_decision_world_count": 0
+          }
+        },
+        {
+          "checkpoint_id": "B3",
+          "cumulative_edits": 60000,
+          "snapshot_sha256": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii",
+          "edit_strategy": "MERGE_FOCUSED",
+          "global_status": "GLOBAL_CONVERGED",
+          "global_invariant_count": 15,
+          "global_invariant_sha256": "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj",
+          "global_forecast_status": "SYNTHETIC_FIXTURE",
+          "query_evaluation": {
+            "admissible_world_ids": [
+              "world-b",
+              "late-refuting-world"
+            ],
+            "query_decisions": [
+              false,
+              true
+            ],
+            "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
+            "observation_identifiability": "IDENTIFIABLE",
+            "missed_candidate_upper_bound": 0,
+            "boundary_status": "CLOSED_WITH_DECLARED_MARGIN",
+            "query_status": "QUERY_UNSTABLE",
+            "safe_to_stop_for_query": false,
+            "certificate_sha256": null,
+            "certificate_generation": 4,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
+          }
+        }
+      ],
+      "certificate_invalidation_events": [
+        {
+          "event_id": "late-admission-flips-region-b-query",
+          "at_checkpoint_id": "B3",
+          "new_alternative_id": "late-refuting-world",
+          "changes_query_decision": true,
+          "prior_certificate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+          "prior_certificate_invalidated": true
+        }
+      ]
+    }
+  ]
+}
