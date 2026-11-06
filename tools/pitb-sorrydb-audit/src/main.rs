@@ -1260,6 +1260,293 @@ fn summarize_proof_runs(
     Ok((verified_success_count, successful_task_ids.len(), summaries))
 }
 
+type StrategyKey = (String, String, Option<String>, Option<String>);
+
+fn strategy_key(run: &ProofRun) -> StrategyKey {
+    (
+        run.strategy.name.clone(),
+        run.strategy.version.clone(),
+        run.strategy.model_id.clone(),
+        run.strategy.model_version.clone(),
+    )
+}
+
+fn strategy_label(key: &StrategyKey) -> String {
+    format!(
+        "{}@{}|{}|{}",
+        key.0,
+        key.1,
+        key.2.as_deref().unwrap_or("no-model-id"),
+        key.3.as_deref().unwrap_or("no-model-version")
+    )
+}
+
+fn percentile(sorted: &[f64], probability: f64) -> Result<f64, String> {
+    if sorted.is_empty() || !(0.0..=1.0).contains(&probability) {
+        return Err("percentile requires non-empty values and probability in [0,1]".into());
+    }
+    let position = probability * (sorted.len() - 1) as f64;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    if lower == upper {
+        Ok(sorted[lower])
+    } else {
+        let fraction = position - lower as f64;
+        Ok(sorted[lower] * (1.0 - fraction) + sorted[upper] * fraction)
+    }
+}
+
+fn bootstrap_repository_rate_differences(
+    repositories: &[RepositoryBootstrapBlock],
+    replicates: usize,
+    seed: &str,
+    nested_files: bool,
+) -> Result<(f64, f64), String> {
+    if repositories.is_empty() || replicates < 100 {
+        return Err("cluster bootstrap requires repositories and at least 100 replicates".into());
+    }
+    let mut rng = DeterministicRng::from_seed_hex(seed)?;
+    let mut values = Vec::with_capacity(replicates);
+    for _ in 0..replicates {
+        let mut task_count = 0usize;
+        let mut a_solved = 0usize;
+        let mut b_solved = 0usize;
+        for _ in 0..repositories.len() {
+            let repository = &repositories[rng.index(repositories.len())];
+            if nested_files {
+                if repository.files.is_empty() {
+                    return Err("repository bootstrap block has no source-file clusters".into());
+                }
+                for _ in 0..repository.files.len() {
+                    let file = &repository.files[rng.index(repository.files.len())];
+                    task_count += file.task_count;
+                    a_solved += file.a_solved;
+                    b_solved += file.b_solved;
+                }
+            } else {
+                task_count += repository.task_count;
+                a_solved += repository.a_solved;
+                b_solved += repository.b_solved;
+            }
+        }
+        if task_count == 0 {
+            return Err("cluster bootstrap produced an empty task sample".into());
+        }
+        values.push((b_solved as f64 - a_solved as f64) / task_count as f64);
+    }
+    values.sort_by(f64::total_cmp);
+    Ok((percentile(&values, 0.025)?, percentile(&values, 0.975)?))
+}
+
+fn repository_cluster_sign_flip_p_value(
+    repositories: &[RepositoryBootstrapBlock],
+    observed_delta_sum: i64,
+    replicates: usize,
+    seed: &str,
+) -> Result<f64, String> {
+    if repositories.is_empty() || replicates < 100 {
+        return Err("cluster permutation test requires repositories and at least 100 replicates".into());
+    }
+    let mut rng = DeterministicRng::from_seed_hex(seed)?;
+    let observed = observed_delta_sum.unsigned_abs();
+    let mut extreme = 0usize;
+    for _ in 0..replicates {
+        let mut permuted = 0_i64;
+        for repository in repositories {
+            let delta = repository.b_solved as i64 - repository.a_solved as i64;
+            if rng.coin() {
+                permuted += delta;
+            } else {
+                permuted -= delta;
+            }
+        }
+        if permuted.unsigned_abs() >= observed {
+            extreme += 1;
+        }
+    }
+    Ok((extreme + 1) as f64 / (replicates + 1) as f64)
+}
+
+fn pairwise_clustered_comparisons(
+    runs: &[ProofRun],
+    evaluation: &Dataset,
+) -> Result<Vec<ClusteredStrategyComparison>, String> {
+    let mut attempted = BTreeMap::<StrategyKey, BTreeSet<String>>::new();
+    let mut solved = BTreeMap::<StrategyKey, BTreeSet<String>>::new();
+    for run in runs {
+        let key = strategy_key(run);
+        attempted.entry(key.clone()).or_default().insert(run.task_id.clone());
+        if run.outcome == "verified_success" {
+            solved.entry(key).or_default().insert(run.task_id.clone());
+        }
+    }
+    let keys: Vec<StrategyKey> = attempted.keys().cloned().collect();
+    if keys.len() < 2 {
+        return Ok(Vec::new());
+    }
+    let mut tasks_by_repository_file =
+        BTreeMap::<String, BTreeMap<String, Vec<&SorryRecord>>>::new();
+    for task in &evaluation.sorries {
+        tasks_by_repository_file
+            .entry(task.repo.remote.clone())
+            .or_default()
+            .entry(task.location.path.clone())
+            .or_default()
+            .push(task);
+    }
+
+    let mut comparisons = Vec::<(f64, ClusteredStrategyComparison)>::new();
+    for first_index in 0..keys.len() {
+        for second_index in (first_index + 1)..keys.len() {
+            let a_key = &keys[first_index];
+            let b_key = &keys[second_index];
+            let a_attempted = attempted.get(a_key).ok_or("missing strategy A attempt map")?;
+            let b_attempted = attempted.get(b_key).ok_or("missing strategy B attempt map")?;
+            let a_solved_set = solved.get(a_key);
+            let b_solved_set = solved.get(b_key);
+
+            let mut repositories = Vec::<RepositoryBootstrapBlock>::new();
+            let mut a_solved_total = 0usize;
+            let mut b_solved_total = 0usize;
+            let mut both_solved = 0usize;
+            let mut a_only = 0usize;
+            let mut b_only = 0usize;
+            let mut neither = 0usize;
+            let mut file_cluster_total = 0usize;
+            for files in tasks_by_repository_file.values() {
+                let mut file_blocks = Vec::<FileBootstrapBlock>::new();
+                let mut repo_tasks = 0usize;
+                let mut repo_a = 0usize;
+                let mut repo_b = 0usize;
+                for task_rows in files.values() {
+                    let mut file_tasks = 0usize;
+                    let mut file_a = 0usize;
+                    let mut file_b = 0usize;
+                    for task in task_rows {
+                        let a_ok = a_solved_set.is_some_and(|set| set.contains(&task.id));
+                        let b_ok = b_solved_set.is_some_and(|set| set.contains(&task.id));
+                        file_tasks += 1;
+                        repo_tasks += 1;
+                        a_solved_total += usize::from(a_ok);
+                        b_solved_total += usize::from(b_ok);
+                        repo_a += usize::from(a_ok);
+                        repo_b += usize::from(b_ok);
+                        file_a += usize::from(a_ok);
+                        file_b += usize::from(b_ok);
+                        match (a_ok, b_ok) {
+                            (true, true) => both_solved += 1,
+                            (true, false) => a_only += 1,
+                            (false, true) => b_only += 1,
+                            (false, false) => neither += 1,
+                        }
+                    }
+                    if file_tasks > 0 {
+                        file_blocks.push(FileBootstrapBlock {
+                            task_count: file_tasks,
+                            a_solved: file_a,
+                            b_solved: file_b,
+                        });
+                        file_cluster_total += 1;
+                    }
+                }
+                if repo_tasks > 0 {
+                    repositories.push(RepositoryBootstrapBlock {
+                        files: file_blocks,
+                        task_count: repo_tasks,
+                        a_solved: repo_a,
+                        b_solved: repo_b,
+                    });
+                }
+            }
+            let denominator = evaluation.sorries.len();
+            if denominator == 0 || a_solved_total + b_solved_total > 2 * denominator {
+                return Err("clustered strategy comparison has an invalid fixed denominator".into());
+            }
+            let paired_delta_sum = b_solved_total as i64 - a_solved_total as i64;
+            let paired_risk_difference = paired_delta_sum as f64 / denominator as f64;
+            let seed_material = format!(
+                "SorryDB_2601|{}|{}|repo-file-bootstrap-v0|10000|50000",
+                strategy_label(a_key),
+                strategy_label(b_key)
+            );
+            let seed = sha256(seed_material.as_bytes());
+            let repo_bootstrap_seed = sha256(format!("{seed}|repository-bootstrap").as_bytes());
+            let nested_bootstrap_seed = sha256(format!("{seed}|nested-file-bootstrap").as_bytes());
+            let permutation_seed = sha256(format!("{seed}|repository-sign-flip").as_bytes());
+            let repository_bootstrap_replicates = 10_000usize;
+            let nested_bootstrap_replicates = 10_000usize;
+            let permutation_replicates = 50_000usize;
+            let (repo_low, repo_high) = bootstrap_repository_rate_differences(
+                &repositories,
+                repository_bootstrap_replicates,
+                &repo_bootstrap_seed,
+                false,
+            )?;
+            let (nested_low, nested_high) = bootstrap_repository_rate_differences(
+                &repositories,
+                nested_bootstrap_replicates,
+                &nested_bootstrap_seed,
+                true,
+            )?;
+            let raw_p = repository_cluster_sign_flip_p_value(
+                &repositories,
+                paired_delta_sum,
+                permutation_replicates,
+                &permutation_seed,
+            )?;
+            comparisons.push((
+                raw_p,
+                ClusteredStrategyComparison {
+                    strategy_a_name: a_key.0.clone(),
+                    strategy_a_version: a_key.1.clone(),
+                    strategy_a_model_id: a_key.2.clone(),
+                    strategy_a_model_version: a_key.3.clone(),
+                    strategy_b_name: b_key.0.clone(),
+                    strategy_b_version: b_key.1.clone(),
+                    strategy_b_model_id: b_key.2.clone(),
+                    strategy_b_model_version: b_key.3.clone(),
+                    task_denominator: denominator,
+                    strategy_a_attempted_tasks: a_attempted.len(),
+                    strategy_b_attempted_tasks: b_attempted.len(),
+                    strategy_a_attempt_coverage: a_attempted.len() as f64 / denominator as f64,
+                    strategy_b_attempt_coverage: b_attempted.len() as f64 / denominator as f64,
+                    strategy_a_unique_verified_tasks: a_solved_total,
+                    strategy_b_unique_verified_tasks: b_solved_total,
+                    both_solved_tasks: both_solved,
+                    a_only_solved_tasks: a_only,
+                    b_only_solved_tasks: b_only,
+                    neither_solved_tasks: neither,
+                    paired_risk_difference_b_minus_a: paired_risk_difference,
+                    repository_cluster_count: repositories.len(),
+                    repository_file_cluster_count: file_cluster_total,
+                    repository_bootstrap_replicates,
+                    repository_bootstrap_ci95_low: repo_low,
+                    repository_bootstrap_ci95_high: repo_high,
+                    nested_repository_file_bootstrap_replicates: nested_bootstrap_replicates,
+                    nested_repository_file_bootstrap_ci95_low: nested_low,
+                    nested_repository_file_bootstrap_ci95_high: nested_high,
+                    repository_cluster_sign_flip_replicates: permutation_replicates,
+                    repository_cluster_sign_flip_p_value: raw_p,
+                    holm_adjusted_p_value: 1.0,
+                    deterministic_seed_sha256: seed,
+                    inference_note: "The full fixed evaluation split is the denominator; unattempted tasks count as not solved. Retries collapse to one task-level success per strategy. Confidence intervals resample repositories, with a nested repository/file bootstrap. The paired sign-flip test flips all task outcomes within each repository and Holm-corrects the complete pairwise family. This is uncertainty for the pinned task cohort, not project-disjoint generalization.".into(),
+                },
+            ));
+        }
+    }
+
+    let mut order: Vec<usize> = (0..comparisons.len()).collect();
+    order.sort_by(|left, right| comparisons[*left].0.total_cmp(&comparisons[*right].0));
+    let mut adjusted_so_far = 0.0_f64;
+    let family_size = comparisons.len();
+    for (rank, index) in order.into_iter().enumerate() {
+        let candidate = (comparisons[index].0 * (family_size - rank) as f64).min(1.0);
+        adjusted_so_far = adjusted_so_far.max(candidate);
+        comparisons[index].1.holm_adjusted_p_value = adjusted_so_far;
+    }
+    Ok(comparisons.into_iter().map(|(_, comparison)| comparison).collect())
+}
+
 fn audit(
     full: &Dataset,
     evaluation: &Dataset,
@@ -1334,6 +1621,7 @@ fn audit(
     }
     let (verified_success_run_count, unique_successful_task_count, strategy_summaries) =
         summarize_proof_runs(proof_runs, evaluation)?;
+    let pairwise_clustered_comparisons = pairwise_clustered_comparisons(proof_runs, evaluation)?;
 
     let documentation_drift = full.sorries.len() != DOCUMENTED_FULL_COUNT;
     let mut warnings = Vec::new();
@@ -1372,6 +1660,7 @@ fn audit(
         verified_success_run_count,
         unique_successful_task_count,
         strategy_summaries,
+        pairwise_clustered_comparisons,
         full_task_count: full.sorries.len(),
         evaluation_task_count: evaluation.sorries.len(),
         documented_full_task_count: DOCUMENTED_FULL_COUNT,
@@ -1712,6 +2001,7 @@ fn synthetic_report() -> Result<Value, String> {
         "verified_success_run_count": verified_success_run_count,
         "unique_successful_task_count": unique_successful_task_count,
         "strategy_summaries": strategy_summaries,
+        "pairwise_clustered_comparisons": [],
         "full_task_count": 3,
         "evaluation_task_count": 2,
         "documented_full_task_count": DOCUMENTED_FULL_COUNT,
