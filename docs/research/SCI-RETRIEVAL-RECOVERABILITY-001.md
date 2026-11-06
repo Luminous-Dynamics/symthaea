@@ -143,3 +143,47 @@ The current literature gives us concrete evaluation priorities:
 - Agentic-R reports improvements over strong baselines on seven single-hop and multi-hop QA benchmarks using a retriever trained around multi-turn utility. It is a competitive retrieval baseline to include, not proof that agentic retrieval is universally superior: https://aclanthology.org/2026.findings-acl.785/
 
 The comparison ladder is therefore BM25, dense multilingual retrieval, hybrid retrieval, standard reranking, fixed multi-query/iterative RAG, Agentic-R-style retrievers, and the full agent. All must use matched corpus snapshots, models, tool/action budgets, retrieval depths, evidence-token ceilings, cost and latency accounting. The primary claim should be incremental value over the fixed-loop baseline, not merely a win over one-shot RAG.
+
+
+## Industry comparison and metric-specific stretch targets
+
+Agentic retrieval is no longer novel by itself. Azure AI Search documents query planning, parallel subqueries, semantic reranking, source references and activity logs; its current documentation distinguishes generally available minimal extractive retrieval from preview LLM query planning and answer synthesis. AWS Bedrock similarly documents model-driven query decomposition, iterative retrieval and sufficiency assessment. These systems are mandatory comparators, not straw men.
+
+Microsoft's AgenticRAG research harness uses search/find/open/summarize operations. Its May 2026 paper reports 49.6% Recall@1 on BRIGHT (+21.8 percentage points over its best embedding baseline), 0.96 factuality on WixQA, and 92% correctness on FinanceBench within two percentage points of oracle evidence. These are the paper's benchmark-specific results, not a general guarantee about Azure production systems.
+
+The BRIGHT leaderboard reports 66.9 average nDCG@10 for its April 2026 leader across 12 datasets. That metric is **not comparable** to AgenticRAG's 49.6% Recall@1. TEMPO's 32.0 nDCG@10 / 71.4% Temporal Coverage@10 is another separate benchmark with different tasks and gold mappings. TEMPS is a temporal embedding baseline worth including; its paper reports TS-Retriever R@1 increasing from 19.92 to 25.39 over the prior temporal result. We should reproduce these protocols rather than create a blended headline score.
+
+Official and paper references:
+- Azure AI Search Agentic Retrieval: https://learn.microsoft.com/azure/search/agentic-retrieval-overview
+- AWS Bedrock Agentic Retrieval: https://docs.aws.amazon.com/bedrock/latest/userguide/kb-test-agentic-retrieve.html
+- AgenticRAG: https://www.microsoft.com/en-us/research/publication/agenticrag-agentic-retrieval-for-enterprise-knowledge-bases/
+- BRIGHT benchmark leaderboard: https://brightbenchmark.github.io/
+- TEMPO: https://aclanthology.org/2026.emnlp-main.291/
+- TEMPS: https://aclanthology.org/2026.emnlp-main.2657/
+
+### Proposed benchmark gates (targets, not measured results)
+
+| Lane | Reproduction baseline | Stretch target |
+|---|---|---|
+| BRIGHT reasoning-intensive retrieval | Reproduce the current published top system and its exact 12-dataset protocol; report nDCG@10 by dataset | ≥68.0 average nDCG@10 with paired uncertainty, plus no material worst-dataset regression |
+| TEMPO temporal retrieval | Reproduce DiVeR's 32.0 nDCG@10 and 71.4% Temporal Coverage@10 under the same corpus/retrieval setup | ≥85% Temporal Coverage@10 while non-inferior on nDCG@10 |
+| RDQA source-grounded multimodal | Reproduce its 41.1% process-aware adjusted accuracy and report PLR | ≥45% adjusted accuracy and PLR ≤5%, separately by modality/capability family |
+| Evidence reading | Gold-evidence injection; measure errors with source present | ≤10% residual reader failure after exact-evidence presentation, with re-presentation gain reported separately |
+| Query rewriting | Original-query and unconstrained rewrite controls | ≤5% harmful rewrite rate; no silent anchor loss |
+| Agency attribution | One-shot RAG vs cost-matched fixed iterative loop vs full agent | Positive, multiplicity-corrected A2−A1 effect on preregistered navigation-recoverable tasks; otherwise claim iteration gain only |
+| Rights/provenance | Known source-family, revocation, stale-cache and disclosure controls | Zero critical rights bypasses, fabricated locators or false independence on qualification controls |
+
+A stretch score is not a result and is not an admission gate until its dataset, evaluator, baseline versions, token/tool/time/cost budgets and analysis plan are pinned. In particular, never compare 66.9 BRIGHT nDCG@10, 49.6 BRIGHT Recall@1, TEMPO Temporal Coverage@10, and RDQA adjusted accuracy as though they were a shared scale.
+
+### What should be uniquely better
+
+The defensible advantage is not another planner. It is the combination of:
+
+1. **Recoverability before scoring:** determine whether the evidence was reachable at all under a frozen search surface and budget.
+2. **Causal credit assignment:** separate one-shot retrieval, fixed iteration, structural navigation and open-ended agency.
+3. **Reader isolation:** force-inject gold evidence and optionally re-present the exact same bytes to distinguish missing retrieval from reading failure.
+4. **Temporal and provenance qualification:** bind source versions, as-known-at cutoffs, source families and materialization uncertainty.
+5. **Rights as a hard execution constraint:** propagate deny/revocation through retrieval and derived content rather than averaging a rights violation into a grounding score.
+6. **Non-compensatory evaluation:** strong answer accuracy cannot offset a fabricated citation, contaminated trial, false absence claim or unauthorized disclosure.
+
+This is the route to a meaningful industry advantage: show a reproducible improvement on at least one narrow lane, show that it survives source-family/time/language-held-out evaluation, and show its cost and failure modes alongside the score.
