@@ -9,10 +9,10 @@
 //! This is an execution-reconciliation kernel, not a dispatch optimizer,
 //! meter-authentication service, or Market Operator settlement calculator.
 
-use std::collections::{BTreeMap, BTreeSet};
 use crate::power_trace_execution::{
     ScheduledPowerTraceError, ScheduledPowerTraceInputs, evaluate_scheduled_power_trace,
 };
+use std::collections::{BTreeMap, BTreeSet};
 
 const BASIS_POINTS: u128 = 10_000;
 
@@ -871,7 +871,10 @@ pub struct TraceBackedExecutionAssessment<'a> {
     pub interval_receipts: Vec<TraceBackedIntervalReceipt<'a>>,
 }
 
-fn trace_coverage_bps(covered_seconds: u128, horizon_seconds: u128) -> Result<u64, TraceBackedExecutionError> {
+fn trace_coverage_bps(
+    covered_seconds: u128,
+    horizon_seconds: u128,
+) -> Result<u64, TraceBackedExecutionError> {
     let numerator = covered_seconds
         .checked_mul(BASIS_POINTS)
         .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?;
@@ -880,7 +883,9 @@ fn trace_coverage_bps(covered_seconds: u128, horizon_seconds: u128) -> Result<u6
 }
 
 fn trace_add_u128(total: u128, value: u128) -> Result<u128, TraceBackedExecutionError> {
-    total.checked_add(value).ok_or(TraceBackedExecutionError::ArithmeticOverflow)
+    total
+        .checked_add(value)
+        .ok_or(TraceBackedExecutionError::ArithmeticOverflow)
 }
 
 fn trace_add_i128(total: i128, value: i128) -> Result<i128, TraceBackedExecutionError> {
@@ -905,10 +910,9 @@ pub fn evaluate_trace_backed_execution<'a>(
         return Err(TraceBackedExecutionError::EmptyTrace);
     }
 
-    let horizon_seconds = u128::try_from(
-        i128::from(inputs.horizon_end_utc) - i128::from(inputs.horizon_start_utc),
-    )
-    .map_err(|_| TraceBackedExecutionError::ArithmeticOverflow)?;
+    let horizon_seconds =
+        u128::try_from(i128::from(inputs.horizon_end_utc) - i128::from(inputs.horizon_start_utc))
+            .map_err(|_| TraceBackedExecutionError::ArithmeticOverflow)?;
 
     let mut interval_ids = BTreeSet::new();
     let mut schedule_record_ids = BTreeSet::new();
@@ -974,10 +978,7 @@ pub fn evaluate_trace_backed_execution<'a>(
 
         let start = trace_inputs.interval_start_utc_seconds;
         let end = trace_inputs.interval_end_utc_seconds;
-        if start < inputs.horizon_start_utc
-            || end > inputs.horizon_end_utc
-            || start >= end
-        {
+        if start < inputs.horizon_start_utc || end > inputs.horizon_end_utc || start >= end {
             return Err(TraceBackedExecutionError::InvalidInterval);
         }
         if previous_start.is_some_and(|previous| start < previous) {
@@ -998,8 +999,9 @@ pub fn evaluate_trace_backed_execution<'a>(
         let interval_duration = u128::try_from(i128::from(end) - i128::from(start))
             .map_err(|_| TraceBackedExecutionError::ArithmeticOverflow)?;
         scheduled_seconds = trace_add_u128(scheduled_seconds, interval_duration)?;
-        let scheduled_abs = u128::try_from(i128::from(trace_inputs.scheduled_energy_milli_wh).abs())
-            .map_err(|_| TraceBackedExecutionError::ArithmeticOverflow)?;
+        let scheduled_abs =
+            u128::try_from(i128::from(trace_inputs.scheduled_energy_milli_wh).abs())
+                .map_err(|_| TraceBackedExecutionError::ArithmeticOverflow)?;
         let denominator = 7_200_i128;
         scheduled_energy_abs_numerator = trace_add_u128(
             scheduled_energy_abs_numerator,
@@ -1032,17 +1034,20 @@ pub fn evaluate_trace_backed_execution<'a>(
                 .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?;
             absolute_deviation_numerator = trace_add_u128(
                 absolute_deviation_numerator,
-                result.absolute_deviation_numerator_milli_wh
+                result
+                    .absolute_deviation_numerator_milli_wh
                     .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?,
             )?;
             unfulfilled_energy_numerator = trace_add_u128(
                 unfulfilled_energy_numerator,
-                result.unfulfilled_scheduled_energy_numerator_milli_wh
+                result
+                    .unfulfilled_scheduled_energy_numerator_milli_wh
                     .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?,
             )?;
             overdelivery_numerator = trace_add_u128(
                 overdelivery_numerator,
-                result.overdelivery_energy_numerator_milli_wh
+                result
+                    .overdelivery_energy_numerator_milli_wh
                     .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?,
             )?;
         } else {
@@ -1080,8 +1085,10 @@ pub fn evaluate_trace_backed_execution<'a>(
                 .checked_add(1)
                 .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?;
             settlement_seconds = trace_add_u128(settlement_seconds, interval_duration)?;
-            known_balancing_charge =
-                trace_add_i128(known_balancing_charge, i128::from(settlement.balancing_charge_minor_zar))?;
+            known_balancing_charge = trace_add_i128(
+                known_balancing_charge,
+                i128::from(settlement.balancing_charge_minor_zar),
+            )?;
             settlement_id = Some(settlement.record_id);
             settlement_ref = Some(settlement.source_ref);
         }
@@ -1113,15 +1120,12 @@ pub fn evaluate_trace_backed_execution<'a>(
         .map_err(|_| TraceBackedExecutionError::ArithmeticOverflow)?;
     let missing_settlement_count = interval_count.saturating_sub(settlement_interval_count);
     let schedule_complete = schedule_coverage == 10_000;
-    let meter_complete = schedule_complete
-        && incomplete_trace_interval_count == 0
-        && meter_coverage == 10_000;
-    let settlement_complete = meter_complete
-        && missing_settlement_count == 0
-        && settlement_coverage == 10_000;
+    let meter_complete =
+        schedule_complete && incomplete_trace_interval_count == 0 && meter_coverage == 10_000;
+    let settlement_complete =
+        meter_complete && missing_settlement_count == 0 && settlement_coverage == 10_000;
     let schedule_fulfilment_bps = if meter_complete && scheduled_energy_abs_numerator > 0 {
-        let fulfilled = scheduled_energy_abs_numerator
-            .saturating_sub(unfulfilled_energy_numerator);
+        let fulfilled = scheduled_energy_abs_numerator.saturating_sub(unfulfilled_energy_numerator);
         let numerator = fulfilled
             .checked_mul(BASIS_POINTS)
             .ok_or(TraceBackedExecutionError::ArithmeticOverflow)?;
@@ -1149,9 +1153,12 @@ pub fn evaluate_trace_backed_execution<'a>(
         settlement_evidence_complete: settlement_complete,
         known_meter_energy_numerator_milli_wh: known_meter_energy_numerator,
         scheduled_energy_abs_numerator_milli_wh: scheduled_energy_abs_numerator,
-        complete_absolute_deviation_numerator_milli_wh: meter_complete.then_some(absolute_deviation_numerator),
-        complete_unfulfilled_energy_numerator_milli_wh: meter_complete.then_some(unfulfilled_energy_numerator),
-        complete_overdelivery_energy_numerator_milli_wh: meter_complete.then_some(overdelivery_numerator),
+        complete_absolute_deviation_numerator_milli_wh: meter_complete
+            .then_some(absolute_deviation_numerator),
+        complete_unfulfilled_energy_numerator_milli_wh: meter_complete
+            .then_some(unfulfilled_energy_numerator),
+        complete_overdelivery_energy_numerator_milli_wh: meter_complete
+            .then_some(overdelivery_numerator),
         schedule_fulfilment_bps,
         known_balancing_charge_sum_minor_zar: known_balancing_charge,
         complete_balancing_charge_minor_zar: settlement_complete.then_some(known_balancing_charge),
@@ -1163,14 +1170,18 @@ pub fn evaluate_trace_backed_execution<'a>(
 #[cfg(test)]
 mod trace_backed_tests {
     use super::*;
-    use crate::power_trace::PowerTraceSample;
     use crate::power_trace::PowerTraceInputs;
+    use crate::power_trace::PowerTraceSample;
 
     const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const SCHEDULE_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     fn sample(id: &'static str, t: i64, power: i64) -> PowerTraceSample<'static> {
-        PowerTraceSample { sample_id: id, timestamp_utc_seconds: t, power_milli_w: power }
+        PowerTraceSample {
+            sample_id: id,
+            timestamp_utc_seconds: t,
+            power_milli_w: power,
+        }
     }
 
     fn item<'a>(
@@ -1210,7 +1221,12 @@ mod trace_backed_tests {
         }
     }
 
-    fn settlement(id: &'static str, source: &'static str, charge: i64, available: i64) -> BalancingSettlementEvidence<'static> {
+    fn settlement(
+        id: &'static str,
+        source: &'static str,
+        charge: i64,
+        available: i64,
+    ) -> BalancingSettlementEvidence<'static> {
         BalancingSettlementEvidence {
             record_id: id,
             source_ref: source,
@@ -1222,13 +1238,35 @@ mod trace_backed_tests {
 
     #[test]
     fn two_interval_raw_trace_replay_aggregates_exact_energy_and_booked_settlement() {
-        let samples_a = [sample("a-start", 100, 1_000_000), sample("a-end", 3_700, 1_000_000)];
-        let samples_b = [sample("b-start", 3_700, 1_000_000), sample("b-end", 7_300, 1_000_000)];
+        let samples_a = [
+            sample("a-start", 100, 1_000_000),
+            sample("a-end", 3_700, 1_000_000),
+        ];
+        let samples_b = [
+            sample("b-start", 3_700, 1_000_000),
+            sample("b-end", 7_300, 1_000_000),
+        ];
         let intervals = [
-            item("tp-a", "schedule-a", "meter/day-file", &samples_a, 100, 3_700, 900_000,
-                Some(settlement("settle-a", "settlement/a", 10, 3_720))),
-            item("tp-b", "schedule-b", "meter/day-file", &samples_b, 3_700, 7_300, 1_100_000,
-                Some(settlement("settle-b", "settlement/b", 20, 7_320))),
+            item(
+                "tp-a",
+                "schedule-a",
+                "meter/day-file",
+                &samples_a,
+                100,
+                3_700,
+                900_000,
+                Some(settlement("settle-a", "settlement/a", 10, 3_720)),
+            ),
+            item(
+                "tp-b",
+                "schedule-b",
+                "meter/day-file",
+                &samples_b,
+                3_700,
+                7_300,
+                1_100_000,
+                Some(settlement("settle-b", "settlement/b", 20, 7_320)),
+            ),
         ];
         let result = evaluate_trace_backed_execution(TraceBackedExecutionInputs {
             scenario_id: "golden-pv-bess/trace-backed",
@@ -1247,21 +1285,53 @@ mod trace_backed_tests {
         assert_eq!(result.meter_time_coverage_bps, 10_000);
         assert_eq!(result.settlement_time_coverage_bps, 10_000);
         assert_eq!(result.known_meter_energy_numerator_milli_wh, 14_400_000_000);
-        assert_eq!(result.scheduled_energy_abs_numerator_milli_wh, 14_400_000_000);
-        assert_eq!(result.complete_unfulfilled_energy_numerator_milli_wh, Some(720_000_000));
-        assert_eq!(result.complete_overdelivery_energy_numerator_milli_wh, Some(720_000_000));
+        assert_eq!(
+            result.scheduled_energy_abs_numerator_milli_wh,
+            14_400_000_000
+        );
+        assert_eq!(
+            result.complete_unfulfilled_energy_numerator_milli_wh,
+            Some(720_000_000)
+        );
+        assert_eq!(
+            result.complete_overdelivery_energy_numerator_milli_wh,
+            Some(720_000_000)
+        );
         assert_eq!(result.schedule_fulfilment_bps, Some(9_500));
         assert_eq!(result.complete_balancing_charge_minor_zar, Some(30));
     }
 
     #[test]
     fn incomplete_raw_trace_withholds_complete_fulfilment_and_settlement_total() {
-        let samples_a = [sample("a-start", 100, 1_000_000), sample("a-end", 3_700, 1_000_000)];
-        let samples_b = [sample("b-middle", 4_000, 1_000_000), sample("b-end", 7_300, 1_000_000)];
+        let samples_a = [
+            sample("a-start", 100, 1_000_000),
+            sample("a-end", 3_700, 1_000_000),
+        ];
+        let samples_b = [
+            sample("b-middle", 4_000, 1_000_000),
+            sample("b-end", 7_300, 1_000_000),
+        ];
         let intervals = [
-            item("tp-a", "schedule-a", "meter/day-file", &samples_a, 100, 3_700, 900_000,
-                Some(settlement("settle-a", "settlement/a", 10, 3_720))),
-            item("tp-b", "schedule-b", "meter/day-file", &samples_b, 3_700, 7_300, 1_100_000, None),
+            item(
+                "tp-a",
+                "schedule-a",
+                "meter/day-file",
+                &samples_a,
+                100,
+                3_700,
+                900_000,
+                Some(settlement("settle-a", "settlement/a", 10, 3_720)),
+            ),
+            item(
+                "tp-b",
+                "schedule-b",
+                "meter/day-file",
+                &samples_b,
+                3_700,
+                7_300,
+                1_100_000,
+                None,
+            ),
         ];
         let result = evaluate_trace_backed_execution(TraceBackedExecutionInputs {
             scenario_id: "golden/incomplete",
@@ -1282,11 +1352,35 @@ mod trace_backed_tests {
 
     #[test]
     fn schedule_gap_reduces_coverage_and_withholds_complete_result() {
-        let samples_a = [sample("a-start", 100, 1_000_000), sample("a-end", 3_700, 1_000_000)];
-        let samples_b = [sample("b-start", 4_000, 1_000_000), sample("b-end", 7_300, 1_000_000)];
+        let samples_a = [
+            sample("a-start", 100, 1_000_000),
+            sample("a-end", 3_700, 1_000_000),
+        ];
+        let samples_b = [
+            sample("b-start", 4_000, 1_000_000),
+            sample("b-end", 7_300, 1_000_000),
+        ];
         let intervals = [
-            item("tp-a", "schedule-a", "meter/day-file", &samples_a, 100, 3_700, 900_000, None),
-            item("tp-b", "schedule-b", "meter/day-file", &samples_b, 4_000, 7_300, 1_100_000, None),
+            item(
+                "tp-a",
+                "schedule-a",
+                "meter/day-file",
+                &samples_a,
+                100,
+                3_700,
+                900_000,
+                None,
+            ),
+            item(
+                "tp-b",
+                "schedule-b",
+                "meter/day-file",
+                &samples_b,
+                4_000,
+                7_300,
+                1_100_000,
+                None,
+            ),
         ];
         let result = evaluate_trace_backed_execution(TraceBackedExecutionInputs {
             scenario_id: "golden/schedule-gap",
@@ -1303,11 +1397,35 @@ mod trace_backed_tests {
 
     #[test]
     fn reused_power_sample_ids_and_conflicting_source_digests_fail_closed() {
-        let samples_a = [sample("shared-start", 100, 1_000_000), sample("a-end", 3_700, 1_000_000)];
-        let samples_b = [sample("shared-start", 3_700, 1_000_000), sample("b-end", 7_300, 1_000_000)];
+        let samples_a = [
+            sample("shared-start", 100, 1_000_000),
+            sample("a-end", 3_700, 1_000_000),
+        ];
+        let samples_b = [
+            sample("shared-start", 3_700, 1_000_000),
+            sample("b-end", 7_300, 1_000_000),
+        ];
         let intervals = [
-            item("tp-a", "schedule-a", "meter/day-file", &samples_a, 100, 3_700, 900_000, None),
-            item("tp-b", "schedule-b", "meter/day-file", &samples_b, 3_700, 7_300, 1_100_000, None),
+            item(
+                "tp-a",
+                "schedule-a",
+                "meter/day-file",
+                &samples_a,
+                100,
+                3_700,
+                900_000,
+                None,
+            ),
+            item(
+                "tp-b",
+                "schedule-b",
+                "meter/day-file",
+                &samples_b,
+                3_700,
+                7_300,
+                1_100_000,
+                None,
+            ),
         ];
         assert_eq!(
             evaluate_trace_backed_execution(TraceBackedExecutionInputs {
@@ -1347,8 +1465,14 @@ mod trace_backed_tests {
 
     #[test]
     fn duplicate_settlement_receipts_and_settlement_without_complete_trace_are_rejected() {
-        let samples_a = [sample("a-start", 100, 1_000_000), sample("a-end", 3_700, 1_000_000)];
-        let samples_b = [sample("b-start", 3_700, 1_000_000), sample("b-end", 7_300, 1_000_000)];
+        let samples_a = [
+            sample("a-start", 100, 1_000_000),
+            sample("a-end", 3_700, 1_000_000),
+        ];
+        let samples_b = [
+            sample("b-start", 3_700, 1_000_000),
+            sample("b-end", 7_300, 1_000_000),
+        ];
         let duplicate = [
             item("tp-a", "schedule-a", "meter/day-file", &samples_a, 100, 3_700, 900_000,
                 Some(settlement("settle-a", "settlement/same", 10, 3_720))),
