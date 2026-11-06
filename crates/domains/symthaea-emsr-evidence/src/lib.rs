@@ -568,6 +568,12 @@ pub fn assess_common_mode_independence(
             "snapshot ID and as-of time are required",
         ));
     }
+    if chrono::DateTime::parse_from_rfc3339(as_of).is_err() {
+        return Err(ValidationError::new(
+            "$.sources[0].as_of",
+            "as-of time must be a valid RFC 3339 timestamp",
+        ));
+    }
 
     let mut source_ids = HashSet::new();
     for (index, source) in sources.iter().enumerate() {
@@ -1215,6 +1221,20 @@ mod tests {
             summary.pairs[0].relation,
             PairwiseRelation::Unknown
         );
+    }
+
+    #[test]
+    fn common_mode_graph_rejects_invalid_as_of_timestamp() {
+        let sources = vec![EvidenceSourceProfile {
+            snapshot_id: "snapshot-a".to_owned(),
+            as_of: "not-a-timestamp".to_owned(),
+            source_id: "rx-a".to_owned(),
+            failure_domains: vec!["clock:a".to_owned()],
+            dependencies_complete: true,
+        }];
+        let error = assess_common_mode_independence(&sources)
+            .expect_err("invalid as-of timestamp must fail closed");
+        assert!(error.to_string().contains("RFC 3339"));
     }
 
     #[test]
