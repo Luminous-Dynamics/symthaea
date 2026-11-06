@@ -1,0 +1,530 @@
+{
+  "schema_version": "hlb-fep-wsp-factorial-v1",
+  "status": "protocol_only",
+  "claim_ceiling": "Design-contract consistency only. No runtime activation, repair accuracy, model capability, efficiency, safety, SOTA, or consciousness claim is supported.",
+  "source_binding": {
+    "required_run_environment_variable": "SYMTHAEA_SOURCE_SHA",
+    "required_format": "40-character hexadecimal Git commit SHA",
+    "checkout_policy": "The benchmark must check out exactly the PR head SHA or dispatched commit SHA. Receipts must include source, manifest, task, profile, seed, and result digests."
+  },
+  "factors": [
+    {
+      "id": "native_hdc",
+      "enabled_mechanism": "Native Symthaea HDC/VSA and HRR associative representation with explicit algebra contract",
+      "disabled_control": "Fixed-seed random projection / conventional representation with matched width and downstream interface",
+      "adapter_status": "planned_not_implemented_or_verified"
+    },
+    {
+      "id": "cfc_ltc",
+      "enabled_mechanism": "Nominated active-core CfC/LTC liquid model with explicit elapsed-time intervals",
+      "disabled_control": "Parameter-matched GRU temporal model; include leaky-state and memoryless controls in temporal tasks",
+      "adapter_status": "planned_not_implemented_or_verified"
+    },
+    {
+      "id": "fep_epistemic_policy",
+      "enabled_mechanism": "FEP policy using prospective action-dependent model-hypothesis expected information gain",
+      "disabled_control": "Pragmatic-greedy policy with identical observation and world-model interface",
+      "adapter_status": "isolated_information_gain_primitive_exists_production_adapter_not_verified"
+    },
+    {
+      "id": "weight_space_programming",
+      "enabled_mechanism": "WSP agent proposes typed, bounded WeightProgram edits evaluated through SWI transactional candidate boundary",
+      "disabled_control": "No-edit and conventional/analytic repair comparators; SWI validation harness remains active in all profiles",
+      "adapter_status": "typed_swi_edit_foundation_exists_wsp_proposer_not_implemented_or_verified"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "H0-C0-F0-W0",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C0-F0-W1",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C0-F1-W0",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C0-F1-W1",
+      "native_hdc": false,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F0-W0",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F0-W1",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F1-W0",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H0-C1-F1-W1",
+      "native_hdc": false,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F0-W0",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F0-W1",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F1-W0",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C0-F1-W1",
+      "native_hdc": true,
+      "cfc_ltc": false,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F0-W0",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F0-W1",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": false,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F1-W0",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": false,
+      "execution_status": "planned_not_executed"
+    },
+    {
+      "id": "H1-C1-F1-W1",
+      "native_hdc": true,
+      "cfc_ltc": true,
+      "fep_epistemic_policy": true,
+      "weight_space_programming": true,
+      "execution_status": "planned_not_executed"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "information_selective_diagnosis",
+      "environment": "Seeded partially observable environment with multiple model/fault hypotheses and diagnostic probes that differ in observation distributions, cost, and downstream consequence",
+      "primary_outcomes": [
+        "diagnosis_accuracy",
+        "normalized_regret",
+        "diagnostic_observation_cost"
+      ],
+      "diagnostics": [
+        "prospective_expected_information_gain_nats",
+        "realized_posterior_entropy_reduction",
+        "posterior_brier_score",
+        "probes_to_diagnosis",
+        "decision_change_after_probe"
+      ],
+      "negative_controls": [
+        "identical_outcome_distributions_across_hypotheses",
+        "information_channel_disabled_with_reward_cost_and_novelty_fixed"
+      ]
+    },
+    {
+      "id": "injected_fault_repair_with_healthy_controls",
+      "environment": "Small fully specified CfC and HDC-LTC networks with planted faults in input, recurrent, tau/gate, mixing, and HDC-role groups plus untouched healthy models; hidden labels are withheld from the proposer",
+      "primary_outcomes": [
+        "fault_detection_precision",
+        "fault_detection_recall",
+        "repair_success_rate",
+        "collateral_regression_rate",
+        "healthy_model_false_edit_rate"
+      ],
+      "diagnostics": [
+        "fault_localization_precision",
+        "edit_parameter_count",
+        "edit_norm",
+        "candidate_evaluations",
+        "forward_pass_budget",
+        "verification_disagreement",
+        "rollback_rate"
+      ],
+      "negative_controls": [
+        "healthy_models_without_faults",
+        "sham_fault_metadata",
+        "random_matched_sparsity_edits",
+        "no_edit"
+      ]
+    },
+    {
+      "id": "compositional_associative_transfer",
+      "environment": "Seeded role-filler, nested relation, temporal order, and held-out composition tasks with controlled crosstalk, missing elements, role swaps, and corruption",
+      "primary_outcomes": [
+        "held_out_compositional_success",
+        "retrieval_precision",
+        "retrieval_recall",
+        "false_retrieval_rate"
+      ],
+      "diagnostics": [
+        "capacity_by_dimension_and_load",
+        "order_swap_sensitivity",
+        "calibration",
+        "memory_bytes",
+        "operations_per_query"
+      ]
+    },
+    {
+      "id": "irregular_time_dynamics_and_regime_change",
+      "environment": "Frozen synthetic and public time-series tasks with nonuniform elapsed time, missing observations, input interpolation, and controlled dynamics/reward regime changes",
+      "primary_outcomes": [
+        "forecast_error",
+        "rollout_stability",
+        "recovery_steps_after_shift"
+      ],
+      "diagnostics": [
+        "error_by_elapsed_interval",
+        "error_vs_high_accuracy_reference",
+        "uncertainty_calibration",
+        "p50_latency_ns",
+        "p95_latency_ns",
+        "peak_memory_bytes"
+      ]
+    }
+  ],
+  "baselines": [
+    {
+      "id": "hdc_onlinehd_or_equivalent",
+      "scope": "online HDC classification and associative representation"
+    },
+    {
+      "id": "map_bipolar_xor",
+      "scope": "VSA binding baseline with self-inverse bipolar contract"
+    },
+    {
+      "id": "continuous_hadamard",
+      "scope": "real-valued Hadamard binding with declared inverse/cleanup contract"
+    },
+    {
+      "id": "hrr_circular_convolution",
+      "scope": "HRR with unitary roles and correlation unbinding"
+    },
+    {
+      "id": "fixed_seed_random_projection",
+      "scope": "representation control"
+    },
+    {
+      "id": "svm_shared_features",
+      "scope": "conventional classification on identical input features"
+    },
+    {
+      "id": "rvfl_shared_features",
+      "scope": "random vector functional link baseline on identical input features"
+    },
+    {
+      "id": "gradient_boosted_trees",
+      "scope": "strong tabular baseline when task/data type permits"
+    },
+    {
+      "id": "original_ltc_cfc",
+      "scope": "continuous-time temporal baseline"
+    },
+    {
+      "id": "parameter_matched_gru",
+      "scope": "temporal architecture baseline"
+    },
+    {
+      "id": "parameter_matched_lstm",
+      "scope": "temporal architecture baseline"
+    },
+    {
+      "id": "neural_cde_or_ode_rnn",
+      "scope": "irregular-time continuous-time comparator where fair"
+    },
+    {
+      "id": "nialim_dfa_cfn_prdfa_cfn",
+      "scope": "2026 rederived CfC interpolation/error-bound line; reproduce matched tasks"
+    },
+    {
+      "id": "state_space_model",
+      "scope": "state-space temporal baseline where fair implementation is available"
+    },
+    {
+      "id": "simple_leaky_state",
+      "scope": "minimal temporal memory control"
+    },
+    {
+      "id": "memoryless_model",
+      "scope": "non-temporal control"
+    },
+    {
+      "id": "pragmatic_greedy_policy",
+      "scope": "FEP ablation using same observation/world-model interface"
+    },
+    {
+      "id": "random_probe_policy",
+      "scope": "diagnostic action baseline"
+    },
+    {
+      "id": "always_probe_policy",
+      "scope": "diagnostic action baseline"
+    },
+    {
+      "id": "cue_greedy_policy",
+      "scope": "diagnostic action baseline"
+    },
+    {
+      "id": "bounded_bayesian_value_of_information",
+      "scope": "model-relative information-seeking baseline"
+    },
+    {
+      "id": "matched_rl_exploration",
+      "scope": "complexity-matched RL baseline"
+    },
+    {
+      "id": "perfect_information_oracle",
+      "scope": "labelled upper bound only; never a deployable comparator or tuning signal"
+    },
+    {
+      "id": "no_edit",
+      "scope": "repair control"
+    },
+    {
+      "id": "random_matched_sparsity_edit",
+      "scope": "repair control matched on edit count and norm"
+    },
+    {
+      "id": "analytic_oracle_repair",
+      "scope": "known-fault upper bound only; never a tuning signal"
+    },
+    {
+      "id": "gradient_adam_repair",
+      "scope": "optimization-based repair under matched forward/backward budget"
+    },
+    {
+      "id": "black_box_coordinate_or_evolutionary_search",
+      "scope": "non-gradient candidate search under matched candidate budget"
+    },
+    {
+      "id": "wsp_weights_only",
+      "scope": "WSP without execution traces; separate capability score"
+    },
+    {
+      "id": "wsp_trace_assisted",
+      "scope": "WSP with explicitly permitted training/diagnostic traces; separate capability score"
+    },
+    {
+      "id": "swi_constrained_wsp_with_verifier",
+      "scope": "typed WeightProgram, transactional candidate edits and independent verifier"
+    }
+  ],
+  "seeds": {
+    "development": [
+      11,
+      23,
+      37,
+      53,
+      71,
+      89,
+      107,
+      131,
+      151,
+      173
+    ],
+    "held_out": [
+      211,
+      223,
+      227,
+      229,
+      233,
+      239,
+      241,
+      251,
+      257,
+      263,
+      269,
+      271,
+      277,
+      281,
+      283,
+      293,
+      307,
+      311,
+      313,
+      317
+    ]
+  },
+  "tuning_budget": {
+    "max_candidate_configs_per_profile_task": 40,
+    "max_weight_program_candidates_per_fault_instance": 8,
+    "forward_pass_budget_per_candidate": 50,
+    "same_candidate_count_for_all_profiles": true,
+    "aggregate_validation_compute_must_be_recorded": true,
+    "deviations_require_explicit_receipt_field": true
+  },
+  "metrics": {
+    "primary": [
+      "diagnosis_accuracy",
+      "normalized_regret",
+      "repair_success_rate",
+      "collateral_regression_rate",
+      "healthy_model_false_edit_rate",
+      "held_out_compositional_success",
+      "forecast_error"
+    ],
+    "guardrails": [
+      "constraint_violation_rate",
+      "posterior_brier_score",
+      "selective_risk_at_common_coverage",
+      "false_retrieval_rate",
+      "invalid_edit_rejection_rate",
+      "rollback_rate"
+    ],
+    "efficiency": [
+      "diagnostic_probes",
+      "candidate_evaluations",
+      "p50_latency_ns",
+      "p95_latency_ns",
+      "peak_memory_bytes",
+      "state_bytes",
+      "edited_parameter_count",
+      "measured_operation_count"
+    ],
+    "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
+  },
+  "analysis_plan": {
+    "pairing": "Pair all task seeds, fault instances, and scenarios across all sixteen profiles and baselines.",
+    "uncertainty": "Report per-task effect sizes, distributions across seeds, and 95% confidence intervals; use exact binomial intervals for false-edit rates.",
+    "multiplicity": "Predeclare primary contrasts and apply Holm correction across registered primary tests.",
+    "interaction": "Estimate preregistered H×C×F×W interaction effects; do not infer synergy from the full profile alone.",
+    "budgets": "Match proposer candidates, forward passes, tuning opportunities, parameter counts, and compute. Report unmatched deviations.",
+    "holdout": "Holdout labels/results are inaccessible to proposer, policy, editor, and tuning. Open once for final report; no post-hoc retuning.",
+    "healthy_controls": "Include enough independent healthy networks to estimate low false-edit rates. A low observed count from a small sample is not a low-risk guarantee.",
+    "reporting": "Publish null/negative results, all registered contrasts, failed runs, and artifact/source digests."
+  },
+  "hard_gates": [
+    "All sixteen unique H×C×F×W profiles must be present exactly once and each factor setting must match its profile ID.",
+    "Each enabled/disabled factor must have an explicit adapter and runtime receipt proving which implementation actually ran.",
+    "Protocol-only validation must never mark any profile as executed or emit task-performance claims.",
+    "Exact source SHA, protocol digest, task revision, profile, baseline, seed/split, tuning budget, and result artifact digests are mandatory.",
+    "Development and held-out seeds are disjoint; no held-out label or result may leak into model, policy, proposer, verifier tuning, or candidate selection.",
+    "FEP information gain must be prospective, model-relative, action-dependent, and based on outcome likelihoods/posteriors; novelty or entropy of deterministic predicted states is insufficient.",
+    "The information-channel-off control must remove the information-selection benefit while reward, action cost, and novelty accounting remain fixed.",
+    "WSP must write only to isolated candidate copies through typed SWI operations with exact base-digest preconditions.",
+    "Stale digests, malformed dimensions, duplicate conflicting groups, non-finite values, invalid tau, norm/budget violations, or algebra-invariant violations must fail closed before mutation.",
+    "Healthy networks and sham fault metadata must be included; false edits to healthy models must be reported with confidence intervals.",
+    "Repair success must include held-out target improvement and non-target collateral-regression measurements.",
+    "Weights-only and trace-assisted WSP results must be reported separately.",
+    "Gradient, analytic, black-box, random matched-sparsity, no-edit, and task-appropriate conventional baselines must be budget-matched.",
+    "Primary contrasts, multiple-comparison procedure, and stop conditions must be preregistered before held-out evaluation.",
+    "Incomplete execution, skipped tests, queued workflows, missing baselines, invalid outputs, or integrity failures are non-qualification states.",
+    "No SOTA, production readiness, general self-improvement, safety certification, biological equivalence, or consciousness claim follows from this protocol."
+  ],
+  "research_references": [
+    {
+      "id": "wsp_mit_2026",
+      "url": "https://rikiyat.github.io/blog/weight-space-programming/"
+    },
+    {
+      "id": "weight_space_learning_survey_2026",
+      "url": "https://arxiv.org/abs/2603.10090"
+    },
+    {
+      "id": "clinical_network_wsp_audit_2026",
+      "url": "https://arxiv.org/abs/2611.05341"
+    },
+    {
+      "id": "hdc_comparative_review_2025",
+      "url": "https://doi.org/10.1007/s10462-025-11181-2"
+    },
+    {
+      "id": "original_cfc_ltc_2022",
+      "url": "https://doi.org/10.1038/s42256-022-00556-7"
+    },
+    {
+      "id": "rederived_cfc_nialim_2026",
+      "url": "https://doi.org/10.1109/TNNLS.2026.3669345"
+    },
+    {
+      "id": "active_inference_artificial_reasoning_2026",
+      "url": "https://doi.org/10.1038/s41467-026-77209-5"
+    },
+    {
+      "id": "active_inference_vs_rl_2026",
+      "url": "https://doi.org/10.1016/j.jmp.2026.103011"
+    },
+    {
+      "id": "symthaea_fep_issue_8391",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/issues/8391"
+    },
+    {
+      "id": "symthaea_swi_pr_10628",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10628"
+    },
+    {
+      "id": "symthaea_hlb_pr_10694",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/10694"
+    },
+    {
+      "id": "symthaea_factorial_v1_pr_8375",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/8375"
+    },
+    {
+      "id": "symthaea_model_information_gain_pr_8394",
+      "url": "https://github.com/Luminous-Dynamics/symthaea/pull/8394"
+    }
+  ]
+}
