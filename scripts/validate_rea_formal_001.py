@@ -19,6 +19,13 @@ PARENT_CLOSURE_BLOB = "3b7e9edca79b01cc005b86ca6ae0c2afdc2e26f4"
 
 THEOREMS = (
     "provider_observation_support_binds_full_request",
+    "changed_claim_digest_cannot_support",
+    "changed_request_schema_cannot_support",
+    "changed_result_schema_cannot_support",
+    "changed_rule_generation_cannot_support",
+    "changed_platform_cannot_support",
+    "changed_platform_version_cannot_support",
+    "changed_environment_cannot_support",
     "provider_observation_is_a_distinct_evidence_class",
     "provider_observation_support_has_exact_predicate",
     "provider_observation_cannot_promote_to_other_predicate",
@@ -124,6 +131,8 @@ def validate() -> None:
         "evaluatorRuleGeneration",
         "ruleId",
         "operation",
+        "platform",
+        "platformVersion",
         "environment",
         "predicate",
     ):
