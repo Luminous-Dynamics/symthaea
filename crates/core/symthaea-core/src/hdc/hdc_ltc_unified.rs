@@ -1002,13 +1002,9 @@ impl HdcLtcUnifiedNeuron {
     /// Mathematically equivalent to `evolve_closed_form` within ~0.4% tolerance.
     #[inline]
     pub fn evolve_closed_form_fused(&mut self, dt: f32, input: &ContinuousHV) {
-        if self.config.fourier_frequencies.is_empty() {
-            self.capture_pre_evolution_state();
-        } else {
-            // The fused kernels currently omit Fourier-basis injection, so their
-            // gradient must not borrow a Fourier-aware pre-state contract.
-            self.clear_pre_evolution_state();
-        }
+        // The fused kernels use an approximate activation in their SIMD paths
+        // and do not share the exact scalar forward map used by backward().
+        self.clear_pre_evolution_state();
         // Compute gating FIRST (reads self.state immutably, no mutation)
         let sigma = self.compute_gating(input, dt);
         let one_minus_sigma = 1.0 - sigma;
