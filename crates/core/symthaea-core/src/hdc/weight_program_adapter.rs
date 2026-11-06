@@ -151,10 +151,10 @@ pub fn materialize_hdc_ltc_weight_program(
         if before.values == after.values {
             continue;
         }
-        let WeightProgramTarget::HdcLtc(id) = after.target else {
+        let WeightProgramTarget::HdcLtc(id) = &after.target else {
             return Err(HdcLtcWeightProgramAdapterError::NonHdcTarget);
         };
-        candidate_neuron.try_replace_parameter_group(id, &after.values)?;
+        candidate_neuron.try_replace_parameter_group(*id, &after.values)?;
     }
 
     candidate_neuron.reset();
@@ -183,7 +183,8 @@ mod tests {
     use super::*;
     use crate::hdc::hdc_ltc_unified::UnifiedConfig;
     use crate::hdc::unified_hv::ContinuousHV;
-    use crate::weight_space_program::{WeightProgramOperation, HdcLtcParameterGroupId};
+    use crate::hdc::hdc_ltc_unified::HdcLtcParameterGroupId;
+    use crate::weight_space_program::WeightProgramOperation;
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
