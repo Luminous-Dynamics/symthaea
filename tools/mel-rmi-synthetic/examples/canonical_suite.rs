@@ -6,7 +6,8 @@ use mel_rmi_synthetic::{
     PartnerCausalContrast, ReciprocalTrialRecordV1, ResponsivePartnerPolicy, RuleBasedPolicy,
     TaskSpec, TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
     assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
-    run_policy_suite_v1, run_reciprocal_suite_v1, validate_partner_authority_event,
+    render_synthetic_midi_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
+    validate_partner_authority_event,
     verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
@@ -54,60 +55,74 @@ impl AgentPolicy for YokedSuitePolicy {
     }
 }
 
-fn synthetic_midi_bytes(marker: &[u8]) -> Vec<u8> {
-    let mut track = vec![0x00, 0xff, 0x01, marker.len() as u8];
-    track.extend_from_slice(marker);
-    track.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
-    let mut bytes = b"MThd\x00\x00\x00\x06\x00\x00\x00\x01\x01\xe0MTrk".to_vec();
-    bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
-    bytes.extend(track);
-    bytes
+fn synthetic_artifact_set(
+    event_id: &str,
+    direction: &str,
+    target: Feature,
+    protected: Feature,
+) -> Result<ArtifactPayloadSetV1, HarnessError> {
+    let score_json = format!(
+        r#"{{"event":"{}","direction":"{}","target_dimension":"{}","target_value":{},"protected_dimension":"{}","protected_value":{}}}"#,
+        event_id,
+        direction,
+        target.dimension.as_str(),
+        target.value,
+        protected.dimension.as_str(),
+        protected.value,
+    );
+    Ok(ArtifactPayloadSetV1 {
+        event_id: event_id.to_owned(),
+        transaction_receipt_bytes: format!("synthetic-studio-receipt:{direction}:{event_id}")
+            .into_bytes(),
+        artifacts: vec![
+            ArtifactPayloadV1 {
+                format: ArtifactFormatV1::ScoreJson,
+                bytes: score_json.into_bytes(),
+            },
+            ArtifactPayloadV1 {
+                format: ArtifactFormatV1::Midi,
+                bytes: render_synthetic_midi_v1(target, protected, event_id.as_bytes())?,
+            },
+        ],
+    })
 }
 
 fn bind_and_verify_synthetic_artifacts(record: &mut TrialRecordV1) -> Result<(), HarnessError> {
-    let inputs = std::array::from_fn(|index| {
-        let event_id = record.manifest.input_event_ids[index].clone();
-        ArtifactPayloadSetV1 {
-            event_id: event_id.clone(),
-            transaction_receipt_bytes: format!("synthetic-studio-receipt:input:{event_id}")
-                .into_bytes(),
-            artifacts: vec![
-                ArtifactPayloadV1 {
-                    format: ArtifactFormatV1::ScoreJson,
-                    bytes: format!(r#"{{"event":"{event_id}","role":"input"}}"#).into_bytes(),
-                },
-                ArtifactPayloadV1 {
-                    format: ArtifactFormatV1::Midi,
-                    bytes: synthetic_midi_bytes(event_id.as_bytes()),
-                },
-            ],
-        }
-    });
-    let outputs = std::array::from_fn(|index| {
-        let event_id = record.manifest.output_event_ids[index].clone();
-        ArtifactPayloadSetV1 {
-            event_id: event_id.clone(),
-            transaction_receipt_bytes: format!("synthetic-studio-receipt:output:{event_id}")
-                .into_bytes(),
-            artifacts: vec![
-                ArtifactPayloadV1 {
-                    format: ArtifactFormatV1::ScoreJson,
-                    bytes: format!(r#"{{"event":"{event_id}","role":"output"}}"#).into_bytes(),
-                },
-                ArtifactPayloadV1 {
-                    format: ArtifactFormatV1::Midi,
-                    bytes: synthetic_midi_bytes(event_id.as_bytes()),
-                },
-            ],
-        }
-    });
+    let observations = [
+        &record.interventions.control,
+        &record.interventions.targeted,
+        &record.interventions.sham,
+        &record.interventions.unrelated,
+    ];
+    let mut input_sets = Vec::with_capacity(4);
+    let mut output_sets = Vec::with_capacity(4);
+    for (index, observation) in observations.iter().enumerate() {
+        input_sets.push(synthetic_artifact_set(
+            &observation.event_id,
+            "input",
+            observation.current_partner_feature,
+            observation.unrelated_feature,
+        )?);
+        output_sets.push(synthetic_artifact_set(
+            &record.manifest.output_event_ids[index],
+            "output",
+            record.actions[index].feature,
+            observation.unrelated_feature,
+        )?);
+    }
+    let inputs: [ArtifactPayloadSetV1; 4] = input_sets
+        .try_into()
+        .map_err(|_| HarnessError::InvalidArtifactSet)?;
+    let outputs: [ArtifactPayloadSetV1; 4] = output_sets
+        .try_into()
+        .map_err(|_| HarnessError::InvalidArtifactSet)?;
 
     bind_verified_artifacts(
         record,
         inputs.clone(),
         outputs.clone(),
         "synthetic-byte-verifier",
-        "v1",
+        "midi-note-event-v1",
     )?;
     verify_trial_artifact_bindings(record, &inputs, &outputs)
 }
