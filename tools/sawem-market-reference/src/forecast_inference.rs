@@ -400,7 +400,7 @@ mod tests {
         let mut assessment = skill();
         assessment.paired_loss_deltas[1].valid_period_start_utc = 201;
         assert_eq!(
-            evaluate_forecast_skill_inference(&assessment, plan(starts, 1)),
+            evaluate_forecast_skill_inference(&assessment, plan(&starts, 1)),
             Err(ForecastInferenceError::NonChronologicalOrGappedTargets)
         );
     }
