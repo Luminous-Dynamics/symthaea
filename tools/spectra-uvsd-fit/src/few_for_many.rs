@@ -482,8 +482,9 @@ mod tests {
             enumerate_bounded_portfolios(&[3, 1, 2], 2, 6).unwrap(),
             vec![vec![1], vec![2], vec![3], vec![1, 2], vec![1, 3], vec![2, 3]]
         );
+        assert_eq!(enumerate_bounded_portfolios(&[1, 2, 3], 3, 7).unwrap().len(), 7);
         assert_eq!(
-            enumerate_bounded_portfolios(&[1, 2, 3], 3, 7),
+            enumerate_bounded_portfolios(&[1, 2, 3], 3, 6),
             Err(FewForManyPortfolioError::EnumerationBudgetExceeded)
         );
     }
