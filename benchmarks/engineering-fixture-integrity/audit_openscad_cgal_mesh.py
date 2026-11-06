@@ -113,12 +113,14 @@ def run_openscad(
         line for line in log.splitlines()
         if "CGAL Polyhedrons in cache:" in line
     ]
+    cache_match = re.search(r"^CGAL Polyhedrons in cache:\\s*(\\d+)\\s*$", log, re.MULTILINE)
     require(
-        bool(cache_lines) and "1" in cache_lines[0].split(":", 1)[1],
-        f"OpenSCAD did not report a CGAL polyhedron conversion: {mesh_path.name}: {log[-2000:]}",
+        cache_match is not None and int(cache_match.group(1)) == 1,
+        f"Expected exactly one CGAL polyhedron conversion: {mesh_path.name}: {log[-2000:]}",
     )
+    simple_match = re.search(r"^\\s*Simple:\\s*yes\\s*$", log, re.MULTILINE)
     require(
-        re.search(r"Simple:\s+yes", log) is not None,
+        simple_match is not None,
         f"OpenSCAD CGAL output was not simple: {mesh_path.name}: {log[-2000:]}",
     )
     require(
@@ -146,6 +148,144 @@ def run_openscad(
     }
 
 
+
+def package_path(root: Path, relative_path: str) -> Path:
+    candidate = Path(relative_path)
+    require(not candidate.is_absolute(), f"Absolute package path forbidden: {relative_path}")
+    require(".." not in candidate.parts, f"Parent traversal forbidden: {relative_path}")
+    resolved_root = root.resolve()
+    resolved = (resolved_root / candidate).resolve()
+    require(resolved.is_relative_to(resolved_root), f"Path escapes package root: {relative_path}")
+    require(resolved.is_file(), f"Manifest artifact missing: {relative_path}")
+    return resolved
+
+
+def validate_manifest_digest(value: Any, label: str) -> str:
+    require(
+        isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None,
+        f"Invalid SHA-256 in materialization manifest for {label}",
+    )
+    return value
+
+
+def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, Path, str]], Path, str, str]:
+    manifest_path = root / "materialization-manifest.json"
+    require(manifest_path.is_file(), "materialization-manifest.json is required")
+    manifest_bytes = manifest_path.read_bytes()
+    try:
+        manifest = json.loads(manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise AuditError(f"Invalid materialization manifest: {exc}") from exc
+    require(isinstance(manifest, dict), "Materialization manifest root must be an object")
+    schema_version = manifest.get("schema_version")
+    require(
+        isinstance(schema_version, str)
+        and schema_version.startswith("engineering-fixture-materialization-v0."),
+        f"Unsupported materialization manifest schema: {schema_version!r}",
+    )
+
+    cad_cases = manifest.get("cad_cases")
+    require(isinstance(cad_cases, list) and len(cad_cases) == 6,
+            "Manifest must contain exactly six CAD-HISTORY cases")
+    subjects: list[tuple[str, Path, str]] = []
+    seen_ids: set[str] = set()
+    seen_paths: set[str] = set()
+    for case in cad_cases:
+        require(isinstance(case, dict), "CAD case must be an object")
+        fixture_id = case.get("fixture_id")
+        require(isinstance(fixture_id, str) and fixture_id not in seen_ids,
+                f"Missing or duplicate fixture ID: {fixture_id!r}")
+        seen_ids.add(fixture_id)
+        variants = case.get("variants")
+        require(isinstance(variants, list) and len(variants) == 2,
+                f"{fixture_id} must declare exactly two variants")
+        variant_names: set[str] = set()
+        for variant in variants:
+            require(isinstance(variant, dict), f"{fixture_id} variant must be an object")
+            name = variant.get("variant")
+            require(name in {"source", "edited"} and name not in variant_names,
+                    f"{fixture_id} has missing/duplicate/unsupported variant {name!r}")
+            variant_names.add(name)
+            require(variant.get("valid_brep") is True and variant.get("solid_count") == 1,
+                    f"{fixture_id}/{name} is not declared as one valid B-rep solid")
+            rel = variant.get("artifact")
+            require(isinstance(rel, str) and rel not in seen_paths,
+                    f"Missing or duplicate CAD artifact path: {rel!r}")
+            seen_paths.add(rel)
+            expected = validate_manifest_digest(variant.get("sha256"), rel)
+            artifact = package_path(root, rel)
+            actual = sha256(artifact)
+            require(actual == expected,
+                    f"Manifest digest mismatch for {rel}: expected {expected}, got {actual}")
+            subjects.append((rel, artifact, expected))
+        require(variant_names == {"source", "edited"},
+                f"{fixture_id} must declare source and edited variants")
+    require(len(subjects) == 12, f"Expected 12 manifest-bound CAD variants; found {len(subjects)}")
+
+    assembly = manifest.get("assembly")
+    require(isinstance(assembly, dict), "Manifest assembly record is required")
+    assembly_rel = assembly.get("artifact")
+    require(isinstance(assembly_rel, str), "Manifest assembly artifact path is missing")
+    assembly_digest = validate_manifest_digest(assembly.get("sha256"), assembly_rel)
+    assembly_path = package_path(root, assembly_rel)
+    require(sha256(assembly_path) == assembly_digest,
+            f"Manifest digest mismatch for assembly artifact {assembly_rel}")
+    require(assembly.get("valid_brep") is True
+            and assembly.get("solid_count") == 7
+            and assembly.get("physical_instance_count") == 7,
+            "Assembly manifest must declare one valid seven-solid / seven-instance assembly")
+    part_definitions = assembly.get("part_definitions")
+    require(isinstance(part_definitions, list) and len(part_definitions) == 6,
+            "Assembly manifest must declare six unique part definitions")
+    for part in part_definitions:
+        require(isinstance(part, dict) and part.get("valid_brep") is True,
+                "Each part definition must be declared a valid B-rep")
+        part_rel = part.get("artifact")
+        expected = validate_manifest_digest(part.get("sha256"), str(part_rel))
+        part_path = package_path(root, part_rel)
+        require(sha256(part_path) == expected,
+                f"Manifest digest mismatch for assembly part definition {part_rel}")
+
+    manifest_digest = sha256(manifest_path)
+    return manifest, subjects, assembly_path, assembly_digest, manifest_digest
+
+
+def validate_audit_toolchain(manifest: dict[str, Any], openscad_arg: str) -> tuple[str, str, dict[str, str]]:
+    declared = manifest.get("toolchain")
+    require(isinstance(declared, dict), "Manifest toolchain profile is required")
+    require(declared.get("cadquery") == "2.8.0",
+            f"Manifest CadQuery version is not the audited pin: {declared.get('cadquery')!r}")
+    require(declared.get("cadquery_ocp") == "7.9.3.1",
+            f"Manifest Open CASCADE pin is not the audited pin: {declared.get('cadquery_ocp')!r}")
+    python_version = sys.version.split()[0]
+    require(declared.get("python") == python_version,
+            f"Python version differs from manifest: expected {declared.get('python')}, got {python_version}")
+
+    actual = {
+        "python": python_version,
+        "cadquery": version("cadquery"),
+        "cadquery_ocp_distribution": version("cadquery-ocp"),
+        "opencascade_module": getattr(OCP, "__version__", "unknown"),
+        "trimesh": version("trimesh"),
+    }
+    require(actual["cadquery"] == "2.8.0", f"Unexpected CadQuery version: {actual['cadquery']}")
+    require(actual["opencascade_module"] == "7.9.3.1",
+            f"Unexpected Open CASCADE module version: {actual['opencascade_module']}")
+    require(actual["trimesh"] == "4.11.1", f"Unexpected Trimesh version: {actual['trimesh']}")
+
+    executable = shutil.which(openscad_arg)
+    require(executable is not None, f"OpenSCAD executable not found: {openscad_arg}")
+    result = subprocess.run(
+        [executable, "--version"], capture_output=True, text=True,
+        check=False, timeout=15, shell=False,
+    )
+    version_label = (result.stdout + result.stderr).strip()
+    require(result.returncode == 0, f"Cannot query OpenSCAD version: {version_label}")
+    require(version_label == "OpenSCAD version 2021.01",
+            f"OpenSCAD version differs from frozen profile: {version_label}")
+    actual["openscad"] = version_label
+    return executable, version_label, actual
+
 def audit_solid(
     step_path: Path,
     label: str,
@@ -154,6 +294,9 @@ def audit_solid(
     temp_root: Path,
     sequence: int,
     timeout_seconds: int,
+    source_artifact: str | None = None,
+    source_digest: str | None = None,
+    manifest_digest: str | None = None,
 ) -> dict[str, Any]:
     shape = importers.importStep(str(step_path)).val()
     require(shape.isValid(), f"OCP STEP import invalid: {label}")
@@ -182,6 +325,10 @@ def audit_solid(
         input_mesh.is_watertight and input_mesh.is_winding_consistent,
         f"OCP tessellation is not watertight/winding-consistent: {label}",
     )
+    require(
+        len(input_mesh.split(only_watertight=False)) == 1,
+        f"OCP tessellation has multiple connected components: {label}",
+    )
     input_volume = abs(float(input_mesh.volume))
     require(
         math.isfinite(input_volume) and input_volume > 0.0,
@@ -203,6 +350,10 @@ def audit_solid(
     require(
         output_mesh.is_watertight and output_mesh.is_winding_consistent,
         f"CGAL output mesh is not watertight/winding-consistent: {label}",
+    )
+    require(
+        len(output_mesh.split(only_watertight=False)) == 1,
+        f"CGAL output contains multiple connected components: {label}",
     )
     output_volume = abs(float(output_mesh.volume))
     require(
@@ -231,6 +382,9 @@ def audit_solid(
     return {
         "subject": label,
         "step_sha256": sha256(step_path),
+        "source_artifact": source_artifact or label,
+        "source_artifact_sha256": source_digest or sha256(step_path),
+        "source_manifest_sha256": manifest_digest,
         "input_stl_sha256": sha256(mesh_path),
         "cgal_output_stl_sha256": sha256(output_path),
         "brep_volume_mm3": brep_volume,
@@ -274,50 +428,29 @@ def main() -> int:
     parser.add_argument("--openscad", default="openscad", help="OpenSCAD executable")
     parser.add_argument("--timeout-seconds", type=int, default=180)
     args = parser.parse_args()
+    require(args.timeout_seconds > 0, "--timeout-seconds must be positive")
 
     fixture_root = args.fixture_root.resolve()
-    require(
-        (fixture_root / "cad").is_dir() and (fixture_root / "assembly").is_dir(),
-        f"Not an engineering-fixtures-v0.4 package root: {fixture_root}",
-    )
-    executable = shutil.which(args.openscad)
-    require(executable is not None, f"OpenSCAD executable not found: {args.openscad}")
-    version_run = subprocess.run(
-        [executable, "--version"],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=15,
-        shell=False,
-    )
-    version_label = (version_run.stdout + version_run.stderr).strip()
-    require(version_run.returncode == 0, f"Cannot query OpenSCAD version: {version_label}")
-    require(
-        EXPECTED_OPENSCAD_VERSION in version_label,
-        f"OpenSCAD version differs from frozen profile {EXPECTED_OPENSCAD_VERSION}: {version_label}",
-    )
-
-    step_paths = sorted((fixture_root / "cad").glob("*.step"))
-    assembly_path = fixture_root / "assembly" / "ASM-P01_support-frame.step"
-    require(
-        len(step_paths) == 12 and assembly_path.is_file(),
-        "Expected 12 CAD variants and one support-frame assembly STEP",
-    )
+    manifest, cad_subjects, assembly_path, assembly_digest, manifest_digest = load_manifest_subjects(fixture_root)
+    executable, version_label, toolchain = validate_audit_toolchain(manifest, args.openscad)
 
     records: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="engineering-fixture-openscad-cgal-") as temporary:
         temp_root = Path(temporary)
         sequence = 0
-        for step_path in step_paths:
+        for relative_path, step_path, expected_digest in cad_subjects:
             records.append(
                 audit_solid(
                     step_path,
-                    f"cad/{step_path.name}",
+                    relative_path,
                     executable,
                     version_label,
                     temp_root,
                     sequence,
                     args.timeout_seconds,
+                    source_artifact=relative_path,
+                    source_digest=expected_digest,
+                    manifest_digest=manifest_digest,
                 )
             )
             sequence += 1
@@ -328,22 +461,27 @@ def main() -> int:
             "Assembly STEP must contain seven valid solids",
         )
         for index, solid in enumerate(assembly.Solids(), start=1):
-            # Export one assembly instance through a temporary STEP file so the
-            # CGAL mesh test treats each article as a separate subject.
+            # The temporary STEP is a derived per-instance representation.
+            # The parent assembly digest remains the source identity.
             local_step = temp_root / f"assembly-solid-{index}.step"
             cq.exporters.export(solid, str(local_step), exportType="STEP")
             records.append(
                 audit_solid(
                     local_step,
-                    f"assembly/ASM-P01_support-frame.step#solid-{index}",
+                    f"{manifest['assembly']['fixture_id']}#solid-{index}",
                     executable,
                     version_label,
                     temp_root,
                     sequence,
                     args.timeout_seconds,
+                    source_artifact=manifest["assembly"]["artifact"],
+                    source_digest=assembly_digest,
+                    manifest_digest=manifest_digest,
                 )
             )
             sequence += 1
+
+    require(len(records) == 19, f"Expected 19 mesh subjects, got {len(records)}")
 
     max_input_to_cgal = max(
         record["relative_input_to_cgal_volume_error"] for record in records
@@ -355,7 +493,10 @@ def main() -> int:
         record["max_brep_to_cgal_bbox_error_mm"] for record in records
     )
     report = {
-        "schema_version": "openscad-cgal-mesh-audit-v0.1",
+        "schema_version": "openscad-cgal-mesh-audit-v0.2",
+        "manifest_schema_version": manifest["schema_version"],
+        "manifest_sha256": manifest_digest,
+        "toolchain": toolchain,
         "evidence_class": "synthetic_development_fixture_integrity",
         "status": "PASS_CROSS_ENGINE_CGAL_MESH_REEVALUATION_ONLY",
         "claim_ceiling": (
@@ -399,6 +540,9 @@ def main() -> int:
         args.output
         or (fixture_root / "openscad-cgal-mesh-audit.json")
     ).resolve()
+    protected = {assembly_path.resolve(), (fixture_root / "materialization-manifest.json").resolve()}
+    protected.update(path.resolve() for _, path, _ in cad_subjects)
+    require(output not in protected, "Audit output cannot overwrite an input STEP or the manifest")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     summary_keys = (
