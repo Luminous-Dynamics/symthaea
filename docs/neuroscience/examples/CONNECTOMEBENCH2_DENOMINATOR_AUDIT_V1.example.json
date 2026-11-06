@@ -1,0 +1,290 @@
+{
+  "schema_version": 1,
+  "audit_id": "connectomebench2-v1-card-denominator-arithmetic-2026-11-07",
+  "audit_date": "2026-11-07",
+  "scope": "metadata_only_source_card_known_answer",
+  "sources": [
+    {
+      "source_id": "connectomebench2-paper",
+      "source_kind": "paper",
+      "uri": "https://arxiv.org/abs/2606.21116",
+      "revision_label": "arXiv:2606.21116; project page checked 2026-11-07",
+      "revision_identity_status": "revision_label_only_unpinned",
+      "commit_sha": null,
+      "commit_short": null,
+      "notes": [
+        "Project abstract reports more than 716,485 expert-labelled proofreading decisions and more than 4,500,000 associated images.",
+        "Paper-level expert decisions and associated images are not interchangeable with dataset-card rows."
+      ]
+    },
+    {
+      "source_id": "connectomebench2-card-v1-main",
+      "source_kind": "dataset_card",
+      "uri": "https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2/blob/main/README.md",
+      "revision_label": "main; initially submitted V1; README commit short identifier 1039fdf",
+      "revision_identity_status": "short_identifier_only",
+      "commit_sha": null,
+      "commit_short": "1039fdf",
+      "notes": [
+        "Card explicitly says main is initially submitted V1 and the paper-current revision is v2.",
+        "All row, split, sample-type and EM coverage observations in this fixture are scoped to the visible V1/main card unless otherwise specified.",
+        "The full immutable Git commit SHA is not pinned in this metadata-only fixture."
+      ]
+    },
+    {
+      "source_id": "connectomebench2-card-v2",
+      "source_kind": "dataset_revision",
+      "uri": "https://huggingface.co/datasets/jeffbbrown2/ConnectomeBench2",
+      "revision_label": "v2",
+      "revision_identity_status": "revision_label_only_unpinned",
+      "commit_sha": null,
+      "commit_short": null,
+      "notes": [
+        "V2 is explicitly identified by the card as the revision used by the current arXiv paper.",
+        "The exact immutable V2 commit SHA and V2 shard/sidecar byte manifests have not been materialized or verified in this fixture."
+      ]
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "paper-expert-decisions",
+      "source_id": "connectomebench2-paper",
+      "revision_label": "arXiv:2606.21116",
+      "metric": "expert_labelled_proofreading_decisions",
+      "value": 716485,
+      "qualifier": "greater_than",
+      "unit": "expert_labelled_decisions",
+      "scope": "four connectomes: mouse, human, zebrafish and fly",
+      "precision": "lower bound as worded by the project abstract"
+    },
+    {
+      "observation_id": "paper-associated-images",
+      "source_id": "connectomebench2-paper",
+      "revision_label": "arXiv:2606.21116",
+      "metric": "associated_images",
+      "value": 4500000,
+      "qualifier": "greater_than",
+      "unit": "associated_images",
+      "scope": "four connectomes",
+      "precision": "lower bound as worded by the project abstract"
+    },
+    {
+      "observation_id": "v1-dataset-rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "metric": "dataset_rows_total",
+      "value": 401170,
+      "qualifier": "exact",
+      "unit": "dataset_rows",
+      "scope": "visible V1/main dataset card",
+      "precision": "integer row count"
+    },
+    {
+      "observation_id": "v1-rows-with-em",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "metric": "rows_with_em_views",
+      "value": 251499,
+      "qualifier": "exact",
+      "unit": "rows_with_em",
+      "scope": "visible V1/main dataset card",
+      "precision": "integer row count"
+    },
+    {
+      "observation_id": "v1-em-coverage",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "metric": "overall_rows_with_em_percent",
+      "value": 63,
+      "qualifier": "approximately",
+      "unit": "percent_rows",
+      "scope": "visible V1/main dataset card",
+      "precision": "whole-percent approximation"
+    },
+    {
+      "observation_id": "v1-parquet-shards",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "metric": "parquet_shards",
+      "value": 506,
+      "qualifier": "exact",
+      "unit": "parquet_shards",
+      "scope": "visible V1/main dataset card",
+      "precision": "integer shard count"
+    },
+    {
+      "observation_id": "v1-dataset-size-gb",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "metric": "dataset_size_gb",
+      "value": 121,
+      "qualifier": "approximately",
+      "unit": "gigabytes",
+      "scope": "visible V1/main repository page",
+      "precision": "rounded GB display"
+    }
+  ],
+  "sample_type_counts": [
+    {
+      "category": "adjacent_control",
+      "value": 121333,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    },
+    {
+      "category": "junction_control",
+      "value": 38272,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    },
+    {
+      "category": "synapse_control",
+      "value": 18182,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    },
+    {
+      "category": "merge_edit",
+      "value": 146461,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    },
+    {
+      "category": "split_edit",
+      "value": 77213,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    }
+  ],
+  "split_counts": [
+    {
+      "category": "train",
+      "value": 319727,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    },
+    {
+      "category": "validation",
+      "value": 43517,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    },
+    {
+      "category": "test",
+      "value": 37926,
+      "unit": "rows",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1",
+      "status": "reported"
+    }
+  ],
+  "em_coverage": [
+    {
+      "sample_type": "adjacent_control",
+      "percent_has_em": 100,
+      "qualifier": "exact",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1"
+    },
+    {
+      "sample_type": "junction_control",
+      "percent_has_em": 100,
+      "qualifier": "exact",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1"
+    },
+    {
+      "sample_type": "synapse_control",
+      "percent_has_em": 100,
+      "qualifier": "exact",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1"
+    },
+    {
+      "sample_type": "merge_edit",
+      "percent_has_em": 38,
+      "qualifier": "approximately",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1"
+    },
+    {
+      "sample_type": "split_edit",
+      "percent_has_em": 23,
+      "qualifier": "approximately",
+      "source_id": "connectomebench2-card-v1-main",
+      "revision_label": "main/V1"
+    }
+  ],
+  "task_contract": [
+    {
+      "task_id": "false_split_correction",
+      "sample_types": [
+        "merge_edit",
+        "synapse_control",
+        "adjacent_control"
+      ],
+      "mask_requirement": "has_dual_mask",
+      "geometry_view": "dual_segment",
+      "label_definition": "same_neuron; false-split correction merges distinct segmentation fragments of the same neuron"
+    },
+    {
+      "task_id": "false_merge_identification",
+      "sample_types": [
+        "split_edit",
+        "junction_control"
+      ],
+      "mask_requirement": "has_single_mask",
+      "geometry_view": "single_segment",
+      "label_definition": "not same_neuron; identify false merges inside one segmentation"
+    },
+    {
+      "task_id": "split_mask_generation",
+      "sample_types": [
+        "split_edit"
+      ],
+      "mask_requirement": "has_single_mask",
+      "geometry_view": "single_segment_input_with_dual_target",
+      "label_definition": "single-segment input with the corresponding dual-segment render supplying Mask A/Mask B targets"
+    }
+  ],
+  "leakage_controls": [
+    "Discard em_best in single-segment tasks because its oblique view is selected using both segment masks.",
+    "Use task-correct single/dual geometry and fuse/zero EM mask channels according to the declared task.",
+    "Split by declared 50-micrometre spatial cubes; never randomly split derived views or row copies.",
+    "Keep synthetic adjacent/junction/synapse controls separate from real merge_edit/split_edit metrics."
+  ],
+  "v2_artifact_pin": {
+    "revision_label": "v2",
+    "identity_status": "revision_label_only_unpinned",
+    "commit_sha": null,
+    "shard_count_reported": null,
+    "shard_manifest_status": "not_materialized",
+    "note": "The README identifies v2 as the current arXiv-paper revision, but this fixture does not invent an immutable commit SHA or transfer V1/main shard counts to V2."
+  },
+  "expected_checks": {
+    "sample_type_count_sum": 401461,
+    "reported_dataset_rows": 401170,
+    "sample_type_difference": 291,
+    "split_count_sum": 401170,
+    "split_total_matches": true,
+    "sample_type_partition_status": "MISMATCH",
+    "sample_type_partition_disposition": "UNRESOLVED_CARD_INCONSISTENCY",
+    "paper_decision_unit_comparison": "NOT_COMPARABLE_WITH_DATASET_ROWS_UNTIL_COUNTING_RULES_RECONCILED",
+    "v2_reproduction_status": "NOT_REPRODUCED"
+  },
+  "claim_scope": "metadata_only"
+}
