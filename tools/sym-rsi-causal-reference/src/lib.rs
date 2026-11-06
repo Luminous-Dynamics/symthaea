@@ -300,6 +300,12 @@ pub struct ChangeUnit {
     pub id: String,
     pub origin_parent_id: Option<String>,
     pub class: ChangeClass,
+    pub source_diff_digest: String,
+    pub affected_paths: Vec<String>,
+    pub declared_mechanism: String,
+    pub predicted_intermediate_effect: String,
+    pub rollback_procedure_ref: String,
+    pub transplant_procedure_ref: String,
     #[serde(default)]
     pub requires: Vec<String>,
     #[serde(default)]
@@ -332,6 +338,16 @@ pub enum ManifestIssue {
     EmptyField(&'static str),
     UnsupportedSchemaVersion(String),
     InvalidSha256(&'static str),
+    InvalidChangeDiffDigest(String),
+    EmptyChangeUnitField {
+        unit: String,
+        field: &'static str,
+    },
+    EmptyAffectedPaths(String),
+    DuplicateAffectedPath {
+        unit: String,
+        path: String,
+    },
     DuplicateParent(String),
     DuplicateChangeUnit(String),
     DuplicateRelation {
@@ -443,6 +459,40 @@ pub fn validate_manifest(
     for (id, unit) in &units {
         if matches!(unit.class, ChangeClass::EvaluatorOrTaskContract) {
             issues.push(ManifestIssue::ForbiddenChangeClass { unit: id.clone() });
+        }
+
+        if !is_canonical_sha256(&unit.source_diff_digest) {
+            issues.push(ManifestIssue::InvalidChangeDiffDigest(id.clone()));
+        }
+        if unit.affected_paths.is_empty() {
+            issues.push(ManifestIssue::EmptyAffectedPaths(id.clone()));
+        }
+        let mut affected_paths = BTreeSet::new();
+        for path in &unit.affected_paths {
+            if path.trim().is_empty() {
+                issues.push(ManifestIssue::EmptyChangeUnitField {
+                    unit: id.clone(),
+                    field: "affected_paths",
+                });
+            } else if !affected_paths.insert(path.as_str()) {
+                issues.push(ManifestIssue::DuplicateAffectedPath {
+                    unit: id.clone(),
+                    path: path.clone(),
+                });
+            }
+        }
+        for (field, value) in [
+            ("declared_mechanism", unit.declared_mechanism.as_str()),
+            ("predicted_intermediate_effect", unit.predicted_intermediate_effect.as_str()),
+            ("rollback_procedure_ref", unit.rollback_procedure_ref.as_str()),
+            ("transplant_procedure_ref", unit.transplant_procedure_ref.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                issues.push(ManifestIssue::EmptyChangeUnitField {
+                    unit: id.clone(),
+                    field,
+                });
+            }
         }
 
         if let Some(parent) = unit.origin_parent_id.as_deref() {
@@ -885,6 +935,12 @@ mod tests {
                     id: "change-a".to_owned(),
                     origin_parent_id: Some("lineage-a".to_owned()),
                     class: ChangeClass::Algorithm,
+                    source_diff_digest: digest('3'),
+                    affected_paths: vec!["crates/core/example/src/update.rs".to_owned()],
+                    declared_mechanism: "adaptive update".to_owned(),
+                    predicted_intermediate_effect: "lower update variance".to_owned(),
+                    rollback_procedure_ref: "procedure:rollback-a".to_owned(),
+                    transplant_procedure_ref: "procedure:transplant-a".to_owned(),
                     requires: vec![],
                     conflicts: vec![],
                     coupled_group: None,
@@ -893,6 +949,12 @@ mod tests {
                     id: "change-b".to_owned(),
                     origin_parent_id: Some("lineage-b".to_owned()),
                     class: ChangeClass::Algorithm,
+                    source_diff_digest: digest('4'),
+                    affected_paths: vec!["crates/core/example/src/memory.rs".to_owned()],
+                    declared_mechanism: "bounded retrieval gate".to_owned(),
+                    predicted_intermediate_effect: "higher retrieval precision".to_owned(),
+                    rollback_procedure_ref: "procedure:rollback-b".to_owned(),
+                    transplant_procedure_ref: "procedure:transplant-b".to_owned(),
                     requires: vec![],
                     conflicts: vec![],
                     coupled_group: None,
@@ -1027,6 +1089,38 @@ mod tests {
     #[test]
     fn valid_manifest_passes_structure_checks() {
         assert_eq!(validate_manifest(&valid_manifest()), Ok(()));
+    }
+
+    #[test]
+    fn manifest_rejects_missing_mechanism_or_intervention_procedures() {
+        let mut manifest = valid_manifest();
+        manifest.change_units[0].predicted_intermediate_effect.clear();
+        manifest.change_units[1].transplant_procedure_ref.clear();
+        let result = validate_manifest(&manifest).expect_err("causal intent must be preregistered");
+        assert!(result.contains(&ManifestIssue::EmptyChangeUnitField {
+            unit: "change-a".to_owned(),
+            field: "predicted_intermediate_effect"
+        }));
+        assert!(result.contains(&ManifestIssue::EmptyChangeUnitField {
+            unit: "change-b".to_owned(),
+            field: "transplant_procedure_ref"
+        }));
+    }
+
+    #[test]
+    fn manifest_rejects_invalid_patch_digest_and_duplicate_paths() {
+        let mut manifest = valid_manifest();
+        manifest.change_units[0].source_diff_digest = "not-a-digest".to_owned();
+        manifest.change_units[1].affected_paths = vec![
+            "crates/core/example/src/memory.rs".to_owned(),
+            "crates/core/example/src/memory.rs".to_owned(),
+        ];
+        let result = validate_manifest(&manifest).expect_err("patch identity must be unambiguous");
+        assert!(result.contains(&ManifestIssue::InvalidChangeDiffDigest("change-a".to_owned())));
+        assert!(result.contains(&ManifestIssue::DuplicateAffectedPath {
+            unit: "change-b".to_owned(),
+            path: "crates/core/example/src/memory.rs".to_owned()
+        }));
     }
 
     #[test]
