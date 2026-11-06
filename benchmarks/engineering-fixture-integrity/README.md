@@ -44,9 +44,10 @@ A 2026-11-05 development run reported:
 
 Those are observations from the prior v0.4 development run. The current
 manifest-binding verifier revision has not been rerun against the v0.4 ZIP in
-this chat environment. Its nine manifest preflight/negative-control unit
-tests are the local validation tranche; the full 19-subject run remains a
-separate reproducibility check.
+this execution environment. Nine manifest preflight/negative-control unit test
+cases have been authored, but they have not yet been executed here. The draft
+PR's GitHub workflows were skipped, not passed. Both the unit-test run and the
+full 19-subject replay remain open validation tasks.
 
 ## Claim boundary
 
