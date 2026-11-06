@@ -237,12 +237,6 @@ pub fn evaluate_paired_policy_comparison<'a>(
     for (reference, digest) in common_references.into_iter().zip(common_digests) {
         validate_reference(reference, digest)?;
     }
-    for (index, reference) in common_references.iter().enumerate() {
-        if common_references[..index].contains(reference) {
-            return Err(PairedPolicyComparisonError::InvalidEvidenceReference);
-        }
-    }
-
     if inputs.declared_scenario_ids.is_empty() {
         return Err(PairedPolicyComparisonError::EmptyScenarioSet);
     }
@@ -291,7 +285,6 @@ pub fn evaluate_paired_policy_comparison<'a>(
     }
 
     let mut outcome_ids = BTreeSet::new();
-    let mut scenario_source_refs = BTreeSet::new();
     let mut candidate_record_ids = BTreeSet::new();
     let mut comparator_record_ids = BTreeSet::new();
     let mut total_probability = 0_u32;
@@ -335,7 +328,8 @@ pub fn evaluate_paired_policy_comparison<'a>(
         {
             return Err(PairedPolicyComparisonError::FutureKnownEvidence);
         }
-        if !scenario_source_refs.insert(outcome.scenario_source_ref)
+        if !nonempty(outcome.candidate_result_record_id)
+            || !nonempty(outcome.comparator_result_record_id)
             || !candidate_record_ids.insert(outcome.candidate_result_record_id)
             || !comparator_record_ids.insert(outcome.comparator_result_record_id)
         {
@@ -514,7 +508,7 @@ mod tests {
     ) -> PolicyOutcomePair<'static> {
         PolicyOutcomePair {
             scenario_id,
-            scenario_source_ref: scenario_id,
+            scenario_source_ref: "scenario/manifest/v1",
             scenario_source_sha256: SOURCE_SHA,
             probability_source_ref: "probability/manifest/v1",
             probability_source_sha256: SOURCE_SHA,
