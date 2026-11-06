@@ -834,6 +834,78 @@ mod tests {
         );
     }
 
+    fn enumerate_assignment_costs(
+        costs: &[Vec<f64>],
+        row: usize,
+        used_columns: &mut [bool],
+        accumulated: f64,
+        totals: &mut Vec<f64>,
+    ) {
+        if row == costs.len() {
+            totals.push(accumulated);
+            return;
+        }
+        for column in 0..costs.len() {
+            if used_columns[column] {
+                continue;
+            }
+            used_columns[column] = true;
+            enumerate_assignment_costs(
+                costs,
+                row + 1,
+                used_columns,
+                accumulated + costs[row][column],
+                totals,
+            );
+            used_columns[column] = false;
+        }
+    }
+
+    #[test]
+    fn assignment_margin_matches_brute_force_second_best_cost() {
+        let mut random_state = 0x5eed_cafe_d15c_a11u64;
+        for dimension in 2..=6 {
+            for _case in 0..12 {
+                let mut costs = vec![vec![0.0; dimension]; dimension];
+                for row in &mut costs {
+                    for value in row {
+                        random_state = random_state
+                            .wrapping_mul(6_364_136_223_846_793_005)
+                            .wrapping_add(1_442_695_040_888_963_407);
+                        *value = f64::from((random_state >> 32) as u32 % 10_000) / 101.0;
+                    }
+                }
+
+                let (assignment, best_cost) =
+                    minimum_cost_assignment(&costs).expect("complete finite assignment");
+                let mut totals = Vec::new();
+                enumerate_assignment_costs(
+                    &costs,
+                    0,
+                    &mut vec![false; dimension],
+                    0.0,
+                    &mut totals,
+                );
+                totals.sort_by(f64::total_cmp);
+                let brute_best = totals[0];
+                let brute_second = totals[1];
+                let brute_margin = brute_second - brute_best;
+                let measured_margin =
+                    alternating_cycle_assignment_margin(&costs, &assignment)
+                        .expect("complete finite matrix has an alternative assignment");
+
+                assert!(
+                    (best_cost - brute_best).abs() < 1e-9,
+                    "Hungarian optimum mismatch at dimension {dimension}"
+                );
+                assert!(
+                    (measured_margin - brute_margin).abs() < 1e-8,
+                    "assignment margin mismatch at dimension {dimension}: {measured_margin} vs {brute_margin}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn activation_signature_alignment_recovers_hidden_unit_permutation() {
         let source = vec![
