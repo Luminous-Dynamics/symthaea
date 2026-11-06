@@ -636,6 +636,10 @@ fn compute_decision_directed_cell_priorities(
         })
         .collect();
     let mut priorities = Vec::with_capacity(receipt.metrics.len());
+    // For CRN, every candidate action in a scenario is the same atomic batch.
+    // Cache its exact projection once per scenario instead of recomputing it A times.
+    let mut crn_projection_cache =
+        BTreeMap::<u16, (f64, f64, usize, f64)>::new();
 
     for action_interval in &certificate.action_intervals {
         let competitive = competitive_ids
@@ -651,101 +655,148 @@ fn compute_decision_directed_cell_priorities(
 
         for metric in action_metrics {
             let sample_count = metric.target_utility.sample_count;
-            let mut priority = 0.0;
-            let mut certificate_gap_contraction = 0.0;
-            let mut projected_batch_cost = 0usize;
-            let mut projected_regret_upper_bound = certificate.regret_upper_bound;
-
+            let mut projection = (
+                0.0,
+                0.0,
+                0,
+                certificate.regret_upper_bound,
+            );
             if competitive {
-                let target_action_ids = match config.seed_mode {
-                    ReplicationSeedMode::IndependentPerCell => vec![metric.action_id],
-                    ReplicationSeedMode::CommonRandomNumbersWithinScenario => {
-                        let mut counts = BTreeMap::new();
-                        for sample in receipt
-                            .samples
-                            .iter()
-                            .filter(|sample| sample.scenario_id == metric.scenario_id)
-                        {
-                            counts.insert(sample.action_id, common_cell_sample_count(sample)?);
-                        }
-                        if counts.len() != receipt.action_snapshot.len()
-                            || counts.values().any(|count| *count != sample_count)
-                        {
-                            return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
-                        }
-                        receipt
-                            .action_snapshot
-                            .iter()
-                            .map(|action| action.action_id)
-                            .collect::<Vec<_>>()
-                    }
-                };
-
-                let cost_per_replication = target_action_ids.len();
-                let affordable_count = remaining_budget / cost_per_replication;
-                let batch_count = affordable_count.min(config.next_batch_size);
-                if batch_count > 0 {
-                    let projected_count = sample_count
-                        .checked_add(batch_count)
-                        .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
-                    let mut overrides = Vec::with_capacity(target_action_ids.len());
-                    for target_action_id in &target_action_ids {
-                        let target_metric = receipt
-                            .metrics
-                            .iter()
-                            .find(|candidate| {
-                                candidate.action_id == *target_action_id
-                                    && candidate.scenario_id == metric.scenario_id
-                            })
-                            .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
-                        if target_metric.target_utility.sample_count != sample_count {
-                            return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
-                        }
-                        let radius = projected_anytime_hoeffding_radius(
-                            target_metric.target_utility.declared_range,
-                            projected_count,
-                            receipt.per_claim_alpha,
+                if config.seed_mode == ReplicationSeedMode::CommonRandomNumbersWithinScenario {
+                    if let Some(cached) =
+                        crn_projection_cache.get(&metric.scenario_id).copied()
+                    {
+                        projection = cached;
+                    } else {
+                        projection = project_decision_directed_batch(
+                            receipt,
+                            certificate,
+                            config,
+                            metric.action_id,
+                            metric.scenario_id,
+                            sample_count,
+                            remaining_budget,
                         )?;
-                        let point = target_metric.target_utility.point_estimate;
-                        let range = target_metric.target_utility.declared_range;
-                        let lower = (point - radius).max(range.lower);
-                        let upper = (point + radius).min(range.upper);
-                        if !lower.is_finite() || !upper.is_finite() || lower > upper {
-                            return Err(AdaptiveAllocationError::NonFinitePriority);
-                        }
-                        overrides.push((*target_action_id, metric.scenario_id, lower, upper));
+                        crn_projection_cache.insert(metric.scenario_id, projection);
                     }
-                    projected_regret_upper_bound = counterfactual_regret_upper_bound(
+                } else {
+                    projection = project_decision_directed_batch(
                         receipt,
-                        config.robust_utility,
-                        &overrides,
-                    )
-                    .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?;
-                    certificate_gap_contraction =
-                        (certificate.regret_upper_bound - projected_regret_upper_bound).max(0.0);
-                    projected_batch_cost = batch_count
-                        .checked_mul(cost_per_replication)
-                        .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
-                    priority = certificate_gap_contraction / projected_batch_cost as f64;
-                    if !priority.is_finite() || priority < 0.0 {
-                        return Err(AdaptiveAllocationError::NonFinitePriority);
-                    }
+                        certificate,
+                        config,
+                        metric.action_id,
+                        metric.scenario_id,
+                        sample_count,
+                        remaining_budget,
+                    )?;
                 }
             }
-
             priorities.push(CellPriority {
                 action_id: metric.action_id,
                 scenario_id: metric.scenario_id,
                 sample_count,
-                priority,
-                certificate_gap_contraction,
-                projected_batch_cost,
-                projected_regret_upper_bound,
+                priority: projection.0,
+                certificate_gap_contraction: projection.1,
+                projected_batch_cost: projection.2,
+                projected_regret_upper_bound: projection.3,
                 competitive,
             });
         }
     }
     Ok(priorities)
+}
+
+/// Returns (priority, certificate-gap contraction, fully charged cost, projected regret bound).
+fn project_decision_directed_batch(
+    receipt: &ScoreBoundsReceipt,
+    certificate: &RobustSelectionCertificate,
+    config: &AdaptiveAllocationConfig,
+    candidate_action_id: u32,
+    scenario_id: u16,
+    sample_count: usize,
+    remaining_budget: usize,
+) -> Result<(f64, f64, usize, f64), AdaptiveAllocationError> {
+    let target_action_ids = match config.seed_mode {
+        ReplicationSeedMode::IndependentPerCell => vec![candidate_action_id],
+        ReplicationSeedMode::CommonRandomNumbersWithinScenario => {
+            let mut counts = BTreeMap::new();
+            for sample in receipt
+                .samples
+                .iter()
+                .filter(|sample| sample.scenario_id == scenario_id)
+            {
+                counts.insert(sample.action_id, common_cell_sample_count(sample)?);
+            }
+            if counts.len() != receipt.action_snapshot.len()
+                || counts.values().any(|count| *count != sample_count)
+            {
+                return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
+            }
+            receipt
+                .action_snapshot
+                .iter()
+                .map(|action| action.action_id)
+                .collect::<Vec<_>>()
+        }
+    };
+
+    let cost_per_replication = target_action_ids.len();
+    let affordable_count = remaining_budget / cost_per_replication;
+    let batch_count = affordable_count.min(config.next_batch_size);
+    if batch_count == 0 {
+        return Ok((0.0, 0.0, 0, certificate.regret_upper_bound));
+    }
+    let projected_count = sample_count
+        .checked_add(batch_count)
+        .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
+    let mut overrides = Vec::with_capacity(target_action_ids.len());
+    for target_action_id in &target_action_ids {
+        let target_metric = receipt
+            .metrics
+            .iter()
+            .find(|candidate| {
+                candidate.action_id == *target_action_id
+                    && candidate.scenario_id == scenario_id
+            })
+            .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
+        if target_metric.target_utility.sample_count != sample_count {
+            return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
+        }
+        let radius = projected_anytime_hoeffding_radius(
+            target_metric.target_utility.declared_range,
+            projected_count,
+            receipt.per_claim_alpha,
+        )?;
+        let point = target_metric.target_utility.point_estimate;
+        let range = target_metric.target_utility.declared_range;
+        let lower = (point - radius).max(range.lower);
+        let upper = (point + radius).min(range.upper);
+        if !lower.is_finite() || !upper.is_finite() || lower > upper {
+            return Err(AdaptiveAllocationError::NonFinitePriority);
+        }
+        overrides.push((*target_action_id, scenario_id, lower, upper));
+    }
+    let projected_regret_upper_bound = counterfactual_regret_upper_bound(
+        receipt,
+        config.robust_utility,
+        &overrides,
+    )
+    .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?;
+    let certificate_gap_contraction =
+        (certificate.regret_upper_bound - projected_regret_upper_bound).max(0.0);
+    let projected_batch_cost = batch_count
+        .checked_mul(cost_per_replication)
+        .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
+    let priority = certificate_gap_contraction / projected_batch_cost as f64;
+    if !priority.is_finite() || priority < 0.0 {
+        return Err(AdaptiveAllocationError::NonFinitePriority);
+    }
+    Ok((
+        priority,
+        certificate_gap_contraction,
+        projected_batch_cost,
+        projected_regret_upper_bound,
+    ))
 }
 
 fn projected_anytime_hoeffding_radius(
@@ -1174,6 +1225,46 @@ mod tests {
         );
     }
 
+
+
+    #[test]
+    fn crn_projection_cache_matches_direct_projection_for_every_action_candidate() {
+        let receipt = score_receipt(1_000, [0.85, 0.70], true);
+        let mut cfg = config(0.01, 5_000, 2);
+        cfg.robust_utility = RobustUtility::LowerTailCvar { tail_mass: 0.5 };
+        let allocation =
+            allocate_next_score_batch_decision_directed(&receipt, &cfg).unwrap();
+        let remaining_budget = cfg.max_total_replications - allocation.current_total_replications;
+
+        for scenario_id in [10_u16, 20_u16] {
+            let candidates = allocation
+                .cell_priorities
+                .iter()
+                .filter(|cell| cell.scenario_id == scenario_id && cell.competitive)
+                .collect::<Vec<_>>();
+            assert!(!candidates.is_empty());
+            let first = candidates[0];
+            let cached_tuple = (
+                first.priority,
+                first.certificate_gap_contraction,
+                first.projected_batch_cost,
+                first.projected_regret_upper_bound,
+            );
+            for candidate in candidates {
+                let direct = project_decision_directed_batch(
+                    &receipt,
+                    &allocation.certificate,
+                    &cfg,
+                    candidate.action_id,
+                    scenario_id,
+                    candidate.sample_count,
+                    remaining_budget,
+                )
+                .unwrap();
+                assert_eq!(direct, cached_tuple);
+            }
+        }
+    }
 
     #[test]
     fn decision_directed_crn_refuses_partial_atomic_batch() {
