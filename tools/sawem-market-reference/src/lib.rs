@@ -16,6 +16,7 @@ pub mod cash_risk;
 pub mod credit_cover;
 pub mod decision_certificate;
 pub mod decision_regret;
+pub mod execution_authority;
 pub mod execution_fidelity;
 pub mod forecast_baselines;
 pub mod forecast_cohort;
