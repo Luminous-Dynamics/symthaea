@@ -207,13 +207,15 @@ impl PhonemeHdcLtc {
         )
     }
 
-    /// Train one step: evolve network, then update each neuron via backward.
+    /// Train one frame with a layer-local target objective.
     ///
-    /// For each neuron in each layer, computes gradients against the target
-    /// phoneme prototype and updates weights. This distributes learning
-    /// across all 24 neurons.
+    /// Each layer computes its local gradients from the neuron's pre-evolution
+    /// state, applies the update, and then evolves. The next layer receives the
+    /// updated output of the previous layer. This fixes the former forward /
+    /// backward state mismatch; it is deliberately not described as temporal
+    /// BPTT or full chain-rule backpropagation.
     ///
-    /// Returns cosine similarity of output to target prototype.
+    /// Returns cosine similarity of the post-update output to the target prototype.
     pub fn train_step(
         &mut self,
         input_hv: &ContinuousHV,
@@ -221,37 +223,17 @@ impl PhonemeHdcLtc {
         dt: f32,
         lr: f32,
     ) -> f32 {
-        // Find target prototype
-        let target_idx = self.prototypes.iter().position(|(l, _)| l == target_label);
-        let target_idx = match target_idx {
-            Some(idx) => idx,
+        let target_idx = match self.prototypes.iter().position(|(label, _)| label == target_label) {
+            Some(index) => index,
             None => return 0.0,
         };
         let target_proto = self.prototypes[target_idx].1.clone();
 
-        // Forward: evolve entire network
-        self.network.evolve_closed_form(dt, input_hv);
-
-        // Compute output similarity before update (for metrics)
-        let output = self.network.output().normalize();
-        let sim_before = output.similarity(&target_proto);
-
-        // Backward: update each neuron in each layer
-        let n_layers = self.network.n_layers();
-        for layer_idx in 0..n_layers {
-            // Get the input this layer received
-            let layer_input = self.network.layer_input(layer_idx, input_hv);
-
-            // Update each neuron in this layer
-            if let Some(layer) = self.network.layer_mut(layer_idx) {
-                for neuron in layer.iter_mut() {
-                    let grads = neuron.backward(&layer_input, &target_proto, dt);
-                    neuron.apply_gradients_no_decay(&grads, lr);
-                }
-            }
-        }
-
-        sim_before
+        let output = self
+            .network
+            .train_local_target_step(dt, input_hv, &target_proto, lr)
+            .normalize();
+        output.similarity(&target_proto)
     }
 
     /// Reset all neuron states.
