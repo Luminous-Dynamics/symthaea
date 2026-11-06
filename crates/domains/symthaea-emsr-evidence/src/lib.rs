@@ -828,6 +828,29 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    const FROZEN_CATALOG_FIXTURE: &str = include_str!(
+        "../../../../docs/research/emsr-v0.1/emsr-dataset-catalog-v0.1.json"
+    );
+    const SYNTHETIC_SPLIT_FIXTURE: &str = include_str!(
+        "../../../../docs/research/emsr-v0.1/emsr-split-manifest-example-v0.1.json"
+    );
+
+    #[test]
+    fn validates_committed_rights_pending_dataset_catalogue() {
+        let summary = validate_dataset_catalog(FROZEN_CATALOG_FIXTURE)
+            .expect("committed discovery-only catalogue should validate");
+        assert_eq!(summary.not_imported, 4);
+        assert_eq!(summary.imported, 0);
+    }
+
+    #[test]
+    fn validates_committed_synthetic_split_example() {
+        let summary = validate_split_manifest(SYNTHETIC_SPLIT_FIXTURE)
+            .expect("committed synthetic split example should validate");
+        assert_eq!(summary.record_count, 3);
+        assert_eq!(summary.test_count, 1);
+    }
+
     fn sample_catalog(ingestion: &str, rights_state: &str, permitted_uses: Vec<&str>) -> String {
         let payload_files: Vec<serde_json::Value> = if ingestion == "imported" {
             vec![json!({
