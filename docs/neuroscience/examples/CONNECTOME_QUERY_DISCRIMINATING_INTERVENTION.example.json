@@ -417,6 +417,7 @@
       "infeasible-perfect": 1
     },
     "expected_selected_intervention_id": "orthogonal-robust",
-    "expected_entropy_greedy_intervention_id": "high-eig-irrelevant"
+    "expected_entropy_greedy_intervention_id": "high-eig-irrelevant",
+    "expected_decision_status": "DISCRIMINATING_INTERVENTION_AVAILABLE"
   }
 }
