@@ -3629,15 +3629,18 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
             .collect::<Vec<_>>(),
     });
 
-    let index_result = {
-        let _guard = studio
-            .keeper_log
-            .lock()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        append_keeper_entry_atomically(&entry, keeper_sequence)
+    let index_result = match studio.keeper_log.lock() {
+        Ok(_guard) => append_keeper_entry_atomically(&entry, keeper_sequence),
+        Err(_) => Err(std::io::Error::other("keeper index mutex poisoned")),
     };
-    if index_result.is_err() {
-        let _ = std::fs::remove_dir_all(bundle_path);
+    if let Err(index_error) = index_result {
+        if let Err(cleanup_error) = std::fs::remove_dir_all(&bundle_path) {
+            eprintln!(
+                "[muse_studio] keeper: failed to remove unindexed bundle {} after index failure ({index_error}): {cleanup_error}",
+                bundle_path.display()
+            );
+        }
+        let _ = sync_directory(bundle_path.parent().unwrap_or_else(|| Path::new(".")));
         // The keep itself failed downstream of genealogy allocation --
         // don't leave a manifest referencing an audio_key whose bundle
         // directory was just deleted and whose JSONL entry never landed.
