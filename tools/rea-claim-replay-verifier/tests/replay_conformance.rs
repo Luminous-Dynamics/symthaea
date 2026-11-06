@@ -1016,4 +1016,3 @@ fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
     assert_eq!(replay.evidence_count, 4);
     assert_eq!(replay.rule_id, "no-registered-predicate-rule/v0");
 }
-
