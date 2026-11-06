@@ -430,7 +430,15 @@
         },
         "shared_envelope_digest": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "same_envelope_for_all_arms": {
           "const": true
@@ -452,7 +460,15 @@
               "properties": {
                 "envelope_digest": {
                   "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    {
+                      "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                    }
+                  ]
                 },
                 "inclusive": {
                   "const": true
@@ -469,7 +485,15 @@
               "properties": {
                 "envelope_digest": {
                   "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    {
+                      "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                    }
+                  ]
                 },
                 "inclusive": {
                   "const": true
@@ -668,7 +692,15 @@
             },
             "audit_method_digest": {
               "type": "string",
-              "pattern": "^[a-f0-9]{64}$"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
             },
             "independent_auditor": {
               "type": "string",
@@ -1016,19 +1048,51 @@
       "properties": {
         "implementation_digest": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "configuration_digest": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "task_contract_digest": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "epoch_manifest_digest": {
           "type": "string",
-          "pattern": "^[a-f0-9]{64}$"
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "shared_across_arms": {
           "const": true
