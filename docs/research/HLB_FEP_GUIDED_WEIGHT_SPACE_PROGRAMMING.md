@@ -187,6 +187,10 @@ Add a **function-space and symmetry-aware** lane alongside raw weight introspect
 
 The WeightProgram IR should remain tied to the exact source model digest. An aligned view is diagnostic metadata, not a new authority to mutate a different checkpoint.
 
+**Executable alignment primitive now present:** `src/dynamics/cfc/weight_program_adapter.rs` exposes `cfc_hidden_unit_activation_signatures` and `align_cfc_hidden_unit_signatures`. It runs a frozen sequence of functional probes on a detached network clone, records per-unit activation signatures for a selected layer, and uses a deterministic Hungarian assignment to map source units to candidate units by mean-squared signature distance. It also reports the minimum cost increase of any alternative assignment (computed through alternating-cycle shortest paths in O(n³)). A near-zero margin means the probes do not uniquely identify the correspondence; consumers must abstain below a threshold calibrated on development data. Malformed/non-finite probes and signatures fail closed.
+
+The primitive does not reorder parameters, rewrite native fingerprints, change WeightProgram target identities, or authorize edits. Current tests cover known permutation recovery, ambiguous duplicate signatures, malformed inputs, and integration into the one-layer no-backbone CfC permutation fixture. Multi-layer/backbone correspondence and any transform application remain unimplemented. This is a cautious first bridge between behavioral evidence and parameter-space editing, not a general weight-space solver.
+
 This creates a distinctive benchmark: can SWI distinguish **parameter reordering with identical behavior** from a real fault, and can a repair learned in one parameterization transfer to a functionally equivalent permuted network?
 
 ## 3. Proposed architecture: FEP chooses probes; WSP writes candidates
