@@ -127,7 +127,7 @@ def shortest_route(
 
 def classify(manifest: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
     if (
-        manifest["surface_state"] != "frozen_observed"
+        manifest["surface_state"] == "unknown"
         or unit["artifact_availability"] != "present_pinned"
     ):
         label, route = "NotEvaluable", None
@@ -141,13 +141,17 @@ def classify(manifest: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
             label, route = "ReformulationRecoverable", reformulation
         elif navigation is not None:
             label, route = "NavigationRecoverable", navigation
-        else:
+        elif manifest["surface_state"] == "frozen_observed":
             label, route = "UnreachableWithinBudget", None
+        else:
+            label, route = "NotEvaluable", None
 
     return {
         "evidence_unit_id": unit["evidence_unit_id"],
+        "target_node_ref": unit["target_node_ref"],
+        "source_family_ref": unit["source_family_ref"],
         "recoverability": label,
-        "route_cost": route[0] if route else None,
+        "shortest_route_cost": route[0] if route else None,
         "route_edge_refs": list(route[1]) if route else [],
     }
 
@@ -201,8 +205,22 @@ def main() -> int:
     partial_fields["surface_state"] = "partial"
     partial_path = out_dir / "partial-surface-manifest.json"
     partial = save_manifest(partial_fields, partial_path)
-    if any(classify(partial, unit)["recoverability"] != "NotEvaluable" for unit in partial["evidence_units"]):
-        raise SystemExit("partial surface did not force NotEvaluable")
+    partial_rows = [classify(partial, unit) for unit in partial["evidence_units"]]
+    partial_labels = {row["evidence_unit_id"]: row["recoverability"] for row in partial_rows}
+    if partial_labels != {
+        "unit:direct": "DirectlyReachable",
+        "unit:rewrite": "ReformulationRecoverable",
+        "unit:navigation": "NavigationRecoverable",
+        "unit:unreachable": "NotEvaluable",
+        "unit:unknown": "NotEvaluable",
+    }:
+        raise SystemExit(f"partial surface proof asymmetry failed: {partial_labels!r}")
+
+    unknown_fields = copy.deepcopy(base_fields)
+    unknown_fields["surface_state"] = "unknown"
+    unknown = save_manifest(unknown_fields, out_dir / "unknown-surface-manifest.json")
+    if any(classify(unknown, unit)["recoverability"] != "NotEvaluable" for unit in unknown["evidence_units"]):
+        raise SystemExit("unknown surface must produce only NotEvaluable")
 
     # Reducing route budget cannot improve any recoverability class.
     lower_budget = copy.deepcopy(base_fields)
