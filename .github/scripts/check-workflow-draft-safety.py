@@ -295,7 +295,6 @@ jobs:
         raise AssertionError("runner workflow without ready_for_review was accepted")
 
     manual = """on:
-  pull_request:
   workflow_dispatch:
 jobs:
   manual:
@@ -304,11 +303,10 @@ jobs:
     steps:
       - run: true
 """
-    pr = pull_request_block(manual)
-    assert pr is not None
-    # A workflow whose only runner root explicitly excludes PR does not need a
-    # ready_for_review event because no PR runner can ever be allocated.
-    assert validate_generic(Path("manual.yml"), manual, pr) == (1, 0)
+    # This fixture is genuinely manual-only: no pull_request event means no
+    # PR runner root exists, so ready_for_review is neither needed nor parsed.
+    assert pull_request_block(manual) is None
+    assert validate_generic(Path("manual.yml"), manual, []) == (1, 0)
 
 
 def main() -> int:
