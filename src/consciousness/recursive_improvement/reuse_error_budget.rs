@@ -26,7 +26,7 @@
 
 use super::reuse_confidence_certificate::{
     BoundedScoreConfidenceCertificate, MAX_CERTIFICATE_SAMPLE_COUNT, ReuseCertificateError,
-    ReuseConfidenceCertificate, bounded_score_confidence_certificate,
+    ReuseConfidenceCertificate, bounded_score_confidence_certificate, compensated_sum,
     pass_fail_confidence_certificate,
 };
 use std::fmt;
@@ -238,14 +238,13 @@ impl BoundedScoreCandidateEvidence {
             });
         }
 
-        let mut sum = 0.0_f64;
         for &difference in &paired_differences {
             if !difference.is_finite() || !(-1.0..=1.0).contains(&difference) {
                 return Err(ReuseBudgetError::InvalidBoundedDifference);
             }
-            sum += difference;
         }
-        let empirical_improvement = sum / paired_differences.len() as f64;
+        let empirical_improvement =
+            compensated_sum(paired_differences.iter().copied()) / paired_differences.len() as f64;
         if !empirical_improvement.is_finite() {
             return Err(ReuseBudgetError::InvalidBoundedDifference);
         }
@@ -1047,6 +1046,18 @@ mod bounded_score_round_tests {
                 ReuseBudgetError::PromotionCountExceedsHistory
             ))
         ));
+    }
+
+    #[test]
+    fn bounded_score_candidate_evidence_preserves_cancellation_sensitive_mean() {
+        let paired = (0..1_000)
+            .flat_map(|_| [1.0_f64, 1e-16_f64, -1.0_f64])
+            .collect::<Vec<_>>();
+        let evidence = BoundedScoreCandidateEvidence::new(paired.clone()).unwrap();
+        let certificate = bounded_score_confidence_certificate(&paired, 0.05).unwrap();
+        let expected_mean = 1e-16 / 3.0;
+        assert!((evidence.empirical_improvement() - expected_mean).abs() < 1e-22);
+        assert_eq!(evidence.empirical_improvement(), certificate.empirical_mean());
     }
 
     #[test]
