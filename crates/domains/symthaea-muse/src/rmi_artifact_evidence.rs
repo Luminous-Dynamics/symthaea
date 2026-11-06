@@ -202,7 +202,7 @@ impl RmiTrialArtifactManifestV1 {
 /// This verifier does not open arbitrary paths or treat a storage locator as
 /// proof. The integration adapter must resolve the artifact from the
 /// authoritative store and pass those exact bytes here.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct RmiArtifactPayloadV1<'a> {
     /// Content identity used by the manifest.
     pub artifact_id: String,
@@ -238,25 +238,25 @@ pub fn verify_rmi_artifact_bytes<'a>(
         .map(|artifact| artifact.artifact_id.as_str())
         .collect();
 
-    let mut supplied = BTreeMap::new();
+    let mut supplied: BTreeMap<String, &[u8]> = BTreeMap::new();
     for payload in payloads {
-        if supplied.insert(payload.artifact_id.as_str(), payload.bytes).is_some() {
+        if supplied.insert(payload.artifact_id.clone(), payload.bytes).is_some() {
             return Err(RmiArtifactEvidenceError::DuplicatePayload);
         }
     }
 
-    if supplied.keys().any(|artifact_id| !expected_ids.contains(*artifact_id)) {
+    if supplied.keys().any(|artifact_id| !expected_ids.contains(artifact_id.as_str())) {
         return Err(RmiArtifactEvidenceError::UnexpectedPayload);
     }
     for artifact_id in &expected_ids {
-        if !supplied.contains_key(artifact_id) {
+        if !supplied.contains_key(*artifact_id) {
             return Err(RmiArtifactEvidenceError::MissingPayload);
         }
     }
 
     for artifact in &manifest.artifacts {
         let bytes = supplied
-            .get(artifact.artifact_id.as_str())
+            .get(&artifact.artifact_id)
             .ok_or(RmiArtifactEvidenceError::MissingPayload)?;
         let actual_len = u64::try_from(bytes.len())
             .map_err(|_| RmiArtifactEvidenceError::ByteLengthMismatch)?;
@@ -271,7 +271,7 @@ pub fn verify_rmi_artifact_bytes<'a>(
     let mut total_verified_bytes = 0u64;
     for artifact_id in &expected_ids {
         let bytes = supplied
-            .get(artifact_id)
+            .get(*artifact_id)
             .ok_or(RmiArtifactEvidenceError::MissingPayload)?;
         let len = u64::try_from(bytes.len())
             .map_err(|_| RmiArtifactEvidenceError::ByteLengthMismatch)?;
@@ -784,7 +784,7 @@ mod tests {
         let manifest = manifest();
         let mut inputs = payloads();
         inputs[0] = RmiArtifactPayloadV1 {
-            artifact_id: inputs[0].artifact_id,
+            artifact_id: inputs[0].artifact_id.clone(),
             bytes: b"changed-midi-longer",
         };
         assert_eq!(
@@ -831,7 +831,7 @@ mod tests {
     #[test]
     fn duplicate_payload_identity_is_rejected() {
         let mut inputs = payloads();
-        inputs.push(inputs[0]);
+        inputs.push(inputs[0].clone());
         assert_eq!(
             verify_rmi_artifact_bytes(&manifest(), &inputs),
             Err(RmiArtifactEvidenceError::DuplicatePayload)
