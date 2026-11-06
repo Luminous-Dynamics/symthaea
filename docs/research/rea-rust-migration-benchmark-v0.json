@@ -2418,7 +2418,12 @@
         "historically_valid_evidence_is_not_automatically_current_at_query_time",
         "knowledge_time_cutoff_is_not_inferred_from_event_or_receipt_time",
         "repository_revision_change_invalidates_only_affected_claim_evidence",
-        "stale_or_superseded_evidence_remains_historically_replayable_but_not_current"
+        "stale_or_superseded_evidence_remains_historically_replayable_but_not_current",
+        "self_consistent_forged_derivation_digest_with_incorrect_disposition_must_replay_mismatch",
+        "result_reencoding_with_jcs_equivalent_numeric_token_must_replay_match",
+        "cli_exit_code_separates_replay_match_mismatch_and_invalid_input",
+        "cli_bounded_read_rejects_claim_result_per_evidence_and_aggregate_oversize",
+        "cli_does_not_write_extract_execute_or_mutate_input_artifacts"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2439,7 +2444,11 @@
         "target_time_scope_leakage_rate",
         "knowledge_as_of_cutoff_accuracy",
         "selective_revalidation_precision_recall_after_repository_change",
-        "historical_replay_vs_current_validity_separation_accuracy"
+        "historical_replay_vs_current_validity_separation_accuracy",
+        "self_consistent_forged_result_false_accept_rate",
+        "jcs_equivalent_serialization_replay_parity",
+        "cli_exit_code_accuracy_by_outcome",
+        "bounded_input_limit_enforcement_rate"
       ],
       "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.",
       "protocol": [
@@ -2460,7 +2469,10 @@
         "do not infer lifecycle/currentness from REA Evidence v1; compose #10600 valid-time and knowledge-time projection only when source-owned evidence exists",
         "do not infer continued validity after repository evolution; compose #10630 selective revalidation and #9112 decision-use validity",
         "cyber claim progression and negative-evidence coverage remain owned by #2270/#453; generic provider observation support cannot promote a CyberClaim kind",
-        "for agent benchmarking separate factual accuracy, schema/field-placement accuracy, answer coverage, abstention, and grader adjudication quality"
+        "for agent benchmarking separate factual accuracy, schema/field-placement accuracy, answer coverage, abstention, and grader adjudication quality",
+        "the standalone rea-claim-replay CLI must bounded-read inputs before JSON parsing and distinguish match, semantic mismatch, invalid input, IO and resource-limit outcomes through stable exit codes",
+        "a producer-supplied unkeyed SHA-256 digest is not an authenticator; recompute a forged but self-consistent derivation digest over an incorrect disposition and require independent semantic replay to reject it",
+        "compare full serialized results with RFC 8785 canonical bytes so representation-only number spelling changes do not create false replay mismatches"
       ],
       "claim_boundaries": {
         "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
