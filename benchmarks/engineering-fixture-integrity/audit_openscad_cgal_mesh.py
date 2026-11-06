@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-engine CGAL mesh acceptance audit for engineering-fixtures-v0.3.
+"""Cross-engine CGAL mesh acceptance audit for engineering-fixtures-v0.4.
 
 STEP import and tessellation use the same CadQuery/OCP family as fixture
 creation. The resulting STL is then sent through OpenSCAD's CGAL
@@ -24,12 +24,12 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-import cadquery as cq
-import trimesh
-import OCP
-from cadquery import importers
-
 ROOT = Path(__file__).resolve().parent
+EXPECTED_MANIFEST_SCHEMA = "engineering-fixture-materialization-v0.4"
+EXPECTED_CADQUERY_VERSION = "2.8.0"
+EXPECTED_CADQUERY_OCP_MODULE_VERSION = "7.9.3.1"
+EXPECTED_CADQUERY_OCP_DISTRIBUTION_VERSION = "7.9.3.1.1"
+EXPECTED_TRIMESH_VERSION = "4.11.1"
 EXPECTED_OPENSCAD_VERSION = "2021.01"
 LINEAR_DEFLECTION_MM = 0.01
 ANGULAR_DEFLECTION_RAD = 0.1
@@ -55,7 +55,7 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def bbox_values(shape: cq.Shape) -> list[float]:
+def bbox_values(shape: Any) -> list[float]:
     box = shape.BoundingBox()
     return [
         float(box.xmin), float(box.ymin), float(box.zmin),
@@ -63,7 +63,7 @@ def bbox_values(shape: cq.Shape) -> list[float]:
     ]
 
 
-def mesh_bounds(mesh: trimesh.Trimesh) -> list[float]:
+def mesh_bounds(mesh: Any) -> list[float]:
     return [
         float(mesh.bounds[0][0]), float(mesh.bounds[0][1]), float(mesh.bounds[0][2]),
         float(mesh.bounds[1][0]), float(mesh.bounds[1][1]), float(mesh.bounds[1][2]),
@@ -172,9 +172,8 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
     require(isinstance(manifest, dict), "Materialization manifest root must be an object")
     schema_version = manifest.get("schema_version")
     require(
-        isinstance(schema_version, str)
-        and schema_version.startswith("engineering-fixture-materialization-v0."),
-        f"Unsupported materialization manifest schema: {schema_version!r}",
+        schema_version == EXPECTED_MANIFEST_SCHEMA,
+        f"Expected exact manifest schema {EXPECTED_MANIFEST_SCHEMA!r}, got {schema_version!r}",
     )
 
     cad_cases = manifest.get("cad_cases")
@@ -220,6 +219,8 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
     assembly_rel = assembly.get("artifact")
     require(isinstance(assembly_rel, str), "Manifest assembly artifact path is missing")
     assembly_digest = validate_manifest_digest(assembly.get("sha256"), assembly_rel)
+    require(assembly_rel not in seen_paths, "Assembly artifact path aliases a CAD source/edit artifact")
+    seen_paths.add(assembly_rel)
     assembly_path = package_path(root, assembly_rel)
     require(sha256(assembly_path) == assembly_digest,
             f"Manifest digest mismatch for assembly artifact {assembly_rel}")
@@ -234,7 +235,10 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
         require(isinstance(part, dict) and part.get("valid_brep") is True,
                 "Each part definition must be declared a valid B-rep")
         part_rel = part.get("artifact")
-        expected = validate_manifest_digest(part.get("sha256"), str(part_rel))
+        require(isinstance(part_rel, str) and part_rel not in seen_paths,
+                f"Missing or duplicate assembly part-definition artifact path: {part_rel!r}")
+        seen_paths.add(part_rel)
+        expected = validate_manifest_digest(part.get("sha256"), part_rel)
         part_path = package_path(root, part_rel)
         require(sha256(part_path) == expected,
                 f"Manifest digest mismatch for assembly part definition {part_rel}")
@@ -244,12 +248,14 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
 
 
 def validate_audit_toolchain(manifest: dict[str, Any], openscad_arg: str) -> tuple[str, str, dict[str, str]]:
+    import OCP
+
     declared = manifest.get("toolchain")
     require(isinstance(declared, dict), "Manifest toolchain profile is required")
-    require(declared.get("cadquery") == "2.8.0",
+    require(declared.get("cadquery") == EXPECTED_CADQUERY_VERSION,
             f"Manifest CadQuery version is not the audited pin: {declared.get('cadquery')!r}")
-    require(declared.get("cadquery_ocp") == "7.9.3.1",
-            f"Manifest Open CASCADE pin is not the audited pin: {declared.get('cadquery_ocp')!r}")
+    require(declared.get("cadquery_ocp") == EXPECTED_CADQUERY_OCP_MODULE_VERSION,
+            f"Manifest Open CASCADE pin is not the audited module pin: {declared.get('cadquery_ocp')!r}")
     python_version = sys.version.split()[0]
     require(declared.get("python") == python_version,
             f"Python version differs from manifest: expected {declared.get('python')}, got {python_version}")
@@ -261,10 +267,14 @@ def validate_audit_toolchain(manifest: dict[str, Any], openscad_arg: str) -> tup
         "opencascade_module": getattr(OCP, "__version__", "unknown"),
         "trimesh": version("trimesh"),
     }
-    require(actual["cadquery"] == "2.8.0", f"Unexpected CadQuery version: {actual['cadquery']}")
-    require(actual["opencascade_module"] == "7.9.3.1",
+    require(actual["cadquery"] == EXPECTED_CADQUERY_VERSION,
+            f"Unexpected CadQuery version: {actual['cadquery']}")
+    require(actual["cadquery_ocp_distribution"] == EXPECTED_CADQUERY_OCP_DISTRIBUTION_VERSION,
+            f"Unexpected cadquery-ocp distribution version: {actual['cadquery_ocp_distribution']}")
+    require(actual["opencascade_module"] == EXPECTED_CADQUERY_OCP_MODULE_VERSION,
             f"Unexpected Open CASCADE module version: {actual['opencascade_module']}")
-    require(actual["trimesh"] == "4.11.1", f"Unexpected Trimesh version: {actual['trimesh']}")
+    require(actual["trimesh"] == EXPECTED_TRIMESH_VERSION,
+            f"Unexpected Trimesh version: {actual['trimesh']}")
 
     executable = shutil.which(openscad_arg)
     require(executable is not None, f"OpenSCAD executable not found: {openscad_arg}")
@@ -291,6 +301,9 @@ def audit_solid(
     source_digest: str | None = None,
     manifest_digest: str | None = None,
 ) -> dict[str, Any]:
+    import trimesh
+    from cadquery import importers
+
     shape = importers.importStep(str(step_path)).val()
     require(shape.isValid(), f"OCP STEP import invalid: {label}")
     solids = shape.Solids()
@@ -423,6 +436,8 @@ def main() -> int:
     args = parser.parse_args()
     require(args.timeout_seconds > 0, "--timeout-seconds must be positive")
 
+    import cadquery as cq
+
     fixture_root = args.fixture_root.resolve()
     manifest, cad_subjects, assembly_path, assembly_digest, manifest_digest = load_manifest_subjects(fixture_root)
     executable, version_label, toolchain = validate_audit_toolchain(manifest, args.openscad)
@@ -489,7 +504,6 @@ def main() -> int:
         "schema_version": "openscad-cgal-mesh-audit-v0.2",
         "manifest_schema_version": manifest["schema_version"],
         "manifest_sha256": manifest_digest,
-        "toolchain": toolchain,
         "evidence_class": "synthetic_development_fixture_integrity",
         "status": "PASS_CROSS_ENGINE_CGAL_MESH_REEVALUATION_ONLY",
         "claim_ceiling": (
@@ -529,8 +543,13 @@ def main() -> int:
         args.output
         or (fixture_root / "openscad-cgal-mesh-audit.json")
     ).resolve()
-    protected = {assembly_path.resolve(), (fixture_root / "materialization-manifest.json").resolve()}
+    protected = {
+        assembly_path.resolve(),
+        (fixture_root / "materialization-manifest.json").resolve(),
+    }
     protected.update(path.resolve() for _, path, _ in cad_subjects)
+    for part in manifest["assembly"]["part_definitions"]:
+        protected.add(package_path(fixture_root, part["artifact"]).resolve())
     require(output not in protected, "Audit output cannot overwrite an input STEP or the manifest")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
