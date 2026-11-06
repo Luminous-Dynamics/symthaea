@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Pass/fail REUSE lower confidence certificate.
+//! REUSE lower confidence certificates for pass/fail and bounded-score outcomes.
 //!
 //! Implements Lemma A3 of Sun et al. (arXiv:2609.33180v2), Appendix A.3:
 //! the maximum of (1) a Clopper-Pearson sign/disagreement lower bound and
@@ -246,13 +246,33 @@ pub struct BoundedScoreConfidenceCertificate {
 }
 
 impl BoundedScoreConfidenceCertificate {
-    pub fn sample_count(&self) -> usize { self.sample_count }
-    pub fn empirical_mean(&self) -> f64 { self.empirical_mean }
-    pub fn empirical_second_moment(&self) -> f64 { self.empirical_second_moment }
-    pub fn upper_second_moment(&self) -> f64 { self.upper_second_moment }
-    pub fn log_term(&self) -> f64 { self.log_term }
-    pub fn deviation(&self) -> f64 { self.deviation }
-    pub fn lower_bound(&self) -> f64 { self.lower_bound }
+    pub fn sample_count(&self) -> usize {
+        self.sample_count
+    }
+
+    pub fn empirical_mean(&self) -> f64 {
+        self.empirical_mean
+    }
+
+    pub fn empirical_second_moment(&self) -> f64 {
+        self.empirical_second_moment
+    }
+
+    pub fn upper_second_moment(&self) -> f64 {
+        self.upper_second_moment
+    }
+
+    pub fn log_term(&self) -> f64 {
+        self.log_term
+    }
+
+    pub fn deviation(&self) -> f64 {
+        self.deviation
+    }
+
+    pub fn lower_bound(&self) -> f64 {
+        self.lower_bound
+    }
 }
 
 /// Compute the Appendix A.1 empirical-Bernstein lower confidence bound for
@@ -599,13 +619,15 @@ mod bounded_score_tests {
         assert!(zeros.upper_second_moment() > 0.0);
         assert!(zeros.lower_bound() < 0.0);
 
-        let all_positive = bounded_score_confidence_certificate(&vec![1.0; 1_000], 0.05).unwrap();
+        let all_positive =
+            bounded_score_confidence_certificate(&vec![1.0; 1_000], 0.05).unwrap();
         assert_eq!(all_positive.empirical_mean(), 1.0);
         assert_eq!(all_positive.upper_second_moment(), 1.0);
         assert!(all_positive.lower_bound() < 1.0);
         assert!(all_positive.lower_bound() > 0.0);
 
-        let all_negative = bounded_score_confidence_certificate(&vec![-1.0; 1_000], 0.05).unwrap();
+        let all_negative =
+            bounded_score_confidence_certificate(&vec![-1.0; 1_000], 0.05).unwrap();
         assert_eq!(all_negative.empirical_mean(), -1.0);
         assert_eq!(all_negative.upper_second_moment(), 1.0);
         assert!(all_negative.lower_bound() < -1.0);
