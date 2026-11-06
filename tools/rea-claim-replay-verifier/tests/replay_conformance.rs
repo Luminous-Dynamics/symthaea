@@ -443,3 +443,26 @@ fn bounded_cli_returns_distinct_nonzero_exit_for_semantic_mismatch() {
     assert_eq!(receipt["outcome"], json!("replay_mismatch"));
     std::fs::remove_dir_all(directory).unwrap();
 }
+#[test]
+fn replay_preserves_inferred_confidence_and_analyst_authority_without_promotion() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut value = original.value.clone();
+    value["confidence"] = json!("inferred");
+    value["authority"] = json!("analyst-inference");
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
+
+    let assessment = &serde_json::from_slice::<Value>(&result_bytes).unwrap()
+        ["evidence_assessments"][0];
+    assert_eq!(assessment["confidence"], json!("inferred"));
+    assert_eq!(assessment["authority"], json!("analyst-inference"));
+}
+
