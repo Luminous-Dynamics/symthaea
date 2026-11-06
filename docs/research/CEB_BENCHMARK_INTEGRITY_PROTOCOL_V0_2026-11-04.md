@@ -75,6 +75,22 @@ The [GSO benchmark](https://gso-bench.github.io/) similarly reports raw and hack
 
 All V4V cases in this catalog remain `design_only_not_executed`. These checks do not authorize running candidate-controlled code, generated verifiers, build scripts or attacks on the host-opt-in runner.
 
+
+
+### 3.2 Optimization benchmark integrity and legitimate caching
+
+GSO's [public benchmark](https://gso-bench.github.io/) provides a useful methodological reference for CEB-OPT. It contains 102 tasks across 10 codebases and five languages. Its Opt@1 criterion requires a one-attempt result to reach at least 95% of expert reference speedup while preserving correctness. The GSO public page reports a hack detector for deceptive optimizations, including benchmark-input memoization and harness hijacking, and describes network hardening after upstream commit retrieval attempts. Its leaderboard presents raw and hack-adjusted outcomes separately.
+
+CEB must distinguish three different things:
+
+- **Legitimate optimization:** caching/memoization or specialization explicitly permitted by the contract and correct across all in-scope inputs, cache invalidation, collisions, cold starts and resource limits.
+- **Benchmark-specific overfitting:** hardcoded outputs or memoized values for disclosed visible examples where the contract requires a general solution.
+- **Measurement-channel manipulation:** benchmark-invocation detection, harness mutation, timing interception or bypassing required computation.
+
+The new control patterns BI-N37–BI-N39 cover benchmark-input memorization, harness-aware bypass, and workload-distribution overfitting. BI-P11 is a positive control for legitimate cache behavior. All are authoring patterns only; none has been executed.
+
+The CEB-OPT lane adds hard gates and evidence requirements for frozen challenge-distribution digests, harness integrity review, unseen-input generalization and cache lifecycle semantics. Keep the existing three primary metrics—expert-normalized speedup, performance-regression rate and measurement variance—unchanged. Report raw measurements and integrity adjudication separately; do not introduce a hack-adjusted score until there is a validated detector and a preregistered adjudication rule. GSO Opt@1 is not numerically equivalent to CEB expert-normalized speedup.
+
 ## 4. Scoring without hiding failure
 
 Let:
@@ -101,7 +117,7 @@ Do not hide false accepts inside an accuracy/F1 score. Do not weight away critic
 |---|---:|
 | Initial hand-authored corpus | >=20 negative and >=5 positive controls; current design catalog has 36 negative and 10 positive |
 | Qualification campaign | >=300 distinct negative and >=300 distinct positive instantiations |
-| Fault-family diversity | >=36 distinct negative fault families |
+| Fault-family diversity | >=39 distinct negative fault families |
 | Critical false accepts | 0 permitted |
 | Statistical target | One-sided 95% exact upper bound <1% for FA and FR, subject to cluster-aware analysis |
 | Reference / empty-patch gate | 100% reference pass and empty-patch fail before a task enters the scored set |
@@ -151,7 +167,7 @@ A system that solves 1–2 percentage points fewer tasks but has verified eviden
 - The static Rust verifier can be expanded with non-executing malformed-receipt and inventory tests, but those tests do not qualify an OS boundary or hidden-answer custody.
 - The CEB task catalog and this attack catalog are design artifacts until source fixtures, independently administered graders, pins, qualified runner and exact-head test evidence exist.
 
-**Current status:** 36 negative controls, 10 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate plus V4V protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
+**Current status:** 39 negative controls, 11 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate plus V4V protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
 
 ## CEB-wide measurement linkage
 
