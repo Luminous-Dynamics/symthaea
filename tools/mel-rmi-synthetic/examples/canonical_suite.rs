@@ -7,8 +7,7 @@ use mel_rmi_synthetic::{
     TaskSpec, TrialRecordV1, TrialRunConfig, UnrelatedFeatureShortcutPolicy, assess_negotiation,
     assess_scoped_negotiation, bind_verified_artifacts, canonical_fixture_replicates_v1,
     render_synthetic_midi_v1, run_policy_suite_v1, run_reciprocal_suite_v1,
-    validate_partner_authority_event,
-    verify_trial_artifact_bindings,
+    validate_partner_authority_event, verify_trial_artifact_bindings,
 };
 use std::collections::BTreeMap;
 use std::error::Error;
