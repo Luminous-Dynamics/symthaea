@@ -832,7 +832,7 @@ mod tests {
         let assignment = vec![0, 1, 2];
         assert_eq!(
             alternating_cycle_assignment_margin(&costs, &assignment),
-            11.0
+            Some(11.0)
         );
     }
 
@@ -882,8 +882,11 @@ mod tests {
         let signatures =
             cfc_hidden_unit_activation_signatures(&network, 1, &probes)
                 .expect("layer one accepts hidden-sized input");
-        assert_eq!(signatures.len(), 4);
-        assert!(signatures.iter().all(|signature| signature.len() == 1));
+        assert_eq!(signatures.signatures.len(), 4);
+        assert!(signatures
+            .signatures
+            .iter()
+            .all(|signature| signature.len() == 1));
 
         let invalid = vec![CfCFunctionalProbe {
             input: vec![0.2, -0.3, 0.7],
