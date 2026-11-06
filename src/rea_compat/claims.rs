@@ -931,21 +931,21 @@ mod tests {
     #[test]
     fn wrong_subject_and_operation_are_not_applied_to_claim_scope() {
         let evidence = verified_fixture();
-        let mut claim = claim(
+        let mut wrong_subject_claim = claim(
             ClaimPredicate::ProviderReportedObservation,
             vec![evidence.evidence_id.clone()],
         );
-        claim.scope.subject_sha256 =
+        wrong_subject_claim.scope.subject_sha256 =
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
-        let result = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
+        let result = evaluate_claim(&wrong_subject_claim, &[evidence.clone()]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Inapplicable);
 
-        let mut claim = claim(
+        let mut wrong_operation_claim = claim(
             ClaimPredicate::ProviderReportedObservation,
             vec![evidence.evidence_id.clone()],
         );
-        claim.scope.operation = "verify_signature".to_owned();
-        let result = evaluate_claim(&claim, &[evidence]).unwrap();
+        wrong_operation_claim.scope.operation = "verify_signature".to_owned();
+        let result = evaluate_claim(&wrong_operation_claim, &[evidence]).unwrap();
         assert_eq!(result.disposition, ClaimDisposition::Inapplicable);
     }
 
@@ -1052,7 +1052,7 @@ mod tests {
         let second = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
         assert_eq!(first.derivation_sha256, second.derivation_sha256);
 
-        let mut changed = claim;
+        let mut changed = claim.clone();
         changed.scope.operation = "other_operation".to_owned();
         let different = evaluate_claim(&changed, &[evidence.clone()]).unwrap();
         assert_ne!(first.derivation_sha256, different.derivation_sha256);
