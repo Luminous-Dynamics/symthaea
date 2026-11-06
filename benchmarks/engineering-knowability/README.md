@@ -206,3 +206,17 @@ The immediate extension is [ENG-KNOW-CODESIGN-001 #10702](https://github.com/Lum
 
 
 | [CADWorld](https://cad-world.github.io/) | Claude Opus 5.5 extended-run GUI agent: 41.5% on the 200-task FreeCAD cohort; 87.0% expert reference is a single-trial result | Long-horizon native FreeCAD workflows spanning sketching, part design, assembly, CAM, FEM, measurement, mesh, and technical drawing; task-specific executable checks on saved files | Not a population-level human baseline; does not grade complete claim/evidence validity, uncertainty/calibration correctness or lifecycle requalification. The original seven-agent paper snapshot (17.5% strongest result) is separate from the current live extended-run page |
+
+
+## Standards interoperability dependency
+
+Compose with [MBD-INTEROP-001 #10595](https://github.com/Luminous-Dynamics/symthaea/issues/10595), which owns the bounded semantic round-trip benchmark across STEP AP242, QIF and MTConnect. This benchmark does **not** add a second translator, standards bridge or semantic identity engine.
+
+The knowability task must preserve exact design generation, product/component/assembly identity, feature/datum association, semantic PMI characteristic identity, article identity, inspection-plan/result binding and calibration references when those artifacts cross the declared exchange path. A visually intact annotation that has lost its semantic datum/feature association is a critical failure.
+
+The two directly relevant exchange standards are:
+
+- [ISO 10303-242:2025, AP242 Edition 4](https://www.iso.org/standard/84300.html), published 25 August 2025. The ISO catalogue status was "to be revised" at retrieval (6 November 2026); pin the exact edition and application profile. A bounded subset is not full AP242 conformance.
+- [ISO 23952:2020, QIF](https://www.iso.org/standard/77461.html), reviewed and confirmed on 14 June 2026. It defines an integrated model for manufacturing quality information and quality-workflow documents. Schema validity alone does not prove that an inspection result is bound to the correct characteristic, article, instrument or calibration.
+
+The mapping register adds three semantic contracts for profile/edition scope, semantic PMI preservation, and exact inspection-result binding. Full exchange fidelity remains MBD-INTEROP's owner; knowability evaluates whether the preserved information is sufficient to support an admissible evidence path.
