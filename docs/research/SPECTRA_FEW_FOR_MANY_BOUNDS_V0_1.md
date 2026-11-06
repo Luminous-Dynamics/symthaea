@@ -84,15 +84,18 @@ Disposition:
 
 This says whether a candidate satisfies a registered degradation threshold. It does not by itself say that it is the best portfolio in the candidate family.
 
-### Exact small-K portfolio family certificate
+### Exact small-K portfolio family certificates
 
-New function: certify_exact_bounded_portfolio_family.
+Two separate family APIs are provided:
+- certify_exact_bounded_portfolio_family: enumerate all nonempty portfolios up to L, matching SPECTRA's at-most-L deployment cap.
+- certify_exact_size_portfolio_family: enumerate exactly L representatives, matching the paper's AFM / few-for-many candidate-family semantics.
 
-1. Enumerates every nonempty portfolio up to the cap, using the declared max-candidate budget.
-2. Computes bounds for every portfolio.
-3. Selects the portfolio with the smallest degradation upper bound, breaking ties lexicographically by action ID.
-4. Computes min_S D_lower(S), a lower bound on the best achievable degradation over the complete enumerated family.
-5. Certifies family optimality only when D_upper(S_selected) ≤ min_S D_lower(S). Otherwise it returns Unresolved.
+Both APIs:
+1. Enumerate the complete declared family using a checked candidate budget.
+2. Compute bounds for every portfolio.
+3. Select the portfolio with smallest degradation upper bound, breaking ties lexicographically by action ID.
+4. Compute min_S D_lower(S), a lower bound on the best achievable degradation over the complete enumerated family.
+5. Certify family optimality only when D_upper(S_selected) ≤ min_S D_lower(S). Otherwise return Unresolved.
 
 The reported optimality gap upper bound is max(0, D_upper(S_selected) - min_S D_lower(S)). This is conditional on the upstream simultaneous intervals and the complete enumerated family.
 
@@ -108,7 +111,8 @@ Exact enumeration is only an oracle for small K. It is guarded by checked combin
 - Exact enumeration succeeds exactly at the budget and rejects a budget one below the candidate count.
 - Malformed grids, empty/duplicate/unknown portfolios, invalid coefficients and over-cap members fail closed.
 - Deterministic generated property corpus over 128 campaigns, 2–6 actions, 1–4 objectives and all nonempty portfolios up to size 3; checks every true weighted degradation is inside its computed interval.
-- Exact family certificate succeeds for a uniquely separated point-interval optimum.
+- Exact at-most-L and exact-size-L enumerators have stable lexicographic order and enforce explicit candidate budgets.
+- Exact family certificates succeed for a uniquely separated point-interval optimum under both family definitions.
 - Overlapping intervals do not produce a false optimality certificate.
 - Exact-family enumeration respects the explicit candidate budget.
 
