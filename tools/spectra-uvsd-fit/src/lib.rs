@@ -1751,6 +1751,9 @@ pub mod scenario;
 /// Known-truth observer and measurement-channel generation for SPECTRA.
 pub mod scenario_dgp;
 
+/// Joint five-metric covariance diagnostics (not inferential confidence sets).
+pub mod score_covariance;
+
 /// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
 pub mod score_bounds;
 
