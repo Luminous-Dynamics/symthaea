@@ -1041,6 +1041,35 @@ mod tests {
     }
 
     #[test]
+    fn record_level_support_preserves_inferred_confidence_and_authority() {
+        let original = verified_fixture();
+        let mut value = original.value.clone();
+        value["confidence"] = json!("inferred");
+        value["authority"] = json!("analyst-inference");
+        value["evidence_id"] = json!(super::super::compute_evidence_id(&value).unwrap());
+        let evidence = verify_evidence_value(&value).unwrap();
+
+        let claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
+        let result = evaluate_claim(&claim, &[evidence]).unwrap();
+
+        // This disposition qualifies only the exact contents of the record.
+        // It does not upgrade an inferred analyst report to an observation
+        // about artifact truth or to an independently trusted authority.
+        assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
+        assert_eq!(result.evidence_assessments[0].confidence.as_deref(), Some("inferred"));
+        assert_eq!(
+            result.evidence_assessments[0].authority.as_deref(),
+            Some("analyst-inference")
+        );
+        assert!(result.claim_ceiling.iter().any(|line| {
+            line.contains("does not prove the underlying real-world proposition")
+        }));
+    }
+
+    #[test]
     fn forged_verified_evidence_metadata_is_rechecked() {
         let mut evidence = verified_fixture();
         evidence.evidence_id = format!("ev_{}", "f".repeat(64));
