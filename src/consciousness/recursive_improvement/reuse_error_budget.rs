@@ -84,10 +84,16 @@ impl fmt::Display for ReuseBudgetError {
                 )
             }
             Self::InvalidBoundedCandidateEvidence => {
-                write!(f, "bounded-score candidate evidence requires a non-empty paired outcome vector")
+                write!(
+                    f,
+                    "bounded-score candidate evidence requires a non-empty paired outcome vector"
+                )
             }
             Self::InvalidBoundedDifference => {
-                write!(f, "bounded-score paired differences must be finite and within [-1, 1]")
+                write!(
+                    f,
+                    "bounded-score paired differences must be finite and within [-1, 1]"
+                )
             }
             Self::CandidateSampleTooLarge { actual, maximum } => {
                 write!(
@@ -239,11 +245,19 @@ impl BoundedScoreCandidateEvidence {
             return Err(ReuseBudgetError::InvalidBoundedDifference);
         }
 
-        Ok(Self { paired_differences, empirical_improvement })
+        Ok(Self {
+            paired_differences,
+            empirical_improvement,
+        })
     }
 
-    pub fn sample_count(&self) -> usize { self.paired_differences.len() }
-    pub fn empirical_improvement(&self) -> f64 { self.empirical_improvement }
+    pub fn sample_count(&self) -> usize {
+        self.paired_differences.len()
+    }
+
+    pub fn empirical_improvement(&self) -> f64 {
+        self.empirical_improvement
+    }
 }
 
 /// Candidate-facing output for one complete REUSE round. This is the paper's
@@ -380,9 +394,7 @@ pub(crate) fn evaluate_bounded_score_reuse_round_audited(
     candidates: &[BoundedScoreCandidateEvidence],
     prior_cumulative_lower_bound: f64,
 ) -> Result<BoundedScoreRoundAudit, BoundedScoreRoundError> {
-    if !practical_improvement_threshold.is_finite()
-        || practical_improvement_threshold < 0.0
-    {
+    if !practical_improvement_threshold.is_finite() || practical_improvement_threshold < 0.0 {
         return Err(BoundedScoreRoundError::InvalidPracticalImprovementThreshold);
     }
     if !prior_cumulative_lower_bound.is_finite() || prior_cumulative_lower_bound < 0.0 {
@@ -392,11 +404,15 @@ pub(crate) fn evaluate_bounded_score_reuse_round_audited(
         return Err(ReuseBudgetError::CandidateCountMismatch {
             expected: candidates_per_round,
             actual: candidates.len(),
-        }.into());
+        }
+        .into());
     }
 
     let delta = compute_reuse_total_error_budget(
-        alpha, round, prior_promotions, candidates_per_round,
+        alpha,
+        round,
+        prior_promotions,
+        candidates_per_round,
     )?;
 
     let mut best: Option<(usize, usize, f64, BoundedScoreConfidenceCertificate)> = None;
@@ -425,8 +441,7 @@ pub(crate) fn evaluate_bounded_score_reuse_round_audited(
         });
     };
 
-    let cumulative_lower_bound =
-        prior_cumulative_lower_bound + certificate.lower_bound();
+    let cumulative_lower_bound = prior_cumulative_lower_bound + certificate.lower_bound();
     if !cumulative_lower_bound.is_finite() {
         return Err(BoundedScoreRoundError::InvalidCumulativeLowerBound);
     }
@@ -534,11 +549,17 @@ pub struct BoundedScoreRoundAudit {
 }
 
 impl BoundedScoreRoundAudit {
-    pub fn decision(&self) -> ReuseRoundDecision { self.decision }
+    pub fn decision(&self) -> ReuseRoundDecision {
+        self.decision
+    }
+
     pub fn selected_certificate(&self) -> Option<&BoundedScoreConfidenceCertificate> {
         self.selected_certificate.as_ref()
     }
-    pub fn cumulative_lower_bound(&self) -> f64 { self.cumulative_lower_bound }
+
+    pub fn cumulative_lower_bound(&self) -> f64 {
+        self.cumulative_lower_bound
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -569,11 +590,15 @@ impl fmt::Display for BoundedScoreRoundError {
 impl std::error::Error for BoundedScoreRoundError {}
 
 impl From<ReuseBudgetError> for BoundedScoreRoundError {
-    fn from(value: ReuseBudgetError) -> Self { Self::Budget(value) }
+    fn from(value: ReuseBudgetError) -> Self {
+        Self::Budget(value)
+    }
 }
 
 impl From<ReuseCertificateError> for BoundedScoreRoundError {
-    fn from(value: ReuseCertificateError) -> Self { Self::ConfidenceCertificate(value) }
+    fn from(value: ReuseCertificateError) -> Self {
+        Self::ConfidenceCertificate(value)
+    }
 }
 
 /// Allocate the per-comparison REUSE error budget for one adaptive round.
