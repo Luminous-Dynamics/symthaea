@@ -72,7 +72,7 @@ def validate_manifest_identity(binding: dict[str, Any], input_data: dict[str, An
 
 def validate_challenge_semantics(binding: dict[str, Any], challenge_result: dict[str, Any], computed_challenge_sha: str) -> None:
     expected = binding['expected_challenge_result']
-    fields = (
+    allowed_fields = {
         'added_scenario_count',
         'adaptive_worst_case_effort_before',
         'adaptive_worst_case_effort_after',
@@ -85,7 +85,9 @@ def validate_challenge_semantics(binding: dict[str, Any], challenge_result: dict
         'fixed_status_after',
         'fixed_effort_non_decreasing',
         'monotonicity_passed',
-    )
+    }
+    fields = tuple(expected)
+    require(fields and set(fields).issubset(allowed_fields), 'expected challenge result fields are empty or unsupported')
     actual = {field: challenge_result.get(field) for field in fields}
     require(actual == expected, 'challenge result differs from the frozen expected outcome')
     require(challenge_result.get('challenge_sha256') == computed_challenge_sha, 'report challenge digest differs from the digest recomputed from exact base input bytes')
