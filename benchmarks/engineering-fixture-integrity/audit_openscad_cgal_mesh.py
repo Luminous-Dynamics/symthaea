@@ -109,10 +109,6 @@ def run_openscad(
         completed.returncode == 0,
         f"OpenSCAD failed for {mesh_path.name}: {log[-3000:]}",
     )
-    cache_lines = [
-        line for line in log.splitlines()
-        if "CGAL Polyhedrons in cache:" in line
-    ]
     cache_match = re.search(r"^CGAL Polyhedrons in cache:\s*(\d+)\s*$", log, re.MULTILINE)
     require(
         cache_match is not None and int(cache_match.group(1)) == 1,
@@ -278,7 +274,7 @@ def validate_audit_toolchain(manifest: dict[str, Any], openscad_arg: str) -> tup
     )
     version_label = (result.stdout + result.stderr).strip()
     require(result.returncode == 0, f"Cannot query OpenSCAD version: {version_label}")
-    require(version_label == "OpenSCAD version 2021.01",
+    require(version_label == f"OpenSCAD version {EXPECTED_OPENSCAD_VERSION}",
             f"OpenSCAD version differs from frozen profile: {version_label}")
     actual["openscad"] = version_label
     return executable, version_label, actual
