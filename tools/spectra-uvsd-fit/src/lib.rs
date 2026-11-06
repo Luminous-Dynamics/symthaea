@@ -1751,6 +1751,9 @@ pub mod scenario;
 /// Known-truth observer and measurement-channel generation for SPECTRA.
 pub mod scenario_dgp;
 
+/// Paired CRN contrast and variance diagnostics (not inferential bounds).
+pub mod paired_contrast;
+
 /// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
 pub mod score_bounds;
 
