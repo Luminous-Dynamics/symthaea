@@ -13,6 +13,7 @@ on:
       - "tools/knowledge-benchmark-harness/src/bin/**"
       - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
       - "tools/knowledge-benchmark-harness/**"
+      - "crates/domains/symthaea-epistemic-types/**"
       - "scripts/validate-knowledge-benchmarks.sh"
       - ".github/workflows/knowledge-benchmark.yml"
   push:
@@ -27,6 +28,7 @@ on:
       - "tools/knowledge-benchmark-harness/src/bin/**"
       - "docs/research/ESOTERICA_KNOWLEDGE_FABRIC.md"
       - "tools/knowledge-benchmark-harness/**"
+      - "crates/domains/symthaea-epistemic-types/**"
       - "scripts/validate-knowledge-benchmarks.sh"
       - ".github/workflows/knowledge-benchmark.yml"
   workflow_dispatch:
