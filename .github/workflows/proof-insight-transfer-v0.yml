@@ -7,7 +7,6 @@ on:
       - "crates/bridges/symthaea-proof-insights/**"
       - "data/benchmarks/proof-insight-transfer-v0/**"
       - "docs/research/proof-insight-transfer-2026.md"
-      - ".github/workflows/proof-insight-transfer-v0.yml"
   workflow_dispatch:
 
 permissions:
