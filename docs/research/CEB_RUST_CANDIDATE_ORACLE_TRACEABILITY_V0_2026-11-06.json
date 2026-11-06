@@ -345,6 +345,19 @@
           "scenario": "An append-only event log with a deterministic projection checkpoint and replay-safe identity handling removes the defect while preserving all specified terminal outcomes.",
           "expected_verifier_disposition": "accepted_candidate",
           "why_spec_derived": "The contract requires replay-safe durable effects and truthful terminal states, not a particular storage architecture."
+        },
+        {
+          "id": "REPRO-C01",
+          "kind": "required_composition",
+          "requirement_ids": [
+            "REPRO-01",
+            "REPRO-03",
+            "REPRO-04",
+            "REPRO-05"
+          ],
+          "scenario": "A duplicate event is delivered concurrently while the process restarts after a commit but before acknowledgement; the repair must preserve one durable effect, replay safety and a truthful acknowledgement outcome.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The composition combines the deterministic reproduction, causal repair, replay/restart behavior and protected terminal outcomes explicitly required by the specification."
         }
       ],
       "unresolved_before_fixture": "Freeze the event schedule, durable-effect definition, acknowledgement boundary, storage assumptions, deterministic crash/restart instrumentation and protected invariants.",
