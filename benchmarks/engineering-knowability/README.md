@@ -99,6 +99,10 @@ These are prospective targets, not results or universal metrology rules.
 A passing synthetic result shows only that the candidate planned admissible evidence paths on the exact declared fixtures. It does not establish an instrument's capability, real-world observability, calibration, measurement uncertainty, product conformity, safety, approval or release authority.
 
 
+## Co-design extension proposal
+
+The next research step extends claim-to-evidence planning into joint design and inspection planning. See [CO_DESIGN_EXTENSION_V0_2.md](CO_DESIGN_EXTENSION_V0_2.md) for a separately versioned proposal with current CAD-agent comparators, eight task-family blueprints, baselines, hard gates and prospective targets. This is not part of the 12-case v0.1 corpus and has no gold labels or scores.
+
 ## Standards and metrology references
 
 The manifest pins the following external references to the cases where their scope is relevant:
