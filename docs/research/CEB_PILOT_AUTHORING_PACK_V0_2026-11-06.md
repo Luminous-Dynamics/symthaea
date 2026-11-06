@@ -321,13 +321,13 @@ The following are **provisional aspiration bands for feasibility planning**, not
 
 | Metric | Calibration target | Safety/claim guardrail |
 |---|---:|---|
-| Sequence-complete rate | ≥0.90 | Report full distribution by sequence depth and event stratum |
-| Evidence-disposition macro-F1 | ≥0.95 | Also report per-disposition precision/recall and prevalence |
+| Sequence-complete rate | Calibrate during the feasibility pilot; pre-register the confirmatory margin under #10619 | Report full distribution by sequence depth and event stratum; do not borrow SWE-Milestone percentages |
+| Evidence-disposition macro-F1 | ≥0.90 after blinded pilot calibration; ≥0.95 on sealed holdout | Also report per-disposition precision/recall and prevalence |
 | Stale-evidence use | ≤1% overall | Zero critical stale/revoked evidence use in hard-gate cases |
-| False invalidation | ≤5% | Report the cost of unnecessary revalidation separately |
+| False invalidation | ≤0.05 in feasibility; ≤0.02 on sealed holdout | Report the cost of unnecessary revalidation separately |
 | Revalidation cost per accepted sequence | ≤80% of reset-and-recheck | Must not increase stale-evidence use or false acceptance |
-| Repair survival | ≥0.90 through three milestones | Require exact successor revision and regression evidence |
-| Evidence-lineage completeness | ≥0.99 | Missing source/receipt identity is not imputed |
+| Repair survival | ≥0.90 across all later milestones in the declared sequence on sealed holdout | Require calibrated sequence depth, exact successor revision and regression evidence |
+| Evidence-lineage completeness | ≥0.98 on sealed holdout | Missing source/receipt identity is not imputed |
 
 For collaboration, use the prospective hypotheses already in #10640: ≥0.95 policy compliance, zero unauthorized high-impact side effects, ≥0.95 handoff factual precision, ≥0.90 correction-integration accuracy, and ≥20% lower reviewer reconstruction time at non-inferior accepted-work correctness. Calibrate these against reviewer disagreement and task difficulty before locking confirmatory margins.
 
