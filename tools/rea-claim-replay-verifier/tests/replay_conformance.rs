@@ -8,6 +8,9 @@ use rea_compat::claims::{
 };
 use replay_verifier::{ReplayErrorKind, ReplayOutcome, replay_claim_evaluation};
 use serde_json::{Value, json};
+use std::path::PathBuf;
+use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn fixture_bytes() -> &'static [u8] {
     include_bytes!(
@@ -358,3 +361,74 @@ fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
 }
+
+fn temporary_cli_dir() -> PathBuf {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock follows Unix epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "rea-claim-replay-{}-{nonce}",
+        std::process::id()
+    ))
+}
+
+#[test]
+fn bounded_cli_emits_machine_readable_replay_match() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let directory = temporary_cli_dir();
+    std::fs::create_dir_all(&directory).unwrap();
+    let claim_path = directory.join("claim.json");
+    let result_path = directory.join("result.json");
+    let evidence_path = directory.join("evidence.json");
+    std::fs::write(&claim_path, claim_bytes).unwrap();
+    std::fs::write(&result_path, result_bytes).unwrap();
+    std::fs::write(&evidence_path, fixture_bytes()).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rea-claim-replay"))
+        .arg(&claim_path)
+        .arg(&result_path)
+        .arg(&evidence_path)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let receipt: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(receipt["outcome"], json!("replay_match"));
+    assert_eq!(receipt["expected_disposition"], json!("supported_within_scope"));
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn bounded_cli_returns_distinct_nonzero_exit_for_semantic_mismatch() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let mut forged: Value = serde_json::from_slice(&result_bytes).unwrap();
+    forged["disposition"] = json!("refuted_within_scope");
+    let forged_bytes = serde_json::to_vec(&forged).unwrap();
+
+    let directory = temporary_cli_dir();
+    std::fs::create_dir_all(&directory).unwrap();
+    let claim_path = directory.join("claim.json");
+    let result_path = directory.join("result.json");
+    let evidence_path = directory.join("evidence.json");
+    std::fs::write(&claim_path, claim_bytes).unwrap();
+    std::fs::write(&result_path, forged_bytes).unwrap();
+    std::fs::write(&evidence_path, fixture_bytes()).unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_rea-claim-replay"))
+        .arg(&claim_path)
+        .arg(&result_path)
+        .arg(&evidence_path)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let receipt: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(receipt["outcome"], json!("replay_mismatch"));
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
