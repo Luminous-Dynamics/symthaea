@@ -1,0 +1,10 @@
+[package]
+name = "ceb-feature-matrix-protocol"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+default = ["json"]
+json = []
+binary = []
