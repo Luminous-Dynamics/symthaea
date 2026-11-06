@@ -2562,7 +2562,7 @@
           "graph_invariants": [
             {
               "invariant_id": "edge_density",
-              "value": 0.201
+              "value": 0.2008
             },
             {
               "invariant_id": "mean_degree",
@@ -2576,7 +2576,7 @@
           "graph_invariants": [
             {
               "invariant_id": "edge_density",
-              "value": 0.2011
+              "value": 0.2009
             },
             {
               "invariant_id": "mean_degree",
@@ -2716,7 +2716,7 @@
           "graph_invariants": [
             {
               "invariant_id": "edge_density",
-              "value": 0.201
+              "value": 0.2008
             },
             {
               "invariant_id": "mean_degree",
@@ -2730,7 +2730,7 @@
           "graph_invariants": [
             {
               "invariant_id": "edge_density",
-              "value": 0.2011
+              "value": 0.2009
             },
             {
               "invariant_id": "mean_degree",
@@ -2788,7 +2788,7 @@
           "graph_invariants": [
             {
               "invariant_id": "edge_density",
-              "value": 0.201
+              "value": 0.2008
             },
             {
               "invariant_id": "mean_degree",
@@ -2802,7 +2802,7 @@
           "graph_invariants": [
             {
               "invariant_id": "edge_density",
-              "value": 0.2011
+              "value": 0.2009
             },
             {
               "invariant_id": "mean_degree",
