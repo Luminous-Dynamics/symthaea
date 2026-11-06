@@ -222,10 +222,37 @@ The tool deliberately does not execute candidate code, access sealed holdouts, a
 | SelfImprove-Bench (2026) | G0–G4 generalization ladder across Exploring/Planning/Reasoning game scenarios; reports inconsistent transfer across levels | Carry the ladder into software engineering, scientific research and algorithm design; game-only transfer is not general R&D competence |
 | AI4AI-Bench (2026) | Ten training-algorithm repositories; paper reports mean 0.166 and best system 0.250, and method-changing submissions average 0.226 vs 0.126 for configuration-only changes | Useful algorithm-design starting point, but do not treat 0.250 as uncontested SOTA: an independent audit classified v1 as flawed, with score-changing defects in 4/10 tasks and final-test checkpoint selection; preserve paper and audit evidence as separate records |
 | Red Queen Gödel Machine (2026) | Co-evolves agents and evaluators using frozen utility within epochs and controlled evaluator changes at boundaries | #10708 already owns this paradigm; #10717 must consume its independent anchor/confirmation authority, not create a second evaluator |
+| Recursive automated AI research (2026-10-18) | Reports NanoChat 0.9109 vs 0.9372 BPB, NanoGPT Speedrun 77.5 s vs 79.7 s, and SOL-ExecBench 0.754 vs 0.699 across 235 B200 kernels; public artifacts include 10-seed B200 NanoChat data, NanoGPT timing/statistics logs, and 10 illustrative kernel implementations | Strong practical automated-R&D comparator for algorithm/system optimization and cross-task motif reuse. Treat the NanoGPT leaderboard result as pending official PrimeIntellect timing; distinguish artifact audit, exact-hardware reproduction and reduced-hardware portability. It is not an R4 outer-loop ignition result |
 | AIDE² (2026) | Reports seven accepted inner-agent rewrites over eight days (0.703→0.778), two further runs accepting two and four rewrites, and transfer to four held-out benchmarks including OOD weather forecasting. Its ignition comparison of the evolved agent vs human-developed agent as the *outer-loop improver* is inconclusive: three seeds/arm, mean endpoints 0.780 vs 0.782 | Closest R4 comparator. Symthaea must separately pass the outer-loop ignition test; inner-loop gains and task transfer do not prove an improved self-improver |
 | FIRE-Bench (ICML 2026) | Execution-grounded rediscovery of documented scientific insights by designing/running experiments and comparing conclusions with published findings | Add it as a scientific-process/rediscovery baseline; rediscovery is not novelty, and LLM-judge prose quality is not enough |
 | RSI evidence audit (2026-10-20) | Full-text census of 114 eligible studies (90 self-labelled RSI): only 22% audit ≥2 full-loop reruns; of 26 studies claiming a better improver, only 4 compare earlier/later procedures from identical starts at matched budgets | Direct field-wide target: repeated full-loop replication and fair same-start improver swaps are under-reported; make them non-negotiable rather than another weighted leaderboard score |
 | METR Anthropic R&D assessment (2026-11-05) | Estimates 1.9× growth in Anthropic AECI benchmark capability since October 2025 (95% CI 1.5–2.8×); judges much of the acceleration likely AI-assisted while noting no highly significant fully autonomous contribution to the most important training stages yet | Measure AI-assisted R&D productivity separately from autonomous recursion; the estimate is high-uncertainty, benchmark-scoped and partly informed by redacted evidence |
+
+### Recursive's automated AI research release: a practical SOTA target portfolio
+
+Recursive's October 18, 2026 release is a new and important comparison because it reports practical improvements on three tightly measured engineering tasks, and publishes selected artifacts. Its blog reports NanoChat validation BPB 0.9372→0.9109, NanoGPT Speedrun 79.7→77.5 seconds, and SOL-ExecBench mean score 0.699→0.754 across 235 kernels. The public artifact repository supplies 10-seed B200 NanoChat trajectories, NanoGPT reproducibility logs and same-hardware baseline logs, and 10 illustrative kernels out of 235. The public NanoGPT README reports a 77.34-second 13-run mean against an 80.61-second 10-run re-run of record #83 on the same Modal 8×H100 setup, with one-sided loss-threshold tests; it also says official PrimeIntellect leaderboard timing is pending. Preserve the blog headline, README's updated measurement and official leaderboard status as separate facts. Do not silently substitute 77.34 for 77.5 or call the pending result an accepted official leaderboard record.
+
+This release describes a system that runs multiple research threads over long horizons, maintains useful context, combines promising branches and subjects candidates to increasingly strict correctness/reward-hack checks. That makes it a direct comparison for the *quality of automated R&D execution* and research-thread orchestration. It does not, by itself, supply a matched-start comparison demonstrating that the outer-loop improver became better at improving itself. Keep it distinct from #10497's R4 ignition estimand.
+
+Symthaea should pursue a three-tier reproduction:
+1. **Artifact audit:** hashes, licenses/notices, exact source versions, per-seed logs, aggregation scripts, benchmark/task definitions, evaluator versions and score calculations. This tier is CPU-only and useful before any GPU allocation.
+2. **Hardware-matched reproduction:** only compare numerical timing/performance where accelerator, software stack, compiler, clocks, run count, evaluator and budget are aligned. NanoChat reference evidence is single-B200/5-minute/10-seed; NanoGPT is 8×H100; SOL-ExecBench is B200. Hardware-normalized guesses are not valid SOTA comparisons.
+3. **Cross-hardware portability:** port the mechanism or smaller task variant to less expensive hardware and report quality, throughput, memory and energy/cost frontiers separately. A reduced-device result is not a reproduction of the H100/B200 leaderboard number.
+
+A second, more interesting experiment isolates cross-task learning:
+- Run **independent per-task search** against **joint multi-task search** at identical aggregate compute, inference, evaluator and human-review budgets.
+- Hold out related kernels / training variants so that reusable patterns are transferred without exposing the final tasks during search.
+- Compare shared research memory against shuffled memory, no-memory and random matched-cost controls.
+- Measure whether a discovered profiling, optimizer, representation or kernel-fusion principle transfers to a new family.
+- Use #10717 for causal attribution of the transferred change, #10691 for clean-start algorithm outcomes, and #10497 for whether the outer-loop researcher itself improved.
+
+Classify findings as known-technique application, recombination, context-specific adaptation, independent rediscovery, or novel mechanism. A benchmark score alone cannot distinguish these. Novelty requires a source-backed prior-art review and independent technical review.
+
+### Strengthen the RSI census interpretation
+
+The full-text audit reports not only the 22% full-loop-rerun figure. It finds that only 54/90 studies (60%) report evaluation on tasks unused for selection; only 39/90 report per-round audits; only 10/90 pair development and audit scores for the same rounds; only 33/90 use a budget-matched comparator; only 17/90 include a null control and 17/90 report noise-aware promotion; only six report all three of per-round audit, full-loop reruns and a budget-matched comparator. Among 45 studies claiming accumulation, only seven pair development and audit scores round-by-round. Just 13/90 (14%) reach the audit's E4 bundle: held-out evaluation plus per-round audit or audited reruns plus a matched-budget improver comparison. These are coded evidence-design frequencies, not benchmark success rates.
+
+Symthaea should aim for the complete E4-style bundle, not selectively choose the most flattering component. The three additional mandatory elements are: (a) explicit null/negative controls, (b) prospectively defined noise-aware promotion, and (c) round-by-round reporting of both development and independent audit outcomes so accumulation claims can be tested, not inferred from endpoints.
 
 ### The field-wide gap: test the improver, not only its output
 
@@ -285,6 +312,8 @@ Symthaea should not claim novelty for “an agent that edits itself,” “an ed
 - Independent AI4AI-Bench audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
 - Red Queen Gödel Machine: https://arxiv.org/abs/2606.26294
 - AIDE² paper and ignition test: https://arxiv.org/abs/2609.26457
+- Recursive automated AI research results and methods (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
+- Recursive open artifacts and per-seed/log details: https://github.com/recursive-org/first-steps-toward-automated-ai-research
 - RSI evaluation-evidence census (2026-10-20): https://arxiv.org/abs/2610.27610
 - RSI-Anything world-model framework: https://arxiv.org/abs/2610.13912
 - RSI survey and seven-dimensional evaluation profile: https://lee1003-lee.github.io/Awesome-RSI-Research/
