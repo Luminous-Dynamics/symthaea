@@ -77,6 +77,8 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
         require(math.isfinite(action["stage_one_cost_units"]) and action["stage_one_cost_units"] > 0, "invalid stage-one cost")
         if action["feasibility_status"] != "FEASIBLE":
             require(action["action_id"] != data["policy_space"]["root_action_id"], "infeasible root action")
+        if action["one_shot_eligible"]:
+            require(action["stage_one_available"], "one-shot action is not available at stage one")
     policy_space = data["policy_space"]
     root_id = policy_space["root_action_id"]
     require(root_id in actions and actions[root_id]["stage_one_available"], "root action unavailable at stage one")
@@ -119,6 +121,15 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
             stage_one[key] = probabilities(kernel["outcomes"], f"{model_id} stage-one {key}")
         expected_stage_one = {(action_id, world_id) for action_id in actions for world_id in worlds}
         require(set(stage_one) == expected_stage_one, f"{model_id} stage-one kernel matrix is incomplete")
+        observed_root_histories = {
+            outcome_id
+            for world_id in worlds
+            for outcome_id in stage_one[(root_id, world_id)]
+        }
+        require(
+            observed_root_histories == set(histories),
+            f"{model_id} root-action outcomes do not match the frozen history alphabet",
+        )
 
         stage_two = {}
         expected_stage_two = {
@@ -133,6 +144,15 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
             require(key not in stage_two, f"{model_id} duplicate stage-two kernel {key}")
             stage_two[key] = probabilities(kernel["outcomes"], f"{model_id} stage-two {key}")
         require(set(stage_two) == expected_stage_two, f"{model_id} stage-two kernel matrix is incomplete")
+        observed_second_outcomes = {
+            outcome_id
+            for distribution in stage_two.values()
+            for outcome_id in distribution
+        }
+        require(
+            observed_second_outcomes == set(second_outcomes),
+            f"{model_id} stage-two outcomes do not match the frozen outcome alphabet",
+        )
         models[model_id] = {"row": model, "prior": prior, "stage_one": stage_one, "stage_two": stage_two}
 
     split = data["split_manifest"]
