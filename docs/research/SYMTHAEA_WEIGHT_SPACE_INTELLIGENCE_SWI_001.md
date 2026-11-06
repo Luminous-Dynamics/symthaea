@@ -135,7 +135,7 @@ The network has analytic gradient / Adam paths. This gives SWI an unusually usef
 - routes asynchronous cognitive-loop weight swaps through try_set_weights() and rejects invalid updates without panicking;
 - preserves the legacy set_weights() signature as a compatibility wrapper.
 
-Twenty-one tests were added across the CfC, HDC-LTC, and async training modules. They cover manifest/layout; model fingerprints; typed and transactional edits; malformed payloads; initialization scale/orthogonality; HDC parameter profiling and bounded windows; adaptive one-step gradient finite differences (including Fourier, gate, tau, input and state paths); local target updates; and valid/invalid asynchronous swaps. The tests have not been executed here; do not describe them as passing until run on the exact branch head.
+Twenty-five tests were added across the CfC, HDC-LTC, structured-mixer/HRR, and async training modules. They cover manifest/layout; model fingerprints; typed and transactional edits; malformed payloads; initialization scale/orthogonality; HDC parameter profiling and bounded windows; adaptive one-step gradient finite differences (including Fourier, gate, tau, input and state paths); local target updates; and valid/invalid asynchronous swaps. The tests have not been executed here; do not describe them as passing until run on the exact branch head.
 
 ### 4.2 HDC-LTC: novel representation-space target
 
@@ -154,7 +154,7 @@ It exposes closed-form evolution and Hebbian / contrastive updates, and now has 
 
 SWI-001 now exposes `HdcLtcParameterGroupId`, `HdcLtcNeuronParameterProfile`, bounded read-only parameter windows, and a validated replacement API for the five learnable hypervectors. The profile reports dimension, norm, mean, variance, extrema, non-finite count, and saturation count. Genesis initialization is now normalized and orthogonalized to match the unit-norm seeded constructor.
 
-Do not flatten these hypervectors and pretend every coordinate has an independent neuron-level interpretation. The manifest/profile must record algebraic role, dimension, normalization contract, and binding position. See [SWI-002 Holographic Liquid Brain](./SYMTHAEA_HOLOGRAPHIC_LIQUID_BRAIN_SWI_002.md) for the full HDC/CfC architecture and benchmark programme.
+Do not flatten these hypervectors and pretend every coordinate has an independent neuron-level interpretation. The manifest/profile must record algebraic role, dimension, normalization contract, and binding position. See [SWI-002 Holographic Liquid Brain](./SYMTHAEA_HOLOGRAPHIC_LIQUID_BRAIN_SWI_002.md) for the full HDC/CfC architecture and benchmark programme, including comparisons to NIALIM/DFA-CfN, low-rank RNNs and the systematic 121-UCI HDC benchmark.
 
 ### 4.3 Broca: projection parameters and metamorphic updates
 
@@ -520,7 +520,8 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 
 ### P3 — extend architecture-aware editing
 - HDC-LTC now has typed parameter-group IDs, profiles, bounded windows, and validated replacement for its five learnable hypervectors.
-- Validate HDC local gradients against finite differences on the exact branch head.
+- Structured orthogonal mixing and unitary HRR circular convolution are now available as independent primitives; benchmark and task-level ablations are next.
+- Validate HDC local gradients and FFT/HRR round trips on the exact branch head.
 - Define typed Broca projection/expert group IDs.
 - Replace string target selection at the SWI boundary with typed selectors.
 - Add model-specific preservation suites.
