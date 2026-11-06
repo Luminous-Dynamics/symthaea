@@ -6,10 +6,10 @@ mod replay_verifier;
 use rea_compat::claims::{
     ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
 };
-use serde_json::{Value, json};
 use replay_verifier::{
     MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome, replay_claim_evaluation,
 };
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -533,13 +533,15 @@ fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
     assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
 
     let mut assessed_and_missing = original;
-    assessed_and_missing["missing_evidence_ids"] = json!([rea_compat::verify_evidence_json(
-        fixture_bytes()
-    )
-    .unwrap()
-    .evidence_id]);
+    assessed_and_missing["missing_evidence_ids"] =
+        json!([rea_compat::verify_evidence_json(fixture_bytes())
+            .unwrap()
+            .evidence_id]);
     assert_eq!(
-        oracle_label("evidence-id-marked-assessed-and-missing", "expected_replay_outcome"),
+        oracle_label(
+            "evidence-id-marked-assessed-and-missing",
+            "expected_replay_outcome"
+        ),
         "invalid_input"
     );
     let error = replay_claim_evaluation(
@@ -636,8 +638,7 @@ fn replay_preserves_inferred_confidence_and_analyst_authority_without_promotion(
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
