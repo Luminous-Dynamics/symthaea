@@ -182,6 +182,7 @@ EXPECTED_CASE_IDS = {
     "BMS-SOC-CAPABILITY-ENVELOPE-001",
     "BMS-CAPABILITY-CELL-CALIBRATION-001",
     "CASH-RISK-DISTRIBUTION-001",
+    "DECISION-REGRET-EVPI-001",
     "BMS-MULTIDIM-CAPABILITY-SURFACE-001",
     "NON-ANTICIPATIVITY-POLICY-AUDIT-001",
     "REVENUE-REALIZATION-BRIDGE-001",
@@ -318,6 +319,7 @@ def main() -> None:
     benchmark_corpus_path = root / "docs/research/sawem/v1/sawem-bess-benchmark-corpus-v1.json"
     kernel_path = root / "tools/sawem-market-reference/src/lib.rs"
     credit_cover_kernel_path = root / "tools/sawem-market-reference/src/credit_cover.rs"
+    decision_regret_kernel_path = root / "tools/sawem-market-reference/src/decision_regret.rs"
     liquidity_options_kernel_path = root / "tools/sawem-market-reference/src/liquidity_options.rs"
     liquidity_stress_kernel_path = root / "tools/sawem-market-reference/src/liquidity_stress.rs"
     liquidity_waterfall_kernel_path = root / "tools/sawem-market-reference/src/liquidity_waterfall.rs"
@@ -342,6 +344,7 @@ def main() -> None:
         benchmark_corpus_bytes = benchmark_corpus_path.read_bytes()
         kernel_bytes = kernel_path.read_bytes()
         credit_cover_kernel_bytes = credit_cover_kernel_path.read_bytes()
+        decision_regret_kernel_bytes = decision_regret_kernel_path.read_bytes()
         liquidity_options_kernel_bytes = liquidity_options_kernel_path.read_bytes()
         liquidity_stress_kernel_bytes = liquidity_stress_kernel_path.read_bytes()
         liquidity_waterfall_kernel_bytes = liquidity_waterfall_kernel_path.read_bytes()
@@ -366,6 +369,8 @@ def main() -> None:
             kernel_bytes
             + b"\n"
             + credit_cover_kernel_bytes
+            + b"\n"
+            + decision_regret_kernel_bytes
             + b"\n"
             + liquidity_options_kernel_bytes
             + b"\n"
