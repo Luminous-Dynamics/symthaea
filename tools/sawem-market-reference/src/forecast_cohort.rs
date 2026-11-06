@@ -78,8 +78,8 @@ pub enum ForecastCohortAuditError {
     EmptyPopulation,
     IncompleteCensus,
     DuplicateAssetId,
-    DuplicatePopulationSource,
     DuplicateSelection,
+    NonRepresentativeExclusion,
     UnknownAsset,
     ExclusionReasonOnIncludedAsset,
     MissingExclusionReason,
@@ -161,9 +161,6 @@ pub fn audit_forecast_calibration_cohort(
             if previous.asset_id == asset.asset_id {
                 return Err(ForecastCohortAuditError::DuplicateAssetId);
             }
-            if previous.source_ref == asset.source_ref {
-                return Err(ForecastCohortAuditError::DuplicatePopulationSource);
-            }
         }
     }
 
@@ -219,7 +216,7 @@ pub fn audit_forecast_calibration_cohort(
             && (selection.exclusion_reason == CohortExclusionReason::ContractedRevenue
                 || selection.exclusion_reason == CohortExclusionReason::PerformanceOutlier)
         {
-            return Err(ForecastCohortAuditError::InvalidMerchantOnlyExclusion);
+            return Err(ForecastCohortAuditError::NonRepresentativeExclusion);
         }
         if inputs.objective == CohortObjective::MerchantOnly
             && selection.disposition == CohortDisposition::Excluded
