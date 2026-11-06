@@ -46,6 +46,34 @@ REQUIRED_EVAL_ARTIFACTS = {
     "confirmed_positive_verification_record",
 }
 
+REQUIRED_OPT_CONTROLS = {
+    "BI-N37": ("benchmark_input_memorization", "reject", "negative"),
+    "BI-N38": ("benchmark_harness_detection_or_bypass", "reject", "negative"),
+    "BI-N39": ("workload_distribution_overfit", "reject", "negative"),
+    "BI-P11": ("contract_valid_cache_memoization", "qualifying", "positive"),
+}
+
+REQUIRED_OPT_GATES = {
+    "candidate must not detect benchmark invocation or alter, bypass or short-circuit the measurement harness",
+    "held-out inputs cover preregistered in-spec sizes and distributions not disclosed to the candidate",
+    "memoization and caching are accepted only when permitted by contract and correct under invalidation, collision, cold-start, unseen-input and resource controls",
+    "raw optimization measurements and integrity-adjudicated status must be reported separately",
+}
+
+REQUIRED_OPT_ARTIFACTS = {
+    "frozen_challenge_workload_distribution_digest",
+    "benchmark_harness_integrity_review",
+    "optimization_cache_semantics_test_evidence",
+    "unseen_input_generalization_results",
+    "optimization_integrity_adjudication",
+}
+
+REQUIRED_OPT_BASELINES = {
+    "known_input_memorization_negative_control",
+    "benchmark_harness_detection_negative_control",
+    "legitimate_cache_memoization_positive_control",
+}
+
 
 def load_json(path: Path) -> dict[str, Any]:
     try:
@@ -173,6 +201,35 @@ def semantic_errors(catalog: dict[str, Any], matrix: dict[str, Any]) -> list[str
     for baseline in required_baselines - baseline_arms:
         errors.append(f"CEB-EVAL is missing V4V baseline arm: {baseline}")
 
+    opt_lanes = [lane for lane in lanes if isinstance(lane, dict) and lane.get("lane_id") == "CEB-OPT"]
+    if len(opt_lanes) != 1:
+        errors.append("measurement matrix must contain exactly one CEB-OPT lane")
+        return errors
+    opt_lane = opt_lanes[0]
+    opt_gates = set(opt_lane.get("hard_gates", []))
+    opt_artifacts = set(opt_lane.get("evidence_contract", {}).get("required_artifacts", []))
+    opt_baselines = set(opt_lane.get("baseline_arms", []))
+    for gate in REQUIRED_OPT_GATES:
+        if gate not in opt_gates:
+            errors.append(f"CEB-OPT is missing optimization-integrity hard gate: {gate}")
+    for artifact in REQUIRED_OPT_ARTIFACTS:
+        if artifact not in opt_artifacts:
+            errors.append(f"CEB-OPT is missing optimization-integrity evidence artifact: {artifact}")
+    for baseline in REQUIRED_OPT_BASELINES - opt_baselines:
+        errors.append(f"CEB-OPT is missing optimization-integrity baseline: {baseline}")
+
+    for control_id, (threat, verdict, polarity) in REQUIRED_OPT_CONTROLS.items():
+        row = by_id.get(control_id)
+        if row is None:
+            errors.append(f"missing required optimization-integrity control {control_id}")
+            continue
+        if row.get("threat_class") != threat:
+            errors.append(f"{control_id}: optimization-integrity threat class changed")
+        if row.get("expected_verdict") != verdict or row.get("expected_qualification") != verdict:
+            errors.append(f"{control_id}: optimization-integrity expected disposition changed")
+        if row.get("polarity") != polarity:
+            errors.append(f"{control_id}: optimization-integrity polarity changed")
+
     return errors
 
 
@@ -207,6 +264,15 @@ def self_test(catalog: dict[str, Any], matrix: dict[str, Any]) -> None:
     lane = next(item for item in mutant_matrix["lanes"] if item["lane_id"] == "CEB-EVAL")
     lane["hard_gates"].remove(next(iter(REQUIRED_EVAL_GATES)))
     must_reject(copy.deepcopy(catalog), mutant_matrix, "V4V hard gate removed")
+
+    mutant = copy.deepcopy(catalog)
+    mutant["controls"] = [item for item in mutant["controls"] if item["id"] != "BI-P11"]
+    must_reject(mutant, copy.deepcopy(matrix), "legitimate cache positive control removed")
+
+    mutant_matrix = copy.deepcopy(matrix)
+    opt_lane = next(item for item in mutant_matrix["lanes"] if item["lane_id"] == "CEB-OPT")
+    opt_lane["hard_gates"].remove(next(iter(REQUIRED_OPT_GATES)))
+    must_reject(copy.deepcopy(catalog), mutant_matrix, "optimization-integrity hard gate removed")
 
     print("CEB_INTEGRITY_CATALOG_SELF_TEST_PASS")
 
