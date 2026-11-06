@@ -1,0 +1,113 @@
+name: Melothaea RMI synthetic harness
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-rmi-synthetic/**"
+      - ".github/workflows/mel-rmi-synthetic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-rmi-oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify the exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_RMI_CODE_REVISION=$actual" >> "$GITHUB_ENV"
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Stage isolated crate outside repository workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-rmi-synthetic"
+          mkdir -p "$staged/src" "$staged/examples"
+          cp tools/mel-rmi-synthetic/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-rmi-synthetic/Cargo.lock "$staged/Cargo.lock"
+          cp tools/mel-rmi-synthetic/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-rmi-synthetic/examples/canonical_suite.rs "$staged/examples/canonical_suite.rs"
+          echo "MEL_RMI_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Format isolated crate
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_RMI_MANIFEST"
+      - name: Test deterministic RMI oracle
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_RMI_MANIFEST"
+      - name: Run 160-case five-dimension seed sweep and verify control separation
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/mel-rmi-canonical-suite.csv"
+          summary="$RUNNER_TEMP/mel-rmi-dimension-summary.txt"
+          artifact_report="$RUNNER_TEMP/mel-rmi-artifact-digests.csv"
+          event_report="$RUNNER_TEMP/mel-rmi-trial-events.csv"
+          MEL_RMI_ARTIFACT_REPORT="$artifact_report" MEL_RMI_TRIAL_EVENT_REPORT="$event_report" cargo +1.96.0 run --locked --manifest-path "$MEL_RMI_MANIFEST" --example canonical_suite > "$report" 2> "$summary"
+          cat "$report"
+          cat "$summary"
+          head -n 6 "$artifact_report"
+          head -n 6 "$event_report"
+          rule_count="$(awk -F, '$1 == "trial" && $3 == "rule-positive" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          fixed_passes="$(awk -F, '$1 == "trial" && $3 == "fixed" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          imitation_passes="$(awk -F, '$1 == "trial" && $3 == "imitation" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          one_way_passes="$(awk -F, '$1 == "trial" && $3 == "one-way" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          yoked_passes="$(awk -F, '$1 == "trial" && $3 == "yoked" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          distractor_passes="$(awk -F, '$1 == "trial" && $3 == "distractor-shortcut" && $11 == "true" { count++ } END { print count + 0 }' "$report")"
+          reciprocal_count="$(awk -F, '$1 == "reciprocal" && $18 == "true" { count++ } END { print count + 0 }' "$report")"
+          reciprocal_oracle_count="$(awk -F, '$1 == "reciprocal" && $17 == "true" { count++ } END { print count + 0 }' "$report")"
+          negotiation_qualified="$(awk -F, '$1 == "negotiation_qualified" { value=$2 } END { print value + 0 }' "$report")"
+          negotiation_rejected="$(awk -F, '$1 == "negotiation_rejected" { value=$2 } END { print value + 0 }' "$report")"
+          authority_scope_qualified="$(awk -F, '$1 == "authority_scope_qualified" { value=$2 } END { print value + 0 }' "$report")"
+          authority_scope_rejected="$(awk -F, '$1 == "authority_scope_rejected" { value=$2 } END { print value + 0 }' "$report")"
+          artifact_count="$(awk -F, '$1 == "artifact_verified" { count=$2 } END { print count + 0 }' "$report")"
+          artifact_digest_rows="$(awk -F, '$1 == "artifact_digest_rows" { count=$2 } END { print count + 0 }' "$report")"
+          artifact_report_rows="$(awk 'END { print NR - 1 }' "$artifact_report")"
+          event_count="$(awk -F, '$1 == "trial_event_rows" { value=$2 } END { print value + 0 }' "$report")"
+          event_report_rows="$(awk 'END { print NR - 1 }' "$event_report")"
+          event_report_bad_rows="$(awk -F, 'NF != 40 { count++ } END { print count + 0 }' "$event_report")"
+          agent_summary_count="$(grep -c '^RMI_AGENT_AGGREGATE,' "$summary")"
+          partner_summary_count="$(grep -c '^RMI_PARTNER_AGGREGATE,' "$summary")"
+          test "$rule_count" -eq 160
+          test "$fixed_passes" -eq 0
+          test "$imitation_passes" -eq 0
+          test "$one_way_passes" -eq 0
+          test "$yoked_passes" -eq 0
+          test "$distractor_passes" -eq 0
+          test "$reciprocal_oracle_count" -eq 160
+          test "$reciprocal_count" -eq 160
+          test "$negotiation_qualified" -eq 6
+          test "$negotiation_rejected" -eq 5
+          test "$authority_scope_qualified" -eq 1
+          test "$authority_scope_rejected" -eq 6
+          test "$artifact_count" -eq 1120
+          test "$artifact_digest_rows" -eq 17920
+          test "$artifact_report_rows" -eq 17920
+          test "$event_count" -eq 4480
+          test "$event_report_rows" -eq 4480
+          test "$event_report_bad_rows" -eq 0
+          test "$agent_summary_count" -eq 30
+          test "$partner_summary_count" -eq 5
+      - name: Upload replayable RMI evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-rmi-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/mel-rmi-canonical-suite.csv
+            ${{ runner.temp }}/mel-rmi-dimension-summary.txt
+            ${{ runner.temp }}/mel-rmi-artifact-digests.csv
+            ${{ runner.temp }}/mel-rmi-trial-events.csv
+          if-no-files-found: error
+          retention-days: 90
