@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_ADAPTIVE_CHALLENGE_REPLAY_BINDING.schema.json",
+  "title": "Exact adaptive hypothesis-expansion challenge replay binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "binding_id",
+    "challenge_id",
+    "expected_base",
+    "expected_challenge_result",
+    "upstream_source"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "binding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_base": {
+      "$ref": "#/$defs/base"
+    },
+    "expected_challenge_result": {
+      "$ref": "#/$defs/challenge_result"
+    },
+    "upstream_source": {
+      "$ref": "#/$defs/upstream_source"
+    }
+  },
+  "$defs": {
+    "sha40": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "base": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_revision_commit_sha",
+        "query_id",
+        "query_spec_sha256",
+        "scenario_set_sha256",
+        "action_set_sha256",
+        "joint_support_sha256"
+      ],
+      "properties": {
+        "dataset_revision_commit_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "scenario_set_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "action_set_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "joint_support_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "challenge_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "added_scenario_count",
+        "adaptive_worst_case_effort_before",
+        "adaptive_worst_case_effort_after",
+        "adaptive_status_before",
+        "adaptive_status_after",
+        "adaptive_effort_non_decreasing",
+        "monotonicity_passed"
+      ],
+      "properties": {
+        "added_scenario_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "adaptive_worst_case_effort_before": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "adaptive_worst_case_effort_after": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "adaptive_status_before": {
+          "enum": [
+            "POLICY_EXISTS",
+            "NO_POLICY"
+          ]
+        },
+        "adaptive_status_after": {
+          "enum": [
+            "POLICY_EXISTS",
+            "NO_POLICY"
+          ]
+        },
+        "adaptive_effort_non_decreasing": {
+          "type": "boolean"
+        },
+        "monotonicity_passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "upstream_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rust_git_blob_sha1",
+        "oracle_git_blob_sha1"
+      ],
+      "properties": {
+        "rust_git_blob_sha1": {
+          "$ref": "#/$defs/sha40"
+        },
+        "oracle_git_blob_sha1": {
+          "$ref": "#/$defs/sha40"
+        }
+      }
+    }
+  }
+}
