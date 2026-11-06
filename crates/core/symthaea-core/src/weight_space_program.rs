@@ -431,7 +431,7 @@ fn validate_group(
         });
     }
 
-    match group.target {
+    match &group.target {
         WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { .. }) => {
             if group.role != ParameterGroupRole::TimeConstant
                 || !group.constraints.min_value.is_some_and(|minimum| minimum > 0.0)
@@ -452,9 +452,15 @@ fn validate_group(
 fn validate_group_constraints(
     constraints: &ParameterGroupConstraints,
 ) -> Result<(), WeightProgramError> {
+    for value in [constraints.min_value, constraints.max_value]
+        .into_iter()
+        .flatten()
+    {
+        if !value.is_finite() {
+            return Err(WeightProgramError::InvalidConstraints);
+        }
+    }
     for value in [
-        constraints.min_value,
-        constraints.max_value,
         constraints.min_l2_norm,
         constraints.max_l2_norm,
         constraints.max_l2_delta,
