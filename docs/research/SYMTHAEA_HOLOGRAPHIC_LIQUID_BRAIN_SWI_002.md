@@ -80,7 +80,7 @@ The current network:
 - optionally bundles a skip connection from the original input;
 - caches the resulting layer output.
 
-This yields a layered, high-dimensional liquid representation. It is a useful substrate, but it is not yet a complete associative memory architecture: there is no general cleanup-memory contract, explicit item/role retrieval layer, or capacity guarantee at the network boundary.
+This yields a layered, high-dimensional liquid representation. A separate HRR module now supplies unitary role binding, correlation unbinding, and a confidence-aware nearest-codeword cleanup codebook. It is the first associative-memory primitive, not yet a complete multi-factor resonator or a demonstrated capacity guarantee.
 
 ### 2.4 Current algebra is not all of HRR
 
@@ -177,7 +177,9 @@ The research branch now contains the following HDC/CfC work:
 - HDC-LTC now exposes typed parameter group IDs, profile statistics, bounded read-only windows, and dimension/finite/norm-validated replacement.
 - The `structured_mixer.rs` prototype provides identity, cyclic permutation and normalized Walsh–Hadamard transforms with exact inverse methods.
 - The `hrr.rs` prototype implements O(D log D) circular convolution/correlation using a radix-2 FFT and unitary HRR roles, with exact unbinding for unitary roles.
-- HRR and structured-mixer tests specify round-trip reconstruction, norm preservation, one-hot spreading, role-slot retrieval, commutativity, and invalid-shape rejection.
+- `HdcHrrCodebook` now performs nearest-codeword cleanup with both minimum-similarity and best-versus-runner-up margin thresholds; ambiguous retrieval is represented as abstention.
+- HRR and structured-mixer tests specify round-trip reconstruction, norm preservation, one-hot spreading, role-slot retrieval, loaded-record top-1 retrieval, confidence-based abstention, commutativity, and invalid-shape rejection.
+- The Criterion suite `hlb_algebra_dynamics` now times Hadamard, Walsh–Hadamard, permutation, HRR bind/unbind, HRR cleanup, and liquid integrators across D=256–16,384; the 65,536 and retrieval-load sweeps remain follow-on work.
 
 **Important:** the structured mixer is not yet wired into the default HDC-LTC neuron. Its tests establish operator correctness, not a task-accuracy or efficiency improvement. The new Rust tests have not run in this environment.
 
@@ -406,6 +408,50 @@ A faster one-step method that is 30% away from its reference is not “better”
 
 These are engineering gates. They are not claims of current performance or SOTA.
 
+## 6.1 Industry and SOTA comparison matrix
+
+The comparison needs to be task-specific. HDC is not a universal classifier winner: the 2025 systematic comparison uses seven established HDC datasets plus 121 UCI datasets and reports that conventional off-the-shelf classifiers can surpass HDC methods on many tabular classification tasks. It also identifies key-value encoding and iterative adaptive training as strong HDC directions. Therefore, include conventional classifiers in any classification claim, and make compositional memory, temporal irregularity, robustness and deployable efficiency the areas where HLS must prove a distinct advantage.
+
+| Capability | Strong external comparators | What Symthaea must match or beat |
+|---|---|---|
+| HDC classification | TorchHD baselines: OnlineHD, AdaptHD, SparseHD, QuantHD, NeuralHD, CompHD, LeHDC, SemiHD; plus SVM, LDA, Ridge, GLVQ and RVFL | Accuracy/F1, few-shot curves, calibration, latency, memory, and robustness on the seven-dataset HDC benchmark and the 121-UCI benchmark |
+| Continuous-time dynamics | LTC, CfC, Neural CDE, ODE-RNN, adaptive RK methods; NIALIM / DFA-CfN / PRDFA-CfN (2026) | Matched one-step and rollout error, irregular-sampling robustness, accuracy/runtime Pareto curves, and a declared error bound |
+| Structured recurrent coupling | Dense RNN, GRU/LSTM, low-rank RNN, NEF/FORCE-style teacher-trained recurrent systems, OMP-minimal dynamics fits | Same-task accuracy at matched parameter count, FLOPs and training data; report whether structured mixing helps |
+| Associative retrieval | HRR/FHRR, bipolar MAP/BSC, modern Hopfield memory, resonator networks | Exact/top-k retrieval, capacity, false recall, confidence calibration, correct convergence, spurious convergence, non-convergence, and updates to correct convergence |
+| On-device / edge efficiency | TorchHD / optimized SIMD HDC and domain-specific HDC ASIC/FPGA systems | Latency, peak memory, bytes moved, energy per correct retrieval/prediction, and numerical error on identical hardware |
+
+The 2026 resonator comparison is especially important for HLB-HDC. It evaluates sign, softmax, ReLU and polynomial cleanup; it separates correct convergence from spurious convergence and non-convergence; and it finds that cleanup nonlinearities change both factorization capacity and failure mode. On matched-dimensionality FHRR experiments, the relative ranking also changes by representation. HLS should reproduce this protocol before claiming a better associative memory. For dense bipolar F=3, D=1,000 factorization, that study reports roughly 4.2 / 13.8 mean recurrent updates for sign cleanup at search spaces near 4.9e3 / 6.4e4, but those iteration counts are conditional on correct convergence; they are meaningless without the terminal-outcome proportions.
+
+The 2026 NIALIM paper is the direct continuous-time comparator. It challenges the frozen-input / zero-order approximation on high-resolution and irregularly sampled inputs, derives a Lagrange-interpolation approximation with an error bound, and evaluates DFA-CfN and PRDFA-CfN across six sequence tasks. Symthaea should reproduce selected task protocols rather than infer superiority from one local ODE test.
+
+The NeurIPS 2025 low-rank RNN work motivates a parameter-matched low-rank baseline, including teacher-training, OMP-based minimality and active selection of informative activity patterns. A fixed Walsh–Hadamard transform is only a useful mixer if it gives measurable performance per unit compute over simpler permutations and learned low-rank alternatives.
+
+## 6.2 Quantitative research gates
+
+These targets are preregistration goals, not measured results.
+
+| Experiment | Initial target to beat |
+|---|---|
+| Zero-time identity | Exact state identity to floating-point tolerance for every integrator at dt=0 |
+| One-step gradient correctness | Relative finite-difference error ≤1e-3 on well-conditioned coordinates; explicitly report absolute error near zero and clamp-boundary cases |
+| Liquid numerical fidelity | ≤1% normalized rollout error on preregistered smooth and piecewise-linear tasks, while reporting latency and work per step |
+| Irregular time sampling | No material accuracy collapse under held-out irregular dt schedules versus the matched NIALIM / CfC baseline |
+| One-factor HRR cleanup | ≥99% top-1 retrieval at declared dimension/load, with separately reported abstention, false-accept and false-reject rates |
+| Multi-factor resonator | Beat sign/softmax/ReLU/polynomial baselines on correct-convergence rate at matched D, codebook size, restart count and iteration budget; never optimize mean iterations alone |
+| Temporal task learning | Statistically significant improvement over EMA, AR/linear state-space, GRU/LSTM, CfC/LTC and low-rank RNN at matched data/compute |
+| Efficiency | Show a Pareto improvement in task quality versus latency/memory/energy on fixed hardware; do not compare CPU microbench timings to GPU papers |
+
+For multi-factor memory, preregister D, number of factors F, codebook size n per factor, search space M=n^F, random seeds, initialization, maximum iterations and restart budget. Record:
+- correct convergence;
+- spurious convergence;
+- non-convergence;
+- exact factor recovery;
+- per-factor similarity and top-1 margin;
+- mean/median/worst-case updates *conditioned on correct convergence*;
+- wall time and memory per trial.
+
+For HDC classification, reproduce the published split and preprocessing rules; use the 7-task benchmark and 121-UCI set; include conventional SVM/LDA/Ridge/GLVQ/RVFL controls; and report both training and inference times. A benchmark-only win on one selected dataset is not a SOTA claim.
+
 ## 7. What would make this different from the field?
 
 The most credible differentiation is not simply “HDC plus CfC.” Both HDC/VSA and liquid-network research are active fields. A 2025 systematic HDC/VSA benchmark review covers seven established tasks plus 121 UCI datasets and reports that HDC methods can still be surpassed by off-the-shelf classifiers, despite improvements in few-shot learning and robustness. The HLB programme must therefore include well-tuned conventional baselines, not just HDC variants. In continuous-time modelling, the 2026 NIALIM/DFA-CfN paper is a direct comparator for the current zero-order/frozen-input CfC path. For structured coupling, recent NeurIPS low-rank RNN results motivate a parameter-matched low-rank baseline, not just dense RNNs.
@@ -445,8 +491,9 @@ This is a research hypothesis. To claim superiority, Symthaea must reproduce sel
 ### P2 — architecture experiments
 - Implement a small HDC-LTC structured-mixer prototype behind a feature/configuration gate.
 - Add HRR circular-convolution as a separate binding backend and compare to current Hadamard/MAP.
-- Add a cleanup-memory / resonator retrieval test harness with explicit correct/spurious/non-convergence outcomes.
+- Extend the current confidence-aware one-factor HRR cleanup into multi-factor resonator factorization, with explicit correct/spurious/non-convergence outcomes.
 - Benchmark role/filler HRR record retrieval across load and dimension, not just the exact one-role inverse.
+- Add FHRR as a matched-effective-dimension comparator; the current backend is real-valued HRR and must not be presented as FHRR.
 
 ### P3 — learning and full HLB
 - Add eligibility traces after the temporal benchmark validator is run.
@@ -464,6 +511,7 @@ The ignored phoneme training test remains ignored. No new phoneme accuracy, nume
 1. Liang, X. et al. (2026). *Rederived Closed-Form Continuous-Time Neural Networks.* IEEE Transactions on Neural Networks and Learning Systems, 37(9), 4381–4395. DOI: https://doi.org/10.1109/TNNLS.2026.3669345. PubMed: https://pubmed.ncbi.nlm.nih.gov/41790819/
 2. Vergés, P. et al. (2025). *Classification using hyperdimensional computing: a review with comparative analysis.* Artificial Intelligence Review 58, 173. https://doi.org/10.1007/s10462-025-11181-2
 3. Arora, A. and Pillow, J. (2025). *Efficient Training of Minimal and Maximal Low-Rank Recurrent Neural Networks.* NeurIPS 2025. https://proceedings.neurips.cc/paper_files/paper/2025/hash/902244a9e85ebc8535ce111cf96f3e04-Abstract-Conference.html
+4. Yeung, C., Poduval, P. and Imani, M. (2026). *A comparative study of nonlinear cleanup rules in resonator networks.* Frontiers in Artificial Intelligence, 9, 1793314. https://doi.org/10.3389/frai.2026.1793314
 4. Salik, A. Y. et al. (2026). *Hyper-dimensional computing architectures for AI applications: A comprehensive survey of principles, performance, and future prospects.* Results in Engineering, 29, 109589. DOI: https://doi.org/10.1016/j.rineng.2026.109589
 5. IEEE CIS Task Force on Hyperdimensional Computing and Vector Symbolic Architectures: https://cis.taskforce.ieee.org/hdcvsa/
 6. *A comparison of vector symbolic architectures.* Artificial Intelligence Review (2021). https://link.springer.com/article/10.1007/s10462-021-10110-3
