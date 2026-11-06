@@ -545,10 +545,7 @@ pub fn replay_claim_evaluation(
                 EvidenceErrorKind::InputTooLarge => ReplayErrorKind::InputTooLarge,
                 _ => ReplayErrorKind::InvalidEvidence,
             };
-            ReplayError::new(
-                kind,
-                format!("REA Evidence verification failed: {error}"),
-            )
+            ReplayError::new(kind, format!("REA Evidence verification failed: {error}"))
         })?;
         if !claim.evidence_ids.contains(&evidence.evidence_id) {
             return Err(ReplayError::new(
@@ -571,15 +568,12 @@ pub fn replay_claim_evaluation(
     }
 
     let expected = derive_reference_result(&claim, &evidence_by_id)?;
-    let expected_value = serde_json::to_value(&expected).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
-    let expected_canonical = canonical_jcs_bytes(&expected_value).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
-    let reported_canonical = canonical_jcs_bytes(&reported_value).map_err(|error| {
-        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
-    })?;
+    let expected_value = serde_json::to_value(&expected)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
+    let expected_canonical = canonical_jcs_bytes(&expected_value)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
+    let reported_canonical = canonical_jcs_bytes(&reported_value)
+        .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
     let outcome = if expected_canonical == reported_canonical {
         ReplayOutcome::ReplayMatch
     } else {
@@ -665,7 +659,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
                 ScopeDisposition::Inapplicable => "platform does not match claim scope",
                 ScopeDisposition::Unverifiable => {
                     "platform scope is absent or broader than the Evidence observation"
-                },
+                }
                 ScopeDisposition::Match => unreachable!(),
             }
             .to_owned(),
@@ -683,7 +677,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
                 ScopeDisposition::Inapplicable => "environment_id does not match claim scope",
                 ScopeDisposition::Unverifiable => {
                     "environment identity is not recorded at the requested scope"
-                },
+                }
                 ScopeDisposition::Match => unreachable!(),
             }
             .to_owned(),
