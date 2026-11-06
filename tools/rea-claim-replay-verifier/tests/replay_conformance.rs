@@ -1335,3 +1335,66 @@ fn unsupported_predicate_closure_sweep_cannot_be_bought_with_more_observations()
     }
 }
 
+#[test]
+fn bounded_cli_rejects_oversized_sparse_files_before_reading_payloads() {
+    let directory = temporary_cli_dir();
+    std::fs::create_dir_all(&directory).unwrap();
+
+    let small_claim = directory.join("small-claim.json");
+    let small_result = directory.join("small-result.json");
+    std::fs::write(&small_claim, b"{}").unwrap();
+    std::fs::write(&small_result, b"{}").unwrap();
+
+    let oversized_claim = directory.join("oversized-claim.json");
+    std::fs::File::create(&oversized_claim)
+        .unwrap()
+        .set_len(1024 * 1024 + 1)
+        .unwrap();
+
+    let oversized_result = directory.join("oversized-result.json");
+    std::fs::File::create(&oversized_result)
+        .unwrap()
+        .set_len(4 * 1024 * 1024 + 1)
+        .unwrap();
+
+    let oversized_evidence = directory.join("oversized-evidence.json");
+    std::fs::File::create(&oversized_evidence)
+        .unwrap()
+        .set_len(symthaea_rea_compat::MAX_EVIDENCE_JSON_BYTES as u64 + 1)
+        .unwrap();
+
+    let cases = [
+        (
+            "claim",
+            vec![oversized_claim.as_os_str(), small_result.as_os_str()],
+        ),
+        (
+            "result",
+            vec![small_claim.as_os_str(), oversized_result.as_os_str()],
+        ),
+        (
+            "Evidence",
+            vec![
+                small_claim.as_os_str(),
+                small_result.as_os_str(),
+                oversized_evidence.as_os_str(),
+            ],
+        ),
+    ];
+
+    for (label, arguments) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_rea-claim-replay"))
+            .args(arguments)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{label} input");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("exceeds"),
+            "{label} input should fail at byte-limit preflight: {stderr}"
+        );
+    }
+
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
