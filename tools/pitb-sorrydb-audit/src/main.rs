@@ -165,6 +165,103 @@ struct StrategySummary {
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct ClusteredStrategyComparison {
+    strategy_a_name: String,
+    strategy_a_version: String,
+    strategy_a_model_id: Option<String>,
+    strategy_a_model_version: Option<String>,
+    strategy_b_name: String,
+    strategy_b_version: String,
+    strategy_b_model_id: Option<String>,
+    strategy_b_model_version: Option<String>,
+    task_denominator: usize,
+    strategy_a_attempted_tasks: usize,
+    strategy_b_attempted_tasks: usize,
+    strategy_a_attempt_coverage: f64,
+    strategy_b_attempt_coverage: f64,
+    strategy_a_unique_verified_tasks: usize,
+    strategy_b_unique_verified_tasks: usize,
+    both_solved_tasks: usize,
+    a_only_solved_tasks: usize,
+    b_only_solved_tasks: usize,
+    neither_solved_tasks: usize,
+    paired_risk_difference_b_minus_a: f64,
+    repository_cluster_count: usize,
+    repository_file_cluster_count: usize,
+    repository_bootstrap_replicates: usize,
+    repository_bootstrap_ci95_low: f64,
+    repository_bootstrap_ci95_high: f64,
+    nested_repository_file_bootstrap_replicates: usize,
+    nested_repository_file_bootstrap_ci95_low: f64,
+    nested_repository_file_bootstrap_ci95_high: f64,
+    repository_cluster_sign_flip_replicates: usize,
+    repository_cluster_sign_flip_p_value: f64,
+    holm_adjusted_p_value: f64,
+    deterministic_seed_sha256: String,
+    inference_note: String,
+}
+
+#[derive(Debug, Clone)]
+struct FileBootstrapBlock {
+    task_count: usize,
+    a_solved: usize,
+    b_solved: usize,
+}
+
+#[derive(Debug, Clone)]
+struct RepositoryBootstrapBlock {
+    files: Vec<FileBootstrapBlock>,
+    task_count: usize,
+    a_solved: usize,
+    b_solved: usize,
+}
+
+struct DeterministicRng {
+    state: [u64; 4],
+}
+
+impl DeterministicRng {
+    fn from_seed_hex(seed: &str) -> Result<Self, String> {
+        if !valid_hex(seed, 64) {
+            return Err("deterministic RNG seed must be a SHA-256 digest".into());
+        }
+        let mut state = [0_u64; 4];
+        for (index, word) in state.iter_mut().enumerate() {
+            let start = index * 16;
+            *word = u64::from_str_radix(&seed[start..start + 16], 16)
+                .map_err(|error| format!("parse deterministic RNG seed: {error}"))?;
+        }
+        if state.iter().all(|word| *word == 0) {
+            return Err("deterministic RNG cannot use the all-zero state".into());
+        }
+        Ok(Self { state })
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let result = self.state[1]
+            .wrapping_mul(5)
+            .rotate_left(7)
+            .wrapping_mul(9);
+        let t = self.state[1] << 17;
+        self.state[2] ^= self.state[0];
+        self.state[3] ^= self.state[1];
+        self.state[1] ^= self.state[2];
+        self.state[0] ^= self.state[3];
+        self.state[2] ^= t;
+        self.state[3] = self.state[3].rotate_left(45);
+        result
+    }
+
+    fn index(&mut self, upper: usize) -> usize {
+        (self.next_u64() % upper as u64) as usize
+    }
+
+    fn coin(&mut self) -> bool {
+        self.next_u64() & 1 == 1
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct Report {
     schema_version: String,
     upstream_repository: String,
@@ -180,6 +277,7 @@ struct Report {
     verified_success_run_count: usize,
     unique_successful_task_count: usize,
     strategy_summaries: Vec<StrategySummary>,
+    pairwise_clustered_comparisons: Vec<ClusteredStrategyComparison>,
     full_task_count: usize,
     evaluation_task_count: usize,
     documented_full_task_count: usize,
