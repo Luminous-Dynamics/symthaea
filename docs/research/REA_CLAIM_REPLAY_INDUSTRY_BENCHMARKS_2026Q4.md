@@ -178,3 +178,18 @@ Do not compare a synthetic deterministic control result to a model benchmark lea
 ## 7. Claim ceiling
 
 This work establishes only a scoped, reproducible evaluation of a provider-reported observation from semantically verified REA Evidence. It does not establish general truth, producer identity, trustworthiness, artifact safety, temporal validity, source independence, completeness, platform acceptance, or security-control effectiveness. Those remain separate predicates with separate source-owned proof obligations.
+
+## 8. Independent replay CLI
+
+The standalone package now includes `rea-claim-replay`, a read-only command for CI and reviewer workflows:
+
+```sh
+cargo run --locked --manifest-path tools/rea-claim-replay-verifier/Cargo.toml -- \
+  claim.json result.json evidence-1.json evidence-2.json
+```
+
+Evidence paths are optional when the claim intentionally contains no premises. The CLI emits a JSON replay receipt on stdout and uses these exit codes: 0 = ReplayMatch; 1 = well-formed result but semantic ReplayMismatch; 2 = invalid input, bounded-read/resource failure, IO or canonicalization error.
+
+The command reads at most 1 MiB for the claim, 4 MiB for the result, 64 MiB per Evidence record and 128 MiB total Evidence bytes. It uses bounded `Read::take(limit + 1)` reads rather than unbounded `fs::read`, then invokes the same independently implemented replay path used by the conformance tests. It does not write, extract, execute or mutate supplied artifacts.
+
+A matching replay receipt remains a reproducibility result, not a signature, trusted timestamp, provider-authentication result or proof of underlying artifact truth.
