@@ -24,6 +24,22 @@ The exact 1,000 evaluation records have 1,000 unique task IDs and 1,000 unique g
 
 The zero-based columns are retained verbatim. Do not convert them to one-based coordinates without checking the pinned source and SorryDB's coordinate convention. The tasks are clustered by project and file, so statistical comparisons should use repository/file-level clustered resampling, not an IID bootstrap over 1,000 rows.
 
+## Paired strategy inference under repository clustering
+
+When proof-run receipts from two or more strategies are supplied, the report includes every pairwise strategy comparison on the **entire fixed evaluation split**.
+
+- A retry is collapsed to one task-level success if any attempt for that strategy passes every registered proof and semantic gate.
+- An unattempted task remains in the denominator and counts as not solved; the attempt-coverage field is reported separately so missing work is visible.
+- The comparison reports both-solved, A-only, B-only and neither-solved task counts, plus the paired risk difference.
+- The outer bootstrap resamples repository clusters with replacement (10,000 replicates).
+- A nested bootstrap resamples source-file clusters inside each sampled repository (10,000 replicates).
+- A paired cluster sign-flip test flips all task outcomes within each repository (50,000 replicates); the resulting family of pairwise p-values receives Holm correction.
+- Every random stream is deterministically seeded from the frozen snapshot and strategy identities; the seed digest is retained in the report.
+
+The task-level split contains all 78 repositories; it is not project-disjoint. The repository-clustered interval quantifies uncertainty on this particular mixture of projects. It does **not** establish generalization to unseen repositories. The nested file bootstrap checks sensitivity to shared source-file context, but must not be presented as a substitute for a project-disjoint or temporal holdout.
+
+For strong external claims, publish three separate evaluations: (1) task-held-out on the fixed SorryDB split, (2) repository-disjoint on a frozen project partition, and (3) a later temporal snapshot whose task/source commits postdate the model's declared knowledge cutoff. Never merge these into one undifferentiated score.
+
 ## Audit checks
 
 The Rust verifier:
