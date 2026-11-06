@@ -143,10 +143,7 @@ fn validate_reference(reference: &str, digest: &str) -> Result<(), PairedPolicyC
     Ok(())
 }
 
-fn add_i128(
-    current: i128,
-    value: i128,
-) -> Result<i128, PairedPolicyComparisonError> {
+fn add_i128(current: i128, value: i128) -> Result<i128, PairedPolicyComparisonError> {
     current
         .checked_add(value)
         .ok_or(PairedPolicyComparisonError::ArithmeticOverflow)
@@ -220,14 +217,8 @@ pub fn evaluate_paired_policy_comparison<'a>(
     {
         return Err(PairedPolicyComparisonError::PolicyIdentityNotDistinct);
     }
-    validate_reference(
-        inputs.candidate_policy_id,
-        inputs.candidate_policy_sha256,
-    )?;
-    validate_reference(
-        inputs.comparator_policy_id,
-        inputs.comparator_policy_sha256,
-    )?;
+    validate_reference(inputs.candidate_policy_id, inputs.candidate_policy_sha256)?;
+    validate_reference(inputs.comparator_policy_id, inputs.comparator_policy_sha256)?;
 
     let common_references = [
         inputs.market_rule_source_ref,
@@ -282,20 +273,16 @@ pub fn evaluate_paired_policy_comparison<'a>(
         inputs.comparator_decisions,
     )?;
 
-    let candidate_non_anticipativity = audit_non_anticipative_policy(
-        inputs.declared_scenario_ids,
-        inputs.candidate_decisions,
-    )
-    .map_err(|_: NonAnticipativityError| {
-        PairedPolicyComparisonError::NonAnticipativeCandidateInvalid
-    })?;
-    let comparator_non_anticipativity = audit_non_anticipative_policy(
-        inputs.declared_scenario_ids,
-        inputs.comparator_decisions,
-    )
-    .map_err(|_: NonAnticipativityError| {
-        PairedPolicyComparisonError::NonAnticipativeComparatorInvalid
-    })?;
+    let candidate_non_anticipativity =
+        audit_non_anticipative_policy(inputs.declared_scenario_ids, inputs.candidate_decisions)
+            .map_err(|_: NonAnticipativityError| {
+                PairedPolicyComparisonError::NonAnticipativeCandidateInvalid
+            })?;
+    let comparator_non_anticipativity =
+        audit_non_anticipative_policy(inputs.declared_scenario_ids, inputs.comparator_decisions)
+            .map_err(|_: NonAnticipativityError| {
+                PairedPolicyComparisonError::NonAnticipativeComparatorInvalid
+            })?;
     if declared.len() > 1
         && (candidate_non_anticipativity.shared_information_set_count == 0
             || comparator_non_anticipativity.shared_information_set_count == 0)
@@ -326,7 +313,10 @@ pub fn evaluate_paired_policy_comparison<'a>(
             return Err(PairedPolicyComparisonError::ScenarioCensusMismatch);
         }
         validate_reference(outcome.scenario_source_ref, outcome.scenario_source_sha256)?;
-        validate_reference(outcome.probability_source_ref, outcome.probability_source_sha256)?;
+        validate_reference(
+            outcome.probability_source_ref,
+            outcome.probability_source_sha256,
+        )?;
         validate_reference(
             outcome.candidate_result_source_ref,
             outcome.candidate_result_sha256,
@@ -614,11 +604,22 @@ mod tests {
             outcome("low", 5_000, 100, 80),
             outcome("high", 5_000, 50, 70),
         ];
-        let result =
-            evaluate_paired_policy_comparison(inputs(&declared, &candidate, &comparator, &outcomes, 5_000))
-                .unwrap();
-        assert_eq!(result.candidate_expected_net_cash_numerator_minor_zar_bps, 750_000);
-        assert_eq!(result.comparator_expected_net_cash_numerator_minor_zar_bps, 750_000);
+        let result = evaluate_paired_policy_comparison(inputs(
+            &declared,
+            &candidate,
+            &comparator,
+            &outcomes,
+            5_000,
+        ))
+        .unwrap();
+        assert_eq!(
+            result.candidate_expected_net_cash_numerator_minor_zar_bps,
+            750_000
+        );
+        assert_eq!(
+            result.comparator_expected_net_cash_numerator_minor_zar_bps,
+            750_000
+        );
         assert_eq!(result.expected_cash_delta_numerator_minor_zar_bps, 0);
         assert_eq!(result.candidate_win_probability_bps, 5_000);
         assert_eq!(result.comparator_win_probability_bps, 5_000);
@@ -626,7 +627,10 @@ mod tests {
         assert_eq!(result.worst_case_cash_delta_minor_zar, -20);
         assert_eq!(result.best_case_cash_delta_minor_zar, 20);
         assert_eq!(result.lower_tail_delta_var_minor_zar, -20);
-        assert_eq!(result.lower_tail_delta_cvar_numerator_minor_zar_bps, -100_000);
+        assert_eq!(
+            result.lower_tail_delta_cvar_numerator_minor_zar_bps,
+            -100_000
+        );
         assert!(result.comparison_is_matched_and_non_anticipative);
     }
 
