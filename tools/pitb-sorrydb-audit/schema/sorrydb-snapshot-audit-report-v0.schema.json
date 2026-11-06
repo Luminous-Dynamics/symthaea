@@ -263,7 +263,10 @@
           "verified_success_attempts",
           "unique_tasks_solved",
           "unique_task_success_rate",
-          "cost_per_unique_verified_task_usd"
+          "cost_per_unique_verified_task_usd",
+          "implementation_sha256",
+          "execution_stack_sha256",
+          "checkpoint_sha256"
         ],
         "properties": {
           "strategy_name": {
@@ -353,6 +356,25 @@
               {
                 "type": "number",
                 "minimum": 0
+              }
+            ]
+          },
+          "implementation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "execution_stack_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "checkpoint_sha256": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
               }
             ]
           }
