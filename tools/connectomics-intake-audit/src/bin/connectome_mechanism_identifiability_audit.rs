@@ -874,5 +874,4 @@ mod tests {
                 .all(|row| row.mechanism_identified)
         );
     }
-
 }
