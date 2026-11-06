@@ -1,0 +1,425 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.schema.json",
+  "title": "Query-discriminating connectome intervention benchmark input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "dataset_binding",
+    "query",
+    "worlds",
+    "nuisance_models",
+    "interventions",
+    "predictions",
+    "split_manifest",
+    "selection_objective",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "dataset_binding": {
+      "$ref": "#/$defs/dataset_binding"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "nuisance_models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nuisance_model"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split_manifest"
+    },
+    "selection_objective": {
+      "enum": [
+        "WORST_CASE_EXPECTED_POSTERIOR_0_1_LOSS_REDUCTION_PER_COST"
+      ]
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision_sha256",
+        "species",
+        "evidence_tier",
+        "same_specimen_registration",
+        "source_access_receipt_sha256"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "species": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_tier": {
+          "enum": [
+            "SYNTHETIC",
+            "OBSERVATIONAL_FUNCTIONAL",
+            "MEASURED_INTERVENTION",
+            "PROSPECTIVE_INTERVENTION"
+          ]
+        },
+        "same_specimen_registration": {
+          "type": "boolean"
+        },
+        "source_access_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256",
+        "baseline_decision",
+        "loss_false_true",
+        "loss_true_false"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "baseline_decision": {
+          "type": "boolean"
+        },
+        "loss_false_true": {
+          "type": "number",
+          "minimum": 0
+        },
+        "loss_true_false": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "graph_sha256",
+        "source_evidence_sha256",
+        "biological_disposition",
+        "query_decision",
+        "prior_probability"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "biological_disposition": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE",
+            "INDETERMINATE",
+            "DISPUTED"
+          ]
+        },
+        "query_decision": {
+          "type": "boolean"
+        },
+        "prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "nuisance_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance_model_id",
+        "model_sha256",
+        "observation_model_sha256",
+        "description"
+      ],
+      "properties": {
+        "nuisance_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "observation_model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "intervention_kind",
+        "cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "safety_profile_sha256"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_kind": {
+          "enum": [
+            "optogenetic",
+            "ELECTRICAL",
+            "PHARMACOLOGICAL",
+            "SENSORY",
+            "BEHAVIORAL",
+            "SIMULATED",
+            "OTHER"
+          ]
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "safety_profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "world_id",
+        "nuisance_model_id",
+        "trajectory_sha256",
+        "observations"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nuisance_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trajectory_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "split_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_unit",
+        "train_units",
+        "validation_units",
+        "lockbox_units",
+        "split_sha256"
+      ],
+      "properties": {
+        "split_unit": {
+          "enum": [
+            "animal",
+            "session",
+            "target_neuron",
+            "animal_session",
+            "synthetic_unit"
+          ]
+        },
+        "train_units": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "validation_units": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "lockbox_units": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_expected_query_loss",
+        "worst_case_expected_posterior_query_loss",
+        "worst_case_eig_bits",
+        "decision_value_per_cost",
+        "expected_selected_intervention_id",
+        "expected_entropy_greedy_intervention_id"
+      ],
+      "properties": {
+        "baseline_expected_query_loss": {
+          "type": "number",
+          "minimum": 0
+        },
+        "worst_case_expected_posterior_query_loss": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "worst_case_eig_bits": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "decision_value_per_cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "expected_selected_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_entropy_greedy_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
