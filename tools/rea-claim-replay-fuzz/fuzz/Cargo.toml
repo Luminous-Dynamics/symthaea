@@ -1,0 +1,30 @@
+[package]
+name = "rea-claim-replay-fuzz"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+rea-claim-replay-verifier = { path = "../../rea-claim-replay-verifier" }
+symthaea-rea-compat = { path = "../../../crates/domains/symthaea-rea-compat" }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+
+[[bin]]
+name = "replay_claim_json"
+path = "fuzz_targets/replay_claim_json.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "generate_replay_seeds"
+path = "fuzz_targets/generate_replay_seeds.rs"
+test = false
+doc = false
+
+[workspace]
+members = ["."]
+resolver = "2"
