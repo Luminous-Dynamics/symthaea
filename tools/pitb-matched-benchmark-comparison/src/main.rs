@@ -45,6 +45,7 @@ struct Cohort {
     require_vacuity_audit: bool,
     require_assumption_audit: bool,
     bootstrap_replicates: usize,
+    cluster_sign_flip_replicates: usize,
     bootstrap_seed_sha256: String,
     arms: Vec<Arm>,
 }
@@ -134,6 +135,10 @@ struct PairComparison {
     cluster_bootstrap_95_percentile_upper: f64,
     bootstrap_replicates: usize,
     bootstrap_seed_sha256: String,
+    cluster_sign_flip_method: String,
+    cluster_sign_flip_permutations: usize,
+    cluster_sign_flip_p_value: f64,
+    holm_adjusted_p_value: f64,
     interpretation_boundary: String,
 }
 
@@ -272,6 +277,11 @@ fn validate_cohort(cohort: &Cohort) -> Result<(), String> {
     if !(1_000..=MAX_BOOTSTRAP_REPLICATES).contains(&cohort.bootstrap_replicates) {
         return Err(format!(
             "bootstrap_replicates must be between 1000 and {MAX_BOOTSTRAP_REPLICATES}"
+        ));
+    }
+    if !(10_000..=MAX_BOOTSTRAP_REPLICATES).contains(&cohort.cluster_sign_flip_replicates) {
+        return Err(format!(
+            "cluster_sign_flip_replicates must be between 10000 and {MAX_BOOTSTRAP_REPLICATES}"
         ));
     }
     if cohort.arms.len() < 2 {
@@ -613,12 +623,82 @@ fn cluster_bootstrap_interval(
     (quantile(&estimates, 0.025), quantile(&estimates, 0.975))
 }
 
+fn cluster_sign_flip_p_value(
+    clusters: &BTreeMap<String, ClusterDiff>,
+    monte_carlo_replicates: usize,
+    seed: &str,
+) -> (String, usize, f64) {
+    let sums: Vec<f64> = clusters
+        .values()
+        .map(|cluster| cluster.task_differences.iter().sum::<f64>())
+        .collect();
+    let total_tasks: usize = clusters
+        .values()
+        .map(|cluster| cluster.task_differences.len())
+        .sum();
+    if sums.is_empty() || total_tasks == 0 {
+        return ("exact_cluster_sign_flip".into(), 0, 1.0);
+    }
+    let observed = sums.iter().sum::<f64>().abs() / total_tasks as f64;
+    let extreme = |signed_sum: f64| {
+        signed_sum.abs() / total_tasks as f64 + 1e-12 >= observed
+    };
+
+    if sums.len() <= 20 {
+        let permutations = 1_u64 << sums.len();
+        let mut extreme_count = 0_u64;
+        for mask in 0..permutations {
+            let mut signed_sum = 0.0;
+            for (index, value) in sums.iter().enumerate() {
+                signed_sum += if (mask & (1_u64 << index)) == 0 { *value } else { -*value };
+            }
+            extreme_count += u64::from(extreme(signed_sum));
+        }
+        return (
+            "exact_cluster_sign_flip".into(),
+            permutations as usize,
+            extreme_count as f64 / permutations as f64,
+        );
+    }
+
+    let mut rng = XorShift64::from_seed(seed);
+    let mut extreme_count = 0usize;
+    for _ in 0..monte_carlo_replicates {
+        let mut signed_sum = 0.0;
+        for value in &sums {
+            signed_sum += if rng.next() & 1 == 0 { *value } else { -*value };
+        }
+        extreme_count += usize::from(extreme(signed_sum));
+    }
+    (
+        "monte_carlo_cluster_sign_flip".into(),
+        monte_carlo_replicates,
+        (extreme_count + 1) as f64 / (monte_carlo_replicates + 1) as f64,
+    )
+}
+
+fn holm_adjust_p_values(values: &[f64]) -> Vec<f64> {
+    let mut order: Vec<usize> = (0..values.len()).collect();
+    order.sort_by(|left, right| values[*left].total_cmp(&values[*right]));
+    let mut adjusted = vec![1.0; values.len()];
+    let mut running_max: f64 = 0.0;
+    let family_size = values.len();
+    for (rank, index) in order.into_iter().enumerate() {
+        let multiplier = family_size - rank;
+        let candidate = (values[index] * multiplier as f64).min(1.0);
+        running_max = running_max.max(candidate);
+        adjusted[index] = running_max;
+    }
+    adjusted
+}
+
 fn compare_pair(
     reference: &Arm,
     challenger: &Arm,
     task_scores: &BTreeMap<String, BTreeMap<String, TaskScore>>,
     task_clusters: &BTreeMap<String, String>,
     replicates: usize,
+    sign_flip_replicates: usize,
     seed: &str,
 ) -> Result<PairComparison, String> {
     let mut wins = 0usize;
@@ -659,6 +739,8 @@ fn compare_pair(
         differences.iter().sum::<f64>() / paired_task_count as f64
     };
     let (lower, upper) = cluster_bootstrap_interval(&clusters, replicates, seed);
+    let (sign_flip_method, sign_flip_permutations, sign_flip_p_value) =
+        cluster_sign_flip_p_value(&clusters, sign_flip_replicates, seed);
     Ok(PairComparison {
         reference_arm_id: reference.arm_id.clone(),
         challenger_arm_id: challenger.arm_id.clone(),
@@ -674,6 +756,10 @@ fn compare_pair(
         cluster_bootstrap_95_percentile_upper: upper,
         bootstrap_replicates: replicates,
         bootstrap_seed_sha256: seed.to_owned(),
+        cluster_sign_flip_method: sign_flip_method,
+        cluster_sign_flip_permutations: sign_flip_permutations,
+        cluster_sign_flip_p_value: sign_flip_p_value,
+        holm_adjusted_p_value: 1.0,
         interpretation_boundary: "The interval resamples repository clusters, not individual task rows. It estimates the paired task-weighted success-rate difference for this frozen split and budget policy; it does not establish project-disjoint or temporal generalization.".into(),
     })
 }
@@ -743,8 +829,7 @@ fn analyze(cohort: &Cohort, rows: &[RunRecord], input_sha256: String) -> Result<
 
     let mut pairwise = Vec::new();
     for i in 0..cohort.arms.len() {
-        for j in 0..cohort.arms.len() {
-            if i == j { continue; }
+        for j in (i + 1)..cohort.arms.len() {
             let pair_seed = sha256(format!(
                 "{}|{}|{}|{}",
                 cohort.bootstrap_seed_sha256,
@@ -758,9 +843,18 @@ fn analyze(cohort: &Cohort, rows: &[RunRecord], input_sha256: String) -> Result<
                 &task_scores,
                 &task_clusters,
                 cohort.bootstrap_replicates,
+                cohort.cluster_sign_flip_replicates,
                 &pair_seed,
             )?);
         }
+    }
+    let raw_pairwise_p_values: Vec<f64> = pairwise
+        .iter()
+        .map(|comparison| comparison.cluster_sign_flip_p_value)
+        .collect();
+    let adjusted = holm_adjust_p_values(&raw_pairwise_p_values);
+    for (comparison, adjusted_p) in pairwise.iter_mut().zip(adjusted) {
+        comparison.holm_adjusted_p_value = adjusted_p;
     }
 
     Ok(Report {
@@ -835,6 +929,7 @@ fn synthetic_cohort() -> Cohort {
         require_vacuity_audit: true,
         require_assumption_audit: true,
         bootstrap_replicates: 1_000,
+        cluster_sign_flip_replicates: 50_000,
         bootstrap_seed_sha256: fake_digest("seed"),
         arms: vec![
             Arm {
@@ -946,6 +1041,10 @@ fn run_self_tests() -> Result<(), String> {
         || pair.reference_wins != 0
         || pair.ties != 2
         || pair.paired_assurance_success_difference != 0.5
+        || pair.cluster_sign_flip_method != "exact_cluster_sign_flip"
+        || pair.cluster_sign_flip_permutations != 4
+        || pair.cluster_sign_flip_p_value != 0.5
+        || pair.holm_adjusted_p_value != 0.5
     {
         return Err("paired task comparison or cluster accounting changed".into());
     }
