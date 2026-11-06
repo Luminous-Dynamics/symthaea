@@ -156,6 +156,18 @@ The first tranche should use inert, non-executable fixtures with known expected 
 11. Non-identifiable outcome under the available interventions.
 12. Incompatible transplant with an unsatisfied precondition.
 
+The first eight deterministic cases are recorded in machine-readable form at [SYM_RSI_CAUSAL_LINEAGE_2X2_FIXTURES_V0_2026-11-06.json](./fixtures/SYM_RSI_CAUSAL_LINEAGE_2X2_FIXTURES_V0_2026-11-06.json). The reference vectors deliberately exercise different causal shapes:
+
+| Fixture | (Y00, Y10, Y01, Y11) | A marginal | B marginal | A×B interaction |
+|---|---:|---:|---:|---:|
+| A contributes; B no-op | (0, 2, 0, 2) | 2 | 0 | 0 |
+| Pure synergy | (0, 0, 0, 4) | 2 | 2 | 4 |
+| Harmful B masked by A | (0, 6, -2, 4) | 6 | -2 | 0 |
+| Antagonistic interaction | (0, 2, 2, 1) | 0.5 | 0.5 | -3 |
+| Both no-op | (0, 0, 0, 0) | 0 | 0 | 0 |
+
+The corpus also includes a missing counterfactual, evaluation-context mismatch, and source-to-executable mismatch. The expected behavior is respectively “not identified,” reject the contrast, and block mechanism-level credit. The fixture file is a synthetic arithmetic/claim-gating oracle, not an empirical benchmark, signed receipt, or hidden holdout.
+
 A structural manifest validator can establish consistency of declared identities and factor/dependency relations. It cannot establish that a proposed intervention is truly atomic, that an executable ran, or that the causal claim is true. Those require later execution and independent evidence.
 
 ## 10. Baselines and comparison
