@@ -16,6 +16,8 @@ pub mod cash_risk;
 pub mod credit_cover;
 pub mod decision_regret;
 pub mod execution_fidelity;
+pub mod forecast_baselines;
+pub mod forecast_cohort;
 pub mod forecast_inference;
 pub mod forecast_metrics;
 pub mod forecast_skill;
