@@ -456,14 +456,14 @@ fn self_test() -> Result<Report, String> {
     }
     println!("SELF_TEST_PASS fold imbalance is bounded by the largest indivisible repository cluster");
 
-    let mut overlap = BTreeMap::<String, usize>::new();
-    for assignment in &a.assignments {
-        *overlap.entry(assignment.repository_key.clone()).or_default() += 1;
+    let repo0_folds: BTreeSet<usize> = a.assignments.iter()
+        .filter(|assignment| assignment.repository_key == "https://github.com/example/repo0")
+        .map(|assignment| assignment.fold_id)
+        .collect();
+    if repo0_folds.len() != 1 {
+        return Err("tasks with alternate URL spellings for one project crossed folds".into());
     }
-    if overlap.values().any(|count| *count == 0) {
-        return Err("empty repository assignment observed".into());
-    }
-    println!("SELF_TEST_PASS normalized GitHub remote spellings map to one repository key");
+    println!("SELF_TEST_PASS canonical GitHub remote spellings keep one project in one fold");
 
     let mut bad = synthetic_dataset();
     let parsed: Value = serde_json::from_slice(&bad).map_err(|e| e.to_string())?;
