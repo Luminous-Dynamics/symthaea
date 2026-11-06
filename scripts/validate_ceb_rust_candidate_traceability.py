@@ -269,7 +269,7 @@ def semantic_errors(payload: dict, require_full_catalog: bool = True) -> list[st
 
 def git_blob_sha1(raw: bytes) -> str:
     """Return Git's SHA-1 for a blob, including the canonical object header."""
-    header = f"blob {len(raw)}\\0".encode("ascii")
+    header = f"blob {len(raw)}\0".encode("ascii")
     return hashlib.sha1(header + raw).hexdigest()
 
 
