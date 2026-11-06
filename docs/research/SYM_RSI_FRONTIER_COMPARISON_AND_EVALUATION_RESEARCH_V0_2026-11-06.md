@@ -25,7 +25,7 @@ An improvement in one loop is not evidence that the other two improved. This dis
 | **AI4AI-Bench** (arXiv:2608.20318) | Paper reports 0.166 mean and 0.250 best normalized score across 10 algorithm-design tasks and 29 configurations. | Useful frozen training-algorithm research work packages and a separation between run tuning and learning-method changes. | A third-party full code audit dated 2026-11-03 reports score-changing defects in 4/10 tasks, hidden data exposure in two tasks, best-of-three selection on final metrics, and no case classified as research progress under that audit's rubric. Treat the published ranking as provisional pending corrected reproduction. |
 | **RSIBench-Data** (arXiv:2607.25886) | Agents improved on their first valid attempt in 58.33% of settings; among runs continuing beyond the best observed score, 78.26% ended below that peak. | Data-strategy iteration can work, but continued search often loses the best result. | Final checkpoint is not a safe proxy for best-so-far; preserving a peak is not proof of repeatable transfer or R4. |
 | **EvalResearchBench** (arXiv:2610.04184) | Nine evaluator researchers and 13 candidate models; best evaluator ordered about 75% of candidate pairs as target benchmarks did, below a 91% target-disagreement ceiling. Development-best evaluator was not best on sealed targets; human-designed task samples remained strong. | Evaluator construction is a measurable research skill, not a solved utility. | A strong development grader can fail on sealed families; self-designed evaluation cannot certify itself. |
-| **METR / frontier-lab productivity signal** (reported 2026-11-05) | METR estimates benchmark-task capability improvement has accelerated about 1.9× since October 2025, with a wide 1.5–2.5× uncertainty range; the report does not establish highly significant fully autonomous contributions to most important training steps. | AI assistance may be accelerating human AI R&D already. | Increased human+AI productivity is not equivalent to autonomous recursive self-improvement. |
+| **METR / frontier-lab productivity signal** (reported 2026-11-05) | METR estimates benchmark-task capability improvement has accelerated about 1.9× since October 2025, with a 95% confidence interval of 1.5–2.8×; METR emphasizes uncertainty and reports that highly significant fully autonomous contributions are not yet a major contributor to the most important training stages. | AI assistance may be accelerating human AI R&D already. | Increased human+AI productivity is not equivalent to autonomous recursive self-improvement. |
 
 ### Comparator interpretation
 
@@ -96,6 +96,8 @@ Measure:
 Adversarial controls must include readable hidden seeds, task overlap, scorer gaming, collapsed outputs, unattainable metric optima, noisy baselines, best-of-N sealed checkpoint selection, truncation, budget exhaustion, dropped tool results, missingness manipulation, evaluator-version drift and pseudo-independent correlated tasks.
 
 A high-concordance evaluator is a measurement instrument, not an authority. The target portfolio itself can be wrong or biased; use disagreement ceilings, human review and independent target adjudication.
+
+The first synthetic adversarial-control pack is tracked in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_V0_2026-11-06.json`. These fixtures specify threat mutations and expected dispositions; they are not real task data, sealed tests or a substitute for an independently custodied target portfolio.
 
 ## 5. Immediate execution sequence
 
