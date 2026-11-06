@@ -1,0 +1,50 @@
+name: EMSR Evidence Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Cargo.lock'
+      - 'crates/domains/symthaea-emsr-evidence/**'
+      - 'docs/research/EMSR_BENCHMARK_CHARTER_V0_1.md'
+      - 'docs/research/emsr-v0.1/**'
+      - '.github/workflows/emsr-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.lock'
+      - 'crates/domains/symthaea-emsr-evidence/**'
+      - 'docs/research/EMSR_BENCHMARK_CHARTER_V0_1.md'
+      - 'docs/research/emsr-v0.1/**'
+      - '.github/workflows/emsr-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: emsr-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-contract:
+    name: EMSR evidence validator
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-emsr-evidence/Cargo.toml -- --check
+
+      - name: Run validator tests
+        run: cargo test -p symthaea-emsr-evidence --locked
+
+      - name: Run Clippy
+        run: cargo clippy -p symthaea-emsr-evidence --all-targets --locked -- -D warnings
