@@ -226,10 +226,8 @@ pub fn summarize_paired_effects(
     }
 
     let mut seen_trials = BTreeSet::new();
-    let mut groups: BTreeMap<
-        (Dimension, InfluenceDirection),
-        Vec<&PairedEffectObservation>,
-    > = BTreeMap::new();
+    let mut groups: BTreeMap<(Dimension, InfluenceDirection), Vec<&PairedEffectObservation>> =
+        BTreeMap::new();
 
     for observation in observations {
         if observation.cluster_id.trim().is_empty() || observation.trial_id.trim().is_empty() {
@@ -281,8 +279,7 @@ fn summarize_group(
     config: BootstrapConfig,
 ) -> DimensionEffectSummary {
     let mut attempted_clusters = BTreeSet::new();
-    let mut metrics: [BTreeMap<String, Vec<f64>>; 9] =
-        std::array::from_fn(|_| BTreeMap::new());
+    let mut metrics: [BTreeMap<String, Vec<f64>>; 9] = std::array::from_fn(|_| BTreeMap::new());
     let mut measured_trials = 0usize;
     let mut missing_trials = 0usize;
     let mut missing_by_reason = MissingOutcomeCounts::default();
@@ -329,17 +326,11 @@ fn summarize_group(
         if let Some(yoked_delta) = value.yoked_delta {
             let yoked = f64::from(yoked_delta) / max_distance;
             push_metric(&mut metrics[3], &observation.cluster_id, yoked);
-            push_metric(
-                &mut metrics[6],
-                &observation.cluster_id,
-                targeted - yoked,
-            );
+            push_metric(&mut metrics[6], &observation.cluster_id, targeted - yoked);
         }
     }
 
-    let group_seed = config.seed
-        ^ ((dimension as u64) << 32)
-        ^ ((direction as u64) << 48);
+    let group_seed = config.seed ^ ((dimension as u64) << 32) ^ ((direction as u64) << 48);
     let estimate = |index: usize| {
         estimate_cluster_means(&metrics[index], config.resamples, group_seed ^ index as u64)
     };
@@ -366,11 +357,7 @@ fn summarize_group(
     }
 }
 
-fn push_metric(
-    clusters: &mut BTreeMap<String, Vec<f64>>,
-    cluster_id: &str,
-    value: f64,
-) {
+fn push_metric(clusters: &mut BTreeMap<String, Vec<f64>>, cluster_id: &str, value: f64) {
     clusters
         .entry(cluster_id.to_owned())
         .or_default()
@@ -518,9 +505,7 @@ mod tests {
         }
     }
 
-    fn single_summary(
-        observations: &[PairedEffectObservation],
-    ) -> DimensionEffectSummary {
+    fn single_summary(observations: &[PairedEffectObservation]) -> DimensionEffectSummary {
         summarize_paired_effects(observations, config())
             .unwrap()
             .into_iter()
@@ -679,10 +664,7 @@ mod tests {
             Err(StatisticsError::InvalidDomain)
         );
         assert_eq!(
-            summarize_paired_effects(
-                &[measured("a", "a-1", 5, 0, 0, None)],
-                config()
-            ),
+            summarize_paired_effects(&[measured("a", "a-1", 5, 0, 0, None)], config()),
             Err(StatisticsError::InvalidDistance)
         );
     }
