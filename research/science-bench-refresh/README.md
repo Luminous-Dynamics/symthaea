@@ -314,12 +314,12 @@ The follow-on SCI-RETRIEVAL-RECOVERABILITY-001 / #10690 adds an evaluator-side r
 The model-free route graph classifies each pinned answer-critical evidence unit under one exact corpus snapshot, search surface, route policy, and budget:
 
 - DirectlyReachable: exact evidence is reachable through initial retrieval.
-- ReformulationRecoverable: evidence requires an allowed query reformulation and a post-reformulation retrieval.
+- ReformulationRecoverable: first-pass retrieval misses the required evidence unit, then an allowed query reformulation and post-reformulation retrieval reach it; structural navigation is not required.
 - NavigationRecoverable: evidence requires a declared structural operation such as opening a document, following a link/TOC, pagination, or in-document find.
 - UnreachableWithinBudget: no permitted route fits the frozen budget and graph.
 - NotEvaluable: the surface is not frozen/observed or the artifact is unavailable/unknown.
 
-Every reachable classification includes a deterministic shortest route witness and cost, for evaluator-side use only. A partial surface can preserve a concrete positive route witness, but cannot yield an unreachable finding when no route is present; an unknown surface yields only NotEvaluable. Only the explicit CompleteFrozenInventory state—an exhaustive route inventory under the exact declared finite surface and route policy—can establish UnreachableWithinBudget. The graph is benchmark-relative; it does not say that a source is absent from the open web or world.
+A reformulation route is ordered: InitialRetrieval (miss) → QueryReformulation → PostReformulationRetrieval. Rewriting before the first retrieval, or retrieving before the rewrite, does not qualify. Every reachable classification includes a deterministic shortest route witness and cost, for evaluator-side use only. A partial surface can preserve a concrete positive route witness, but cannot yield an unreachable finding when no route is present; an unknown surface yields only NotEvaluable. Only the explicit CompleteFrozenInventory state—an exhaustive route inventory under the exact declared finite surface and route policy—can establish UnreachableWithinBudget. The graph is benchmark-relative; it does not say that a source is absent from the open web or world.
 
 ~~~sh
 cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
