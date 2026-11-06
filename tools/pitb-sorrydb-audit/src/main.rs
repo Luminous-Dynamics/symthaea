@@ -1124,6 +1124,8 @@ fn validate_proof_run(
     }
     for (field, value) in [
         ("goal_sha256", &run.goal_sha256),
+        ("budget_policy_sha256", &run.budget_policy_sha256),
+        ("evaluation_condition_sha256", &run.evaluation_condition_sha256),
         ("declaration_signature_before_sha256", &run.declaration_signature_before_sha256),
         ("declaration_signature_after_sha256", &run.declaration_signature_after_sha256),
         ("source_file_sha256", &run.source_file_sha256),
@@ -1133,9 +1135,15 @@ fn validate_proof_run(
         ("semantic_gate_receipt_sha256", &run.semantic_gate_receipt_sha256),
         ("source_binding_receipt_sha256", &run.source_binding_receipt_sha256),
         ("strategy.implementation_sha256", &run.strategy.implementation_sha256),
+        ("strategy.execution_stack_sha256", &run.strategy.execution_stack_sha256),
     ] {
         if !valid_hex(value, 64) {
             return Err(format!("{label}.{field} must be a 64-character lowercase SHA-256"));
+        }
+    }
+    if let Some(checkpoint) = &run.strategy.checkpoint_sha256 {
+        if !valid_hex(checkpoint, 64) {
+            return Err(format!("{label}.strategy.checkpoint_sha256 must be a 64-character lowercase SHA-256"));
         }
     }
     non_empty(&run.strategy.name, &format!("{label}.strategy.name"))?;
@@ -1209,7 +1217,7 @@ fn summarize_proof_runs(
         .map(|row| (row.id.as_str(), row))
         .collect();
     let mut run_ids = BTreeSet::new();
-    let mut groups = BTreeMap::<(String, String, Option<String>, Option<String>), Vec<&ProofRun>>::new();
+    let mut groups = BTreeMap::<StrategyKey, Vec<&ProofRun>>::new();
     let mut verified_success_count = 0usize;
     let mut successful_task_ids = BTreeSet::<&str>::new();
     for (index, run) in runs.iter().enumerate() {
@@ -1230,7 +1238,7 @@ fn summarize_proof_runs(
     }
 
     let mut summaries = Vec::new();
-    for ((name, version, model_id, model_version), group) in groups {
+    for ((name, version, model_id, model_version, implementation_sha256, execution_stack_sha256, checkpoint_sha256), group) in groups {
         let attempts = group.len();
         let verified = group.iter().filter(|run| run.outcome == "verified_success").count();
         let unique_solved = group.iter()
@@ -1251,6 +1259,9 @@ fn summarize_proof_runs(
             strategy_version: version,
             model_id,
             model_version,
+            implementation_sha256,
+            execution_stack_sha256,
+            checkpoint_sha256,
             attempts,
             verified_success_attempts: verified,
             unique_tasks_solved: unique_solved,
@@ -1275,7 +1286,15 @@ fn summarize_proof_runs(
     Ok((verified_success_count, successful_task_ids.len(), summaries))
 }
 
-type StrategyKey = (String, String, Option<String>, Option<String>);
+type StrategyKey = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    String,
+    String,
+    Option<String>,
+);
 
 fn strategy_key(run: &ProofRun) -> StrategyKey {
     (
@@ -1283,16 +1302,22 @@ fn strategy_key(run: &ProofRun) -> StrategyKey {
         run.strategy.version.clone(),
         run.strategy.model_id.clone(),
         run.strategy.model_version.clone(),
+        run.strategy.implementation_sha256.clone(),
+        run.strategy.execution_stack_sha256.clone(),
+        run.strategy.checkpoint_sha256.clone(),
     )
 }
 
 fn strategy_label(key: &StrategyKey) -> String {
     format!(
-        "{}@{}|{}|{}",
+        "{}@{}|{}|{}|impl={}|stack={}|checkpoint={}",
         key.0,
         key.1,
         key.2.as_deref().unwrap_or("no-model-id"),
-        key.3.as_deref().unwrap_or("no-model-version")
+        key.3.as_deref().unwrap_or("no-model-version"),
+        key.4,
+        key.5,
+        key.6.as_deref().unwrap_or("no-checkpoint"),
     )
 }
 
@@ -1402,8 +1427,21 @@ fn pairwise_clustered_comparisons(
 ) -> Result<Vec<ClusteredStrategyComparison>, String> {
     let mut attempted = BTreeMap::<StrategyKey, BTreeSet<String>>::new();
     let mut solved = BTreeMap::<StrategyKey, BTreeSet<String>>::new();
+    let mut execution_conditions = BTreeMap::<StrategyKey, (String, String)>::new();
     for run in runs {
         let key = strategy_key(run);
+        let condition = (
+            run.budget_policy_sha256.clone(),
+            run.evaluation_condition_sha256.clone(),
+        );
+        if let Some(previous) = execution_conditions.insert(key.clone(), condition.clone()) {
+            if previous != condition {
+                return Err(format!(
+                    "strategy {} mixes resource-budget or evaluation-condition identities",
+                    strategy_label(&key)
+                ));
+            }
+        }
         attempted.entry(key.clone()).or_default().insert(run.task_id.clone());
         if run.outcome == "verified_success" {
             solved.entry(key).or_default().insert(run.task_id.clone());
@@ -1412,6 +1450,17 @@ fn pairwise_clustered_comparisons(
     let keys: Vec<StrategyKey> = attempted.keys().cloned().collect();
     if keys.len() < 2 {
         return Ok(Vec::new());
+    }
+    let matched_condition = execution_conditions
+        .get(&keys[0])
+        .ok_or("missing strategy execution condition")?;
+    for key in &keys[1..] {
+        if execution_conditions.get(key) != Some(matched_condition) {
+            return Err(format!(
+                "pairwise strategy comparison requires identical budget and evaluation-condition digests: {} differs",
+                strategy_label(key)
+            ));
+        }
     }
     let mut tasks_by_repository_file =
         BTreeMap::<String, BTreeMap<String, Vec<&SorryRecord>>>::new();
@@ -1530,10 +1579,18 @@ fn pairwise_clustered_comparisons(
                     strategy_a_version: a_key.1.clone(),
                     strategy_a_model_id: a_key.2.clone(),
                     strategy_a_model_version: a_key.3.clone(),
+                    strategy_a_implementation_sha256: a_key.4.clone(),
+                    strategy_a_execution_stack_sha256: a_key.5.clone(),
+                    strategy_a_checkpoint_sha256: a_key.6.clone(),
                     strategy_b_name: b_key.0.clone(),
                     strategy_b_version: b_key.1.clone(),
                     strategy_b_model_id: b_key.2.clone(),
                     strategy_b_model_version: b_key.3.clone(),
+                    strategy_b_implementation_sha256: b_key.4.clone(),
+                    strategy_b_execution_stack_sha256: b_key.5.clone(),
+                    strategy_b_checkpoint_sha256: b_key.6.clone(),
+                    budget_policy_sha256: matched_condition.0.clone(),
+                    evaluation_condition_sha256: matched_condition.1.clone(),
                     task_denominator: denominator,
                     strategy_a_attempted_tasks: a_attempted.len(),
                     strategy_b_attempted_tasks: b_attempted.len(),
