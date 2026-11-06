@@ -3132,12 +3132,14 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         eprintln!("[muse_studio] keeper bundle read-back failed: {error}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let bundle_verification_sha256 = bundle_verification
-        .receipt_sha256()
-        .map_err(|error| {
+    let bundle_verification_sha256 = match bundle_verification.receipt_sha256() {
+        Ok(digest) => digest,
+        Err(error) => {
             eprintln!("[muse_studio] keeper verification receipt hash failed: {error}");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
+            let _ = std::fs::remove_dir_all(&bundle_path);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
 
     // Genealogy is an enrichment, not a requirement -- a ledger failure
     // (missing store, sqlite error) must not block the keep the user asked
@@ -3186,8 +3188,8 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         "midi_available": midi_available,
         "genealogy_id": genealogy.as_ref().map(|m| m.id),
         "score_sha256": score_sha256.clone(),
-        "bundle_verification": bundle_verification,
-        "bundle_verification_sha256": bundle_verification_sha256,
+        "bundle_verification": bundle_verification.clone(),
+        "bundle_verification_sha256": bundle_verification_sha256.clone(),
         // Persisted so future Atlas reads don't depend on recompose
         // determinism across engine versions (MUSE_DIVERSITY_TRUTH_PLAN
         // Phase 3's "persist fingerprints at keep time"). Dimension count
