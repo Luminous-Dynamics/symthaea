@@ -83,7 +83,6 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
     histories = policy_space["first_stage_outcome_ids"]
     unique(histories, "first-stage history")
     require(len(histories) == 2, "V1 starter contract requires two first-stage histories")
-    require(set(histories) == set(policy_space["second_stage_outcome_ids"]) - set(policy_space["second_stage_outcome_ids"]) or len(histories) > 0, "invalid histories")
     second_outcomes = policy_space["second_stage_outcome_ids"]
     unique(second_outcomes, "second-stage outcome")
     require(len(second_outcomes) == 2, "V1 starter contract requires two second-stage outcomes")
@@ -125,8 +124,7 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
         expected_stage_two = {
             (history, action_id, world_id)
             for history in histories
-            for history_actions in options_by_history.values()
-            for action_id in history_actions
+            for action_id in options_by_history[history]
             for world_id in worlds
         }
         for kernel in model["stage_two_kernels"]:
