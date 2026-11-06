@@ -636,6 +636,20 @@ mod tests {
     }
 
     #[test]
+    fn alternating_cycle_margin_matches_small_exact_assignment_fixture() {
+        let costs = vec![
+            vec![0.0, 4.0, 9.0],
+            vec![7.0, 0.0, 5.0],
+            vec![3.0, 8.0, 0.0],
+        ];
+        let assignment = vec![0, 1, 2];
+        assert_eq!(
+            alternating_cycle_assignment_margin(&costs, &assignment),
+            11.0
+        );
+    }
+
+    #[test]
     fn activation_signature_alignment_recovers_hidden_unit_permutation() {
         let source = vec![
             vec![0.0, 0.2, 0.8, -0.1],
