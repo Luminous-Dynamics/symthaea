@@ -1376,8 +1376,13 @@ mod tests {
     fn rejects_split_version_that_does_not_match_exact_catalogue() {
         let (catalog, split, receipt) = bound_run_fixture();
         let wrong_split = split.replace("fixture-v1", "fixture-v2");
+        let mut receipt_value: serde_json::Value =
+            serde_json::from_str(&receipt).expect("valid run receipt fixture");
+        receipt_value["split_manifest_sha256"] =
+            json!(sha256_hex(wrong_split.as_bytes()));
+        let rebound_receipt = receipt_value.to_string();
         let error = verify_run_receipt_input_bindings(
-            &receipt,
+            &rebound_receipt,
             catalog.as_bytes(),
             wrong_split.as_bytes(),
             &[PayloadArtifact {
@@ -1385,7 +1390,7 @@ mod tests {
                 bytes: b"synthetic-receiver-payload-v1",
             }],
         ).expect_err("split must bind exact catalogue version");
-        assert!(error.to_string().contains("split_manifest_sha256"));
+        assert!(error.to_string().contains("does not match catalogue version"));
     }
 
     #[test]
