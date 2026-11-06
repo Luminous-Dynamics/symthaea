@@ -356,3 +356,19 @@ This update reinforces why Symthaea should not chase one blended leaderboard. Ag
 No Luminous/Symthaea participation or result is claimed here. A defensible comparison requires the exact official protocol, permitted tool access, frozen versions, repeated attempts, complete eligible denominators, refusal/unsupported accounting and uncertainty intervals. Our additional differentiation should be measured through false-entailment rate, scope leakage, correct abstention, dependency-aware corroboration and decision regret—capabilities not reducible to AgentRE or SRE headline scores.
 
 Source checked: AgentRE-Bench v3.1 results, updated November 5, 2026: https://www.agentre-bench.ai/results/v3-1/ . SRE-Bench official page, updated October 2026: https://daplab.cs.columbia.edu/benchmarks/sre-bench/ .
+
+## 2026-11-06 verification refresh — AgentRE v3.1 scoring, coverage and audit caveats
+
+The official v3.1 page continues to identify the report as updated November 5, 2026. It now documents eight passed review regression checks and a separate AI reviewer that reproduced all 600 baseline and all 600 reviewed score objects. The report explicitly says no independent human audit has been completed. The review inspected 219 exact-claim mappings; 46 source-supported mappings still incur fixed-rubric penalties because claims fell outside allowed facts or were placed in another answer field, and no episode received full credit (0/600). These are not reasons to ignore the results; they show why claim accuracy, allowed-fact scope, field/schema placement and grader reliability need separate measures. [Official report: method and evidence](https://www.agentre-bench.ai/results/v3-1/).
+
+The attempt protocol also matters for matched comparison: 20 binaries × five attempts × six models = 600 episodes; up to 64 model turns and 25 tool attempts per episode, including rejected calls and final submission. Attempts were unseeded. Model transports, reasoning settings and collection dates differed. DeepSeek's provider-mapped model did not have an immutable weight identifier in the released run context. Treat these as reproducibility/attribution limitations when comparing exact model identity or cost. Overall is 90% Main + 10% Bonus; refusals and budget exhaustion remain zero-valued. Conditional answer quality excludes nonanswers and covers different answered subsets. [Official results/method](https://www.agentre-bench.ai/results/v3-1/).
+
+### Implication for the REA claim benchmark
+
+The REA matched-arm evaluation should preserve at least four independent dimensions:
+1. factual/semantic claim correctness against independent binary behavior or held-out ground truth;
+2. claim schema, allowed-fact and field-placement correctness;
+3. attempt coverage, refusals, abstentions, unsupported and budget exits;
+4. adjudicator/grader reproducibility and human-review status.
+
+A fifth, REA-specific dimension is whether each accepted claim is entailed by exact evidence in scope, and whether an independent reviewer can replay its derivation. Do not interpret exact formatting/schema validity as truth, or a high conditional answer-quality score as full-suite capability.
