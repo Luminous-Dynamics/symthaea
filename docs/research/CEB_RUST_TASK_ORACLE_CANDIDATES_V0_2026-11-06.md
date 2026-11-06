@@ -27,6 +27,8 @@ No candidate-controlled code, Cargo build script, procedural macro, unit test, i
 
 The six domains are now mapped to the exact six root-cause family IDs in the canonical #10617 sampling and preregistration artifacts. This is a **family mapping only**: no repository identity, slot, task ID, partition, or difficulty label is assigned. The canonical plan remains authoritative for all sampling decisions.
 
+A compact machine-readable requirement/oracle crosswalk is maintained in [`CEB_RUST_CANDIDATE_ORACLE_TRACEABILITY_V0_2026-11-06.json`](CEB_RUST_CANDIDATE_ORACLE_TRACEABILITY_V0_2026-11-06.json). It contains requirement IDs, case IDs, expected dispositions, family mappings and fixture-validity controls. It is an authoring aid only—not a task registry or task manifest.
+
 A reviewer should classify each candidate:
 
 - **Ready for static review:** requirements and oracle logic are sufficiently precise to review without running candidate code.
