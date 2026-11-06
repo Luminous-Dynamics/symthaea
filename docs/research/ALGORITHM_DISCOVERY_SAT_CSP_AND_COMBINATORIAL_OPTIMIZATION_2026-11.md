@@ -182,6 +182,51 @@ The Luminous portfolio should distinguish at least five guarantee classes:
 
 A single “accuracy” metric cannot compare these classes. The type of guarantee must be part of each problem contract and every benchmark receipt.
 
+## Measured industry/research baseline snapshot (SAT Competition 2026)
+
+The published Main Track table currently reports:
+
+| Main Track entry | PAR-2-style score shown | Solved | SAT solved | UNSAT solved |
+|---|---:|---:|---:|---:|
+| Virtual-best-solver (VBS) | 1681.30 | 347 | 168 | 179 |
+| `kissat-sc2024` | 2788.13 | 306 | 153 | 153 |
+| `Kissat_MAB-DC` | 3435.23 | 290 | 146 | 144 |
+| `hKis-bva` | 3461.15 | 285 | 143 | 142 |
+| `CaDiCaL` | 3494.11 | 284 | 142 | 142 |
+| `AMSAT_RGC` | 3631.69 | 279 | 139 | 140 |
+
+Source: [official SAT Competition 2026 results](https://github.com/satcompetition/2026/blob/main/results.html).
+
+Interpretation:
+- The VBS score is an oracle that selects the best solver for each instance with hindsight. It is not a deployable solver and should not be presented as one.
+- The 41-instance gap between VBS and the best listed individual solver is a concrete target for an **online, feature-based portfolio selector**. The selector must choose before knowing the answer and under a real resource budget; it cannot use oracle knowledge.
+- SAT and UNSAT cases must be reported separately. Main Track UNSAT results additionally require independently checked proof certificates.
+- These are competition-specific results, not a universal ranking across every SAT distribution or industrial workload.
+
+A serious Symthaea result should first reproduce a comparable fixed corpus and resource setup, then beat a pinned individual solver or a deployable portfolio on held-out families. We should report the delta from the single-best solver and from a learned/feature-based portfolio separately, with no VBS leakage.
+
+## Model-counting specialist baselines and task separation
+
+The 2021–2023 model-counting competition review, published in 2026, identifies a useful group of established reference systems:
+
+- **SharpSAT-TD:** top-down compilation with tree-decomposition heuristics.
+- **Ganak:** SharpSAT-derived with probabilistic component caching.
+- **D4:** Decision-DNNF knowledge compilation with dynamic decomposition.
+- **GPMC:** compilation-based and includes projected-counting optimizations.
+- **ExactMC:** CCDD compilation, for non-projected counting in the cited comparison.
+- **ApproxMC:** hashing-based approximate model counting.
+
+The review reports different leaders across exact/projected/approximate tracks and a sizeable virtual-best-solver gap; this is evidence for complementary methods, not one universal #SAT ranking. See [Model Counting in the Wild](https://proceedings.kr.org/2024/71/kr2024-0071-shaw-et-al.pdf) and the [2021–2023 competition review](https://doi.org/10.1016/j.artint.2026.104605).
+
+For our benchmark contracts, distinguish at least:
+1. Exact non-projected #SAT.
+2. Exact projected #SAT.
+3. Approximate model counting with explicit confidence/relative-error guarantees.
+4. Weighted model counting.
+5. Knowledge compilation, where the compiled representation supports repeated downstream queries.
+
+Do not compare projected counts with full model counts, or approximate counters with exact counters, using a single solved-count metric. Compare counts, proof/precision guarantees, preprocessing, compile time, query time, memory and reuse across repeated queries.
+
 ## State of practice: competition and benchmark baselines
 
 - [SAT Competition 2026](https://satcompetition.github.io/2026/): Main, Parallel, Experimental and Cloud tracks, including AI-generated/AI-tuned participation. The rules require a model for SAT instances in all tracks and UNSAT proof certificates in the Main Track; source code and a 1–2 page system description are required, including disclosure of AI-authored code and AI-tuned heuristics. Pure portfolios combining solvers developed by different groups are restricted outside the Cloud Track, so an internal portfolio benchmark is not automatically a valid competition submission. Use the published benchmark list, per-instance outcomes, solver sources and result logs.
