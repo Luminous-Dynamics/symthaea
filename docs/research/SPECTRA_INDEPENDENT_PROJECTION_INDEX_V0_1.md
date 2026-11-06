@@ -41,7 +41,7 @@ Let A be the number of actions and S the number of scenarios.
 
 - One-time metric indexing and robust-interval preparation is O(A·S log(A·S)) for ordered maps and O(A·S log S) for CVaR aggregation.
 - Per independent candidate, Maximin projection is O(S) and CVaR projection is O(S log S); the global best/runner-up endpoint update is O(1).
-- Across all A·S candidates, the worst-case projection phase is O(A·S²) for Maximin and O(A·S² log S) for CVaR, rather than rebuilding all A action aggregates for every candidate.
+- There are A·S candidate cells. Rebuilding the complete projection for each candidate costs O(A²·S²) for Maximin and O(A²·S² log S) for CVaR (including the A·S candidate count). The indexed path costs O(A·S²) for Maximin and O(A·S² log S) for CVaR after one-time index preparation. The expected structural improvement is one factor of A, not an omitted scenario factor.
 - CRN complexity is unchanged by this PR.
 
 These are structural operation-count expectations, not measured latency results. The next optimization frontier is a per-action dynamic minimum index for Maximin and a deterministic weighted order-statistics structure for CVaR. Any such structure must preserve the registered ordering and a reviewed numerical-equivalence contract; a faster but arithmetically different reduction must not silently replace the oracle.
