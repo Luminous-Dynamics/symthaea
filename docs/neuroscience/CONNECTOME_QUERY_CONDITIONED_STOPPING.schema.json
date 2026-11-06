@@ -256,7 +256,6 @@
       "required": [
         "admissible_world_ids",
         "query_decisions",
-        "unresolved_world_count",
         "world_frame_status",
         "observation_identifiability",
         "missed_candidate_upper_bound",
@@ -264,7 +263,9 @@
         "query_status",
         "safe_to_stop_for_query",
         "certificate_sha256",
-        "certificate_generation"
+        "certificate_generation",
+        "unresolved_graph_world_count",
+        "unresolved_query_decision_world_count"
       ],
       "properties": {
         "admissible_world_ids": {
@@ -279,14 +280,16 @@
         "query_decisions": {
           "type": "array",
           "minItems": 1,
-          "uniqueItems": true,
           "items": {
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
-        },
-        "unresolved_world_count": {
-          "type": "integer",
-          "minimum": 0
         },
         "world_frame_status": {
           "enum": [
@@ -335,6 +338,14 @@
           ]
         },
         "certificate_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_graph_world_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unresolved_query_decision_world_count": {
           "type": "integer",
           "minimum": 0
         }
