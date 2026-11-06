@@ -17,8 +17,8 @@ use symthaea_core::weight_space_program::{
 use thiserror::Error;
 
 use super::network::{
-    CfCNetwork, CfCParameterGroupId, CfCParameterGroupReplacement, CfCParameterManifest,
-    CfCWeightLoadError,
+    CfCNetwork, CfCNetworkConfig, CfCParameterGroupId, CfCParameterGroupReplacement,
+    CfCParameterManifest, CfCWeightLoadError,
 };
 use super::types::MIN_TAU;
 
@@ -255,7 +255,7 @@ mod tests {
 
     #[test]
     fn candidate_materialization_does_not_mutate_live_cfc_network() {
-        let config = super::super::network::CfCNetworkConfig {
+        let config = CfCNetworkConfig {
             input_dim: 2,
             hidden_dim: 4,
             num_layers: 1,
@@ -313,7 +313,7 @@ mod tests {
 
     #[test]
     fn invalid_target_specification_is_rejected_before_clone_edit() {
-        let config = super::super::network::CfCNetworkConfig {
+        let config = CfCNetworkConfig {
             input_dim: 2,
             hidden_dim: 4,
             num_layers: 1,
