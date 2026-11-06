@@ -10,6 +10,7 @@
     "snapshot_id",
     "split_id",
     "split_role",
+    "cluster_unit",
     "split_manifest_sha256",
     "expected_task_count",
     "expected_cluster_count",
@@ -363,6 +364,12 @@
     "receipt_authentication_boundary": {
       "type": "string",
       "minLength": 40
+    },
+    "cluster_unit": {
+      "enum": [
+        "repository",
+        "repository_file"
+      ]
     }
   }
 }
