@@ -28,12 +28,14 @@ V1 qualifies **new-animal / known-pair** transport. Pair- and target-held-out ge
 
 ## 4. V1 split contract
 
-- Split at the independent biological unit: animal. All trials, timepoints, neuron pairs and response kernels from one animal belong to exactly one of train, validation or lockbox.
+- Split at the independent biological unit: animal. All trials, timepoints, neuron pairs and response kernels from one animal belong to exactly one of train, validation/tuning, calibration, or lockbox.
 - A known neuron pair may occur in train and lockbox animals in the `NEW_ANIMAL_SAME_PAIR` track. This is intentional and does not qualify as new-pair generalization.
-- Models declare exact training animal IDs and an explicit supported-condition set. They may not claim support for a genotype/context absent from the training manifest unless an independently justified external-training receipt is supplied.
+- Validation animals are for model/threshold selection; calibration animals are a separately frozen cohort for fitting probability/interval calibrators; lockbox animals are untouched evaluation. Do not reuse validation animals to fit the primary calibrator in V1.
+- Models declare exact training animal IDs, calibration method, calibration animal IDs, calibration-artifact receipt and supported-condition set. An absent calibration method is explicit (`NONE`) and is not described as calibrated.
 - A lockbox outcome must not influence model selection, threshold selection, calibration, nuisance-set construction, intervention choice or report editing.
-- Canonical split SHA-256 is recomputed over the domain tag `connectome-cohort-transport-split-v1`, the ordered labels TRAIN/VALIDATION/LOCKBOX, and sorted animal IDs using length-prefixed UTF-8 fields. A stale digest or changed membership rejects the run.
-- Each model training-manifest SHA-256 is recomputed over `connectome-cohort-training-manifest-v1`, model ID, split digest, sorted training animal IDs and sorted training-condition IDs. Validation and lockbox animals are never allowed in this manifest.
+- Canonical split SHA-256 is recomputed over the domain tag `connectome-cohort-transport-split-v1`, the ordered labels TRAIN/VALIDATION/CALIBRATION/LOCKBOX, and sorted animal IDs using length-prefixed UTF-8 fields. A stale digest or changed membership rejects the run.
+- Each model training-manifest SHA-256 is recomputed over `connectome-cohort-training-manifest-v1`, model ID, split digest, sorted training animal IDs and sorted training-condition IDs. Validation, calibration and lockbox animals are never allowed in this manifest.
+- Each calibration-manifest SHA-256 is recomputed over `connectome-cohort-calibration-manifest-v1`, model ID, split digest, calibration method, sorted calibration animal IDs and their conditions. Calibrator receipts are retained separately from the manifest digest.
 - Report per-animal metrics and the animal-macro aggregate. Do not count trials, frames, timepoints or pairs within one animal as independent biological replicates.
 
 ## 5. Observation dispositions
@@ -53,13 +55,13 @@ Every sampled animal/pair/condition record receives exactly one status:
 
 ## 6. Models and predictions
 
-Each model binds its implementation, training manifest, exact training animal IDs and supported biological conditions. For every measured lockbox observation, it emits either:
+Each model binds its implementation, training manifest, exact training animal IDs, separate calibration manifest and receipt, calibration method, and supported biological conditions. A method of `NONE` has an empty calibration cohort and no calibrator receipt; other methods require a non-empty calibration animal subset and an artifact receipt. For every measured lockbox observation, it emits either:
 - `PREDICTED`: a probability of functional connection plus a predictive response mean and 90% interval; or
 - `ABSTAINED_OUT_OF_DOMAIN`: no probability/response point prediction, with an out-of-domain receipt.
 
 An out-of-domain condition not declared in the model's supported-condition set must be abstained, not silently scored as an ordinary prediction. A `NOT_MEASURED`, `FAILED` or `INACCESSIBLE` observation receives `NOT_APPLICABLE`, not an imputed prediction.
 
-V1 checks contract integrity and computes finite lockbox sample metrics. It does not infer that a model is biologically calibrated from a tiny synthetic fixture, and it does not compute population confidence intervals.
+V1 checks split/calibration provenance and computes finite lockbox sample metrics. It does not verify the internal statistical correctness of a calibrator artifact from its digest alone, infer biological calibration from a tiny synthetic fixture, or compute population confidence intervals.
 
 ## 7. Required comparator families
 
