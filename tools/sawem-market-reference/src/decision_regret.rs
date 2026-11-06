@@ -323,8 +323,8 @@ pub fn evaluate_decision_regret<'a>(
     }
 
     let evpi_share_bps = if oracle_expected_numerator > 0 {
-        let probability_basis = i128::try_from(PROBABILITY_BPS)
-            .map_err(|_| DecisionRegretError::ArithmeticOverflow)?;
+        let probability_basis =
+            i128::try_from(PROBABILITY_BPS).map_err(|_| DecisionRegretError::ArithmeticOverflow)?;
         let numerator = regret_expected_numerator
             .checked_mul(probability_basis)
             .ok_or(DecisionRegretError::ArithmeticOverflow)?;
