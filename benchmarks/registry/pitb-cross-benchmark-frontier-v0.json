@@ -1,0 +1,441 @@
+{
+  "schema_version": "pitb.cross-benchmark-frontier.v0",
+  "as_of_date": "2026-11-06",
+  "title": "PITB cross-benchmark competitive frontier",
+  "governing_policy": {
+    "no_pooled_score": true,
+    "baseline_provenance": "Every external result is a dated, source-linked reference under the source's own task condition. It is not a PITB run.",
+    "comparison_rule": "A superiority claim requires the same immutable task set, model version, source visibility, tools, agent scaffold, stopping policy, verifier, hardware class and resource ceiling. Report deviations as non-matched descriptive comparisons.",
+    "admission_rule": "A proof result is counted only after exact task/source/goal binding, independent checker replay and the task-family-specific semantic gates. Unknown or unauthenticated evidence is quarantined, not scored as success.",
+    "uncertainty_rule": "Preserve the task's dependency clusters. Use repository/file clustered resampling for SorryDB; source-group stratification for AutoformBench; PBT identity grouping for FVSpec; implementation/spec pair grouping for Aegis.",
+    "target_status": "All targets below are preregistered engineering goals, not achieved PITB results."
+  },
+  "benchmarks": [
+    {
+      "benchmark_id": "sorrydb-2601",
+      "name": "SorryDB",
+      "track": "real_world_lean_proof_completion",
+      "task_unit": "one open Prop-valued sorry at a pinned repository commit and Lean version",
+      "frozen_cohort": {
+        "snapshot_id": "SorryDB_2601",
+        "tasks": 1000,
+        "repositories": 78,
+        "repository_commit_pairs": 107,
+        "repository_file_clusters": 339,
+        "upstream_repository_commit": "74b3b63f8ba890d675f362924b21ac55db410383",
+        "evaluation_split_git_blob_sha1": "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+      },
+      "reference_results": [
+        {
+          "system": "Aleph Prover Proprietary",
+          "metric": "Pass@1",
+          "solved": 572,
+          "denominator": 1000,
+          "value": 0.572,
+          "condition": "live SorryDB_2601 leaderboard snapshot; single attempt per task",
+          "source_url": "https://sorrydb.org/",
+          "source_date": "2026-11-06"
+        },
+        {
+          "system": "all listed approaches combined",
+          "metric": "task coverage",
+          "solved": 632,
+          "denominator": 1000,
+          "value": 0.632,
+          "condition": "fraction solved by at least one listed approach; this is an ensemble coverage reference, not one model",
+          "source_url": "https://sorrydb.org/",
+          "source_date": "2026-11-06"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "matched single-system Pass@1",
+          "minimum_solved": 603,
+          "denominator": 1000,
+          "minimum_value": 0.603,
+          "comparison": "at least +3.1 percentage points versus the 57.2% live single-system reference"
+        },
+        {
+          "metric": "matched multi-system task coverage",
+          "minimum_solved": 680,
+          "denominator": 1000,
+          "minimum_value": 0.68,
+          "comparison": "at least +4.8 percentage points versus 63.2% listed-system union; same declared system-count and total budget"
+        }
+      ],
+      "qualification_gates": [
+        "Pin the exact SorryDB JSON Git blob, task IDs, repository commit, Lean version, path and coordinates.",
+        "Reproduce the source location, sorry span, elaborated Prop goal and project build; quarantine mismatched tasks without removing them from the denominator.",
+        "Require independent kernel replay, source-binding evidence, no sorryAx/new sorry delta, and semantic/vacuity/assumption gates for assurance-adjusted success.",
+        "Report the official task-held-out result separately from the project-disjoint five-fold result; the original 1,000-task split overlaps all 78 repositories in the full snapshot.",
+        "Use paired repository/file-cluster statistics, charge every retry, and report cost per assurance-qualified task."
+      ],
+      "comparability_boundary": "The 57.2% and 63.2% figures belong to the live official leaderboard on the January 2026 1,000-task snapshot. They are not automatically comparable to other model or benchmark scores; system membership, source visibility, retries and budgets must be frozen for a new claim.",
+      "sources": [
+        "https://sorrydb.org/",
+        "https://proceedings.mlr.press/v306/letson26a.html",
+        "https://github.com/SorryDB/SorryDB"
+      ]
+    },
+    {
+      "benchmark_id": "autoformbench-341",
+      "name": "AutoformBench",
+      "track": "advanced_mathematics_formalization",
+      "task_unit": "one complete advanced-mathematics formalization task; every required declaration/obligation must pass",
+      "frozen_cohort": {
+        "tasks": 341,
+        "source_groups": 24,
+        "graded_declarations": 1155,
+        "lean_toolchain": "leanprover/lean4:v4.32.2",
+        "mathlib_commit": "905b95818eb32af7874a58b427f50c1711a5e96"
+      },
+      "reference_results": [
+        {
+          "system": "GPT-6 Astra",
+          "metric": "task completion",
+          "solved": 281,
+          "denominator": 341,
+          "value": 0.8240469208211144,
+          "condition": "official source-present evaluation condition",
+          "source_url": "https://github.com/facebookresearch/autoformbench",
+          "source_date": "2026-11-06"
+        },
+        {
+          "system": "Opus 5",
+          "metric": "task completion",
+          "solved": 211,
+          "denominator": 341,
+          "value": 0.6187683284457478,
+          "condition": "official source-present evaluation condition",
+          "source_url": "https://github.com/facebookresearch/autoformbench",
+          "source_date": "2026-11-06"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "matched source-present task completion",
+          "minimum_solved": 299,
+          "denominator": 341,
+          "minimum_value": 0.8768328445747801,
+          "comparison": "first integer result clearing +5 percentage points over 281/341"
+        },
+        {
+          "metric": "stretch matched source-present task completion",
+          "minimum_solved": 316,
+          "denominator": 341,
+          "minimum_value": 0.9266862170087976,
+          "comparison": "first integer result clearing +10 percentage points over 281/341"
+        },
+        {
+          "metric": "cost non-inferiority frontier",
+          "maximum_relative_cost": 0.8,
+          "maximum_success_rate_regression": 0.01,
+          "comparison": "at least 20% lower cost with no more than 1 percentage point completion regression"
+        }
+      ],
+      "qualification_gates": [
+        "Use the exact 341-task manifest, clean-room workspaces and pinned Lean/Mathlib versions.",
+        "Score the complete task, not an isolated declaration; preserve infrastructure failure as a separate state.",
+        "Report source-present and source-free conditions separately; do not compare across them.",
+        "Report cost, tokens, turns and generated code size alongside completion.",
+        "Respect the upstream CC BY-NC 4.0 release and its evaluation/research-only, not-training designation; do not import source excerpts, gold solutions or traces into training."
+      ],
+      "comparability_boundary": "AutoformBench is infrastructure-building formalization, not isolated sorry completion. The headline 82.4% is source-present; it must not be pooled with SorryDB Pass@1 or FVSpec Pass@k.",
+      "sources": [
+        "https://github.com/facebookresearch/autoformbench",
+        "https://ai.meta.com/research/publications/autoformbench-a-lean-formalization-benchmark-for-advanced-mathematics/"
+      ]
+    },
+    {
+      "benchmark_id": "fvspec-9415",
+      "name": "FVSpec",
+      "track": "property_based_test_to_formal_software_specification_and_proof",
+      "task_unit": "one Lean challenge linked to a source Python property-based test and implementation",
+      "frozen_cohort": {
+        "pbt_count": 11039,
+        "source_pbt_count": 2772,
+        "lean_challenge_count": 9415,
+        "source_repositories": 333,
+        "mean_formalizations_per_pbt": 3
+      },
+      "reference_results": [
+        {
+          "system": "reported baseline model mean on easy tasks",
+          "metric": "success rate",
+          "value": 0.7,
+          "condition": "paper-reported average over Claude Sonnet 4.6, Claude Opus 4.7 and GPT 5.4",
+          "source_url": "https://arxiv.org/abs/2606.01008",
+          "source_date": "2026-05-31"
+        },
+        {
+          "system": "reported baseline model mean on hard tasks",
+          "metric": "success rate",
+          "value": 0.49,
+          "condition": "paper-reported average over Claude Sonnet 4.6, Claude Opus 4.7 and GPT 5.4",
+          "source_url": "https://arxiv.org/abs/2606.01008",
+          "source_date": "2026-05-31"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "matched easy-task assurance-adjusted completion",
+          "minimum_value": 0.75,
+          "comparison": "+5 percentage points over the reported mean baseline"
+        },
+        {
+          "metric": "matched hard-task assurance-adjusted completion",
+          "minimum_value": 0.54,
+          "comparison": "+5 percentage points over the reported mean baseline"
+        },
+        {
+          "metric": "source-PBT correspondence",
+          "minimum_value": 1,
+          "comparison": "100% of counted successes must retain a verified source test, implementation and spec correspondence receipt"
+        }
+      ],
+      "qualification_gates": [
+        "Group formalization variants by their originating PBT; multiple variants are not independent source tasks.",
+        "Independently inspect semantic correspondence between source PBT, Python implementation, Lean implementation and generated proposition.",
+        "Audit Python-specific semantics, exceptions, mutation, numeric behavior and generated inputs before admitting a spec.",
+        "Report easy and hard strata separately, plus repository/PBT-cluster uncertainty.",
+        "A Lean kernel proof does not by itself prove that the translated proposition captures the original PBT."
+      ],
+      "comparability_boundary": "The paper's easy/hard averages are a baseline summary, not one model's Pass@1. Compare model-specific results under the same task variants, source visibility and proof budget.",
+      "sources": [
+        "https://fvspec.galois.com/paper",
+        "https://arxiv.org/abs/2606.01008",
+        "https://huggingface.co/datasets/GaloisInc/fvspec-fv"
+      ]
+    },
+    {
+      "benchmark_id": "aegis-2000",
+      "name": "Aegis",
+      "track": "rust_implementation_to_lean_verification",
+      "task_unit": "one generated Lean specification over a frozen Rust implementation, with proof or refutation",
+      "frozen_cohort": {
+        "validated_rust_lean_program_pairs": 2045,
+        "candidate_specifications": 11533,
+        "reported_stratified_sample": 2000,
+        "budget_minutes_per_statement": 30
+      },
+      "reference_results": [
+        {
+          "system": "EasyProver",
+          "metric": "proved statements",
+          "solved": 1054,
+          "denominator": 2000,
+          "value": 0.527,
+          "condition": "stratified sample; 30-minute budget per statement",
+          "source_url": "https://arxiv.org/abs/2610.38174",
+          "source_date": "2026-10-28"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "matched proof completion",
+          "minimum_solved": 1200,
+          "denominator": 2000,
+          "minimum_value": 0.6,
+          "comparison": "+7.3 percentage points over the reported 52.7% result at the same 30-minute budget"
+        },
+        {
+          "metric": "implementation/specification correspondence",
+          "minimum_value": 1,
+          "comparison": "100% of scored successes must pass exact Rust source, Aeneas translation and Lean statement binding"
+        }
+      ],
+      "qualification_gates": [
+        "Pin Rust source, compiler, Aeneas translation, Lean environment and specification candidate IDs.",
+        "Keep implementation identity separate from generated specification identity.",
+        "Audit machine arithmetic, casts, overflow, failure behavior, loops, mutation and aliasing.",
+        "Score proof and valid refutation separately; do not count a refutation as a proof completion.",
+        "Use the same stratified 2,000-task cohort and 30-minute cap for direct baseline comparison."
+      ],
+      "comparability_boundary": "Aegis is much harder than saturated competition-math sets and is about implementation-level software obligations. The 52.7% reference is a sample, not a full-11,533-spec result.",
+      "sources": [
+        "https://arxiv.org/abs/2610.38174"
+      ]
+    },
+    {
+      "benchmark_id": "mathlib-retrieval",
+      "name": "LeanGraphSearch / MathlibQR / MathlibMPR",
+      "track": "premise_retrieval_and_complete_proof_route_coverage",
+      "task_unit": "one retrieval query over a pinned Mathlib graph, with a separately annotated sufficient premise route",
+      "frozen_cohort": {
+        "mathlibqr_fair_queries": 810,
+        "mathlibmpr_route_coverage_cutoffs": [
+          20,
+          50
+        ]
+      },
+      "reference_results": [
+        {
+          "system": "LeanGraphSearch",
+          "metric": "MathlibQR Recall@100",
+          "value": 0.947,
+          "condition": "810-query fair subset; LeanSearch v2 0.827",
+          "source_url": "https://arxiv.org/abs/2610.22339",
+          "source_date": "2026-10-15"
+        },
+        {
+          "system": "LeanGraphSearch",
+          "metric": "MathlibMPR Covered@20",
+          "value": 0.428,
+          "condition": "complete annotated proof-route premise coverage; LeanSearch v2 0.391",
+          "source_url": "https://arxiv.org/abs/2610.22339",
+          "source_date": "2026-10-15"
+        },
+        {
+          "system": "LeanGraphSearch",
+          "metric": "MathlibMPR Covered@50",
+          "value": 0.442,
+          "condition": "complete annotated proof-route premise coverage; LeanSearch v2 0.413",
+          "source_url": "https://arxiv.org/abs/2610.22339",
+          "source_date": "2026-10-15"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "matched MathlibQR Recall@100",
+          "minimum_value": 0.96,
+          "comparison": "at least +1.3 percentage points over 94.7%"
+        },
+        {
+          "metric": "matched MathlibMPR Covered@20",
+          "minimum_value": 0.448,
+          "comparison": "at least +2.0 percentage points over 42.8%"
+        },
+        {
+          "metric": "matched MathlibMPR Covered@50",
+          "minimum_value": 0.462,
+          "comparison": "at least +2.0 percentage points over 44.2%"
+        },
+        {
+          "metric": "downstream proof utility",
+          "minimum_value": 0,
+          "comparison": "strict positive paired gain in assurance-qualified exact-target completion or lower cost at non-inferior completion; recall alone is insufficient"
+        }
+      ],
+      "qualification_gates": [
+        "Use the exact query subsets, target environments, graph manifest and route annotations.",
+        "Bind each query to raw ranked IDs, filtered candidate pool, retriever/checkpoint/configuration and resource budget.",
+        "Treat retriever scores as uncalibrated unless calibrated on separate held-out data.",
+        "Measure useful-novel-premise rate, sufficient-route recall, antichain-route coverage and exact-target proof completion.",
+        "Run no-retrieval, BM25, LeanSearch v2, DAPS, LeanGraphSearch and PITB graph-union arms under equal downstream prover budgets."
+      ],
+      "comparability_boundary": "Recall@100, route coverage and Pass@turn are different metrics. LeanGraphSearch's reported downstream results are from its own integrated prover loop; they do not establish a direct PITB gain.",
+      "sources": [
+        "https://arxiv.org/abs/2610.22339"
+      ]
+    },
+    {
+      "benchmark_id": "coco-cost-frontier",
+      "name": "CoCo-Prover",
+      "track": "cost_efficient_multi_goal_program_verification",
+      "task_unit": "one proof obligation in a multi-obligation function or repository proof graph",
+      "frozen_cohort": {
+        "benchmark_count": 5,
+        "benchmark_names": [
+          "CLEVER",
+          "VERINA",
+          "AlgoVeri",
+          "NTP4VC",
+          "Vero"
+        ]
+      },
+      "reference_results": [
+        {
+          "system": "CoCo-Prover",
+          "metric": "reported cost reduction versus strongest baseline",
+          "value": 0.309,
+          "condition": "up to 30.9% on a benchmark/system cell; authors report best solve rate on each evaluated benchmark and up to 100% on two",
+          "source_url": "https://arxiv.org/abs/2610.09681",
+          "source_date": "2026-10-07"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "matched success-cost Pareto frontier",
+          "minimum_value": 0,
+          "comparison": "show a strict improvement in the area/coverage of the success-cost frontier on at least three of five benchmarks without lowering the fixed-budget solve rate"
+        },
+        {
+          "metric": "resource efficiency",
+          "minimum_value": 0.2,
+          "comparison": "target at least 20% lower cost at a matched success rate, subject to a per-benchmark paired comparison"
+        }
+      ],
+      "qualification_gates": [
+        "Keep per-obligation and repository-level denominators distinct.",
+        "Count orchestration, failed probes, parallel work and verification in total cost.",
+        "Report wall time and monetary/token cost separately; parallel search may reduce wall time while increasing compute.",
+        "Compare under matched base model, tools, resource ceilings and stopping rules.",
+        "Retain the AND/OR graph and invocation receipts to explain routing decisions."
+      ],
+      "comparability_boundary": "The 30.9% figure is a maximum reported cell, not a universal average. It cannot be used as a single threshold across all five benchmarks.",
+      "sources": [
+        "https://arxiv.org/abs/2610.09681"
+      ]
+    },
+    {
+      "benchmark_id": "formal-benchmark-assurance",
+      "name": "Formal benchmark specification and evaluation assurance",
+      "track": "benchmark_integrity_and_semantic_fidelity",
+      "task_unit": "one benchmark task plus its source/specification, split, verifier and result custody chain",
+      "frozen_cohort": {
+        "audited_benchmark_families": 5,
+        "reported_findings": 4833,
+        "mechanically_certified_issues": 398
+      },
+      "reference_results": [
+        {
+          "system": "ICML 2026 benchmark audit",
+          "metric": "mechanically certified benchmark defects",
+          "solved": 398,
+          "denominator": 4833,
+          "value": 0.08235,
+          "condition": "audit of five Lean benchmark families and forks; includes counterexamples, vacuity and unsound axioms",
+          "source_url": "https://proceedings.mlr.press/v306/ammanamanchi26a.html",
+          "source_date": "2026-07-06"
+        }
+      ],
+      "targets": [
+        {
+          "metric": "source/specification/reproduction evidence closure",
+          "minimum_value": 1,
+          "comparison": "100% of admitted tasks have exact source, statement, environment and verifier receipts"
+        },
+        {
+          "metric": "silent task loss",
+          "maximum_value": 0,
+          "comparison": "zero dropped, overwritten, deduplicated or quarantined tasks without a retained reason and denominator record"
+        },
+        {
+          "metric": "known-defect negative controls",
+          "minimum_value": 1,
+          "comparison": "100% detection of the registered benchmark-integrity attack corpus, with no weakened controls"
+        }
+      ],
+      "qualification_gates": [
+        "Verify source-to-goal correspondence independently of Lean kernel success.",
+        "Audit vacuity, missing hypotheses, axiom/sorry leakage, nontermination/timeouts and evaluation harness exploits.",
+        "Maintain a blinded negative-control corpus and mutation-tested independent verifier.",
+        "Use exact task custody, split membership, retry accounting and immutable report inputs.",
+        "Publish defect counts separately from prover solve rate."
+      ],
+      "comparability_boundary": "This is an assurance track, not a prover leaderboard. Finding rates from an audit sample are not estimates of global benchmark defect prevalence.",
+      "sources": [
+        "https://proceedings.mlr.press/v306/ammanamanchi26a.html",
+        "https://github.com/Shashi456/atp-checkers"
+      ]
+    }
+  ],
+  "claims_not_allowed": [
+    "Do not report a pooled PITB score across SorryDB, AutoformBench, FVSpec, Aegis and Mathlib retrieval.",
+    "Do not call the SorryDB_2601 task-held-out split project-disjoint; use the separately generated project-disjoint folds for that claim.",
+    "Do not treat kernel acceptance as proof that a benchmark specification matches its source-level intent.",
+    "Do not treat retrieved candidates, retrieval scores or proof-term references as sufficient routes or logically necessary premises.",
+    "Do not claim SOTA from a comparison with unmatched models, source access, scaffolds, tools, time budgets, cost accounting or stopping policies.",
+    "Do not use AutoformBench's source-free CC BY-NC 4.0 release as training data; respect third-party source licenses separately."
+  ]
+}
