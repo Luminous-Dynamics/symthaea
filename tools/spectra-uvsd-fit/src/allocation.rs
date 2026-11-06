@@ -14,7 +14,8 @@ use std::fmt;
 
 use super::ranking::{
     certify_epsilon_optimal_action, counterfactual_regret_upper_bound,
-    ActionRobustUtilityInterval, RobustSelectionCertificate, RobustSelectionStatus,
+    ActionRobustUtilityInterval, IndependentCounterfactualProjectionIndex,
+    RobustSelectionCertificate, RobustSelectionStatus,
 };
 use super::scenario::{RobustUtility, ScenarioDefinition};
 use super::score_bounds::{
@@ -636,6 +637,16 @@ fn compute_decision_directed_cell_priorities(
         })
         .collect();
     let mut priorities = Vec::with_capacity(receipt.metrics.len());
+    // Independent mode repeatedly changes only one action × scenario cell.
+    // Build one exact index and reuse all untouched action aggregates.
+    let independent_projection_index = if config.seed_mode == ReplicationSeedMode::IndependentPerCell {
+        Some(
+            IndependentCounterfactualProjectionIndex::new(receipt, config.robust_utility)
+                .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?,
+        )
+    } else {
+        None
+    };
     // For CRN, every candidate action in a scenario is the same atomic batch.
     // Cache its exact projection once per scenario instead of recomputing it A times.
     let mut crn_projection_cache =
@@ -676,6 +687,7 @@ fn compute_decision_directed_cell_priorities(
                             metric.scenario_id,
                             sample_count,
                             remaining_budget,
+                            independent_projection_index.as_ref(),
                         )?;
                         crn_projection_cache.insert(metric.scenario_id, projection);
                     }
@@ -688,6 +700,7 @@ fn compute_decision_directed_cell_priorities(
                         metric.scenario_id,
                         sample_count,
                         remaining_budget,
+                        independent_projection_index.as_ref(),
                     )?;
                 }
             }
@@ -715,6 +728,7 @@ fn project_decision_directed_batch(
     scenario_id: u16,
     sample_count: usize,
     remaining_budget: usize,
+    independent_projection_index: Option<&IndependentCounterfactualProjectionIndex>,
 ) -> Result<(f64, f64, usize, f64), AdaptiveAllocationError> {
     let target_action_ids = match config.seed_mode {
         ReplicationSeedMode::IndependentPerCell => vec![candidate_action_id],
@@ -776,12 +790,22 @@ fn project_decision_directed_batch(
         }
         overrides.push((*target_action_id, scenario_id, lower, upper));
     }
-    let projected_regret_upper_bound = counterfactual_regret_upper_bound(
-        receipt,
-        config.robust_utility,
-        &overrides,
-    )
-    .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?;
+    let projected_regret_upper_bound = match config.seed_mode {
+        ReplicationSeedMode::IndependentPerCell => {
+            if overrides.len() != 1 {
+                return Err(AdaptiveAllocationError::CounterfactualCertificateFailure);
+            }
+            let (action_id, scenario_id, lower, upper) = overrides[0];
+            independent_projection_index
+                .ok_or(AdaptiveAllocationError::CounterfactualCertificateFailure)?
+                .regret_upper_bound_with_override(action_id, scenario_id, lower, upper)
+                .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?
+        }
+        ReplicationSeedMode::CommonRandomNumbersWithinScenario => {
+            counterfactual_regret_upper_bound(receipt, config.robust_utility, &overrides)
+                .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?
+        }
+    };
     let certificate_gap_contraction =
         (certificate.regret_upper_bound - projected_regret_upper_bound).max(0.0);
     let projected_batch_cost = batch_count
@@ -1259,6 +1283,7 @@ mod tests {
                     scenario_id,
                     candidate.sample_count,
                     remaining_budget,
+                    None,
                 )
                 .unwrap();
                 assert_eq!(direct, cached_tuple);
