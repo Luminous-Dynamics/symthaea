@@ -9,7 +9,8 @@
     "evaluator_epochs": "#10708",
     "source_build_lineage": "#10569",
     "canonical_receipts": "#10314/#10370/#10533",
-    "statistical_inference": "#8438/#9433/#10513"
+    "statistical_inference": "#8438/#9433/#10513",
+    "evidence_continuity": "#10630"
   },
   "experiment": {
     "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
@@ -313,5 +314,38 @@
     "shared_across_arms": true,
     "candidate_write_access": false,
     "confirmation_material_write_access": false
+  },
+  "research_state_continuity": {
+    "state_snapshot_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "record_schema_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "required_record_types": [
+      "accepted_finding_with_evidence",
+      "rejected_hypothesis",
+      "null_or_negative_result",
+      "counterexample_and_failure",
+      "candidate_lineage_and_patch_digest",
+      "evaluator_epoch_and_task_contract",
+      "inclusive_cost_and_retry_record",
+      "open_question_and_next_test"
+    ],
+    "provenance_policy": "Every retained record binds its source evidence, originating candidate, evaluator epoch, task/family scope, timestamp/as-of validity, and supersession or contradiction relation. A claim without admissible lineage remains unresolved.",
+    "stale_evidence_policy": "A successor must preserve historical results with their original context while marking claims stale, superseded, contradicted or requiring revalidation when source, task, evaluator, dependency, scope or policy changes.",
+    "cold_restart_restore_test_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "successor_migration_test_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "independent_recovery_audit_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "ablation_arms": [
+      "full_verified_state",
+      "no_state",
+      "untyped_history",
+      "shuffled_verified_state",
+      "accepted_findings_only"
+    ],
+    "metrics": [
+      "provenance_complete_record_recovery",
+      "false_currentness_rate",
+      "evidence_revalidation_precision_recall",
+      "duplicated_experiment_rate",
+      "fresh_family_confirmed_yield"
+    ]
   }
 }
