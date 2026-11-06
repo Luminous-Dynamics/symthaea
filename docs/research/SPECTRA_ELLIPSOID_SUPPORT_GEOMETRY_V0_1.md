@@ -56,6 +56,8 @@ No statistical method ID is inferred from the geometry; the method ID only ident
 ## Tests declared
 
 - 1D analytic support.
+- Strict shape-matrix Cholesky recovery for a correlated 2D SPD matrix.
+- Reject asymmetric, singular and indefinite shape matrices.
 - 2D correlated ellipsoid support using full shape matrix rather than diagonal-only variances.
 - Multiple direction ordering and replay mutation.
 - Positive homogeneity and negative-direction endpoint swapping.
