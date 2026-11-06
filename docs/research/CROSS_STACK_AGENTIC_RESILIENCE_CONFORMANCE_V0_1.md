@@ -268,3 +268,18 @@ A passing result applies only to the declared software, model, tools, policies, 
 - OpenAI, [Designing AI agents to resist prompt injection](https://openai.com/index/designing-agents-to-resist-prompt-injection/), March 11, 2026.
 - IETF, [RFC 9943: An Architecture for Trustworthy and Transparent Digital Supply Chains](https://www.rfc-editor.org/info/rfc9943/), June 2026.
 - NIST, [SP 800-207: Zero Trust Architecture](https://www.nist.gov/publications/zero-trust-architecture).
+
+
+## Public development corpus v0.1
+
+The first machine-readable development corpus is committed under `docs/research/xstack-v0.1/`:
+
+- `xstack-solver-input-v0.1.schema.json` — strict JSON Schema 2020-12 for subject-visible scenario inputs.
+- `xstack-oracle-v0.1.schema.json` — strict JSON Schema for evaluator expectations.
+- `solver-input.public-dev-v0.1.json` — six deterministic synthetic cases.
+- `evaluator-expectations.public-dev-v0.1.json` — separate expected outcomes, positive-control reachability, benign-neighbor, and ablation obligations.
+- `campaign.manifest.json` — corpus roles, execution boundary, scenario IDs/seeds, and SHA-256 digests.
+
+The two corpus files are deliberately separate: the runner must pass only the selected solver-visible case to the subject. The evaluator file is public development material, not a hidden holdout. Validation performed during authoring: all six solver cases and all six evaluator cases passed their respective Draft 2020-12 schemas and both manifest digests matched the file bytes.
+
+The fixtures are specifications and test data, not an executable benchmark result. They contain synthetic records only and prohibit production credentials, live external effects, and physical actuation. A runner must still implement matched permissive positive controls, protected arms, one-safeguard ablations, independently observed semantic effects, and benign near-neighbor tests before any containment claim is made.
