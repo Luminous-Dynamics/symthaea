@@ -426,7 +426,7 @@ fn validate_claim(claim: &ClaimRequest) -> Result<(), ReplayError> {
     Ok(())
 }
 
-fn parse_result(bytes: &[u8]) -> Result<ClaimEvaluation, ReplayError> {
+fn parse_result(bytes: &[u8]) -> Result<(ClaimEvaluation, Value), ReplayError> {
     let value = parse_unique_json(bytes, MAX_RESULT_JSON_BYTES, "claim evaluation result")?;
     require_keys(
         &value,
@@ -513,7 +513,7 @@ fn parse_result(bytes: &[u8]) -> Result<ClaimEvaluation, ReplayError> {
             "result digests must be lowercase SHA-256",
         ));
     }
-    Ok(result)
+    Ok((result, value))
 }
 
 pub fn replay_claim_evaluation(
@@ -522,7 +522,7 @@ pub fn replay_claim_evaluation(
     result_json: &[u8],
 ) -> Result<ReplayReceipt, ReplayError> {
     let claim = parse_claim(claim_json)?;
-    let reported = parse_result(result_json)?;
+    let (reported, reported_value) = parse_result(result_json)?;
 
     let mut total_bytes = 0usize;
     let mut evidence_by_id = HashMap::<String, VerifiedEvidence>::new();
@@ -567,7 +567,16 @@ pub fn replay_claim_evaluation(
     }
 
     let expected = derive_reference_result(&claim, &evidence_by_id)?;
-    let outcome = if expected == reported {
+    let expected_value = serde_json::to_value(&expected).map_err(|error| {
+        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
+    })?;
+    let expected_canonical = canonical_jcs_bytes(&expected_value).map_err(|error| {
+        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
+    })?;
+    let reported_canonical = canonical_jcs_bytes(&reported_value).map_err(|error| {
+        ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string())
+    })?;
+    let outcome = if expected_canonical == reported_canonical {
         ReplayOutcome::ReplayMatch
     } else {
         ReplayOutcome::ReplayMismatch
