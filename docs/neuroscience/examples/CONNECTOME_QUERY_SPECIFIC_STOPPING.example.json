@@ -2533,7 +2533,7 @@
       "case_id": "global_converges_but_query_worlds_disagree",
       "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "frame_id": "synthetic-residual-frame-v1",
-      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "frame_coverage_receipt_sha256": "595e2a626d9fe750410d79cf82e8b6dfc8377637e26971edee64843ce3071e9f",
       "global_stop_policy": {
         "relative_delta_tolerance": 0.005,
         "consecutive_stable_transitions": 2
@@ -2610,7 +2610,7 @@
       "case_id": "query_sufficient_before_global_convergence",
       "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "frame_id": "synthetic-residual-frame-v1",
-      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "frame_coverage_receipt_sha256": "595e2a626d9fe750410d79cf82e8b6dfc8377637e26971edee64843ce3071e9f",
       "global_stop_policy": {
         "relative_delta_tolerance": 0.005,
         "consecutive_stable_transitions": 2
@@ -2687,7 +2687,7 @@
       "case_id": "global_converges_but_candidate_frame_incomplete",
       "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "frame_id": "synthetic-residual-frame-v1",
-      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "frame_coverage_receipt_sha256": "fcb1a9e60443d0008ff51fda396e0ed29c77b910b75860d356628e3fc25786a9",
       "global_stop_policy": {
         "relative_delta_tolerance": 0.005,
         "consecutive_stable_transitions": 2
@@ -2759,7 +2759,7 @@
       "case_id": "indeterminate_reconstruction_alternative_blocks_stop",
       "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "frame_id": "synthetic-residual-frame-v1",
-      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "frame_coverage_receipt_sha256": "595e2a626d9fe750410d79cf82e8b6dfc8377637e26971edee64843ce3071e9f",
       "global_stop_policy": {
         "relative_delta_tolerance": 0.005,
         "consecutive_stable_transitions": 2
