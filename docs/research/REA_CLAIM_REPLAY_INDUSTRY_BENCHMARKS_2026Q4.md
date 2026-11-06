@@ -296,3 +296,74 @@ Initial laws implemented or being qualified in #10740:
 
 The target is 100% preservation of the finite metamorphic laws and zero unexpected upgrades. These tests qualify the transformations they exercise; they do not prove general semantic correctness.
 
+
+## 8. Quantitative baseline refresh and fair comparison protocol (2026-11-06)
+
+### Lifecycle evidence is now a measurable SOTA axis
+
+Vera-Life-Eval reports 8,500 questions and 41,203 versioned evidence pieces across six lifecycle settings: current, past, stale-only, update, conflict and multi-hop. Its Vera-Life controller reports LifeEM 0.623 versus 0.374 for the best prompt-only baseline on the shared Qwen3-8B generator; timestamp-only and text-only regimes report 0.584 and 0.504 respectively. This is a strong published lifecycle-reasoning baseline, but it is not a directly comparable score to REA's deterministic claim conformance suite.
+
+REA should adopt its lifecycle categories and build a source-disjoint, versioned test track after composing #10600. Proposed target: zero supported claims on stale-only or superseded evidence when the target-time contract invalidates them; exact expected dispositions on the finite lifecycle oracle; and separate current/past/conflict/unknown coverage, not one LifeEM-like scalar.
+
+Reference: [Vera-Life-Eval (GroundLM 2026)](https://aclanthology.org/2026.groundlm-1.18/).
+
+### Continuous engineering is a different estimand from one-shot repair
+
+SWE-Milestone's ICML 2026 study reports evaluated systems above 80% on isolated tasks but no more than 38% in continuous milestone settings, across 12 frontier models and four agent frameworks. SWE-CI provides 100 repository-maintenance tasks with average histories of 233 days and 71 commits. These benchmarks justify treating exact-head evidence as revision-local: a qualification receipt at revision R must not imply the claim remains current at R+1.
+
+REA's continuity target should be measured as:
+- stale-claim detection recall after relevant source/dependency changes;
+- selective revalidation precision (how many re-runs were actually necessary);
+- stale claim false-retention rate;
+- regression and recovery rate over a milestone sequence;
+- time/cost to re-establish a qualified claim.
+
+Reuse #10630's source/repository continuity model rather than introduce another revision graph.
+
+References: [SWE-Milestone (ICML 2026)](https://proceedings.mlr.press/v306/deng26d.html); [SWE-CI](https://arxiv.org/abs/2603.03823).
+
+### AgentRE v3.1 is a fixed-suite diagnostic, not a transferable truth score
+
+The November 5 v3.1 report has six models × 20 Windows PE artifacts × five attempts = 600 episodes. Muse Wonder scored 87.37 Overall and GPT-6 Astra 87.04; the simultaneous 95% interval for the difference is -3.8203 to +4.4689 and includes zero. Both supplied 100/100 valid answers. DeepSeek V4.1 Flash scored 78.31 with 98/100 valid answers. The review reproduced all 600 score objects, but human adjudication remains outstanding; 46 source-supported mappings still incur field-placement/allowed-fact penalties, and no episode received full credit.
+
+REA should reproduce the task/attempt denominator and keep at least these axes distinct: artifact fact accuracy, claim-evidence entailment, allowed-fact and schema placement, coverage/nonanswers, and independent adjudicator agreement. A correct answer placed in the wrong field is an interface/schema error; a claim unsupported by the binary is a factual error. Do not combine them without a published weighting rule.
+
+Reference: [AgentRE-Bench v3.1 report, updated 2026-11-05](https://www.agentre-bench.ai/results/v3-1/).
+
+### Statistical target: estimate generalization, not just fixed-corpus accuracy
+
+NIST AI 800-3 warns that simple averages and standard errors can imply invalid uncertainty when benchmark assumptions are implicit, system performance is conflated, or task populations are heterogeneous. Its demonstration uses a generalized linear mixed model across 22 API-access models and three benchmarks to separate system and item/task variation.
+
+For a later REA agent benchmark, preregister:
+- fixed-suite performance and target-population performance as different estimands;
+- random effects for artifact family, task and source lineage where sampling supports them;
+- paired comparisons on identical evidence, tool budgets, model settings and target-time cutoffs;
+- uncertainty intervals and multiplicity control for multiple model comparisons;
+- full denominator accounting for abstentions, invalid outputs, refusals, timeouts and budget exits.
+
+Do not claim a 100% finite-oracle pass is a 100% generalization rate. The finite oracle is a software correctness gate; statistical generalization is a separate empirical question.
+
+References: [NIST AI 800-3 (February 2026)](https://nvlpubs.nist.gov/nistpubs/ai/NIST.AI.800-3.pdf); [NIST TEVV-Athlon framework](https://www.nist.gov/artificial-intelligence/ai-research/tevv-athlon-framework-evaluating-ai-systems).
+
+### Standards versioning and semantics
+
+Pin exact standard revisions in every adapter and qualification receipt. The TUF versioned v1.0.36 specification page is dated 2026-08-05; the specification repository's current master metadata labels a 1.0.37 text dated 2026-10-08, while the public version selector still lists v1.0.33 as its latest entry. This is a documentation/version-index discrepancy, not a reason to invent a single "latest" version. For reproducible integration, record the exact versioned text URL and content digest and distinguish a published version from a repository working draft.
+
+RFC 8785 is an Informational RFC and requires the I-JSON-compatible subset: no duplicate object property names, Unicode preservation, and numbers expressible as IEEE-754 binary64. This is why REA rejects duplicate keys and uses ECMAScript-compatible JCS for semantic commitments. For values requiring exact precision beyond binary64, encode the value as a string under an application schema rather than relying on an interoperable JSON number.
+
+SCITT RFC 9943 explicitly says an issuer may make false statements; a receipt demonstrates registration in the transparency service, not the accuracy of the statement. This is a hard non-implication the REA typed-claim layer must preserve.
+
+References: [TUF v1.0.36](https://theupdateframework.github.io/specification/v1.0.36/); [TUF specification repository](https://github.com/theupdateframework/specification); [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html); [RFC 9943 §9.2](https://www.rfc-editor.org/rfc/rfc9943.html#section-9.2).
+
+### Fair SOTA comparison: REA should be a composition layer, not a replacement leaderboard
+
+The existing tools measure orthogonal properties. REA should compare against them in matched workflows:
+1. Native SLSA/TUF/Sigstore/SCITT verification with their own policy gates.
+2. REA Evidence admission alone.
+3. Producer claim evaluation.
+4. Independent replay.
+5. Lifecycle + source-lineage + revision-continuity composition where the owner APIs are qualified.
+6. Model/agent synthesis with the same evidence but no claim gating.
+7. Model/agent synthesis with claim gating, independent replay and explicit abstention.
+
+The improvement claim should be: lower false-entailment and stale-evidence error at a measured cost, while retaining useful coverage—not "beats SLSA" or "beats AgentRE" on unrelated scores.
