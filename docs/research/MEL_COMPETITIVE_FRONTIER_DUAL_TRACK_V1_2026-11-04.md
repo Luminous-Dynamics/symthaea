@@ -1,6 +1,6 @@
 # Melothaea competitive frontier and dual-track strategy v1
 
-**Date:** 5 November 2026  
+**Date:** 6 November 2026  
 **Status:** Research and evaluation strategy; targets are not results.  
 **Parent:** [#10417 — Reproducible external SOTA and industry comparison ledger](https://github.com/Luminous-Dynamics/symthaea/issues/10417)  
 **Composes:** #10307, #10390, #10393, #10402, #10409, #10088, #10190, #10133, #10249, #10421.
@@ -22,7 +22,7 @@ The product architecture should therefore be **generator-neutral**: Melothaea ow
 
 Artificial Analysis currently exposes separate AA-Music-Instrumental v1.1 and AA-Music-Vocal v1.1 leaderboards. Its methodology describes blind pairwise comparisons on the same prompt and modality, Bradley–Terry maximum-likelihood ratings rescaled to Elo, and 95% intervals. Audio is loudness-normalized to a -16 LUFS target (with a -1 dBTP ceiling) and delivered as 320 kbps MP3 at 44.1 kHz; the methodology also documents an October 2026 statistical update. This is a useful production-quality comparator, not a complete measure of controllability, musical structure, ownership, collaboration or rights.
 
-**Instrumental v1.1 retrieved snapshot (5 November 2026):**
+**Instrumental v1.1 retrieved snapshot (6 November 2026; current board capture):**
 
 | Model | Elo | Reported 95% interval | Samples |
 | --- | ---: | ---: |
@@ -33,7 +33,7 @@ Artificial Analysis currently exposes separate AA-Music-Instrumental v1.1 and AA
 | Lyria 3 Pro | 1080 | 1059–1101 | 2,329 |
 | Lyria 3.5 | 1078 | 1057–1099 | 2,302 |
 
-**Vocal v1.1 retrieved snapshot (5 November 2026):**
+**Vocal v1.1 retrieved snapshot (6 November 2026; latest accessible board capture):**
 
 | Model | Elo | Reported 95% interval |
 | --- | ---: | ---: |
@@ -89,7 +89,7 @@ The vocal board adds Eleven Music v2.5 1016±18 (3,220 samples), Eleven Music v2
 
 ### HEARTBEAT 2027
 
-The official dedicated challenge page was opened and re-checked on **5 November 2026**. It states that all deadlines are 23:59 UTC unless otherwise noted. Its current schedule reads:
+The official dedicated challenge page was opened and re-checked on **6 November 2026**. It states that all deadlines are 23:59 UTC unless otherwise noted. Its current schedule reads:
 
 - 16 November 2026: development leaderboard opens.
 - 2 December: team membership and resource declarations freeze.
@@ -100,7 +100,7 @@ The official dedicated challenge page was opened and re-checked on **5 November 
 
 The current page describes 132,571 samples (127,371 train / 5,200 development) across approximately 3,103 hours and ~599.83 GB, with reciprocal audio turn-taking and streaming proactive-understanding tracks. Offline Track I asks for WAIT/RESPOND/CONTINUE/YIELD; Online Track I requires generated audio plus timestamped interaction logs. Track I online scoring covers behavior, response quality and speech onset/offset timing. Track II online scoring uses precision, recall and joint F1; its protocol requires current/past input only, logs every chunk including no-response chunks, and response timestamps at the end of the producing chunk (no backdating).
 
-The page has returned multiple conflicting schedule snapshots during this research session. The current opened page explicitly shows 16 November/2 December/16 December/23 December/30 December. Re-check the official page before every submission milestone and archive the page content with the run manifest. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
+The page has returned multiple conflicting schedule snapshots during this research session. The current 6 November opened page explicitly shows 16 November/2 December/16 December/23 December/30 December. Re-check the official page before every submission milestone and archive the page content with the run manifest. Keep speech challenge results separate from music-adapted results; HEARTBEAT is an adjacent evaluation source, not a music leaderboard.
 ### MMAE
 
 The official challenge site lists:
