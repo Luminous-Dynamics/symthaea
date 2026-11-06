@@ -37,6 +37,12 @@ cargo run --locked --manifest-path tools/pitb-grouped-benchmark-splits/Cargo.tom
 
 The optional `--source-blob-sha1` is verified by the planner against the exact Git blob object digest. The report always records the raw input SHA-256.
 
+## Exact-head SorryDB result (November 6, 2026)
+
+The pinned evaluation split produced five project-disjoint folds with **exactly 200 tasks each**. The fold repository counts were 15, 16, 16, 15 and 16. The 78 repositories, 107 repository/commit pairs and 339 repository/file clusters were all assigned without project overlap. The largest indivisible project contained 21 tasks; the observed task-load range was 200–200.
+
+This is a useful property of the actual cohort: balanced task denominators were achieved without cutting repository clusters. The fold manifest is retained as the `pitb-sorrydb-project-disjoint-folds` CI artifact.
+
 ## Interpretation
 
 Five folds over the SorryDB_2601 evaluation slice create a project-held-out cross-validation protocol **within that snapshot**. For each fold, all tasks from those repositories are held out together; the remaining folds are the complementary project groups. For a fair comparison:
