@@ -1,0 +1,558 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL.schema.json",
+  "title": "Static-model robust sequential connectome intervention run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "query",
+    "worlds",
+    "actions",
+    "model_vertices",
+    "policy_space",
+    "oracle_expectations",
+    "split_manifest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "model_vertices": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/model_vertex"
+      }
+    },
+    "policy_space": {
+      "$ref": "#/$defs/policy_space"
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split_manifest"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256",
+        "certificate_max_expected_loss"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "certificate_max_expected_loss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "source_evidence_sha256",
+        "query_decision"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "query_decision": {
+          "type": "boolean"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "action_kind",
+        "stage_one_available",
+        "one_shot_eligible",
+        "stage_one_cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_kind": {
+          "enum": [
+            "CALIBRATION",
+            "OPTOGENETIC",
+            "ELECTRICAL",
+            "PHARMACOLOGICAL",
+            "SENSORY",
+            "SIMULATED",
+            "OTHER"
+          ]
+        },
+        "stage_one_available": {
+          "type": "boolean"
+        },
+        "one_shot_eligible": {
+          "type": "boolean"
+        },
+        "stage_one_cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "prior_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "probability"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "stage_one_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "world_id",
+        "outcomes"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "stage_two_kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_outcome_id",
+        "action_id",
+        "world_id",
+        "outcomes"
+      ],
+      "properties": {
+        "first_outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "model_vertex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_vertex_id",
+        "model_sha256",
+        "dependence_group_ids",
+        "prior",
+        "stage_one_kernels",
+        "stage_two_kernels"
+      ],
+      "properties": {
+        "model_vertex_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "dependence_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "prior": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/prior_entry"
+          }
+        },
+        "stage_one_kernels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/stage_one_kernel"
+          }
+        },
+        "stage_two_kernels": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/stage_two_kernel"
+          }
+        }
+      }
+    },
+    "stage_two_option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "cost_units"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "history_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_outcome_id",
+        "options"
+      ],
+      "properties": {
+        "first_outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/stage_two_option"
+          }
+        }
+      }
+    },
+    "policy_space": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_action_id",
+        "first_stage_outcome_ids",
+        "second_stage_options_by_first_outcome",
+        "second_stage_outcome_ids",
+        "max_worst_branch_cost_units"
+      ],
+      "properties": {
+        "root_action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "first_stage_outcome_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "second_stage_options_by_first_outcome": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/history_options"
+          }
+        },
+        "second_stage_outcome_ids": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "max_worst_branch_cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "one_shot_robust_loss_by_action",
+        "best_one_shot_robust_loss",
+        "static_robust_loss",
+        "rectangular_risk_of_static_policy",
+        "rectangular_minimax_loss",
+        "static_rectangular_gap",
+        "static_gain_over_one_shot",
+        "static_worst_branch_cost",
+        "rectangular_worst_branch_cost",
+        "static_certificate",
+        "rectangular_certificate",
+        "expected_static_second_action_by_history",
+        "expected_static_terminal_decision_by_history",
+        "expected_rectangular_terminal_decision_by_history"
+      ],
+      "properties": {
+        "one_shot_robust_loss_by_action": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "best_one_shot_robust_loss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "static_robust_loss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rectangular_risk_of_static_policy": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "rectangular_minimax_loss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "static_rectangular_gap": {
+          "type": "number"
+        },
+        "static_gain_over_one_shot": {
+          "type": "number"
+        },
+        "static_worst_branch_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rectangular_worst_branch_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "static_certificate": {
+          "type": "boolean"
+        },
+        "rectangular_certificate": {
+          "type": "boolean"
+        },
+        "expected_static_second_action_by_history": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "expected_static_terminal_decision_by_history": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "SUPPORT",
+              "REFUTE"
+            ]
+          }
+        },
+        "expected_rectangular_terminal_decision_by_history": {
+          "type": "object",
+          "additionalProperties": {
+            "enum": [
+              "SUPPORT",
+              "REFUTE"
+            ]
+          }
+        }
+      }
+    },
+    "split_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_unit",
+        "train_units",
+        "validation_units",
+        "lockbox_units",
+        "split_sha256"
+      ],
+      "properties": {
+        "split_unit": {
+          "enum": [
+            "animal",
+            "session",
+            "target_neuron",
+            "animal_session",
+            "synthetic_unit"
+          ]
+        },
+        "train_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "validation_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "lockbox_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    }
+  }
+}
