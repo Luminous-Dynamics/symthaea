@@ -12,9 +12,7 @@ mod rea_compat;
 #[path = "../lib.rs"]
 mod replay_verifier;
 
-use rea_compat::claims::{
-    ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
-};
+use rea_compat::claims::{ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim};
 use replay_verifier::{
     MAX_CLAIM_JSON_BYTES, MAX_EVIDENCE_RECORDS, MAX_RESULT_JSON_BYTES,
     MAX_TOTAL_EVIDENCE_JSON_BYTES, ReplayOutcome, replay_claim_evaluation,
