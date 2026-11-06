@@ -113,11 +113,7 @@ fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn cycle_between(
-    start: Reversal,
-    end: Reversal,
-    kind: RainflowCycleKind,
-) -> RainflowCycle {
+fn cycle_between(start: Reversal, end: Reversal, kind: RainflowCycleKind) -> RainflowCycle {
     let range = start.soc_bps.abs_diff(end.soc_bps);
     RainflowCycle {
         kind,
@@ -281,9 +277,7 @@ fn count_reversal_segment(
 pub fn count_soc_rainflow_cycles(
     inputs: RainflowInputs<'_>,
 ) -> Result<RainflowAssessment, RainflowError> {
-    if !nonempty(inputs.scenario_id)
-        || !nonempty(inputs.sampling_policy_source_ref)
-    {
+    if !nonempty(inputs.scenario_id) || !nonempty(inputs.sampling_policy_source_ref) {
         return Err(RainflowError::InvalidEvidenceReference);
     }
     if !valid_sha256(inputs.sampling_policy_source_sha256) {
@@ -383,15 +377,9 @@ pub fn count_soc_rainflow_cycles(
         }
     }
 
-    let reversals = extract_reversals(
-        inputs.samples,
-        segment_start,
-        inputs.samples.len(),
-    );
+    let reversals = extract_reversals(inputs.samples, segment_start, inputs.samples.len());
     reversal_count = reversal_count
-        .checked_add(
-            u64::try_from(reversals.len()).map_err(|_| RainflowError::ArithmeticOverflow)?,
-        )
+        .checked_add(u64::try_from(reversals.len()).map_err(|_| RainflowError::ArithmeticOverflow)?)
         .ok_or(RainflowError::ArithmeticOverflow)?;
     count_reversal_segment(
         &reversals,
@@ -441,11 +429,7 @@ mod tests {
 
     const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-    fn sample(
-        id: &'static str,
-        time: i64,
-        soc_bps: u16,
-    ) -> SocTelemetrySample<'static> {
+    fn sample(id: &'static str, time: i64, soc_bps: u16) -> SocTelemetrySample<'static> {
         SocTelemetrySample {
             sample_id: id,
             source_ref: id,
@@ -567,10 +551,12 @@ mod tests {
         assert_eq!(result.uncovered_seconds, 6);
         assert_eq!(result.segment_count, 2);
         assert_eq!(result.cycles.len(), 3);
-        assert!(result
-            .cycles
-            .iter()
-            .all(|cycle| cycle.kind == RainflowCycleKind::Half));
+        assert!(
+            result
+                .cycles
+                .iter()
+                .all(|cycle| cycle.kind == RainflowCycleKind::Half)
+        );
     }
 
     #[test]
@@ -638,10 +624,7 @@ mod tests {
             Err(RainflowError::InvalidSample)
         );
 
-        let out_of_order = [
-            sample("first", 0, 2_000),
-            sample("second", 1, 8_000),
-        ];
+        let out_of_order = [sample("first", 0, 2_000), sample("second", 1, 8_000)];
         let reversed = [out_of_order[1], out_of_order[0]];
         let invalid = RainflowInputs {
             samples: &reversed,
