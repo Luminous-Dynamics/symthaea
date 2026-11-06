@@ -69,7 +69,7 @@
     },
     {
       "intervention_id": "cheap-confounded",
-      "intervention_kind": "optogenetic",
+      "intervention_kind": "OPTOGENETIC",
       "cost_units": 0.5,
       "feasibility_status": "FEASIBLE",
       "feasibility_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
