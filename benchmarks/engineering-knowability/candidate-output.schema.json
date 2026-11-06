@@ -256,7 +256,7 @@
           "type": "array",
           "minItems": 1,
           "items": {
-            "$ref": "#/$defs/artifactRef"
+            "$ref": "#/$defs/designArtifact"
           }
         },
         "requirement_claim_refs": {
@@ -441,7 +441,9 @@
         "decision_rule_ref",
         "dependence_refs",
         "lifecycle_requalification",
-        "evidence_class"
+        "evidence_class",
+        "target_article_or_configuration_ref",
+        "independence_assessment"
       ],
       "properties": {
         "path_ref": {
@@ -634,6 +636,66 @@
             "synthetic_reference",
             "proposal",
             "simulation"
+          ]
+        },
+        "target_article_or_configuration_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independence_assessment": {
+          "enum": [
+            "not_claimed",
+            "independent_with_declared_basis",
+            "shared_reference_or_common_mode",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "designArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "sha256",
+        "format",
+        "role",
+        "editable_native",
+        "native_rebuild_state",
+        "native_rebuild_evidence_ref"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "editable_native": {
+          "type": "boolean"
+        },
+        "native_rebuild_state": {
+          "enum": [
+            "not_attempted",
+            "valid",
+            "invalid",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "native_rebuild_evidence_ref": {
+          "type": [
+            "string",
+            "null"
           ]
         }
       }
