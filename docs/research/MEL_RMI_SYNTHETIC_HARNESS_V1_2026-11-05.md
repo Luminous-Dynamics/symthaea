@@ -106,7 +106,15 @@ The dedicated workflow pins Rust 1.96.0, stages the crate outside the root works
 | Agent summaries | 30 (six policies × five dimensions) |
 | Partner summaries | 5 dimensions |
 
-These counts are finite fixture-control results, not benchmark accuracy estimates or evidence of generalization. The per-dimension means/standard deviations are descriptive summaries across constructed deterministic variants; no confidence intervals, statistical population inference, or cross-dimension composite score are reported.
+These counts are finite fixture-control results, not benchmark accuracy estimates or evidence of generalization. The 32 variants per dimension are constructed deterministic clusters, not a sample of musicians or models; their intervals do not estimate uncertainty about Melothaea or a human population. No cross-dimension composite score is reported.
+
+## Paired cluster-bootstrap analysis
+
+The crate includes a separate statistics module for paired outcomes. For each dimension and causal direction it reports normalized targeted, sham, and unrelated changes; paired targeted-minus-sham and targeted-minus-unrelated effects; input-sensitivity and target-specificity rates; attempted/measured/missing trial counts; and reason-specific missingness. It reports no yoked contrast unless a yoked measurement is actually supplied.
+
+The estimator first averages observations within each declared independent cluster, then resamples those cluster means with replacement (2,000 deterministic percentile-bootstrap replicates by default). This avoids treating turns within one musician/session as independent and avoids giving a cluster extra weight merely because it contributes more turns. The output carries a mean and 95% interval where at least two measured clusters exist; with fewer than two, it returns the mean but leaves the interval unavailable. No missing outcome is imputed as zero. The bootstrap index sampler uses rejection sampling rather than modulo reduction.
+
+The canonical runner emits 30 agent summaries (six policies × five dimensions) and five agent-to-partner summaries. The dedicated workflow requires all 35. These intervals are a software-path demonstration over synthetic fixture clusters only. They do not qualify model uncertainty, generalization, or population inference. For actual musician studies, preregister the independent cluster unit and confirmatory outcomes, power from pilot estimates, retain every attempted/missing case, and use hierarchical or multiway-cluster inference when musicians, sessions, tasks, and items form crossed or nested sampling structures. Multiplicity correction and missing-data sensitivity analyses must be frozen before confirmatory outcomes are inspected.
 
 ## Verification history
 
