@@ -429,7 +429,7 @@
       "case_id": "RULE-SUPERSESSION-001",
       "track": "evidence_and_lifecycle",
       "title": "Effective-dated rule revision and historical applicability replay",
-      "scenario": "Resolve the published rule revision for an exact authority, jurisdiction, instrument and product scope at a transaction/project valid-time, using only rule records actually available at the historical decision's knowledge-time. Explicit supersession chains resolve overlapping revisions. Drafts are not treated as effective rules; future-known amendments never rewrite prior decisions; ambiguous parallel amendments, missing predecessors, cross-authority supersession and cycles fail closed. Selection of a rule revision is only an input to downstream product-eligibility evaluation.",
+      "scenario": "Resolve the published rule revision for an exact authority, jurisdiction, instrument and product scope at a transaction/project valid-time, using only rule records actually available at the historical decision's knowledge-time. Explicit supersession chains resolve overlapping revisions. Drafts are not treated as effective rules; future-known amendments never rewrite prior decisions; ambiguous parallel amendments, missing predecessors, cross-authority supersession and cycles fail closed. Selection of a rule revision is only an input to downstream product-eligibility evaluation. Effective windows are start-inclusive/end-exclusive. A published future-effective amendment does not displace the currently effective revision before its start time. Publication-state metadata must be internally consistent.",
       "owner": "Symthaea (decision applicability) + Mycelix (evidence provenance)",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -445,7 +445,10 @@
         "draft_and_not_yet_effective_rules_do_not_become_applicable",
         "wrong_authority_jurisdiction_instrument_and_scope_do_not_match",
         "inconsistent_source_digest_and_invalid_publication_order_are_rejected",
-        "duplicate_revision_ids_and_invalid_windows_fail_closed"
+        "duplicate_revision_ids_and_invalid_windows_fail_closed",
+        "effective_window_is_start_inclusive_and_end_exclusive",
+        "not_yet_effective_published_amendment_does_not_displace_current_rule",
+        "draft_or_published_state_metadata_must_be_consistent"
       ],
       "required_evidence": [
         "old rule artifact identity, content digest, authority and jurisdiction",
