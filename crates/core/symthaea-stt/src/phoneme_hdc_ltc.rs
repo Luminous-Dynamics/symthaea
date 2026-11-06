@@ -324,18 +324,20 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "known bug, not yet root-caused: see comment below"]
+    #[ignore = "historical learning regression; re-enable only after new diagnostics establish a stable acceptance threshold"]
     fn test_training_changes_output() {
-        // KNOWN BUG (2026-07): raising the training schedule to 100 steps at
-        // lr=0.1 (a 100x increase over the original 10 steps @ lr=0.01) did
-        // NOT change the observed similarity at all (0.999890 -> 0.999889),
-        // so this is not a step-count/learning-rate tuning problem. The
-        // one-step-from-reset evaluation methodology below may be masking
-        // real weight changes (e.g. tanh saturation making x_inf insensitive
-        // to the trained input_mask, or a vanishing-gradient issue in
-        // `HdcLtcUnifiedNeuron::backward`) rather than training being inert.
-        // Needs instrumented printf/diagnostic investigation of gradient and
-        // weight-hv magnitude across steps, not another hyperparameter guess.
+        // Historical failure (2026-07): increasing the schedule to 100 steps
+        // at lr=0.1 left the reset-state output essentially unchanged
+        // (similarity 0.999890 -> 0.999889). Source inspection later found
+        // forward/backward inconsistencies: backward omitted the adaptive gate
+        // and Fourier term, used a different tau derivative, and the trainer
+        // evolved before asking for gradients. SWI-001 now aligns the local
+        // gradient with the forward map and updates before evolution.
+        //
+        // Keep this end-to-end assertion ignored until it is rerun with
+        // per-step loss, parameter-norm, saturation, and held-out phoneme
+        // accuracy measurements. Do not replace the known failure with a
+        // learning-rate sweep or weaken the threshold without evidence.
         let genesis = GenesisSeed::from_phrase("test_changes");
         let labels = vec!["AA".to_string(), "IH".to_string()];
         let mut ltc = PhonemeHdcLtc::new(&genesis, &labels, 0.020);
