@@ -1222,6 +1222,34 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn decision_directed_projection_rejects_overflow_and_non_finite_inputs() {
+        let range = super::super::score_bounds::ScoreRange {
+            lower: 0.0,
+            upper: 1.0,
+        };
+        assert_eq!(
+            projected_anytime_hoeffding_radius(range, usize::MAX, 0.01),
+            Err(AdaptiveAllocationError::ReplicationCountOverflow)
+        );
+        assert_eq!(
+            projected_anytime_hoeffding_radius(range, 10, f64::NAN),
+            Err(AdaptiveAllocationError::NonFinitePriority)
+        );
+        assert_eq!(
+            projected_anytime_hoeffding_radius(
+                super::super::score_bounds::ScoreRange {
+                    lower: 0.0,
+                    upper: f64::INFINITY,
+                },
+                10,
+                0.01,
+            ),
+            Err(AdaptiveAllocationError::NonFinitePriority)
+        );
+    }
+
     #[test]
     fn allocation_receipts_replay_for_batch_and_stop_dispositions() {
         let receipt = score_receipt(4, [0.8, 0.7], true);
