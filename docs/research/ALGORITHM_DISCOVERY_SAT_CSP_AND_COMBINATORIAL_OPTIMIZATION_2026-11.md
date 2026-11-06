@@ -130,6 +130,16 @@ This is directly relevant to Symthaea. Treat those reported improvements as resu
 
 LACE's input/output/tool/heuristic-portfolio interface and complementary evolution are a strong model for a domain-independent algorithm-discovery layer. It evaluates a broad CO benchmark and structurally new problems. Reuse its interface and evaluation ideas where licensing and engineering review permit; do not assume its results transfer unchanged to SAT or industrial workloads.
 
+## Counting-to-sampling and Max-k-SAT consequences in the ETH manuscript
+
+The October 25 manuscript also derives two useful consequences of exact #k-SAT counting. Treat both as claims within that preprint, subject to the same proof-scope and review caveats as the main theorem.
+
+- **Witness extraction:** testing whether the exact count is positive decides SAT; standard self-reduction fixes variables one at a time, querying the remaining conditional counts to construct a satisfying assignment.
+- **Uniform feasible-solution sampling:** choosing each variable according to the two conditional model counts yields an exactly uniform random satisfying assignment, with polynomial expected overhead as stated in the manuscript. This is not ordinary heuristic sampling and depends on access to the exact counter. It may become a valuable research primitive for sampling feasible schedules/configurations or measuring solution-space diversity, if the asymptotic algorithm ever becomes practical.
+- **Additive Max-k-SAT approximation:** the manuscript derives a randomized algorithm that, for fixed k and epsilon > 0, returns an assignment satisfying at least OPT(F) - epsilon*m clauses with probability 1 - 2^(-Omega(n)), in subexponential time and polynomial space. This is an **additive error in clause count**, not a multiplicative approximation ratio, and it remains a superpolynomial-time theoretical guarantee.
+
+For Symthaea, the interesting experiment is to compare (a) exact-count-guided uniform sampling, (b) approximate model counters and (c) learned solution samplers on small instances where exact distributions are enumerable. Measure distributional calibration, mode coverage, sample diversity and validity separately. For planning systems, feasible-solution sampling should be used to characterize flexibility and fragility—not to silently choose a legally or morally binding allocation.
+
 ## Additional OpenAI 2026 algorithmic results with direct transfer potential
 
 The broader OpenAI math release contains several results that are useful beyond SAT. Keep these as separate tracks; they solve different problems and carry different guarantees.
