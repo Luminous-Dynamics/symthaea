@@ -191,14 +191,14 @@ pub fn assess_intraday_redeclaration<'a>(
             reason: "Market Operator receipt timestamp is missing",
         });
     };
-    if received_at <= gate.gate_close_utc {
+    if received_at < gate.gate_close_utc {
         return Ok(IntradayGateDisposition::IncludedInNamedAuction {
             gate_id: gate.gate_id,
             received_at_utc: received_at,
         });
     }
     match (gate.next_gate_id, gate.next_gate_close_utc) {
-        (Some(next_gate_id), Some(next_gate_close)) if received_at <= next_gate_close => {
+        (Some(next_gate_id), Some(next_gate_close)) if received_at < next_gate_close => {
             Ok(IntradayGateDisposition::MissedNamedAuctionEligibleForNext {
                 missed_gate_id: gate.gate_id,
                 next_gate_id,
@@ -266,11 +266,12 @@ mod tests {
     }
 
     #[test]
-    fn receipt_exactly_at_gate_boundary_is_included() {
+    fn receipt_exactly_at_gate_boundary_misses_named_auction_but_can_use_next() {
         assert_eq!(
             assess_intraday_redeclaration(gate(), submission(Some(6 * 3_600))),
-            Ok(IntradayGateDisposition::IncludedInNamedAuction {
-                gate_id: "idm/2026-11-06/06:00",
+            Ok(IntradayGateDisposition::MissedNamedAuctionEligibleForNext {
+                missed_gate_id: "idm/2026-11-06/06:00",
+                next_gate_id: "idm/2026-11-06/12:00",
                 received_at_utc: 6 * 3_600,
             })
         );
@@ -282,6 +283,24 @@ mod tests {
             assess_intraday_redeclaration(gate(), submission(None)),
             Ok(IntradayGateDisposition::Indeterminate {
                 reason: "Market Operator receipt timestamp is missing",
+            })
+        );
+    }
+
+    #[test]
+    fn receipt_exactly_at_final_remaining_gate_is_too_late() {
+        let final_gate = IntradayGateEvidence {
+            gate_id: "idm/2026-11-06/12:00",
+            gate_close_utc: 12 * 3_600,
+            next_gate_id: None,
+            next_gate_close_utc: None,
+            ..gate()
+        };
+        assert_eq!(
+            assess_intraday_redeclaration(final_gate, submission(Some(12 * 3_600))),
+            Ok(IntradayGateDisposition::MissedAllRemainingGates {
+                missed_gate_id: "idm/2026-11-06/12:00",
+                received_at_utc: 12 * 3_600,
             })
         );
     }
