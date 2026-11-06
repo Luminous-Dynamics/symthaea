@@ -573,7 +573,10 @@
       "bmr_parameterization_mismatch_rejection_rate",
       "bmr_invalid_parameterization_digest_rejection_rate",
       "minimum_hidden_unit_assignment_margin",
-      "ambiguous_alignment_abstention_rate"
+      "ambiguous_alignment_abstention_rate",
+      "dirichlet_support_mask_validation_failure_rate",
+      "dirichlet_excluded_observed_outcome_zero_evidence_accuracy",
+      "dirichlet_reduced_posterior_nonintegrability_rejection_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -632,7 +635,7 @@
     "The three-ball implementation records the paper's published rule (centre green→green; centre red→left colour; centre blue→right colour), foveated single-ball observation, and outcome preference log probabilities (no feedback=0, correct=2, incorrect=-6 nats); any changed mechanism is labelled as an adaptation.",
     "The three-ball categorical likelihood reproduction must use Dirichlet model reduction over the full-model posterior and prior concentrations; the diagonal-Gaussian BMR primitive must not be substituted for this conjugate categorical case.",
     "Three-ball model evidence must use the registered model family and Dirichlet column ordering, and the reported Occam threshold must be expressed as posterior model log-odds in nats; model commitment is evaluated at the declared 16-nat threshold as a replication metric, not as a universal constant.",
-    "Dirichlet BMR only accepts proper positive concentrations. Reduced priors that require exact-zero support restrictions must use an explicit support-restricted model representation, not be silently approximated as proper Dirichlet distributions."
+    "Dirichlet BMR requires positive concentrations on active coordinates and an explicit active-support mask; inactive coordinates must have exactly zero concentration, and any posterior count in an excluded coordinate makes that reduced model's evidence zero. Empty or malformed support and non-integrable reduced posteriors are rejected."
   ],
   "research_references": [
     {
