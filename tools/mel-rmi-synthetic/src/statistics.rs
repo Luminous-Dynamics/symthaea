@@ -116,6 +116,39 @@ pub struct Estimate {
     pub bootstrap_resamples: usize,
 }
 
+/// Counts of each explicit missing-outcome category.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct MissingOutcomeCounts {
+    /// Explicit policy abstention.
+    pub abstained: usize,
+    /// Deadline timeout.
+    pub timeout: usize,
+    /// Invalid action or artifact.
+    pub invalid_output: usize,
+    /// Missing committed or source artifact.
+    pub missing_artifact: usize,
+    /// Adapter cannot expose the required measurement.
+    pub adapter_unavailable: usize,
+    /// Participant withdrawal.
+    pub participant_withdrawal: usize,
+    /// Other preregistered missingness.
+    pub other: usize,
+}
+
+impl MissingOutcomeCounts {
+    fn record(&mut self, reason: MissingOutcomeReason) {
+        match reason {
+            MissingOutcomeReason::Abstained => self.abstained += 1,
+            MissingOutcomeReason::Timeout => self.timeout += 1,
+            MissingOutcomeReason::InvalidOutput => self.invalid_output += 1,
+            MissingOutcomeReason::MissingArtifact => self.missing_artifact += 1,
+            MissingOutcomeReason::AdapterUnavailable => self.adapter_unavailable += 1,
+            MissingOutcomeReason::ParticipantWithdrawal => self.participant_withdrawal += 1,
+            MissingOutcomeReason::Other => self.other += 1,
+        }
+    }
+}
+
 /// Separate summary for one musical dimension and one causal direction.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DimensionEffectSummary {
@@ -129,6 +162,8 @@ pub struct DimensionEffectSummary {
     pub measured_trials: usize,
     /// Trials retained as missing rather than imputed.
     pub missing_trials: usize,
+    /// Breakdown of explicit missingness reasons.
+    pub missing_by_reason: MissingOutcomeCounts,
     /// Distinct clusters represented in the attempted denominator.
     pub attempted_clusters: usize,
     /// Distinct clusters with at least one complete observation.
@@ -250,10 +285,14 @@ fn summarize_group(
         std::array::from_fn(|_| BTreeMap::new());
     let mut measured_trials = 0usize;
     let mut missing_trials = 0usize;
+    let mut missing_by_reason = MissingOutcomeCounts::default();
 
     for observation in group {
         attempted_clusters.insert(observation.cluster_id.as_str());
         let PairedEffectOutcome::Measured(value) = observation.outcome else {
+            if let PairedEffectOutcome::Missing(reason) = observation.outcome {
+                missing_by_reason.record(reason);
+            }
             missing_trials += 1;
             continue;
         };
@@ -312,6 +351,7 @@ fn summarize_group(
         attempted_trials: group.len(),
         measured_trials,
         missing_trials,
+        missing_by_reason,
         attempted_clusters: attempted_clusters.len(),
         measured_clusters,
         targeted_delta: estimate(0),
@@ -623,6 +663,54 @@ mod tests {
                 config()
             ),
             Err(StatisticsError::InvalidDistance)
+        );
+    }
+
+    #[test]
+    fn missing_reason_counts_remain_disaggregated() {
+        let observations = [
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::Abstained),
+                ..missing("a", "a-1")
+            },
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::Timeout),
+                ..missing("b", "b-1")
+            },
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::InvalidOutput),
+                ..missing("c", "c-1")
+            },
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::MissingArtifact),
+                ..missing("d", "d-1")
+            },
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::AdapterUnavailable),
+                ..missing("e", "e-1")
+            },
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::ParticipantWithdrawal),
+                ..missing("f", "f-1")
+            },
+            PairedEffectObservation {
+                outcome: PairedEffectOutcome::Missing(MissingOutcomeReason::Other),
+                ..missing("g", "g-1")
+            },
+        ];
+        let summary = single_summary(&observations);
+        assert_eq!(summary.missing_trials, 7);
+        assert_eq!(
+            summary.missing_by_reason,
+            MissingOutcomeCounts {
+                abstained: 1,
+                timeout: 1,
+                invalid_output: 1,
+                missing_artifact: 1,
+                adapter_unavailable: 1,
+                participant_withdrawal: 1,
+                other: 1,
+            }
         );
     }
 
