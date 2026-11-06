@@ -78,6 +78,7 @@ def verify(
     mechanism_oracle_raw: bytes,
     transport_oracle_raw: bytes,
     bridge_oracle_raw: bytes,
+    binding_raw: bytes,
 ) -> dict[str, Any]:
     require(binding["schema_version"] == 1, "unsupported integration binding version")
     require(binding["claim_scope"] == "synthetic_known_truth", "V1 bridge accepts synthetic fixtures only")
@@ -116,14 +117,22 @@ def verify(
     transport_models = {row["model_id"]: row for row in transport_data["models"]}
     require(set(mechanism_ids).issubset(mechanisms), "mechanism mapping references an unknown mechanism")
     require(set(model_ids).issubset(transport_models), "mechanism mapping references an unknown transport model")
+    require(set(transport_models) == set(model_ids), "transport model inventory differs from the frozen two-model mapping")
+    expected_model_kind = {
+        "DIRECT_SYNAPTIC": "ANATOMY_ONLY",
+        "EXTRASYNAPTIC_LATENT": "WIRED_PLUS_EXTRASYNAPTIC",
+    }
     for row in map_rows:
         require(row["mechanism_class"] == mechanisms[row["mechanism_id"]]["mechanism_class"], "mechanism class mapping mismatch")
-    pair_ids = list(zip(mechanism_ids, mechanism_ids[1:]))
-    require(len(pair_ids) == 1, "V1 compares exactly one pre-registered mechanism pair")
-    mechanism_pair = tuple(mechanism_ids)
-    pair_report = expected_pair.get(mechanism_pair)
-    if pair_report is None:
-        pair_report = expected_pair.get(tuple(reversed(mechanism_pair)))
+        require(transport_models[row["model_id"]]["model_kind"] == expected_model_kind.get(row["mechanism_class"]),
+                "transport model kind does not match the frozen mechanism-family mapping")
+    require(len(mechanism_ids) == 2, "V1 compares exactly one pre-registered mechanism pair")
+    mechanism_pair = tuple(sorted(mechanism_ids))
+    pair_report = next(
+        (row for row in action_report["pairwise_results"]
+         if {row["mechanism_a"], row["mechanism_b"]} == set(mechanism_ids)),
+        None,
+    )
     require(pair_report is not None, "mapped mechanism pair is absent from the selected action report")
     require(pair_report["different_mechanism_class"], "mapped mechanism pair does not differ in mechanism class")
     require(not pair_report["different_query_decision"], "V1 predictive mechanism comparison must hold query decision fixed")
@@ -194,11 +203,9 @@ def verify(
     require(len(set(tb["lockbox_animal_ids"])) == len(tb["lockbox_animal_ids"]), "duplicate lockbox animal ID")
     require(set(lockbox_primary_animals).issubset(set(tb["lockbox_animal_ids"])), "primary animals are not in the frozen lockbox")
 
-    observations_by_id = {row["observation_id"]: row for row in observations}
     predictions_by_key = {(row["model_id"], row["observation_id"]): row for row in predictions}
     require(len(predictions_by_key) == len(predictions), "duplicate model/observation prediction")
     brier_by_model_animal: dict[str, dict[str, list[float]]] = {model_a: {}, model_b: {}}
-    paired_observation_ids: dict[str, list[str]] = {}
     for animal_id in lockbox_primary_animals:
         obs = find_exactly_one(
             observations,
@@ -211,7 +218,6 @@ def verify(
         require(obs["functional_disposition"] == binding["comparison"]["observation_disposition"],
                 f"primary observation disposition differs from frozen scoring rule for {animal_id}")
         truth = 1.0
-        paired_observation_ids[animal_id] = [obs["observation_id"]]
         for model_id in (model_a, model_b):
             prediction = predictions_by_key.get((model_id, obs["observation_id"]))
             require(prediction is not None, f"missing paired prediction: {model_id}/{obs['observation_id']}")
@@ -279,6 +285,12 @@ def verify(
     require(mapping.get("direct") == model_a and mapping.get("extra") == model_b,
             "mechanism-to-model mapping differs from the frozen known answer")
 
+    upstream = binding["upstream_sources"]
+    require(valid_sha(upstream["mechanism_commit_sha"], 40), "mechanism source commit SHA malformed")
+    require(valid_sha(upstream["transport_commit_sha"], 40), "transport source commit SHA malformed")
+    for field in ("mechanism_rust_git_blob_sha1", "mechanism_oracle_git_blob_sha1", "transport_oracle_git_blob_sha1"):
+        require(valid_sha(upstream[field], 40), f"upstream Git blob identity malformed: {field}")
+
     return {
         "schema_version": 1,
         "tool": "verify-connectome-mechanism-model-animal-transport",
@@ -289,6 +301,7 @@ def verify(
         "mechanism_report_input_sha256": mechanism_report["input_sha256"],
         "transport_input_sha256": sha256(transport_raw),
         "transport_report_sha256": sha256(transport_report_raw),
+        "binding_raw_sha256": sha256(binding_raw),
         "transport_dataset_revision_sha256": dataset["dataset_revision_sha256"],
         "transport_split_sha256": split["split_sha256"],
         "query_id": mechanism_data["query"]["query_id"],
@@ -298,6 +311,8 @@ def verify(
         "synthetic_mechanism_gate": "IDENTIFIED" if action_report["mechanism_identified"] else "UNIDENTIFIED",
         "mechanism_pair": list(mechanism_pair),
         "model_pair": [model_a, model_b],
+        "mechanism_source_origin_commit_sha": upstream["mechanism_commit_sha"],
+        "transport_source_origin_commit_sha": upstream["transport_commit_sha"],
         "target_pair_id": target_pair_id,
         "target_pair_direct_wiring_status": pairs[target_pair_id]["direct_wiring_status"],
         "primary_condition_id": primary_condition,
@@ -364,10 +379,8 @@ def main() -> int:
             mechanism_raw, mechanism_report_raw, transport_raw, transport_report_raw,
             binding, mechanism_data, mechanism_report, transport_data, transport_report,
             mechanism_oracle, transport_oracle, mechanism_rust_source_raw,
-            mechanism_oracle_raw, transport_oracle_raw, bridge_oracle_raw
+            mechanism_oracle_raw, transport_oracle_raw, bridge_oracle_raw, binding_raw
         )
-        receipt["mechanism_source_origin_commit_sha"] = upstream["mechanism_commit_sha"]
-        receipt["transport_source_origin_commit_sha"] = upstream["transport_commit_sha"]
         receipt["mechanism_rust_git_blob_sha1"] = git_blob_sha1(mechanism_rust_source_raw)
         receipt["mechanism_oracle_git_blob_sha1"] = git_blob_sha1(mechanism_oracle_raw)
         receipt["transport_oracle_git_blob_sha1"] = git_blob_sha1(transport_oracle_raw)
