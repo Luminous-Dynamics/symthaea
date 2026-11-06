@@ -49,6 +49,8 @@ The opportunity is not to claim that industry has no DfI methods. It is to make 
 
 ## Co-design task contract
 
+The eight paired authoring families are enumerated in [codesign-paired-task-matrix.csv](codesign-paired-task-matrix.csv). Each defines a matched design-first baseline and a knowability/co-design alternative, the lifecycle mutation, critical claim/evidence requirements, hard failure gate and canonical owner inputs. This is an authoring matrix only; it does not make the fixtures scored or gold-adjudicated.
+
 Each task should contain:
 
 - A frozen requirement/claim set with criticality and acceptance semantics.
