@@ -18,12 +18,17 @@ pub const RECEIPT_CORPUS_SHA256: &str =
     "48ed00a275b8585666db8426a61e1330d44223196e50fb1017d58e0acc147d9b";
 pub const INTERPRETATION_SCHEMA_VERSION: &str = "symthaea:execution-evidence-interpretation:v0.1";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ReceiptAuthority {
+    ExecutionObservationOnly,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ToolExecutionReceiptV1 {
     pub schema_version: String,
     pub receipt_id: String,
-    pub receipt_authority: String,
+    pub receipt_authority: ReceiptAuthority,
     pub selected_profile: SelectedProfileV1,
     pub observed_tool: ObservedToolV1,
     pub request: RequestV1,
@@ -413,7 +418,7 @@ pub fn interpret_tool_execution_receipt(
             ),
         ));
     }
-    if receipt.receipt_authority != RECEIPT_AUTHORITY {
+    if receipt.receipt_authority != ReceiptAuthority::ExecutionObservationOnly {
         errors.push(ReceiptInterpretationError::new(
             "authority_escalation",
             "receipt_authority",
