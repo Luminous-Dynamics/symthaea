@@ -34,6 +34,20 @@ The balanced two-way decomposition reports candidate, continuation and candidate
 
 It is undefined when the denominator is zero. This is a descriptive decomposition of the supplied finite matrix, not an inferential variance component estimate.
 
+## Support-gated reference selector
+
+The crate now includes a finite reference selector that is separate from the evaluator-oracle diagnostics above. It uses repeated selection-continuation means and a familywise two-sided Hoeffding gate over the supported baseline and supported alternatives. It selects an alternative only when that candidate's lower bound strictly exceeds the baseline's upper bound.
+
+- Candidate support is explicit: Supported, Unsupported, Unknown, or Incomplete. Only Supported alternatives can enter the selection comparison.
+- If the baseline's support is not qualified, the selector abstains. It does not silently fall back to a nominal baseline.
+- If no alternative clears the simultaneous separation gate, it retains the supported baseline. This means "no improvement established", not "baseline proven optimal".
+- An incomplete or budget-limited candidate universe is labelled `EnumeratedBankOnly`; the result is not represented as a global action optimum.
+- The bounded utility range, familywise delta, selection continuation count and rollout counts are returned with the decision.
+- The confidence formula assumes independent continuation draws across continuation IDs for each candidate. The caller must supply an IID sampling contract and justification reference. The crate retains that claim but does not authenticate it or validate the scientific sampling process.
+- The selected candidate is scored only after selection on the disjoint evaluation continuation batch. These held-out values are descriptive in this reference and do not feed back into the choice.
+
+This is a **support-gated reference rule**, not the learned D3 selector and not a vehicle policy. The familywise bounds are valid only under their declared bounded/IID assumptions; they are not an empirical guarantee for temporally dependent road scenarios.
+
 ## Exact finite fixtures
 
 The tests include:
@@ -43,9 +57,10 @@ The tests include:
 - Candidate × continuation rank reversal where all candidate main effects are zero and all candidate-distinguishing variation is interaction; paired CRN fixtures where positive covariance reduces variance and negative covariance increases it.
 - Uncoupled and sensitivity-only pairing, both of which refuse primary variance reduction claims; single-continuation batches do not report sample variance.
 - Selection/evaluation overlap, noncanonical candidate ordering, malformed outcome dimensions and missing coupling justification.
+- Support-gated reference selection: strong supported improvement, noise-only non-selection, unsupported/unknown candidate exclusion, baseline-support abstention, incomplete-bank scope labelling, utility-bound checks, and rejection of unqualified IID continuation sampling.
 
 ## Deliberate limits
 
-This reference does not implement a simulator, policy continuation, learned selector, D0/D1/D2/D3 comparison, confidence sequence, cluster bootstrap, statistical power analysis, common-random-number causal proof, external receipt authentication, or physical-driving experiment. It does not infer empirical performance from finite fixture results.
+This reference does not implement a simulator, policy continuation, learned D3 selector, D0/D1/D2/D3 campaign, confidence sequence, cluster bootstrap, statistical power analysis, common-random-number causal proof, external receipt authentication, or physical-driving experiment. Its support-gated rule is a transparent finite reference selector, not an empirically qualified planner. It does not infer empirical performance from finite fixture results.
 
 The full #10625 protocol remains responsible for repeated closed-loop continuations, separate calibration and sealed evaluation sets, matched-compute comparisons, support/abstention gates, correspondence hypotheses, causal stochastic receipts, family-clustered inference, and compute/latency/energy accounting.
