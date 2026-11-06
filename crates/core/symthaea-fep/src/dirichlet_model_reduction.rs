@@ -55,8 +55,13 @@ const LANCZOS_COEFFICIENTS: [f64; 9] = [
 pub struct DirichletConcentrationTensor {
     /// SHA-256 digest of the canonical ordered parameterization.
     pub parameterization_digest: String,
-    /// Per-column concentration vectors; every entry must be positive finite.
+    /// Per-column concentration vectors.
+    /// Active coordinates must be positive finite; inactive coordinates must be exactly zero.
     pub columns: Vec<Vec<f64>>,
+    /// Explicit support mask. Full-model tensors use all true; reduced models
+    /// may mark excluded coordinates false to represent a proper lower-dimensional
+    /// Dirichlet on a simplex face.
+    pub active_support: Vec<Vec<bool>>,
 }
 
 /// A prior-restricted Dirichlet model within a shared full-model parameterization.
@@ -112,6 +117,23 @@ pub enum DirichletBayesianModelReductionError {
         column: usize,
         outcome: usize,
         value: f64,
+        active: bool,
+    },
+    InvalidSupportMask {
+        distribution: &'static str,
+        column: usize,
+        expected: usize,
+        actual: usize,
+    },
+    EmptyReducedSupport {
+        model_id: String,
+        column: usize,
+    },
+    PosteriorBelowPrior {
+        model_id: String,
+        column: usize,
+        outcome: usize,
+        increment: f64,
     },
     InvalidParameterizationDigest {
         distribution: &'static str,
@@ -173,9 +195,31 @@ impl std::fmt::Display for DirichletBayesianModelReductionError {
                 column,
                 outcome,
                 value,
+                active,
             } => write!(
                 f,
-                "{distribution} concentration at column {column}, outcome {outcome} must be positive finite, got {value}"
+                "{distribution} concentration at column {column}, outcome {outcome} is invalid for active={active}: {value}"
+            ),
+            Self::InvalidSupportMask {
+                distribution,
+                column,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "{distribution} support mask at column {column} has length {actual}, expected {expected}"
+            ),
+            Self::EmptyReducedSupport { model_id, column } => {
+                write!(f, "model {model_id} has empty active support at column {column}")
+            }
+            Self::PosteriorBelowPrior {
+                model_id,
+                column,
+                outcome,
+                increment,
+            } => write!(
+                f,
+                "model {model_id} has posterior-minus-prior increment {increment} at column {column}, outcome {outcome}"
             ),
             Self::InvalidParameterizationDigest { distribution } => {
                 write!(f, "{distribution} has an invalid parameterization digest")
@@ -240,8 +284,8 @@ pub fn reduce_dirichlet_models(
     DirichletBayesianModelReductionError,
 > {
     let column_count = full_posterior.columns.len();
-    validate_tensor(full_posterior, "full posterior", None)?;
-    validate_tensor(full_prior, "full prior", Some(full_posterior))?;
+    validate_tensor(full_posterior, "full posterior", None, false)?;
+    validate_tensor(full_prior, "full prior", Some(full_posterior), false)?;
     ensure_parameterization_matches(
         &full_posterior.parameterization_digest,
         "full prior",
@@ -276,6 +320,7 @@ pub fn reduce_dirichlet_models(
             &model.parameter_prior,
             "reduced prior",
             Some(full_posterior),
+            true,
         )?;
         ensure_parameterization_matches(
             &full_posterior.parameterization_digest,
@@ -380,9 +425,30 @@ fn dirichlet_log_evidence_ratio(
         let posterior = &full_posterior.columns[column];
         let full = &full_prior.columns[column];
         let reduced = &reduced_prior.columns[column];
+        let reduced_support = &reduced_prior.active_support[column];
         let mut reduced_posterior = Vec::with_capacity(posterior.len());
+        let mut reduced_prior_active = Vec::new();
+        let mut reduced_posterior_active = Vec::new();
 
         for outcome in 0..posterior.len() {
+            let posterior_increment = posterior[outcome] - full[outcome];
+            if !reduced_support[outcome] {
+                if posterior_increment < -1e-9 {
+                    return Err(DirichletBayesianModelReductionError::PosteriorBelowPrior {
+                        model_id: model_id.to_owned(),
+                        column,
+                        outcome,
+                        increment: posterior_increment,
+                    });
+                }
+                if posterior_increment > 1e-9 {
+                    // The data contain an outcome forbidden by this reduced model.
+                    // Its marginal likelihood is exactly zero.
+                    return Ok(f64::NEG_INFINITY);
+                }
+                continue;
+            }
+
             let value = posterior[outcome] + reduced[outcome] - full[outcome];
             if !value.is_finite() || value <= 0.0 {
                 return Err(
@@ -394,13 +460,21 @@ fn dirichlet_log_evidence_ratio(
                     },
                 );
             }
+            reduced_prior_active.push(reduced[outcome]);
+            reduced_posterior_active.push(value);
             reduced_posterior.push(value);
         }
 
+        if reduced_prior_active.is_empty() {
+            return Err(DirichletBayesianModelReductionError::EmptyReducedSupport {
+                model_id: model_id.to_owned(),
+                column,
+            });
+        }
         let contribution = log_multivariate_beta(full)
-            + log_multivariate_beta(&reduced_posterior)
+            + log_multivariate_beta(&reduced_posterior_active)
             - log_multivariate_beta(posterior)
-            - log_multivariate_beta(reduced);
+            - log_multivariate_beta(&reduced_prior_active);
         if !contribution.is_finite() {
             return Err(DirichletBayesianModelReductionError::NonFiniteLogEvidence {
                 model_id: model_id.to_owned(),
@@ -422,6 +496,7 @@ fn validate_tensor(
     tensor: &DirichletConcentrationTensor,
     distribution: &'static str,
     expected: Option<&DirichletConcentrationTensor>,
+    allow_support_restriction: bool,
 ) -> Result<(), DirichletBayesianModelReductionError> {
     if !is_sha256_digest(&tensor.parameterization_digest) {
         return Err(DirichletBayesianModelReductionError::InvalidParameterizationDigest {
@@ -430,6 +505,13 @@ fn validate_tensor(
     }
     if tensor.columns.is_empty() {
         return Err(DirichletBayesianModelReductionError::EmptyColumnSet { distribution });
+    }
+    if tensor.active_support.len() != tensor.columns.len() {
+        return Err(DirichletBayesianModelReductionError::ColumnCountMismatch {
+            distribution,
+            expected: tensor.columns.len(),
+            actual: tensor.active_support.len(),
+        });
     }
     if let Some(expected) = expected {
         if tensor.columns.len() != expected.columns.len() {
@@ -458,15 +540,40 @@ fn validate_tensor(
                 });
             }
         }
-        for (outcome_index, concentration) in column.iter().copied().enumerate() {
-            if !concentration.is_finite() || concentration <= 0.0 {
+        let support = &tensor.active_support[column_index];
+        if support.len() != column.len() {
+            return Err(DirichletBayesianModelReductionError::InvalidSupportMask {
+                distribution,
+                column: column_index,
+                expected: column.len(),
+                actual: support.len(),
+            });
+        }
+        for (outcome_index, (concentration, active)) in
+            column.iter().copied().zip(support.iter().copied()).enumerate()
+        {
+            let valid = if active {
+                concentration.is_finite() && concentration > 0.0
+            } else {
+                allow_support_restriction && concentration == 0.0
+            };
+            if !valid {
                 return Err(DirichletBayesianModelReductionError::InvalidConcentration {
                     distribution,
                     column: column_index,
                     outcome: outcome_index,
                     value: concentration,
+                    active,
                 });
             }
+        }
+        if !allow_support_restriction && support.iter().any(|active| !active) {
+            return Err(DirichletBayesianModelReductionError::InvalidSupportMask {
+                distribution,
+                column: column_index,
+                expected: column.len(),
+                actual: support.iter().filter(|active| **active).count(),
+            });
         }
     }
     Ok(())
@@ -534,6 +641,10 @@ mod tests {
         DirichletConcentrationTensor {
             parameterization_digest: digest(parameterization),
             columns: columns.iter().map(|column| column.to_vec()).collect(),
+            active_support: columns
+                .iter()
+                .map(|column| vec![true; column.len()])
+                .collect(),
         }
     }
 
