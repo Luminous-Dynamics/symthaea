@@ -52,9 +52,9 @@ jobs:
       - name: Format isolated verifier harness and exact production module
         run: cargo +1.96.0 fmt --check --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
       - name: Resolve pinned standalone lock from the offline Rust registry index
-        run: cargo +1.96.0 generate-lockfile --offline --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
       - name: Test exact production Studio artifact evidence module
-        run: cargo +1.96.0 test --offline --locked --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
       - name: Record resolved dependency-lock evidence
         shell: bash
         run: |
