@@ -273,6 +273,21 @@ fn validate_fields(fields: &RecoverabilityManifestFieldsV1) -> Result<(), Vec<St
         }
     }
 
+    if let Some(completeness_sha256) = &fields.surface_completeness_receipt_sha256 {
+        if !is_nonzero_sha256(completeness_sha256) {
+            errors.push(
+                "surface_completeness_receipt_sha256: expected non-zero lowercase SHA-256"
+                    .to_string(),
+            );
+        }
+        if fields.surface_state != SearchSurfaceStateV1::CompleteFrozenInventory {
+            errors.push(
+                "surface_completeness_receipt_sha256 is only valid for complete_frozen_inventory"
+                    .to_string(),
+            );
+        }
+    }
+
     if fields.max_route_cost == 0 {
         errors.push("max_route_cost: must be greater than zero".to_string());
     }
@@ -518,6 +533,7 @@ fn classify_unit(
 ) -> RecoverabilityRecordV1 {
     let artifact_unavailable = unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
     let surface_unknown = fields.surface_state == SearchSurfaceStateV1::Unknown;
+    let complete_inventory_receipt_present = fields.surface_completeness_receipt_sha256.is_some();
 
     // A concrete pinned route is positive evidence even when the route inventory
     // is partial. Absence of a route is informative only for a frozen, complete
@@ -542,7 +558,9 @@ fn classify_unit(
         RouteMode::Navigation,
     ) {
         (RecoverabilityClassV1::NavigationRecoverable, Some(route))
-    } else if fields.surface_state == SearchSurfaceStateV1::CompleteFrozenInventory {
+    } else if fields.surface_state == SearchSurfaceStateV1::CompleteFrozenInventory
+        && complete_inventory_receipt_present
+    {
         (RecoverabilityClassV1::UnreachableWithinBudget, None)
     } else {
         (RecoverabilityClassV1::NotEvaluable, None)
@@ -624,6 +642,7 @@ pub fn verify_recoverability_manifest(
             "unreachable within budget is not world-level or open-web unavailability",
             "pinned artifact identity does not establish source authenticity or factual truth",
             "the manifest commitment requires independent pre-run anchoring",
+            "the surface-completeness receipt digest is a reference only; its content and issuer must be independently verified before negative reachability is admitted",
             "this evaluator does not prove the absence of unlogged tools or network channels",
             "source-family references are opaque declarations; their count is not independent provenance verification",
         ],
