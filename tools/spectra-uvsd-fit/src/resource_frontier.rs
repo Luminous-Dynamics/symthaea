@@ -118,6 +118,7 @@ impl ResourceCostQualification {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceCostUpperBound {
     pub units: ResourceUnits,
+    pub currency_code: String,
     /// All six dimensions must be explicitly bounded; true plus amount zero
     /// represents a known zero, while false means unknown and fails closed.
     pub qualification: ResourceCostQualification,
@@ -166,6 +167,7 @@ pub struct ResourceFrontierReceipt {
 pub enum ResourceFrontierError {
     EmptyPolicyVersion,
     InvalidCurrencyCode,
+    CurrencyMismatch,
     EmptyCandidateSet,
     EmptyCandidateId,
     DuplicateCandidateId,
@@ -181,6 +183,7 @@ impl fmt::Display for ResourceFrontierError {
         let message = match self {
             Self::EmptyPolicyVersion => "resource-frontier policy version must not be empty",
             Self::InvalidCurrencyCode => "currency code must contain exactly three uppercase ASCII letters",
+            Self::CurrencyMismatch => "candidate resource cost currency does not match the frozen budget currency",
             Self::EmptyCandidateSet => "resource frontier requires at least one candidate",
             Self::EmptyCandidateId => "candidate ID must be nonempty",
             Self::DuplicateCandidateId => "candidate IDs must be unique",
@@ -195,21 +198,41 @@ impl fmt::Display for ResourceFrontierError {
 }
 impl std::error::Error for ResourceFrontierError {}
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResourceChargeLedger {
+    pub currency_code: String,
     pub charged: ResourceUnits,
 }
 
 impl ResourceChargeLedger {
-    pub fn charge(&mut self, actual: ResourceUnits) -> Result<(), ResourceFrontierError> {
+    pub fn new(currency_code: impl Into<String>) -> Result<Self, ResourceFrontierError> {
+        let currency_code = currency_code.into();
+        validate_currency_code(&currency_code)?;
+        Ok(Self { currency_code, charged: ResourceUnits::default() })
+    }
+
+    pub fn charge(
+        &mut self,
+        currency_code: &str,
+        actual: ResourceUnits,
+    ) -> Result<(), ResourceFrontierError> {
+        if currency_code != self.currency_code {
+            return Err(ResourceFrontierError::CurrencyMismatch);
+        }
         self.charged = self.charged
             .checked_add(actual)
             .ok_or(ResourceFrontierError::ResourceLedgerOverflow)?;
         Ok(())
     }
 
-    pub fn remaining(&self, total_budget: ResourceUnits) -> Result<ResourceUnits, ResourceFrontierError> {
-        total_budget.checked_sub(self.charged)
+    pub fn remaining(
+        &self,
+        contract: &ResourceFrontierContract,
+    ) -> Result<ResourceUnits, ResourceFrontierError> {
+        if self.currency_code != contract.currency_code {
+            return Err(ResourceFrontierError::CurrencyMismatch);
+        }
+        contract.remaining_budget.checked_sub(self.charged)
             .ok_or(ResourceFrontierError::CostExceedsRemainingBudget)
     }
 }
@@ -239,6 +262,9 @@ pub fn build_resource_feasible_pareto_frontier(
             || candidate.projected_certificate_gap_contraction < 0.0
         {
             return Err(ResourceFrontierError::InvalidProjectedBenefit);
+        }
+        if candidate.upper_cost.currency_code != contract.currency_code {
+            return Err(ResourceFrontierError::CurrencyMismatch);
         }
         if !candidate.upper_cost.qualification.is_complete() {
             return Err(ResourceFrontierError::IncompleteCostEvidence);
@@ -309,7 +335,11 @@ fn validate_contract(contract: &ResourceFrontierContract) -> Result<(), Resource
     if contract.policy_version.trim().is_empty() {
         return Err(ResourceFrontierError::EmptyPolicyVersion);
     }
-    let code = contract.currency_code.as_bytes();
+    validate_currency_code(&contract.currency_code)
+}
+
+fn validate_currency_code(currency_code: &str) -> Result<(), ResourceFrontierError> {
+    let code = currency_code.as_bytes();
     if code.len() != 3 || code.iter().any(|c| !c.is_ascii_uppercase()) {
         return Err(ResourceFrontierError::InvalidCurrencyCode);
     }
@@ -344,7 +374,7 @@ mod tests {
     fn candidate(id:&str,benefit:f64,cost:ResourceUnits)->ResourceProjectionCandidate {
         ResourceProjectionCandidate {
             candidate_id:id.into(),projected_certificate_gap_contraction:benefit,
-            upper_cost:ResourceCostUpperBound{units:cost,qualification:ResourceCostQualification::all_qualified()}
+            upper_cost:ResourceCostUpperBound{units:cost,currency_code:"USD".into(),qualification:ResourceCostQualification::all_qualified()}
         }
     }
 
@@ -429,6 +459,9 @@ mod tests {
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[candidate(" ",1.0,ResourceUnits::default())]),Err(ResourceFrontierError::EmptyCandidateId));
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[candidate("x",f64::NAN,ResourceUnits::default())]),Err(ResourceFrontierError::InvalidProjectedBenefit));
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[candidate("x",-0.1,ResourceUnits::default())]),Err(ResourceFrontierError::InvalidProjectedBenefit));
+        let mut mismatch = candidate("wrong-currency",1.0,ResourceUnits::default());
+        mismatch.upper_cost.currency_code = "EUR".into();
+        assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[mismatch]),Err(ResourceFrontierError::CurrencyMismatch));
         let mut unqualified = candidate("unqualified",1.0,ResourceUnits::default());
         unqualified.upper_cost.qualification.gpu_millis = false;
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[unqualified]),Err(ResourceFrontierError::IncompleteCostEvidence));
@@ -437,11 +470,12 @@ mod tests {
 
     #[test]
     fn resource_ledger_detects_overflow_and_budget_overrun() {
-        let mut ledger=ResourceChargeLedger::default();
-        ledger.charge(units(2,3,4,5,6,7)).unwrap();
-        assert_eq!(ledger.remaining(units(4,6,8,10,12,14)),Ok(units(2,3,4,5,6,7)));
-        assert_eq!(ledger.remaining(units(1,6,8,10,12,14)),Err(ResourceFrontierError::CostExceedsRemainingBudget));
+        let mut ledger=ResourceChargeLedger::new("USD").unwrap();
+        ledger.charge("USD",units(2,3,4,5,6,7)).unwrap();
+        assert_eq!(ledger.remaining(&contract(units(4,6,8,10,12,14))),Ok(units(2,3,4,5,6,7)));
+        assert_eq!(ledger.remaining(&contract(units(1,6,8,10,12,14))),Err(ResourceFrontierError::CostExceedsRemainingBudget));
+        assert_eq!(ledger.charge("EUR",units(0,0,0,0,0,1)),Err(ResourceFrontierError::CurrencyMismatch));
         ledger.charged.simulation_replications=u64::MAX;
-        assert_eq!(ledger.charge(units(1,0,0,0,0,0)),Err(ResourceFrontierError::ResourceLedgerOverflow));
+        assert_eq!(ledger.charge("USD",units(1,0,0,0,0,0)),Err(ResourceFrontierError::ResourceLedgerOverflow));
     }
 }
