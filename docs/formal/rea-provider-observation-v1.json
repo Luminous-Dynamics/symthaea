@@ -169,5 +169,12 @@
     "ordered_premise_ids": "FormalProviderObservation.binding.requested_evidence_ids",
     "claim_ceiling": "FormalProviderObservation.claim_ceiling",
     "distinction": "Exact source strings and digests are retained; generic closure subject/claim identities remain separate typed identities"
+  },
+  "rust_adapter": {
+    "pr": 10832,
+    "branch": "feat/rea-formal-claim-export-20261107",
+    "source": "src/rea_compat/formal.rs",
+    "schema": "docs/formal/rea-formal-provider-observation-v1.schema.json",
+    "status": "authored-not-yet-validated"
   }
 }
