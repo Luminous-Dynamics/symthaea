@@ -437,7 +437,8 @@ fn find_route(
                 used_reformulation: state.used_reformulation
                     || edge.operation == RouteOperationV1::QueryReformulation,
                 used_post_reformulation_retrieval: state.used_post_reformulation_retrieval
-                    || edge.operation == RouteOperationV1::PostReformulationRetrieval,
+                    || (state.used_reformulation
+                        && edge.operation == RouteOperationV1::PostReformulationRetrieval),
                 used_navigation: state.used_navigation || edge.operation.is_navigation(),
             };
             let candidate = (next_cost, next_path.clone());
@@ -826,6 +827,41 @@ mod tests {
             after.records.iter().find(|r| r.evidence_unit_id == "unit:unreachable").unwrap().recoverability,
             RecoverabilityClassV1::DirectlyReachable
         );
+    }
+
+    #[test]
+    fn post_reformulation_retrieval_before_reformulation_does_not_qualify() {
+        let mut fields = base_fields();
+        fields.edges.retain(|edge| edge.edge_ref != "route:rewrite-query");
+        fields.edges.retain(|edge| edge.edge_ref != "route:rewrite-search");
+        fields.nodes.push(RecoverabilityNodeV1 {
+            node_ref: "state:pre-retrieval".into(),
+        });
+        fields.edges.push(RecoverabilityEdgeV1 {
+            edge_ref: "route:post-before-rewrite".into(),
+            from_node_ref: "state:start".into(),
+            to_node_ref: "state:pre-retrieval".into(),
+            operation: RouteOperationV1::PostReformulationRetrieval,
+            cost: 1,
+        });
+        fields.edges.push(RecoverabilityEdgeV1 {
+            edge_ref: "route:rewrite-after-search".into(),
+            from_node_ref: "state:pre-retrieval".into(),
+            to_node_ref: "evidence:rewrite".into(),
+            operation: RouteOperationV1::QueryReformulation,
+            cost: 1,
+        });
+        let result = report(fields);
+        let row = result
+            .records
+            .iter()
+            .find(|record| record.evidence_unit_id == "unit:rewrite")
+            .unwrap();
+        assert_eq!(
+            row.recoverability,
+            RecoverabilityClassV1::UnreachableWithinBudget
+        );
+        assert!(row.route_edge_refs.is_empty());
     }
 
     #[test]
