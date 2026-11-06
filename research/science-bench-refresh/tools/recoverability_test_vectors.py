@@ -290,6 +290,7 @@ def main() -> int:
     # A partial surface is a valid manifest but no unit can be classed.
     partial_fields = copy.deepcopy(base_fields)
     partial_fields["surface_state"] = "partial_observed"
+    partial_fields["surface_completeness_receipt_sha256"] = None
     partial_path = out_dir / "partial-surface-manifest.json"
     partial = save_manifest(partial_fields, partial_path)
     partial_rows = [classify(partial, unit) for unit in partial["evidence_units"]]
@@ -305,6 +306,7 @@ def main() -> int:
 
     unknown_fields = copy.deepcopy(base_fields)
     unknown_fields["surface_state"] = "unknown"
+    unknown_fields["surface_completeness_receipt_sha256"] = None
     unknown = save_manifest(unknown_fields, out_dir / "unknown-surface-manifest.json")
     if any(classify(unknown, unit)["recoverability"] != "NotEvaluable" for unit in unknown["evidence_units"]):
         raise SystemExit("unknown surface must produce only NotEvaluable")
