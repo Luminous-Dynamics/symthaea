@@ -239,16 +239,23 @@ mod tests {
         }
     }
 
-    fn inputs<'a>(samples: &'a [PowerTraceSample<'a>]) -> PowerTraceInputs<'a> {
+    fn inputs_with_gap<'a>(
+        samples: &'a [PowerTraceSample<'a>],
+        maximum_integrable_gap_seconds: u32,
+    ) -> PowerTraceInputs<'a> {
         PowerTraceInputs {
             series_id: "M5BAT/POC/2023-04-01",
             source_ref: "m5bat/BESS.csv",
             source_sha256: SOURCE_SHA,
             horizon_start_utc_seconds: 0,
             horizon_end_utc_seconds: 3_600,
-            maximum_integrable_gap_seconds: 1,
+            maximum_integrable_gap_seconds,
             samples,
         }
+    }
+
+    fn inputs<'a>(samples: &'a [PowerTraceSample<'a>]) -> PowerTraceInputs<'a> {
+        inputs_with_gap(samples, 1_800)
     }
 
     #[test]
@@ -291,7 +298,7 @@ mod tests {
             sample("after-gap", 5, 1_000_000),
             sample("end", 3_600, 1_000_000),
         ];
-        let result = integrate_power_trace(inputs(&samples)).unwrap();
+        let result = integrate_power_trace(inputs_with_gap(&samples, 1)).unwrap();
         assert!(!result.trace_complete);
         assert_eq!(result.integrated_interval_count, 1);
         assert_eq!(result.gap_interval_count, 2);
