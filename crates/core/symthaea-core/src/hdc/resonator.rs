@@ -50,7 +50,7 @@ The system resonates to a fixed point that satisfies all constraints!
 */
 
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Resonator network for HDC constraint satisfaction
 ///
@@ -228,6 +228,17 @@ impl Default for ResonatorConfig {
     }
 }
 
+/// Terminal outcome when a solver is evaluated against a known target.
+///
+/// Convergence only means the dynamics stopped changing; it does not imply
+/// that the fixed point is the correct factor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResonatorOutcome {
+    CorrectConvergence,
+    SpuriousConvergence,
+    NonConvergence,
+}
+
 /// Result of resonator solving
 #[derive(Debug, Clone)]
 pub struct ResonatorSolution {
@@ -247,23 +258,74 @@ pub struct ResonatorSolution {
     pub confidence: f32,
 }
 
+impl ResonatorSolution {
+    /// Classify a converged solution against known ground truth.
+    ///
+    /// Returns both the terminal outcome and cosine similarity so benchmarks
+    /// can report convergence separately from actual recovery accuracy.
+    pub fn classify_against(
+        &self,
+        expected: &[f32],
+        min_similarity: f32,
+    ) -> Result<(ResonatorOutcome, f32)> {
+        if expected.len() != self.vector.len() {
+            anyhow::bail!(
+                "Expected vector dimension {} does not match solution dimension {}",
+                expected.len(),
+                self.vector.len()
+            );
+        }
+        if !min_similarity.is_finite() || !(-1.0..=1.0).contains(&min_similarity) {
+            anyhow::bail!("min_similarity must be finite and in [-1, 1]");
+        }
+        if expected.iter().any(|value| !value.is_finite()) {
+            anyhow::bail!("Expected vector contains non-finite values");
+        }
+
+        let similarity = cosine_similarity(&self.vector, expected);
+        let outcome = if !self.converged {
+            ResonatorOutcome::NonConvergence
+        } else if similarity >= min_similarity {
+            ResonatorOutcome::CorrectConvergence
+        } else {
+            ResonatorOutcome::SpuriousConvergence
+        };
+        Ok((outcome, similarity))
+    }
+}
+
 impl ResonatorNetwork {
     /// Create new resonator network with given dimensionality
     pub fn new(dimension: usize) -> Result<Self> {
-        Ok(Self {
-            dimension,
-            codebook: Vec::new(),
-            symbol_names: HashMap::new(),
-            states: Vec::new(),
-            coupling_strengths: Vec::new(),
-            iteration_count: 0,
-            config: ResonatorConfig::default(),
-            energy_history: Vec::new(),
-        })
+        Self::with_config(dimension, ResonatorConfig::default())
     }
 
-    /// Create with custom configuration
+    /// Create with custom configuration after validating dimensions and dynamics.
     pub fn with_config(dimension: usize, config: ResonatorConfig) -> Result<Self> {
+        if dimension == 0 {
+            anyhow::bail!("Resonator dimension must be non-zero");
+        }
+        if !config.step_size.is_finite() || !(0.0..=1.0).contains(&config.step_size) {
+            anyhow::bail!("Resonator step_size must be finite and in [0, 1]");
+        }
+        if !config.momentum.is_finite() || !(0.0..1.0).contains(&config.momentum) {
+            anyhow::bail!("Resonator momentum must be finite and in [0, 1)");
+        }
+        if !config.temperature.is_finite() || config.temperature <= 0.0 {
+            anyhow::bail!("Resonator temperature must be finite and positive");
+        }
+        if !config.convergence_threshold.is_finite()
+            || !(-1.0..=1.0).contains(&config.convergence_threshold)
+        {
+            anyhow::bail!("Resonator convergence threshold must be in [-1, 1]");
+        }
+        if !config.noise_scale.is_finite() || config.noise_scale < 0.0 {
+            anyhow::bail!("Resonator noise_scale must be finite and non-negative");
+        }
+        if !config.energy_threshold.is_finite() || config.energy_threshold < 0.0 {
+            anyhow::bail!("Resonator energy_threshold must be finite and non-negative");
+        }
+
         Ok(Self {
             dimension,
             codebook: Vec::new(),
@@ -280,7 +342,7 @@ impl ResonatorNetwork {
     ///
     /// Symbols serve as attractors - solutions are "cleaned up" to
     /// the nearest codebook entry.
-    pub fn add_symbol(&mut self, name: &str, vector: Vec<f32>) -> Result<()> {
+    pub fn add_symbol(&mut self, name: &str, mut vector: Vec<f32>) -> Result<()> {
         if vector.len() != self.dimension {
             anyhow::bail!(
                 "Symbol dimension {} doesn't match network dimension {}",
@@ -288,6 +350,20 @@ impl ResonatorNetwork {
                 self.dimension
             );
         }
+        if name.trim().is_empty() {
+            anyhow::bail!("Symbol name must not be empty");
+        }
+        if self.symbol_names.contains_key(name) {
+            anyhow::bail!("Symbol name already exists in codebook: {name}");
+        }
+        if vector.iter().any(|value| !value.is_finite()) {
+            anyhow::bail!("Symbol vector contains non-finite values");
+        }
+        let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+        if norm <= 1e-10 {
+            anyhow::bail!("Symbol vector must have non-zero norm");
+        }
+        normalize(&mut vector);
 
         let idx = self.codebook.len();
         self.codebook.push(SymbolEntry {
@@ -325,6 +401,21 @@ impl ResonatorNetwork {
         constraints: &[Constraint],
         max_iter: Option<usize>,
     ) -> Result<ResonatorSolution> {
+        if constraints.is_empty() {
+            anyhow::bail!("Resonator solve requires at least one constraint");
+        }
+        for constraint in constraints {
+            if constraint.left.len() != self.dimension || constraint.right.len() != self.dimension {
+                anyhow::bail!("Resonator constraint dimensions must match network dimension");
+            }
+            if constraint.left.iter().chain(constraint.right.iter()).any(|value| !value.is_finite()) {
+                anyhow::bail!("Resonator constraint contains non-finite values");
+            }
+            if !constraint.weight.is_finite() || constraint.weight <= 0.0 {
+                anyhow::bail!("Resonator constraint weight must be finite and positive");
+            }
+        }
+
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
         self.energy_history.clear();
 
