@@ -276,7 +276,7 @@
     },
     {
       "id": "partial_observation_rule_discovery",
-      "environment": "Three-ball-style partially observed rule-discovery environment: hidden ball attributes and a latent rule/likelihood mapping determine correct, incorrect, or no-feedback outcomes; an action reveals or samples only a restricted part of the scene. Reproduce the Friston et al. (2026) protocol only after its exact state space, rule set, preferences, observation model, and stopping rule are transcribed from the paper/supplement; otherwise label the environment an adaptation.",
+      "environment": "Published-paper anchor (Friston et al., Nature Communications 2026): three balls have red/green/blue colours; the rule is centre-green→choose green, centre-red→choose the left ball's colour, centre-blue→choose the right ball's colour. The agent sees only the currently foveated ball, so it must choose where to look as well as which colour to report; outcomes are no response/correct/incorrect with stated prior log probabilities 0/2/-6 nats. The symmetry-constrained family contains 81 candidate likelihood mappings; full-state response combinations number 3×3×3×4=108. Exact reproduction requires transcribing the paper/supplement tensor layout, Dirichlet priors, policy horizon, and all settings. Any change to balls, colours, rule family, feedback, preferences, observation, or horizon is an adaptation.",
       "primary_outcomes": [
         "rule_identification_accuracy",
         "trials_to_model_selection",
@@ -612,7 +612,8 @@
     "The three-ball task is labelled an exact reproduction only when the paper/supplement state space, rule set, preference distribution, observation likelihoods, action constraints, and stopping rule are transcribed and independently verified; otherwise it must be named a task adaptation.",
     "BMR log evidence is used only for post-observation model comparison; it is not added directly to prospective expected information gain or pragmatic value.",
     "All Gaussian distributions supplied to BMR (full posterior, full prior, and each reduced prior) carry the same canonical parameterization digest binding coordinate identities, semantic roles, tensor shapes, and coordinate order; missing, malformed, or mismatched digests are rejected before evidence calculation.",
-    "Activation-based hidden-unit correspondence is diagnostic only: the source model is unchanged, native fingerprints are not rewritten, and low-margin or ambiguous assignments must abstain. Report probe-set identity, signature error, and assignment margin for every attempted alignment."
+    "Activation-based hidden-unit correspondence is diagnostic only: the source model is unchanged, native fingerprints are not rewritten, and low-margin or ambiguous assignments must abstain. Report probe-set identity, signature error, and assignment margin for every attempted alignment.",
+    "The three-ball implementation records the paper's published rule (centre green→green; centre red→left colour; centre blue→right colour), foveated single-ball observation, and outcome preference log probabilities (no feedback=0, correct=2, incorrect=-6 nats); any changed mechanism is labelled as an adaptation."
   ],
   "research_references": [
     {
