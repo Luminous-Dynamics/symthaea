@@ -3189,7 +3189,7 @@ mod tests {
                 panic!("unexpected MIDI status byte: {event_status:#x}");
             }
         }
-        events
+        events.into_iter().map(|(_, event)| event).collect()
     }
 
     #[test]
