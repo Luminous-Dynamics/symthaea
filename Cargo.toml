@@ -20,6 +20,10 @@ exclude = [
     # Excluding the examples-only directory prevents the crates/core/* member glob
     # from asking Cargo to load a nonexistent package manifest.
     "crates/core/symthaea",
+    # Source-only observation-attestation prototype; no package manifest/API yet.
+    "crates/core/symthaea-observation-attestation",
+    # README-only REA verifier placeholder; executable crate is not present yet.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
