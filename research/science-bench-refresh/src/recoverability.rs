@@ -458,10 +458,14 @@ fn classify_unit(
     adjacency: &BTreeMap<String, Vec<&RecoverabilityEdgeV1>>,
     unit: &RequiredEvidenceUnitV1,
 ) -> RecoverabilityRecordV1 {
-    let unavailable = fields.surface_state != SearchSurfaceStateV1::FrozenObserved
-        || unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
+    let artifact_unavailable =
+        unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
+    let surface_unknown = fields.surface_state == SearchSurfaceStateV1::Unknown;
 
-    let result = if unavailable {
+    // A concrete pinned route is positive evidence even when the route inventory
+    // is partial. Absence of a route is informative only for a frozen, complete
+    // inventory of the declared finite search surface.
+    let result = if artifact_unavailable || surface_unknown {
         (RecoverabilityClassV1::NotEvaluable, None)
     } else if let Some(route) = find_route(
         fields,
@@ -487,8 +491,10 @@ fn classify_unit(
         RouteMode::Navigation,
     ) {
         (RecoverabilityClassV1::NavigationRecoverable, Some(route))
-    } else {
+    } else if fields.surface_state == SearchSurfaceStateV1::FrozenObserved {
         (RecoverabilityClassV1::UnreachableWithinBudget, None)
+    } else {
+        (RecoverabilityClassV1::NotEvaluable, None)
     };
 
     RecoverabilityRecordV1 {
@@ -744,14 +750,47 @@ mod tests {
     }
 
     #[test]
-    fn unknown_or_partial_search_surface_makes_all_units_not_evaluable() {
+    fn partial_surface_preserves_positive_routes_but_never_claims_unreachable() {
         let mut fields = base_fields();
         fields.surface_state = SearchSurfaceStateV1::Partial;
         let result = report(fields);
         assert!(result.valid);
-        assert!(result.records.iter().all(|r| {
-            r.recoverability == RecoverabilityClassV1::NotEvaluable
-                && r.route_edge_refs.is_empty()
+        let actual: BTreeMap<_, _> = result
+            .records
+            .iter()
+            .map(|record| (record.evidence_unit_id.as_str(), record.recoverability))
+            .collect();
+        assert_eq!(actual["unit:direct"], RecoverabilityClassV1::DirectlyReachable);
+        assert_eq!(
+            actual["unit:rewrite"],
+            RecoverabilityClassV1::ReformulationRecoverable
+        );
+        assert_eq!(
+            actual["unit:navigation"],
+            RecoverabilityClassV1::NavigationRecoverable
+        );
+        assert_eq!(
+            actual["unit:unreachable"],
+            RecoverabilityClassV1::NotEvaluable
+        );
+        assert_eq!(actual["unit:unknown"], RecoverabilityClassV1::NotEvaluable);
+        assert!(result.records
+            .iter()
+            .find(|record| record.evidence_unit_id == "unit:unreachable")
+            .unwrap()
+            .route_edge_refs
+            .is_empty());
+    }
+
+    #[test]
+    fn unknown_search_surface_makes_even_observed_route_untrusted() {
+        let mut fields = base_fields();
+        fields.surface_state = SearchSurfaceStateV1::Unknown;
+        let result = report(fields);
+        assert!(result.valid);
+        assert!(result.records.iter().all(|record| {
+            record.recoverability == RecoverabilityClassV1::NotEvaluable
+                && record.route_edge_refs.is_empty()
         }));
     }
 
