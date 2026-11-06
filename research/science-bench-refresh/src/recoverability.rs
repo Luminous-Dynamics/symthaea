@@ -642,6 +642,9 @@ mod tests {
                     node_ref: "state:start".into(),
                 },
                 RecoverabilityNodeV1 {
+                    node_ref: "state:first-pass-miss".into(),
+                },
+                RecoverabilityNodeV1 {
                     node_ref: "evidence:direct".into(),
                 },
                 RecoverabilityNodeV1 {
@@ -675,8 +678,15 @@ mod tests {
                     cost: 1,
                 },
                 RecoverabilityEdgeV1 {
-                    edge_ref: "route:rewrite-query".into(),
+                    edge_ref: "route:first-pass-miss".into(),
                     from_node_ref: "state:start".into(),
+                    to_node_ref: "state:first-pass-miss".into(),
+                    operation: RouteOperationV1::InitialRetrieval,
+                    cost: 1,
+                },
+                RecoverabilityEdgeV1 {
+                    edge_ref: "route:rewrite-query".into(),
+                    from_node_ref: "state:first-pass-miss".into(),
                     to_node_ref: "state:rewrite".into(),
                     operation: RouteOperationV1::QueryReformulation,
                     cost: 1,
