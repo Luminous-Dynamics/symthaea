@@ -2,6 +2,7 @@ name: Robust connectome query-disambiguation under set-valued outcomes
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_robust_query_disambiguation_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_robust_query_disambiguation_oracle.py"
