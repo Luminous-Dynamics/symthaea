@@ -36,10 +36,10 @@ These layers should compose without substituting for one another. A signed state
 - [Sigstore security model](https://docs.sigstore.dev/about/security/)
 - [IETF RFC 9943 — SCITT architecture](https://www.rfc-editor.org/rfc/rfc9943.html)
 - [IETF RFC 9162 — Certificate Transparency v2](https://www.rfc-editor.org/rfc/rfc9162.html)
-- [The Update Framework specification](https://github.com/theupdateframework/specification/blob/master/tuf-spec.md)
+- [The Update Framework specification v1.0.36 (5 August 2026)](https://theupdateframework.github.io/specification/v1.0.36/)
 - [IETF RFC 8785 — JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html)
 
-Important detail: SLSA v1.2 is the current approved specification and includes Build and Source tracks. The Build Track describes artifact provenance and expected build process/inputs; the Source Track describes how source revisions were created and change-managed. The v1.1 provenance page is now marked retired. REA adapters should pin the track-specific v1.2 predicate and preserve the expected signer/builder policy boundary. Rekor's log entries are signed records and its log requires independent monitoring. SCITT explicitly distinguishes registration of a signed statement from the statement's accuracy. These are precisely the boundaries the REA claim layer must preserve. 
+Important detail: SLSA v1.2 is the current approved specification and has separate Build and Source tracks. Build provenance traces an artifact to its source/build process; Source provenance records how revisions were created and change-managed. REA adapters should bind a track-specific predicate and preserve the consumer's expected signer/builder policy. Sigstore's own security model requires independent Rekor monitoring; a log's signed append-only property is not a semantic truth oracle. SCITT RFC 9943 is a June 2026 IETF Standards Track publication for single-issuer signed-statement transparency; its receipts prove registration and auditability, not the truth of the issuer's statement. TUF 1.0.36 (5 August 2026) addresses update metadata, rollback and freeze protections. These systems supply distinct evidence families and must not be collapsed into one trust score.
 
 ## 2. Research benchmarks and what they teach us
 
@@ -206,34 +206,43 @@ A matching replay receipt remains a reproducibility result, not a signature, tru
 
 ## 8. Implementation update — 2026-11-06
 
-The producer implementation is [#10665](https://github.com/Luminous-Dynamics/symthaea/pull/10665), whose focused REA workflow passed at exact head `08947cc924386d75190a0ca3a9660b5a0425cd31` (40 tests across the focused harnesses). That is a focused compatibility/claim-evaluator result, not full-workspace qualification or general semantic truth.
+The producer implementation is [#10665](https://github.com/Luminous-Dynamics/symthaea/pull/10665). Its focused REA workflow passed on exact head `e2160007bcd8eb03c283465c08ba07e34372b75f` after the raw Evidence move/clone reduction, named provider metadata record, bundle-adapter Clippy cleanup and test-slice borrowing fixes. This is focused compatibility/claim-evaluator qualification, not full-workspace qualification or general semantic truth.
 
-The independent verifier is in refreshed stacked draft [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It now includes:
-- a frozen public seed oracle at `tools/rea-claim-replay-verifier/tests/fixtures/rea-claim-replay-v0-oracle.json`, with 23 explicit expected-disposition/replay-outcome cases, authored independently of the production evaluator;
-- a standalone, bounded, read-only `rea-claim-replay` CLI: exit 0 for replay match, 1 for semantic mismatch, 2 for invalid input / IO / resource failure;
-- duplicate-key rejection and schema validation for raw claim and result JSON;
-- verification of semantic Evidence IDs from raw Evidence inputs;
-- rejection of duplicate, malformed, missing-inconsistent, unrequested and unreferenced Evidence identifiers in the claim/result/replay set;
-- complete-result comparison under RFC 8785 canonical bytes, not a self-reported derivation hash;
+The independent replay implementation is refreshed stacked draft [#10725](https://github.com/Luminous-Dynamics/symthaea/pull/10725), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It includes:
+- a frozen public seed oracle with 23 explicit expected-disposition/replay-outcome cases, authored independently of the production evaluator;
+- a standalone, bounded, read-only `rea-claim-replay` CLI with exit 0 for match, 1 for semantic mismatch, and 2 for invalid input / IO / resource failure;
+- separate request/result parsing, recursive duplicate-key rejection, required-nullable-field checks and closed result schemas;
+- verification of raw REA Evidence semantic IDs and rejection of duplicate, malformed, missing-inconsistent, unrequested and unreferenced Evidence identifiers;
+- complete JCS-canonical result comparison, recomputed request/derivation hashes and rejection of self-digested forged dispositions;
 - explicit fail-closed treatment of unsupported predicates, assumptions and scope dimensions absent from REA Evidence v1;
-- a pinned Rust 1.99.1 toolchain, isolated Cargo manifest, generated lockfile artifact, formatting, conformance tests and warnings-denied Clippy gates.
+- 1 MiB claim, 4 MiB result, 128 MiB aggregate Evidence, 64 MiB per Evidence and 4,096-record limits;
+- a claim-authorized Evidence projection after full verification, so raw_result and unrelated metadata do not remain in the replay inference map;
+- disclosed reuse of the shared REA Evidence identity verifier and RFC 8785 canonicalization primitive. Independence is at the claim scope/disposition/replay logic level, not a second cryptographic implementation or canonicalizer.
 
-The independent implementation deliberately reuses the REA Evidence identity verifier and JCS canonicalization primitive. It is independent at the claim scope/disposition/replay implementation level, not a second cryptographic primitive or canonicalizer. The new verifier's exact-head workflow is queued/in progress in this draft; no replay tests or Clippy result are claimed as passing yet.
+The replay exact-head workflow has already passed the parent formatter, upstream Evidence differential suite and warnings-denied parent Clippy on the refreshed stack. The independent replay formatter has been iterated on exact output; the current replay head must still complete the independent conformance and Clippy steps before a pass is claimed. Do not interpret a queued or skipped job as success.
+
+The independent fuzz workspace is [#10728](https://github.com/Luminous-Dynamics/symthaea/pull/10728), with research contract [#10726](https://github.com/Luminous-Dynamics/symthaea/issues/10726). It keeps cargo-fuzz out of production dependencies and has three targets: raw request parsing, raw result parsing, and bounded framed end-to-end replay. It uses pinned nightly/cargo-fuzz, an inspectable public seed corpus, deterministic framing tests, 1 MiB per-input cap, 8 Evidence records per fuzz frame, five-second per-input timeout and 512 MiB runner RSS ceiling. Its corrected exact-head workflow passed the deterministic frame parser suite and all three bounded campaigns. This is bounded no-crash evidence for that exact run, not a parser security certification.
+
+The older replay draft [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710) was closed as superseded after its branch diverged from the parent; its work was carried to #10725.
 
 ### Additional finite-oracle gates
 
-The public seed corpus now explicitly covers:
-- provider-observation support and refutation;
-- JCS numeric equivalence and numeric near-miss;
-- same-scope contradiction preservation;
-- wrong subject/operation and unrepresented platform version;
-- missing Evidence and unimplemented authenticity;
-- unsupported assumptions;
-- forged disposition even after recomputing an unkeyed derivation digest;
-- changed falsification condition with an old result;
-- duplicate raw JSON keys, omitted nullable fields, unknown fields and version drift;
-- duplicate/unrequested Evidence inputs;
-- malformed, duplicate, unrequested and conflicting result Evidence references;
-- CLI output and stable semantic-match/mismatch exit distinctions.
+The 23-case frozen public seed covers provider-observation support/refutation, JCS numeric equivalence and near-miss, same-scope conflict preservation, wrong subject/operation, unrepresented platform version, missing Evidence, unimplemented authenticity, assumptions, forged disposition with recomputed digest, changed falsification condition, duplicate raw JSON keys, omitted nullable fields, unknown fields, version drift, duplicate/unrequested Evidence inputs, malformed/duplicate/unrequested/conflicting result Evidence references, and CLI exit distinctions.
 
-The frozen public seed is a conformance floor, not a broad population estimate. A hidden holdout and external adjudication are still required before making claims about real-world agent reliability.
+The public seed is a conformance floor, not a broad population estimate. A blinded holdout, external adjudication and continuous-maintenance evaluation remain necessary before claims about real-world agent reliability.
+
+## 9. New qualification paradigm — metamorphic semantic laws
+
+Issue [#10738](https://github.com/Luminous-Dynamics/symthaea/issues/10738) extends fixed examples with transformations whose expected relation is known even when no new answer label is authored.
+
+Initial laws now being added to #10725:
+- recursive JSON object-key permutation is representation-only; Evidence ID and replay must remain equivalent under JCS;
+- reordering raw Evidence transport records is representation-only when the claim's exact ordered Evidence ID list is unchanged;
+- reordering the claim's Evidence ID list is semantic input mutation and the old result must not replay;
+- duplicate or unreferenced records are invalid, never extra votes;
+- premise weakening, unsupported assumptions and absent scope dimensions must never produce an epistemic upgrade;
+- adding a same-scope contradiction preserves conflict rather than majority-voting it away;
+- unsupported predicate families remain non-positive regardless of evidence count.
+
+The target is 100% preservation of the finite metamorphic laws and zero unexpected upgrades. These tests qualify the transformations they exercise; they do not prove general semantic correctness.
+
