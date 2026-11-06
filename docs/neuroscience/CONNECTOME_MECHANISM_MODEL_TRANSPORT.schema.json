@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_MECHANISM_MODEL_TRANSPORT.schema.json",
+  "title": "Transport-qualified mechanism-model comparison binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "mechanism_binding",
+    "transport_binding",
+    "mechanism_model_mappings",
+    "intervention_condition_bindings",
+    "comparison",
+    "known_answer",
+    "upstream_sources"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "mechanism_binding": {
+      "$ref": "#/$defs/mechanism_binding"
+    },
+    "transport_binding": {
+      "$ref": "#/$defs/transport_binding"
+    },
+    "mechanism_model_mappings": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/mechanism_model"
+      }
+    },
+    "intervention_condition_bindings": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/condition_binding"
+      }
+    },
+    "comparison": {
+      "$ref": "#/$defs/comparison"
+    },
+    "known_answer": {
+      "$ref": "#/$defs/known_answer"
+    },
+    "upstream_sources": {
+      "$ref": "#/$defs/upstream_sources"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha40": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "mechanism_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_path",
+        "expected_query_id",
+        "expected_query_spec_sha256",
+        "expected_selected_intervention_id",
+        "expected_query_identified",
+        "expected_mechanism_identified"
+      ],
+      "properties": {
+        "input_path": {
+          "const": "docs/neuroscience/examples/CONNECTOME_MECHANISM_IDENTIFIABILITY.example.json"
+        },
+        "expected_query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "expected_selected_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_query_identified": {
+          "const": true
+        },
+        "expected_mechanism_identified": {
+          "const": true
+        }
+      }
+    },
+    "transport_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_path",
+        "dataset_revision_sha256",
+        "split_sha256",
+        "lockbox_animal_ids",
+        "target_pair_id",
+        "target_pair_direct_wiring_status",
+        "minimum_paired_animals"
+      ],
+      "properties": {
+        "input_path": {
+          "const": "docs/neuroscience/examples/CONNECTOME_MECHANISM_TRANSPORT_COHORT.example.json"
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "lockbox_animal_ids": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "target_pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_pair_direct_wiring_status": {
+          "const": "NO_DIRECT_EDGE"
+        },
+        "minimum_paired_animals": {
+          "const": 5
+        }
+      }
+    },
+    "mechanism_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism_id",
+        "mechanism_class",
+        "model_id",
+        "mapping_receipt_sha256"
+      ],
+      "properties": {
+        "mechanism_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_class": {
+          "enum": [
+            "DIRECT_SYNAPTIC",
+            "EXTRASYNAPTIC_LATENT",
+            "POLYSYNAPTIC",
+            "SHARED_INPUT",
+            "CELL_INTRINSIC_STATE",
+            "OBSERVATION_ARTIFACT",
+            "MIXTURE_UNRESOLVED",
+            "OTHER"
+          ]
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mapping_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "condition_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "condition_id",
+        "mapping_scope",
+        "intervention_protocol_sha256",
+        "mapping_receipt_sha256"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mapping_scope": {
+          "enum": [
+            "PRIMARY_PAIRED_CONTRAST",
+            "OOD_ABSTENTION_CONTROL"
+          ]
+        },
+        "intervention_protocol_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "mapping_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_a_id",
+        "model_b_id",
+        "preferred_direction",
+        "alpha",
+        "sign_test_alternative",
+        "familywise_comparison_count",
+        "scoring_rule",
+        "observation_disposition"
+      ],
+      "properties": {
+        "model_a_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_b_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preferred_direction": {
+          "const": "MODEL_B_LOWER_ANIMAL_MACRO_BRIER"
+        },
+        "alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.5
+        },
+        "sign_test_alternative": {
+          "const": "MODEL_B_LOWER_LOSS"
+        },
+        "familywise_comparison_count": {
+          "const": 1
+        },
+        "scoring_rule": {
+          "const": "PER_ANIMAL_MEAN_BRIER_ON_SHARED_DETERMINATE_OBSERVATIONS"
+        },
+        "observation_disposition": {
+          "const": "FUNCTIONAL_CONNECTION"
+        }
+      }
+    },
+    "known_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_evaluable_animal_count",
+        "model_b_wins",
+        "model_a_wins",
+        "ties",
+        "one_sided_exact_sign_test_p",
+        "expected_predictive_transport_status",
+        "expected_model_b_ood_abstentions_on_control_condition",
+        "biological_mechanism_status"
+      ],
+      "properties": {
+        "paired_evaluable_animal_count": {
+          "const": 5
+        },
+        "model_b_wins": {
+          "const": 5
+        },
+        "model_a_wins": {
+          "const": 0
+        },
+        "ties": {
+          "const": 0
+        },
+        "one_sided_exact_sign_test_p": {
+          "const": 0.03125
+        },
+        "expected_predictive_transport_status": {
+          "const": "MODEL_B_FAVORED"
+        },
+        "expected_model_b_ood_abstentions_on_control_condition": {
+          "const": 2
+        },
+        "biological_mechanism_status": {
+          "const": "NOT_ESTABLISHED_BY_PREDICTIVE_TRANSPORT"
+        }
+      }
+    },
+    "upstream_sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism_commit_sha",
+        "mechanism_rust_git_blob_sha1",
+        "mechanism_oracle_git_blob_sha1",
+        "transport_commit_sha",
+        "transport_oracle_git_blob_sha1"
+      ],
+      "properties": {
+        "mechanism_commit_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "mechanism_rust_git_blob_sha1": {
+          "$ref": "#/$defs/sha40"
+        },
+        "mechanism_oracle_git_blob_sha1": {
+          "$ref": "#/$defs/sha40"
+        },
+        "transport_commit_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "transport_oracle_git_blob_sha1": {
+          "$ref": "#/$defs/sha40"
+        }
+      }
+    }
+  }
+}
