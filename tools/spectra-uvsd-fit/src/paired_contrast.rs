@@ -279,6 +279,7 @@ pub fn diagnose_paired_contrasts(
                     || !independent_sum_variance.is_finite()
                     || !paired_standard_error_diagnostic.is_finite()
                     || variance_ratio.is_some_and(|ratio| !ratio.is_finite())
+                    || correlation.is_some_and(|value| !value.is_finite())
                 {
                     return Err(PairedContrastError::NumericFailure);
                 }
