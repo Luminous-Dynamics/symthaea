@@ -43,11 +43,23 @@ in-memory payload sets before reporting `artifact_verified,1120`; this is
 synthetic byte-equality evidence, not proof of a separate durable-storage
 read-back. A real Studio adapter must independently fetch committed bytes and
 authenticated transaction receipts before making a production claim. The
-example also emits dimension-specific agent and partner summaries to stderr:
-fixture count, means, targeted-effect dispersion, sham/unrelated contrasts,
-and control/oracle qualification counts. These are descriptive summaries over
-constructed fixtures, not statistical estimates from sampled musicians; no
-confidence interval or cross-dimension composite is reported. The event-level CSV contains **4,480 condition rows** (four rows for every
+example also emits dimension-specific agent and partner descriptive summaries
+and 35 paired-bootstrap summaries (six policies × five dimensions for
+partner-to-agent, plus five dimensions for agent-to-partner). The statistics
+module first averages observations within the declared cluster, then performs
+2,000 deterministic percentile-bootstrap resamples of clusters. It reports
+normalized targeted, sham, and unrelated effects; paired targeted-minus-sham
+and targeted-minus-unrelated effects; input-sensitivity and target-specificity
+rates; and 95% intervals where at least two measured clusters exist. Dimension
+and direction are never collapsed into a composite. Missing attempts remain
+in the denominator and are broken down by abstention, timeout, invalid output,
+missing artifact, adapter unavailability, participant withdrawal, and other.
+These intervals describe the constructed fixture generator only; they are not
+uncertainty estimates for Melothaea or a population of musicians. A human study
+must predeclare the independent cluster unit, account for multi-level/crossed
+musician-task designs with appropriate hierarchical analysis, define missing-
+data handling and multiplicity correction, and power confirmatory outcomes
+from pilot variance. The event-level CSV contains **4,480 condition rows** (four rows for every
 policy and reciprocal trial). Each row binds task/session/seed, randomized
 condition order, exact input/output event IDs, input target/unrelated values,
 the agent action value and mechanism, both directional contrasts, and the
