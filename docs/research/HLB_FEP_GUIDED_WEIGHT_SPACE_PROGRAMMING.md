@@ -360,7 +360,7 @@ The analytical/oracle baseline is an upper bound, never a tuning signal. Weights
 - Zero-duration identity: (|F(0,x)-x|) at numerical precision.
 - Semigroup/composition error: compare (F(t_1+t_2,x)) with (F(t_2,F(t_1,x))) under controlled constant-input conditions.
 - Local and long-horizon error against a high-accuracy solver.
-- Boundedness, stability, and error as a function of the dimensionless elapsed interval \`Delta t / tau\`.
+- Boundedness, stability, and error as a function of the dimensionless elapsed interval `Delta t / tau`.
 - Latency, allocation count, state bytes, and energy only with documented device/method.
 
 ### HDC
