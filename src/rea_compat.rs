@@ -3,6 +3,7 @@
 //! Enable the root crate feature rea-compat to expose the verifier and
 //! semantic identity functions without routing in-process work through MCP.
 
+#[path = "rea_compat/claims.rs"]
 pub mod claims;
 
 pub use claims::{
