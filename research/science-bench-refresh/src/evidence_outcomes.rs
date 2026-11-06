@@ -955,9 +955,9 @@ mod tests {
             condition: condition.to_owned(),
             terminal_status: OutcomeTerminalStatusV1::Completed,
             response_status: OutcomeResponseStatusV1::Answered,
-            runner_receipt_sha256: Some(digest(char::from(b'a' + index as u8))),
-            response_artifact_sha256: Some(digest(char::from(b'd' + index as u8))),
-            evaluator_record_sha256: Some(digest(char::from(b'f' + index as u8))),
+            runner_receipt_sha256: Some(digest(char::from(b'1' + index as u8))),
+            response_artifact_sha256: Some(digest(char::from(b'4' + index as u8))),
+            evaluator_record_sha256: Some(digest(char::from(b'a' + index as u8))),
             task_correctness: if index == 1 {
                 TaskCorrectnessV1::Incorrect
             } else {
