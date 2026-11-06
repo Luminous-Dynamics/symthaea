@@ -1,0 +1,2836 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-question-specific-stopping-v1",
+  "claim_scope": "synthetic_known_truth",
+  "preregistration": {
+    "preregistration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "frozen_before_sampling": true
+  },
+  "query_binding": {
+    "query_id": "does-declared-neural-path-change-the-conclusion",
+    "query_spec_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "decision_loss_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "baseline_decision": true
+  },
+  "sampling_frames": [
+    {
+      "frame_id": "synthetic-residual-frame-v1",
+      "source_frame_receipt_sha256": "4218b67c0a5d7f340be2145a465fc8f80950193da3f2e6c09d5b04bb6f155d74",
+      "candidate_frame_sha256": "a9b41c8bc43f2c7a231609d6dc1f641402ee81d5b3d8e0866511415bf2e9d4f0",
+      "candidate_unit_ids": [
+        "candidate-0001",
+        "candidate-0002",
+        "candidate-0003",
+        "candidate-0004",
+        "candidate-0005",
+        "candidate-0006",
+        "candidate-0007",
+        "candidate-0008",
+        "candidate-0009",
+        "candidate-0010",
+        "candidate-0011",
+        "candidate-0012",
+        "candidate-0013",
+        "candidate-0014",
+        "candidate-0015",
+        "candidate-0016",
+        "candidate-0017",
+        "candidate-0018",
+        "candidate-0019",
+        "candidate-0020",
+        "candidate-0021",
+        "candidate-0022",
+        "candidate-0023",
+        "candidate-0024",
+        "candidate-0025",
+        "candidate-0026",
+        "candidate-0027",
+        "candidate-0028",
+        "candidate-0029",
+        "candidate-0030",
+        "candidate-0031",
+        "candidate-0032",
+        "candidate-0033",
+        "candidate-0034",
+        "candidate-0035",
+        "candidate-0036",
+        "candidate-0037",
+        "candidate-0038",
+        "candidate-0039",
+        "candidate-0040",
+        "candidate-0041",
+        "candidate-0042",
+        "candidate-0043",
+        "candidate-0044",
+        "candidate-0045",
+        "candidate-0046",
+        "candidate-0047",
+        "candidate-0048",
+        "candidate-0049",
+        "candidate-0050",
+        "candidate-0051",
+        "candidate-0052",
+        "candidate-0053",
+        "candidate-0054",
+        "candidate-0055",
+        "candidate-0056",
+        "candidate-0057",
+        "candidate-0058",
+        "candidate-0059",
+        "candidate-0060",
+        "candidate-0061",
+        "candidate-0062",
+        "candidate-0063",
+        "candidate-0064",
+        "candidate-0065",
+        "candidate-0066",
+        "candidate-0067",
+        "candidate-0068",
+        "candidate-0069",
+        "candidate-0070",
+        "candidate-0071",
+        "candidate-0072",
+        "candidate-0073",
+        "candidate-0074",
+        "candidate-0075",
+        "candidate-0076",
+        "candidate-0077",
+        "candidate-0078",
+        "candidate-0079",
+        "candidate-0080",
+        "candidate-0081",
+        "candidate-0082",
+        "candidate-0083",
+        "candidate-0084",
+        "candidate-0085",
+        "candidate-0086",
+        "candidate-0087",
+        "candidate-0088",
+        "candidate-0089",
+        "candidate-0090",
+        "candidate-0091",
+        "candidate-0092",
+        "candidate-0093",
+        "candidate-0094",
+        "candidate-0095",
+        "candidate-0096",
+        "candidate-0097",
+        "candidate-0098",
+        "candidate-0099",
+        "candidate-0100",
+        "candidate-0101",
+        "candidate-0102",
+        "candidate-0103",
+        "candidate-0104",
+        "candidate-0105",
+        "candidate-0106",
+        "candidate-0107",
+        "candidate-0108",
+        "candidate-0109",
+        "candidate-0110",
+        "candidate-0111",
+        "candidate-0112",
+        "candidate-0113",
+        "candidate-0114",
+        "candidate-0115",
+        "candidate-0116",
+        "candidate-0117",
+        "candidate-0118",
+        "candidate-0119",
+        "candidate-0120",
+        "candidate-0121",
+        "candidate-0122",
+        "candidate-0123",
+        "candidate-0124",
+        "candidate-0125",
+        "candidate-0126",
+        "candidate-0127",
+        "candidate-0128",
+        "candidate-0129",
+        "candidate-0130",
+        "candidate-0131",
+        "candidate-0132",
+        "candidate-0133",
+        "candidate-0134",
+        "candidate-0135",
+        "candidate-0136",
+        "candidate-0137",
+        "candidate-0138",
+        "candidate-0139",
+        "candidate-0140",
+        "candidate-0141",
+        "candidate-0142",
+        "candidate-0143",
+        "candidate-0144",
+        "candidate-0145",
+        "candidate-0146",
+        "candidate-0147",
+        "candidate-0148",
+        "candidate-0149",
+        "candidate-0150",
+        "candidate-0151",
+        "candidate-0152",
+        "candidate-0153",
+        "candidate-0154",
+        "candidate-0155",
+        "candidate-0156",
+        "candidate-0157",
+        "candidate-0158",
+        "candidate-0159",
+        "candidate-0160",
+        "candidate-0161",
+        "candidate-0162",
+        "candidate-0163",
+        "candidate-0164",
+        "candidate-0165",
+        "candidate-0166",
+        "candidate-0167",
+        "candidate-0168",
+        "candidate-0169",
+        "candidate-0170",
+        "candidate-0171",
+        "candidate-0172",
+        "candidate-0173",
+        "candidate-0174",
+        "candidate-0175",
+        "candidate-0176",
+        "candidate-0177",
+        "candidate-0178",
+        "candidate-0179",
+        "candidate-0180",
+        "candidate-0181",
+        "candidate-0182",
+        "candidate-0183",
+        "candidate-0184",
+        "candidate-0185",
+        "candidate-0186",
+        "candidate-0187",
+        "candidate-0188",
+        "candidate-0189",
+        "candidate-0190",
+        "candidate-0191",
+        "candidate-0192",
+        "candidate-0193",
+        "candidate-0194",
+        "candidate-0195",
+        "candidate-0196",
+        "candidate-0197",
+        "candidate-0198",
+        "candidate-0199",
+        "candidate-0200",
+        "candidate-0201",
+        "candidate-0202",
+        "candidate-0203",
+        "candidate-0204",
+        "candidate-0205",
+        "candidate-0206",
+        "candidate-0207",
+        "candidate-0208",
+        "candidate-0209",
+        "candidate-0210",
+        "candidate-0211",
+        "candidate-0212",
+        "candidate-0213",
+        "candidate-0214",
+        "candidate-0215",
+        "candidate-0216",
+        "candidate-0217",
+        "candidate-0218",
+        "candidate-0219",
+        "candidate-0220",
+        "candidate-0221",
+        "candidate-0222",
+        "candidate-0223",
+        "candidate-0224",
+        "candidate-0225",
+        "candidate-0226",
+        "candidate-0227",
+        "candidate-0228",
+        "candidate-0229",
+        "candidate-0230",
+        "candidate-0231",
+        "candidate-0232",
+        "candidate-0233",
+        "candidate-0234",
+        "candidate-0235",
+        "candidate-0236",
+        "candidate-0237",
+        "candidate-0238",
+        "candidate-0239",
+        "candidate-0240",
+        "candidate-0241",
+        "candidate-0242",
+        "candidate-0243",
+        "candidate-0244",
+        "candidate-0245",
+        "candidate-0246",
+        "candidate-0247",
+        "candidate-0248",
+        "candidate-0249",
+        "candidate-0250",
+        "candidate-0251",
+        "candidate-0252",
+        "candidate-0253",
+        "candidate-0254",
+        "candidate-0255",
+        "candidate-0256",
+        "candidate-0257",
+        "candidate-0258",
+        "candidate-0259",
+        "candidate-0260",
+        "candidate-0261",
+        "candidate-0262",
+        "candidate-0263",
+        "candidate-0264",
+        "candidate-0265",
+        "candidate-0266",
+        "candidate-0267",
+        "candidate-0268",
+        "candidate-0269",
+        "candidate-0270",
+        "candidate-0271",
+        "candidate-0272",
+        "candidate-0273",
+        "candidate-0274",
+        "candidate-0275",
+        "candidate-0276",
+        "candidate-0277",
+        "candidate-0278",
+        "candidate-0279",
+        "candidate-0280",
+        "candidate-0281",
+        "candidate-0282",
+        "candidate-0283",
+        "candidate-0284",
+        "candidate-0285",
+        "candidate-0286",
+        "candidate-0287",
+        "candidate-0288",
+        "candidate-0289",
+        "candidate-0290",
+        "candidate-0291",
+        "candidate-0292",
+        "candidate-0293",
+        "candidate-0294",
+        "candidate-0295",
+        "candidate-0296",
+        "candidate-0297",
+        "candidate-0298",
+        "candidate-0299",
+        "candidate-0300",
+        "candidate-0301",
+        "candidate-0302",
+        "candidate-0303",
+        "candidate-0304",
+        "candidate-0305",
+        "candidate-0306",
+        "candidate-0307",
+        "candidate-0308",
+        "candidate-0309",
+        "candidate-0310",
+        "candidate-0311",
+        "candidate-0312",
+        "candidate-0313",
+        "candidate-0314",
+        "candidate-0315",
+        "candidate-0316",
+        "candidate-0317",
+        "candidate-0318",
+        "candidate-0319",
+        "candidate-0320",
+        "candidate-0321",
+        "candidate-0322",
+        "candidate-0323",
+        "candidate-0324",
+        "candidate-0325",
+        "candidate-0326",
+        "candidate-0327",
+        "candidate-0328",
+        "candidate-0329",
+        "candidate-0330",
+        "candidate-0331",
+        "candidate-0332",
+        "candidate-0333",
+        "candidate-0334",
+        "candidate-0335",
+        "candidate-0336",
+        "candidate-0337",
+        "candidate-0338",
+        "candidate-0339",
+        "candidate-0340",
+        "candidate-0341",
+        "candidate-0342",
+        "candidate-0343",
+        "candidate-0344",
+        "candidate-0345",
+        "candidate-0346",
+        "candidate-0347",
+        "candidate-0348",
+        "candidate-0349",
+        "candidate-0350",
+        "candidate-0351",
+        "candidate-0352",
+        "candidate-0353",
+        "candidate-0354",
+        "candidate-0355",
+        "candidate-0356",
+        "candidate-0357",
+        "candidate-0358",
+        "candidate-0359",
+        "candidate-0360",
+        "candidate-0361",
+        "candidate-0362",
+        "candidate-0363",
+        "candidate-0364",
+        "candidate-0365",
+        "candidate-0366",
+        "candidate-0367",
+        "candidate-0368",
+        "candidate-0369",
+        "candidate-0370",
+        "candidate-0371",
+        "candidate-0372",
+        "candidate-0373",
+        "candidate-0374",
+        "candidate-0375",
+        "candidate-0376",
+        "candidate-0377",
+        "candidate-0378",
+        "candidate-0379",
+        "candidate-0380",
+        "candidate-0381",
+        "candidate-0382",
+        "candidate-0383",
+        "candidate-0384",
+        "candidate-0385",
+        "candidate-0386",
+        "candidate-0387",
+        "candidate-0388",
+        "candidate-0389",
+        "candidate-0390",
+        "candidate-0391",
+        "candidate-0392",
+        "candidate-0393",
+        "candidate-0394",
+        "candidate-0395",
+        "candidate-0396",
+        "candidate-0397",
+        "candidate-0398",
+        "candidate-0399",
+        "candidate-0400",
+        "candidate-0401",
+        "candidate-0402",
+        "candidate-0403",
+        "candidate-0404",
+        "candidate-0405",
+        "candidate-0406",
+        "candidate-0407",
+        "candidate-0408",
+        "candidate-0409",
+        "candidate-0410",
+        "candidate-0411",
+        "candidate-0412",
+        "candidate-0413",
+        "candidate-0414",
+        "candidate-0415",
+        "candidate-0416",
+        "candidate-0417",
+        "candidate-0418",
+        "candidate-0419",
+        "candidate-0420",
+        "candidate-0421",
+        "candidate-0422",
+        "candidate-0423",
+        "candidate-0424",
+        "candidate-0425",
+        "candidate-0426",
+        "candidate-0427",
+        "candidate-0428",
+        "candidate-0429",
+        "candidate-0430",
+        "candidate-0431",
+        "candidate-0432",
+        "candidate-0433",
+        "candidate-0434",
+        "candidate-0435",
+        "candidate-0436",
+        "candidate-0437",
+        "candidate-0438",
+        "candidate-0439",
+        "candidate-0440",
+        "candidate-0441",
+        "candidate-0442",
+        "candidate-0443",
+        "candidate-0444",
+        "candidate-0445",
+        "candidate-0446",
+        "candidate-0447",
+        "candidate-0448",
+        "candidate-0449",
+        "candidate-0450",
+        "candidate-0451",
+        "candidate-0452",
+        "candidate-0453",
+        "candidate-0454",
+        "candidate-0455",
+        "candidate-0456",
+        "candidate-0457",
+        "candidate-0458",
+        "candidate-0459",
+        "candidate-0460",
+        "candidate-0461",
+        "candidate-0462",
+        "candidate-0463",
+        "candidate-0464",
+        "candidate-0465",
+        "candidate-0466",
+        "candidate-0467",
+        "candidate-0468",
+        "candidate-0469",
+        "candidate-0470",
+        "candidate-0471",
+        "candidate-0472",
+        "candidate-0473",
+        "candidate-0474",
+        "candidate-0475",
+        "candidate-0476",
+        "candidate-0477",
+        "candidate-0478",
+        "candidate-0479",
+        "candidate-0480",
+        "candidate-0481",
+        "candidate-0482",
+        "candidate-0483",
+        "candidate-0484",
+        "candidate-0485",
+        "candidate-0486",
+        "candidate-0487",
+        "candidate-0488",
+        "candidate-0489",
+        "candidate-0490",
+        "candidate-0491",
+        "candidate-0492",
+        "candidate-0493",
+        "candidate-0494",
+        "candidate-0495",
+        "candidate-0496",
+        "candidate-0497",
+        "candidate-0498",
+        "candidate-0499",
+        "candidate-0500",
+        "candidate-0501",
+        "candidate-0502",
+        "candidate-0503",
+        "candidate-0504",
+        "candidate-0505",
+        "candidate-0506",
+        "candidate-0507",
+        "candidate-0508",
+        "candidate-0509",
+        "candidate-0510",
+        "candidate-0511",
+        "candidate-0512",
+        "candidate-0513",
+        "candidate-0514",
+        "candidate-0515",
+        "candidate-0516",
+        "candidate-0517",
+        "candidate-0518",
+        "candidate-0519",
+        "candidate-0520",
+        "candidate-0521",
+        "candidate-0522",
+        "candidate-0523",
+        "candidate-0524",
+        "candidate-0525",
+        "candidate-0526",
+        "candidate-0527",
+        "candidate-0528",
+        "candidate-0529",
+        "candidate-0530",
+        "candidate-0531",
+        "candidate-0532",
+        "candidate-0533",
+        "candidate-0534",
+        "candidate-0535",
+        "candidate-0536",
+        "candidate-0537",
+        "candidate-0538",
+        "candidate-0539",
+        "candidate-0540",
+        "candidate-0541",
+        "candidate-0542",
+        "candidate-0543",
+        "candidate-0544",
+        "candidate-0545",
+        "candidate-0546",
+        "candidate-0547",
+        "candidate-0548",
+        "candidate-0549",
+        "candidate-0550",
+        "candidate-0551",
+        "candidate-0552",
+        "candidate-0553",
+        "candidate-0554",
+        "candidate-0555",
+        "candidate-0556",
+        "candidate-0557",
+        "candidate-0558",
+        "candidate-0559",
+        "candidate-0560",
+        "candidate-0561",
+        "candidate-0562",
+        "candidate-0563",
+        "candidate-0564",
+        "candidate-0565",
+        "candidate-0566",
+        "candidate-0567",
+        "candidate-0568",
+        "candidate-0569",
+        "candidate-0570",
+        "candidate-0571",
+        "candidate-0572",
+        "candidate-0573",
+        "candidate-0574",
+        "candidate-0575",
+        "candidate-0576",
+        "candidate-0577",
+        "candidate-0578",
+        "candidate-0579",
+        "candidate-0580",
+        "candidate-0581",
+        "candidate-0582",
+        "candidate-0583",
+        "candidate-0584",
+        "candidate-0585",
+        "candidate-0586",
+        "candidate-0587",
+        "candidate-0588",
+        "candidate-0589",
+        "candidate-0590",
+        "candidate-0591",
+        "candidate-0592",
+        "candidate-0593",
+        "candidate-0594",
+        "candidate-0595",
+        "candidate-0596",
+        "candidate-0597",
+        "candidate-0598",
+        "candidate-0599",
+        "candidate-0600",
+        "candidate-0601",
+        "candidate-0602",
+        "candidate-0603",
+        "candidate-0604",
+        "candidate-0605",
+        "candidate-0606",
+        "candidate-0607",
+        "candidate-0608",
+        "candidate-0609",
+        "candidate-0610",
+        "candidate-0611",
+        "candidate-0612",
+        "candidate-0613",
+        "candidate-0614",
+        "candidate-0615",
+        "candidate-0616",
+        "candidate-0617",
+        "candidate-0618",
+        "candidate-0619",
+        "candidate-0620",
+        "candidate-0621",
+        "candidate-0622",
+        "candidate-0623",
+        "candidate-0624",
+        "candidate-0625",
+        "candidate-0626",
+        "candidate-0627",
+        "candidate-0628",
+        "candidate-0629",
+        "candidate-0630",
+        "candidate-0631",
+        "candidate-0632",
+        "candidate-0633",
+        "candidate-0634",
+        "candidate-0635",
+        "candidate-0636",
+        "candidate-0637",
+        "candidate-0638",
+        "candidate-0639",
+        "candidate-0640",
+        "candidate-0641",
+        "candidate-0642",
+        "candidate-0643",
+        "candidate-0644",
+        "candidate-0645",
+        "candidate-0646",
+        "candidate-0647",
+        "candidate-0648",
+        "candidate-0649",
+        "candidate-0650",
+        "candidate-0651",
+        "candidate-0652",
+        "candidate-0653",
+        "candidate-0654",
+        "candidate-0655",
+        "candidate-0656",
+        "candidate-0657",
+        "candidate-0658",
+        "candidate-0659",
+        "candidate-0660",
+        "candidate-0661",
+        "candidate-0662",
+        "candidate-0663",
+        "candidate-0664",
+        "candidate-0665",
+        "candidate-0666",
+        "candidate-0667",
+        "candidate-0668",
+        "candidate-0669",
+        "candidate-0670",
+        "candidate-0671",
+        "candidate-0672",
+        "candidate-0673",
+        "candidate-0674",
+        "candidate-0675",
+        "candidate-0676",
+        "candidate-0677",
+        "candidate-0678",
+        "candidate-0679",
+        "candidate-0680",
+        "candidate-0681",
+        "candidate-0682",
+        "candidate-0683",
+        "candidate-0684",
+        "candidate-0685",
+        "candidate-0686",
+        "candidate-0687",
+        "candidate-0688",
+        "candidate-0689",
+        "candidate-0690",
+        "candidate-0691",
+        "candidate-0692",
+        "candidate-0693",
+        "candidate-0694",
+        "candidate-0695",
+        "candidate-0696",
+        "candidate-0697",
+        "candidate-0698",
+        "candidate-0699",
+        "candidate-0700",
+        "candidate-0701",
+        "candidate-0702",
+        "candidate-0703",
+        "candidate-0704",
+        "candidate-0705",
+        "candidate-0706",
+        "candidate-0707",
+        "candidate-0708",
+        "candidate-0709",
+        "candidate-0710",
+        "candidate-0711",
+        "candidate-0712",
+        "candidate-0713",
+        "candidate-0714",
+        "candidate-0715",
+        "candidate-0716",
+        "candidate-0717",
+        "candidate-0718",
+        "candidate-0719",
+        "candidate-0720",
+        "candidate-0721",
+        "candidate-0722",
+        "candidate-0723",
+        "candidate-0724",
+        "candidate-0725",
+        "candidate-0726",
+        "candidate-0727",
+        "candidate-0728",
+        "candidate-0729",
+        "candidate-0730",
+        "candidate-0731",
+        "candidate-0732",
+        "candidate-0733",
+        "candidate-0734",
+        "candidate-0735",
+        "candidate-0736",
+        "candidate-0737",
+        "candidate-0738",
+        "candidate-0739",
+        "candidate-0740",
+        "candidate-0741",
+        "candidate-0742",
+        "candidate-0743",
+        "candidate-0744",
+        "candidate-0745",
+        "candidate-0746",
+        "candidate-0747",
+        "candidate-0748",
+        "candidate-0749",
+        "candidate-0750",
+        "candidate-0751",
+        "candidate-0752",
+        "candidate-0753",
+        "candidate-0754",
+        "candidate-0755",
+        "candidate-0756",
+        "candidate-0757",
+        "candidate-0758",
+        "candidate-0759",
+        "candidate-0760",
+        "candidate-0761",
+        "candidate-0762",
+        "candidate-0763",
+        "candidate-0764",
+        "candidate-0765",
+        "candidate-0766",
+        "candidate-0767",
+        "candidate-0768",
+        "candidate-0769",
+        "candidate-0770",
+        "candidate-0771",
+        "candidate-0772",
+        "candidate-0773",
+        "candidate-0774",
+        "candidate-0775",
+        "candidate-0776",
+        "candidate-0777",
+        "candidate-0778",
+        "candidate-0779",
+        "candidate-0780",
+        "candidate-0781",
+        "candidate-0782",
+        "candidate-0783",
+        "candidate-0784",
+        "candidate-0785",
+        "candidate-0786",
+        "candidate-0787",
+        "candidate-0788",
+        "candidate-0789",
+        "candidate-0790",
+        "candidate-0791",
+        "candidate-0792",
+        "candidate-0793",
+        "candidate-0794",
+        "candidate-0795",
+        "candidate-0796",
+        "candidate-0797",
+        "candidate-0798",
+        "candidate-0799",
+        "candidate-0800",
+        "candidate-0801",
+        "candidate-0802",
+        "candidate-0803",
+        "candidate-0804",
+        "candidate-0805",
+        "candidate-0806",
+        "candidate-0807",
+        "candidate-0808",
+        "candidate-0809",
+        "candidate-0810",
+        "candidate-0811",
+        "candidate-0812",
+        "candidate-0813",
+        "candidate-0814",
+        "candidate-0815",
+        "candidate-0816",
+        "candidate-0817",
+        "candidate-0818",
+        "candidate-0819",
+        "candidate-0820",
+        "candidate-0821",
+        "candidate-0822",
+        "candidate-0823",
+        "candidate-0824",
+        "candidate-0825",
+        "candidate-0826",
+        "candidate-0827",
+        "candidate-0828",
+        "candidate-0829",
+        "candidate-0830",
+        "candidate-0831",
+        "candidate-0832",
+        "candidate-0833",
+        "candidate-0834",
+        "candidate-0835",
+        "candidate-0836",
+        "candidate-0837",
+        "candidate-0838",
+        "candidate-0839",
+        "candidate-0840",
+        "candidate-0841",
+        "candidate-0842",
+        "candidate-0843",
+        "candidate-0844",
+        "candidate-0845",
+        "candidate-0846",
+        "candidate-0847",
+        "candidate-0848",
+        "candidate-0849",
+        "candidate-0850",
+        "candidate-0851",
+        "candidate-0852",
+        "candidate-0853",
+        "candidate-0854",
+        "candidate-0855",
+        "candidate-0856",
+        "candidate-0857",
+        "candidate-0858",
+        "candidate-0859",
+        "candidate-0860",
+        "candidate-0861",
+        "candidate-0862",
+        "candidate-0863",
+        "candidate-0864",
+        "candidate-0865",
+        "candidate-0866",
+        "candidate-0867",
+        "candidate-0868",
+        "candidate-0869",
+        "candidate-0870",
+        "candidate-0871",
+        "candidate-0872",
+        "candidate-0873",
+        "candidate-0874",
+        "candidate-0875",
+        "candidate-0876",
+        "candidate-0877",
+        "candidate-0878",
+        "candidate-0879",
+        "candidate-0880",
+        "candidate-0881",
+        "candidate-0882",
+        "candidate-0883",
+        "candidate-0884",
+        "candidate-0885",
+        "candidate-0886",
+        "candidate-0887",
+        "candidate-0888",
+        "candidate-0889",
+        "candidate-0890",
+        "candidate-0891",
+        "candidate-0892",
+        "candidate-0893",
+        "candidate-0894",
+        "candidate-0895",
+        "candidate-0896",
+        "candidate-0897",
+        "candidate-0898",
+        "candidate-0899",
+        "candidate-0900",
+        "candidate-0901",
+        "candidate-0902",
+        "candidate-0903",
+        "candidate-0904",
+        "candidate-0905",
+        "candidate-0906",
+        "candidate-0907",
+        "candidate-0908",
+        "candidate-0909",
+        "candidate-0910",
+        "candidate-0911",
+        "candidate-0912",
+        "candidate-0913",
+        "candidate-0914",
+        "candidate-0915",
+        "candidate-0916",
+        "candidate-0917",
+        "candidate-0918",
+        "candidate-0919",
+        "candidate-0920",
+        "candidate-0921",
+        "candidate-0922",
+        "candidate-0923",
+        "candidate-0924",
+        "candidate-0925",
+        "candidate-0926",
+        "candidate-0927",
+        "candidate-0928",
+        "candidate-0929",
+        "candidate-0930",
+        "candidate-0931",
+        "candidate-0932",
+        "candidate-0933",
+        "candidate-0934",
+        "candidate-0935",
+        "candidate-0936",
+        "candidate-0937",
+        "candidate-0938",
+        "candidate-0939",
+        "candidate-0940",
+        "candidate-0941",
+        "candidate-0942",
+        "candidate-0943",
+        "candidate-0944",
+        "candidate-0945",
+        "candidate-0946",
+        "candidate-0947",
+        "candidate-0948",
+        "candidate-0949",
+        "candidate-0950",
+        "candidate-0951",
+        "candidate-0952",
+        "candidate-0953",
+        "candidate-0954",
+        "candidate-0955",
+        "candidate-0956",
+        "candidate-0957",
+        "candidate-0958",
+        "candidate-0959",
+        "candidate-0960",
+        "candidate-0961",
+        "candidate-0962",
+        "candidate-0963",
+        "candidate-0964",
+        "candidate-0965",
+        "candidate-0966",
+        "candidate-0967",
+        "candidate-0968",
+        "candidate-0969",
+        "candidate-0970",
+        "candidate-0971",
+        "candidate-0972",
+        "candidate-0973",
+        "candidate-0974",
+        "candidate-0975",
+        "candidate-0976",
+        "candidate-0977",
+        "candidate-0978",
+        "candidate-0979",
+        "candidate-0980",
+        "candidate-0981",
+        "candidate-0982",
+        "candidate-0983",
+        "candidate-0984",
+        "candidate-0985",
+        "candidate-0986",
+        "candidate-0987",
+        "candidate-0988",
+        "candidate-0989",
+        "candidate-0990",
+        "candidate-0991",
+        "candidate-0992",
+        "candidate-0993",
+        "candidate-0994",
+        "candidate-0995",
+        "candidate-0996",
+        "candidate-0997",
+        "candidate-0998",
+        "candidate-0999",
+        "candidate-1000"
+      ],
+      "sampling_design": "SRS_WITHOUT_REPLACEMENT",
+      "sample_size": 300,
+      "sampled_unit_set_sha256": "795ca56cd12534305700bcca7475d2cd051a4f5b116247cab4beb32105de1592",
+      "sample_outcome_ledger_sha256": "4897c1c0c2e4f596a51b0f0582b5b0e478394324a4afa46a6ed94ac39314fd81",
+      "sampling_receipt_sha256": "d96d7747899165a49bb563d51987627654698a85b2962fa5ee3893d4c15802e8",
+      "sampled_units": [
+        {
+          "unit_id": "candidate-0004",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0005",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0008",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0009",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0011",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0019",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0021",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0029",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0031",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0032",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0037",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0039",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0053",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0055",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0057",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0059",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0061",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0063",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0064",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0067",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0068",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0071",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0073",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0075",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0076",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0077",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0079",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0084",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0085",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0087",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0089",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0091",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0093",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0095",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0096",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0097",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0101",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0103",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0105",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0106",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0107",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0109",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0111",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0113",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0116",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0117",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0120",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0121",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0129",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0132",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0137",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0139",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0140",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0143",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0144",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0145",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0147",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0148",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0151",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0153",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0155",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0159",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0160",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0161",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0163",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0166",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0167",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0168",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0169",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0173",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0175",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0177",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0183",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0185",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0187",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0193",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0195",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0196",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0197",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0201",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0207",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0211",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0213",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0219",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0223",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0225",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0228",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0232",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0237",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0238",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0243",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0244",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0251",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0257",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0259",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0265",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0267",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0268",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0271",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0283",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0285",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0290",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0292",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0297",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0300",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0303",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0305",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0309",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0311",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0313",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0315",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0318",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0323",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0328",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0329",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0335",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0337",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0340",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0341",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0343",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0348",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0351",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0353",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0357",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0358",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0359",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0360",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0361",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0363",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0364",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0367",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0369",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0373",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0375",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0377",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0379",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0381",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0383",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0385",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0391",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0393",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0395",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0399",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0406",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0407",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0409",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0412",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0419",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0421",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0422",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0423",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0429",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0432",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0433",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0436",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0443",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0445",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0451",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0459",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0460",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0461",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0467",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0471",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0472",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0473",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0474",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0475",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0481",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0483",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0484",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0487",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0490",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0491",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0493",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0495",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0497",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0499",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0500",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0501",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0502",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0511",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0513",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0516",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0528",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0535",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0536",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0542",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0543",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0545",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0549",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0559",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0561",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0564",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0569",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0571",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0573",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0574",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0577",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0579",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0589",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0593",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0596",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0599",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0601",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0604",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0609",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0612",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0633",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0641",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0643",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0645",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0647",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0649",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0651",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0653",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0655",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0662",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0664",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0666",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0673",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0675",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0677",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0679",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0681",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0684",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0686",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0689",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0690",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0701",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0705",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0707",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0715",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0719",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0720",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0721",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0724",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0725",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0728",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0735",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0737",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0750",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0753",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0759",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0761",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0772",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0775",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0781",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0787",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0791",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0793",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0798",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0806",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0813",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0815",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0817",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0827",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0831",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0833",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0835",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0839",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0840",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0844",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0845",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0847",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0851",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0853",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0855",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0867",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0873",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0874",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0875",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0881",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0884",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0891",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0892",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0899",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0904",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0917",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0919",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0921",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0925",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0926",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0929",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0938",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0940",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0941",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0943",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0944",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0955",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0957",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0958",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0961",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0963",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0966",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0967",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0975",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0977",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0993",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0994",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        },
+        {
+          "unit_id": "candidate-0999",
+          "outcome": "NO_QUERY_FLIP",
+          "inclusion_probability": 0.3
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "global_converges_but_query_worlds_disagree",
+      "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "frame_id": "synthetic-residual-frame-v1",
+      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "global_stop_policy": {
+        "relative_delta_tolerance": 0.005,
+        "consecutive_stable_transitions": 2
+      },
+      "confidence_level": 0.95,
+      "residual_query_flip_tolerance": 0.01,
+      "frame_coverage_status": "CLOSED",
+      "snapshots": [
+        {
+          "snapshot_id": "S1",
+          "edit_count": 1000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S2",
+          "edit_count": 2000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.201
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.01
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S3",
+          "edit_count": 3000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2011
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.0105
+            }
+          ]
+        }
+      ],
+      "worlds": [
+        {
+          "world_id": "world-supporting",
+          "biological_disposition": "ADMISSIBLE",
+          "query_decision": true
+        },
+        {
+          "world_id": "world-refuting",
+          "biological_disposition": "ADMISSIBLE",
+          "query_decision": false
+        }
+      ],
+      "expected": {
+        "global_stop_snapshot_id": "S3",
+        "query_world_agreement": false,
+        "residual_upper_count": 8,
+        "residual_upper_prevalence": 0.008,
+        "query_stop_status": "QUERY_UNRESOLVED",
+        "joint_disposition": "GLOBAL_ONLY"
+      }
+    },
+    {
+      "case_id": "query_sufficient_before_global_convergence",
+      "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "frame_id": "synthetic-residual-frame-v1",
+      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "global_stop_policy": {
+        "relative_delta_tolerance": 0.005,
+        "consecutive_stable_transitions": 2
+      },
+      "confidence_level": 0.95,
+      "residual_query_flip_tolerance": 0.01,
+      "frame_coverage_status": "CLOSED",
+      "snapshots": [
+        {
+          "snapshot_id": "S1",
+          "edit_count": 1000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S2",
+          "edit_count": 2000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.22
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.15
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S3",
+          "edit_count": 3000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.24
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.3
+            }
+          ]
+        }
+      ],
+      "worlds": [
+        {
+          "world_id": "world-a",
+          "biological_disposition": "ADMISSIBLE",
+          "query_decision": true
+        },
+        {
+          "world_id": "world-b",
+          "biological_disposition": "ADMISSIBLE",
+          "query_decision": true
+        }
+      ],
+      "expected": {
+        "global_stop_snapshot_id": null,
+        "query_world_agreement": true,
+        "residual_upper_count": 8,
+        "residual_upper_prevalence": 0.008,
+        "query_stop_status": "QUERY_ROBUST_WITHIN_DECLARED_FRAME",
+        "joint_disposition": "QUERY_ROBUST_WITHIN_DECLARED_FRAME"
+      }
+    },
+    {
+      "case_id": "global_converges_but_candidate_frame_incomplete",
+      "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "frame_id": "synthetic-residual-frame-v1",
+      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "global_stop_policy": {
+        "relative_delta_tolerance": 0.005,
+        "consecutive_stable_transitions": 2
+      },
+      "confidence_level": 0.95,
+      "residual_query_flip_tolerance": 0.01,
+      "frame_coverage_status": "INCOMPLETE",
+      "snapshots": [
+        {
+          "snapshot_id": "S1",
+          "edit_count": 1000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S2",
+          "edit_count": 2000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.201
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.01
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S3",
+          "edit_count": 3000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2011
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.0105
+            }
+          ]
+        }
+      ],
+      "worlds": [
+        {
+          "world_id": "world-a",
+          "biological_disposition": "ADMISSIBLE",
+          "query_decision": true
+        }
+      ],
+      "expected": {
+        "global_stop_snapshot_id": "S3",
+        "query_world_agreement": true,
+        "residual_upper_count": 8,
+        "residual_upper_prevalence": 0.008,
+        "query_stop_status": "FRAME_INCOMPLETE",
+        "joint_disposition": "FRAME_INCOMPLETE"
+      }
+    },
+    {
+      "case_id": "indeterminate_reconstruction_alternative_blocks_stop",
+      "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "frame_id": "synthetic-residual-frame-v1",
+      "frame_coverage_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "global_stop_policy": {
+        "relative_delta_tolerance": 0.005,
+        "consecutive_stable_transitions": 2
+      },
+      "confidence_level": 0.95,
+      "residual_query_flip_tolerance": 0.01,
+      "frame_coverage_status": "CLOSED",
+      "snapshots": [
+        {
+          "snapshot_id": "S1",
+          "edit_count": 1000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S2",
+          "edit_count": 2000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.201
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.01
+            }
+          ]
+        },
+        {
+          "snapshot_id": "S3",
+          "edit_count": 3000,
+          "graph_invariants": [
+            {
+              "invariant_id": "edge_density",
+              "value": 0.2011
+            },
+            {
+              "invariant_id": "mean_degree",
+              "value": 8.0105
+            }
+          ]
+        }
+      ],
+      "worlds": [
+        {
+          "world_id": "world-a",
+          "biological_disposition": "ADMISSIBLE",
+          "query_decision": true
+        },
+        {
+          "world_id": "world-b",
+          "biological_disposition": "INDETERMINATE",
+          "query_decision": null
+        }
+      ],
+      "expected": {
+        "global_stop_snapshot_id": "S3",
+        "query_world_agreement": false,
+        "residual_upper_count": 8,
+        "residual_upper_prevalence": 0.008,
+        "query_stop_status": "NOT_ESTIMABLE",
+        "joint_disposition": "NOT_ESTIMABLE"
+      }
+    }
+  ]
+}
