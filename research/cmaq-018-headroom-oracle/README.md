@@ -38,11 +38,11 @@ It is undefined when the denominator is zero. This is a descriptive decompositio
 
 The crate now includes a finite reference selector that is separate from the evaluator-oracle diagnostics above. It uses repeated selection-continuation means and a familywise two-sided Hoeffding gate over the supported baseline and supported alternatives. It selects an alternative only when that candidate's lower bound strictly exceeds the baseline's upper bound.
 
-- Candidate support is explicit: Supported, Unsupported, Unknown, or Incomplete. Only Supported alternatives can enter the selection comparison.
+- Candidate support is explicit: Supported, Unsupported, Unknown, or Incomplete. Only Supported alternatives can enter the selection comparison. Each record retains a support-receipt reference, and its assessment must be declared independent of utility-outcome ranking; an empty receipt or outcome-dependent/unknown support assessment is rejected.
 - If the baseline's support is not qualified, the selector abstains. It does not silently fall back to a nominal baseline.
 - If no alternative clears the simultaneous separation gate, it retains the supported baseline. This means "no improvement established", not "baseline proven optimal".
 - An incomplete or budget-limited candidate universe is labelled `EnumeratedBankOnly`; the result is not represented as a global action optimum.
-- The bounded utility range, familywise delta, selection continuation count and rollout counts are returned with the decision.
+- The bounded utility range, familywise delta, selection continuation count and rollout counts are returned with the decision, alongside the original support records and sampling contract so a reviewer can reconstruct the gate.
 - The confidence formula assumes independent continuation draws across continuation IDs for each candidate. The caller must supply an IID sampling contract and justification reference. The crate retains that claim but does not authenticate it or validate the scientific sampling process.
 - The selected candidate is scored only after selection on the disjoint evaluation continuation batch. These held-out values are descriptive in this reference and do not feed back into the choice.
 

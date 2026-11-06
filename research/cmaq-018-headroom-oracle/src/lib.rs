@@ -162,10 +162,19 @@ pub enum CandidateSupportDisposition {
     Incomplete,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SupportAssessmentIndependence {
+    IndependentOfOutcomeSelection,
+    OutcomeDependentOrUnknown,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CandidateSupportRecord {
     pub candidate_id: String,
     pub disposition: CandidateSupportDisposition,
+    pub independence: SupportAssessmentIndependence,
+    /// Exact support-gate receipt reference; not authenticated by this crate.
+    pub support_receipt_digest: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,6 +222,8 @@ pub enum SupportedSelectorError {
     InvalidFamilywiseDelta,
     SupportRecordCountMismatch,
     SupportRecordOrderMismatch,
+    SupportAssessmentNotIndependentOfOutcomeSelection,
+    EmptySupportReceiptDigest,
     SelectionContinuationIndependenceNotEstablished,
     EmptySamplingJustification,
     OutcomeOutsideDeclaredUtilityBounds,
@@ -241,6 +252,12 @@ pub struct SupportGatedSelectorReport {
     pub baseline_candidate_id: String,
     pub scope: SelectorScope,
     pub familywise_delta_ppm: u32,
+    pub utility_lower_bound: i64,
+    pub utility_upper_bound: i64,
+    /// Source-side support dispositions and receipt references retained verbatim.
+    pub support_records: Vec<CandidateSupportRecord>,
+    /// Sampling assumption and caller-supplied justification retained verbatim.
+    pub continuation_sampling: ContinuationSamplingContract,
     pub selection_continuation_count: usize,
     pub evaluation_continuation_count: usize,
     pub eligible_alternative_count: usize,
@@ -299,6 +316,16 @@ pub fn select_supported_candidate(
         if record.candidate_id != *candidate_id {
             return Err(SupportedSelectorError::SupportRecordOrderMismatch);
         }
+        if record.independence
+            != SupportAssessmentIndependence::IndependentOfOutcomeSelection
+        {
+            return Err(
+                SupportedSelectorError::SupportAssessmentNotIndependentOfOutcomeSelection,
+            );
+        }
+        if record.support_receipt_digest.trim().is_empty() {
+            return Err(SupportedSelectorError::EmptySupportReceiptDigest);
+        }
     }
     for batch in [&design.headroom.selection, &design.headroom.evaluation] {
         if batch.candidates.iter().any(|candidate| {
@@ -349,6 +376,10 @@ pub fn select_supported_candidate(
             baseline_candidate_id: design.headroom.baseline_candidate_id.clone(),
             scope,
             familywise_delta_ppm: design.familywise_delta_ppm,
+            utility_lower_bound: design.utility_lower_bound,
+            utility_upper_bound: design.utility_upper_bound,
+            support_records: design.support.clone(),
+            continuation_sampling: design.continuation_sampling.clone(),
             selection_continuation_count: design.headroom.selection.continuation_ids.len(),
             evaluation_continuation_count: design.headroom.evaluation.continuation_ids.len(),
             eligible_alternative_count: 0,
@@ -436,6 +467,10 @@ pub fn select_supported_candidate(
         baseline_candidate_id: design.headroom.baseline_candidate_id.clone(),
         scope,
         familywise_delta_ppm: design.familywise_delta_ppm,
+        utility_lower_bound: design.utility_lower_bound,
+        utility_upper_bound: design.utility_upper_bound,
+        support_records: design.support.clone(),
+        continuation_sampling: design.continuation_sampling.clone(),
         selection_continuation_count: design.headroom.selection.continuation_ids.len(),
         evaluation_continuation_count: design.headroom.evaluation.continuation_ids.len(),
         eligible_alternative_count: eligible_alternatives.len(),
@@ -1153,6 +1188,10 @@ mod tests {
         CandidateSupportRecord {
             candidate_id: candidate_id.to_owned(),
             disposition,
+            independence: SupportAssessmentIndependence::IndependentOfOutcomeSelection,
+            support_receipt_digest: format!(
+                "synthetic-support-receipt:{candidate_id}:{disposition:?}"
+            ),
         }
     }
 
@@ -1353,6 +1392,41 @@ mod tests {
 
         assert_eq!(report.disposition, SupportedSelectorDisposition::AlternativeSelected);
         assert_eq!(report.scope, SelectorScope::EnumeratedBankOnly);
+    }
+
+    #[test]
+    fn support_gate_requires_and_retains_receipt_references() {
+        let mut selector = selector_design(
+            noise_only_design(),
+            vec![
+                support_record("baseline", CandidateSupportDisposition::Supported),
+                support_record("candidate-a", CandidateSupportDisposition::Unknown),
+                support_record("candidate-b", CandidateSupportDisposition::Unsupported),
+            ],
+            CandidateUniverseScope::ExhaustiveWithinDeclaredScope,
+        );
+        selector.support[1].support_receipt_digest.clear();
+        assert_eq!(
+            select_supported_candidate(&selector),
+            Err(SupportedSelectorError::EmptySupportReceiptDigest)
+        );
+
+        selector.support[1].support_receipt_digest =
+            "sam-support-receipt:candidate-a:unknown".to_owned();
+        selector.support[2].independence =
+            SupportAssessmentIndependence::OutcomeDependentOrUnknown;
+        assert_eq!(
+            select_supported_candidate(&selector),
+            Err(SupportedSelectorError::SupportAssessmentNotIndependentOfOutcomeSelection)
+        );
+
+        selector.support[2].independence =
+            SupportAssessmentIndependence::IndependentOfOutcomeSelection;
+        let report = select_supported_candidate(&selector).unwrap();
+        assert_eq!(report.support_records, selector.support);
+        assert_eq!(report.continuation_sampling, selector.continuation_sampling);
+        assert_eq!(report.utility_lower_bound, selector.utility_lower_bound);
+        assert_eq!(report.utility_upper_bound, selector.utility_upper_bound);
     }
 
     #[test]
