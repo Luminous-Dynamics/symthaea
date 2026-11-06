@@ -114,6 +114,32 @@ impl std::error::Error for RobustThresholdError {}
 /// receipt. Mandatory model-adequacy, operational-mapping, target-support,
 /// scenario-coverage, provenance, resource, and external-governance gates are
 /// separate and may still block the composed decision.
+/// Failure while replaying a previously recorded threshold classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RobustThresholdReplayError {
+    InvalidInput(RobustThresholdError),
+    ClassificationMismatch,
+}
+
+impl fmt::Display for RobustThresholdReplayError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidInput(error) => write!(f, "cannot replay threshold classification: {error}"),
+            Self::ClassificationMismatch => {
+                f.write_str("recorded threshold classification does not match deterministic recomputation")
+            }
+        }
+    }
+}
+
+impl std::error::Error for RobustThresholdReplayError {}
+
+impl From<RobustThresholdError> for RobustThresholdReplayError {
+    fn from(error: RobustThresholdError) -> Self {
+        Self::InvalidInput(error)
+    }
+}
+
 pub fn classify_robust_threshold(
     action_intervals: &[ActionRobustUtilityInterval],
     threshold: f64,
@@ -181,6 +207,23 @@ pub fn classify_robust_threshold(
         unresolved_action_ids,
         disposition,
     })
+}
+
+/// Replay the deterministic classification and reject any changed output field.
+///
+/// This verifies only the classification relative to the caller-supplied
+/// intervals and threshold. It does not authenticate a digest, prove upstream
+/// interval coverage, or verify source/action/scenario provenance.
+pub fn verify_robust_threshold_classification_replay(
+    action_intervals: &[ActionRobustUtilityInterval],
+    threshold: f64,
+    recorded: &RobustThresholdClassification,
+) -> Result<(), RobustThresholdReplayError> {
+    let expected = classify_robust_threshold(action_intervals, threshold)?;
+    if &expected != recorded {
+        return Err(RobustThresholdReplayError::ClassificationMismatch);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -281,6 +324,61 @@ mod tests {
         assert_eq!(
             classify_robust_threshold(&forward, 0.75).unwrap(),
             classify_robust_threshold(&reverse, 0.75).unwrap()
+        );
+    }
+
+    #[test]
+    fn threshold_classification_replay_accepts_exact_output_and_rejects_mutations() {
+        let intervals = [interval(1, 0.1, 0.3), interval(2, 0.8, 0.9)];
+        let expected = classify_robust_threshold(&intervals, 0.7).unwrap();
+        assert_eq!(
+            verify_robust_threshold_classification_replay(&intervals, 0.7, &expected),
+            Ok(())
+        );
+
+        let mut changed_membership = expected.clone();
+        changed_membership.certified_good_action_ids.clear();
+        assert_eq!(
+            verify_robust_threshold_classification_replay(
+                &intervals,
+                0.7,
+                &changed_membership
+            ),
+            Err(RobustThresholdReplayError::ClassificationMismatch)
+        );
+
+        let mut changed_threshold = expected.clone();
+        changed_threshold.threshold = 0.75;
+        assert_eq!(
+            verify_robust_threshold_classification_replay(
+                &intervals,
+                0.7,
+                &changed_threshold
+            ),
+            Err(RobustThresholdReplayError::ClassificationMismatch)
+        );
+
+        let mut changed_bound = expected.clone();
+        changed_bound.action_classifications[0].upper_bound += 0.01;
+        assert_eq!(
+            verify_robust_threshold_classification_replay(
+                &intervals,
+                0.7,
+                &changed_bound
+            ),
+            Err(RobustThresholdReplayError::ClassificationMismatch)
+        );
+
+        let mut changed_disposition = expected.clone();
+        changed_disposition.disposition =
+            ThresholdFamilyDisposition::CertifiedNoGoodCandidate;
+        assert_eq!(
+            verify_robust_threshold_classification_replay(
+                &intervals,
+                0.7,
+                &changed_disposition
+            ),
+            Err(RobustThresholdReplayError::ClassificationMismatch)
         );
     }
 
