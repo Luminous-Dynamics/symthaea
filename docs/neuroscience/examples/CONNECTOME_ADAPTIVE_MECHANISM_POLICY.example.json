@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-exact-adaptive-mechanism-policy-v1",
+  "claim_scope": "synthetic_known_truth",
+  "query": {
+    "query_id": "which-mechanism-explains-the-query-relevant-response",
+    "query_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decision_rule_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "mechanisms": [
+    {
+      "mechanism_id": "DIRECT",
+      "mechanism_class": "DIRECT_SYNAPTIC",
+      "query_decision": true,
+      "prior_probability": 0.4,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "model_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "mechanism_id": "EXTRA",
+      "mechanism_class": "EXTRASYNAPTIC_LATENT",
+      "query_decision": true,
+      "prior_probability": 0.4,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "model_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "mechanism_id": "SHARED",
+      "mechanism_class": "SHARED_INPUT",
+      "query_decision": false,
+      "prior_probability": 0.2,
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "model_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "nuisance_profiles": [
+    {
+      "nuisance_profile_id": "nominal",
+      "profile_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "description": "Nominal response gain and indicator kernel."
+    },
+    {
+      "nuisance_profile_id": "shifted-gain",
+      "profile_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "description": "Plausible gain shift alters first-stage response probabilities."
+    }
+  ],
+  "interventions": [
+    {
+      "action_id": "A",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "outcome_ids": [
+        "SUPPORTING",
+        "REFUTING"
+      ]
+    },
+    {
+      "action_id": "B",
+      "cost_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome_ids": [
+        "DIRECT_SIGNAL",
+        "EXTRA_SIGNAL"
+      ]
+    }
+  ],
+  "predictions": [
+    {
+      "action_id": "A",
+      "mechanism_id": "DIRECT",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "outcomes": [
+        {
+          "outcome_id": "SUPPORTING",
+          "probability": 0.95
+        },
+        {
+          "outcome_id": "REFUTING",
+          "probability": 0.05
+        }
+      ]
+    },
+    {
+      "action_id": "A",
+      "mechanism_id": "EXTRA",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "outcomes": [
+        {
+          "outcome_id": "SUPPORTING",
+          "probability": 0.95
+        },
+        {
+          "outcome_id": "REFUTING",
+          "probability": 0.05
+        }
+      ]
+    },
+    {
+      "action_id": "A",
+      "mechanism_id": "SHARED",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "outcomes": [
+        {
+          "outcome_id": "SUPPORTING",
+          "probability": 0.05
+        },
+        {
+          "outcome_id": "REFUTING",
+          "probability": 0.95
+        }
+      ]
+    },
+    {
+      "action_id": "A",
+      "mechanism_id": "DIRECT",
+      "nuisance_profile_id": "shifted-gain",
+      "observation_model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "outcomes": [
+        {
+          "outcome_id": "SUPPORTING",
+          "probability": 0.93
+        },
+        {
+          "outcome_id": "REFUTING",
+          "probability": 0.07
+        }
+      ]
+    },
+    {
+      "action_id": "A",
+      "mechanism_id": "EXTRA",
+      "nuisance_profile_id": "shifted-gain",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "outcomes": [
+        {
+          "outcome_id": "SUPPORTING",
+          "probability": 0.93
+        },
+        {
+          "outcome_id": "REFUTING",
+          "probability": 0.07
+        }
+      ]
+    },
+    {
+      "action_id": "A",
+      "mechanism_id": "SHARED",
+      "nuisance_profile_id": "shifted-gain",
+      "observation_model_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "outcomes": [
+        {
+          "outcome_id": "SUPPORTING",
+          "probability": 0.07
+        },
+        {
+          "outcome_id": "REFUTING",
+          "probability": 0.93
+        }
+      ]
+    },
+    {
+      "action_id": "B",
+      "mechanism_id": "DIRECT",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "outcomes": [
+        {
+          "outcome_id": "DIRECT_SIGNAL",
+          "probability": 0.95
+        },
+        {
+          "outcome_id": "EXTRA_SIGNAL",
+          "probability": 0.05
+        }
+      ]
+    },
+    {
+      "action_id": "B",
+      "mechanism_id": "EXTRA",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "outcomes": [
+        {
+          "outcome_id": "DIRECT_SIGNAL",
+          "probability": 0.05
+        },
+        {
+          "outcome_id": "EXTRA_SIGNAL",
+          "probability": 0.95
+        }
+      ]
+    },
+    {
+      "action_id": "B",
+      "mechanism_id": "SHARED",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "outcomes": [
+        {
+          "outcome_id": "DIRECT_SIGNAL",
+          "probability": 0.5
+        },
+        {
+          "outcome_id": "EXTRA_SIGNAL",
+          "probability": 0.5
+        }
+      ]
+    },
+    {
+      "action_id": "B",
+      "mechanism_id": "DIRECT",
+      "nuisance_profile_id": "shifted-gain",
+      "observation_model_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "outcomes": [
+        {
+          "outcome_id": "DIRECT_SIGNAL",
+          "probability": 0.93
+        },
+        {
+          "outcome_id": "EXTRA_SIGNAL",
+          "probability": 0.07
+        }
+      ]
+    },
+    {
+      "action_id": "B",
+      "mechanism_id": "EXTRA",
+      "nuisance_profile_id": "shifted-gain",
+      "observation_model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "outcomes": [
+        {
+          "outcome_id": "DIRECT_SIGNAL",
+          "probability": 0.07
+        },
+        {
+          "outcome_id": "EXTRA_SIGNAL",
+          "probability": 0.93
+        }
+      ]
+    },
+    {
+      "action_id": "B",
+      "mechanism_id": "SHARED",
+      "nuisance_profile_id": "shifted-gain",
+      "observation_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "outcomes": [
+        {
+          "outcome_id": "DIRECT_SIGNAL",
+          "probability": 0.5
+        },
+        {
+          "outcome_id": "EXTRA_SIGNAL",
+          "probability": 0.5
+        }
+      ]
+    }
+  ],
+  "alpha_query": 0.25,
+  "alpha_mechanism": 0.25,
+  "max_depth": 2,
+  "max_frontier_vectors": 10000,
+  "fixed_bundles": [
+    [
+      "A",
+      "B"
+    ]
+  ],
+  "known_answer": {
+    "expected_status": "EXACT_ADAPTIVE_POLICY_FOUND",
+    "expected_root_action_id": "A",
+    "expected_policy": {
+      "action_id": "A",
+      "branches": {
+        "REFUTING": {
+          "stop": true
+        },
+        "SUPPORTING": {
+          "action_id": "B",
+          "branches": {
+            "DIRECT_SIGNAL": {
+              "stop": true
+            },
+            "EXTRA_SIGNAL": {
+              "stop": true
+            }
+          }
+        }
+      }
+    },
+    "expected_policy_sha256": null,
+    "expected_cost_by_nuisance": {
+      "nominal": 2.54,
+      "shifted-gain": 2.516
+    },
+    "expected_robust_expected_cost": 2.54,
+    "expected_fixed_bundle_costs": {
+      "A+B": {
+        "nominal": 3,
+        "shifted-gain": 3
+      }
+    }
+  }
+}
