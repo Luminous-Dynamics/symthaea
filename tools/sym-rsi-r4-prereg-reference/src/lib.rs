@@ -282,6 +282,14 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     ] {
         require_string(report, root, &["research_state_continuity", field]);
     }
+    if string_at(root, &["research_state_continuity", "state_snapshot_digest"])
+        != string_at(root, &["starting_state", "shared_inner_agent", "memory_research_state_digest"])
+    {
+        report.issue(
+            "STATE_SNAPSHOT_START_MISMATCH",
+            "research-state continuity snapshot must identify the exact starting inner-agent research state",
+        );
+    }
     require_string(report, root, &["issue_refs", "evidence_continuity"]);
 
     let required_record_types = [
@@ -830,6 +838,18 @@ mod tests {
             Value::String("starting_state.other_candidate".to_owned());
         let report = validate_preregistration(&value);
         assert!(report.issues.iter().any(|issue| issue.starts_with("START_REFERENCE_MISMATCH")));
+    }
+
+    #[test]
+    fn rejects_research_state_snapshot_mismatch() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["state_snapshot_digest"] =
+            Value::String("f".repeat(64));
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("STATE_SNAPSHOT_START_MISMATCH")));
     }
 
     #[test]
