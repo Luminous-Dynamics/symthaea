@@ -6,6 +6,7 @@ license.workspace = true
 description = "Fail-closed dataset, split, and run-receipt validation for defensive EMSR research"
 
 [dependencies]
+chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
