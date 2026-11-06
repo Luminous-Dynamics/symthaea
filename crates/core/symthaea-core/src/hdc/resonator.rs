@@ -16,11 +16,12 @@ Traditional approaches:
 3. **HDC Retrieval**: Find similar patterns (no algebraic solving)
 
 Resonator Networks:
-- **Coupled oscillators** that "resonate" to constraint solutions
-- **Iterative convergence** for selected constraint satisfaction problems
-- **Energy-based**: Solutions are low-energy stable states
-- **Algebra-aware**: Current continuous-Hadamard mode is approximate; exact
+- **Coupled iterative states** that search for stable constraint estimates
+- **Convergence is measured**, not assumed to imply correctness
+- **Energy-based diagnostics** for residual constraint consistency
+- **Algebra-aware**: current continuous-Hadamard updates are approximate; exact
   inverse contracts require bipolar MAP or unitary HRR roles
+- **Replayable runs** with seeded initialization and exploration noise
 
 ## Core Insight
 
@@ -215,6 +216,45 @@ pub struct ResonatorConfig {
     pub noise_scale: f32,
     /// Energy threshold for solution acceptance
     pub energy_threshold: f32,
+    /// Seed for reproducible initialization and exploration noise.
+    pub initialization_seed: u64,
+}
+
+#[derive(Debug, Clone)]
+struct ResonatorRng {
+    state: u64,
+}
+
+impl ResonatorRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed },
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // xorshift64*: deterministic and sufficient for initialization/noise,
+        // not intended for cryptographic use.
+        let mut value = self.state;
+        value ^= value >> 12;
+        value ^= value << 25;
+        value ^= value >> 27;
+        self.state = value;
+        value.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+
+    fn unit_f32(&mut self) -> f32 {
+        let mantissa = (self.next_u64() >> 40) as u32;
+        mantissa as f32 * (1.0 / 16_777_216.0)
+    }
+
+    fn signed_f32(&mut self) -> f32 {
+        self.unit_f32().mul_add(2.0, -1.0)
+    }
+
+    fn vector(&mut self, dimension: usize) -> Vec<f32> {
+        (0..dimension).map(|_| self.signed_f32()).collect()
+    }
 }
 
 impl Default for ResonatorConfig {
@@ -227,6 +267,7 @@ impl Default for ResonatorConfig {
             max_iterations: 100,
             noise_scale: 0.01,
             energy_threshold: 0.1,
+            initialization_seed: 0x5253_4E54_524E_0001,
         }
     }
 }
@@ -422,10 +463,11 @@ impl ResonatorNetwork {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
         self.energy_history.clear();
 
-        // Initialize estimate randomly
-        let mut estimate: Vec<f32> = (0..self.dimension)
-            .map(|_| rand::random::<f32>() * 2.0 - 1.0)
-            .collect();
+        // Deterministic, replayable initialization. The accumulated iteration
+        // count gives successive solve calls distinct but reproducible streams.
+        let seed = self.config.initialization_seed ^ self.iteration_count as u64;
+        let mut rng = ResonatorRng::new(seed);
+        let mut estimate = rng.vector(self.dimension);
         normalize(&mut estimate);
 
         let mut previous = estimate.clone();
@@ -479,7 +521,7 @@ impl ResonatorNetwork {
             // Add noise for exploration
             if self.config.noise_scale > 0.0 {
                 for i in 0..self.dimension {
-                    velocity[i] += self.config.noise_scale * (rand::random::<f32>() * 2.0 - 1.0);
+                    velocity[i] += self.config.noise_scale * rng.signed_f32();
                 }
             }
 
@@ -610,16 +652,16 @@ impl ResonatorNetwork {
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
         self.energy_history.clear();
 
-        // Initialize estimates for all unknowns
-        let mut estimates: HashMap<String, Vec<f32>> = unknowns
-            .iter()
-            .map(|&name| {
-                let v: Vec<f32> = (0..self.dimension)
-                    .map(|_| rand::random::<f32>() * 2.0 - 1.0)
-                    .collect();
-                (name.to_string(), v)
-            })
-            .collect();
+        // Deterministic initialization: same seed, call order and inputs produce
+        // identical initial states and terminal status.
+        let seed = self.config.initialization_seed ^ self.iteration_count as u64;
+        let mut rng = ResonatorRng::new(seed);
+        let mut estimates: HashMap<String, Vec<f32>> = HashMap::with_capacity(unknowns.len());
+        for &name in unknowns {
+            let mut estimate = rng.vector(self.dimension);
+            normalize(&mut estimate);
+            estimates.insert(name.to_string(), estimate);
+        }
 
         // Initialize resonator states for introspection
         self.states = unknowns
