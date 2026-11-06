@@ -18,6 +18,7 @@ pub const CLAIM_SCHEMA: &str = "luminous.rea.claim.v0";
 pub const CLAIM_EVALUATION_SCHEMA: &str = "luminous.rea.claim-evaluation.v0";
 pub const CLAIM_EVALUATOR_VERSION: &str = "rea-claim-evaluator/v0";
 pub const MAX_CLAIM_JSON_BYTES: usize = 1024 * 1024;
+pub const MAX_CLAIM_EVIDENCE_RECORDS: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, SerdeDeserialize)]
 #[serde(rename_all = "snake_case")]
@@ -137,6 +138,8 @@ pub enum ClaimErrorKind {
     InvalidClaim,
     InvalidEvidence,
     DuplicateEvidence,
+    UnexpectedEvidence,
+    ResourceLimit,
     Canonicalization,
 }
 
@@ -237,6 +240,17 @@ pub fn validate_claim(claim: &ClaimRequest) -> Result<(), ClaimError> {
             ));
         }
         _ => {}
+    }
+
+    if claim.evidence_ids.len() > MAX_CLAIM_EVIDENCE_RECORDS {
+        return Err(ClaimError::new(
+            ClaimErrorKind::ResourceLimit,
+            format!(
+                "claim references {} Evidence records; limit is {}",
+                claim.evidence_ids.len(),
+                MAX_CLAIM_EVIDENCE_RECORDS
+            ),
+        ));
     }
 
     let mut seen = HashSet::with_capacity(claim.evidence_ids.len());
@@ -567,6 +581,12 @@ pub fn evaluate_claim(
     supplied_evidence: &[VerifiedEvidence],
 ) -> Result<ClaimEvaluation, ClaimError> {
     validate_claim(claim)?;
+    if supplied_evidence.len() > claim.evidence_ids.len() {
+        return Err(ClaimError::new(
+            ClaimErrorKind::UnexpectedEvidence,
+            "supplied Evidence set contains more records than the claim references",
+        ));
+    }
 
     let mut verified_by_id = HashMap::<String, VerifiedEvidence>::new();
     for supplied in supplied_evidence {
@@ -583,6 +603,15 @@ pub fn evaluate_claim(
             return Err(ClaimError::new(
                 ClaimErrorKind::InvalidEvidence,
                 "supplied VerifiedEvidence identifier does not match its verified value",
+            ));
+        }
+        if !claim.evidence_ids.contains(&verified.evidence_id) {
+            return Err(ClaimError::new(
+                ClaimErrorKind::UnexpectedEvidence,
+                format!(
+                    "supplied Evidence {} is not referenced by the claim",
+                    verified.evidence_id
+                ),
             ));
         }
         if verified_by_id
