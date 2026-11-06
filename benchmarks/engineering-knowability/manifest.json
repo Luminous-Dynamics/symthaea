@@ -517,13 +517,39 @@
       "comparability_boundary": "Do not compare v2.0 with v2.1. The score covers CAD geometry/topology, assembly placement and board connectivity, not manufacturing readiness, uncertainty, inspection access, lifecycle requalification or physical performance."
     },
     {
-      "id": "cadworld-2026-11-06",
-      "name": "CADWorld — Computer-Use Benchmark for Long-Horizon CAD",
+      "id": "cadworld-v0-60-task-release-2026-11-06",
+      "name": "CADWorld — released v0, 60-task coverage evaluation",
+      "source_url": "https://cad-world.github.io/",
+      "captured_at": "2026-11-06",
+      "task_count": 60,
+      "scope": "released_v0_60_task_coverage",
+      "run_protocol": "Seven agents evaluated across all 11 workflow categories; capped at 100 GUI steps per task. Task success requires all executable checks on saved FreeCAD and auxiliary artifacts. Expert reference is a single-trial pass, not a population estimate.",
+      "entries": [
+        {
+          "model": "GPT-5.4",
+          "harness": "CADWorld computer-use agent",
+          "score": 0.25,
+          "cost_per_task_usd": 1.4,
+          "median_duration_minutes": null
+        },
+        {
+          "model": "Human expert single-trial reference",
+          "harness": "CADWorld expert execution",
+          "score": 0.87,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "The benchmark universe contains 200 tasks, but the published v0 release and this result table cover 60 tasks. The 87.0% human figure is one expert reference pass, not a population benchmark. Do not treat this as a score on the full 200-task universe."
+    },
+    {
+      "id": "cadworld-extended-run-snapshot-2026-11-06",
+      "name": "CADWorld — extended-run result snapshot",
       "source_url": "https://cad-world.github.io/",
       "captured_at": "2026-11-06",
       "task_count": 200,
-      "scope": "full_200_task_freecad_workflow_cohort",
-      "run_protocol": "Live benchmark page reports 14 evaluated agents; 100 GUI steps per task; task-specific executable checks on saved FreeCAD artifacts. Extended-run board and original seven-agent paper snapshot are different evaluation snapshots.",
+      "scope": "extended_run_result_denominator_not_confirmed",
+      "run_protocol": "The indexed extended-run display lists 14 evaluated agents and uses 100 GUI steps per task. The retrieved summary does not establish the exact task denominator for these extended-run scores; 200 is the benchmark task-universe count, not an assertion that every extended agent run covered all 200 tasks.",
       "entries": [
         {
           "model": "Claude Opus 5.5",
@@ -531,49 +557,23 @@
           "score": 0.415,
           "cost_per_task_usd": null,
           "median_duration_minutes": null
-        }
-      ],
-      "comparability_boundary": "The live page's 87.0% expert reference is a single-trial expert pass, not an estimated human population mean. The original September paper reports a different seven-agent snapshot with a 17.5% strongest agent. Do not merge the snapshots. The benchmark includes measurement and manufacturing workflows but does not score full claim-to-evidence-path validity, calibration/uncertainty correctness or post-service requalification."
-    },
-    {
-      "id": "benchcad-2.1-standard-core-2026-11-05",
-      "name": "BenchCAD 2.1 Core — standard harness",
-      "source_url": "https://benchcad.com/leaderboard",
-      "captured_at": "2026-11-06",
-      "task_count": 100,
-      "scope": "v2.1_standard_100_held_out_core_cases",
-      "run_protocol": "Standard v2.1: 60 rounds and 500,000 output tokens per case (thinking included), reasoning carried across rounds; mean of five full passes over all 100 Core cases; displayed ±95%; API list price.",
-      "entries": [
+        },
         {
-          "model": "Claude Opus 5.5 (max)",
-          "harness": "BenchCAD standard v2.1",
-          "score": 0.49,
-          "displayed_uncertainty_95": 0.013,
-          "cost_per_task_usd": 8.1,
+          "model": "Claude Sonnet 5.5",
+          "harness": "CADWorld extended-run GUI agent",
+          "score": 0.335,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        },
+        {
+          "model": "GPT-6 Astra",
+          "harness": "CADWorld extended-run GUI agent",
+          "score": 0.33,
+          "cost_per_task_usd": null,
           "median_duration_minutes": null
         }
       ],
-      "comparability_boundary": "A distinct release from BenchCAD 2.0. v2.1 scores are not comparable with v2.0 because rounds, token budget, reasoning carry and Task 6 matching changed. This score is the standard board; do not merge with the customized-harness board."
-    },
-    {
-      "id": "benchcad-2.1-customized-core-2026-11-05",
-      "name": "BenchCAD 2.1 Core — customized harness board",
-      "source_url": "https://benchcad.com/leaderboard",
-      "captured_at": "2026-11-06",
-      "task_count": 100,
-      "scope": "v2.1_customized_harness_100_held_out_core_cases",
-      "run_protocol": "Customized harness board. Claude Opus 5.5 in Claude Code: mean of runs over all 100 Core cases, number of passes not specified in the leaderboard summary; displayed ±95%; API list price.",
-      "entries": [
-        {
-          "model": "Claude Opus 5.5 (max)",
-          "harness": "Claude Code; BenchCAD customized-harness board",
-          "score": 0.653,
-          "displayed_uncertainty_95": 0.014,
-          "cost_per_task_usd": 20,
-          "median_duration_minutes": null
-        }
-      ],
-      "comparability_boundary": "Separate from the standard v2.1 board. The leaderboard also shows an OpenAI internal-model/Codex row scored with the BenchCAD 2.0 scorer; that row is excluded from this v2.1-scored entry. Customized-harness scores are not comparable with the standard harness board or BenchCAD 2.0."
+      "comparability_boundary": "Separate from the released v0 60-task evaluation and the original paper snapshot. Exact extended-run task denominator and run repetition are not established in the retrieved result summary; do not compare this record directly to the v0 board or claim full-200-task completion."
     }
   ]
 }
