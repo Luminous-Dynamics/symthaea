@@ -499,7 +499,7 @@ mod tests {
                     "same",
                     1_200,
                     CapabilityMeasurementKind::CapabilityLimitTest,
-                    )
+                )
             },
         ];
         assert_eq!(
