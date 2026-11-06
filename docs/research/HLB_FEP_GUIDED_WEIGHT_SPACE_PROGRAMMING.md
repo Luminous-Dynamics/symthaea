@@ -173,12 +173,12 @@ where \\(B\\) is the multivariate beta function. The implementation accumulates 
 
 **Contract and boundary:**
 - Full posterior, full prior, and every reduced prior must carry the same 64-character parameterization digest, binding the ordered likelihood columns, factor dimensions, outcome order, and coordinates.
-- All concentrations must be finite and strictly positive. Exact-zero concentrations define a support-restricted / point-mass structure rather than an ordinary proper Dirichlet. That requires a separate explicit structural-support representation; this implementation rejects zeros and negatives instead of pretending they are proper Dirichlets.
+- Full-model prior and posterior concentrations must be finite and strictly positive. Reduced priors carry an explicit per-column `active_support` mask: active coordinates require positive concentrations; inactive coordinates require exactly zero concentration and define a proper lower-dimensional simplex face. If posterior evidence contains any count in an excluded coordinate, that reduced model receives exactly zero marginal likelihood. Empty support, implicit zeros, negative values, and non-integrable reduced posteriors are rejected.
 - Reduced posterior concentrations must remain strictly positive. If the data accumulated under the full model make a proposed reduction non-integrable, the candidate is rejected.
 - Independent columns factorize exactly. Correlated or hierarchical Dirichlet structures are outside the present implementation.
 - The Gaussian and Dirichlet BMR modules are complementary primitives, not interchangeable approximations.
 
-Tests include the exact Beta-Binomial evidence ratio for a Beta(1,1) full prior and Beta(2,1) reduced prior (reduced/full evidence ratio \\(4/3\\)), additivity across independent likelihood columns, model-prior odds, ordered-parameterization binding, and negative controls for zero concentrations and incompatible reduced posteriors.
+Tests include the exact Beta-Binomial evidence ratio for a Beta(1,1) full prior and Beta(2,1) reduced prior (reduced/full evidence ratio \\(4/3\\)), explicit support-restricted evidence when excluded outcomes are unobserved, zero evidence when an excluded outcome is observed, additivity across independent likelihood columns, model-prior odds, ordered-parameterization binding, and negative controls for malformed support and incompatible reduced posteriors.
 
 This is the appropriate BMR substrate for the [2026 three-ball active structure-learning paper](https://doi.org/10.1038/s41467-026-77209-5), whose categorical likelihood parameters are represented by Dirichlet counts. It remains a primitive: the complete POMDP, policy evaluator, model-space construction, and prospective model expected-information-gain adapter are not yet wired into Symthaea's production selector.
 
