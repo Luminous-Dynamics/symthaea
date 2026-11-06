@@ -283,7 +283,7 @@ mod tests {
             sample("start", 0, -1_000_000),
             sample("end", 3_600, -1_000_000),
         ];
-        let result = integrate_power_trace(inputs(&samples)).unwrap();
+        let result = integrate_power_trace(inputs_with_gap(&samples, 3_600)).unwrap();
         assert!(result.trace_complete);
         assert_eq!(result.signed_energy_milli_wh_numerator, -7_200_000_000);
         assert_eq!(result.peak_import_power_abs_milli_w, 1_000_000);
