@@ -183,7 +183,7 @@ Only after those gates should a matched human/rule/model comparison begin. A lat
 
 ## Industry benchmark context — captured 2026-11-06
 
-The machine-readable manifest pins four external comparison snapshots. They are **context**, not a merged leaderboard and not scores for this knowability benchmark.
+The machine-readable manifest pins five external comparison snapshots. They are **context**, not a merged leaderboard and not scores for this knowability benchmark.
 
 | Comparator | Publicly reported reference | What it measures | What remains outside its score |
 |---|---|---|---|
@@ -191,6 +191,8 @@ The machine-readable manifest pins four external comparison snapshots. They are 
 | [PLE public development, 29 tasks](https://ple-bench.com/leaderboard?set=dev) | Claude Opus 5.5 + Claude Code: 0.551; Claude Opus 5.5 + Codex: 0.549; GPT-6 Astra + Codex: 0.530 | Same public development split and three-run protocol | Not comparable with PLE hidden 56, all-85 or committed-artifact submission mode |
 | [Parametric CAD Bench V3](https://cadbench.ai/leaderboard) | Claude Opus 5.5 + Claude Code: 0.6103 (displayed 95% CI ±0.0753), 99/100 scored, $573.94 total | 100 public tasks: 30 text creation, 30 create-and-edit, 40 engineering drawings; separate programmatic FreeCAD validator | Does not score inspection access, calibrated measurement capability, maintenance or physical conformity |
 | [BenchCAD 2.0 Core](https://benchcad.com/blog/benchcad-2) | GPT-6 Astra: 0.59, about $11/task, 62 min median; Claude Opus 5.5: 0.57, about $28/task, 222 min median | 100 held-out hardware-engineering cases; geometry/topology, assembly placement and ECAD connectivity | Does not score manufacturability, physical performance, metrology, inspectability or lifecycle requalification; v2.0 is not comparable with v2.1 |
+
+| [CADWorld](https://cad-world.github.io/) | Claude Opus 5.5 extended-run GUI agent: 41.5% on the 200-task FreeCAD cohort; 87.0% expert reference is a single-trial result | Long-horizon native FreeCAD workflows spanning sketching, part design, assembly, CAM, FEM, measurement, mesh, and technical drawing; task-specific executable checks on saved files | Not a population-level human baseline; does not grade complete claim/evidence validity, uncertainty/calibration correctness or lifecycle requalification. The original seven-agent paper snapshot (17.5% strongest result) is separate from the current live extended-run page |
 
 These comparisons show why model-only ranking is insufficient. PLE's live board varies both model and harness; on the 29-task development set, the same Claude Opus 5.5 system has visible harness-dependent score and cost changes. Benchmark records must therefore identify the full model × harness × effort × task-split × evaluator protocol. Never pool the above means or use the highest point estimate as a statistically decisive ranking without considering the stated uncertainty and protocol.
 
@@ -205,7 +207,6 @@ This is intended as an orthogonal capability layer, not a claim that the current
 The immediate extension is [ENG-KNOW-CODESIGN-001 #10702](https://github.com/Luminous-Dynamics/symthaea/issues/10702): test whether integrating inspection, measurement, diagnosis and requalification affordances during design reduces late blockers and lifecycle burden without sacrificing functional feasibility. It composes #10652 with existing SE-OPT #3686, ENG-REF #6121 and canonical metrology/tolerance/lifecycle owners; it creates no new optimizer or measurement authority.
 
 
-| [CADWorld](https://cad-world.github.io/) | Claude Opus 5.5 extended-run GUI agent: 41.5% on the 200-task FreeCAD cohort; 87.0% expert reference is a single-trial result | Long-horizon native FreeCAD workflows spanning sketching, part design, assembly, CAM, FEM, measurement, mesh, and technical drawing; task-specific executable checks on saved files | Not a population-level human baseline; does not grade complete claim/evidence validity, uncertainty/calibration correctness or lifecycle requalification. The original seven-agent paper snapshot (17.5% strongest result) is separate from the current live extended-run page |
 
 
 ## Standards interoperability dependency
