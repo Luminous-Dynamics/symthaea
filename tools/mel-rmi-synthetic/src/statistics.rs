@@ -45,7 +45,7 @@ pub struct PairedEffectValue {
     pub sham_delta: u32,
     /// Distance between unrelated-feature and control next actions.
     pub unrelated_delta: u32,
-    /// Optional distance between yoked-replay and control next actions.
+    /// Treatment-versus-control action change in the matched yoked replay arm.
     pub yoked_delta: Option<u32>,
 }
 
