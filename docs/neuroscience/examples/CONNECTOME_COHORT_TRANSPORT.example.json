@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-connectome-new-animal-transport-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_binding": {
+    "dataset_id": "synthetic-wt-and-unc31-cohort",
+    "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "source_access_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "species": "C-elegans-synthetic",
+    "evidence_tier": "SYNTHETIC"
+  },
+  "split_manifest": {
+    "track": "NEW_ANIMAL_SAME_PAIR",
+    "split_unit": "ANIMAL",
+    "train_animal_ids": [
+      "WT-TRAIN-01"
+    ],
+    "validation_animal_ids": [
+      "WT-VALID-01"
+    ],
+    "lockbox_animal_ids": [
+      "WT-LOCKBOX-01",
+      "UNC31-LOCKBOX-01"
+    ],
+    "split_sha256": "3720a6de7af2a47ed63fca4c6b6310d4b08bb406058f5c615963a22ca8ade03c",
+    "lockbox_frozen_before_prediction": true,
+    "calibration_animal_ids": [
+      "WT-CAL-01"
+    ]
+  },
+  "animals": [
+    {
+      "animal_id": "WT-TRAIN-01",
+      "condition_id": "WT_BACKGROUND",
+      "cohort_role": "TRAIN"
+    },
+    {
+      "animal_id": "WT-VALID-01",
+      "condition_id": "WT_BACKGROUND",
+      "cohort_role": "VALIDATION"
+    },
+    {
+      "animal_id": "WT-LOCKBOX-01",
+      "condition_id": "WT_BACKGROUND",
+      "cohort_role": "LOCKBOX"
+    },
+    {
+      "animal_id": "UNC31-LOCKBOX-01",
+      "condition_id": "UNC31_MUTANT",
+      "cohort_role": "LOCKBOX"
+    },
+    {
+      "animal_id": "WT-CAL-01",
+      "condition_id": "WT_BACKGROUND",
+      "cohort_role": "CALIBRATION"
+    }
+  ],
+  "pairs": [
+    {
+      "pair_id": "RID-URX",
+      "upstream_neuron_id": "RID",
+      "downstream_neuron_id": "URX",
+      "direct_wiring_status": "NO_DIRECT_EDGE",
+      "structure_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "pair_id": "DIRECT-PAIR",
+      "upstream_neuron_id": "A",
+      "downstream_neuron_id": "B",
+      "direct_wiring_status": "DIRECT_EDGE",
+      "structure_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "pair_id": "UNMEASURED-PAIR",
+      "upstream_neuron_id": "C",
+      "downstream_neuron_id": "D",
+      "direct_wiring_status": "UNKNOWN",
+      "structure_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "OBS-WT-RID-URX",
+      "animal_id": "WT-LOCKBOX-01",
+      "condition_id": "WT_BACKGROUND",
+      "pair_id": "RID-URX",
+      "measurement_disposition": "OBSERVED",
+      "functional_disposition": "FUNCTIONAL_CONNECTION",
+      "trial_count": 3,
+      "response_mean": 0.8,
+      "response_kernel_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "equivalence_protocol_sha256": null,
+      "equivalence_receipt_sha256": null
+    },
+    {
+      "observation_id": "OBS-WT-DIRECT",
+      "animal_id": "WT-LOCKBOX-01",
+      "condition_id": "WT_BACKGROUND",
+      "pair_id": "DIRECT-PAIR",
+      "measurement_disposition": "OBSERVED",
+      "functional_disposition": "INDETERMINATE",
+      "trial_count": 2,
+      "response_mean": 0.4,
+      "response_kernel_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "equivalence_protocol_sha256": null,
+      "equivalence_receipt_sha256": null
+    },
+    {
+      "observation_id": "OBS-WT-MISSING",
+      "animal_id": "WT-LOCKBOX-01",
+      "condition_id": "WT_BACKGROUND",
+      "pair_id": "UNMEASURED-PAIR",
+      "measurement_disposition": "NOT_MEASURED",
+      "functional_disposition": "NOT_MEASURED",
+      "trial_count": null,
+      "response_mean": null,
+      "response_kernel_sha256": null,
+      "equivalence_protocol_sha256": null,
+      "equivalence_receipt_sha256": null
+    },
+    {
+      "observation_id": "OBS-UNC31-RID-URX",
+      "animal_id": "UNC31-LOCKBOX-01",
+      "condition_id": "UNC31_MUTANT",
+      "pair_id": "RID-URX",
+      "measurement_disposition": "OBSERVED",
+      "functional_disposition": "FUNCTIONAL_NON_CONNECTION",
+      "trial_count": 3,
+      "response_mean": 0.1,
+      "response_kernel_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "equivalence_protocol_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "equivalence_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    {
+      "observation_id": "OBS-UNC31-DIRECT",
+      "animal_id": "UNC31-LOCKBOX-01",
+      "condition_id": "UNC31_MUTANT",
+      "pair_id": "DIRECT-PAIR",
+      "measurement_disposition": "OBSERVED",
+      "functional_disposition": "INDETERMINATE",
+      "trial_count": 2,
+      "response_mean": 0.5,
+      "response_kernel_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "equivalence_protocol_sha256": null,
+      "equivalence_receipt_sha256": null
+    },
+    {
+      "observation_id": "OBS-UNC31-MISSING",
+      "animal_id": "UNC31-LOCKBOX-01",
+      "condition_id": "UNC31_MUTANT",
+      "pair_id": "UNMEASURED-PAIR",
+      "measurement_disposition": "NOT_MEASURED",
+      "functional_disposition": "NOT_MEASURED",
+      "trial_count": null,
+      "response_mean": null,
+      "response_kernel_sha256": null,
+      "equivalence_protocol_sha256": null,
+      "equivalence_receipt_sha256": null
+    }
+  ],
+  "models": [
+    {
+      "model_id": "anatomy-only",
+      "model_kind": "ANATOMY_ONLY",
+      "implementation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "training_manifest_sha256": "a8b0f62ed891262789547ab8d9730f48951ad3a65e2d9e787bddcdd8066e85f7",
+      "training_animal_ids": [
+        "WT-TRAIN-01"
+      ],
+      "supported_conditions": [
+        {
+          "condition_id": "WT_BACKGROUND",
+          "support_basis": "TRAIN_OBSERVED",
+          "support_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+        },
+        {
+          "condition_id": "UNC31_MUTANT",
+          "support_basis": "MECHANISTIC_INVARIANCE_ASSUMPTION",
+          "support_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "calibration_method": "NONE",
+      "calibration_animal_ids": [],
+      "calibration_manifest_sha256": "60bfd4001fb10cc239701e0929c19a41fe8d4db79f7090338e4d131f0b99947a",
+      "calibration_receipt_sha256": null
+    },
+    {
+      "model_id": "state-aware",
+      "model_kind": "STATE_HISTORY_AWARE",
+      "implementation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "training_manifest_sha256": "d9bc2b2c3e6871c11ad98ba1e7b24587b7d19209b4020a8cfeaf00748c1e9df2",
+      "training_animal_ids": [
+        "WT-TRAIN-01"
+      ],
+      "supported_conditions": [
+        {
+          "condition_id": "WT_BACKGROUND",
+          "support_basis": "TRAIN_OBSERVED",
+          "support_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      ],
+      "calibration_method": "ISOTONIC_PLUS_SPLIT_CONFORMAL",
+      "calibration_animal_ids": [
+        "WT-CAL-01"
+      ],
+      "calibration_manifest_sha256": "3929641b696d92ae360efe33e5a476794ed929d1f40eac0fef5482315e3892f0",
+      "calibration_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "predictions": [
+    {
+      "prediction_id": "P-A-1",
+      "model_id": "anatomy-only",
+      "observation_id": "OBS-WT-RID-URX",
+      "prediction_disposition": "PREDICTED",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": 0.1,
+      "predicted_response_mean": 0.1,
+      "lower90": 0,
+      "upper90": 0.2
+    },
+    {
+      "prediction_id": "P-A-2",
+      "model_id": "anatomy-only",
+      "observation_id": "OBS-WT-DIRECT",
+      "prediction_disposition": "PREDICTED",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": 0.8,
+      "predicted_response_mean": 0.8,
+      "lower90": 0.6,
+      "upper90": 1
+    },
+    {
+      "prediction_id": "P-A-3",
+      "model_id": "anatomy-only",
+      "observation_id": "OBS-WT-MISSING",
+      "prediction_disposition": "NOT_APPLICABLE",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": null,
+      "predicted_response_mean": null,
+      "lower90": null,
+      "upper90": null
+    },
+    {
+      "prediction_id": "P-A-4",
+      "model_id": "anatomy-only",
+      "observation_id": "OBS-UNC31-RID-URX",
+      "prediction_disposition": "PREDICTED",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": 0.1,
+      "predicted_response_mean": 0.1,
+      "lower90": 0,
+      "upper90": 0.2
+    },
+    {
+      "prediction_id": "P-A-5",
+      "model_id": "anatomy-only",
+      "observation_id": "OBS-UNC31-DIRECT",
+      "prediction_disposition": "PREDICTED",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": 0.8,
+      "predicted_response_mean": 0.8,
+      "lower90": 0.6,
+      "upper90": 1
+    },
+    {
+      "prediction_id": "P-A-6",
+      "model_id": "anatomy-only",
+      "observation_id": "OBS-UNC31-MISSING",
+      "prediction_disposition": "NOT_APPLICABLE",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": null,
+      "predicted_response_mean": null,
+      "lower90": null,
+      "upper90": null
+    },
+    {
+      "prediction_id": "P-S-1",
+      "model_id": "state-aware",
+      "observation_id": "OBS-WT-RID-URX",
+      "prediction_disposition": "PREDICTED",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": 0.8,
+      "predicted_response_mean": 0.75,
+      "lower90": 0.6,
+      "upper90": 0.9
+    },
+    {
+      "prediction_id": "P-S-2",
+      "model_id": "state-aware",
+      "observation_id": "OBS-WT-DIRECT",
+      "prediction_disposition": "PREDICTED",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": 0.6,
+      "predicted_response_mean": 0.4,
+      "lower90": 0.2,
+      "upper90": 0.6
+    },
+    {
+      "prediction_id": "P-S-3",
+      "model_id": "state-aware",
+      "observation_id": "OBS-WT-MISSING",
+      "prediction_disposition": "NOT_APPLICABLE",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": null,
+      "predicted_response_mean": null,
+      "lower90": null,
+      "upper90": null
+    },
+    {
+      "prediction_id": "P-S-4",
+      "model_id": "state-aware",
+      "observation_id": "OBS-UNC31-RID-URX",
+      "prediction_disposition": "ABSTAINED_OUT_OF_DOMAIN",
+      "out_of_domain_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "probability_functional": null,
+      "predicted_response_mean": null,
+      "lower90": null,
+      "upper90": null
+    },
+    {
+      "prediction_id": "P-S-5",
+      "model_id": "state-aware",
+      "observation_id": "OBS-UNC31-DIRECT",
+      "prediction_disposition": "ABSTAINED_OUT_OF_DOMAIN",
+      "out_of_domain_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "probability_functional": null,
+      "predicted_response_mean": null,
+      "lower90": null,
+      "upper90": null
+    },
+    {
+      "prediction_id": "P-S-6",
+      "model_id": "state-aware",
+      "observation_id": "OBS-UNC31-MISSING",
+      "prediction_disposition": "NOT_APPLICABLE",
+      "out_of_domain_receipt_sha256": null,
+      "probability_functional": null,
+      "predicted_response_mean": null,
+      "lower90": null,
+      "upper90": null
+    }
+  ]
+}
