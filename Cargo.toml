@@ -24,6 +24,12 @@ exclude = [
     "crates/core/symthaea-observation-attestation",
     # README-only REA verifier placeholder; executable crate is not present yet.
     "crates/domains/symthaea-rea-evidence-verifier",
+    # Test-only IIT fixtures; no independently buildable crate manifest.
+    "crates/core/symthaea-iit",
+    # Source-only architecture-engineering prototype; no Cargo package manifest.
+    "crates/domains/symthaea-architecture-engineering",
+    # Documentation/source design prototype; no Cargo package manifest.
+    "crates/domains/symthaea-dishwasher-design",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
