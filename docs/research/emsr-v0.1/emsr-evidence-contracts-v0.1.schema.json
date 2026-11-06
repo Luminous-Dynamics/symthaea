@@ -1,0 +1,766 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/emsr-evidence-contracts-v0.1.schema.json",
+  "title": "EMSR Evidence Contracts v0.1",
+  "$comment": "Shared schemas for defensive recorded-data EMSR research. Cross-record uniqueness, group-leakage, exact-byte digest verification, and executor/verifier identity comparison are enforced by the Rust validator, not JSON Schema alone.",
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "gitObjectId": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "datasetRights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "license_expression",
+        "permitted_uses",
+        "source_terms_uri",
+        "reviewed_by",
+        "reviewed_at"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pending",
+            "reviewed",
+            "blocked"
+          ]
+        },
+        "license_expression": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "permitted_uses": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "research",
+              "commercial",
+              "redistribution"
+            ]
+          }
+        },
+        "source_terms_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "reviewed_by": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "reviewed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "pending"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "permitted_uses": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "blocked"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "permitted_uses": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "reviewed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "license_expression": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_terms_uri": {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https://"
+              },
+              "reviewed_by": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reviewed_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "fileDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "datasetEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "version",
+        "source_uri",
+        "rights",
+        "intended_use",
+        "ingestion",
+        "payload_files"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "recorded_receiver",
+            "raw_if",
+            "raw_iq",
+            "published_method"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "latest",
+              "unknown",
+              "tbd",
+              "LATEST",
+              "UNKNOWN",
+              "TBD"
+            ]
+          }
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "rights": {
+          "$ref": "#/$defs/datasetRights"
+        },
+        "intended_use": {
+          "enum": [
+            "research",
+            "commercial",
+            "redistribution"
+          ]
+        },
+        "ingestion": {
+          "enum": [
+            "not_imported",
+            "metadata_only",
+            "imported"
+          ]
+        },
+        "payload_files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fileDigest"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ingestion": {
+                "const": "imported"
+              }
+            },
+            "required": [
+              "ingestion"
+            ]
+          },
+          "then": {
+            "properties": {
+              "rights": {
+                "properties": {
+                  "state": {
+                    "const": "reviewed"
+                  },
+                  "permitted_uses": {
+                    "contains": {
+                      "const": "research"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ingestion": {
+                "enum": [
+                  "not_imported",
+                  "metadata_only"
+                ]
+              }
+            },
+            "required": [
+              "ingestion"
+            ]
+          },
+          "then": {
+            "properties": {
+              "payload_files": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "rights": {
+                "properties": {
+                  "state": {
+                    "const": "blocked"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "rights"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ingestion": {
+                "const": "not_imported"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "rights": {
+                "properties": {
+                  "state": {
+                    "const": "pending"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "rights"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ingestion": {
+                "enum": [
+                  "not_imported",
+                  "metadata_only"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "datasetCatalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "state",
+        "entries"
+      ],
+      "properties": {
+        "schema": {
+          "const": "emsr.dataset-catalog"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "state": {
+          "const": "FROZEN_DESIGN"
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/datasetEntry"
+          }
+        }
+      }
+    },
+    "splitRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "split",
+        "event_group",
+        "recording_group",
+        "receiver_group",
+        "campaign_group",
+        "location_group"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "validation",
+            "test"
+          ]
+        },
+        "event_group": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recording_group": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver_group": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "campaign_group": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "location_group": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      }
+    },
+    "splitManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "dataset_id",
+        "dataset_version",
+        "held_out_dimensions",
+        "records"
+      ],
+      "properties": {
+        "schema": {
+          "const": "emsr.split-manifest"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "held_out_dimensions": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "event_group",
+              "recording_group",
+              "receiver_group",
+              "campaign_group",
+              "location_group"
+            ]
+          }
+        },
+        "records": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/splitRecord"
+          }
+        }
+      }
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "outcome",
+        "reason_code",
+        "output_sha256"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "indeterminate"
+          ]
+        },
+        "reason_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "independentVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "verifier_id",
+        "verifier_sha256",
+        "report_sha256"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pending",
+            "verified",
+            "failed",
+            "indeterminate"
+          ]
+        },
+        "verifier_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "verifier_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "report_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "verified"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verifier_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verifier_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "report_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "pending",
+                  "failed",
+                  "indeterminate"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verifier_id": {
+                "const": null
+              },
+              "verifier_sha256": {
+                "const": null
+              },
+              "report_sha256": {
+                "const": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "runReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "run_id",
+        "executor_id",
+        "state",
+        "git_commit",
+        "dataset_catalog_sha256",
+        "dataset_payload_sha256",
+        "split_manifest_sha256",
+        "code_sha256",
+        "model_sha256",
+        "configuration_sha256",
+        "toolchain",
+        "environment_sha256",
+        "seed",
+        "cases",
+        "independent_verification"
+      ],
+      "properties": {
+        "schema": {
+          "const": "emsr.run-receipt"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "enum": [
+            "complete",
+            "incomplete"
+          ]
+        },
+        "git_commit": {
+          "$ref": "#/$defs/gitObjectId"
+        },
+        "dataset_catalog_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "dataset_payload_sha256": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "code_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "model_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/caseResult"
+          }
+        },
+        "independent_verification": {
+          "$ref": "#/$defs/independentVerification"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "independent_verification": {
+                "properties": {
+                  "state": {
+                    "const": "verified"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "independent_verification"
+            ]
+          },
+          "then": {
+            "properties": {
+              "state": {
+                "const": "complete"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "sourceProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "failure_domains",
+        "dependencies_complete"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "failure_domains": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dependencies_complete": {
+          "type": "boolean"
+        }
+      }
+    },
+    "sourceProfileSet": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceProfile"
+      }
+    }
+  }
+}
