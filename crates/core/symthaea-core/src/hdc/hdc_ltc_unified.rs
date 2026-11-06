@@ -3063,6 +3063,113 @@ mod tests {
     }
 
     #[test]
+    fn test_adaptive_gate_and_tau_gradients_match_finite_difference() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: Vec::new(),
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 91);
+        let input = ContinuousHV::random(64, 111).scale(0.2);
+        let target = ContinuousHV::random(64, 222).scale(0.2);
+        neuron.set_state(ContinuousHV::random(64, 333).scale(0.1));
+
+        let dt = 0.017;
+        let epsilon = 5e-3;
+        let index = 9;
+        let gradients = neuron.backward(&input, &target, dt);
+
+        fn loss(
+            original: &HdcLtcUnifiedNeuron,
+            input: &ContinuousHV,
+            target: &ContinuousHV,
+            dt: f32,
+        ) -> f32 {
+            let mut candidate = original.clone();
+            candidate.evolve_closed_form(dt, input);
+            candidate
+                .state()
+                .values
+                .iter()
+                .zip(target.values.iter())
+                .map(|(&predicted, &expected)| (predicted - expected).powi(2))
+                .sum::<f32>()
+                / target.dim() as f32
+        }
+
+        let finite_difference = |plus: HdcLtcUnifiedNeuron, minus: HdcLtcUnifiedNeuron| {
+            (loss(&plus, &input, &target, dt) - loss(&minus, &input, &target, dt))
+                / (2.0 * epsilon)
+        };
+
+        let mut plus = neuron.clone();
+        plus.tau_modulator.values[index] += epsilon;
+        let mut minus = neuron.clone();
+        minus.tau_modulator.values[index] -= epsilon;
+        let tau_gradient_fd = finite_difference(plus, minus);
+        assert!(
+            (gradients.d_tau_modulator.values[index] - tau_gradient_fd).abs() < 2e-3,
+            "tau-modulator gradient mismatch: analytic={}, finite_difference={}",
+            gradients.d_tau_modulator.values[index],
+            tau_gradient_fd
+        );
+
+        let mut plus = neuron.clone();
+        plus.gate_weight.values[index] += epsilon;
+        let mut minus = neuron.clone();
+        minus.gate_weight.values[index] -= epsilon;
+        let gate_gradient_fd = finite_difference(plus, minus);
+        assert!(
+            (gradients.d_gate_weight.values[index] - gate_gradient_fd).abs() < 2e-3,
+            "gate-weight gradient mismatch: analytic={}, finite_difference={}",
+            gradients.d_gate_weight.values[index],
+            gate_gradient_fd
+        );
+
+        let mut plus = neuron.clone();
+        plus.gate_bias.values[index] += epsilon;
+        let mut minus = neuron.clone();
+        minus.gate_bias.values[index] -= epsilon;
+        let gate_bias_gradient_fd = finite_difference(plus, minus);
+        assert!(
+            (gradients.d_gate_bias.values[index] - gate_bias_gradient_fd).abs() < 2e-3,
+            "gate-bias gradient mismatch: analytic={}, finite_difference={}",
+            gradients.d_gate_bias.values[index],
+            gate_bias_gradient_fd
+        );
+
+        let mut input_plus = input.clone();
+        input_plus.values[index] += epsilon;
+        let mut input_minus = input.clone();
+        input_minus.values[index] -= epsilon;
+        let input_gradient_fd = (loss(&neuron, &input_plus, &target, dt)
+            - loss(&neuron, &input_minus, &target, dt))
+            / (2.0 * epsilon);
+        assert!(
+            (gradients.d_input.values[index] - input_gradient_fd).abs() < 2e-3,
+            "input gradient mismatch: analytic={}, finite_difference={}",
+            gradients.d_input.values[index],
+            input_gradient_fd
+        );
+
+        let mut state_plus = neuron.clone();
+        let mut state_plus_hv = neuron.state().clone();
+        state_plus_hv.values[index] += epsilon;
+        state_plus.set_state(state_plus_hv);
+        let mut state_minus = neuron.clone();
+        let mut state_minus_hv = neuron.state().clone();
+        state_minus_hv.values[index] -= epsilon;
+        state_minus.set_state(state_minus_hv);
+        let state_gradient_fd = finite_difference(state_plus, state_minus);
+        assert!(
+            (gradients.d_state.values[index] - state_gradient_fd).abs() < 2e-3,
+            "state gradient mismatch: analytic={}, finite_difference={}",
+            gradients.d_state.values[index],
+            state_gradient_fd
+        );
+    }
+
+    #[test]
     fn test_local_target_step_updates_parameters_and_evolves() {
         let config = UnifiedConfig {
             dimension: 64,
