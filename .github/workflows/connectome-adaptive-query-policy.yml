@@ -28,6 +28,10 @@ on:
       - "tools/connectomics-intake-audit/src/bin/connectome_support_expansion_lattice_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_adaptive_query_policy_oracle.py"
       - "tools/connectomics-intake-audit/reference/verify_support_expansion_lattice_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py"
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_CHALLENGE_REPLAY_BINDING.schema.json"
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_CHALLENGE_REPLAY_V1.md"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_CHALLENGE_REPLAY_BINDING.example.json"
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_QUERY_POLICY_V1.md"
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_BENCHMARK_V1.md"
       - "docs/neuroscience/CONNECTOME_SUPPORT_EXPANSION_LATTICE_V1.md"
@@ -49,8 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Checkout exact event subject
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check adaptive policy formatting
@@ -102,7 +108,7 @@ jobs:
           PY
       - name: Independently replay exact hypothesis-expansion challenge
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_HEAD: ${{ github.sha }}
         run: |
           python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_query_challenge_binding.py --self-test
