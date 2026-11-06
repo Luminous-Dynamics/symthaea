@@ -1,7 +1,15 @@
 //! Native Rust access to the REA-compatible Evidence contract.
 //!
-//! Enable the root crate feature `rea-compat` to expose the verifier and
+//! Enable the root crate feature rea-compat to expose the verifier and
 //! semantic identity functions without routing in-process work through MCP.
+
+pub mod claims;
+
+pub use claims::{
+    ClaimDisposition, ClaimError, ClaimErrorKind, ClaimEvaluation, ClaimPredicate, ClaimRequest,
+    ClaimScope, EvidenceAssessment, EvidenceAssessmentKind, evaluate_claim, parse_claim_json,
+    validate_claim, CLAIM_EVALUATOR_VERSION, CLAIM_SCHEMA, MAX_CLAIM_JSON_BYTES,
+};
 
 pub use symthaea_rea_compat::{
     analysis_profile_digest,
