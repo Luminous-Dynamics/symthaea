@@ -184,17 +184,28 @@ Compare:
 
 The success criterion is not “more explanations.” It is a higher rate of correctly identified, independently replicated mechanisms, lower false attribution, and lower cost per validated contribution.
 
-## 11. No-runner implementation tranche
+## 11. No-runner implementation tranche and current prototype
 
-Before execution isolation and independent evaluator prerequisites qualify:
+The first no-runner slice is now present in this PR branch:
 
-1. Publish this protocol and a preregistration template.
-2. Define inert intervention manifests and the fixture corpus.
-3. Add only structural validation and offline reference calculations over synthetic outcomes, following existing validation conventions.
-4. Add positive and adversarial negative-control tests.
-5. Map the protocol to #10497, #10498, #10674, #10691, #10569 and #10573.
+- Standalone Rust package: `tools/sym-rsi-causal-reference/`. Its nested `[workspace]` keeps it outside the production root workspace and avoids relying on the still-unmerged #10472/#10496/#10499/#10515 draft stack.
+- `Factorial2x2`: computes A/B marginal effects, conditional effects and A×B interaction from same-base outcomes.
+- `summarize_equal_cluster_blocks`: requires one canonical context digest, retains block and cluster contrasts, and reports an equal-cluster point estimate. It does not calculate confidence intervals or assert cluster independence.
+- `InterventionManifest`: checks digest syntax, unique identities, known parent/change references, dependency acyclicity, symmetric conflicts, coupled-group cardinality and exclusion of candidate-side evaluator/task-contract edits.
+- Offline CLI: parses the inert 2×2 fixture corpus and synthetic manifest example.
+- Fifteen Rust unit tests are authored for fixture arithmetic/gates, manifest validation, non-finite input, cluster weighting, context mismatch, dependency cycles/conflicts and evaluator-edit exclusion.
 
-Do not execute candidate code, open sealed holdouts, or claim causal validity from structural tests. A later executable pilot must run through the existing isolated, attested, independently regraded evidence path.
+Commands from the repository root:
+
+```sh
+cargo test --manifest-path tools/sym-rsi-causal-reference/Cargo.toml
+cargo run --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- fixtures docs/research/fixtures/SYM_RSI_CAUSAL_LINEAGE_2X2_FIXTURES_V0_2026-11-06.json
+cargo run --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- manifest docs/research/fixtures/SYM_RSI_INTERVENTION_MANIFEST_V0_EXAMPLE_2026-11-06.json
+```
+
+The current execution environment has no `rustc`, `cargo`, `rustfmt` or `nix`; the Rust tests are authored but **not compiled or executed**. A separate script parsed all eight 2×2 fixture cases and their expected arithmetic/claim-gating outputs; all eight matched. The example manifest's required fields, digest syntax, parent origins and unique change IDs were also checked. These are static/reference checks only—not a Rust test pass, CI pass, authenticated source/build proof or causal result.
+
+The tool deliberately does not execute candidate code, access sealed holdouts, authenticate evidence refs, infer causal atomicity, prove statistical independence, calculate inferential uncertainty, or authorize promotion. Later execution must use the existing isolated, attested, independently regraded evidence path and the authority owners above.
 
 ## 12. Research landscape and Symthaea's differentiator
 
@@ -204,13 +215,47 @@ Do not execute candidate code, open sealed holdouts, or claim causal validity fr
 | HyperAgents (Meta, 2026) | Editable task agent and meta-agent in one self-referential program; reports meta-procedural improvement across coding, paper review, robotics reward design and proof grading | Same-start matched budgets, patch-level causal attribution, and independent confirmation are the differentiators—not editable meta-code alone |
 | RSIGym (2026) | Reports a leading RSI-Index of 0.4809 (Opus 5) across five benchmarks and a $500 platform-service budget per run; 29/30 Joint runs improve | Treat 0.4809 as a known-suite infrastructure result, not direct unseen-transfer evidence: final evaluations reuse development-available tasks, each configuration is run once, and researcher inference/official evaluation are billed separately |
 | RSI-Env (2026) | Persistent model/harness improvement with an independent Host Controller. Its Open-General Self setting reports GPQA Diamond 65.2→73.2 and AIME 2026 53.3→56.7; Knowledge Self reports SimpleQA 82→85→88 across updates | Measure cross-capability retention and task-family transfer under the same start and full cost boundary; published results are not independent Symthaea replications |
-| RSIBench (2026) | Fixed-model harness evolution over five rounds, 84 train and 84 test tasks across six domains; frozen verifiers/budgets and rollback/keep-one ablations | Strong harness-causality comparator; Symthaea adds multi-parent interaction, clean transplant/rescue and clean-start learning-algorithm mechanisms. RSIBench has no validation split, so reproduce its protocol but do not inherit that limitation for Symthaea's confirmatory design |
+| RSIBench (2026) | Fixed-model harness evolution over five rounds, 84 train and 84 sealed test tasks across six domains; frozen verifiers/budgets and rollback/keep-one ablations | Strong harness-causality comparator. Its published protocol has no validation split; Symthaea should use discovery, validation and sealed confirmation, then add fresh-family and clean-start algorithm transfer |
+| RSI-Anything (2026) | Uses predictive world models to rank actions/learning data before costly external feedback, then updates workflows and conditionally adapts the predictor under component/pair compatibility checks. Reports code-repair success 26.3→29.2→31.2% at comparable test usage, a 39.4% reduction in GUI actions, and 96.15% mean best observed reaction yield vs 82.16% for Bayesian optimization at 40 experiments | A strong efficiency and world-model comparator. Separate predictions from observed outcomes; test reliability under policy-induced distribution shift; reuse #5476 prospective VoC, #5478 causal ablations and #8721 allocation rather than adding another scheduler |
 | SelfImprove-Bench (2026) | G0–G4 generalization ladder across Exploring/Planning/Reasoning game scenarios; reports inconsistent transfer across levels | Carry the ladder into software engineering, scientific research and algorithm design; game-only transfer is not general R&D competence |
 | AI4AI-Bench (2026) | Ten training-algorithm repositories; paper reports mean 0.166 and best system 0.250, and method-changing submissions average 0.226 vs 0.126 for configuration-only changes | Useful algorithm-design starting point, but do not treat 0.250 as uncontested SOTA: an independent audit classified v1 as flawed, with score-changing defects in 4/10 tasks and final-test checkpoint selection; preserve paper and audit evidence as separate records |
 | Red Queen Gödel Machine (2026) | Co-evolves agents and evaluators using frozen utility within epochs and controlled evaluator changes at boundaries | #10708 already owns this paradigm; #10717 must consume its independent anchor/confirmation authority, not create a second evaluator |
-| AIDE² (2026) | Paper reports seven successive self-improvements in an autonomous eight-day run and transfer to four held-out benchmarks, including OOD weather forecasting | Close R4 comparator: reproduce same-start swaps, matched total resources, inherited meta-level changes, fresh-family transfer and independent replication |
+| AIDE² (2026) | Reports seven accepted inner-agent rewrites over eight days (0.703→0.778), two further runs accepting two and four rewrites, and transfer to four held-out benchmarks including OOD weather forecasting. Its ignition comparison of the evolved agent vs human-developed agent as the *outer-loop improver* is inconclusive: three seeds/arm, mean endpoints 0.780 vs 0.782 | Closest R4 comparator. Symthaea must separately pass the outer-loop ignition test; inner-loop gains and task transfer do not prove an improved self-improver |
 | FIRE-Bench (ICML 2026) | Execution-grounded rediscovery of documented scientific insights by designing/running experiments and comparing conclusions with published findings | Add it as a scientific-process/rediscovery baseline; rediscovery is not novelty, and LLM-judge prose quality is not enough |
+| RSI evidence audit (2026-10-20) | Full-text census of 114 eligible studies (90 self-labelled RSI): only 22% audit ≥2 full-loop reruns; of 26 studies claiming a better improver, only 4 compare earlier/later procedures from identical starts at matched budgets | Direct field-wide target: repeated full-loop replication and fair same-start improver swaps are under-reported; make them non-negotiable rather than another weighted leaderboard score |
 | METR Anthropic R&D assessment (2026-11-05) | Estimates 1.9× growth in Anthropic AECI benchmark capability since October 2025 (95% CI 1.5–2.8×); judges much of the acceleration likely AI-assisted while noting no highly significant fully autonomous contribution to the most important training stages yet | Measure AI-assisted R&D productivity separately from autonomous recursion; the estimate is high-uncertainty, benchmark-scoped and partly informed by redacted evidence |
+
+### The field-wide gap: test the improver, not only its output
+
+Chen, Zhu and Zheng's October 20, 2026 census coded 114 eligible RSI studies, 90 of which described their own systems as RSI. Only 22% of those 90 audited two or more reruns of the complete loop. Of 26 papers claiming a better improvement procedure, 23 reported a related comparison, but only four compared earlier and later improvers from identical starting artifacts at matched budgets. These are frequencies of reported evaluation designs, not success rates. The implication is unusually actionable: a rigorous same-start, matched-budget and multi-seed R4 demonstration would address a documented methodological gap in the field, not just chase another benchmark number.
+
+### The AIDE² ignition test should become Symthaea's R4 gate
+
+AIDE²'s inner loop accepted seven rewrites in its main eight-day trajectory (grade 0.703 to 0.778), plus two and four accepted rewrites in two additional complete runs. It also reports transfer to four external benchmarks, including out-of-distribution weather forecasting. But its ignition test—using an evolved agent as the outer-loop researcher—compared AIDE47 against the human-developed AIDE agent from the same AIDE47 inner-loop start, with three seeds per arm and 50 outer-loop steps. Mean endpoints were 0.780 and 0.782 respectively. The authors explicitly regard the result as inconclusive because of seed variance and the cost of additional outer-loop runs and external evaluation.
+
+Symthaea should make this distinction explicit in #10497:
+
+1. **Product improvement:** the task-solving or inner research agent improves.
+2. **Improver improvement:** the evolved researcher makes better candidates under the same starting state and total cost.
+3. **Ignition:** the evolved researcher, when placed in the outer loop, produces a better next-generation improver than the incumbent/human-designed reference.
+4. **Recursive progress:** the accepted outer-loop successor itself repeats the advantage over multiple complete, independently seeded cycles.
+
+For ignition, freeze the starting task-agent, outer-loop state, model/backend, task populations, tools, evaluation rules, retry policy and total cost. Compare the evolved outer-loop agent against a fixed/human-authored outer-loop baseline on the same initial artifacts. Use several independent full-loop seeds, estimate variance before fixing confirmatory sample size, and evaluate the resulting successor researchers on fresh-family tasks. A positive inner-loop grade or a single successful outer-loop trajectory is insufficient.
+
+### Predictive world models: improve experiment economy without treating prediction as truth
+
+RSI-Anything is a timely adjacent approach. It uses action-conditioned predictive world models to rank candidate actions and select where to spend costly external feedback, then uses observed feedback to update the policy/workflow and conditionally adapt the predictor. It adds component and policy–predictor compatibility checks before retaining an updated pair. The paper reports gains in code repair, GUI efficiency, lab planning and reaction optimization, but these results are paper-reported and task-specific.
+
+Symthaea should not build a competing generic value-of-computation scheduler. Instead compose:
+- #5476 for forecast-before-outcome and realized-utility calibration;
+- #5478 for intact/lesion/sham/rescue causal comparison of metareasoning mechanisms;
+- #8721 for the scientific tool-allocation application.
+
+Add one experimental comparison to #10497/#10674: no predictor, frozen predictor, reliability-gated adaptive predictor, and a synthetic oracle upper bound. Record every prediction before its outcome; retain predictor and policy as a versioned compatible pair; detect when policy evolution changes the predictor's error distribution; fall back to a simpler policy when calibration or compatibility fails. Do not count a predicted gain as observed improvement, and do not train on feedback hidden from the independent confirmation authority.
+
+### Seven-dimensional RSI evidence profile
+
+The 2026 RSI survey organizes evaluation around reliability, efficiency, diversity, persistence, adaptability, controllability and generalization. Use these as a reporting profile, not a new weighted composite. In particular, diversity must mean causal independence of hypotheses/interventions and differentiated failure coverage—not just varied wording. Persistence requires retained changes to remain useful in later cycles; adaptability requires explicit distribution-shift tests; controllability requires scoped authority, review and rollback; generalization includes transfer of the *improver*, not only the final product.
 
 ### Human-supervised productivity is not autonomous RSI
 
@@ -245,6 +290,10 @@ Symthaea should not claim novelty for “an agent that edits itself,” “an ed
 - AI4AI-Bench: https://arxiv.org/abs/2608.20318
 - Independent AI4AI-Bench audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
 - FIRE-Bench: https://proceedings.mlr.press/v306/wang26d.html
+- AIDE² paper and ignition test: https://arxiv.org/abs/2609.26457
+- RSI evaluation-evidence census (2026-10-20): https://arxiv.org/abs/2610.27610
+- RSI-Anything world-model framework: https://arxiv.org/abs/2610.13912
+- RSI survey and seven-dimensional evaluation profile: https://lee1003-lee.github.io/Awesome-RSI-Research/
 - Red Queen Gödel Machine: https://arxiv.org/abs/2606.26294
 
 ## 13. Claim boundary
