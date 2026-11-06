@@ -1954,14 +1954,7 @@ pub fn render_synthetic_midi_v1(
                 let shift = value.rem_euclid(12) as u8;
                 let pitches = [60_u8, 64, 67, 65];
                 for (index, pitch) in pitches.into_iter().enumerate() {
-                    add_note(
-                        events,
-                        channel,
-                        pitch + shift,
-                        88,
-                        index as u32 * 480,
-                        360,
-                    );
+                    add_note(events, channel, pitch + shift, 88, index as u32 * 480, 360);
                 }
             }
             Dimension::Rhythm => {
@@ -2026,17 +2019,12 @@ pub fn render_synthetic_midi_v1(
     // Track name includes a bounded event marker for byte-level lineage fixtures.
     let mut track_name = b"RMI synthetic ".to_vec();
     track_name.extend_from_slice(event_tag);
-    push_event(
-        &mut events,
-        0,
-        0,
-        {
-            let mut bytes = vec![0xff, 0x03];
-            bytes.push(track_name.len().min(127) as u8);
-            bytes.extend_from_slice(&track_name[..track_name.len().min(127)]);
-            bytes
-        },
-    );
+    push_event(&mut events, 0, 0, {
+        let mut bytes = vec![0xff, 0x03];
+        bytes.push(track_name.len().min(127) as u8);
+        bytes.extend_from_slice(&track_name[..track_name.len().min(127)]);
+        bytes
+    });
     // 4/4 time signature, 480 ticks per quarter note.
     push_event(
         &mut events,
@@ -3084,17 +3072,11 @@ mod tests {
             let input = fixture.interventions.control.current_partner_feature;
             let output = Feature {
                 dimension: fixture.task.target_dimension,
-                value: fixture
-                    .task
-                    .expected_response
-                    .apply(input.value)
-                    .unwrap(),
+                value: fixture.task.expected_response.apply(input.value).unwrap(),
             };
             let protected = fixture.interventions.control.unrelated_feature;
-            let before =
-                render_synthetic_midi_v1(input, protected, b"input").unwrap();
-            let after =
-                render_synthetic_midi_v1(output, protected, b"output").unwrap();
+            let before = render_synthetic_midi_v1(input, protected, b"input").unwrap();
+            let after = render_synthetic_midi_v1(output, protected, b"output").unwrap();
 
             let target_channel = match input.dimension {
                 Dimension::Motif => 0x90,
@@ -3112,10 +3094,8 @@ mod tests {
             };
             let target_notes_before: Vec<_> = midi_channel_note_events(&before, target_channel);
             let target_notes_after: Vec<_> = midi_channel_note_events(&after, target_channel);
-            let protected_before: Vec<_> =
-                midi_channel_note_events(&before, protected_channel);
-            let protected_after: Vec<_> =
-                midi_channel_note_events(&after, protected_channel);
+            let protected_before: Vec<_> = midi_channel_note_events(&before, protected_channel);
+            let protected_after: Vec<_> = midi_channel_note_events(&after, protected_channel);
 
             if input.dimension == Dimension::Tempo {
                 assert_ne!(midi_tempo(&before), midi_tempo(&after));
