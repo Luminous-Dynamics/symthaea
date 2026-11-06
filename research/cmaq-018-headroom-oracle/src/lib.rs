@@ -147,12 +147,9 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
         .map(|candidate| candidate.values[0] as f64)
         .collect();
     let one_shot_index = argmax_canonical(&first_selection_scores);
-    let one_shot = make_lane(
-        design,
-        one_shot_index,
-        baseline_index,
-        |candidate| candidate.values[0] as f64,
-    );
+    let one_shot = make_lane(design, one_shot_index, baseline_index, |candidate| {
+        candidate.values[0] as f64
+    });
 
     let selection_means: Vec<f64> = design
         .selection
@@ -161,19 +158,13 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
         .map(|candidate| mean(&candidate.values))
         .collect();
     let repeated_index = argmax_canonical(&selection_means);
-    let repeated_in_sample = make_lane(
-        design,
-        repeated_index,
-        baseline_index,
-        |candidate| mean(&candidate.values),
-    );
+    let repeated_in_sample = make_lane(design, repeated_index, baseline_index, |candidate| {
+        mean(&candidate.values)
+    });
 
-    let heldout_repeated = make_lane(
-        design,
-        repeated_index,
-        baseline_index,
-        |candidate| mean(&candidate.values),
-    );
+    let heldout_repeated = make_lane(design, repeated_index, baseline_index, |candidate| {
+        mean(&candidate.values)
+    });
 
     let one_shot_selection_optimism =
         one_shot.selected_selection_value - one_shot.selected_heldout_value;
@@ -310,8 +301,12 @@ fn validate_batch(
         }
     }
     match &batch.coupling {
-        CouplingDisposition::SharedInvariant { justification_digest }
-        | CouplingDisposition::SensitivityOnly { justification_digest } => {
+        CouplingDisposition::SharedInvariant {
+            justification_digest,
+        }
+        | CouplingDisposition::SensitivityOnly {
+            justification_digest,
+        } => {
             require_identity(justification_digest, "coupling_justification_digest")?;
         }
         CouplingDisposition::Uncoupled => {}
@@ -381,7 +376,8 @@ fn decompose_candidate_continuation(
     let mut interaction_sum_squares = 0.0;
     for (candidate_index, candidate) in candidates.iter().enumerate() {
         for (continuation_index, value) in candidate.values.iter().enumerate() {
-            let residual = *value as f64 - candidate_means[candidate_index]
+            let residual = *value as f64
+                - candidate_means[candidate_index]
                 - continuation_means[continuation_index]
                 + grand_mean;
             interaction_sum_squares += residual * residual;
@@ -462,10 +458,7 @@ mod tests {
     fn noise_only_best_of_one_has_apparent_gain_but_no_heldout_gain() {
         let report = evaluate_headroom(&noise_only_design()).unwrap();
 
-        assert_eq!(
-            report.one_shot_oracle.selected_candidate_id,
-            "candidate-a"
-        );
+        assert_eq!(report.one_shot_oracle.selected_candidate_id, "candidate-a");
         assert_eq!(report.one_shot_oracle.selection_gain, 10.0);
         assert_eq!(report.one_shot_oracle.heldout_gain, 0.0);
 
@@ -475,10 +468,7 @@ mod tests {
         );
         assert_eq!(report.repeated_in_sample_oracle.selection_gain, 0.0);
         assert_eq!(report.heldout_repeated_oracle.heldout_gain, 0.0);
-        assert_eq!(
-            report.heldout_share_of_one_shot_apparent_gain,
-            Some(0.0)
-        );
+        assert_eq!(report.heldout_share_of_one_shot_apparent_gain, Some(0.0));
         assert_eq!(
             report.actual_selector_status,
             ActualSelectorStatus::NotMeasuredInThisReference
@@ -515,10 +505,7 @@ mod tests {
         };
 
         let report = evaluate_headroom(&design).unwrap();
-        assert_eq!(
-            report.one_shot_oracle.selected_candidate_id,
-            "candidate-b"
-        );
+        assert_eq!(report.one_shot_oracle.selected_candidate_id, "candidate-b");
         assert_eq!(
             report.repeated_in_sample_oracle.selected_candidate_id,
             "candidate-a"
@@ -526,14 +513,8 @@ mod tests {
         assert_eq!(report.one_shot_oracle.selection_gain, 10.0);
         assert_eq!(report.one_shot_oracle.heldout_gain, 0.0);
         assert_eq!(report.heldout_repeated_oracle.heldout_gain, 2.0);
-        assert_eq!(
-            report.heldout_share_of_one_shot_apparent_gain,
-            Some(0.0)
-        );
-        assert_eq!(
-            report.heldout_share_of_repeated_in_sample_gain,
-            Some(1.0)
-        );
+        assert_eq!(report.heldout_share_of_one_shot_apparent_gain, Some(0.0));
+        assert_eq!(report.heldout_share_of_repeated_in_sample_gain, Some(1.0));
     }
 
     #[test]
@@ -571,14 +552,10 @@ mod tests {
             "candidate-a"
         );
         assert_eq!(report.heldout_repeated_oracle.heldout_gain, 2.0);
-        assert_eq!(
-            report.heldout_share_of_one_shot_apparent_gain,
-            Some(1.0)
-        );
+        assert_eq!(report.heldout_share_of_one_shot_apparent_gain, Some(1.0));
         let decomposition = report.variance_decomposition.decomposition.unwrap();
         assert_eq!(
-            decomposition
-                .interaction_fraction_of_candidate_distinguishing_variation,
+            decomposition.interaction_fraction_of_candidate_distinguishing_variation,
             Some(0.0)
         );
     }
@@ -611,8 +588,7 @@ mod tests {
         assert_eq!(decomposition.candidate_sum_squares, 0.0);
         assert!(decomposition.interaction_sum_squares > 0.0);
         assert_eq!(
-            decomposition
-                .interaction_fraction_of_candidate_distinguishing_variation,
+            decomposition.interaction_fraction_of_candidate_distinguishing_variation,
             Some(1.0)
         );
     }
