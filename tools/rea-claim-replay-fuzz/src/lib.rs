@@ -24,7 +24,7 @@ fn take_decimal_line(input: &[u8], cursor: &mut usize) -> Option<usize> {
         return None;
     }
     let value = digits.parse::<usize>().ok()?;
-    *cursor = cursor.checked_add(newline + 1)?;
+    *cursor = (*cursor).checked_add(newline + 1)?;
     Some(value)
 }
 
@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn accepts_exact_frame_and_preserves_payload_boundaries() {
-        let frame = b"2\n{}\n2\n{}\n1\n3\nabc";
+        let frame = b"2\n{}2\n{}1\n3\nabc";
         let parsed = parse_frame(frame).unwrap();
         assert_eq!(parsed.claim, b"{}");
         assert_eq!(parsed.result, b"{}");
@@ -108,14 +108,14 @@ mod tests {
     #[test]
     fn rejects_truncation_trailing_bytes_and_noncanonical_lengths() {
         assert!(parse_frame(b"2\n{").is_none());
-        assert!(parse_frame(b"2\n{}\n2\n{}\n0\nx").is_none());
-        assert!(parse_frame(b"02\n{}\n2\n{}\n0\n").is_none());
-        assert!(parse_frame(b"+2\n{}\n2\n{}\n0\n").is_none());
+        assert!(parse_frame(b"2\n{}2\n{}0\nx").is_none());
+        assert!(parse_frame(b"02\n{}2\n{}0\n").is_none());
+        assert!(parse_frame(b"+2\n{}2\n{}0\n").is_none());
     }
 
     #[test]
     fn rejects_excessive_record_count_and_total_frame_size() {
-        let too_many = format!("2\n{{}}\n2\n{{}}\n{}\n", MAX_EVIDENCE_RECORDS + 1);
+        let too_many = format!("2\n{{}}2\n{{}}{}\n", MAX_EVIDENCE_RECORDS + 1);
         assert!(parse_frame(too_many.as_bytes()).is_none());
 
         let oversized = vec![b'x'; MAX_FRAME_BYTES + 1];
