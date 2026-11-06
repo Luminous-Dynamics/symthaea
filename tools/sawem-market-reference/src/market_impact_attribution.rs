@@ -326,6 +326,8 @@ pub fn compare_market_impact_policies<'a>(
             || candidate.reference_price_record_id != comparator.reference_price_record_id
             || candidate.reference_price_source_ref != comparator.reference_price_source_ref
             || candidate.reference_price_sha256 != comparator.reference_price_sha256
+            || candidate.reference_price_available_at_utc
+                != comparator.reference_price_available_at_utc
         {
             return Err(MarketImpactError::ReferencePricePathMismatch);
         }
@@ -534,6 +536,40 @@ mod tests {
         assert_eq!(
             evaluate_market_impact_policy(inputs("candidate", POLICY_SHA, &future)),
             Err(MarketImpactError::FutureKnownEvidence)
+        );
+    }
+
+    #[test]
+    fn matched_reference_price_path_requires_same_availability_vintage() {
+        let candidate = [interval(
+            "TP-001",
+            "candidate-energy/001",
+            "candidate-impact/001",
+            1_000_000_000,
+            10_000,
+            9_000,
+        )];
+        let comparator = [MarketImpactInterval {
+            reference_price_available_at_utc: 1_001,
+            ..interval(
+                "TP-001",
+                "comparator-energy/001",
+                "comparator-impact/001",
+                500_000_000,
+                10_000,
+                9_500,
+            )
+        }];
+        assert_eq!(
+            compare_market_impact_policies(
+                inputs("candidate", POLICY_SHA, &candidate),
+                inputs(
+                    "comparator",
+                    "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                    &comparator,
+                ),
+            ),
+            Err(MarketImpactError::ReferencePricePathMismatch)
         );
     }
 
