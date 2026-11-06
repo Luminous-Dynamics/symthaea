@@ -318,19 +318,29 @@ def self_test() -> None:
 
 
 def main() -> int:
-    if len(sys.argv) == 2 and sys.argv[1] == '--self-test':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('fixture', nargs='?', type=Path)
+    parser.add_argument('--report', type=Path)
+    parser.add_argument('--self-test', action='store_true')
+    args = parser.parse_args()
+    if args.self_test:
         try:
             self_test()
             return 0
         except Exception as exc:
             print(f'stopping oracle self-test: FAIL: {exc}', file=sys.stderr)
             return 1
-    if len(sys.argv) != 2:
-        print('usage: verify_query_specific_connectome_stopping.py FIXTURE.json', file=sys.stderr)
-        return 2
+    if args.fixture is None:
+        parser.error('FIXTURE.json is required unless --self-test is used')
     try:
-        data = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-        print(json.dumps(verify(data), indent=2, sort_keys=True))
+        data = json.loads(args.fixture.read_text(encoding='utf-8'))
+        expected = verify(data)
+        if args.report is not None:
+            actual = json.loads(args.report.read_text(encoding='utf-8'))
+            require(actual == expected, 'Rust production report differs from the independent Python oracle')
+            print('Rust report exactly matches independent Python stopping oracle')
+        print(json.dumps(expected, indent=2, sort_keys=True))
         print('question-specific connectome stopping oracle: PASS')
         return 0
     except Exception as exc:
