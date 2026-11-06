@@ -789,7 +789,7 @@ impl ResonatorNetwork {
                             .map(|e| cosine_similarity(est, &e.vector))
                             .fold(f32::NEG_INFINITY, f32::max)
                     } else {
-                        0.5 // default confidence without codebook
+                        0.0 // no codebook means no symbol-confidence estimate
                     };
                 }
             }
