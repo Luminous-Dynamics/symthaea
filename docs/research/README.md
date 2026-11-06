@@ -19,6 +19,7 @@ Symthaea is not just software - it's a research platform exploring fundamental q
 | [Validation Studies](#validation-studies) | Empirical validation approaches |
 | [Publications](#publications) | Papers and manuscripts |
 | [Research Roadmap](#research-roadmap) | Future research directions |
+| [ENG-KNOW-QUAL-001](../benchmarks/engineering-knowability/README.md) | Design-for-knowability, inspectability, metrology scope and requalification benchmark |
 
 ---
 
