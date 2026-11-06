@@ -31,6 +31,7 @@ struct Cohort {
     snapshot_id: String,
     split_id: String,
     split_role: String,
+    cluster_unit: String,
     split_manifest_sha256: String,
     expected_task_count: usize,
     expected_cluster_count: usize,
@@ -254,6 +255,9 @@ fn validate_cohort(cohort: &Cohort) -> Result<(), String> {
     if cohort.split_role != "test" {
         return Err("matched comparisons must use a test split, not train/validation/development".into());
     }
+    if !matches!(cohort.cluster_unit.as_str(), "repository" | "repository_file") {
+        return Err("cluster_unit must be repository or repository_file".into());
+    }
     digest(&cohort.split_manifest_sha256, "cohort.split_manifest_sha256")?;
     digest(&cohort.task_id_set_sha256, "cohort.task_id_set_sha256")?;
     digest(&cohort.budget_policy_sha256, "cohort.budget_policy_sha256")?;
@@ -353,6 +357,17 @@ fn validate_run(
         ("run_receipt_sha256", row.run_receipt_sha256.as_str()),
     ] {
         digest(value, &format!("run.{label}"))?;
+    }
+    let expected_cluster_id = match cohort.cluster_unit.as_str() {
+        "repository" => row.repository.clone(),
+        "repository_file" => format!("{}::{}", row.repository, row.source_file),
+        _ => return Err("unsupported cohort cluster unit".into()),
+    };
+    if row.cluster_id != expected_cluster_id {
+        return Err(format!(
+            "run {} cluster_id does not match frozen {} clustering rule",
+            row.task_id, cohort.cluster_unit
+        ));
     }
     if row.attempts > cohort.max_attempts_per_task
         || row.wall_ms > cohort.max_wall_ms_per_task
@@ -485,7 +500,8 @@ fn validate_run(
     let assurance_qualified_success =
         raw_success && goal_ok && source_ok && specification_ok && vacuity_ok && assumptions_ok;
     let assurance_disqualified_success = raw_success
-        && (row.goal_alignment == "mismatch"
+        && (row.source_reproduction_status == "failed"
+            || row.goal_alignment == "mismatch"
             || row.specification_audit_status == "finding"
             || row.vacuity_audit_status == "finding"
             || row.assumption_audit_status == "finding");
@@ -803,6 +819,7 @@ fn synthetic_cohort() -> Cohort {
         snapshot_id: "synthetic-2026-11".into(),
         split_id: "test".into(),
         split_role: "test".into(),
+        cluster_unit: "repository".into(),
         split_manifest_sha256: fake_digest("split-manifest"),
         expected_task_count: 4,
         expected_cluster_count: 2,
@@ -845,7 +862,7 @@ fn synthetic_row(cohort: &Cohort, arm: &Arm, task_id: &str, cluster: &str, succe
         split_id: cohort.split_id.clone(),
         split_manifest_sha256: cohort.split_manifest_sha256.clone(),
         task_id: task_id.into(),
-        cluster_id: cluster.into(),
+        cluster_id: format!("https://github.com/example/{cluster}"),
         repository: format!("https://github.com/example/{cluster}"),
         repository_commit: fake_digest(&format!("commit:{cluster}"))[..40].to_owned(),
         lean_version: "v4.22.0".into(),
@@ -1110,6 +1127,20 @@ mod tests {
         }
         let challenger = report.arm_metrics.iter().find(|x| x.arm_id == "challenger").unwrap();
         assert_eq!(challenger.assurance_qualified_successes, 3);
+    }
+
+    #[test]
+    fn source_reproduction_failure_is_disqualifying_not_unreviewed() {
+        let cohort = synthetic_cohort();
+        let mut rows = synthetic_rows(&cohort);
+        let row = rows.iter_mut().find(|r| r.arm_id == "challenger" && r.task_id == "task-1").unwrap();
+        row.source_reproduction_status = "failed".into();
+        row.source_reproduction_receipt_sha256 = Some(fake_digest("failed-source"));
+        let report = analyze(&cohort, &rows, fake_digest("source-failure")).unwrap();
+        let challenger = report.arm_metrics.iter().find(|x| x.arm_id == "challenger").unwrap();
+        assert_eq!(challenger.raw_kernel_verified_successes, 4);
+        assert_eq!(challenger.assurance_disqualified_successes, 1);
+        assert_eq!(challenger.assurance_unreviewed_successes, 1);
     }
 
     #[test]
