@@ -34,6 +34,14 @@ Source: https://doi.org/10.1109/ACCESS.2026.3693081
 
 **Benchmark implication:** Cross-domain generalization must be a primary track, not a supplementary experiment. Random-window splits are insufficient. Report exact train/test dataset, receiver, campaign, location and scenario families.
 
+### 2.2.1 Meta-learning and cross-testing
+
+Khan et al., *Evaluating ML-Based Algorithms for GNSS Spoofing Detection with Cross-testing Capabilities: A Comparative Study*, 2026 12th Workshop on Satellite Navigation Technologies (NAVITEC), published in IEEE Xplore 22 September 2026, evaluates a conventional CNN and a Model-Agnostic Meta-Learning (MAML) approach across TEXBAT, OAKBAT and FGI-SpoofRepo. Its abstract reports the strongest cross-testing with MAML using post-correlation Doppler features and notes that training on more complex spoofing scenarios (including TEXBAT DS8) improves generalization across datasets.
+
+Source: https://doi.org/10.1109/NAVITEC202669090.2026.11692526
+
+**Benchmark implication:** Add MAML/meta-learning and leave-one-dataset-out evaluation as mandatory research comparators after faithfully reproducing the published protocol. Compare feature extraction stages and scenario diversity under locked event/receiver/dataset splits. Do not treat the abstract's qualitative result as a numerical performance guarantee.
+
 ### 2.3 Collaborative integrity
 
 *Multicriteria Collaborative GNSS Integrity Monitoring*, IEEE Journal of Indoor and Seamless Positioning and Navigation (4 May 2026), combines PVT residuals and carrier-to-noise observations across receivers. It reports real jamming data and simulated spoofing data.
@@ -157,7 +165,8 @@ For aviation and other safety-critical domains, time-to-alert, protection levels
 3. The 2026 raw-IF chi-square method, faithfully reproduced where source and data rights permit.
 4. Conventional supervised CNN or comparable feature model.
 5. Published cross-domain comparator from the 2026 IEEE Access study, subject to faithful reproduction.
-6. Collaborative PVT-residual/C/N0 integrity comparator.
+6. 2026 NAVITEC CNN versus MAML cross-testing comparator across TEXBAT, OAKBAT and FGI-SpoofRepo, subject to faithful reproduction.
+7. Collaborative PVT-residual/C/N0 integrity comparator.
 7. No-collaboration ablation.
 8. No-provenance / no-common-mode analysis ablations.
 9. Symthaea uncertainty-aware assessment.
