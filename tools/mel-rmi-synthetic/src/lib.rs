@@ -1938,6 +1938,9 @@ pub struct MidiProgramChangeV1 {
     pub tick: u32,
 }
 
+/// Maximum file size inspected by the bounded MIDI reader.
+pub const MAX_MIDI_FILE_BYTES_V1: usize = 16 * 1024 * 1024;
+
 /// Bounded semantic inspection of a Standard MIDI File format 0 or 1.
 ///
 /// The parser supports the channel events and meta-events needed by the
@@ -2054,7 +2057,7 @@ fn inspect_midi_track_v1(
                         .ok_or(HarnessError::InvalidMidi)?;
                     let (start_tick, velocity) =
                         queue.pop_front().ok_or(HarnessError::InvalidMidi)?;
-                    if absolute_tick <= start_tick {
+                    if absolute_tick < start_tick {
                         return Err(HarnessError::InvalidMidi);
                     }
                     inspection.notes.push(MidiNoteEventV1 {
@@ -2078,7 +2081,7 @@ fn inspect_midi_track_v1(
                             .ok_or(HarnessError::InvalidMidi)?;
                         let (start_tick, note_velocity) =
                             queue.pop_front().ok_or(HarnessError::InvalidMidi)?;
-                        if absolute_tick <= start_tick {
+                        if absolute_tick < start_tick {
                             return Err(HarnessError::InvalidMidi);
                         }
                         inspection.notes.push(MidiNoteEventV1 {
@@ -2185,7 +2188,10 @@ fn inspect_midi_track_v1(
 /// malformed/truncated input. Artifact binding invokes this before hashing
 /// any payload declared as MIDI.
 pub fn inspect_midi_file_v1(bytes: &[u8]) -> Result<MidiFileInspectionV1, HarnessError> {
-    if bytes.len() < 22 || &bytes[0..4] != b"MThd" {
+    if bytes.len() < 22
+        || bytes.len() > MAX_MIDI_FILE_BYTES_V1
+        || &bytes[0..4] != b"MThd"
+    {
         return Err(HarnessError::InvalidMidi);
     }
     let header_len =
@@ -2256,6 +2262,10 @@ pub fn inspect_synthetic_midi_v1(bytes: &[u8]) -> Result<MidiFileInspectionV1, H
             .time_signatures
             .iter()
             .any(|meter| meter.numerator == 4 && meter.denominator == 4)
+        || inspection
+            .notes
+            .iter()
+            .any(|note| note.end_tick <= note.start_tick)
     {
         return Err(HarnessError::InvalidMidi);
     }
