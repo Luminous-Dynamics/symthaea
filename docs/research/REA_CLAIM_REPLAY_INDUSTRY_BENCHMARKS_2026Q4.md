@@ -45,7 +45,7 @@ Important detail: SLSA's builder identity represents the trust base responsible 
 
 ### Binary analysis and claim-level exactness — AgentRE-Bench v3.1
 
-The November 5, 2026 v3.1 report evaluates six models on 20 Windows PE artifacts, five attempts per artifact, for 600 episodes. The report separates full-suite Overall, valid-answer coverage and conditional answer quality. Its exact-claim review reproduced all 600 score objects, but the report also says independent human adjudication has not occurred. It identifies 46 source-supported mappings penalized by fixed-rubric fact/field-placement rules and reports no full-credit episode.
+The November 5, 2026 v3.1 report evaluates six models on 20 Windows PE artifacts, five attempts per artifact, for 600 episodes. Muse Wonder records 87.37/100 Overall and GPT-6 Astra 87.04/100, with both returning 100/100 valid answers. The simultaneous 95% interval for Muse minus Astra is -3.8203 to +4.4689 and includes zero, so the report does not establish which model would score higher on repeat, nor practical equivalence. DeepSeek V4.1 Flash records 78.31/100 with 98/100 valid answers and two budget exits scored zero. The report separates full-suite Overall, valid-answer coverage and conditional answer quality. Its exact-claim review reproduced all 600 score objects, but the report also says independent human adjudication has not occurred. It identifies 46 source-supported mappings penalized by fixed-rubric fact/field-placement rules and reports no full-credit episode. These are fixed-suite results for the v3.1 artifact set, not evidence of generalization to unfamiliar binaries.
 
 **REA consequence:** score at least four things separately:
 
