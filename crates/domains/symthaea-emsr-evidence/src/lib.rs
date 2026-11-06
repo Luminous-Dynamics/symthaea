@@ -137,6 +137,7 @@ pub struct FileDigest {
 #[serde(deny_unknown_fields)]
 pub struct DatasetRights {
     pub state: RightsState,
+    pub license_expression: Option<String>,
     pub permitted_uses: Vec<UsePurpose>,
     pub source_terms_uri: Option<String>,
     pub reviewed_by: Option<String>,
@@ -258,6 +259,12 @@ pub fn validate_dataset_catalog(input: &str) -> Result<CatalogSummary, Validatio
                 return Err(ValidationError::new(
                     format!("{path}.rights.source_terms_uri"),
                     "reviewed rights require an HTTPS source-terms reference",
+                ));
+            }
+            if rights.license_expression.as_deref().is_none_or(|value| !nonempty(value)) {
+                return Err(ValidationError::new(
+                    format!("{path}.rights.license_expression"),
+                    "reviewed rights require an exact license identifier or named agreement",
                 ));
             }
             if rights.reviewed_by.as_deref().is_none_or(|value| !nonempty(value))
@@ -842,6 +849,7 @@ mod tests {
                 "source_uri": "https://example.org/dataset",
                 "rights": {
                     "state": rights_state,
+                    "license_expression": if rights_state == "reviewed" { Some("CC-BY-4.0") } else { None::<&str> },
                     "permitted_uses": permitted_uses,
                     "source_terms_uri": if rights_state == "reviewed" { Some("https://example.org/terms") } else { None::<&str> },
                     "reviewed_by": if rights_state == "reviewed" { Some("reviewer-1") } else { None::<&str> },
