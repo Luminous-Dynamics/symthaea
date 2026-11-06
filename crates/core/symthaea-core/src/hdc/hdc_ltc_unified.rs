@@ -639,28 +639,26 @@ impl HdcLtcUnifiedNeuron {
         Some(ContinuousHV::from_vec(values))
     }
 
-    /// Compute the equilibrium state x_∞ for given input
+    /// Pre-activation shared by forward evolution and its local gradient.
     ///
-    /// x_∞ = f(W⊗x + U⊗u) where f is the activation function.
-    /// When Fourier basis is configured, it is bundled in as a third component.
+    /// Keeping this in one place prevents the learning path from silently using
+    /// a different HDC bundle (or omitting the optional Fourier component).
     #[inline]
-    fn compute_equilibrium(&self, input: &ContinuousHV) -> ContinuousHV {
-        // HDC binding: W⊗x (state transformation via binding, not matrix mul)
+    fn compute_pre_activation(&self, input: &ContinuousHV) -> ContinuousHV {
         let transformed_state = self.weight_hv.bind(&self.state);
-
-        // HDC binding: U⊗u (input transformation)
         let masked_input = self.input_mask.bind(input);
 
-        // HDC bundling: combine state and input contributions
-        // If Fourier basis exists, bundle as third component
-        let combined = if let Some(ref fourier) = self.compute_fourier_basis() {
+        if let Some(ref fourier) = self.compute_fourier_basis() {
             ContinuousHV::bundle(&[&transformed_state, &masked_input, fourier])
         } else {
             ContinuousHV::bundle(&[&transformed_state, &masked_input])
-        };
+        }
+    }
 
-        // Apply activation function
-        self.config.activation.apply(&combined)
+    /// Compute the equilibrium state x_∞ for the current state and input.
+    #[inline]
+    fn compute_equilibrium(&self, input: &ContinuousHV) -> ContinuousHV {
+        self.config.activation.apply(&self.compute_pre_activation(input))
     }
 
     /// Compute effective time constant τ(||x||, u)
@@ -682,45 +680,46 @@ impl HdcLtcUnifiedNeuron {
         tau.clamp(0.01, 10.0)
     }
 
-    /// Compute gating/interpolation factor σ for closed-form solution
+    /// State/input similarity plus mean gate bias before the sigmoid.
     ///
-    /// σ determines how much to interpolate between current and equilibrium state
+    /// This is factored out so forward evolution and local gradients use exactly
+    /// the same gate definition.
     #[inline]
-    fn compute_gating(&self, input: &ContinuousHV, dt: f32) -> f32 {
-        let tau = self.compute_tau(input);
-
-        // Fused bundle + similarity: avoid allocating a 16384-element bundle vector.
-        // bundle([state, input]) = (state + input) / 2
-        // similarity(bundle, gate_weight) = dot(bundle, gw) / (||bundle|| * ||gw||)
-        // We compute dot((state+input)/2, gw) and norms inline.
+    fn compute_gate_activation(&self, input: &ContinuousHV) -> f32 {
         let dim = self.config.dimension;
-        let inv_dim = 1.0 / dim as f32;
         let mut dot = 0.0f32;
         let mut bundle_norm_sq = 0.0f32;
-        let mut gw_norm_sq = 0.0f32;
+        let mut gate_norm_sq = 0.0f32;
         let mut bias_sum = 0.0f32;
 
         for i in 0..dim {
-            let b = (self.state.values[i] + input.values[i]) * 0.5;
-            let g = self.gate_weight.values[i];
-            dot += b * g;
-            bundle_norm_sq += b * b;
-            gw_norm_sq += g * g;
+            let bundled = (self.state.values[i] + input.values[i]) * 0.5;
+            let gate = self.gate_weight.values[i];
+            dot += bundled * gate;
+            bundle_norm_sq += bundled * bundled;
+            gate_norm_sq += gate * gate;
             bias_sum += self.gate_bias.values[i];
         }
 
-        let denom = (bundle_norm_sq * gw_norm_sq).sqrt();
-        let sim = if denom < 1e-10 { 0.0 } else { dot / denom };
-        let gate_activation = sim + bias_sum * inv_dim;
+        let denominator = (bundle_norm_sq * gate_norm_sq).sqrt();
+        let similarity = if denominator < 1e-10 { 0.0 } else { dot / denominator };
+        similarity + bias_sum / dim as f32
+    }
 
-        // Sigmoid gating with steepness control
-        let sigma_base = 1.0 / (1.0 + (-gate_activation * self.config.gating_steepness).exp());
+    /// Return the base sigmoid gate before the time-scaled interpolation.
+    #[inline]
+    fn compute_gate_base(&self, input: &ContinuousHV) -> f32 {
+        let activation = self.compute_gate_activation(input);
+        1.0 / (1.0 + (-activation * self.config.gating_steepness).exp())
+    }
 
-        // Time-scaled gating: larger dt → more interpolation toward equilibrium
+    /// Compute gating/interpolation factor σ for closed-form solution.
+    #[inline]
+    fn compute_gating(&self, input: &ContinuousHV, dt: f32) -> f32 {
+        let tau = self.compute_tau(input);
+        let sigma_base = self.compute_gate_base(input);
         let decay = (-dt / tau).exp();
-        let sigma = 1.0 - decay * (1.0 - sigma_base);
-
-        sigma.clamp(0.0, 1.0)
+        (1.0 - decay * (1.0 - sigma_base)).clamp(0.0, 1.0)
     }
 
     /// Evolve neuron using Euler integration
@@ -1491,69 +1490,60 @@ impl HdcLtcUnifiedNeuron {
     ) -> HdcLtcGradients {
         let dim = self.config.dimension;
 
-        // --- Forward recomputation ---
-        // Pre-activation: z = W⊗x + U⊗u (bundled)
-        let wx = self.weight_hv.bind(&self.state);
-        let uu = self.input_mask.bind(input);
-        let z = ContinuousHV::bundle(&[&wx, &uu]);
-
-        // Equilibrium: x_∞ = f(z)
+        // This local gradient is defined at the neuron's PRE-EVOLUTION state.
+        // Call backward() before evolve_closed_form() for the same input/dt.
+        // The forward and backward paths share pre-activation and gate helpers,
+        // avoiding the former mismatch (ungated pure exponential in backward
+        // versus adaptive gating/Fourier input in the actual forward path).
+        let z = self.compute_pre_activation(input);
         let x_inf = self.config.activation.apply(&z);
-
-        // Tau and sigma
         let tau = self.compute_tau(input);
+        let sigma_base = self.compute_gate_base(input);
         let decay = (-dt / tau).exp();
-        let sigma = 1.0 - decay;
+        let sigma = (1.0 - decay * (1.0 - sigma_base)).clamp(0.0, 1.0);
 
-        // New state: x' = σ × x_∞ + (1-σ) × x
+        // One-step prediction from the current (pre-evolution) state.
         let new_state = x_inf.scale(sigma).add(&self.state.scale(1.0 - sigma));
 
-        // --- Backward pass ---
-        // dL/dx' = 2(x' - target) / dim   (MSE gradient)
+        // dL/dx' for mean-squared error.
         let dh = new_state.subtract(target).scale(2.0 / dim as f32);
-
-        // Through interpolation: dL/dx_∞ = dL/dx' × σ  (element-wise scale)
         let dx_inf = dh.scale(sigma);
 
-        // Through activation: dL/dz = dL/dx_∞ ⊙ f'(z)
-        // We need element-wise: dx_inf[i] * activation.derivative(z[i])
+        // ContinuousHV::bundle averages its inputs. Account for the exact
+        // 1/n factor (2 components, or 3 when a Fourier basis is injected).
+        let bundle_terms = if self.config.fourier_frequencies.is_empty() {
+            2.0
+        } else {
+            3.0
+        };
         let activation = self.config.activation;
         let dz_values: Vec<f32> = dx_inf
             .values
             .iter()
             .zip(z.values.iter())
-            .map(|(&di, &zi)| di * activation.derivative(zi))
+            .map(|(&di, &zi)| di * activation.derivative(zi) / bundle_terms)
             .collect();
         let dz = ContinuousHV::from_values(dz_values);
 
-        // Bundle = (wx + uu) / n, so ∂bundle/∂wx = 1/n element-wise.
-        // We absorb the 1/n into the learning rate (standard practice) and pass
-        // the full gradient through for stronger signal.
-
-        // Weight gradients via binding chain rule:
-        // W⊗x is element-wise multiply, so ∂(W⊗x)/∂W = x
+        // Partial gradients for the state/input binding paths. The adaptive
+        // gate and tau are held fixed for dw/du; tau receives its own scalar
+        // derivative below. Gate-parameter gradients are a separate follow-up.
         let dw = dz.bind(&self.state);
-
-        // dL/dU = dz ⊙ u
         let du = dz.bind(input);
+        let d_input = dz.bind(&self.input_mask);
 
-        // Tau gradient (scalar):
-        // dσ/dτ = -dt/τ² × exp(-dt/τ)  (since σ = 1 - exp(-dt/τ))
-        // dL/dτ = Σ_i dh_i × (x_∞_i - x_i) × dσ/dτ
-        //       = Σ_i dh_i × (x_inf_i - state_i) × (-dt/τ²) × exp(-dt/τ)
+        // sigma = 1 - exp(-dt/tau) * (1 - sigma_base).
+        // Holding sigma_base fixed, d sigma / d tau is:
+        // -exp(-dt/tau) * (1 - sigma_base) * dt / tau^2.
         let diff = x_inf.subtract(&self.state);
-        let dtau_scalar: f32 = dh
+        let dloss_dsigma: f32 = dh
             .values
             .iter()
             .zip(diff.values.iter())
             .map(|(&dhi, &di)| dhi * di)
-            .sum::<f32>()
-            * (-dt / (tau * tau))
-            * decay;
-
-        // Gradient w.r.t. the actual input vector (for inter-layer BPTT):
-        // U⊗u is element-wise multiply, so ∂(U⊗u)/∂u = U
-        let d_input = dz.bind(&self.input_mask);
+            .sum();
+        let dsigma_dtau = -decay * (1.0 - sigma_base) * dt / (tau * tau);
+        let dtau_scalar = dloss_dsigma * dsigma_dtau;
 
         HdcLtcGradients {
             dw,
@@ -1958,6 +1948,40 @@ impl HdcLtcUnifiedNetwork {
             }
             self.cache_layer_output(layer_idx);
         }
+    }
+
+    /// Apply a layer-local target update using gradients evaluated at each
+    /// neuron's pre-evolution state, then evolve that layer.
+    ///
+    /// This is greedy/local supervised learning, not temporal BPTT or a full
+    /// chain-rule gradient through the network. It is useful for controlled
+    /// neuron-learning experiments where every layer receives the same target
+    /// representation. The layer is trained and evolved before its output is
+    /// supplied to the next layer, preserving the actual forward dependency.
+    pub fn train_local_target_step(
+        &mut self,
+        dt: f32,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        learning_rate: f32,
+    ) -> ContinuousHV {
+        for layer_idx in 0..self.layers.len() {
+            let layer_input = if layer_idx == 0 {
+                input.clone()
+            } else {
+                self.compute_layer_input(layer_idx, input)
+            };
+
+            for neuron in &mut self.layers[layer_idx] {
+                let gradients = neuron.backward(&layer_input, target, dt);
+                neuron.apply_gradients_no_decay(&gradients, learning_rate);
+                neuron.evolve_closed_form(dt, &layer_input);
+            }
+
+            self.cache_layer_output(layer_idx);
+        }
+
+        self.output()
     }
 
     /// Cache layer output
@@ -2814,6 +2838,75 @@ mod tests {
             "State should evolve, got norm={}",
             norm
         );
+    }
+
+    #[test]
+    fn test_backward_weight_gradient_matches_forward_finite_difference() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: Vec::new(),
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        let input = ContinuousHV::random(64, 100);
+        let target = ContinuousHV::random(64, 200);
+        neuron.set_state(ContinuousHV::random(64, 300).scale(0.1));
+
+        let dt = 0.013;
+        let gradients = neuron.backward(&input, &target, dt);
+        let index = 7;
+        let epsilon = 1e-3;
+
+        let loss_at = |mut candidate: HdcLtcUnifiedNeuron| {
+            candidate.evolve_closed_form(dt, &input);
+            candidate
+                .state()
+                .values
+                .iter()
+                .zip(target.values.iter())
+                .map(|(&predicted, &expected)| (predicted - expected).powi(2))
+                .sum::<f32>()
+                / 64.0
+        };
+
+        let mut plus = neuron.clone();
+        plus.weight_hv.values[index] += epsilon;
+        let mut minus = neuron.clone();
+        minus.weight_hv.values[index] -= epsilon;
+        let finite_difference = (loss_at(plus) - loss_at(minus)) / (2.0 * epsilon);
+
+        assert!(
+            (gradients.dw.values[index] - finite_difference).abs() < 2e-3,
+            "weight gradient mismatch: analytic={}, finite_difference={}",
+            gradients.dw.values[index],
+            finite_difference
+        );
+    }
+
+    #[test]
+    fn test_local_target_step_updates_parameters_and_evolves() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: Vec::new(),
+            ..UnifiedConfig::default()
+        };
+        let network_config = UnifiedNetworkConfig {
+            layer_sizes: vec![2, 2],
+            neuron_config: config,
+            use_layer_binding: true,
+            skip_connections: false,
+        };
+        let mut network = HdcLtcUnifiedNetwork::new(network_config, 42);
+        let input = ContinuousHV::random(64, 100);
+        let target = ContinuousHV::random(64, 200);
+        let before = network.layers[0][0].weight_hv.clone();
+
+        let output = network.train_local_target_step(0.01, &input, &target, 0.05);
+
+        assert!(output.values.iter().all(|value| value.is_finite()));
+        assert_ne!(network.layers[0][0].weight_hv.values, before.values);
+        assert_eq!(network.layers[0][0].update_count, 1);
+        assert_eq!(network.layers[1][0].update_count, 1);
     }
 
     #[test]
