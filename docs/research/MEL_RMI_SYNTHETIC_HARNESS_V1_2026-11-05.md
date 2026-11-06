@@ -1,9 +1,9 @@
 # RMI-Bench v1 — synthetic Track A implementation
 
-**Date:** 5 November 2026  
+**Date:** 6 November 2026  
 **Protocol:** `crates/domains/symthaea-muse/RMI_BENCH_V1_PREREGISTRATION_2026-11-02.md`  
 **Implementation:** `tools/mel-rmi-synthetic/`  
-**Pull request:** [#10524](https://github.com/Luminous-Dynamics/symthaea/pull/10524)
+**Pull request:** [#10721](https://github.com/Luminous-Dynamics/symthaea/pull/10721)
 
 ## Scope and claim ceiling
 
@@ -81,7 +81,15 @@ The production integration must reuse MEL-013A: resolve Studio-owned artifacts, 
 
 The canonical example no longer uses marker-only MIDI files. The new renderer writes Standard MIDI File format 0 with one track, a 4/4 time signature, actual note-on/note-off events, and dimension-specific control events. Motif values transpose a fixed melodic contour; rhythm values rotate a note-onset pattern; tempo values produce a tempo meta-event; role values select General MIDI program and register; texture values change chord polyphony. Target and protected features are encoded on separate MIDI channels. An output artifact is generated from the agent action plus the same protected-feature value as its input.
 
-The semantic MIDI tests verify that all five target dimensions change their expected event representation while the protected dimension's note events remain identical; protected tempo is compared as a tempo map, not inferred from note events. These files are actual symbolic MIDI event streams, but they remain procedural fixtures—not expressive performances, audio renders, or human judgments of musical equivalence. The extension raises the authored Rust unit-test count from 64 to 66; the expanded version still needs an exact-head workflow run before any pass claim.
+The semantic MIDI tests verify that all five target dimensions change their expected event representation while the protected dimension's note events remain identical; protected tempo is compared as a tempo map, not inferred from note events. These files are actual symbolic MIDI event streams, but they remain procedural fixtures—not expressive performances, audio renders, or human judgments of musical equivalence.
+
+## 6 November MIDI parser and statistics qualification
+
+The MIDI artifact path now has a bounded Standard MIDI File inspector. It rejects files above 16 MiB, malformed/truncated headers or track chunks, unsupported formats, invalid PPQN, overlong VLQs, unmatched note events, malformed tempo/meter metadata, missing or non-terminal End-of-Track events, and invalid running-status use. It supports a deliberately bounded format-0/format-1 subset, parses notes into absolute-tick intervals, and records tempo, time-signature and program-change events. Meta-events and SysEx events cancel running status as required by the SMF specification. The artifact binder calls this inspector before hashing any representation declared as MIDI. The canonical synthetic profile is narrower than the generic reader: one format-0 track, 4/4, and positive-duration notes.
+
+A new `statistics` module reports paired causal outcomes separately by dimension and direction. It preserves missing attempts (abstention, timeout, invalid output, missing artifact, unavailable adapter, withdrawal, other) in the attempted denominator, never imputes them, averages within the declared independent cluster before resampling clusters, and refuses a confidence interval when fewer than two measured clusters exist. It reports target-minus-sham, target-minus-unrelated and target-minus-yoked effects separately; there is no cross-dimension RMI composite.
+
+Current authored unit tests: **73 core RMI tests + 12 statistics tests = 85**. The 66-test revision's prior exact-head pass is historical. The current MIDI-parser/statistics revision is awaiting its own exact-head workflow; no pass is claimed for 85 tests until that completes.
 
 ## Executable suite and output
 
