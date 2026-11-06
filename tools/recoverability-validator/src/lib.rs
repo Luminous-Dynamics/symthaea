@@ -24,8 +24,8 @@ const MAX_REFERENCE_BYTES: usize = 256;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchSurfaceStateV1 {
-    FrozenObserved,
-    Partial,
+    CompleteFrozenInventory,
+    PartialObserved,
     Unknown,
 }
 
@@ -437,10 +437,29 @@ fn find_route(
                 ),
                 RouteMode::Navigation => true,
             };
-            if !allowed
-                || (edge.operation == RouteOperationV1::PostReformulationRetrieval
-                    && !state.reformulation_pending)
-            {
+            let operation_order_valid = match edge.operation {
+                RouteOperationV1::InitialRetrieval => {
+                    !state.used_initial_retrieval
+                        && !state.used_reformulation
+                        && !state.used_navigation
+                }
+                RouteOperationV1::QueryReformulation => {
+                    state.used_initial_retrieval
+                        && !state.used_reformulation
+                        && !state.reformulation_pending
+                        && !state.used_navigation
+                }
+                RouteOperationV1::PostReformulationRetrieval => {
+                    state.reformulation_pending
+                        && !state.used_post_reformulation_retrieval
+                        && !state.used_navigation
+                }
+                navigation_operation if navigation_operation.is_navigation() => {
+                    state.used_initial_retrieval
+                }
+                _ => false,
+            };
+            if !allowed || !operation_order_valid {
                 continue;
             }
             let Some(next_cost) = cost.checked_add(edge.cost) else {
@@ -485,14 +504,20 @@ fn classify_unit(
     adjacency: &BTreeMap<String, Vec<&RecoverabilityEdgeV1>>,
     unit: &RequiredEvidenceUnitV1,
 ) -> RecoverabilityRecordV1 {
-    let unavailable = fields.surface_state != SearchSurfaceStateV1::FrozenObserved
-        || unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
+    let artifact_unavailable =
+        unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
+    let surface_unknown = fields.surface_state == SearchSurfaceStateV1::Unknown;
 
-    let result = if unavailable {
+    // Positive pinned route witnesses are valid on a partial observed surface.
+    // A missing route is negative evidence only when the inventory is complete.
+    let result = if artifact_unavailable || surface_unknown {
         (RecoverabilityClassV1::NotEvaluable, None)
-    } else if let Some(route) =
-        find_route(fields, adjacency, &unit.target_node_ref, RouteMode::Direct)
-    {
+    } else if let Some(route) = find_route(
+        fields,
+        adjacency,
+        &unit.target_node_ref,
+        RouteMode::Direct,
+    ) {
         (RecoverabilityClassV1::DirectlyReachable, Some(route))
     } else if let Some(route) = find_route(
         fields,
@@ -508,8 +533,10 @@ fn classify_unit(
         RouteMode::Navigation,
     ) {
         (RecoverabilityClassV1::NavigationRecoverable, Some(route))
-    } else {
+    } else if fields.surface_state == SearchSurfaceStateV1::CompleteFrozenInventory {
         (RecoverabilityClassV1::UnreachableWithinBudget, None)
+    } else {
+        (RecoverabilityClassV1::NotEvaluable, None)
     };
 
     RecoverabilityRecordV1 {
@@ -619,7 +646,7 @@ mod tests {
             corpus_snapshot_sha256: digest('a'),
             search_surface_sha256: digest('b'),
             route_policy_sha256: digest('c'),
-            surface_state: SearchSurfaceStateV1::FrozenObserved,
+            surface_state: SearchSurfaceStateV1::CompleteFrozenInventory,
             start_node_ref: "state:start".to_string(),
             max_route_cost: 8,
             budget_unit: "synthetic_action_credit".to_string(),
@@ -631,7 +658,13 @@ mod tests {
                     node_ref: "evidence:direct".into(),
                 },
                 RecoverabilityNodeV1 {
+                    node_ref: "state:rewrite-initial-results".into(),
+                },
+                RecoverabilityNodeV1 {
                     node_ref: "state:rewrite".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "document:search-result".into(),
                 },
                 RecoverabilityNodeV1 {
                     node_ref: "evidence:rewrite".into(),
@@ -661,8 +694,15 @@ mod tests {
                     cost: 1,
                 },
                 RecoverabilityEdgeV1 {
-                    edge_ref: "route:rewrite-query".into(),
+                    edge_ref: "route:rewrite-initial".into(),
                     from_node_ref: "state:start".into(),
+                    to_node_ref: "state:rewrite-initial-results".into(),
+                    operation: RouteOperationV1::InitialRetrieval,
+                    cost: 1,
+                },
+                RecoverabilityEdgeV1 {
+                    edge_ref: "route:rewrite-query".into(),
+                    from_node_ref: "state:rewrite-initial-results".into(),
                     to_node_ref: "state:rewrite".into(),
                     operation: RouteOperationV1::QueryReformulation,
                     cost: 1,
@@ -675,8 +715,15 @@ mod tests {
                     cost: 1,
                 },
                 RecoverabilityEdgeV1 {
-                    edge_ref: "route:open-document".into(),
+                    edge_ref: "route:navigation-initial".into(),
                     from_node_ref: "state:start".into(),
+                    to_node_ref: "document:search-result".into(),
+                    operation: RouteOperationV1::InitialRetrieval,
+                    cost: 1,
+                },
+                RecoverabilityEdgeV1 {
+                    edge_ref: "route:open-document".into(),
+                    from_node_ref: "document:search-result".into(),
                     to_node_ref: "document:known".into(),
                     operation: RouteOperationV1::OpenDocument,
                     cost: 1,
@@ -826,14 +873,55 @@ mod tests {
     }
 
     #[test]
-    fn unknown_or_partial_search_surface_makes_all_units_not_evaluable() {
+    fn partial_surface_preserves_positive_routes_but_not_negative_findings() {
         let mut fields = base_fields();
-        fields.surface_state = SearchSurfaceStateV1::Partial;
+        fields.surface_state = SearchSurfaceStateV1::PartialObserved;
         let result = report(fields);
         assert!(result.valid);
-        assert!(result.records.iter().all(|r| {
-            r.recoverability == RecoverabilityClassV1::NotEvaluable && r.route_edge_refs.is_empty()
+        let actual: BTreeMap<_, _> = result
+            .records
+            .iter()
+            .map(|record| (record.evidence_unit_id.as_str(), record.recoverability))
+            .collect();
+        assert_eq!(actual["unit:direct"], RecoverabilityClassV1::DirectlyReachable);
+        assert_eq!(actual["unit:rewrite"], RecoverabilityClassV1::ReformulationRecoverable);
+        assert_eq!(actual["unit:navigation"], RecoverabilityClassV1::NavigationRecoverable);
+        assert_eq!(actual["unit:unreachable"], RecoverabilityClassV1::NotEvaluable);
+        assert_eq!(actual["unit:unknown"], RecoverabilityClassV1::NotEvaluable);
+    }
+
+    #[test]
+    fn unknown_surface_makes_every_unit_not_evaluable() {
+        let mut fields = base_fields();
+        fields.surface_state = SearchSurfaceStateV1::Unknown;
+        let result = report(fields);
+        assert!(result.valid);
+        assert!(result.records.iter().all(|record| {
+            record.recoverability == RecoverabilityClassV1::NotEvaluable
+                && record.route_edge_refs.is_empty()
         }));
+    }
+
+    #[test]
+    fn reformulation_requires_initial_retrieval_before_rewriting() {
+        let mut fields = base_fields();
+        fields.edges.retain(|edge| edge.edge_ref != "route:rewrite-initial");
+        let result = report(fields);
+        assert_eq!(
+            result.records.iter().find(|r| r.evidence_unit_id == "unit:rewrite").unwrap().recoverability,
+            RecoverabilityClassV1::UnreachableWithinBudget
+        );
+    }
+
+    #[test]
+    fn navigation_requires_a_prior_initial_retrieval_result() {
+        let mut fields = base_fields();
+        fields.edges.retain(|edge| edge.edge_ref != "route:navigation-initial");
+        let result = report(fields);
+        assert_eq!(
+            result.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability,
+            RecoverabilityClassV1::UnreachableWithinBudget
+        );
     }
 
     #[test]
