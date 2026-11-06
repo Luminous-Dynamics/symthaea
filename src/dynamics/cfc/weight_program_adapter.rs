@@ -310,7 +310,10 @@ mod tests {
             enable_online_learning: false,
             ..Default::default()
         };
-        let original = CfCNetwork::new(config);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-swi-permutation-equivalence-v1",
+        );
+        let original = CfCNetwork::from_genesis(config, &genesis, "permutation-equivalence");
         let snapshot =
             cfc_weight_model_snapshot(&original, digest('d')).expect("snapshot");
         let permutation = [2usize, 0, 3, 1];
