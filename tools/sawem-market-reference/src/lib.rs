@@ -14,6 +14,7 @@ pub mod bms_capability;
 pub mod bms_capability_surface;
 pub mod cash_risk;
 pub mod credit_cover;
+pub mod decision_regret;
 pub mod execution_fidelity;
 pub mod forecast_metrics;
 pub mod liquidity_options;
