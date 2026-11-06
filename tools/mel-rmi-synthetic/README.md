@@ -72,6 +72,14 @@ The Rust unit suite additionally exhaustively checks 3,464 dispositions across a
 
 The runner also emits seven scoped-authority cases: one valid event and six rejected cases covering wrong source event, stale sequence, wrong clock origin, not-yet-effective event, expiry, and missing receipt reference. These checks bind the decision state to the current session/task/observation and time context. They do **not** authenticate the referenced actor or signed receipt. Production use must first verify the opaque receipt, actor and purpose-specific authorization through the MEL-013A trust boundary.
 
+## Bounded MIDI inspection and paired statistics
+
+The crate exposes `inspect_midi_file_v1` for a bounded SMF format-0/format-1 subset. It parses absolute-tick note intervals, tempo events, time signatures and program changes, handles channel running status and zero-velocity note-offs, and rejects malformed or truncated chunks, invalid VLQs, unmatched notes, illegal running-status reuse, and missing/non-terminal End-of-Track markers. The input bound is 16 MiB. The synthetic profile is intentionally narrower (format 0, one track, 4/4 and positive-duration notes). The artifact binder runs the parser before hashing bytes declared as MIDI.
+
+The `statistics` module implements paired cluster-aware summaries. It calculates target-minus-sham, target-minus-unrelated and target-minus-yoked contrasts separately, reduces repeated trials within the declared independent cluster before bootstrap sampling, and reports no interval with fewer than two measured clusters. Missing/abstained/timeout/invalid-output/missing-artifact/unavailable-adapter/withdrawal trials remain in the attempted denominator and are not imputed. No dimensions or causal directions are collapsed into one score.
+
+The current source authors 73 core RMI tests and 12 statistics tests (85 total). Confirm exact-head workflow status before calling this revision verified.
+
 ## Interpretation boundary
 
 Passing these tests means only that this finite synthetic harness detects its known positive and negative controls. The manifest stores exact event identities and a caller-supplied code revision; it does not cryptographically hash arbitrary audio or MIDI payloads. Real artifact digests and Studio transaction receipts must be supplied by the MEL-013A adapter before external or human-session claims.
