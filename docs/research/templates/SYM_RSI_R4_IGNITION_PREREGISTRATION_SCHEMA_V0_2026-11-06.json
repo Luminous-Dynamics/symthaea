@@ -726,6 +726,15 @@
               "type": "string",
               "const": "DETERMINE_AFTER_PILOT_AND_FREEZE_BEFORE_CONFIRMATION"
             }
+          ],
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "DETERMINE_AFTER_PILOT_AND_FREEZE_BEFORE_CONFIRMATION"
+            }
           ]
         },
         "confirmatory_power_or_precision_analysis_ref": {
@@ -764,7 +773,15 @@
       "type": "object",
       "properties": {
         "planned_outer_loop_steps": {
-          "type": "string"
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
         },
         "per_round_reporting_required": {
           "type": "boolean"
