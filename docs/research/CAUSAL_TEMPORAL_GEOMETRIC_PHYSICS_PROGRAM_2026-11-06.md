@@ -56,6 +56,33 @@ Known limitation:
 - Its current semantic-stream adapter uses a single zero null score and one
   dimension at a time; this is not a suitable inferential design.
 
+### Quantum many-body / tensor-network foundation
+
+An additional source audit changes the implementation plan materially:
+
+- `symthaea-frontier-physics::dmrg::HeisenbergChain` returns the two-site
+  singlet energy exactly. For larger chains, `ground_state_energy_exact()`
+  uses the infinite-chain Bethe-ansatz energy density plus a fixed boundary
+  correction; it does not run DMRG sweeps or solve a finite-size effective
+  Hamiltonian.
+- Its Schmidt spectrum is a synthetic exponential model derived from an
+  entropy ansatz. It is not computed from a wavefunction or reduced density
+  matrix. Consequently, its truncation-error routine is a property of that
+  synthetic spectrum, not a measured DMRG truncation error.
+- `symthaea-frontier-physics::tensor_networks::MatrixProductState` provides
+  basic product/GHZ state construction, a transfer-contraction norm, and
+  bookkeeping metrics. It does not currently implement canonicalization,
+  two-site gate evolution (TEBD), variational optimization, DMRG sweeps,
+  environment contraction, or a PEPS solver.
+
+These are useful pedagogical/reference primitives, but they must not be
+presented as competitive DMRG or production tensor-network capabilities.
+The new time-crystal implementation must therefore begin with an exact
+small-system Hamiltonian/Floquet oracle. Only then should an MPS/TEBD path be
+added and compared against external reference implementations such as
+TeNPy, ITensor and quimb. This is a more demanding but scientifically honest
+route to competing with the current state of the art.
+
 ### GravCraft foundation
 
 Existing component:
