@@ -1587,7 +1587,7 @@
       "case_id": "FORECAST-SKILL-BLOCK-BOOTSTRAP-001",
       "track": "forecast_and_decision_replay",
       "title": "Serial-dependence-aware confidence interval for paired forecast skill",
-      "scenario": "Use a frozen, source-digested circular moving-block bootstrap plan to resample paired candidate-minus-baseline per-period median-MAE and central-80% WIS improvements. The plan fixes block length, draw count, confidence level and all block starts before inspecting the holdout. Return exact integer confidence bounds over the mean paired improvement. A forecast superiority claim is supported only when the lower confidence bound is strictly positive; intervals crossing zero remain inconclusive. The evaluator must be deterministic and replay the exact resampling plan.",
+      "scenario": "Use a frozen, source-digested circular moving-block bootstrap plan to resample paired candidate-minus-baseline per-period median-MAE and central-80% WIS improvements. The plan fixes block length, draw count, confidence level and all block starts before inspecting the holdout. Return exact integer confidence bounds over the mean paired improvement. A forecast superiority claim is supported only when the lower confidence bound is strictly positive; intervals crossing zero remain inconclusive. The evaluator must be deterministic and replay the exact resampling plan. The bootstrap input must be one chronological, contiguous Trading Period series. Mixed series, reversed timestamps or gaps are rejected rather than allowing a block to cross unrelated markets or missing intervals.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1595,7 +1595,8 @@
       "test_names": [
         "positive_lower_bound_supports_paired_improvement",
         "block_bootstrap_can_be_inconclusive_when_periods_disagree",
-        "invalid_bootstrap_plan_metadata_and_indexes_fail_closed"
+        "invalid_bootstrap_plan_metadata_and_indexes_fail_closed",
+        "bootstrap_rejects_multiple_series_and_time_gaps"
       ],
       "required_evidence": [
         "paired per-period candidate-minus-baseline loss deltas",
@@ -1605,7 +1606,8 @@
         "complete ordered block-start index manifest",
         "content digest and source reference for the bootstrap plan",
         "baseline fitting boundary strictly before evaluation holdout",
-        "forecast and realized source/time receipts for every paired target"
+        "forecast and realized source/time receipts for every paired target",
+        "single-series chronological contiguous Trading Period sequence used by the moving-block plan"
       ],
       "stress_tags": [
         "moving-block-bootstrap",
