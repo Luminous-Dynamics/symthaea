@@ -62,7 +62,9 @@
     "physical_replay": "Compare schedule against grid-connection-point energy; separately evaluate inverter AC/DC efficiency, system SOC drift and individual-unit SOC trajectories.",
     "balancing_cost": "Only calculate balancing cost when the required market price/settlement evidence is present in the dataset or separately source-frozen. Never infer a currency charge from energy deviation alone.",
     "capability_envelope": "Fit conservative charge/discharge SOC capability curves on Test 1 data only; evaluate envelope coverage, derating decisions and delivery outcomes on Test 2.",
-    "minimum_output": "Raw digests, schema/column map, time-quality report, data coverage, 15-minute schedule reconciliation, one-second residuals, SOC drift, unfulfilled energy, efficiency errors and an exact reproduction report."
+    "minimum_output": "Raw digests, schema/column map, time-quality report, data coverage, 15-minute schedule reconciliation, one-second residuals, SOC drift, unfulfilled energy, efficiency errors and an exact reproduction report.",
+    "power_trace_integration": "The public Rust power_trace module now integrates signed integer-milliwatt samples by exact trapezoidal intervals within a declared maximum gap. It reports uncovered seconds and requires horizon endpoints; it does not interpolate or forward-fill. The module has synthetic exact-known-answer tests only. No M5BAT raw CSV has been staged, parsed or evaluated by this kernel.",
+    "data_download_limitation": "The RWTH 2024-04895 dataset record lists M5BAT_04-2023_RAW.zip at approximately 97.0 MB and the public field-data registry documents manual browser download. Scripted archive retrieval was not possible in the present execution environment; archive SHA-256 and member digests remain null until raw bytes are staged."
   },
   "target_gates": {
     "first_gate": "Reproduce the published Test 1 and Test 2 reference metrics within the dataset's documented rounding/tolerance before claiming any improvement.",
@@ -89,7 +91,10 @@
     "field_metrics_state": "not_run",
     "clock_mapping_kernel_tested": false,
     "m5bat_source_clock_reconciled": false,
-    "schedule_measurement_alignment_state": "not_reconciled"
+    "schedule_measurement_alignment_state": "not_reconciled",
+    "power_trace_kernel_tested": true,
+    "power_trace_kernel_state": "synthetic_exact_head_tests_only",
+    "raw_dataset_integration_state": "not_run"
   },
   "field_data_registry_context": {
     "repository": "Astrolabe-Analytics/public-battery-field-data",
