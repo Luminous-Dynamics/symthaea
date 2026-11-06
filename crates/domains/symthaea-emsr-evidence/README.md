@@ -35,6 +35,10 @@ The crate is an explicit workspace package under `crates/domains/*`; it is not c
 - Design fixtures contain no measurements. Only separate run receipts carry observed outcomes.
 - A structurally valid receipt is not a detector-performance pass, operational safety case, certification, or data-rights opinion.
 
+## Machine-readable contracts
+
+`docs/research/emsr-v0.1/emsr-evidence-contracts-v0.1.schema.json` contains Draft 2020-12 definitions for the dataset catalogue, split manifest, run receipt, source failure-domain profile and pairwise-independence graph. Cross-record group leakage, unique identifiers, exact intended-use matching, exact-byte digest checks and executor/verifier identity separation are additionally enforced by the Rust validator.
+
 ## Frozen examples
 
 - `docs/research/emsr-v0.1/emsr-dataset-catalog-v0.1.json` is a discovery-only inventory. All four payloads remain not imported; rights review remains pending.
