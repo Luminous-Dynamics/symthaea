@@ -915,6 +915,13 @@ jobs:
           jq -e '[.records[] | select(.evidence_unit_id == "unit:rewrite")][0].recoverability == "UnreachableWithinBudget"' \
             /tmp/sbr-recoverability/rewrite-before-first-pass-report.json >/dev/null
 
+          # Navigation before the first-pass miss cannot count as recoverability.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-recoverability-manifest /tmp/sbr-recoverability/navigation-before-first-pass-manifest.json \
+            > /tmp/sbr-recoverability/navigation-before-first-pass-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:navigation")][0].recoverability == "UnreachableWithinBudget"' \
+            /tmp/sbr-recoverability/navigation-before-first-pass-report.json >/dev/null
+
           # Reduced route budget cannot make navigation easier; added route can improve only its target.
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
             audit-recoverability-manifest /tmp/sbr-recoverability/lower-budget-manifest.json \
