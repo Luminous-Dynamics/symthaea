@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.schema.json",
+  "title": "Append-only causal and measurement model ambiguity expansion binding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "challenge_id",
+    "base_input_git_blob_sha1",
+    "expanded_input_git_blob_sha1",
+    "sequential_oracle_git_blob_sha1",
+    "base_model_vertex_ids",
+    "expanded_model_vertex_ids",
+    "added_model_vertex_id",
+    "added_model_sha256",
+    "expected_base_robust_loss",
+    "expected_expanded_robust_loss",
+    "expected_base_certificate",
+    "expected_expanded_certificate",
+    "certificate_tolerance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "base_input_git_blob_sha1": {
+      "$ref": "#/$defs/sha1"
+    },
+    "expanded_input_git_blob_sha1": {
+      "$ref": "#/$defs/sha1"
+    },
+    "sequential_oracle_git_blob_sha1": {
+      "$ref": "#/$defs/sha1"
+    },
+    "base_model_vertex_ids": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "expanded_model_vertex_ids": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "added_model_vertex_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "added_model_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "expected_base_robust_loss": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "expected_expanded_robust_loss": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "expected_base_certificate": {
+      "type": "boolean"
+    },
+    "expected_expanded_certificate": {
+      "type": "boolean"
+    },
+    "certificate_tolerance": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "$defs": {
+    "sha1": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
