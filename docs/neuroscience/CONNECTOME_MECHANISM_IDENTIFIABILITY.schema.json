@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_MECHANISM_IDENTIFIABILITY.schema.json",
+  "title": "Connectome mechanism-identifiability run input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "query",
+    "mechanisms",
+    "nuisance_profiles",
+    "interventions",
+    "predictions",
+    "replicate_design",
+    "alpha",
+    "known_answer"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "mechanisms": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/mechanism"
+      }
+    },
+    "nuisance_profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nuisance"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    },
+    "replicate_design": {
+      "$ref": "#/$defs/replicate_design"
+    },
+    "alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 0.5
+    },
+    "known_answer": {
+      "$ref": "#/$defs/known_answer"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "mechanism": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism_id",
+        "mechanism_class",
+        "query_decision",
+        "prior_probability",
+        "source_evidence_sha256",
+        "model_sha256"
+      ],
+      "properties": {
+        "mechanism_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_class": {
+          "enum": [
+            "DIRECT_SYNAPTIC",
+            "POLYSYNAPTIC",
+            "EXTRASYNAPTIC_LATENT",
+            "SHARED_INPUT",
+            "CELL_INTRINSIC_STATE",
+            "OBSERVATION_ARTIFACT",
+            "MIXTURE_UNRESOLVED",
+            "OTHER"
+          ]
+        },
+        "query_decision": {
+          "type": "boolean"
+        },
+        "prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "nuisance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nuisance_profile_id",
+        "profile_sha256",
+        "description"
+      ],
+      "properties": {
+        "nuisance_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "action_kind",
+        "cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "safety_profile_sha256",
+        "outcome_ids"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_kind": {
+          "enum": [
+            "PASSIVE_OBSERVATION",
+            "QUERY_DIRECTED_PERTURBATION",
+            "PATHWAY_SELECTIVE_PERTURBATION",
+            "ORTHOGONAL_MULTI_CHANNEL_MEASUREMENT",
+            "DISALLOWED_REFERENCE",
+            "OTHER"
+          ]
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "safety_profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "outcome_ids": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "mechanism_id",
+        "nuisance_profile_id",
+        "observation_model_sha256",
+        "outcomes"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nuisance_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "replicate_design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_unit",
+        "replicate_count",
+        "independence_scope",
+        "split_manifest_sha256"
+      ],
+      "properties": {
+        "independent_unit": {
+          "enum": [
+            "synthetic_replicate",
+            "animal",
+            "animal_session",
+            "session",
+            "target_neuron"
+          ]
+        },
+        "replicate_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "independence_scope": {
+          "enum": [
+            "SYNTHETIC_IID_KNOWN_TRUTH",
+            "BIOLOGICAL_CLUSTERED_DESIGN",
+            "NOT_ESTABLISHED"
+          ]
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "known_answer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_selected_intervention_id",
+        "expected_action_statuses",
+        "expected_pairwise_risk"
+      ],
+      "properties": {
+        "expected_selected_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_action_statuses": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "query_identified",
+              "mechanism_identified"
+            ],
+            "properties": {
+              "query_identified": {
+                "type": "boolean"
+              },
+              "mechanism_identified": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "expected_pairwise_risk": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 0.5
+          }
+        }
+      }
+    }
+  }
+}
