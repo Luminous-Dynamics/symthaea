@@ -56,6 +56,12 @@ def infer_reproduction_tier(data: dict[str, Any]) -> str:
     raw_stimulated = 'STIMULATED_RAW_RECORDINGS' in materialized
     raw_controls = 'UNSTIMULATED_NULL_CONTROLS' in materialized
     code_pinned = valid_sha(reproduction['analysis_code_commit_sha'], 40)
+    required_code_repositories = {'pumpprobe', 'wormdatamodel', 'wormbrain', 'mistofrutta'}
+    pinned_code_repositories = {
+        row['repository_id']
+        for row in data['code_repositories']
+        if row['revision_status'] == 'COMMIT_PINNED' and valid_sha(row['commit_sha'], 40)
+    }
     full = (
         raw_stimulated
         and raw_controls
@@ -68,12 +74,19 @@ def infer_reproduction_tier(data: dict[str, Any]) -> str:
         and reproduction['qeq_epsilon_sigma'] is not None
         and abs(float(reproduction['qeq_epsilon_sigma']) - 1.2) <= 1e-12
         and code_pinned
+        and required_code_repositories.issubset(pinned_code_repositories)
     )
     if full:
         return 'FULL_RAW_REPRODUCED'
+    paper_q_table = components.get('PAPER_Q_SOURCE_TABLE', {})
+    paper_qeq_table = components.get('PAPER_QEQ_SOURCE_TABLE', {})
     paper_tables = (
         reproduction['paper_source_tables_verified'] is True
         and valid_sha(reproduction['paper_source_tables_sha256'])
+        and paper_q_table.get('availability') == 'MATERIALIZED_AND_HASHED'
+        and valid_sha(paper_q_table.get('content_sha256'))
+        and paper_qeq_table.get('availability') == 'MATERIALIZED_AND_HASHED'
+        and valid_sha(paper_qeq_table.get('content_sha256'))
     )
     if paper_tables:
         return 'PAPER_SOURCE_DATA_REPRODUCED'
@@ -142,6 +155,8 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     reproduction = data['reproduction_evidence']
     if reproduction['paper_source_tables_verified']:
         require(valid_sha(reproduction['paper_source_tables_sha256']), 'verified paper tables lack SHA-256')
+        require(components['PAPER_Q_SOURCE_TABLE']['availability'] == 'MATERIALIZED_AND_HASHED', 'paper-source verification requires the q table to be materialized and hashed')
+        require(components['PAPER_QEQ_SOURCE_TABLE']['availability'] == 'MATERIALIZED_AND_HASHED', 'paper-source verification requires the q_eq table to be materialized and hashed')
     else:
         require(reproduction['paper_source_tables_sha256'] is None, 'unverified paper tables carry a verification digest')
     if reproduction['q_method_reproduced']:
@@ -172,9 +187,15 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         and reproduction['neuron_identity_lineage_complete']
         and reproduction['analysis_code_commit_sha'] is not None
     ), 'full tier requires independent q/q_eq reproduction, complete source lineage and a pinned analysis commit')
+    claim_scope_tiers = {
+        'metadata_inventory': {'METADATA_ONLY'},
+        'source_reconciliation': {'METADATA_ONLY', 'PARTIAL_RESPONSE_REANALYSIS', 'PAPER_SOURCE_DATA_REPRODUCED', 'FULL_RAW_REPRODUCED'},
+        'paper_source_data_reproduction': {'PAPER_SOURCE_DATA_REPRODUCED', 'FULL_RAW_REPRODUCED'},
+        'full_raw_reproduction': {'FULL_RAW_REPRODUCED'},
+    }
     require(
-        data['claim_scope'] != 'metadata_inventory' or inferred_tier == 'METADATA_ONLY',
-        'metadata_inventory claim scope cannot promote a response-reanalysis or reproduction tier'
+        inferred_tier in claim_scope_tiers[data['claim_scope']],
+        f"claim scope {data['claim_scope']} is incompatible with evidence-supported tier {inferred_tier}"
     )
 
     return {
@@ -225,6 +246,15 @@ def run_negative_controls(data: dict[str, Any]) -> None:
     false_q = copy.deepcopy(data)
     false_q['reproduction_evidence']['q_method_reproduced'] = True
     cases.append(('q method claimed without materialized raw/null data', false_q))
+    false_paper_tables = copy.deepcopy(data)
+    false_paper_tables['reproduction_evidence']['paper_source_tables_verified'] = True
+    false_paper_tables['reproduction_evidence']['paper_source_tables_sha256'] = 'b' * 64
+    false_paper_tables['declared_reproduction_tier'] = 'PAPER_SOURCE_DATA_REPRODUCED'
+    cases.append(('paper-source tier without materialized q and q_eq tables', false_paper_tables))
+    unpinned_full = copy.deepcopy(data)
+    unpinned_full['claim_scope'] = 'full_raw_reproduction'
+    unpinned_full['declared_reproduction_tier'] = 'FULL_RAW_REPRODUCED'
+    cases.append(('full-raw claim without pinned analysis dependencies', unpinned_full))
     false_claim_scope = copy.deepcopy(data)
     false_claim_scope['claim_scope'] = 'full_raw_reproduction'
     cases.append(('metadata-only evidence with full-reproduction claim scope', false_claim_scope))
