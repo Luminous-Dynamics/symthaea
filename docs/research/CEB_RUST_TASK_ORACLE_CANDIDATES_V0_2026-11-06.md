@@ -25,7 +25,7 @@ No candidate-controlled code, Cargo build script, procedural macro, unit test, i
 
 ## 2. How to use these candidates
 
-The six domains are selected to span materially different Rust engineering failure surfaces. Their mapping to the exact six fault-family labels and repository quotas in #10617 must be confirmed against the canonical machine-readable plan before any slot assignment. The domains below are descriptive candidate themes, **not a replacement taxonomy**.
+The six domains are now mapped to the exact six root-cause family IDs in the canonical #10617 sampling and preregistration artifacts. This is a **family mapping only**: no repository identity, slot, task ID, partition, or difficulty label is assigned. The canonical plan remains authoritative for all sampling decisions.
 
 A reviewer should classify each candidate:
 
@@ -37,14 +37,16 @@ A candidate is not `fixture_ready` merely because its specification is detailed.
 
 ## 3. Candidate summary
 
-| Candidate theme | Main engineering challenge | High-risk false-positive | High-risk false-negative |
+| Candidate theme | Canonical #10617 family ID | Mapping rationale | Main engineering challenge |
 |---|---|---|---|
-| Cross-crate API and trait migration | Preserve public semantics across crate boundaries | Accept a patch that compiles only because call sites or compatibility surface were deleted | Reject a valid adapter/wrapper strategy that preserves the contract |
-| Async backpressure and shutdown | Preserve accepted work across cancellation and shutdown | Accept a solution that drains only in the no-backpressure path | Reject an alternative scheduler with equivalent boundedness and delivery semantics |
-| Idempotent event replay | Exactly-once effect under at-least-once delivery assumptions | Accept duplicate side effects or acknowledge before durable commit | Reject a valid transactional/outbox or durable deduplication design |
-| Workspace command and path boundary | Prevent command injection and path escape | Accept shell construction or symlink traversal disguised by string-prefix checks | Reject safe direct-argv or descriptor-relative implementations |
-| Cargo feature/target composition | Make supported feature sets coherent without leakage | Accept because default features hide broken no-default/target-specific builds | Reject an alternative feature graph that satisfies all declared build combinations |
-| Streaming top-k under bounded resources | Exact ranking, updates and deterministic ties at bounded memory | Accept a benchmark-specific answer cache or stale-heap result | Reject a correct ordered-set/indexed-heap implementation |
+| Cross-crate API and trait migration | `multi-crate-api-regression` | Public API changes must preserve all in-scope downstream crate consumers and compatibility behavior. | Preserve public semantics across crate boundaries. |
+| Async trait/API bounds and object-safe adapter | `rust-types-traits` | The decisive correctness surface is trait-object compatibility, associated types, lifetimes and `Send`/`Sync` bounds. | Preserve type-level and trait-level contracts through an async abstraction. |
+| Deterministic reproduction of an event-processing defect | `issue-reproduction-debugging` | The task is admitted only if the defect is reproducibly triggered, diagnosed and fixed from a bounded event schedule. | Reproduce a stateful failure, isolate its cause and demonstrate a durable repair. |
+| Workspace command and path boundary | `security-correctness` | The core acceptance property is preventing unauthorized command execution and filesystem escape. | Prevent command injection and path escape. |
+| Cargo feature/target composition | `feature-target-configuration` | The contract is the declared matrix of supported feature combinations and compilation targets. | Make supported feature sets coherent without environment leakage. |
+| Streaming top-k under bounded resources | `performance-correctness` | The task requires a measured resource improvement without semantic or workload-generalization regression. | Exact ranking, updates and deterministic ties at bounded memory. |
+
+**Mapping provenance:** `benchmarks/ceb/rust-balanced-sampling.v0.json` and `benchmarks/ceb/rust-pilot-preregistration.v0.json` on the #10617 branch define the canonical six family IDs. This dossier maps one development candidate theme to each family but does not assign any `repo-slot-*` cell, fill a planned slot, or select a development/holdout partition.
 
 These candidates are not a claim that six tasks are sufficient for the 48-task pilot or a confirmatory study. They are a reviewer-calibration tranche.
 
@@ -52,6 +54,7 @@ These candidates are not a claim that six tasks are sufficient for the 48-task p
 
 ## 4. Candidate A — Cross-crate API and trait migration
 
+**Canonical family:** `multi-crate-api-regression`.  
 **Provisional theme:** Rust API compatibility and type-system correctness.  
 **Provisional difficulty:** Medium.  
 **Synthetic workspace outline:**
@@ -111,70 +114,70 @@ Exact type names and module placement are not normative unless later frozen in t
 
 ---
 
-## 5. Candidate B — Async backpressure and graceful shutdown
+## 5. Candidate B — Async trait/API bounds and object-safe adapter
 
-**Provisional theme:** asynchronous state, cancellation and bounded resource behavior.  
+**Canonical family:** `rust-types-traits`.  
 **Provisional difficulty:** Medium–high.  
 **Synthetic workspace outline:**
 
 ```text
-bounded-worker/
+async-trait-boundary/
   Cargo.toml
   crates/
-    work-protocol/
-    worker-runtime/
-    service-adapter/
+    domain-types/
+    async-contract/
+    worker-adapter/
   tests/
-    # proposed case inventory only; not yet implemented or run
+    # proposed type-level and behavior cases only; not yet implemented or run
 ```
 
 ### Normative requirements
 
-- **ASYNC-01 — Bounded admission:** queued and in-flight work must remain within the explicitly declared capacity.
-- **ASYNC-02 — Acknowledgement order:** a work item may be acknowledged as complete only after its required completion effect is committed.
-- **ASYNC-03 — Graceful stop:** after shutdown begins, no new work is admitted; work accepted before the shutdown boundary is handled according to the declared drain policy.
-- **ASYNC-04 — Cancellation semantics:** cancellation must not silently convert accepted work into successful completion.
-- **ASYNC-05 — Failure visibility:** worker failure, timeout and cancellation remain distinguishable terminal outcomes.
-- **ASYNC-06 — No unbounded escape hatch:** spawning detached tasks or buffering outside the declared bound is not an acceptable way to bypass backpressure.
+- **TRAIT-01 — Object-capable contract:** the public async service contract must be callable through the trait-object form explicitly required by the specification.
+- **TRAIT-02 — Sendable future:** the returned future must satisfy the declared `Send` bound so it can cross the target executor's task boundary.
+- **TRAIT-03 — Borrowed lifetime:** the call may borrow the service instance for the future's lifetime; the implementation must not impose an undocumented `'static` requirement.
+- **TRAIT-04 — Typed associated contract:** success and error types preserve the declared associated-type and error semantics; stringification or erasure of required error distinctions is prohibited.
+- **TRAIT-05 — Consumer compatibility:** all in-scope generic and trait-object consumers compile against the same normative contract.
+- **TRAIT-06 — No semantic escape:** boxing, pinning or macro expansion may change representation, but may not change cancellation, error or result semantics stated by the contract.
 
 ### Valid implementation alternatives
 
-1. A bounded Tokio channel with an explicit producer-close and worker-drain protocol.
-2. A bounded semaphore plus a joinable worker set, if the total accepted/in-flight count is demonstrably bounded.
-3. A single-owner state machine that serializes admission, drain and terminal status.
+1. An explicit object-safe method returning `Pin<Box<dyn Future<Output = Result<Receipt, ServiceError>> + Send + 'a>>`.
+2. An approved async-trait transformation that preserves the same object-safe, `Send`, borrowed-lifetime and error contract.
+3. A generic adapter plus a narrow erased boundary, provided the required trait-object consumer remains supported and observable semantics remain identical.
 
-Alternative runtimes are acceptable only if the task's environment and API contract explicitly allow them.
+The specification must pin the public observable contract, not a preferred macro or exact source spelling. Whether a macro dependency is permitted must be stated before fixture freeze.
 
 ### Negative near-misses
 
-- Pass tests where the queue is empty but drop accepted work when producers saturate capacity.
-- Acknowledge before the durable/required effect finishes.
-- Stop accepting new work but abandon accepted work without the specified terminal status.
-- Detach workers so shutdown returns while tasks still mutate state.
-- Hide cancellation as success or hide worker failure as a timeout.
-- Meet a queue bound while allowing unbounded detached in-flight tasks.
+- Return a future that is not `Send` when the declared executor boundary requires `Send`.
+- Force `'static` and reject otherwise valid borrowed service implementations.
+- Make the trait usable only through static dispatch when the public trait-object form is required.
+- Erase associated error distinctions into a generic string or panic.
+- Update the trait declaration but leave one in-scope implementor or consumer on the stale signature.
+- Change cancellation or error behavior while preserving the same Rust type signature.
 
 ### Oracle traceability
 
 | Oracle case | Requirement | Expected disposition |
 |---|---|---|
-| Submit up to capacity and verify exact admission behavior | ASYNC-01 | Accept |
-| Saturate producer and consumer, then release capacity | ASYNC-01, ASYNC-02 | Accept only bounded, correct delivery |
-| Shutdown with accepted work pending | ASYNC-03 | Accept only the specified drain result |
-| Cancel during in-flight work | ASYNC-04, ASYNC-05 | Preserve explicit non-success outcome |
-| Count queued plus in-flight work under pressure | ASYNC-06 | Reject unbounded detachment |
+| Explicit boxed-future implementation with required bounds | TRAIT-01–TRAIT-05 | Accept |
+| Approved macro-based implementation with identical observable contract | TRAIT-01–TRAIT-06 | Accept |
+| Non-`Send` future crossing the required executor boundary | TRAIT-02 | Reject |
+| Borrowed implementation rejected solely by an invented `'static` bound | TRAIT-03 | Reject |
+| Generic consumer works but required trait-object consumer does not | TRAIT-01, TRAIT-05 | Reject |
+| Same error/result contract through generic and erased call paths | TRAIT-04, TRAIT-06 | Accept |
 
-**Composition case:** saturate the worker, begin shutdown while work is pending, and cancel one in-flight operation. The result must preserve the acceptance boundary, boundedness and truthful terminal outcome simultaneously.
+**Composition case:** a borrowed service object is invoked through the required trait-object path on a `Send` executor; the future must satisfy the bound, preserve the typed error and allow the service borrow to end at the correct lifetime.
 
-**Oracle warning:** timing-only tests are fragile. The final oracle should use deterministic barriers or a controlled scheduler where possible, not narrow sleeps. A timeout is an infrastructure/unresolved outcome unless the task specification establishes a deterministic liveness bound.
+**Oracle warning:** a textual check for `async_trait`, `Pin<Box<...>>` or one particular trait shape is invalid as a sole oracle. The correct oracle combines type checking against the public contract with observable result/error semantics. Type-check/build execution remains gated by #10064.
 
-**Unresolved before fixture creation:** exact queue/in-flight accounting boundary, shutdown cut-off semantics, durable-effect definition, scheduler/runtime versions and deterministic test strategy.
+**Unresolved before fixture creation:** exact public trait signature, target executor, whether macro dependencies are allowed, MSRV, object-safety form and permitted lifetime relationships.
 
----
+## 6. Candidate C — Deterministic reproduction of an event-processing defect
 
-## 6. Candidate C — Idempotent event processing under retry and replay
-
-**Provisional theme:** durable state transitions, duplicate delivery and recovery.  
+**Canonical family:** `issue-reproduction-debugging`.  
+**Provisional theme:** reproduce a stateful defect through a bounded retry/replay schedule, isolate its root cause and verify the repair. The idempotence and crash/replay requirements below are the defect domain, not a new family label.  
 **Provisional difficulty:** High.  
 **Synthetic workspace outline:**
 
@@ -238,6 +241,7 @@ The benchmark must not require a specific database or storage architecture if mu
 
 ## 7. Candidate D — Workspace command and path boundary
 
+**Canonical family:** `security-correctness`.  
 **Provisional theme:** security correctness in Rust tooling.  
 **Provisional difficulty:** Medium–high.  
 **Synthetic workspace outline:**
@@ -300,6 +304,7 @@ The chosen fixture must state its OS and filesystem assumptions. Do not imply th
 
 ## 8. Candidate E — Cargo feature and target composition
 
+**Canonical family:** `feature-target-configuration`.  
 **Provisional theme:** build-system and conditional-compilation correctness.  
 **Provisional difficulty:** Medium–high.  
 **Synthetic workspace outline:**
@@ -360,6 +365,7 @@ feature-matrix/
 
 ## 9. Candidate F — Exact streaming top-k under bounded resources
 
+**Canonical family:** `performance-correctness`.  
 **Provisional theme:** algorithmic correctness, state updates and performance contracts.  
 **Provisional difficulty:** Medium–high.  
 **Synthetic workspace outline:**
