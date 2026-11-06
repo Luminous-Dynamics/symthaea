@@ -1,0 +1,106 @@
+name: Recoverability Validator
+
+on:
+  pull_request:
+    paths:
+      - "tools/recoverability-validator/**"
+      - ".github/workflows/recoverability-validator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recoverability-validator-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Format, compile, and qualify recoverability oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --manifest-path tools/recoverability-validator/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --locked --manifest-path tools/recoverability-validator/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path tools/recoverability-validator/Cargo.toml --all-targets -- -D warnings
+
+      - name: Validate strict schemas and independent Python vectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="tools/recoverability-validator/Cargo.toml"
+          jq empty tools/recoverability-validator/schema/recoverability-manifest.schema.json
+          jq empty tools/recoverability-validator/schema/recoverability-manifest-fields.schema.json
+
+          python3 tools/recoverability-validator/tools/recoverability_test_vectors.py /tmp/recoverability-vectors
+
+          rust_commitment="$(cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            commit-recoverability-manifest /tmp/recoverability-vectors/fields.json \
+            | jq -r '.manifest_commitment_sha256')"
+          expected_commitment="$(jq -r '.expected_manifest_commitment_sha256' /tmp/recoverability-vectors/summary.json)"
+          test "$rust_commitment" = "$expected_commitment"
+
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/valid-manifest.json \
+            > /tmp/recoverability-vectors/valid-report.json
+
+          jq -e '.valid == true and .manifest_commitment_matches == true and .model_free == true' \
+            /tmp/recoverability-vectors/valid-report.json >/dev/null
+          jq -e '.evidence_unit_count == 5 and .distinct_source_family_count == 4' \
+            /tmp/recoverability-vectors/valid-report.json >/dev/null
+          jq -e '.class_counts.DirectlyReachable == 1 and .class_counts.ReformulationRecoverable == 1 and .class_counts.NavigationRecoverable == 1 and .class_counts.UnreachableWithinBudget == 1 and .class_counts.NotEvaluable == 1' \
+            /tmp/recoverability-vectors/valid-report.json >/dev/null
+
+          set +e
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/tampered-manifest.json \
+            > /tmp/recoverability-vectors/tampered-report.json
+          tampered_exit=$?
+          set -e
+          test "$tampered_exit" -eq 11
+          jq -e '.valid == false and .manifest_commitment_matches == false and (.records | length) == 0' \
+            /tmp/recoverability-vectors/tampered-report.json >/dev/null
+
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/partial-surface-manifest.json \
+            > /tmp/recoverability-vectors/partial-report.json
+          jq -e '.valid == true and .class_counts.NotEvaluable == 5' \
+            /tmp/recoverability-vectors/partial-report.json >/dev/null
+
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/lower-budget-manifest.json \
+            > /tmp/recoverability-vectors/lower-budget-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:navigation")][0].recoverability == "UnreachableWithinBudget"' \
+            /tmp/recoverability-vectors/lower-budget-report.json >/dev/null
+
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/added-route-manifest.json \
+            > /tmp/recoverability-vectors/added-route-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:unreachable")][0].recoverability == "DirectlyReachable"' \
+            /tmp/recoverability-vectors/added-route-report.json >/dev/null
+
+          set +e
+          cargo run --locked --quiet --manifest-path "$manifest" --bin science-bench-refresh-validator -- \
+            audit-recoverability-manifest /tmp/recoverability-vectors/model-field-manifest.json \
+            > /tmp/recoverability-vectors/model-field-stdout.json \
+            2> /tmp/recoverability-vectors/model-field-stderr.txt
+          model_field_exit=$?
+          set -e
+          test "$model_field_exit" -eq 2
+          grep -q 'unknown field' /tmp/recoverability-vectors/model-field-stderr.txt
