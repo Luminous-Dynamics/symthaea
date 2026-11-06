@@ -106,7 +106,8 @@ def shortest_route(
                 edge["to_node_ref"],
                 used_initial or operation == "initial_retrieval",
                 used_reform or operation == "query_reformulation",
-                used_post or operation == "post_reformulation_retrieval",
+                used_post
+                or (used_reform and operation == "post_reformulation_retrieval"),
                 used_navigation
                 or operation
                 in {
@@ -222,6 +223,39 @@ def main() -> int:
     if any(classify(unknown, unit)["recoverability"] != "NotEvaluable" for unit in unknown["evidence_units"]):
         raise SystemExit("unknown surface must produce only NotEvaluable")
 
+    # A post-reformulation retrieval before the rewrite is not a valid route.
+    reordered_fields = copy.deepcopy(base_fields)
+    reordered_fields["edges"] = [
+        edge
+        for edge in reordered_fields["edges"]
+        if edge["edge_ref"] not in {"route:rewrite-query", "route:rewrite-search"}
+    ]
+    reordered_fields["nodes"].append({"node_ref": "state:pre-retrieval"})
+    reordered_fields["edges"].extend(
+        [
+            {
+                "edge_ref": "route:post-before-rewrite",
+                "from_node_ref": "state:start",
+                "to_node_ref": "state:pre-retrieval",
+                "operation": "post_reformulation_retrieval",
+                "cost": 1,
+            },
+            {
+                "edge_ref": "route:rewrite-after-search",
+                "from_node_ref": "state:pre-retrieval",
+                "to_node_ref": "evidence:rewrite",
+                "operation": "query_reformulation",
+                "cost": 1,
+            },
+        ]
+    )
+    reordered = save_manifest(reordered_fields, out_dir / "post-before-rewrite-manifest.json")
+    reordered_unit = next(
+        unit for unit in reordered["evidence_units"] if unit["evidence_unit_id"] == "unit:rewrite"
+    )
+    if classify(reordered, reordered_unit)["recoverability"] != "UnreachableWithinBudget":
+        raise SystemExit("post-before-rewrite retrieval incorrectly qualified as reformulation")
+
     # Reducing route budget cannot improve any recoverability class.
     lower_budget = copy.deepcopy(base_fields)
     lower_budget["max_route_cost"] = 2
@@ -272,6 +306,7 @@ def main() -> int:
         "metamorphic_controls": {
             "partial_surface_preserves_positive_and_blocks_negative": True,
             "unknown_surface_all_not_evaluable": True,
+            "post_reformulation_retrieval_requires_prior_rewrite": True,
             "lower_budget_never_improves": True,
             "added_direct_route_improves_unreachable_unit": True,
             "model_free_reference_classifier": True,
