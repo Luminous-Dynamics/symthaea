@@ -1,0 +1,509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_DISTRIBUTIONALLY_ROBUST_DESIGN.schema.json",
+  "title": "Distributionally robust connectome intervention design input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "dataset_binding",
+    "ambiguity_set",
+    "query",
+    "worlds",
+    "interventions",
+    "model_vertices",
+    "split_manifest",
+    "selection_objective",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "dataset_binding": {
+      "$ref": "#/$defs/dataset_binding"
+    },
+    "ambiguity_set": {
+      "$ref": "#/$defs/ambiguity_set"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "model_vertices": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/model_vertex"
+      }
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split_manifest"
+    },
+    "selection_objective": {
+      "const": "MINIMIZE_WORST_CASE_SHARED_POLICY_LOSS_REDUCTION_PER_COST"
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision_sha256",
+        "species",
+        "evidence_tier",
+        "source_access_receipt_sha256"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "species": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_tier": {
+          "enum": [
+            "SYNTHETIC",
+            "OBSERVATIONAL_FUNCTIONAL",
+            "MEASURED_INTERVENTION",
+            "PROSPECTIVE_INTERVENTION"
+          ]
+        },
+        "source_access_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "ambiguity_set": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "vertex_enumeration_protocol_sha256",
+        "declared_vertex_count",
+        "vertex_completeness_status"
+      ],
+      "properties": {
+        "scope": {
+          "const": "CONVEX_HULL_OF_ENUMERATED_JOINT_DISTRIBUTION_VERTICES"
+        },
+        "vertex_enumeration_protocol_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "declared_vertex_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "vertex_completeness_status": {
+          "enum": [
+            "DECLARED_COMPLETE_FOR_SYNTHETIC_FIXTURE",
+            "DECLARED_COMPLETE_FOR_REVIEWED_MODEL_ENVELOPE",
+            "NOT_ESTABLISHED"
+          ]
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256",
+        "certificate_max_expected_loss"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "certificate_max_expected_loss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "graph_sha256",
+        "source_evidence_sha256",
+        "biological_disposition",
+        "query_decision"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "biological_disposition": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE",
+            "INDETERMINATE",
+            "DISPUTED"
+          ]
+        },
+        "query_decision": {
+          "type": "boolean"
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "intervention_kind",
+        "cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "safety_profile_sha256"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intervention_kind": {
+          "enum": [
+            "OPTOGENETIC",
+            "ELECTRICAL",
+            "PHARMACOLOGICAL",
+            "SENSORY",
+            "BEHAVIORAL",
+            "SIMULATED",
+            "OTHER"
+          ]
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "safety_profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "prior_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "probability"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "world_id",
+        "trajectory_sha256",
+        "outcomes"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trajectory_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "model_vertex": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_vertex_id",
+        "causal_model_sha256",
+        "observation_model_sha256",
+        "dependence_group_ids",
+        "prior",
+        "predictions"
+      ],
+      "properties": {
+        "model_vertex_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "causal_model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "observation_model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "dependence_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "prior": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/prior_entry"
+          }
+        },
+        "predictions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 144,
+          "items": {
+            "$ref": "#/$defs/prediction"
+          }
+        }
+      }
+    },
+    "split_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_unit",
+        "train_units",
+        "validation_units",
+        "lockbox_units",
+        "split_sha256"
+      ],
+      "properties": {
+        "split_unit": {
+          "enum": [
+            "animal",
+            "session",
+            "target_neuron",
+            "animal_session",
+            "synthetic_unit"
+          ]
+        },
+        "train_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "validation_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "lockbox_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_robust_loss",
+        "robust_loss_by_intervention",
+        "clairvoyant_lower_bound_by_intervention",
+        "uncertainty_penalty_by_intervention",
+        "value_per_cost_by_intervention",
+        "vertex_min_eig_bits_by_intervention",
+        "vertex_max_eig_bits_by_intervention",
+        "robust_certificate_by_intervention",
+        "expected_selected_intervention_id",
+        "expected_vertex_min_eig_greedy_intervention_id"
+      ],
+      "properties": {
+        "baseline_robust_loss": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "robust_loss_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "clairvoyant_lower_bound_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "uncertainty_penalty_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "value_per_cost_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "vertex_min_eig_bits_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "vertex_max_eig_bits_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "robust_certificate_by_intervention": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "expected_selected_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_vertex_min_eig_greedy_intervention_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
