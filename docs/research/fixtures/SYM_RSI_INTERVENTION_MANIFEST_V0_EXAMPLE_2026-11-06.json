@@ -1,0 +1,36 @@
+{
+  "schema_version": "sym-rsi-intervention-manifest-v0",
+  "experiment_id": "synthetic-two-parent-0001",
+  "base_candidate_id": "base-0001",
+  "parent_candidate_ids": [
+    "lineage-a",
+    "lineage-b"
+  ],
+  "source_tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "executable_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_build_evidence_ref": "synthetic-unverified-build-reference",
+  "evaluation_context_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "task_population_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "evaluator_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "seed_plan_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "budget_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "analysis_plan_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "change_units": [
+    {
+      "id": "change-a",
+      "origin_parent_id": "lineage-a",
+      "class": "algorithm",
+      "requires": [],
+      "conflicts": [],
+      "coupled_group": null
+    },
+    {
+      "id": "change-b",
+      "origin_parent_id": "lineage-b",
+      "class": "algorithm",
+      "requires": [],
+      "conflicts": [],
+      "coupled_group": null
+    }
+  ]
+}
