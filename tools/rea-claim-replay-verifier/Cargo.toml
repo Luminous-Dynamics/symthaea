@@ -12,6 +12,10 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[[bin]]
+name = "rea-claim-replay"
+path = "src/main.rs"
+
 [dependencies]
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "=1.0.150", features = ["preserve_order"] }
