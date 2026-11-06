@@ -414,7 +414,7 @@ fn estimate_cluster_means(
     for _ in 0..resamples {
         let mut sum = 0.0;
         for _ in 0..count {
-            let selected = (rng.next_u64() % count as u64) as usize;
+            let selected = rng.index_below(count);
             sum += cluster_means[selected];
         }
         bootstrap_means.push(sum / count as f64);
@@ -459,6 +459,17 @@ impl SplitMix64 {
         value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
         value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         value ^ (value >> 31)
+    }
+
+    fn index_below(&mut self, upper: usize) -> usize {
+        let bound = upper as u64;
+        let acceptance_limit = u64::MAX - (u64::MAX % bound);
+        loop {
+            let value = self.next_u64();
+            if value < acceptance_limit {
+                return (value % bound) as usize;
+            }
+        }
     }
 }
 
@@ -619,6 +630,16 @@ mod tests {
             summary.dimension == Dimension::Rhythm
                 && summary.direction == InfluenceDirection::PartnerToAgent
         }));
+    }
+
+    #[test]
+    fn bootstrap_index_sampler_always_returns_an_in_range_index() {
+        let mut rng = SplitMix64::new(777);
+        for upper in 2..100 {
+            for _ in 0..100 {
+                assert!(rng.index_below(upper) < upper);
+            }
+        }
     }
 
     #[test]
