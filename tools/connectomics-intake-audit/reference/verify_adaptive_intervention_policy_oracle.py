@@ -342,7 +342,7 @@ def main() -> int:
         for fixture in fixtures:
             raw = fixture.read_bytes()
             report = build_report(raw, json.loads(raw))
-            rendered = json.dumps(report, indent=2, sort_keys=True) + '\\n'
+            rendered = json.dumps(report, indent=2, sort_keys=True) + '\n'
             if args.output_dir is not None:
                 output = args.output_dir / f'{fixture.stem}.report.json'
                 output.write_text(rendered, encoding='utf-8')
