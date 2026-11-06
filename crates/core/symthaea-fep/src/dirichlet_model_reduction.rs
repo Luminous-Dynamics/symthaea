@@ -663,7 +663,7 @@ pub struct DirichletOutcomeModelBelief {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DirichletModelInformationGain {
     pub action_id: String,
-    pub prior_model_entropy_nats: f64,
+    pub current_model_entropy_nats: f64,
     pub expected_posterior_model_entropy_nats: f64,
     pub model_information_gain_nats: f64,
     /// Must be approximately one; retained as an auditable coherence diagnostic.
@@ -707,7 +707,6 @@ pub enum DirichletModelInformationGainError {
         expected: f64,
         actual: f64,
     },
-    PredictiveModelEvidenceMassNotNormalized { sum: f64 },
     InvalidModelInformationGain { value: f64 },
 }
 
@@ -766,10 +765,6 @@ impl std::fmt::Display for DirichletModelInformationGainError {
                 f,
                 "full prior at column {column}, coordinate {outcome} is {actual}, but the model-prior-weighted reduced priors average to {expected}"
             ),
-            Self::PredictiveModelEvidenceMassNotNormalized { sum } => write!(
-                f,
-                "model-averaged predictive outcome mass sums to {sum}, expected 1"
-            ),
             Self::InvalidModelInformationGain { value } => {
                 write!(f, "prospective model information gain is invalid: {value}")
             }
@@ -813,8 +808,9 @@ pub fn evaluate_dirichlet_model_information_gain(
     )
     .map_err(DirichletModelInformationGainError::ModelReduction)?;
 
-    // Validate model priors and dimensions before using them in the BMA check.
-    reduce_dirichlet_models(full_posterior, full_prior, reduced_models)
+    // This is the current posterior over model identity, not the original
+    // model prior. BMR evaluates it from evidence accumulated so far.
+    let current_model_belief = reduce_dirichlet_models(full_posterior, full_prior, reduced_models)
         .map_err(DirichletModelInformationGainError::ModelReduction)?;
     validate_model_average_prior(full_prior, reduced_models)?;
 
@@ -891,14 +887,9 @@ pub fn evaluate_dirichlet_model_information_gain(
         );
     }
 
-    let prior_model_entropy_nats = reduced_models
-        .iter()
-        .filter(|model| model.prior_probability > 0.0)
-        .map(|model| -model.prior_probability * model.prior_probability.ln())
-        .sum::<f64>();
+    let current_model_entropy_nats = current_model_belief.posterior_model_entropy_nats;
 
     let mut outcomes = Vec::with_capacity(action.outcomes.len());
-    let mut marginal_probability_mass = 0.0;
     let mut expected_posterior_model_entropy_nats = 0.0;
 
     for outcome in &action.outcomes {
@@ -916,47 +907,16 @@ pub fn evaluate_dirichlet_model_information_gain(
         )
         .map_err(DirichletModelInformationGainError::ModelReduction)?;
 
-        // log sum_m p(m) p(o|m)/p(o|full), where the Bayes factors are
-        // precisely the post-outcome BMR ratios returned above.
-        let log_evidence_mixture = log_sum_exp(
-            reduced
-                .models
-                .iter()
-                .filter(|model| model.prior_probability > 0.0)
-                .map(|model| {
-                    if model.log_evidence_ratio == f64::NEG_INFINITY {
-                        f64::NEG_INFINITY
-                    } else {
-                        model.prior_probability.ln() + model.log_evidence_ratio
-                    }
-                }),
-        );
-        if !log_evidence_mixture.is_finite() {
-            // A positive full-model predictive probability paired with zero
-            // model-average evidence is a contradictory predictive contract.
-            return Err(
-                DirichletModelInformationGainError::PredictiveModelEvidenceMassNotNormalized {
-                    sum: 0.0,
-                },
-            );
-        }
-        let log_marginal_probability =
-            outcome.full_model_predictive_probability.ln() + log_evidence_mixture;
-        let marginal_probability = log_marginal_probability.exp();
-        if !marginal_probability.is_finite() || marginal_probability <= 0.0 {
-            return Err(
-                DirichletModelInformationGainError::PredictiveModelEvidenceMassNotNormalized {
-                    sum: marginal_probability,
-                },
-            );
-        }
-
-        marginal_probability_mass += marginal_probability;
+        // Eq. 10-11: expectation is under the predictive outcome distribution
+        // of the current full / Bayesian-model-average parent model. BMR supplies
+        // the current and post-outcome model beliefs; it does not redefine the
+        // action's observation probabilities.
+        let predictive_probability = outcome.full_model_predictive_probability;
         expected_posterior_model_entropy_nats +=
-            marginal_probability * reduced.posterior_model_entropy_nats;
+            predictive_probability * reduced.posterior_model_entropy_nats;
         outcomes.push(DirichletOutcomeModelBelief {
             outcome_id: outcome.outcome_id.clone(),
-            predictive_probability: marginal_probability,
+            predictive_probability,
             full_model_predictive_probability: outcome.full_model_predictive_probability,
             posterior_model_entropy_nats: reduced.posterior_model_entropy_nats,
             posterior_model_probabilities: reduced
@@ -967,16 +927,8 @@ pub fn evaluate_dirichlet_model_information_gain(
         });
     }
 
-    if (marginal_probability_mass - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(
-            DirichletModelInformationGainError::PredictiveModelEvidenceMassNotNormalized {
-                sum: marginal_probability_mass,
-            },
-        );
-    }
-
     let raw_information_gain =
-        prior_model_entropy_nats - expected_posterior_model_entropy_nats;
+        current_model_entropy_nats - expected_posterior_model_entropy_nats;
     if !raw_information_gain.is_finite() || raw_information_gain < -1e-8 {
         return Err(DirichletModelInformationGainError::InvalidModelInformationGain {
             value: raw_information_gain,
@@ -984,10 +936,10 @@ pub fn evaluate_dirichlet_model_information_gain(
     }
     Ok(DirichletModelInformationGain {
         action_id: action.action_id.clone(),
-        prior_model_entropy_nats,
+        current_model_entropy_nats,
         expected_posterior_model_entropy_nats,
         model_information_gain_nats: raw_information_gain.max(0.0),
-        predictive_probability_mass: marginal_probability_mass,
+        predictive_probability_mass: full_probability_mass,
         outcomes,
     })
 }
@@ -1019,22 +971,6 @@ fn validate_model_average_prior(
         }
     }
     Ok(())
-}
-
-fn log_sum_exp(values: impl IntoIterator<Item = f64>) -> f64 {
-    let values = values.into_iter().collect::<Vec<_>>();
-    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    if !maximum.is_finite() {
-        return maximum;
-    }
-    maximum
-        + values
-            .iter()
-            .copied()
-            .filter(|value| value.is_finite())
-            .map(|value| (value - maximum).exp())
-            .sum::<f64>()
-            .ln()
 }
 
 #[cfg(test)]
