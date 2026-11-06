@@ -24,6 +24,7 @@ pub enum ReuseCertificateError {
     EmptySample,
     SampleCountTooLarge { actual: usize, maximum: usize },
     InvalidPairedDifference(i8),
+    InvalidBoundedDifference,
     InvalidSuccessCount { successes: usize, trials: usize },
     NumericalFailure(&'static str),
 }
@@ -49,6 +50,9 @@ impl std::fmt::Display for ReuseCertificateError {
                     f,
                     "pass/fail paired difference must be -1, 0 or +1, got {value}"
                 )
+            }
+            Self::InvalidBoundedDifference => {
+                write!(f, "bounded paired difference must be finite and within [-1, 1]")
             }
             Self::InvalidSuccessCount { successes, trials } => {
                 write!(f, "success count {successes} exceeds trial count {trials}")
@@ -220,6 +224,116 @@ pub fn pass_fail_confidence_certificate(
         empirical_bernstein_lower_bound,
         lower_bound,
         cumulative_increment,
+    })
+}
+
+
+/// Audit-only lower confidence certificate for bounded normalized scores.
+///
+/// Implements Appendix A.1 of Sun et al. (arXiv:2609.33180): for paired
+/// differences Z_i in [-1, 1], the lower bound is the empirical mean minus
+/// an empirical-Bernstein deviation using a KL upper confidence limit on
+/// E[Z^2]. The proposer must never receive this certificate.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BoundedScoreConfidenceCertificate {
+    sample_count: usize,
+    empirical_mean: f64,
+    empirical_second_moment: f64,
+    upper_second_moment: f64,
+    log_term: f64,
+    deviation: f64,
+    lower_bound: f64,
+}
+
+impl BoundedScoreConfidenceCertificate {
+    pub fn sample_count(&self) -> usize { self.sample_count }
+    pub fn empirical_mean(&self) -> f64 { self.empirical_mean }
+    pub fn empirical_second_moment(&self) -> f64 { self.empirical_second_moment }
+    pub fn upper_second_moment(&self) -> f64 { self.upper_second_moment }
+    pub fn log_term(&self) -> f64 { self.log_term }
+    pub fn deviation(&self) -> f64 { self.deviation }
+    pub fn lower_bound(&self) -> f64 { self.lower_bound }
+}
+
+/// Compute the Appendix A.1 empirical-Bernstein lower confidence bound for
+/// paired bounded-score differences Z_i = candidate_score_i - incumbent_score_i.
+///
+/// delta is the complete one-comparison error allocation for this bounded
+/// score route. Unlike the pass/fail route, this does not split delta with rho:
+/// promotion requires lower_bound > gamma, and the lower bound itself is the
+/// cumulative progress increment.
+///
+/// Inputs must be the complete preregistered sample of independently sampled
+/// paired units in canonical order. Clustered task rows must first be reduced
+/// to one value per independently sampled cluster by the trusted evidence
+/// adapter. This function does not authenticate that provenance.
+pub fn bounded_score_confidence_certificate(
+    paired_differences: &[f64],
+    delta: f64,
+) -> Result<BoundedScoreConfidenceCertificate, ReuseCertificateError> {
+    if !delta.is_finite() || delta <= 0.0 || delta >= 1.0 {
+        return Err(ReuseCertificateError::InvalidErrorBudget);
+    }
+    let n = paired_differences.len();
+    if n == 0 {
+        return Err(ReuseCertificateError::EmptySample);
+    }
+    if n > MAX_CERTIFICATE_SAMPLE_COUNT {
+        return Err(ReuseCertificateError::SampleCountTooLarge {
+            actual: n,
+            maximum: MAX_CERTIFICATE_SAMPLE_COUNT,
+        });
+    }
+
+    let mut sum = 0.0_f64;
+    let mut square_sum = 0.0_f64;
+    for &difference in paired_differences {
+        if !difference.is_finite() || !(-1.0..=1.0).contains(&difference) {
+            return Err(ReuseCertificateError::InvalidBoundedDifference);
+        }
+        sum += difference;
+        square_sum += difference * difference;
+    }
+
+    let empirical_mean = sum / n as f64;
+    let empirical_second_moment = square_sum / n as f64;
+    // log(2 / delta), evaluated without a potentially overflowing division.
+    let log_term = std::f64::consts::LN_2 - delta.ln();
+    let upper_second_moment =
+        upper_second_moment(empirical_second_moment, n, log_term)?;
+
+    // Appendix A.1, equations (6) and (7).
+    let linear = 2.0 * log_term / (3.0 * n as f64);
+    let radicand = linear * linear
+        + 2.0 * upper_second_moment * log_term / n as f64;
+    if !empirical_mean.is_finite()
+        || !empirical_second_moment.is_finite()
+        || !log_term.is_finite()
+        || !linear.is_finite()
+        || !radicand.is_finite()
+        || radicand < 0.0
+    {
+        return Err(ReuseCertificateError::NumericalFailure(
+            "bounded-score empirical-Bernstein deviation",
+        ));
+    }
+
+    let deviation = linear + radicand.sqrt();
+    let lower_bound = empirical_mean - deviation;
+    if !deviation.is_finite() || !lower_bound.is_finite() {
+        return Err(ReuseCertificateError::NumericalFailure(
+            "bounded-score lower confidence bound",
+        ));
+    }
+
+    Ok(BoundedScoreConfidenceCertificate {
+        sample_count: n,
+        empirical_mean,
+        empirical_second_moment,
+        upper_second_moment,
+        log_term,
+        deviation,
+        lower_bound,
     })
 }
 
@@ -439,5 +553,103 @@ mod tests {
                 maximum: MAX_CERTIFICATE_SAMPLE_COUNT
             })
         );
+    }
+}
+
+
+#[cfg(test)]
+mod bounded_score_tests {
+    use super::*;
+
+    fn repeated_fixture(positive: f64, n: usize) -> Vec<f64> {
+        (0..n).map(|i| if i % 4 == 3 { -0.1 } else { positive }).collect()
+    }
+
+    #[test]
+    fn bounded_lcb_matches_independent_scipy_reference_fixture_n100() {
+        // 75 values of +0.2 and 25 values of -0.1; delta=0.05.
+        // Reference q / epsilon / LCB computed independently with SciPy
+        // brentq over the Bernoulli KL equation in Appendix A.1.
+        let z = repeated_fixture(0.2, 100);
+        let cert = bounded_score_confidence_certificate(&z, 0.05).unwrap();
+        assert_eq!(cert.sample_count(), 100);
+        assert!((cert.empirical_mean() - 0.125).abs() < 1e-15);
+        assert!((cert.empirical_second_moment() - 0.0325).abs() < 1e-15);
+        assert!((cert.upper_second_moment() - 0.104_535_345_271_188_67).abs() < 2e-10);
+        assert!((cert.deviation() - 0.115_790_985_079_843_42).abs() < 2e-10);
+        assert!((cert.lower_bound() - 0.009_209_014_920_156_577).abs() < 2e-10);
+    }
+
+    #[test]
+    fn bounded_lcb_matches_independent_scipy_reference_fixture_n1000() {
+        let z = repeated_fixture(0.2, 1_000);
+        let cert = bounded_score_confidence_certificate(&z, 0.05).unwrap();
+        assert!((cert.empirical_mean() - 0.125).abs() < 1e-15);
+        assert!((cert.empirical_second_moment() - 0.0325).abs() < 1e-15);
+        assert!((cert.upper_second_moment() - 0.050_078_923_133_324_536).abs() < 2e-10);
+        assert!((cert.deviation() - 0.021_837_543_565_560_76).abs() < 2e-10);
+        assert!((cert.lower_bound() - 0.103_162_456_434_439_25).abs() < 2e-10);
+    }
+
+    #[test]
+    fn bounded_lcb_handles_zero_and_endpoint_samples() {
+        let zeros = bounded_score_confidence_certificate(&vec![0.0; 100], 0.05).unwrap();
+        assert_eq!(zeros.empirical_mean(), 0.0);
+        assert_eq!(zeros.empirical_second_moment(), 0.0);
+        assert!(zeros.upper_second_moment() > 0.0);
+        assert!(zeros.lower_bound() < 0.0);
+
+        let all_positive = bounded_score_confidence_certificate(&vec![1.0; 1_000], 0.05).unwrap();
+        assert_eq!(all_positive.empirical_mean(), 1.0);
+        assert_eq!(all_positive.upper_second_moment(), 1.0);
+        assert!(all_positive.lower_bound() < 1.0);
+        assert!(all_positive.lower_bound() > 0.0);
+
+        let all_negative = bounded_score_confidence_certificate(&vec![-1.0; 1_000], 0.05).unwrap();
+        assert_eq!(all_negative.empirical_mean(), -1.0);
+        assert_eq!(all_negative.upper_second_moment(), 1.0);
+        assert!(all_negative.lower_bound() < -1.0);
+    }
+
+    #[test]
+    fn bounded_lcb_rejects_invalid_scores_delta_and_sample_sizes() {
+        assert_eq!(
+            bounded_score_confidence_certificate(&[], 0.05),
+            Err(ReuseCertificateError::EmptySample)
+        );
+        assert!(matches!(
+            bounded_score_confidence_certificate(&[0.0, f64::NAN], 0.05),
+            Err(ReuseCertificateError::InvalidBoundedDifference)
+        ));
+        assert!(matches!(
+            bounded_score_confidence_certificate(&[0.0, f64::INFINITY], 0.05),
+            Err(ReuseCertificateError::InvalidBoundedDifference)
+        ));
+        assert!(matches!(
+            bounded_score_confidence_certificate(&[1.01], 0.05),
+            Err(ReuseCertificateError::InvalidBoundedDifference)
+        ));
+        assert!(matches!(
+            bounded_score_confidence_certificate(&[-1.01], 0.05),
+            Err(ReuseCertificateError::InvalidBoundedDifference)
+        ));
+        assert_eq!(
+            bounded_score_confidence_certificate(&[0.1], 0.0),
+            Err(ReuseCertificateError::InvalidErrorBudget)
+        );
+        assert_eq!(
+            bounded_score_confidence_certificate(&[0.1], 1.0),
+            Err(ReuseCertificateError::InvalidErrorBudget)
+        );
+    }
+
+    #[test]
+    fn bounded_lcb_is_more_conservative_at_smaller_delta_and_smaller_samples() {
+        let z = repeated_fixture(0.2, 1_000);
+        let ordinary = bounded_score_confidence_certificate(&z, 0.05).unwrap();
+        let stricter = bounded_score_confidence_certificate(&z, 0.005).unwrap();
+        let smaller = bounded_score_confidence_certificate(&z[..100], 0.05).unwrap();
+        assert!(stricter.lower_bound() < ordinary.lower_bound());
+        assert!(smaller.lower_bound() < ordinary.lower_bound());
     }
 }
