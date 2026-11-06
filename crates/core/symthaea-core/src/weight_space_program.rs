@@ -464,7 +464,9 @@ fn validate_group(
             return Err(WeightProgramError::InvalidConstraints);
         }
         WeightProgramTarget::HdcLtc(_) => {}
+    }
 
+    Ok(())
 }
 
 fn validate_group_constraints(
