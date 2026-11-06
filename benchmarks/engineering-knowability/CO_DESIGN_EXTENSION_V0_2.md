@@ -177,7 +177,7 @@ The eight-row matrix is only a pilot. No claim that co-design beats a frontier a
 
 ## Candidate / evaluator trust boundary
 
-The machine-readable [candidate submission contract](candidate-output.schema.json) deliberately excludes candidate scores, hidden gold labels, evaluator mutations and hidden-case metadata. A candidate can return editable design alternatives, explicit critical-claim dispositions, proposed evidence paths, Unknown/Unsupported states, owner-evidence requests and resource usage. Its allowed evidence classes for this synthetic v0.1 task contract are `synthetic_reference`, `proposal` and `simulation`.
+The machine-readable [candidate submission contract](candidate-output.schema.json) deliberately excludes candidate scores, hidden gold labels, evaluator mutations and hidden-case metadata. A candidate can return design alternatives with native-editability/rebuild dispositions, exact target article/configuration references, explicit claim dispositions, proposed evidence paths, explicit independence/common-mode assessments, Unknown/Unsupported states, owner-evidence requests and resource usage. These are candidate assertions to be checked by the independent evaluator. Its allowed evidence classes for this synthetic v0.1 task contract are `synthetic_reference`, `proposal` and `simulation`.
 
 The separate [evaluator-only gold contract](gold-adjudication.schema.json) requires at least two independent assessor records, declared assessor independence, a third-adjudicator route when disagreement exists, independent mutation-oracle references and a sealed custody record. It is not candidate-visible.
 
