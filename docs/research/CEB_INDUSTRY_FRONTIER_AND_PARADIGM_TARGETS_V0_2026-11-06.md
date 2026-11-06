@@ -156,6 +156,22 @@ A fair experiment should compare reactive-only, scheduled digest, transparent se
 
 The next runner-independent work is tracked in [#10727 — evidence-grounded proactive engineering insights](https://github.com/Luminous-Dynamics/symthaea/issues/10727). It is design-only and explicitly includes consent, preference, interruption and authority safeguards.
 
+### 2.20 CR-Bench-v2: known-defect detection is not comment usefulness
+
+Pereira et al.'s November 2, 2026 preprint introduces CR-Bench, a defect-centric code-review benchmark built by transforming SWE-Bench issues into originating pull-request review tasks with full repository context. It contains **584 instances**, with a **174-instance CR-Bench-Verified** subset drawn from SWE-Bench Verified; the verified slice spans 11 Python repositories, with Django alone contributing 63 tasks. Each retained instance has one known defect, a ground-truth fix, and generated category/impact/severity labels. The detectability filter and single-originating-PR filter reduce the source pools from 2,294 to 584 and 500 to 174 respectively. [Pereira et al., CR-Bench-v2 (arXiv:2611.02566, submitted November 2; revised November 3)](https://arxiv.org/abs/2611.02566) · [HTML paper](https://arxiv.cnoctave.top/html/2611.02566)
+
+It proposes two distinct outcomes:
+- **Known-Defect Detection Rate (KDDR):** fraction of instances where at least one comment identifies the one labeled defect.
+- **Usefulness Rate:** fraction of all review comments labeled Bug Hit or Valid Suggestion rather than Noise.
+
+These must not be collapsed. The paper's verified-split results show a striking gap: Gemini Code Assist has **78.0% Usefulness Rate but only 8.1% KDDR**. GPT-5.2 Reflexion reaches **33.0% KDDR / 89.8% Usefulness Rate**, while GPT-5-mini Reflexion reaches **33.7% / 72.6%**. The authors report that Reflexion improves KDDR for every evaluated backbone and judge; the per-judge gains range from +2.9 to +12.6 percentage points, with 8 of 12 backbone–judge comparisons statistically significant. KDDR is defect detection, not repair resolution, and must not be compared to SWE-Bench resolve rates. [CR-Bench-v2 paper, Sections 4–5 and Appendix F](https://arxiv.org/abs/2611.02566)
+
+**Evaluator and dataset caveats are central, not footnotes.** The benchmark construction pipeline uses Claude Opus 4.5 to filter detectability, generate reference comments and generate taxonomy labels. The review evaluator uses three LLM judges (GPT-5.4, Claude Sonnet 4.5 and DeepSeek V4 Flash); the paper reports that absolute scores vary by judge even when directions agree. A human study labels 60 comments from one GPT-5.2 Reflexion system: Claude Sonnet 4.5 matches the human majority on 71.7%, while pairwise agreement among three experts ranges from 0.48 to 0.75. The authors explicitly note that the judge is from the same model family as the reference-comment generator, that the human audit covers only one system, that public SWE-Bench data may be in training corpora, and that their tested review agents do not execute code or use tools and omit cost/latency accounting. The verified slice is Python-only, concentrated in 11 repositories, and has one known defect per instance; other true defects in a PR are not counted as KDDR hits. [CR-Bench-v2 limitations and evaluator analysis](https://arxiv.org/abs/2611.02566)
+
+**CEB implication:** report at least two independent review dimensions—known-defect detection and comment utility/actionability—plus noise/false-positive burden, severity, localization and human review cost. Do not let useful but defect-missing comments masquerade as successful defect detection, and do not let a narrow known-defect miss imply that every other comment is useless. Preserve the one-known-defect-per-instance limitation when interpreting KDDR. For a CEB extension, retain human-confirmed defect/fix provenance, independently adjudicate whether findings identify the same semantic defect, and audit the judge's false matches and missed matches. Separate review-only/no-tools results from evidence-grounded tool-using review; add matched-cost evidence acquisition as an experimental arm, not a score bonus for execution count. Reuse #10419, #10723, #9431 and #10680/#10681; do not create another review lane or judge registry.
+
+**How it complements CRBugBench:** CRBugBench supplies broader review-task scale (1,000 open-source tasks/98 repositories plus 800 proprietary tasks) and top-five defect detection. CR-Bench supplies a smaller, defect-centric PR-context subset with paired known-defect and comment-usefulness outcomes, but is Python-only and judge/reference-label dependent. They are complementary contextual comparators, not the same dataset, denominator or leaderboard.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -166,6 +182,7 @@ The next runner-independent work is tracked in [#10727 — evidence-grounded pro
 | SWE-CI | Long repository histories and maintainability under repeated evolution | Separating product evolution from evaluator/metrology drift and claim-admissibility changes |
 | SWE Atlas | Comprehension, test writing, refactoring beyond issue resolution | Whether generated understanding and tests stay valid after subsequent changes |
 | CRBugBench | Human-verified pre-merge bug detection in 1,000 public tasks / 98 repositories plus 800 proprietary tasks | Human-agent complementarity, disconfirm-first review, clean-PR false-positive controls and independent finding-to-defect adjudication |
+| CR-Bench-v2 / CR-Bench-Verified | Defect-centric PR review with one labeled defect per instance; KDDR and comment Usefulness Rate | Keep known-defect detection separate from usefulness; audit reference-comment/taxonomy generation, judge lineage, one-defect denominator and Python/11-repository scope |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
 | Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
@@ -361,6 +378,8 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 **The honest present claim:** CEB has a more developed design for evaluating engineering evidence, continuity and collaboration. It has not yet demonstrated that Symthaea outperforms any industry system on these dimensions.
 
 ## 10. Sources and comparison notes
+
+- Pereira et al., [CR-Bench-v2: Evaluating the Real-World Utility of AI Code Review Agents](https://arxiv.org/abs/2611.02566), submitted November 2, revised November 3, 2026; 584 CR-Bench instances and 174 CR-Bench-Verified review instances.
 
 - Bui and Evangelopoulos, [Agentic Coding Needs Proactivity, Not Just Autonomy](https://research.google/pubs/agentic-coding-needs-proactivity-not-just-autonomy/), Google Research, 2026 (to appear).
 
