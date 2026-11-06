@@ -226,6 +226,29 @@ The fitter does not estimate statistical confidence bounds or authenticate raw s
 
 Benchmark cases: `BMS-MULTIDIM-CAPABILITY-SURFACE-001` and `BMS-CAPABILITY-CELL-CALIBRATION-001`. No field-derived grid has yet been fitted; calibration and validation against M5BAT remain `not_run`.
 
+### SOC rainflow: traceable cycle ranges before degradation claims
+
+The `rainflow_cycles.rs` module extracts reversals from source-bound SOC samples and applies one named counting convention: `AstmE1049ThreePointV1`. Every counted item carries its half/full classification, depth range, exact mean-SOC numerator, start/end sample indexes and UTC times. The assessment retains the decision timestamp, horizon, maximum-sample-gap policy and its source digest.
+
+The method implements the three-point sequence demonstrated in MathWorks' R2026b rainflow documentation, including residual half-cycle treatment. Its known-answer test uses the published 14-point sequence and checks every cycle's class, depth and original sample indexes. That is a reference-vector match for this named algorithm variant, not a claim that all ASTM E1049 cycle-counting methods are equivalent: ASTM explicitly recognises multiple methods and does not recommend one method.
+
+Telemetry gaps larger than the source-bound maximum are split into separate segments. The counter does not manufacture a cycle across a missing interval, and marks the trace incomplete. Equal-SOC plateaus are collapsed deterministically to their final sample so they cannot create zero-depth cycles. The output is a cycle descriptor, not a battery degradation result.
+
+This closes the missing intermediate link between measured SOC and a validated wear model:
+1. preserve and qualify the measured SOC trace;
+2. count full and half cycles with an explicit algorithm and residue rule;
+3. join each depth range to the actual OEM/chemistry-specific cycle-life or capacity-fade curve;
+4. add calendar ageing, temperature/SoH dependence, warranty terms and replacement economics only when their source parameters and validity domains are known.
+
+SAM already has cycle/calendar degradation models and rainflow for applicable cycle-life table cases; HOMER Front 1.5 lists rainflow equivalent-cycle counting and annual cycling limits. The differentiation to test is the traceable, source-bound chain from individual measured cycles through vendor-specific damage curves, warranty consumption and realized project cash—not the presence of a rainflow counter alone.
+
+Benchmark case: `BATTERY-SOC-RAINFLOW-001`. Five synthetic hostile/known-answer tests are registered. No field SOC trace, OEM degradation curve or remaining-life output has been evaluated. ASTM E1049-85(2023) is a method catalogue, not a battery life model.
+
+References:
+- MathWorks R2026b `rainflow` algorithm and reference vector: https://www.mathworks.com/help/signal/ref/rainflow.html
+- ASTM E1049-85(2023): https://store.astm.org/standards/e1049
+- NREL SAM battery life documentation: https://samrepo.nlr.gov/help/battery_life.html
+
 ### Warranty enforcement: contractual envelope over measured operation
 
 The new `warranty_compliance.rs` module evaluates measured BMS/plant intervals against an effective-dated warranty schedule. It checks only limits that are actually supplied and source-bound: minimum/maximum SOC, maximum cell temperature, charge/discharge power, cumulative throughput and per-warranty-period throughput budgets.
