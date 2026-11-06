@@ -137,6 +137,7 @@ pub struct WeightProgram {
 pub struct WeightProgramReceipt {
     pub format_version: u32,
     pub base_model_digest: String,
+    pub program_digest: String,
     pub candidate_snapshot_digest: String,
     pub edited_group_count: usize,
     pub changed_parameter_count: usize,
@@ -201,6 +202,8 @@ pub enum WeightProgramError {
     InvalidScaleRange,
     #[error("edited candidate violates the target group's value or norm constraints")]
     CandidateConstraintViolation,
+    #[error("per-group L2 edit norm exceeds the declared group budget")]
+    GroupDeltaBudgetExceeded,
     #[error("changed parameter count exceeds the declared budget")]
     ChangedParameterBudgetExceeded,
     #[error("total L2 edit norm exceeds the declared budget")]
@@ -297,13 +300,19 @@ impl WeightProgram {
         let mut max_abs_delta = 0.0_f32;
 
         for (before, after) in snapshot.groups.iter().zip(candidate_groups.iter()) {
+            let mut group_delta_sq = 0.0_f64;
             for (old, new) in before.values.iter().zip(after.values.iter()) {
                 let delta = (*new - *old).abs();
                 if delta > 0.0 {
                     changed_parameter_count += 1;
-                    total_delta_sq += f64::from(delta) * f64::from(delta);
+                    let delta_sq = f64::from(delta) * f64::from(delta);
+                    total_delta_sq += delta_sq;
+                    group_delta_sq += delta_sq;
                     max_abs_delta = max_abs_delta.max(delta);
                 }
+            }
+            if before.constraints.max_l2_delta.is_some_and(|limit| group_delta_sq.sqrt() > f64::from(limit)) {
+                return Err(WeightProgramError::GroupDeltaBudgetExceeded);
             }
         }
 
