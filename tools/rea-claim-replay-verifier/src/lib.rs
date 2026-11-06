@@ -641,7 +641,7 @@ fn scope_assessment(claim: &ClaimRequest, evidence: &Value) -> (ScopeDisposition
     if claim.scope.platform_version.is_some() {
         return (
             ScopeDisposition::Unverifiable,
-            "REA Evidence v1 does not represent platform_version".to_owned(),
+            "REA Evidence v1 does not encode platform_version".to_owned(),
         );
     }
 
