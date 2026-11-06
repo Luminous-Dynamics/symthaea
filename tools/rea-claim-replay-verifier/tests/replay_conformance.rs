@@ -6,21 +6,22 @@ mod replay_verifier;
 use rea_compat::claims::{
     ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
 };
+use serde_json::{Value, json};
 use replay_verifier::{
     MAX_EVIDENCE_RECORDS, ReplayErrorKind, ReplayOutcome, replay_claim_evaluation,
 };
-use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn frozen_oracle_corpus_has_independent_expected_labels() {
-    let corpus: Value = serde_json::from_str(include_str!(
-        "fixtures/rea-claim-replay-v0-oracle.json"
-    ))
-    .unwrap();
-    assert_eq!(corpus["schema"], json!("luminous.rea.claim-replay-oracle.v0"));
+    let corpus: Value =
+        serde_json::from_str(include_str!("fixtures/rea-claim-replay-v0-oracle.json")).unwrap();
+    assert_eq!(
+        corpus["schema"],
+        json!("luminous.rea.claim-replay-oracle.v0")
+    );
     assert_eq!(corpus["status"], json!("frozen_public_seed"));
     assert_eq!(
         corpus["provenance"]["authored_independently_of_production_evaluator"],
@@ -39,12 +40,10 @@ fn fixture_bytes() -> &'static [u8] {
     )
 }
 
-
 fn oracle_label(case_id: &str, field: &str) -> String {
-    let corpus: Value = serde_json::from_str(include_str!(
-        "fixtures/rea-claim-replay-v0-oracle.json"
-    ))
-    .expect("frozen independent replay oracle parses");
+    let corpus: Value =
+        serde_json::from_str(include_str!("fixtures/rea-claim-replay-v0-oracle.json"))
+            .expect("frozen independent replay oracle parses");
     corpus["cases"]
         .as_array()
         .expect("oracle cases are an array")
@@ -171,7 +170,10 @@ fn independent_replay_preserves_conflicts_instead_of_voting() {
     )
     .unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, oracle_disposition("same-scope-disagreement"));
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("same-scope-disagreement")
+    );
 }
 
 #[test]
@@ -199,7 +201,10 @@ fn independent_replay_reproduces_unverified_predicate_ceiling() {
 
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, oracle_disposition("producer-authenticity-rule-unimplemented"));
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("producer-authenticity-rule-unimplemented")
+    );
 }
 
 #[test]
@@ -331,14 +336,20 @@ fn independent_expected_labels_cover_wrong_scope_and_missing_platform_version() 
     let (claim_bytes, result_bytes) = produce(&wrong_subject, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, oracle_disposition("wrong-subject-digest"));
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("wrong-subject-digest")
+    );
 
     let mut wrong_operation = provider_claim(evidence.evidence_id.clone());
     wrong_operation.scope.operation = "verify_signature".to_owned();
     let (claim_bytes, result_bytes) = produce(&wrong_operation, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, oracle_disposition("wrong-operation"));
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("wrong-operation")
+    );
 
     let mut unrepresented_platform_version = provider_claim(evidence.evidence_id.clone());
     unrepresented_platform_version.scope.platform_version = Some("Android 17 / API 37".to_owned());
@@ -380,7 +391,10 @@ fn recorded_assumptions_cannot_make_a_claim_supported() {
 
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, oracle_disposition("unverified-assumption-present"));
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("unverified-assumption-present")
+    );
 }
 
 #[test]
@@ -451,7 +465,10 @@ fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
     let mut malformed_requested = original.clone();
     malformed_requested["requested_evidence_ids"][0] = json!("ev_not-a-sha256");
     assert_eq!(
-        oracle_label("malformed-requested-result-evidence-id", "expected_replay_outcome"),
+        oracle_label(
+            "malformed-requested-result-evidence-id",
+            "expected_replay_outcome"
+        ),
         "invalid_input"
     );
     let error = replay_claim_evaluation(
@@ -466,7 +483,10 @@ fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
     unrequested_assessment["evidence_assessments"][0]["evidence_id"] =
         json!(format!("ev_{}", "c".repeat(64)));
     assert_eq!(
-        oracle_label("unrequested-result-assessment-id", "expected_replay_outcome"),
+        oracle_label(
+            "unrequested-result-assessment-id",
+            "expected_replay_outcome"
+        ),
         "invalid_input"
     );
     let error = replay_claim_evaluation(
@@ -496,10 +516,12 @@ fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
     assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
 
     let mut missing_unrequested = original.clone();
-    missing_unrequested["missing_evidence_ids"] =
-        json!([format!("ev_{}", "d".repeat(64))]);
+    missing_unrequested["missing_evidence_ids"] = json!([format!("ev_{}", "d".repeat(64))]);
     assert_eq!(
-        oracle_label("unrequested-missing-result-evidence-id", "expected_replay_outcome"),
+        oracle_label(
+            "unrequested-missing-result-evidence-id",
+            "expected_replay_outcome"
+        ),
         "invalid_input"
     );
     let error = replay_claim_evaluation(
@@ -511,8 +533,11 @@ fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
     assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
 
     let mut assessed_and_missing = original;
-    assessed_and_missing["missing_evidence_ids"] =
-        json!([rea_compat::verify_evidence_json(fixture_bytes()).unwrap().evidence_id]);
+    assessed_and_missing["missing_evidence_ids"] = json!([rea_compat::verify_evidence_json(
+        fixture_bytes()
+    )
+    .unwrap()
+    .evidence_id]);
     assert_eq!(
         oracle_label("evidence-id-marked-assessed-and-missing", "expected_replay_outcome"),
         "invalid_input"
@@ -614,10 +639,13 @@ fn replay_preserves_inferred_confidence_and_analyst_authority_without_promotion(
     let replay =
         replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
+    assert_eq!(
+        replay.expected_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
 
-    let assessment = &serde_json::from_slice::<Value>(&result_bytes).unwrap()
-        ["evidence_assessments"][0];
+    let assessment =
+        &serde_json::from_slice::<Value>(&result_bytes).unwrap()["evidence_assessments"][0];
     assert_eq!(assessment["confidence"], json!("inferred"));
     assert_eq!(assessment["authority"], json!("analyst-inference"));
 }
@@ -692,12 +720,7 @@ fn replay_projects_only_claim_authorized_fields_after_full_evidence_verification
     let claim = provider_claim(evidence.evidence_id.clone());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
-    let replay = replay_claim_evaluation(
-        &claim_bytes,
-        &[&evidence_bytes],
-        &result_bytes,
-    )
-    .unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
@@ -711,14 +734,10 @@ fn request_and_derivation_digest_mutations_fail_replay_even_when_disposition_is_
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
     let original: Value = serde_json::from_slice(&result_bytes).unwrap();
-    assert_eq!(
-        original["disposition"],
-        json!("supported_within_scope")
-    );
+    assert_eq!(original["disposition"], json!("supported_within_scope"));
 
     let mut wrong_request_digest = original.clone();
-    wrong_request_digest["claim_request_sha256"] =
-        json!(format!("{}{}", "b".repeat(63), "c"));
+    wrong_request_digest["claim_request_sha256"] = json!(format!("{}{}", "b".repeat(63), "c"));
     let error = replay_claim_evaluation(
         &claim_bytes,
         &[fixture_bytes()],
@@ -736,8 +755,7 @@ fn request_and_derivation_digest_mutations_fail_replay_even_when_disposition_is_
     );
 
     let mut wrong_derivation_digest = original;
-    wrong_derivation_digest["derivation_sha256"] =
-        json!(format!("{}{}", "d".repeat(63), "e"));
+    wrong_derivation_digest["derivation_sha256"] = json!(format!("{}{}", "d".repeat(63), "e"));
     let error = replay_claim_evaluation(
         &claim_bytes,
         &[fixture_bytes()],
@@ -784,4 +802,3 @@ fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
     assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
     assert_ne!(error.claim_request_sha256, error.reported_derivation_sha256);
 }
-
