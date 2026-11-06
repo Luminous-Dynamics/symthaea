@@ -1,8 +1,9 @@
 #[path = "../../../src/rea_compat.rs"]
 mod rea_compat;
 
-use rea_compat::claims::{ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim};
-use rea_compat::VerifiedEvidence;
+use rea_compat::claims::{
+    ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
+};
 use serde_json::json;
 
 #[test]
@@ -16,7 +17,8 @@ fn root_adapter_exposes_typed_claim_evaluator() {
         claim_id: "root-adapter-smoke".to_owned(),
         predicate: ClaimPredicate::ProviderReportedObservation,
         scope: ClaimScope {
-            subject_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned(),
+            subject_sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .to_owned(),
             operation: "inspect_artifact".to_owned(),
             platform: None,
             platform_version: None,
@@ -34,10 +36,5 @@ fn root_adapter_exposes_typed_claim_evaluator() {
 
     let result = evaluate_claim(&claim, std::slice::from_ref(&evidence)).unwrap();
     assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
-    assert!(VerifiedEvidence {
-        evidence_id: evidence.evidence_id,
-        semantic_sha256: evidence.semantic_sha256,
-        raw_file_sha256: evidence.raw_file_sha256,
-        value: evidence.value,
-    }.evidence_id.starts_with("ev_"));
+    assert!(evidence.evidence_id.starts_with("ev_"));
 }
