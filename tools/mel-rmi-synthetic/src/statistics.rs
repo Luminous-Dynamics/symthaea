@@ -558,7 +558,9 @@ mod tests {
             measured("musician-b", "b-1", 0, 0, 0, None),
         ];
         let summary = single_summary(&observations);
-        assert_eq!(summary.targeted_delta.mean, Some(0.5));
+        // Two clusters receive equal weight: cluster A mean = 0.5,
+        // cluster B mean = 0.0, so the normalized group mean is 0.25.
+        assert_eq!(summary.targeted_delta.mean, Some(0.25));
         assert_eq!(summary.targeted_delta.clusters, 2);
         assert_eq!(summary.targeted_delta.bootstrap_resamples, 2_000);
     }
