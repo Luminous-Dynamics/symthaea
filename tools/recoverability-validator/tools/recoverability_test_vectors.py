@@ -66,8 +66,7 @@ def shortest_route(
         "navigation": None,
     }[mode]
     start = manifest["start_node_ref"]
-    # State flags make the route definition explicit and deterministic.
-    initial = reformulated = post_retrieval = navigated = pending_reformulation = False
+    initial = reformulated = post_retrieval = pending_reformulation = navigated = False
     start_state = (
         start,
         initial,
@@ -100,6 +99,7 @@ def shortest_route(
             (mode == "direct" and used_initial and not used_reform and not used_navigation)
             or (
                 mode == "reformulation"
+                and used_initial
                 and used_reform
                 and used_post
                 and not pending_reformulation
@@ -114,8 +114,38 @@ def shortest_route(
             operation = edge["operation"]
             if allowed is not None and operation not in allowed:
                 continue
-            if operation == "post_reformulation_retrieval" and not pending_reformulation:
+            navigation_operation = operation in {
+                "open_document",
+                "follow_link",
+                "open_table_of_contents",
+                "pagination",
+                "in_document_find",
+            }
+            if operation == "initial_retrieval":
+                order_ok = (
+                    not used_initial
+                    and not used_reform
+                    and not used_navigation
+                )
+            elif operation == "query_reformulation":
+                order_ok = (
+                    used_initial
+                    and not used_reform
+                    and not pending_reformulation
+                    and not used_post
+                    and not used_navigation
+                )
+            elif operation == "post_reformulation_retrieval":
+                order_ok = (
+                    pending_reformulation
+                    and not used_post
+                    and not used_navigation
+                )
+            else:
+                order_ok = used_initial and navigation_operation
+            if not order_ok:
                 continue
+
             next_cost = cost + edge["cost"]
             if next_cost > manifest["max_route_cost"]:
                 continue
@@ -131,15 +161,7 @@ def shortest_route(
                     if operation == "post_reformulation_retrieval"
                     else pending_reformulation
                 ),
-                used_navigation
-                or operation
-                in {
-                    "open_document",
-                    "follow_link",
-                    "open_table_of_contents",
-                    "pagination",
-                    "in_document_find",
-                },
+                used_navigation or navigation_operation,
             )
             next_route = route + (edge["edge_ref"],)
             candidate = (next_cost, next_route)
@@ -150,10 +172,9 @@ def shortest_route(
 
 
 def classify(manifest: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
-    if (
-        manifest["surface_state"] != "frozen_observed"
-        or unit["artifact_availability"] != "present_pinned"
-    ):
+    artifact_available = unit["artifact_availability"] == "present_pinned"
+    surface_unknown = manifest["surface_state"] == "unknown"
+    if not artifact_available or surface_unknown:
         label, route = "NotEvaluable", None
     else:
         direct = shortest_route(manifest, unit["target_node_ref"], "direct")
@@ -165,8 +186,10 @@ def classify(manifest: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
             label, route = "ReformulationRecoverable", reformulation
         elif navigation is not None:
             label, route = "NavigationRecoverable", navigation
-        else:
+        elif manifest["surface_state"] == "complete_frozen_inventory":
             label, route = "UnreachableWithinBudget", None
+        else:
+            label, route = "NotEvaluable", None
 
     return {
         "evidence_unit_id": unit["evidence_unit_id"],
@@ -220,13 +243,28 @@ def main() -> int:
     model_field["model_judgment"] = "directly_reachable"
     (out_dir / "model-field-manifest.json").write_bytes(compact(model_field) + b"\n")
 
-    # A partial surface is a valid manifest but no unit can be classed.
+    # Positive route witnesses survive on a partial observed surface; absent routes do not.
     partial_fields = copy.deepcopy(base_fields)
-    partial_fields["surface_state"] = "partial"
+    partial_fields["surface_state"] = "partial_observed"
     partial_path = out_dir / "partial-surface-manifest.json"
     partial = save_manifest(partial_fields, partial_path)
-    if any(classify(partial, unit)["recoverability"] != "NotEvaluable" for unit in partial["evidence_units"]):
-        raise SystemExit("partial surface did not force NotEvaluable")
+    partial_rows = [classify(partial, unit) for unit in partial["evidence_units"]]
+    partial_by_id = {row["evidence_unit_id"]: row["recoverability"] for row in partial_rows}
+    if partial_by_id["unit:direct"] != "DirectlyReachable":
+        raise SystemExit("partial surface discarded a concrete direct route")
+    if partial_by_id["unit:rewrite"] != "ReformulationRecoverable":
+        raise SystemExit("partial surface discarded a concrete reformulation route")
+    if partial_by_id["unit:navigation"] != "NavigationRecoverable":
+        raise SystemExit("partial surface discarded a concrete navigation route")
+    if partial_by_id["unit:unreachable"] != "NotEvaluable":
+        raise SystemExit("partial surface incorrectly asserted unreachability")
+
+    unknown_fields = copy.deepcopy(base_fields)
+    unknown_fields["surface_state"] = "unknown"
+    unknown_path = out_dir / "unknown-surface-manifest.json"
+    unknown_manifest = save_manifest(unknown_fields, unknown_path)
+    if any(classify(unknown_manifest, unit)["recoverability"] != "NotEvaluable" for unit in unknown_manifest["evidence_units"]):
+        raise SystemExit("unknown surface did not force NotEvaluable")
 
     # Reducing route budget cannot improve any recoverability class.
     lower_budget = copy.deepcopy(base_fields)
@@ -299,6 +337,37 @@ def main() -> int:
     if orphan["recoverability"] != "UnreachableWithinBudget":
         raise SystemExit("post-reformulation retrieval succeeded without a prior rewrite")
 
+    # Query reformulation cannot occur without a first-pass retrieval.
+    no_initial = copy.deepcopy(base_fields)
+    no_initial["edges"] = [
+        edge for edge in no_initial["edges"] if edge["edge_ref"] != "route:rewrite-initial"
+    ]
+    no_initial_manifest = save_manifest(no_initial, out_dir / "no-initial-before-rewrite-manifest.json")
+    no_initial_row = next(
+        classify(no_initial_manifest, unit)
+        for unit in no_initial_manifest["evidence_units"]
+        if unit["evidence_unit_id"] == "unit:rewrite"
+    )
+    if no_initial_row["recoverability"] != "UnreachableWithinBudget":
+        raise SystemExit("query reformulation succeeded without first-pass retrieval")
+
+    # Structural navigation cannot begin from an unobserved document state.
+    no_navigation_initial = copy.deepcopy(base_fields)
+    no_navigation_initial["edges"] = [
+        edge for edge in no_navigation_initial["edges"]
+        if edge["edge_ref"] != "route:navigation-initial"
+    ]
+    no_navigation_manifest = save_manifest(
+        no_navigation_initial, out_dir / "no-initial-before-navigation-manifest.json"
+    )
+    no_navigation_row = next(
+        classify(no_navigation_manifest, unit)
+        for unit in no_navigation_manifest["evidence_units"]
+        if unit["evidence_unit_id"] == "unit:navigation"
+    )
+    if no_navigation_row["recoverability"] != "UnreachableWithinBudget":
+        raise SystemExit("navigation succeeded without first-pass retrieval")
+
     summary = {
         "schema": "symthaea.science_bench_refresh_recoverability_python_vectors.v1",
         "expected_manifest_commitment_sha256": expected_commitment,
@@ -308,10 +377,13 @@ def main() -> int:
             {unit["source_family_ref"] for unit in base["evidence_units"]}
         ),
         "metamorphic_controls": {
-            "partial_surface_all_not_evaluable": True,
+            "partial_surface_preserves_positive_routes_only": True,
+            "unknown_surface_all_not_evaluable": True,
             "lower_budget_never_improves": True,
             "added_direct_route_improves_unreachable_unit": True,
             "post_retrieval_requires_prior_reformulation": True,
+            "reformulation_requires_prior_initial_retrieval": True,
+            "navigation_requires_prior_initial_retrieval": True,
             "model_free_reference_classifier": True,
         },
     }
