@@ -34,8 +34,10 @@ promotion authority.
   same-base design.
 - Exact evaluation-context matching across blocks.
 - Equal-cluster point summaries while retaining each block and cluster result.
-- Structural intervention-manifest consistency: canonical SHA-256 *syntax*,
-  unique IDs, known parent origins, dependency existence and acyclicity,
+- Structural intervention-manifest consistency: canonical SHA-256 *syntax* for
+  source diffs and frozen contexts, non-empty/unique affected paths, preregistered
+  mechanisms and rollback/transplant procedure references, unique IDs, known
+  parent origins, dependency existence and acyclicity,
   symmetric conflicts, coupled-group cardinality, and exclusion of candidate
   edits to evaluator/task contracts.
 - All eight synthetic JSON reference fixtures, including missing evidence and
