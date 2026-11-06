@@ -12,10 +12,65 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[test]
+fn frozen_oracle_corpus_has_independent_expected_labels() {
+    let corpus: Value = serde_json::from_str(include_str!(
+        "fixtures/rea-claim-replay-v0-oracle.json"
+    ))
+    .unwrap();
+    assert_eq!(corpus["schema"], json!("luminous.rea.claim-replay-oracle.v0"));
+    assert_eq!(corpus["status"], json!("frozen_public_seed"));
+    assert_eq!(
+        corpus["provenance"]["authored_independently_of_production_evaluator"],
+        json!(true)
+    );
+    assert!(
+        corpus["cases"].as_array().unwrap().len() >= 18,
+        "the frozen finite oracle must retain all expected cases"
+    );
+}
+
 fn fixture_bytes() -> &'static [u8] {
     include_bytes!(
         "../../../crates/domains/symthaea-rea-compat/tests/fixtures/rea-evidence-v1.json"
     )
+}
+
+
+fn oracle_label(case_id: &str, field: &str) -> String {
+    let corpus: Value = serde_json::from_str(include_str!(
+        "fixtures/rea-claim-replay-v0-oracle.json"
+    ))
+    .expect("frozen independent replay oracle parses");
+    corpus["cases"]
+        .as_array()
+        .expect("oracle cases are an array")
+        .iter()
+        .find(|case| case["id"] == case_id)
+        .unwrap_or_else(|| panic!("oracle case '{case_id}' is missing"))[field]
+        .as_str()
+        .unwrap_or_else(|| panic!("oracle case '{case_id}' has no {field}"))
+        .to_owned()
+}
+
+fn oracle_disposition(case_id: &str) -> ClaimDisposition {
+    match oracle_label(case_id, "expected_disposition").as_str() {
+        "supported_within_scope" => ClaimDisposition::SupportedWithinScope,
+        "refuted_within_scope" => ClaimDisposition::RefutedWithinScope,
+        "underdetermined" => ClaimDisposition::Underdetermined,
+        "conflicted" => ClaimDisposition::Conflicted,
+        "inapplicable" => ClaimDisposition::Inapplicable,
+        "unverified" => ClaimDisposition::Unverified,
+        other => panic!("unknown frozen expected disposition '{other}'"),
+    }
+}
+
+fn oracle_replay_outcome(case_id: &str) -> ReplayOutcome {
+    match oracle_label(case_id, "expected_replay_outcome").as_str() {
+        "replay_match" => ReplayOutcome::ReplayMatch,
+        "replay_mismatch" => ReplayOutcome::ReplayMismatch,
+        other => panic!("case '{case_id}' has no replay outcome: '{other}'"),
+    }
 }
 
 fn provider_claim(evidence_id: String) -> ClaimRequest {
@@ -57,7 +112,14 @@ fn independent_replay_matches_supported_provider_observation() {
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
-    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.outcome,
+        oracle_replay_outcome("basic-provider-report-support")
+    );
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("basic-provider-report-support")
+    );
     assert_eq!(replay.expected_disposition, replay.reported_disposition);
     assert_eq!(
         replay.recomputed_derivation_sha256,
@@ -76,7 +138,7 @@ fn independent_replay_uses_jcs_equivalence_for_json_numbers() {
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
-        ClaimDisposition::SupportedWithinScope
+        oracle_disposition("jcs-number-42-equals-42-point-0")
     );
 }
 
@@ -106,7 +168,7 @@ fn independent_replay_preserves_conflicts_instead_of_voting() {
     )
     .unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Conflicted);
+    assert_eq!(replay.expected_disposition, oracle_disposition("same-scope-disagreement"));
 }
 
 #[test]
@@ -119,7 +181,7 @@ fn independent_replay_keeps_missing_premises_underdetermined() {
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
-        ClaimDisposition::Underdetermined
+        oracle_disposition("referenced-evidence-missing")
     );
     assert_eq!(replay.missing_evidence_count, 1);
 }
@@ -134,7 +196,7 @@ fn independent_replay_reproduces_unverified_predicate_ceiling() {
 
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Unverified);
+    assert_eq!(replay.expected_disposition, oracle_disposition("producer-authenticity-rule-unimplemented"));
 }
 
 #[test]
@@ -158,7 +220,10 @@ fn forged_result_disposition_does_not_pass_on_a_self_digest_alone() {
 
     let forged_bytes = serde_json::to_vec(&forged).unwrap();
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &forged_bytes).unwrap();
-    assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
+    assert_eq!(
+        replay.outcome,
+        oracle_replay_outcome("forged-disposition-with-valid-shaped-digest")
+    );
     assert_ne!(replay.expected_disposition, replay.reported_disposition);
 }
 
@@ -173,7 +238,10 @@ fn changed_request_cannot_reuse_an_old_result() {
     let changed_bytes = serde_json::to_vec(&changed).unwrap();
     let replay =
         replay_claim_evaluation(&changed_bytes, &[fixture_bytes()], &result_bytes).unwrap();
-    assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
+    assert_eq!(
+        replay.outcome,
+        oracle_replay_outcome("changed-falsification-condition-old-result")
+    );
     assert_ne!(
         replay.reported_derivation_sha256,
         replay.recomputed_derivation_sha256
@@ -260,14 +328,14 @@ fn independent_expected_labels_cover_wrong_scope_and_missing_platform_version() 
     let (claim_bytes, result_bytes) = produce(&wrong_subject, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Inapplicable);
+    assert_eq!(replay.expected_disposition, oracle_disposition("wrong-subject-digest"));
 
     let mut wrong_operation = provider_claim(evidence.evidence_id.clone());
     wrong_operation.scope.operation = "verify_signature".to_owned();
     let (claim_bytes, result_bytes) = produce(&wrong_operation, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Inapplicable);
+    assert_eq!(replay.expected_disposition, oracle_disposition("wrong-operation"));
 
     let mut unrepresented_platform_version = provider_claim(evidence.evidence_id.clone());
     unrepresented_platform_version.scope.platform_version = Some("Android 17 / API 37".to_owned());
@@ -279,7 +347,7 @@ fn independent_expected_labels_cover_wrong_scope_and_missing_platform_version() 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
-        ClaimDisposition::Underdetermined
+        oracle_disposition("platform-version-not-represented")
     );
 }
 
@@ -294,7 +362,7 @@ fn independent_expected_label_refutes_a_same_scope_numeric_near_miss() {
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
-        ClaimDisposition::RefutedWithinScope
+        oracle_disposition("numeric-near-miss-42-point-0001")
     );
 }
 
@@ -309,7 +377,7 @@ fn recorded_assumptions_cannot_make_a_claim_supported() {
 
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Unverified);
+    assert_eq!(replay.expected_disposition, oracle_disposition("unverified-assumption-present"));
 }
 
 #[test]
@@ -366,7 +434,7 @@ fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(
         replay.expected_disposition,
-        ClaimDisposition::SupportedWithinScope
+        oracle_disposition("basic-provider-report-support")
     );
 }
 
