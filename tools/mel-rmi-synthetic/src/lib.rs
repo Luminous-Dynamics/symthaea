@@ -9,6 +9,10 @@ use std::fmt;
 
 use sha2::{Digest, Sha256};
 
+/// Paired, cluster-aware RMI estimates with explicit missingness.
+pub mod statistics;
+pub use statistics::*;
+
 /// Version of the synthetic trial-manifest schema.
 pub const RMI_SCHEMA_VERSION: u16 = 1;
 /// Version of the separately reported causal-contrast metrics.
