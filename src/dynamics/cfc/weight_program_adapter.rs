@@ -360,7 +360,7 @@ fn is_lowercase_hex_digest(value: &str) -> bool {
 
 fn cfc_probe_set_digest(layer_index: usize, probes: &[CfCFunctionalProbe]) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea-cfc-functional-probes-v1\\0");
+    hasher.update(b"symthaea-cfc-functional-probes-v1\0");
     hasher.update(&(layer_index as u64).to_le_bytes());
     hasher.update(&(probes.len() as u64).to_le_bytes());
     for probe in probes {
