@@ -52,3 +52,9 @@ Raw claim import also requires every schema-required field to be present, includ
 - Result: `docs/research/rea-claim-evaluation-result-v0.schema.json` (`luminous.rea.claim-evaluation.v0`).
 
 The result schema requires the complete asserted value, source predicate, ordered requested Evidence IDs, assumptions, per-premise assessments, missing IDs, unmet obligations, claim ceiling, canonical request digest and derivation digest. Consumers should validate the result against the result schema before treating it as a portable derivation record.
+
+### Confidence and authority are preserved, not promoted
+
+The v0 positive rule is intentionally record-level: it qualifies that the semantically verified REA Evidence record contains the exact normalized value under the requested scope. It does **not** require the record's `confidence` to be `observed` or its `authority` to be a particular class, because doing so would silently turn one generic record-content predicate into an authority policy.
+
+Instead, every EvidenceAssessment carries the record's confidence and authority verbatim, and the claim ceiling says the result does not prove the underlying proposition. A record labelled `confidence: inferred` and `authority: analyst-inference` can therefore support only the narrow statement that the record reports that value; the assessment must retain those labels. It cannot be promoted to an observed artifact fact, authenticated producer statement, independent corroboration or trusted conclusion. Any stronger rule must declare its confidence/authority preconditions in its own predicate-specific verifier and policy contract.
