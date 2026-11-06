@@ -276,13 +276,14 @@
     },
     {
       "id": "partial_observation_rule_discovery",
-      "environment": "Published-paper anchor (Friston et al., Nature Communications 2026): three balls have red/green/blue colours; the rule is centre-green→choose green, centre-red→choose the left ball's colour, centre-blue→choose the right ball's colour. The agent sees only the currently foveated ball, so it must choose where to look as well as which colour to report; outcomes are no response/correct/incorrect with stated prior log probabilities 0/2/-6 nats. The symmetry-constrained family contains 81 candidate likelihood mappings; full-state response combinations number 3×3×3×4=108. Exact reproduction requires transcribing the paper/supplement tensor layout, Dirichlet priors, policy horizon, and all settings. Any change to balls, colours, rule family, feedback, preferences, observation, or horizon is an adaptation.",
+      "environment": "Exact Friston et al. (2026) three-ball active structure-learning reproduction target: partially observed discrete POMDP with five latent factors (three ball-colour factors, each with red/green/blue states; one look-location factor with start/left/centre/right; one choice factor with no-choice/red/blue/green), two outcome modalities (vision: nothing/red/green/blue; feedback: no-feedback/correct/incorrect), action-controlled gaze and choice, random ball colours per trial, and six decision time points per trial. Feedback preferences are softmax([0, 2, -6]) in the order no-feedback/correct/incorrect. The hidden rule is a context-dependent mapping from centre-ball colour to the criterion location (red→left, green→centre, blue→right); the model family contains 81 possible mappings (79 unique after degeneracy), with rule 65 as the planted generating rule. The generative model is assumed known except for the feedback likelihood tensor. Any change to these factors, outcomes, time horizon, priors, rule family, or model-space construction is a separately labelled adaptation.",
       "primary_outcomes": [
         "rule_identification_accuracy",
         "trials_to_model_selection",
         "model_choice_brier_score",
         "decision_regret",
-        "observation_cost"
+        "observation_cost",
+        "trials_to_log_odds_threshold_16_nats"
       ],
       "diagnostics": [
         "state_information_gain_nats",
@@ -291,7 +292,10 @@
         "realized_model_entropy_reduction_nats",
         "bmr_log_evidence_ratio_nats",
         "posterior_log_odds_of_selected_model",
-        "model_commitment_trial"
+        "model_commitment_trial",
+        "exact_paper_rule_65_posterior_probability",
+        "occams_razor_log_odds_nats",
+        "trials_to_log_odds_threshold_16_nats"
       ],
       "negative_controls": [
         "random_partial_observation_policy",
@@ -471,6 +475,14 @@
     {
       "id": "hierarchical_model_eig_with_bmr",
       "scope": "Prospective hierarchical model information gain with post-observation BMR model comparison; evaluate only after predictive-outcome and posterior adapters are implemented"
+    },
+    {
+      "id": "dirichlet_bayesian_model_reduction_three_ball",
+      "scope": "Exact Dirichlet BMR over categorical likelihood columns, using the paper's full-model Dirichlet posterior/prior and prior-restricted reduced Dirichlet tensors; strictly positive proper concentrations only"
+    },
+    {
+      "id": "categorical_dirichlet_model_average_then_bmr",
+      "scope": "Bayesian model average over categorical likelihood mappings with sequential posterior Dirichlet count updates and post-observation reduced-model evidence"
     }
   ],
   "seeds": {
@@ -536,7 +548,11 @@
       "trials_to_model_selection",
       "model_choice_brier_score",
       "realized_model_entropy_reduction_nats",
-      "bmr_log_evidence_ratio_nats"
+      "bmr_log_evidence_ratio_nats",
+      "dirichlet_model_evidence_log_ratio_nats",
+      "rule_65_posterior_probability",
+      "occams_razor_log_odds_nats",
+      "trials_to_log_odds_threshold_16_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -613,7 +629,10 @@
     "BMR log evidence is used only for post-observation model comparison; it is not added directly to prospective expected information gain or pragmatic value.",
     "All Gaussian distributions supplied to BMR (full posterior, full prior, and each reduced prior) carry the same canonical parameterization digest binding coordinate identities, semantic roles, tensor shapes, and coordinate order; missing, malformed, or mismatched digests are rejected before evidence calculation.",
     "Activation-based hidden-unit correspondence is diagnostic only: the source model is unchanged, native fingerprints are not rewritten, and low-margin or ambiguous assignments must abstain. Report probe-set identity, signature error, and assignment margin for every attempted alignment.",
-    "The three-ball implementation records the paper's published rule (centre green→green; centre red→left colour; centre blue→right colour), foveated single-ball observation, and outcome preference log probabilities (no feedback=0, correct=2, incorrect=-6 nats); any changed mechanism is labelled as an adaptation."
+    "The three-ball implementation records the paper's published rule (centre green→green; centre red→left colour; centre blue→right colour), foveated single-ball observation, and outcome preference log probabilities (no feedback=0, correct=2, incorrect=-6 nats); any changed mechanism is labelled as an adaptation.",
+    "The three-ball categorical likelihood reproduction must use Dirichlet model reduction over the full-model posterior and prior concentrations; the diagonal-Gaussian BMR primitive must not be substituted for this conjugate categorical case.",
+    "Three-ball model evidence must use the registered model family and Dirichlet column ordering, and the reported Occam threshold must be expressed as posterior model log-odds in nats; model commitment is evaluated at the declared 16-nat threshold as a replication metric, not as a universal constant.",
+    "Dirichlet BMR only accepts proper positive concentrations. Reduced priors that require exact-zero support restrictions must use an explicit support-restricted model representation, not be silently approximated as proper Dirichlet distributions."
   ],
   "research_references": [
     {
