@@ -312,6 +312,91 @@ mod tests {
     }
 
     #[test]
+    fn planted_tau_fault_is_repaired_on_clone_and_stale_program_rejects_healthy_model() {
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 4,
+            num_layers: 1,
+            output_dim: 2,
+            ..Default::default()
+        };
+        let healthy = CfCNetwork::new(config);
+        let mut faulty = healthy.clone();
+        let task_digest = digest('d');
+        let healthy_snapshot =
+            cfc_weight_model_snapshot(&healthy, task_digest.clone()).expect("healthy snapshot");
+        let tau_target = WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant {
+            cell: 0,
+        });
+        let healthy_tau = healthy_snapshot
+            .groups
+            .iter()
+            .find(|group| group.target == tau_target)
+            .expect("healthy tau")
+            .values
+            .clone();
+
+        let faulty_values = healthy_tau.iter().map(|value| value * 3.0).collect::<Vec<_>>();
+        let faulty_base_digest = faulty.fingerprint().expect("faulty base").model_digest;
+        faulty
+            .try_apply_parameter_group_replacements(
+                &faulty_base_digest,
+                &[CfCParameterGroupReplacement {
+                    id: native_group_id(&CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+                    values: faulty_values,
+                }],
+            )
+            .expect("plant tau-scale fault");
+
+        let faulty_snapshot =
+            cfc_weight_model_snapshot(&faulty, task_digest.clone()).expect("faulty snapshot");
+        let faulty_digest_before = faulty_snapshot.model_digest.clone();
+        let tau_len = faulty_snapshot
+            .groups
+            .iter()
+            .find(|group| group.target == tau_target)
+            .expect("faulty tau")
+            .values
+            .len();
+        let repair = WeightProgram {
+            format_version: 1,
+            architecture_digest: faulty_snapshot.architecture_digest.clone(),
+            manifest_digest: faulty_snapshot.manifest_digest.clone(),
+            base_model_digest: faulty_snapshot.model_digest.clone(),
+            target_specification_digest: task_digest.clone(),
+            fault_hypothesis_ids: vec!["fault:tau-scale-3x".into()],
+            evidence_receipt_ids: vec!["receipt:impulse-response-01".into()],
+            max_changed_parameters: tau_len,
+            max_total_l2_delta: 100.0,
+            max_abs_delta: 100.0,
+            operations: vec![WeightProgramOperation::ScaleRange {
+                target: tau_target,
+                start: 0,
+                end: tau_len,
+                factor: 1.0 / 3.0,
+            }],
+        };
+
+        let candidate =
+            materialize_cfc_weight_program(&faulty, task_digest.clone(), &repair)
+                .expect("candidate repair");
+        assert_eq!(
+            faulty.fingerprint().expect("faulty remains unchanged").model_digest,
+            faulty_digest_before
+        );
+        let repaired_tau = candidate.network.flattened_tau();
+        for (repaired, expected) in repaired_tau.iter().zip(healthy_tau.iter()) {
+            assert!((repaired - expected).abs() < 1e-5);
+        }
+
+        let healthy_now = cfc_weight_model_snapshot(&healthy, task_digest).expect("healthy current");
+        assert_eq!(
+            repair.validate_and_materialize(&healthy_now),
+            Err(WeightProgramError::StaleDigest("base model"))
+        );
+    }
+
+    #[test]
     fn invalid_target_specification_is_rejected_before_clone_edit() {
         let config = CfCNetworkConfig {
             input_dim: 2,
