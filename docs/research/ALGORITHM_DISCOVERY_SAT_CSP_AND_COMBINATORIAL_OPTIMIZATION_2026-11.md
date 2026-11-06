@@ -29,6 +29,20 @@ The theoretical and applied programmes should be separate but connected:
 
 A benchmark result for one target does not establish performance on the others.
 
+## Direct cross-problem consequences claimed by the OpenAI #SAT preprint
+
+The October 25 preprint contains a particularly relevant corollary, not just a 3-SAT result. It claims deterministic subexponential-time exact counting for:
+
+- Independent sets in a simple graph with v vertices and e edges: 2^o(v) time and polynomial space.
+- Proper q-colorings, for each fixed q >= 2: 2^o(v) time and polynomial space.
+- Perfect matchings: 2^o(v+e) time and polynomial space.
+
+The paper gives counting-preserving encodings: independent sets map directly to 2-CNF; fixed-q graph colorings use q variables per vertex with exactly-one and adjacency constraints; perfect matching uses one variable per edge and a linear-size checking circuit. These are **claims inherited from the preprint's main theorem**, not independently reproduced results.
+
+Important reduction boundary: the preprint explicitly warns that 2^o(n) time does not automatically transfer through arbitrary polynomial-time reductions. The number of variables in the fixed-width SAT encoding must remain controlled. Its graph-counting corollary is therefore concrete; it does not imply that every NP problem has a subexponential algorithm.
+
+Research priority: graph coloring and independent-set counting should join #3-SAT as a first-class theoretical reproduction track; perfect-matching counting is a separate algebraic/counting track. Also test the encodings against native graph algorithms on small instances and verify counts exhaustively.
+
 ## Current literature worth implementing or reproducing
 
 ### 1. OpenAI: “The Exponential Time Hypothesis is False” (2026-10-25)
