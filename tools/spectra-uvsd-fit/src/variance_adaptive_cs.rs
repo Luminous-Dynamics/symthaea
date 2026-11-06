@@ -116,11 +116,22 @@ impl VarianceAdaptiveSubGaussianCs {
         }
 
         let subgaussian_proxy = width * 0.5;
-        if !subgaussian_proxy.is_finite()
-            || !(subgaussian_proxy * subgaussian_proxy).is_finite()
-            || !(subgaussian_proxy * subgaussian_proxy * subgaussian_proxy).is_finite()
-        {
+        if !subgaussian_proxy.is_finite() {
             return Err(VarianceAdaptiveCsError::InvalidScoreRange);
+        }
+        if subgaussian_proxy > 0.0 {
+            let squared_proxy = subgaussian_proxy * subgaussian_proxy;
+            let cubed_proxy = squared_proxy * subgaussian_proxy;
+            let maximum_bet = 1.0 / (5.0 * subgaussian_proxy);
+            if !squared_proxy.is_finite()
+                || squared_proxy == 0.0
+                || !cubed_proxy.is_finite()
+                || cubed_proxy == 0.0
+                || !maximum_bet.is_finite()
+                || maximum_bet <= 0.0
+            {
+                return Err(VarianceAdaptiveCsError::InvalidScoreRange);
+            }
         }
 
         Ok(Self {
@@ -391,6 +402,10 @@ mod tests {
         );
         assert_eq!(
             VarianceAdaptiveSubGaussianCs::new(0.0, f64::MAX, 0.05),
+            Err(VarianceAdaptiveCsError::InvalidScoreRange)
+        );
+        assert_eq!(
+            VarianceAdaptiveSubGaussianCs::new(0.0, f64::MIN_POSITIVE, 0.05),
             Err(VarianceAdaptiveCsError::InvalidScoreRange)
         );
         assert_eq!(
