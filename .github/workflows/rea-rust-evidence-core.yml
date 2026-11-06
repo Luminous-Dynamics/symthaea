@@ -46,6 +46,7 @@ jobs:
     env:
       CARGO_BUILD_JOBS: 2
       HUSKY: "0"
+      RUSTUP_TOOLCHAIN: "1.99.1"
     steps:
       - name: Checkout Symthaea revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -71,7 +72,7 @@ jobs:
         run: |
           rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
           rustup default 1.99.1
-          test "$(rustc --version)" = "rustc 1.99.1 (58cf8f9 2026-10-15)"
+          test "$(rustc --version)" = "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
           cargo --version
           cargo fmt --version
           cargo clippy --version
