@@ -88,6 +88,14 @@ Crucial scope boundary: this computes a distributional asymptotic threshold; it 
 
 **Use for Symthaea:** probabilistic reasoning, finite-certificate search, distribution-aware benchmark generation, and separation of asymptotic distributional claims from worst-case algorithmic claims.
 
+### 3. Vorobyev: “An upper bound of 4.268 for the random 3-SAT satisfiability threshold” (2026-10-06)
+
+[arXiv:2610.10599](https://arxiv.org/abs/2610.10599)
+
+This paper proves that a uniform random 3-SAT formula with `floor(4.268 n)` clauses is UNSAT with high probability. It brings the rigorous upper estimate close to the cavity-method prediction around 4.267 and formalizes the finite calculation in Lean 4. This is an **upper bound on the random threshold**, not the exact threshold itself and not an algorithm for arbitrary worst-case 3-SAT.
+
+**Use for Symthaea:** create an exact-rational, proof-backed threshold certificate benchmark. Compare lower certificates, upper certificates, convergence of bounds, and machine-checkable arithmetic. Keep distributional guarantees separate from per-instance decision.
+
 ### 3. Kutzkov: “Complementary Branching for #SAT” (IJCAI 2026)
 
 [IJCAI proceedings](https://www.ijcai.org/proceedings/2026/254)
