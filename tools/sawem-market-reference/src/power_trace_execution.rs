@@ -111,12 +111,7 @@ pub fn evaluate_scheduled_power_trace<'a>(
         .checked_mul(denominator)
         .ok_or(ScheduledPowerTraceError::ArithmeticOverflow)?;
 
-    let (
-        absolute_deviation,
-        unfulfilled,
-        overdelivery,
-        fulfilment,
-    ) = if trace.trace_complete {
+    let (absolute_deviation, unfulfilled, overdelivery, fulfilment) = if trace.trace_complete {
         let measured = trace.signed_energy_milli_wh_numerator;
         let absolute_deviation = u128::try_from(
             measured
@@ -155,9 +150,10 @@ pub fn evaluate_scheduled_power_trace<'a>(
             Some(10_000)
         } else {
             let delivered = scheduled_directional
-                .checked_sub(i128::try_from(unfulfilled).map_err(|_| {
-                    ScheduledPowerTraceError::ArithmeticOverflow
-                })?)
+                .checked_sub(
+                    i128::try_from(unfulfilled)
+                        .map_err(|_| ScheduledPowerTraceError::ArithmeticOverflow)?,
+                )
                 .ok_or(ScheduledPowerTraceError::ArithmeticOverflow)?;
             let numerator = u128::try_from(delivered)
                 .map_err(|_| ScheduledPowerTraceError::ArithmeticOverflow)?
@@ -251,10 +247,7 @@ mod tests {
         let result = evaluate_scheduled_power_trace(inputs(&samples, 900_000)).unwrap();
         assert_eq!(result.trace.signed_energy_milli_wh_numerator, 7_200_000_000);
         assert_eq!(result.energy_denominator, 7_200);
-        assert_eq!(
-            result.scheduled_energy_numerator_milli_wh,
-            6_480_000_000
-        );
+        assert_eq!(result.scheduled_energy_numerator_milli_wh, 6_480_000_000);
         assert_eq!(
             result.absolute_deviation_numerator_milli_wh,
             Some(720_000_000)
@@ -272,10 +265,7 @@ mod tests {
 
     #[test]
     fn underdelivery_is_reported_in_exact_rational_units() {
-        let samples = [
-            sample("start", 100, 800_000),
-            sample("end", 3_700, 800_000),
-        ];
+        let samples = [sample("start", 100, 800_000), sample("end", 3_700, 800_000)];
         let result = evaluate_scheduled_power_trace(inputs(&samples, 1_000_000)).unwrap();
         assert_eq!(
             result.unfulfilled_scheduled_energy_numerator_milli_wh,
@@ -287,10 +277,7 @@ mod tests {
 
     #[test]
     fn import_schedule_uses_the_same_signed_directional_reconciliation() {
-        let samples = [
-            sample("start", 100, -800_000),
-            sample("end", 3_700, -800_000),
-        ];
+        let samples = [sample("start", 100, -800_000), sample("end", 3_700, -800_000)];
         let result = evaluate_scheduled_power_trace(inputs(&samples, -1_000_000)).unwrap();
         assert_eq!(
             result.unfulfilled_scheduled_energy_numerator_milli_wh,
@@ -306,7 +293,10 @@ mod tests {
             sample("end", 3_700, -500_000),
         ];
         let result = evaluate_scheduled_power_trace(inputs(&samples, 1_000_000)).unwrap();
-        assert_eq!(result.unfulfilled_scheduled_energy_numerator_milli_wh, Some(7_200_000_000));
+        assert_eq!(
+            result.unfulfilled_scheduled_energy_numerator_milli_wh,
+            Some(7_200_000_000)
+        );
         assert_eq!(result.overdelivery_energy_numerator_milli_wh, Some(0));
         assert_eq!(result.schedule_fulfilment_bps, Some(0));
     }
