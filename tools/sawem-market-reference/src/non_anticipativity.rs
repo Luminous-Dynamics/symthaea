@@ -226,11 +226,11 @@ mod tests {
             decision("price-high", "root", INFO_SHA_A, 90, 100, ACTION_A),
             decision("price-low", "root", INFO_SHA_A, 90, 100, ACTION_A),
             decision("outage", "root", INFO_SHA_A, 90, 100, ACTION_A),
-            decision("price-high", "after-price", INFO_SHA_B, 110, 120, ACTION_A),
+            decision("price-high", "after-price-high", INFO_SHA_B, 110, 120, ACTION_A),
             decision(
                 "price-low",
-                "after-price",
-                INFO_SHA_B,
+                "after-price-low",
+                INFO_SHA_A,
                 110,
                 120,
                 DispatchAction {
@@ -242,8 +242,8 @@ mod tests {
         let result = audit_non_anticipative_policy(&scenarios, &decisions).unwrap();
         assert_eq!(result.scenario_count, 3);
         assert_eq!(result.decision_count, 5);
-        assert_eq!(result.shared_information_set_count, 2);
-        assert_eq!(result.scenario_pair_comparison_count, 4);
+        assert_eq!(result.shared_information_set_count, 1);
+        assert_eq!(result.scenario_pair_comparison_count, 3);
         assert!(result.all_shared_decisions_identical);
     }
 
@@ -354,8 +354,13 @@ mod tests {
         );
 
         let duplicate_scenarios = ["case-a", "case-a"];
+        let duplicate_scenario_decisions =
+            [decision("case-a", "root", INFO_SHA_A, 90, 100, ACTION_A)];
         assert_eq!(
-            audit_non_anticipative_policy(&duplicate_scenarios, &[]),
+            audit_non_anticipative_policy(
+                &duplicate_scenarios,
+                &duplicate_scenario_decisions
+            ),
             Err(NonAnticipativityError::DuplicateScenarioId)
         );
 
