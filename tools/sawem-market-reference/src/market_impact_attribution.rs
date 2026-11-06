@@ -133,7 +133,8 @@ fn validate_reference(reference: &str, digest: &str) -> Result<(), MarketImpactE
 }
 
 fn add_i128(left: i128, right: i128) -> Result<i128, MarketImpactError> {
-    left.checked_add(right).ok_or(MarketImpactError::ArithmeticOverflow)
+    left.checked_add(right)
+        .ok_or(MarketImpactError::ArithmeticOverflow)
 }
 
 fn checked_revenue_numerator(
@@ -158,8 +159,14 @@ pub fn evaluate_market_impact_policy<'a>(
         return Err(MarketImpactError::InvalidEvidenceReference);
     }
     validate_reference(inputs.policy_id, inputs.policy_sha256)?;
-    validate_reference(inputs.market_impact_model_id, inputs.market_impact_model_sha256)?;
-    validate_reference(inputs.reference_price_basis_id, inputs.reference_price_basis_sha256)?;
+    validate_reference(
+        inputs.market_impact_model_id,
+        inputs.market_impact_model_sha256,
+    )?;
+    validate_reference(
+        inputs.reference_price_basis_id,
+        inputs.reference_price_basis_sha256,
+    )?;
     if inputs.horizon_start_utc >= inputs.horizon_end_utc
         || inputs.evaluation_as_of_utc < inputs.horizon_end_utc
     {
@@ -187,8 +194,14 @@ pub fn evaluate_market_impact_policy<'a>(
             return Err(MarketImpactError::InvalidEvidenceReference);
         }
         validate_reference(interval.energy_source_ref, interval.energy_source_sha256)?;
-        validate_reference(interval.reference_price_source_ref, interval.reference_price_sha256)?;
-        validate_reference(interval.impact_price_source_ref, interval.impact_price_sha256)?;
+        validate_reference(
+            interval.reference_price_source_ref,
+            interval.reference_price_sha256,
+        )?;
+        validate_reference(
+            interval.impact_price_source_ref,
+            interval.impact_price_sha256,
+        )?;
 
         if interval.interval_start_utc >= interval.interval_end_utc
             || interval.interval_start_utc < inputs.horizon_start_utc
@@ -248,7 +261,8 @@ pub fn evaluate_market_impact_policy<'a>(
     let duration = i128::from(inputs.horizon_end_utc)
         .checked_sub(i128::from(inputs.horizon_start_utc))
         .ok_or(MarketImpactError::ArithmeticOverflow)?;
-    let duration_u64 = u64::try_from(duration).map_err(|_| MarketImpactError::ArithmeticOverflow)?;
+    let duration_u64 =
+        u64::try_from(duration).map_err(|_| MarketImpactError::ArithmeticOverflow)?;
     let interval_count =
         u64::try_from(inputs.intervals.len()).map_err(|_| MarketImpactError::ArithmeticOverflow)?;
     let price_impact_adjustment = impact_adjusted_numerator
@@ -368,10 +382,8 @@ pub fn compare_market_impact_policies<'a>(
 mod tests {
     use super::*;
 
-    const SOURCE_SHA: &str =
-        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    const POLICY_SHA: &str =
-        "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+    const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const POLICY_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
     fn interval(
         interval_id: &'static str,
@@ -433,15 +445,21 @@ mod tests {
             10_000,
             9_000,
         )];
-        let result = evaluate_market_impact_policy(inputs(
-            "candidate",
-            POLICY_SHA,
-            &candidate_intervals,
-        ))
-        .unwrap();
-        assert_eq!(result.price_taker_revenue_numerator_minor_zar, 10_000_000_000_000);
-        assert_eq!(result.impact_adjusted_revenue_numerator_minor_zar, 9_000_000_000_000);
-        assert_eq!(result.price_impact_adjustment_numerator_minor_zar, -1_000_000_000_000);
+        let result =
+            evaluate_market_impact_policy(inputs("candidate", POLICY_SHA, &candidate_intervals))
+                .unwrap();
+        assert_eq!(
+            result.price_taker_revenue_numerator_minor_zar,
+            10_000_000_000_000
+        );
+        assert_eq!(
+            result.impact_adjusted_revenue_numerator_minor_zar,
+            9_000_000_000_000
+        );
+        assert_eq!(
+            result.price_impact_adjustment_numerator_minor_zar,
+            -1_000_000_000_000
+        );
         assert_eq!(result.revenue_denominator_milli_wh_per_mwh, 1_000_000_000);
     }
 
@@ -465,7 +483,11 @@ mod tests {
         )];
         let result = compare_market_impact_policies(
             inputs("candidate", POLICY_SHA, &candidate),
-            inputs("comparator", "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", &comparator),
+            inputs(
+                "comparator",
+                "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+                &comparator,
+            ),
         )
         .unwrap();
         assert_eq!(
@@ -495,9 +517,18 @@ mod tests {
         let result =
             evaluate_market_impact_policy(inputs("charging-policy", POLICY_SHA, &intervals))
                 .unwrap();
-        assert_eq!(result.price_taker_revenue_numerator_minor_zar, 5_000_000_000_000);
-        assert_eq!(result.impact_adjusted_revenue_numerator_minor_zar, 4_000_000_000_000);
-        assert_eq!(result.price_impact_adjustment_numerator_minor_zar, -1_000_000_000_000);
+        assert_eq!(
+            result.price_taker_revenue_numerator_minor_zar,
+            5_000_000_000_000
+        );
+        assert_eq!(
+            result.impact_adjusted_revenue_numerator_minor_zar,
+            4_000_000_000_000
+        );
+        assert_eq!(
+            result.price_impact_adjustment_numerator_minor_zar,
+            -1_000_000_000_000
+        );
     }
 
     #[test]
