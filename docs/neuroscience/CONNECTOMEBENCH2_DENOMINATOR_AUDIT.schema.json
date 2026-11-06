@@ -432,7 +432,10 @@
           "pattern": "^[0-9a-f]{40}$"
         },
         "shard_count_reported": {
-          "type": "integer",
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0
         },
         "shard_manifest_status": {
