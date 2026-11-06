@@ -144,9 +144,12 @@
                 }
               },
               "required": [
+                "control_id",
+                "synthetic_only",
                 "hard_gate",
                 "expected_claim_ceiling",
-                "expected_semantics"
+                "expected_semantics",
+                "threat_category"
               ]
             }
           },
@@ -165,8 +168,15 @@
                 },
                 "hard_gate": {
                   "const": false
+                },
+                "synthetic_only": {
+                  "const": true
                 }
-              }
+              },
+              "required": [
+                "hard_gate",
+                "synthetic_only"
+              ]
             }
           }
         ]
