@@ -41,6 +41,7 @@ jobs:
           cp tools/mel-rmi-synthetic/Cargo.toml "$staged/Cargo.toml"
           cp tools/mel-rmi-synthetic/Cargo.lock "$staged/Cargo.lock"
           cp tools/mel-rmi-synthetic/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-rmi-synthetic/src/statistics.rs "$staged/src/statistics.rs"
           cp tools/mel-rmi-synthetic/examples/canonical_suite.rs "$staged/examples/canonical_suite.rs"
           echo "MEL_RMI_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
       - name: Format isolated crate
