@@ -916,6 +916,13 @@ jobs:
           jq -e '.valid == true and .class_counts.NotEvaluable == 5 and ([.records[].recoverability] | all(. == "NotEvaluable"))' \
             /tmp/sbr-recoverability/unknown-report.json >/dev/null
 
+          # A post-reformulation retrieval that occurs before the rewrite is not valid reformulation reachability.
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-recoverability-manifest /tmp/sbr-recoverability/post-before-rewrite-manifest.json \
+            > /tmp/sbr-recoverability/post-before-rewrite-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:rewrite")][0].recoverability == "UnreachableWithinBudget"' \
+            /tmp/sbr-recoverability/post-before-rewrite-report.json >/dev/null
+
           # Reduced route budget cannot make navigation easier; added route can improve only its target.
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
             audit-recoverability-manifest /tmp/sbr-recoverability/lower-budget-manifest.json \
