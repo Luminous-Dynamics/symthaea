@@ -416,7 +416,8 @@ fn find_route(
                 && !state.used_reformulation
                 && !state.used_navigation,
             RouteMode::Reformulation => {
-                state.used_reformulation
+                state.used_initial_retrieval
+                    && state.used_reformulation
                     && state.used_post_reformulation_retrieval
                     && !state.used_navigation
             }
@@ -458,7 +459,8 @@ fn find_route(
                 used_initial_retrieval: state.used_initial_retrieval
                     || edge.operation == RouteOperationV1::InitialRetrieval,
                 used_reformulation: state.used_reformulation
-                    || edge.operation == RouteOperationV1::QueryReformulation,
+                    || (state.used_initial_retrieval
+                        && edge.operation == RouteOperationV1::QueryReformulation),
                 used_post_reformulation_retrieval: state.used_post_reformulation_retrieval
                     || (state.used_reformulation
                         && edge.operation == RouteOperationV1::PostReformulationRetrieval),
@@ -851,6 +853,48 @@ mod tests {
         assert_eq!(
             after.records.iter().find(|r| r.evidence_unit_id == "unit:unreachable").unwrap().recoverability,
             RecoverabilityClassV1::DirectlyReachable
+        );
+    }
+
+    #[test]
+    fn reformulation_before_first_retrieval_does_not_qualify() {
+        let mut fields = base_fields();
+        fields.edges.retain(|edge| {
+            edge.edge_ref != "route:rewrite-query" && edge.edge_ref != "route:rewrite-search"
+        });
+        fields.nodes.push(RecoverabilityNodeV1 {
+            node_ref: "state:retrieved-too-late".into(),
+        });
+        fields.edges.push(RecoverabilityEdgeV1 {
+            edge_ref: "route:rewrite-first".into(),
+            from_node_ref: "state:start".into(),
+            to_node_ref: "state:retrieved-too-late".into(),
+            operation: RouteOperationV1::QueryReformulation,
+            cost: 1,
+        });
+        fields.edges.push(RecoverabilityEdgeV1 {
+            edge_ref: "route:initial-after-rewrite".into(),
+            from_node_ref: "state:retrieved-too-late".into(),
+            to_node_ref: "evidence:rewrite".into(),
+            operation: RouteOperationV1::InitialRetrieval,
+            cost: 1,
+        });
+        fields.edges.push(RecoverabilityEdgeV1 {
+            edge_ref: "route:post-after-rewrite".into(),
+            from_node_ref: "evidence:rewrite".into(),
+            to_node_ref: "evidence:rewrite".into(),
+            operation: RouteOperationV1::PostReformulationRetrieval,
+            cost: 1,
+        });
+        let result = report(fields);
+        let row = result
+            .records
+            .iter()
+            .find(|record| record.evidence_unit_id == "unit:rewrite")
+            .unwrap();
+        assert_eq!(
+            row.recoverability,
+            RecoverabilityClassV1::UnreachableWithinBudget
         );
     }
 
