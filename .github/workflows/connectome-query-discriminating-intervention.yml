@@ -50,5 +50,6 @@ jobs:
       - name: Run independent decision-value oracle
         run: |
           python3 -m py_compile tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py
+          python3 tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py --self-test
           python3 tools/connectomics-intake-audit/reference/verify_query_discriminating_intervention_oracle.py \
             docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json
