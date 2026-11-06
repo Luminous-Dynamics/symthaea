@@ -3073,6 +3073,50 @@ mod tests {
     }
 
     #[test]
+    fn test_backward_weight_gradient_matches_forward_with_fourier_basis() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: vec![1.0, 3.0],
+            fourier_amplitude: 0.07,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 73);
+        let input = ContinuousHV::random(64, 101).scale(0.15);
+        let target = ContinuousHV::random(64, 202).scale(0.15);
+        neuron.set_state(ContinuousHV::random(64, 303).scale(0.08));
+
+        let dt = 0.011;
+        let epsilon = 1e-3;
+        let index = 13;
+        let gradients = neuron.backward(&input, &target, dt);
+
+        let loss_at = |mut candidate: HdcLtcUnifiedNeuron| {
+            candidate.evolve_closed_form(dt, &input);
+            candidate
+                .state()
+                .values
+                .iter()
+                .zip(target.values.iter())
+                .map(|(&predicted, &expected)| (predicted - expected).powi(2))
+                .sum::<f32>()
+                / 64.0
+        };
+
+        let mut plus = neuron.clone();
+        plus.weight_hv.values[index] += epsilon;
+        let mut minus = neuron.clone();
+        minus.weight_hv.values[index] -= epsilon;
+        let finite_difference = (loss_at(plus) - loss_at(minus)) / (2.0 * epsilon);
+
+        assert!(
+            (gradients.dw.values[index] - finite_difference).abs() < 2e-3,
+            "Fourier-bundle weight gradient mismatch: analytic={}, finite_difference={}",
+            gradients.dw.values[index],
+            finite_difference
+        );
+    }
+
+    #[test]
     fn test_adaptive_gate_and_tau_gradients_match_finite_difference() {
         let config = UnifiedConfig {
             dimension: 64,
