@@ -61,6 +61,7 @@ pub enum HeadroomError {
     CandidateRowOrderMismatch,
     OutcomeCountMismatch,
     SelectionEvaluationOverlap,
+    OutcomeSumOverflow,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -140,24 +141,27 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
         .position(|candidate| candidate == &design.baseline_candidate_id)
         .ok_or(HeadroomError::MissingBaselineCandidate)?;
 
-    let first_selection_scores: Vec<f64> = design
+    let first_selection_scores: Vec<i64> = design
         .selection
         .candidates
         .iter()
-        .map(|candidate| candidate.values[0] as f64)
+        .map(|candidate| candidate.values[0])
         .collect();
     let one_shot_index = argmax_canonical(&first_selection_scores);
     let one_shot = make_lane(design, one_shot_index, baseline_index, |candidate| {
         candidate.values[0] as f64
     });
 
-    let selection_means: Vec<f64> = design
+    // All candidates have the same continuation count, so comparing exact
+    // integer sums is equivalent to comparing their means and avoids f64
+    // ranking collapse for adjacent values above 2^53.
+    let selection_totals: Vec<i128> = design
         .selection
         .candidates
         .iter()
-        .map(|candidate| mean(&candidate.values))
-        .collect();
-    let repeated_index = argmax_canonical(&selection_means);
+        .map(|candidate| checked_sum(&candidate.values))
+        .collect::<Result<_, _>>()?;
+    let repeated_index = argmax_canonical(&selection_totals);
     let repeated_in_sample = make_lane(design, repeated_index, baseline_index, |candidate| {
         mean(&candidate.values)
     });
@@ -301,6 +305,7 @@ fn validate_batch(
         if row.values.len() != batch.continuation_ids.len() {
             return Err(HeadroomError::OutcomeCountMismatch);
         }
+        checked_sum(&row.values)?;
     }
     match &batch.coupling {
         CouplingDisposition::SharedInvariant {
@@ -326,7 +331,7 @@ fn require_identity(value: &str, field: &'static str) -> Result<(), HeadroomErro
 
 /// Candidate IDs must be in canonical lexical order before this function is
 /// called. Ties therefore resolve to the lexicographically first candidate.
-fn argmax_canonical(values: &[f64]) -> usize {
+fn argmax_canonical<T: PartialOrd>(values: &[T]) -> usize {
     let mut best = 0usize;
     for index in 1..values.len() {
         if values[index] > values[best] {
@@ -334,6 +339,14 @@ fn argmax_canonical(values: &[f64]) -> usize {
         }
     }
     best
+}
+
+fn checked_sum(values: &[i64]) -> Result<i128, HeadroomError> {
+    values.iter().try_fold(0_i128, |total, value| {
+        total
+            .checked_add(i128::from(*value))
+            .ok_or(HeadroomError::OutcomeSumOverflow)
+    })
 }
 
 fn mean(values: &[i64]) -> f64 {
@@ -560,6 +573,45 @@ mod tests {
             decomposition.interaction_fraction_of_candidate_distinguishing_variation,
             Some(0.0)
         );
+    }
+
+    #[test]
+    fn repeated_selection_uses_exact_integer_order_above_f64_integer_precision() {
+        let design = HeadroomDesign {
+            candidate_ids: vec![
+                "baseline".to_owned(),
+                "candidate-a".to_owned(),
+                "candidate-b".to_owned(),
+            ],
+            baseline_candidate_id: "baseline".to_owned(),
+            selection: batch(
+                &["s0", "s1"],
+                vec![
+                    candidate("baseline", &[0, 0]),
+                    candidate("candidate-a", &[9_007_199_254_740_992, 9_007_199_254_740_992]),
+                    candidate("candidate-b", &[9_007_199_254_740_993, 9_007_199_254_740_993]),
+                ],
+                shared(),
+            ),
+            evaluation: batch(
+                &["e0"],
+                vec![
+                    candidate("baseline", &[0]),
+                    candidate("candidate-a", &[1]),
+                    candidate("candidate-b", &[2]),
+                ],
+                shared(),
+            ),
+        };
+
+        let report = evaluate_headroom(&design).unwrap();
+        // Both adjacent large means round to the same f64 value, but exact
+        // integer sums correctly rank candidate-b above candidate-a.
+        assert_eq!(
+            report.repeated_in_sample_oracle.selected_candidate_id,
+            "candidate-b"
+        );
+        assert_eq!(report.heldout_repeated_oracle.heldout_gain, 2.0);
     }
 
     #[test]
