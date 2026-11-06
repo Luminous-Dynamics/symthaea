@@ -248,7 +248,12 @@ mod tests {
         );
         assert_ne!(candidate.candidate_model_digest, candidate.base_model_digest);
         assert_eq!(source.stats().state_norm, source_stats_before.state_norm);
+        assert_eq!(source.stats().running_mean, source_stats_before.running_mean);
         assert_eq!(candidate.neuron.stats().state_norm, 0.0);
+        assert_eq!(candidate.neuron.stats().running_mean, 0.0);
+        assert_eq!(candidate.neuron.stats().running_std, 1.0);
+        assert_eq!(candidate.neuron.stats().total_time, 0.0);
+        assert_eq!(candidate.neuron.stats().update_count, 0);
         let edited = candidate.neuron.parameter_group(HdcLtcParameterGroupId::GateBias);
         assert!(
             edited.values.iter().zip(original_values.iter()).any(|(a, b)| a != b)
