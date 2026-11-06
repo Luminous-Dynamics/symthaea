@@ -976,7 +976,7 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// The exact solution is:
     /// ```text
-    /// x(t+Δt) = x_∞ + (x(t) - x_∞) × exp(-Δt/τ)
+    /// x(t+Δt) = x_∞ + (x(t) - x_∞) × exp(-Δt * gate_rate / τ)
     /// ```
     ///
     /// With a learned positive rate multiplier g(x,u):
@@ -1221,7 +1221,8 @@ impl HdcLtcUnifiedNeuron {
 
     /// **PURE ANALYTICAL CLOSED-FORM EVOLUTION** - Single-step exponential decay
     ///
-    /// This method implements the exponential decay solution WITHOUT learned gating.
+    /// This method freezes the learned gate rate and state-dependent equilibrium
+    /// for one exponential step; it is not a nonlinear exact solution.
     ///
     /// ## Mathematical Basis
     ///
@@ -3100,6 +3101,78 @@ mod tests {
             output.norm() > 0.0,
             "Network should produce output after evolution"
         );
+    }
+
+    #[test]
+    fn test_zero_elapsed_time_is_identity_for_every_integrator() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: vec![2.0, 5.0],
+            fourier_amplitude: 0.03,
+            ..UnifiedConfig::default()
+        };
+        let input = ContinuousHV::random(64, 601);
+        let mut initial = HdcLtcUnifiedNeuron::new(config, 602);
+        initial.set_state(ContinuousHV::random(64, 603).scale(0.1));
+        let before = initial.state().clone();
+
+        assert_eq!(initial.compute_gating(&input, 0.0), 0.0);
+
+        let mut candidates = vec![
+            initial.clone(),
+            initial.clone(),
+            initial.clone(),
+            initial.clone(),
+            initial.clone(),
+            initial.clone(),
+        ];
+        candidates[0].evolve_closed_form(0.0, &input);
+        candidates[1].evolve_closed_form_fused(0.0, &input);
+        candidates[2].evolve_closed_form_exact(0.0, &input);
+        candidates[3].evolve_closed_form_iterative(0.0, &input);
+        candidates[4].evolve_rk4(0.0, &input);
+        candidates[5].evolve(0.0, &input);
+
+        for (index, candidate) in candidates.iter().enumerate() {
+            let max_delta = candidate
+                .state()
+                .values
+                .iter()
+                .zip(before.values.iter())
+                .map(|(after, before)| (after - before).abs())
+                .fold(0.0f32, f32::max);
+            assert!(
+                max_delta < 1e-7,
+                "integrator {index} changed the state at dt=0 by {max_delta}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_non_finite_and_negative_dt_are_sanitized_to_identity() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            604,
+        );
+        let input = ContinuousHV::random(64, 605);
+        neuron.set_state(ContinuousHV::random(64, 606).scale(0.1));
+        let before = neuron.state().clone();
+
+        for dt in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -0.1] {
+            neuron.evolve_closed_form(dt, &input);
+            assert!(
+                neuron
+                    .state()
+                    .values
+                    .iter()
+                    .zip(before.values.iter())
+                    .all(|(after, before)| (after - before).abs() < 1e-7),
+                "invalid dt={dt} must not mutate state"
+            );
+        }
     }
 
     #[test]
