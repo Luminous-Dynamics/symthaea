@@ -283,17 +283,6 @@
       ],
       "oracle_cases": [
         {
-          "id": "REPRO-P01",
-          "kind": "reference_behavior",
-          "requirement_ids": [
-            "REPRO-01",
-            "REPRO-02"
-          ],
-          "scenario": "The declared baseline schedule reproducibly triggers the documented duplicate-effect or lost-acknowledgement defect.",
-          "expected_verifier_disposition": "accepted_candidate",
-          "why_spec_derived": "The known baseline reproducer is required for task validity; this is not a candidate solution result."
-        },
-        {
           "id": "REPRO-P02",
           "kind": "valid_repair_alternative",
           "requirement_ids": [
@@ -344,9 +333,44 @@
           "scenario": "The runner cannot expose the required durable state or crash boundary, so the oracle cannot determine whether the event was committed before acknowledgement.",
           "expected_verifier_disposition": "unresolved_not_scored",
           "why_spec_derived": "The requirement explicitly distinguishes missing observability from a candidate failure."
+        },
+        {
+          "id": "REPRO-P03",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "REPRO-03",
+            "REPRO-04",
+            "REPRO-05"
+          ],
+          "scenario": "An append-only event log with a deterministic projection checkpoint and replay-safe identity handling removes the defect while preserving all specified terminal outcomes.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The contract requires replay-safe durable effects and truthful terminal states, not a particular storage architecture."
         }
       ],
-      "unresolved_before_fixture": "Freeze the event schedule, durable-effect definition, acknowledgement boundary, storage assumptions, deterministic crash/restart instrumentation and protected invariants."
+      "unresolved_before_fixture": "Freeze the event schedule, durable-effect definition, acknowledgement boundary, storage assumptions, deterministic crash/restart instrumentation and protected invariants.",
+      "fixture_validity_controls": [
+        {
+          "id": "REPRO-F01",
+          "kind": "baseline_reproducer",
+          "expected_baseline_disposition": "fails_issue_specific_contract",
+          "description": "The frozen event/failure schedule deterministically triggers the documented baseline defect; no timing sleep is required.",
+          "status": "not_executed"
+        },
+        {
+          "id": "REPRO-F02",
+          "kind": "reference_patch",
+          "expected_baseline_disposition": "passes_issue_specific_contract",
+          "description": "A separately reviewed reference repair satisfies the entire frozen specification, not merely the one reproducing trace.",
+          "status": "not_authored"
+        },
+        {
+          "id": "REPRO-F03",
+          "kind": "empty_patch",
+          "expected_baseline_disposition": "fails_issue_specific_contract",
+          "description": "The unchanged baseline/empty patch does not satisfy the issue-specific contract.",
+          "status": "not_executed"
+        }
+      ]
     },
     {
       "candidate_key": "security-boundary",
