@@ -46,7 +46,14 @@ to be run on the pinned toolchain.
 
 ### Time-crystal foundation
 
-Existing component:
+Existing components:
+- The original `symthaea-fractal-time-lab::floquet_time_crystal` remains a
+  classical scalar period-two surrogate with an FFT subharmonic score.
+- A new `symthaea-fractal-time-lab::exact_floquet` module now implements exact
+  complex state-vector evolution for a finite open-boundary kicked-Ising chain,
+  with nearest-neighbour ZZ interactions, longitudinal fields and a global X
+  pulse. Its example compares interacting and noninteracting traces.
+
 - `symthaea-fractal-time-lab::floquet_time_crystal` is a classical, scalar,
   period-two surrogate with an FFT subharmonic score and an early/late
   persistence ratio.
