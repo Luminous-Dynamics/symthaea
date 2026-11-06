@@ -122,6 +122,8 @@ Exact type names and module placement are not normative unless later frozen in t
 
 **Canonical family:** `rust-types-traits`.  
 **Provisional difficulty:** Medium–high.  
+**Public source-only fixture:** [`benchmarks/ceb/public-development-fixtures/rust-async-trait-boundary-v0/`](../../benchmarks/ceb/public-development-fixtures/rust-async-trait-boundary-v0/). The three-crate workspace has eight files and is not compiled, tested or executed; it has no task manifest, reference patch, grader, Cargo.lock or admission status.
+
 **Synthetic workspace outline:**
 
 ```text
@@ -537,7 +539,7 @@ No new CEB lane, primary metric, score, receipt, task schema, task registry, tru
 |---|---|
 | Six candidate specifications authored | Design-only |
 | Exact mapping to #10617 fault-family labels | Confirmed one-to-one against the canonical six family IDs; no sampling slots assigned |
-| Public Rust source fixtures | One 10-file, four-crate API-migration workspace; source-only, not compiled or executed |
+| Public Rust source fixtures | Two workspaces: 10-file/four-crate API migration and 8-file/three-crate async trait boundary; source-only, neither compiled or executed |
 | Reference patches | Not created |
 | Independent grader implementations | Not created |
 | Oracle case blueprints | 37 machine-readable cases across 37 requirements; no executable oracle or test suite |
