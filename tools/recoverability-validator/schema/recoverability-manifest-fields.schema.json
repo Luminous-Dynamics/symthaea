@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/recoverability-manifest-fields.schema.json",
+  "title": "Symthaea Recoverability Manifest Fields v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "manifest_id",
+    "generation_id",
+    "corpus_snapshot_sha256",
+    "search_surface_sha256",
+    "route_policy_sha256",
+    "surface_state",
+    "start_node_ref",
+    "max_route_cost",
+    "budget_unit",
+    "nodes",
+    "edges",
+    "evidence_units"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_recoverability_manifest.v1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "generation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "corpus_snapshot_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "search_surface_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "route_policy_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "surface_state": {
+      "enum": [
+        "frozen_observed",
+        "partial",
+        "unknown"
+      ]
+    },
+    "start_node_ref": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "max_route_cost": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "budget_unit": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_ref"
+        ],
+        "properties": {
+          "node_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 50000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edge_ref",
+          "from_node_ref",
+          "to_node_ref",
+          "operation",
+          "cost"
+        ],
+        "properties": {
+          "edge_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "from_node_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "to_node_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "operation": {
+            "enum": [
+              "initial_retrieval",
+              "query_reformulation",
+              "post_reformulation_retrieval",
+              "open_document",
+              "follow_link",
+              "open_table_of_contents",
+              "pagination",
+              "in_document_find"
+            ]
+          },
+          "cost": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "evidence_units": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_unit_id",
+          "target_node_ref",
+          "artifact_sha256",
+          "source_family_ref",
+          "artifact_availability"
+        ],
+        "properties": {
+          "evidence_unit_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "target_node_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "artifact_sha256": {
+            "$ref": "#/$defs/digest"
+          },
+          "source_family_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "artifact_availability": {
+            "enum": [
+              "present_pinned",
+              "unavailable",
+              "unknown"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "not": {
+        "const": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}
