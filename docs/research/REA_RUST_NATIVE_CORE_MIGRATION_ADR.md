@@ -1246,3 +1246,16 @@ Prospective targets—not results—are 100% disposition accuracy on the finite 
 ### Claim ceiling
 
 Passing this benchmark qualifies only the named predicates, rules, source corpus, dependency knowledge and scopes. It does not show that evidence is complete, that undisclosed dependencies are absent, that an issuer is honest or that software is safe.
+
+
+### Implementation refinement and ownership boundaries — 2026-11-06
+
+The first implementation is draft [#10665](https://github.com/Luminous-Dynamics/symthaea/pull/10665). Its only positive rule remains exact provider-reported observation under a matching subject/operation/represented-environment scope. The claim request and result use distinct versioned schemas. The result binds the canonical full request digest, asserted value, source predicate, ordered premise IDs, assumptions, premise assessments, missing references, unmet obligations and claim ceiling. Duplicate raw JSON keys and missing required request fields are rejected.
+
+The evaluator does not own adjacent domain semantics:
+- #2270 remains the authority-free cybersecurity claim-kind and transition contract; REA observation support does not promote vulnerability/compromise/control claim kinds.
+- #10600 owns lifecycle-faithful target-time/knowledge-time validity, supersession and stale/conflict answer actions. REA Evidence v1 timestamps do not establish these temporal claims.
+- #10630 owns evidence retain/invalidate/revalidate decisions across repository evolution.
+- #6283 owns measurement validity, uncertainty, dependence and generalization principles.
+
+The focused workflow was expanded to watch `src/rea_compat/**`; without this path, edits to nested claim modules could miss the dedicated REA Evidence Core workflow. Exact-head validation remains a separate requirement: formatter failures have been corrected, but no final test/Clippy pass is claimed until the updated exact head completes the workflow.
