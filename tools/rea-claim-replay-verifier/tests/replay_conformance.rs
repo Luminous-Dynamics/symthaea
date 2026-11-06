@@ -358,7 +358,3 @@ fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
 }
-
-
-
-}
