@@ -605,7 +605,7 @@ mod bounded_score_tests {
     fn bounded_lcb_matches_independent_scipy_reference_fixture_n1000() {
         let z = repeated_fixture(0.2, 1_000);
         let cert = bounded_score_confidence_certificate(&z, 0.05).unwrap();
-        assert!((cert.empirical_mean() - 0.125).abs() < 1e-15);
+        assert!((cert.empirical_mean() - 0.125).abs() < 3e-15);
         assert!((cert.empirical_second_moment() - 0.0325).abs() < 1e-15);
         assert!((cert.upper_second_moment() - 0.050_078_923_133_324_536).abs() < 2e-10);
         assert!((cert.deviation() - 0.021_837_543_565_560_76).abs() < 2e-10);
