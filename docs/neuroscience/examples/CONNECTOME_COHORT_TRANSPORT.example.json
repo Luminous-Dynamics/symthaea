@@ -22,8 +22,11 @@
       "WT-LOCKBOX-01",
       "UNC31-LOCKBOX-01"
     ],
-    "split_sha256": "4319e21e5b6c066f5390b994b29e36d12880d62bbea8c84e2119bb83716c30cb",
-    "lockbox_frozen_before_prediction": true
+    "split_sha256": "3720a6de7af2a47ed63fca4c6b6310d4b08bb406058f5c615963a22ca8ade03c",
+    "lockbox_frozen_before_prediction": true,
+    "calibration_animal_ids": [
+      "WT-CAL-01"
+    ]
   },
   "animals": [
     {
@@ -45,6 +48,11 @@
       "animal_id": "UNC31-LOCKBOX-01",
       "condition_id": "UNC31_MUTANT",
       "cohort_role": "LOCKBOX"
+    },
+    {
+      "animal_id": "WT-CAL-01",
+      "condition_id": "WT_BACKGROUND",
+      "cohort_role": "CALIBRATION"
     }
   ],
   "pairs": [
@@ -155,7 +163,7 @@
       "model_id": "anatomy-only",
       "model_kind": "ANATOMY_ONLY",
       "implementation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-      "training_manifest_sha256": "cd89f8ebae9496c2502c659dcc32d41c3842084c2579ff9e7d341c686acf0ec3",
+      "training_manifest_sha256": "a8b0f62ed891262789547ab8d9730f48951ad3a65e2d9e787bddcdd8066e85f7",
       "training_animal_ids": [
         "WT-TRAIN-01"
       ],
@@ -170,13 +178,17 @@
           "support_basis": "MECHANISTIC_INVARIANCE_ASSUMPTION",
           "support_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         }
-      ]
+      ],
+      "calibration_method": "NONE",
+      "calibration_animal_ids": [],
+      "calibration_manifest_sha256": "60bfd4001fb10cc239701e0929c19a41fe8d4db79f7090338e4d131f0b99947a",
+      "calibration_receipt_sha256": null
     },
     {
       "model_id": "state-aware",
       "model_kind": "STATE_HISTORY_AWARE",
       "implementation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "training_manifest_sha256": "4930af4887ff496286b1b6a6e4ffc5278804456c8786499d9063eb1922db9dc1",
+      "training_manifest_sha256": "d9bc2b2c3e6871c11ad98ba1e7b24587b7d19209b4020a8cfeaf00748c1e9df2",
       "training_animal_ids": [
         "WT-TRAIN-01"
       ],
@@ -186,7 +198,13 @@
           "support_basis": "TRAIN_OBSERVED",
           "support_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
         }
-      ]
+      ],
+      "calibration_method": "ISOTONIC_PLUS_SPLIT_CONFORMAL",
+      "calibration_animal_ids": [
+        "WT-CAL-01"
+      ],
+      "calibration_manifest_sha256": "3929641b696d92ae360efe33e5a476794ed929d1f40eac0fef5482315e3892f0",
+      "calibration_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
     }
   ],
   "predictions": [
