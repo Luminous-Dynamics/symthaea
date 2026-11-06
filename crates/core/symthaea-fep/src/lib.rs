@@ -138,6 +138,7 @@
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
 pub mod bayesian_model_reduction;
+pub mod dirichlet_model_reduction;
 mod agent;
 mod bridge;
 pub mod free_energy;
@@ -167,6 +168,12 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use dirichlet_model_reduction::{
+    DirichletBayesianModelReductionError, DirichletBayesianModelReductionResult,
+    DirichletConcentrationTensor, ReducedDirichletModelEvidence,
+    ReducedDirichletModelHypothesis, reduce_dirichlet_models,
+};
 
 pub use hierarchical_information_gain::{
     EpistemicLevel, HierarchicalActionInformationGain, HierarchicalHypothesis,
