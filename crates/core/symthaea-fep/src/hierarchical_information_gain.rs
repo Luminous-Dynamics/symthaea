@@ -226,9 +226,7 @@ pub fn compute_hierarchical_information_gains(
 ) -> Result<Vec<HierarchicalActionInformationGain>, HierarchicalInformationGainError> {
     let (action_count, outcome_count) = validate_hypotheses(hypotheses)?;
     (0..action_count)
-        .map(|action_index| {
-            compute_for_action(hypotheses, action_index, outcome_count)
-        })
+        .map(|action_index| compute_for_action(hypotheses, action_index, outcome_count))
         .collect()
 }
 
@@ -299,9 +297,7 @@ fn compute_for_action(
     let mut expected_state_entropy = 0.0;
     let mut expected_joint_entropy = 0.0;
 
-    for (outcome_index, outcome_probability) in
-        outcome_probabilities.iter().copied().enumerate()
-    {
+    for (outcome_index, outcome_probability) in outcome_probabilities.iter().copied().enumerate() {
         if outcome_probability <= 0.0 {
             continue;
         }
@@ -338,8 +334,7 @@ fn compute_for_action(
     let joint_gain = prior_joint_entropy - expected_joint_entropy;
 
     let minimum_component = model_gain.min(parameter_gain).min(state_gain);
-    let chain_rule_error =
-        (joint_gain - (model_gain + parameter_gain + state_gain)).abs();
+    let chain_rule_error = (joint_gain - (model_gain + parameter_gain + state_gain)).abs();
 
     if chain_rule_error > NUMERICAL_TOLERANCE || minimum_component < -NUMERICAL_TOLERANCE {
         return Err(HierarchicalInformationGainError::NumericalInvariant {
@@ -408,9 +403,7 @@ fn validate_hypotheses(
         .map(|hypothesis| hypothesis.prior_probability)
         .sum::<f64>();
     if (prior_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(HierarchicalInformationGainError::PriorMassNotNormalized {
-            sum: prior_sum,
-        });
+        return Err(HierarchicalInformationGainError::PriorMassNotNormalized { sum: prior_sum });
     }
 
     let action_count = hypotheses[0].outcome_probabilities_by_action.len();
@@ -420,9 +413,7 @@ fn validate_hypotheses(
     let outcome_count = hypotheses[0].outcome_probabilities_by_action[0].len();
     for action_index in 0..action_count {
         if hypotheses[0].outcome_probabilities_by_action[action_index].is_empty() {
-            return Err(HierarchicalInformationGainError::EmptyOutcomeSet {
-                action_index,
-            });
+            return Err(HierarchicalInformationGainError::EmptyOutcomeSet { action_index });
         }
     }
 
@@ -470,10 +461,7 @@ fn validate_hypotheses(
     Ok((action_count, outcome_count))
 }
 
-fn conditional_model_entropy(
-    hypotheses: &[HierarchicalHypothesis],
-    weights: &[f64],
-) -> f64 {
+fn conditional_model_entropy(hypotheses: &[HierarchicalHypothesis], weights: &[f64]) -> f64 {
     let mut model_mass = BTreeMap::<&str, f64>::new();
     for (hypothesis, weight) in hypotheses.iter().zip(weights.iter().copied()) {
         *model_mass.entry(hypothesis.model_id.as_str()).or_default() += weight;
@@ -481,10 +469,7 @@ fn conditional_model_entropy(
     entropy(&model_mass.into_values().collect::<Vec<_>>())
 }
 
-fn conditional_parameter_entropy(
-    hypotheses: &[HierarchicalHypothesis],
-    weights: &[f64],
-) -> f64 {
+fn conditional_parameter_entropy(hypotheses: &[HierarchicalHypothesis], weights: &[f64]) -> f64 {
     let mut model_mass = BTreeMap::<&str, f64>::new();
     let mut parameter_mass = BTreeMap::<(&str, &str), f64>::new();
     for (hypothesis, weight) in hypotheses.iter().zip(weights.iter().copied()) {
@@ -508,10 +493,7 @@ fn conditional_parameter_entropy(
     value
 }
 
-fn conditional_state_entropy(
-    hypotheses: &[HierarchicalHypothesis],
-    weights: &[f64],
-) -> f64 {
+fn conditional_state_entropy(hypotheses: &[HierarchicalHypothesis], weights: &[f64]) -> f64 {
     let mut parent_mass = BTreeMap::<(&str, &str), f64>::new();
     let mut state_mass = BTreeMap::<(&str, &str, &str), f64>::new();
     for (hypothesis, weight) in hypotheses.iter().zip(weights.iter().copied()) {
@@ -585,7 +567,10 @@ mod tests {
                         state_id: format!("s{state}"),
                         prior_probability: 1.0 / total as f64,
                         outcome_probabilities_by_action: vec![
-                            vec![1.0 / outcome_count as f64; outcome_count];
+                            vec![
+                                1.0 / outcome_count as f64;
+                                outcome_count
+                            ];
                             action_count
                         ],
                     });
@@ -628,8 +613,11 @@ mod tests {
     fn parameter_information_is_separate_from_model_information() {
         let mut hypotheses = uniform_joint_hypotheses(1, 2, 1, 1, 2);
         for (index, hypothesis) in hypotheses.iter_mut().enumerate() {
-            hypothesis.outcome_probabilities_by_action[0] =
-                if index == 0 { vec![1.0, 0.0] } else { vec![0.0, 1.0] };
+            hypothesis.outcome_probabilities_by_action[0] = if index == 0 {
+                vec![1.0, 0.0]
+            } else {
+                vec![0.0, 1.0]
+            };
         }
         let gain = compute_hierarchical_information_gain(&hypotheses, 0).expect("gain");
         assert_eq!(gain.model_information_gain_nats, 0.0);
@@ -641,8 +629,11 @@ mod tests {
     fn state_information_is_separate_from_model_and_parameter_information() {
         let mut hypotheses = uniform_joint_hypotheses(1, 1, 2, 1, 2);
         for (index, hypothesis) in hypotheses.iter_mut().enumerate() {
-            hypothesis.outcome_probabilities_by_action[0] =
-                if index == 0 { vec![1.0, 0.0] } else { vec![0.0, 1.0] };
+            hypothesis.outcome_probabilities_by_action[0] = if index == 0 {
+                vec![1.0, 0.0]
+            } else {
+                vec![0.0, 1.0]
+            };
         }
         let gain = compute_hierarchical_information_gain(&hypotheses, 0).expect("gain");
         assert_eq!(gain.model_information_gain_nats, 0.0);
@@ -654,8 +645,11 @@ mod tests {
     fn model_information_is_separate_from_parameter_and_state_information() {
         let mut hypotheses = uniform_joint_hypotheses(2, 1, 1, 1, 2);
         for (index, hypothesis) in hypotheses.iter_mut().enumerate() {
-            hypothesis.outcome_probabilities_by_action[0] =
-                if index == 0 { vec![1.0, 0.0] } else { vec![0.0, 1.0] };
+            hypothesis.outcome_probabilities_by_action[0] = if index == 0 {
+                vec![1.0, 0.0]
+            } else {
+                vec![0.0, 1.0]
+            };
         }
         let gain = compute_hierarchical_information_gain(&hypotheses, 0).expect("gain");
         assert!((gain.model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10);
