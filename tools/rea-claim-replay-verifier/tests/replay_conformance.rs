@@ -57,8 +57,7 @@ fn frozen_oracle_corpus_has_independent_expected_labels() {
         "evidence-id-marked-assessed-and-missing",
     ];
     assert_eq!(
-        actual_ids,
-        expected_ids,
+        actual_ids, expected_ids,
         "the frozen 23-case oracle ID set and order are part of the public contract"
     );
 }
@@ -315,7 +314,10 @@ fn changed_request_cannot_reuse_an_old_result() {
 #[test]
 fn duplicate_json_keys_are_rejected_recursively_in_claims_and_results() {
     assert_eq!(
-        oracle_label("duplicate-key-in-nested-asserted-value", "expected_replay_outcome"),
+        oracle_label(
+            "duplicate-key-in-nested-asserted-value",
+            "expected_replay_outcome"
+        ),
         "invalid_input"
     );
     let raw_claim = br#"{
@@ -349,7 +351,10 @@ fn duplicate_json_keys_are_rejected_recursively_in_claims_and_results() {
 #[test]
 fn omitted_nullable_result_field_is_not_silently_defaulted() {
     assert_eq!(
-        oracle_label("missing-nullable-result-provider-version", "expected_replay_outcome"),
+        oracle_label(
+            "missing-nullable-result-provider-version",
+            "expected_replay_outcome"
+        ),
         "invalid_input"
     );
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
@@ -512,7 +517,10 @@ fn duplicate_evidence_input_is_rejected_even_when_both_records_are_valid() {
 #[test]
 fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
     assert_eq!(
-        oracle_label("jcs-equivalent-result-reencoding", "expected_replay_outcome"),
+        oracle_label(
+            "jcs-equivalent-result-reencoding",
+            "expected_replay_outcome"
+        ),
         "replay_match"
     );
     let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
