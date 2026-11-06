@@ -1,0 +1,673 @@
+{
+  "format_id": "CEB-RUST-CANDIDATE-ORACLE-TRACEABILITY",
+  "version": "0.1.0",
+  "created_on": "2026-11-06",
+  "status": "public_development_design_only",
+  "official_benchmark_name": "Computational Engineering Bench",
+  "canonical_sampling_sources": [
+    "benchmarks/ceb/rust-balanced-sampling.v0.json",
+    "benchmarks/ceb/rust-pilot-preregistration.v0.json"
+  ],
+  "sampling_source_branch": "research/ceb-balanced-task-sampling-v0-2026-11-05",
+  "intended_use": "Requirement-to-oracle authoring aid for six public Rust candidate themes. This document is not a task registry, task manifest, run receipt, executable oracle, or admission record.",
+  "claim_boundary": {
+    "task_ids_assigned": false,
+    "repository_slots_assigned": false,
+    "repository_identities_assigned": false,
+    "development_or_holdout_partition_assigned": false,
+    "difficulty_labels_assigned": false,
+    "fixtures_created": false,
+    "reference_patches_created": false,
+    "graders_implemented": false,
+    "candidate_execution_performed": false,
+    "task_admission_claimed": false,
+    "sealed_holdout_claimed": false,
+    "performance_result_claimed": false
+  },
+  "oracle_semantics": {
+    "accepted_candidate": "The candidate implementation satisfies every cited normative requirement for that case.",
+    "rejected_candidate": "The candidate implementation violates at least one cited normative requirement.",
+    "unresolved_not_scored": "The expected behavior cannot be adjudicated from the current frozen specification or required observation is unavailable; this is not automatically a candidate failure.",
+    "rules": [
+      "Every oracle case cites one or more normative requirement IDs.",
+      "A valid alternative implementation must be accepted even when its source representation differs from the reference implementation.",
+      "A negative case must violate an explicit requirement; hidden tests may instantiate a disclosed requirement but may not add one.",
+      "Reference-patch acceptance and empty-patch rejection are eventual admission controls owned by the canonical task-admission contract, not results asserted by this document.",
+      "False accepts and false rejects must be reported separately when a qualified oracle and execution environment eventually exist.",
+      "Public development material is permanently ineligible for sealed-holdout status."
+    ]
+  },
+  "candidates": [
+    {
+      "candidate_key": "api-migration",
+      "title": "Cross-crate API and trait migration",
+      "family_id": "multi-crate-api-regression",
+      "mapping_rationale": "The decisive failure is a public API change that breaks downstream crate consumers or compatibility paths across a workspace boundary.",
+      "difficulty_estimation": "medium_provisional_not_assigned",
+      "requirements": [
+        {
+          "id": "API-01",
+          "statement": "Malformed input is represented by a typed error result; the implementation does not panic or fabricate a success value."
+        },
+        {
+          "id": "API-02",
+          "statement": "The documented compatibility adapter remains callable and preserves its specified behavior."
+        },
+        {
+          "id": "API-03",
+          "statement": "Every in-scope consumer uses the normative API contract; no stale signature remains."
+        },
+        {
+          "id": "API-04",
+          "statement": "Callers can distinguish every error class that the specification declares observable."
+        },
+        {
+          "id": "API-05",
+          "statement": "Valid legacy inputs preserve the specified semantic result."
+        },
+        {
+          "id": "API-06",
+          "statement": "Deleting a public item, consumer, feature, test, or documented behavior is not an acceptable substitute for migration."
+        }
+      ],
+      "oracle_cases": [
+        {
+          "id": "API-P01",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "API-02",
+            "API-05"
+          ],
+          "scenario": "A wrapper-based compatibility adapter delegates to the new API and preserves all specified legacy input/output semantics.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The requirements specify observable compatibility behavior, not one required implementation shape."
+        },
+        {
+          "id": "API-P02",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "API-01",
+            "API-04"
+          ],
+          "scenario": "A parser-internal error type is translated into a stable public error type while retaining every required error distinction.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The contract requires typed observable error classes but does not require one shared enum definition."
+        },
+        {
+          "id": "API-N01",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "API-03"
+          ],
+          "scenario": "The producer crate changes its public signature but one in-scope downstream crate still calls the stale signature.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "API-03 explicitly requires all in-scope consumers to use the normative contract."
+        },
+        {
+          "id": "API-N02",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "API-01",
+            "API-04"
+          ],
+          "scenario": "All parse failures become None or a generic string, erasing error distinctions required by the specification.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The implementation violates the typed failure and observable error-class requirements."
+        },
+        {
+          "id": "API-N03",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "API-06"
+          ],
+          "scenario": "The patch deletes the compatibility adapter or its documented consumer so the new API compiles.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "Deleting required compatibility surface is explicitly prohibited."
+        },
+        {
+          "id": "API-C01",
+          "kind": "required_composition",
+          "requirement_ids": [
+            "API-01",
+            "API-02",
+            "API-04",
+            "API-05"
+          ],
+          "scenario": "A valid legacy request succeeds through the compatibility adapter after migration, while a malformed request produces the correct typed error through both entry points.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The composition case exercises compatibility and typed errors together, both explicitly required."
+        }
+      ],
+      "unresolved_before_fixture": "Freeze exact public items, supported feature combinations, compatibility window, Rust toolchain and the set of error distinctions observable to downstream callers."
+    },
+    {
+      "candidate_key": "trait-async",
+      "title": "Async trait/API bounds and object-safe adapter",
+      "family_id": "rust-types-traits",
+      "mapping_rationale": "The decisive correctness surface is Rust type-system behavior: object safety, trait bounds, future sendability, associated types and borrowed lifetimes.",
+      "difficulty_estimation": "medium_high_provisional_not_assigned",
+      "requirements": [
+        {
+          "id": "TRAIT-01",
+          "statement": "The public async service contract is callable through the trait-object form required by the specification."
+        },
+        {
+          "id": "TRAIT-02",
+          "statement": "The returned future satisfies the declared Send bound across the target executor boundary."
+        },
+        {
+          "id": "TRAIT-03",
+          "statement": "The future may borrow the service instance for its declared lifetime; no undocumented 'static bound is imposed."
+        },
+        {
+          "id": "TRAIT-04",
+          "statement": "Success and error types preserve all required associated-type and error semantics."
+        },
+        {
+          "id": "TRAIT-05",
+          "statement": "All in-scope generic and trait-object consumers use the same normative contract."
+        },
+        {
+          "id": "TRAIT-06",
+          "statement": "Boxing, pinning, or macro expansion may change representation but not specified result, error, or cancellation behavior."
+        }
+      ],
+      "oracle_cases": [
+        {
+          "id": "TRAIT-P01",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "TRAIT-01",
+            "TRAIT-02",
+            "TRAIT-03",
+            "TRAIT-04",
+            "TRAIT-05"
+          ],
+          "scenario": "An explicit object-safe method returns a pinned boxed Send future whose lifetime is tied to the borrowed service instance.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "This is one representation satisfying the stated type and behavior contract."
+        },
+        {
+          "id": "TRAIT-P02",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "TRAIT-01",
+            "TRAIT-02",
+            "TRAIT-03",
+            "TRAIT-04",
+            "TRAIT-05",
+            "TRAIT-06"
+          ],
+          "scenario": "An approved async-trait transformation provides the same object-safe, Send, borrowed-lifetime and error behavior.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The specification fixes the observable contract, not a particular macro or source spelling."
+        },
+        {
+          "id": "TRAIT-N01",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "TRAIT-02"
+          ],
+          "scenario": "A future captures a non-Send value and cannot cross the required executor boundary.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The candidate violates the explicit Send requirement."
+        },
+        {
+          "id": "TRAIT-N02",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "TRAIT-03"
+          ],
+          "scenario": "The implementation adds an unnecessary 'static bound and rejects valid borrowed service implementations.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The requirement permits a future to borrow the service for its declared lifetime."
+        },
+        {
+          "id": "TRAIT-N03",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "TRAIT-01",
+            "TRAIT-05"
+          ],
+          "scenario": "Generic consumers compile but the required trait-object consumer cannot invoke the service.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The public trait-object call path is explicitly required."
+        },
+        {
+          "id": "TRAIT-C01",
+          "kind": "required_composition",
+          "requirement_ids": [
+            "TRAIT-01",
+            "TRAIT-02",
+            "TRAIT-03",
+            "TRAIT-04"
+          ],
+          "scenario": "A borrowed service is called through the required trait-object path on a Send executor; the future is Send, preserves typed errors and ends the borrow at the correct lifetime.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "This composes object safety, Send, lifetime and error requirements."
+        }
+      ],
+      "unresolved_before_fixture": "Freeze the public trait signature, executor, macro dependency policy, MSRV, target triples, object-safety form and permitted lifetime relationships."
+    },
+    {
+      "candidate_key": "issue-reproduction",
+      "title": "Deterministic reproduction of an event-processing defect",
+      "family_id": "issue-reproduction-debugging",
+      "mapping_rationale": "The task is centered on reproducing a bounded stateful failure, isolating its root cause and demonstrating that the repair removes the reproduced defect without collateral regression.",
+      "difficulty_estimation": "high_provisional_not_assigned",
+      "requirements": [
+        {
+          "id": "REPRO-01",
+          "statement": "The supplied baseline defect is triggered by a deterministic, disclosed event/failure schedule rather than timing luck."
+        },
+        {
+          "id": "REPRO-02",
+          "statement": "The reproduction identifies the triggering preconditions and the observable incorrect state transition."
+        },
+        {
+          "id": "REPRO-03",
+          "statement": "The repair addresses the causal defect, not merely the displayed symptom or one fixed input trace."
+        },
+        {
+          "id": "REPRO-04",
+          "statement": "The repair preserves required behavior across the disclosed retry, replay and restart conditions."
+        },
+        {
+          "id": "REPRO-05",
+          "statement": "The repair preserves unrelated protected invariants and does not suppress errors or hide failed work."
+        },
+        {
+          "id": "REPRO-06",
+          "statement": "A failure to observe the required state because of unavailable instrumentation or infrastructure is unresolved, not a successful repair."
+        }
+      ],
+      "oracle_cases": [
+        {
+          "id": "REPRO-P01",
+          "kind": "reference_behavior",
+          "requirement_ids": [
+            "REPRO-01",
+            "REPRO-02"
+          ],
+          "scenario": "The declared baseline schedule reproducibly triggers the documented duplicate-effect or lost-acknowledgement defect.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The known baseline reproducer is required for task validity; this is not a candidate solution result."
+        },
+        {
+          "id": "REPRO-P02",
+          "kind": "valid_repair_alternative",
+          "requirement_ids": [
+            "REPRO-03",
+            "REPRO-04",
+            "REPRO-05"
+          ],
+          "scenario": "A transactional inbox/outbox or an equivalent atomic deduplication design removes the defect and preserves the declared invariants.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The requirements constrain observable durability and replay behavior, not a specific storage design."
+        },
+        {
+          "id": "REPRO-N01",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "REPRO-03"
+          ],
+          "scenario": "The repair adds a sleep or retry delay that makes the supplied trace pass without fixing the underlying race or state inconsistency.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "A timing workaround does not address the causal defect."
+        },
+        {
+          "id": "REPRO-N02",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "REPRO-04"
+          ],
+          "scenario": "The repair handles sequential duplicate delivery but fails when the same event is replayed after a restart.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "Restart replay is an explicitly stated condition."
+        },
+        {
+          "id": "REPRO-N03",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "REPRO-05"
+          ],
+          "scenario": "The repair makes the reproducer disappear by acknowledging all events as successful while silently dropping failed work.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The declared terminal outcome and protected-work invariants must remain truthful."
+        },
+        {
+          "id": "REPRO-U01",
+          "kind": "unresolved_control",
+          "requirement_ids": [
+            "REPRO-06"
+          ],
+          "scenario": "The runner cannot expose the required durable state or crash boundary, so the oracle cannot determine whether the event was committed before acknowledgement.",
+          "expected_verifier_disposition": "unresolved_not_scored",
+          "why_spec_derived": "The requirement explicitly distinguishes missing observability from a candidate failure."
+        }
+      ],
+      "unresolved_before_fixture": "Freeze the event schedule, durable-effect definition, acknowledgement boundary, storage assumptions, deterministic crash/restart instrumentation and protected invariants."
+    },
+    {
+      "candidate_key": "security-boundary",
+      "title": "Workspace command and path boundary",
+      "family_id": "security-correctness",
+      "mapping_rationale": "The task's primary acceptance construct is preventing untrusted workspace content from crossing command-execution or filesystem-authority boundaries.",
+      "difficulty_estimation": "medium_high_provisional_not_assigned",
+      "requirements": [
+        {
+          "id": "SEC-01",
+          "statement": "Untrusted path and project content is never interpolated into a shell command string."
+        },
+        {
+          "id": "SEC-02",
+          "statement": "Executable selection and arguments are passed as separate values to the process API."
+        },
+        {
+          "id": "SEC-03",
+          "statement": "Filesystem operations remain confined to the declared workspace root."
+        },
+        {
+          "id": "SEC-04",
+          "statement": "Absolute paths, parent traversal and disallowed symlink escapes are rejected under the stated filesystem threat model."
+        },
+        {
+          "id": "SEC-05",
+          "statement": "Invalid paths and process failures produce explicit non-success outcomes rather than silent success."
+        },
+        {
+          "id": "SEC-06",
+          "statement": "The implementation does not broaden command or filesystem permissions to bypass an acceptance check."
+        }
+      ],
+      "oracle_cases": [
+        {
+          "id": "SEC-P01",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "SEC-01",
+            "SEC-02"
+          ],
+          "scenario": "A valid in-root path containing spaces and shell metacharacters is passed as a single data argument through direct argv.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The requirements prohibit shell interpretation, not legitimate data characters."
+        },
+        {
+          "id": "SEC-P02",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "SEC-03",
+            "SEC-04"
+          ],
+          "scenario": "A descriptor-relative or platform-specific safe-open implementation enforces the declared root boundary.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The requirement specifies containment behavior, not a required path API."
+        },
+        {
+          "id": "SEC-N01",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "SEC-01",
+            "SEC-02"
+          ],
+          "scenario": "Untrusted path content is concatenated into sh -c or another shell command string.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "This directly violates the no-shell-interpolation rule."
+        },
+        {
+          "id": "SEC-N02",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "SEC-03",
+            "SEC-04"
+          ],
+          "scenario": "A sibling-prefix path or symlink escape is accepted as inside the workspace.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The path is outside the declared authority boundary."
+        },
+        {
+          "id": "SEC-N03",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "SEC-05",
+            "SEC-06"
+          ],
+          "scenario": "All process errors are caught and converted to success, or an unrestricted shell is enabled to make the check pass.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The behavior hides failures or expands authority beyond the contract."
+        },
+        {
+          "id": "SEC-C01",
+          "kind": "required_composition",
+          "requirement_ids": [
+            "SEC-01",
+            "SEC-02",
+            "SEC-03",
+            "SEC-04"
+          ],
+          "scenario": "A legitimate in-root path containing metacharacters is handled as data, while a symlink resolving outside the root is rejected.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "This tests command/data separation and path authority together."
+        }
+      ],
+      "unresolved_before_fixture": "Pin OS and filesystem behavior, allowed executable policy, symlink race threat model, normalization rules and whether descriptor-relative operations are required."
+    },
+    {
+      "candidate_key": "feature-target-matrix",
+      "title": "Cargo feature and target composition",
+      "family_id": "feature-target-configuration",
+      "mapping_rationale": "The task is defined by the correctness of an explicitly declared matrix of Cargo feature combinations, target-specific dependencies and environment assumptions.",
+      "difficulty_estimation": "medium_high_provisional_not_assigned",
+      "requirements": [
+        {
+          "id": "CFG-01",
+          "statement": "Every supported feature combination is explicitly listed in the frozen task specification."
+        },
+        {
+          "id": "CFG-02",
+          "statement": "Each supported no-default-features configuration builds without importing default-only APIs."
+        },
+        {
+          "id": "CFG-03",
+          "statement": "Platform-specific dependencies and modules are gated for the declared supported targets."
+        },
+        {
+          "id": "CFG-04",
+          "statement": "Mutually exclusive features fail clearly or select the documented behavior; they do not silently choose an unintended backend."
+        },
+        {
+          "id": "CFG-05",
+          "statement": "Supported feature combinations preserve the required public protocol/API behavior."
+        },
+        {
+          "id": "CFG-06",
+          "statement": "The build does not rely on undeclared host packages, ambient environment variables or locally cached artifacts."
+        }
+      ],
+      "oracle_cases": [
+        {
+          "id": "CFG-P01",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "CFG-01",
+            "CFG-03",
+            "CFG-04"
+          ],
+          "scenario": "An explicit backend-selection module and target-specific dependency declarations satisfy every declared feature/target combination.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The contract specifies the supported matrix and behavior, not one Cargo.toml layout."
+        },
+        {
+          "id": "CFG-P02",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "CFG-02",
+            "CFG-05"
+          ],
+          "scenario": "A supported no-default build uses a small adapter boundary and preserves the required public API without enabling defaults.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The behavior and feature surface remain intact while implementation structure may vary."
+        },
+        {
+          "id": "CFG-N01",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "CFG-02"
+          ],
+          "scenario": "Only the default feature set builds; a declared supported no-default configuration references an unavailable symbol.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The no-default configuration is explicitly in the supported matrix."
+        },
+        {
+          "id": "CFG-N02",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "CFG-03"
+          ],
+          "scenario": "An unconditional module import requires a platform-specific dependency on a target where that dependency is unavailable.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The declared target support requires correct platform gating."
+        },
+        {
+          "id": "CFG-N03",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "CFG-04",
+            "CFG-05"
+          ],
+          "scenario": "Mutually exclusive backends both compile but the implementation silently selects an undocumented backend.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The behavior contradicts the explicitly specified conflict policy."
+        },
+        {
+          "id": "CFG-C01",
+          "kind": "required_composition",
+          "requirement_ids": [
+            "CFG-01",
+            "CFG-02",
+            "CFG-03",
+            "CFG-05",
+            "CFG-06"
+          ],
+          "scenario": "A supported no-default feature build on a non-primary target uses no undeclared host dependency and preserves the required protocol behavior.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The declared matrix requires this simultaneous feature, target and environment combination."
+        }
+      ],
+      "unresolved_before_fixture": "Freeze Rust toolchain, exact feature matrix, supported targets, optional dependency versions, cross-compilation environment and clean-build assumptions."
+    },
+    {
+      "candidate_key": "bounded-topk",
+      "title": "Exact streaming top-k under bounded resources",
+      "family_id": "performance-correctness",
+      "mapping_rationale": "The task requires exact semantics and a measured resource improvement under a frozen workload; speed cannot compensate for an incorrect result or manipulated measurement.",
+      "difficulty_estimation": "medium_high_provisional_not_assigned",
+      "requirements": [
+        {
+          "id": "TOPK-01",
+          "statement": "Results equal the exact top-k under the declared total ordering after every accepted update."
+        },
+        {
+          "id": "TOPK-02",
+          "statement": "Equal scores use the specified deterministic tie-breaker."
+        },
+        {
+          "id": "TOPK-03",
+          "statement": "Insert, update and remove operations update the ranking exactly once and do not retain stale entries."
+        },
+        {
+          "id": "TOPK-04",
+          "statement": "k=0, empty input, fewer than k elements and duplicate keys have explicit specified results."
+        },
+        {
+          "id": "TOPK-05",
+          "statement": "NaN, infinities and signed zero follow the declared numeric-domain policy."
+        },
+        {
+          "id": "TOPK-06",
+          "statement": "Time and memory satisfy the explicitly declared workload and resource bound."
+        },
+        {
+          "id": "TOPK-07",
+          "statement": "Caching is allowed only when contract-permitted and semantically correct for unseen in-scope inputs, invalidation, cold starts and resource limits."
+        }
+      ],
+      "oracle_cases": [
+        {
+          "id": "TOPK-P01",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "TOPK-01",
+            "TOPK-02",
+            "TOPK-03",
+            "TOPK-04"
+          ],
+          "scenario": "An indexed binary heap plus key-index map produces exact results and deterministic ties after all declared operations.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The implementation strategy is an alternative to the reference data structure and satisfies the stated semantics."
+        },
+        {
+          "id": "TOPK-P02",
+          "kind": "valid_alternative",
+          "requirement_ids": [
+            "TOPK-01",
+            "TOPK-02",
+            "TOPK-03",
+            "TOPK-04"
+          ],
+          "scenario": "An ordered tree structure plus key index produces the same exact top-k behavior.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The benchmark contract is semantic, not tied to heap internals."
+        },
+        {
+          "id": "TOPK-N01",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "TOPK-01",
+            "TOPK-03"
+          ],
+          "scenario": "A lazy heap keeps stale entries after updates/removals and returns an obsolete top-k member.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The current result must match the exact state after each operation."
+        },
+        {
+          "id": "TOPK-N02",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "TOPK-02",
+            "TOPK-04",
+            "TOPK-05"
+          ],
+          "scenario": "Tie ordering is nondeterministic or a boundary case such as k=0 is handled contrary to the declared numeric and boundary policy.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The candidate violates explicit tie/boundary semantics."
+        },
+        {
+          "id": "TOPK-N03",
+          "kind": "negative_near_miss",
+          "requirement_ids": [
+            "TOPK-06",
+            "TOPK-07"
+          ],
+          "scenario": "A fixed visible workload is memoized, but unseen in-scope values or invalidation cause incorrect results; reported speedup uses only the cached path.",
+          "expected_verifier_disposition": "rejected_candidate",
+          "why_spec_derived": "The behavior violates generalization and measurement integrity even if the visible input appears fast."
+        },
+        {
+          "id": "TOPK-C01",
+          "kind": "required_composition",
+          "requirement_ids": [
+            "TOPK-01",
+            "TOPK-02",
+            "TOPK-03",
+            "TOPK-04"
+          ],
+          "scenario": "An item at the k-boundary is updated, another item is removed and two remaining items tie; the result reflects all operations and the deterministic tie-breaker.",
+          "expected_verifier_disposition": "accepted_candidate",
+          "why_spec_derived": "The interaction combines the required update, removal and tie semantics."
+        }
+      ],
+      "unresolved_before_fixture": "Freeze key type, total ordering, numeric policy, tie-breaker, workload distribution, memory ceiling, hardware and measurement protocol."
+    }
+  ]
+}
