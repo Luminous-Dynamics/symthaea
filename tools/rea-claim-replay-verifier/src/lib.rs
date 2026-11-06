@@ -491,7 +491,7 @@ fn parse_result(bytes: &[u8]) -> Result<(ClaimEvaluation, Value), ReplayError> {
         )?;
     }
 
-    let result: ClaimEvaluation = serde_json::from_value(value).map_err(|error| {
+    let result: ClaimEvaluation = serde_json::from_value(value.clone()).map_err(|error| {
         ReplayError::new(
             ReplayErrorKind::InvalidResult,
             format!("claim evaluation result schema validation failed: {error}"),
