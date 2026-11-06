@@ -961,9 +961,9 @@ mod tests {
         assert_eq!(result.disposition, ClaimDisposition::Underdetermined);
         assert!(
             result
-                .unmet_obligations
+                .evidence_assessments
                 .iter()
-                .any(|item| item.contains("platform_version"))
+                .any(|item| item.reason.contains("platform_version"))
         );
     }
 
