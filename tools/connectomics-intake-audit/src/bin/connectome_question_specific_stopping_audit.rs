@@ -369,6 +369,11 @@ fn evaluate_case(case: &Case, frame: &SamplingFrame) -> Result<CaseResult, Strin
     require(valid_sha256(&case.dataset_revision_sha256), "dataset revision digest malformed")?;
     require(valid_sha256(&case.frame_coverage_receipt_sha256), "frame coverage receipt digest malformed")?;
     require(case.frame_coverage_status == "CLOSED" || case.frame_coverage_status == "INCOMPLETE", "unknown frame coverage status")?;
+    let coverage_receipt = sha256_text(&format!(
+        "coverage-v1\\n{}\\n{}\\n{}\\n{}\\n",
+        case.frame_id, case.frame_coverage_status, frame.candidate_frame_sha256, frame.source_frame_receipt_sha256
+    ));
+    require(case.frame_coverage_receipt_sha256 == coverage_receipt, "frame coverage receipt does not bind the declared status and source frame")?;
     require(case.confidence_level.is_finite() && case.confidence_level > 0.0 && case.confidence_level < 1.0, "confidence level is invalid")?;
     require(case.residual_query_flip_tolerance.is_finite() && case.residual_query_flip_tolerance > 0.0 && case.residual_query_flip_tolerance <= 1.0, "query-flip tolerance is invalid")?;
     let stats = validate_frame(frame)?;
