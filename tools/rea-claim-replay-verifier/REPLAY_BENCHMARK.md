@@ -6,7 +6,7 @@ The `rea-claim-replay-bench` binary is a development benchmark. It is not part o
 
 The runner constructs semantically valid synthetic REA Evidence records from the checked-in public fixture. It preserves the same subject, operation, predicate type and normalized result while assigning distinct provider identities and varying only the size of an irrelevant `raw_result` payload.
 
-It measures 12 independent workload cells:
+It measures three distinct assurance stages over 12 independent workload cells:
 
 - Evidence record count: 1, 4, 16 and 64.
 - `raw_result` payload bytes per record: 0, 65,536 and 1,048,576.
@@ -16,9 +16,10 @@ Every cell reports claim bytes, result bytes, aggregate Evidence bytes and maxim
 ## Timed operations
 
 1. **Evidence admission:** raw JSON parsing, duplicate-key rejection, schema validation and semantic Evidence ID verification for every raw record.
-2. **Independent replay:** full request/result parsing, raw Evidence verification, claim-scope/disposition derivation and complete serialized-result comparison.
+2. **Producer claim evaluation:** typed scope/disposition evaluation over already admitted `VerifiedEvidence` values. This measures the producer rule engine without raw JSON admission.
+3. **Independent replay:** full request/result parsing, raw Evidence verification, claim-scope/disposition derivation and complete serialized-result comparison.
 
-The production evaluator runs before timing, solely to create a valid serialized result for the replay checker. Producer evaluation time is therefore not included in either timed operation. Do not interpret the independent-replay measurement as total application latency including upstream provider execution or producer-side claim evaluation.
+The production evaluator runs once before timing to create a valid serialized result for the replay checker. That setup evaluation is excluded from timing; the separate producer-evaluation distribution measures repeated rule evaluation over the same pre-admitted `VerifiedEvidence` values. The admission distribution measures raw parse/schema/identity cost. Independent replay intentionally includes admission again, because a real replay consumer receives raw Evidence bytes. Do not add or subtract percentile values to infer a total latency; percentile distributions are not additive.
 
 Each cell performs three warmup iterations followed by the requested number of samples (default: 50). It reports nearest-rank p50/p95/p99, minimum and maximum nanoseconds. It emits one JSON receipt to stdout.
 
@@ -46,7 +47,7 @@ sha256sum rea-claim-replay-benchmark.json
 
 Use the generated lockfile as part of the receipt. Record the runner CPU model, physical/logical core count, memory, OS/kernel, concurrency and any CPU governor/container limits alongside the emitted JSON. The JSON includes schema version, package version, target OS/architecture, build profile, sample count, warmup count and workload byte sizes.
 
-Increase the sample count for publication-quality results; 50 samples provide only a preliminary p99 estimate. Run paired revisions on the same runner image and toolchain. Do not compare unrelated hardware or mix workload cells into a single average.
+Increase the sample count for publication-quality results; with 50 samples the nearest-rank p99 is effectively the maximum observation and is not a stable tail estimate. Use at least 1,000 samples for exploratory p99, and substantially more (plus independent process-level repetitions) for defensible tail estimates. Run paired revisions on the same runner image and toolchain. Do not compare unrelated hardware or mix workload cells into a single average.
 
 ## Interpretation and guardrails
 
