@@ -51,6 +51,10 @@ use symthaea_muse::cognitive_session::{CognitiveSessionConfig, run_sonata_cognit
 use symthaea_muse::piece_recipe::{
     DecisionDisposition, PieceRecipe, RendererRecipe, ReproductionGap,
 };
+use symthaea_muse::keeper_bundle::{
+    KEEPER_BUNDLE_LAYOUT_V2, KeeperBundleExpectedDigestsV1, KeeperBundleVerificationV1,
+    verify_published_keeper_bundle,
+};
 use symthaea_muse::sonata_intervention::{
     SonataReturnStrategy, generate_and_rank_sonata_return_with_model,
     learn_symbolic_outcomes_from_batch,
@@ -2976,6 +2980,8 @@ struct KeeperResponse {
     audio_key: Option<String>,
     recipe_sha256: Option<String>,
     score_sha256: Option<String>,
+    bundle_verification: Option<KeeperBundleVerificationV1>,
+    bundle_verification_sha256: Option<String>,
     genealogy: Option<symthaea_muse_protocol::GenealogyManifest>,
 }
 
@@ -3053,6 +3059,8 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
                 audio_key: None,
                 recipe_sha256: None,
                 score_sha256: Some(score_hash),
+                bundle_verification: None,
+                bundle_verification_sha256: None,
                 genealogy: None,
             })
             .into_response());
@@ -3072,30 +3080,39 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
 
     let recipe_bytes =
         serde_json::to_vec_pretty(&recipe).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let (bundle_path, midi_available) = persist_keeper_bundle(
+    let score_bytes =
+        serde_json::to_vec(&score).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let recipe_sha256 =
+        serialized_sha256(&recipe).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let score_sha256 = sha256_hex(&score_bytes);
+    let (bundle_path, midi_available, bundle_verification) = persist_keeper_bundle(
         &audio_key,
         &wav,
         &recipe_bytes,
-        &score,
+        &score_bytes,
+        &recipe_sha256,
         &spec,
         seed,
         &state,
         keeper_sequence,
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(|error| {
+        eprintln!("[muse_studio] keeper bundle read-back failed: {error}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    let bundle_verification_sha256 = bundle_verification
+        .receipt_sha256()
+        .map_err(|error| {
+            eprintln!("[muse_studio] keeper verification receipt hash failed: {error}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Genealogy is an enrichment, not a requirement -- a ledger failure
     // (missing store, sqlite error) must not block the keep the user asked
     // for. Every manifest allocated here is a `Root`: nothing upstream yet
     // tracks "this candidate was derived from kept piece X" (see
     // `symthaea_muse::genealogy`'s module docs).
-    let recipe_sha256 = serialized_sha256(&recipe).ok();
-    let score_sha256 = serialized_sha256(&score).ok();
     let genealogy = studio.genealogy.as_ref().and_then(|store| {
-        let Some(recipe_sha256) = recipe_sha256.as_deref() else {
-            eprintln!("[muse_studio] genealogy: could not hash recipe");
-            return None;
-        };
         let origin = symthaea_muse_protocol::GenealogyOrigin::MuseGenerated {
             seed,
             style_name: spec.name.clone(),
@@ -3103,8 +3120,8 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         match store.allocate_root(
             &origin,
             &audio_key,
-            recipe_sha256,
-            score_sha256.as_deref(),
+            &recipe_sha256,
+            Some(&score_sha256),
             &sha256_hex(&wav),
             unix_time_ms(),
         ) {
@@ -3133,10 +3150,12 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
         "novelty": novelty,
         "diversity_plan": diversity_plan,
         "audio_key": audio_key.clone(),
-        "artifact_layout": "keeper-directory-v1",
+        "artifact_layout": KEEPER_BUNDLE_LAYOUT_V2,
         "midi_available": midi_available,
         "genealogy_id": genealogy.as_ref().map(|m| m.id),
         "score_sha256": score_sha256.clone(),
+        "bundle_verification": bundle_verification,
+        "bundle_verification_sha256": bundle_verification_sha256,
         // Persisted so future Atlas reads don't depend on recompose
         // determinism across engine versions (MUSE_DIVERSITY_TRUTH_PLAN
         // Phase 3's "persist fingerprints at keep time"). Dimension count
@@ -3179,8 +3198,10 @@ fn keeper_sync(studio: &Studio, id: u64) -> Result<Response, StatusCode> {
     Ok(Json(KeeperResponse {
         already_kept: false,
         audio_key: Some(audio_key),
-        recipe_sha256,
-        score_sha256,
+        recipe_sha256: Some(recipe_sha256),
+        score_sha256: Some(score_sha256),
+        bundle_verification: Some(bundle_verification),
+        bundle_verification_sha256: Some(bundle_verification_sha256),
         genealogy,
     })
     .into_response())
