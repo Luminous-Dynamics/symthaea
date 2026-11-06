@@ -192,6 +192,7 @@ EXPECTED_CASE_IDS = {
     "BATTERY-SOC-RAINFLOW-001",
     "FIELD-SOURCE-CLOCK-ALIGNMENT-001",
     "MARKET-PRICE-IMPACT-001",
+    "MARKET-READINESS-GATE-001",
 }
 
 
@@ -346,6 +347,7 @@ def main() -> None:
     market_impact_kernel_path = root / "tools/sawem-market-reference/src/market_impact_attribution.rs"
     rule_applicability_kernel_path = root / "tools/sawem-market-reference/src/rule_applicability.rs"
     intraday_gate_kernel_path = root / "tools/sawem-market-reference/src/intraday_gate.rs"
+    market_readiness_kernel_path = root / "tools/sawem-market-reference/src/market_readiness.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
@@ -378,6 +380,7 @@ def main() -> None:
         market_impact_kernel_bytes = market_impact_kernel_path.read_bytes()
         rule_applicability_kernel_bytes = rule_applicability_kernel_path.read_bytes()
         intraday_gate_kernel_bytes = intraday_gate_kernel_path.read_bytes()
+        market_readiness_kernel_bytes = market_readiness_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
@@ -432,6 +435,8 @@ def main() -> None:
             + rule_applicability_kernel_bytes
             + b"\n"
             + intraday_gate_kernel_bytes
+            + b"\n"
+            + market_readiness_kernel_bytes
         ).decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
