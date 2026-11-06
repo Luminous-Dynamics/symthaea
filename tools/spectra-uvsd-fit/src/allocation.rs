@@ -14,7 +14,8 @@ use std::fmt;
 
 use super::ranking::{
     certify_epsilon_optimal_action, counterfactual_regret_upper_bound,
-    ActionRobustUtilityInterval, RobustSelectionCertificate, RobustSelectionStatus,
+    ActionRobustUtilityInterval, IndependentCounterfactualProjectionIndex,
+    RobustSelectionCertificate, RobustSelectionStatus,
 };
 use super::scenario::{RobustUtility, ScenarioDefinition};
 use super::score_bounds::{
@@ -573,11 +574,10 @@ fn compute_cell_priorities(
             .get(&action_interval.action_id)
             .copied()
             .unwrap_or(false);
-        let mut action_metrics = receipt
-            .metrics
-            .iter()
-            .filter(|metric| metric.action_id == action_interval.action_id)
-            .collect::<Vec<_>>();
+        let mut action_metrics = metrics_by_action
+            .get(&action_interval.action_id)
+            .cloned()
+            .unwrap_or_default();
         action_metrics.sort_by_key(|metric| metric.scenario_id);
 
         let tail_contributions = scenario_tail_contributions(
@@ -635,7 +635,25 @@ fn compute_decision_directed_cell_priorities(
             )
         })
         .collect();
+    let mut metrics_by_action: BTreeMap<u32, Vec<&super::score_bounds::ActionScenarioMetricBounds>> =
+        BTreeMap::new();
+    for metric in &receipt.metrics {
+        metrics_by_action
+            .entry(metric.action_id)
+            .or_default()
+            .push(metric);
+    }
     let mut priorities = Vec::with_capacity(receipt.metrics.len());
+    // Independent mode repeatedly changes only one action × scenario cell.
+    // Build one exact index and reuse all untouched action aggregates.
+    let independent_projection_index = if config.seed_mode == ReplicationSeedMode::IndependentPerCell {
+        Some(
+            IndependentCounterfactualProjectionIndex::new(receipt, config.robust_utility)
+                .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?,
+        )
+    } else {
+        None
+    };
     // For CRN, every candidate action in a scenario is the same atomic batch.
     // Cache its exact projection once per scenario instead of recomputing it A times.
     let mut crn_projection_cache =
@@ -676,6 +694,8 @@ fn compute_decision_directed_cell_priorities(
                             metric.scenario_id,
                             sample_count,
                             remaining_budget,
+                            None,
+                            None,
                         )?;
                         crn_projection_cache.insert(metric.scenario_id, projection);
                     }
@@ -688,6 +708,8 @@ fn compute_decision_directed_cell_priorities(
                         metric.scenario_id,
                         sample_count,
                         remaining_budget,
+                        independent_projection_index.as_ref(),
+                        Some(metric),
                     )?;
                 }
             }
@@ -715,6 +737,8 @@ fn project_decision_directed_batch(
     scenario_id: u16,
     sample_count: usize,
     remaining_budget: usize,
+    independent_projection_index: Option<&IndependentCounterfactualProjectionIndex>,
+    candidate_metric: Option<&super::score_bounds::ActionScenarioMetricBounds>,
 ) -> Result<(f64, f64, usize, f64), AdaptiveAllocationError> {
     let target_action_ids = match config.seed_mode {
         ReplicationSeedMode::IndependentPerCell => vec![candidate_action_id],
@@ -751,14 +775,26 @@ fn project_decision_directed_batch(
         .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
     let mut overrides = Vec::with_capacity(target_action_ids.len());
     for target_action_id in &target_action_ids {
-        let target_metric = receipt
-            .metrics
-            .iter()
-            .find(|candidate| {
-                candidate.action_id == *target_action_id
-                    && candidate.scenario_id == scenario_id
-            })
-            .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
+        let target_metric = match config.seed_mode {
+            ReplicationSeedMode::IndependentPerCell => {
+                let candidate = candidate_metric
+                    .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
+                if candidate.action_id != *target_action_id
+                    || candidate.scenario_id != scenario_id
+                {
+                    return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+                }
+                candidate
+            }
+            ReplicationSeedMode::CommonRandomNumbersWithinScenario => receipt
+                .metrics
+                .iter()
+                .find(|candidate| {
+                    candidate.action_id == *target_action_id
+                        && candidate.scenario_id == scenario_id
+                })
+                .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?,
+        };
         if target_metric.target_utility.sample_count != sample_count {
             return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
         }
@@ -776,12 +812,22 @@ fn project_decision_directed_batch(
         }
         overrides.push((*target_action_id, scenario_id, lower, upper));
     }
-    let projected_regret_upper_bound = counterfactual_regret_upper_bound(
-        receipt,
-        config.robust_utility,
-        &overrides,
-    )
-    .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?;
+    let projected_regret_upper_bound = match config.seed_mode {
+        ReplicationSeedMode::IndependentPerCell => {
+            if overrides.len() != 1 {
+                return Err(AdaptiveAllocationError::CounterfactualCertificateFailure);
+            }
+            let (action_id, scenario_id, lower, upper) = overrides[0];
+            independent_projection_index
+                .ok_or(AdaptiveAllocationError::CounterfactualCertificateFailure)?
+                .regret_upper_bound_with_override(action_id, scenario_id, lower, upper)
+                .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?
+        }
+        ReplicationSeedMode::CommonRandomNumbersWithinScenario => {
+            counterfactual_regret_upper_bound(receipt, config.robust_utility, &overrides)
+                .map_err(|_| AdaptiveAllocationError::CounterfactualCertificateFailure)?
+        }
+    };
     let certificate_gap_contraction =
         (certificate.regret_upper_bound - projected_regret_upper_bound).max(0.0);
     let projected_batch_cost = batch_count
@@ -1259,6 +1305,8 @@ mod tests {
                     scenario_id,
                     candidate.sample_count,
                     remaining_budget,
+                    None,
+                    None,
                 )
                 .unwrap();
                 assert_eq!(direct, cached_tuple);

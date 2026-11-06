@@ -326,6 +326,212 @@ pub fn certify_epsilon_optimal_action(
 /// callers must first verify the original score receipt and must never expose the
 /// returned value as a statistical guarantee. Point estimates and all untouched
 /// cells remain fixed; only the supplied utility endpoints are replaced.
+
+/// Reusable exact projection state for independent action × scenario updates.
+///
+/// The index preserves the production Maximin/CVaR aggregation and caches the
+/// best and runner-up action endpoints. A one-cell counterfactual therefore
+/// recomputes only the affected action's scenario aggregate; all other action
+/// intervals are reused. The full counterfactual function below remains the
+/// reference implementation and parity oracle.
+pub(crate) struct IndependentCounterfactualProjectionIndex {
+    robust_utility: RobustUtility,
+    scenario_values: BTreeMap<u32, Vec<(u16, f64, f64, f64, f64, f64)>>,
+    lower_order: Vec<(f64, u32)>,
+    upper_order: Vec<(f64, u32)>,
+}
+
+impl IndependentCounterfactualProjectionIndex {
+    pub(crate) fn new(
+        receipt: &ScoreBoundsReceipt,
+        robust_utility: RobustUtility,
+    ) -> Result<Self, RobustSelectionError> {
+        validate_scenario_weights(&receipt.scenarios)?;
+
+        let action_ids = receipt
+            .action_snapshot
+            .iter()
+            .map(|action| action.action_id)
+            .collect::<BTreeSet<_>>();
+        let scenario_ids = receipt
+            .scenarios
+            .iter()
+            .map(|scenario| scenario.scenario_id)
+            .collect::<BTreeSet<_>>();
+        if action_ids.is_empty()
+            || scenario_ids.is_empty()
+            || action_ids.len() != receipt.action_snapshot.len()
+            || scenario_ids.len() != receipt.scenarios.len()
+        {
+            return Err(RobustSelectionError::MissingActionOrScenarioSnapshot);
+        }
+
+        let mut utility_by_pair = BTreeMap::new();
+        for metric in &receipt.metrics {
+            if !action_ids.contains(&metric.action_id) {
+                return Err(RobustSelectionError::UnknownMetricAction);
+            }
+            if !scenario_ids.contains(&metric.scenario_id) {
+                return Err(RobustSelectionError::UnknownMetricScenario);
+            }
+            let utility = metric.target_utility;
+            if !utility.point_estimate.is_finite()
+                || !utility.lower_bound.is_finite()
+                || !utility.upper_bound.is_finite()
+                || utility.lower_bound > utility.point_estimate
+                || utility.point_estimate > utility.upper_bound
+                || !utility.declared_range.lower.is_finite()
+                || !utility.declared_range.upper.is_finite()
+                || utility.declared_range.lower > utility.declared_range.upper
+                || utility.lower_bound < utility.declared_range.lower
+                || utility.upper_bound > utility.declared_range.upper
+                || utility.declared_range != receipt.ranges.target_utility
+            {
+                return Err(RobustSelectionError::InvalidUtilityInterval);
+            }
+            if utility_by_pair
+                .insert((metric.action_id, metric.scenario_id), utility)
+                .is_some()
+            {
+                return Err(RobustSelectionError::DuplicateMetricRecord);
+            }
+        }
+
+        let expected_metrics = action_ids
+            .len()
+            .checked_mul(scenario_ids.len())
+            .ok_or(RobustSelectionError::MetricCountMismatch)?;
+        if utility_by_pair.len() != expected_metrics || receipt.metrics.len() != expected_metrics {
+            return Err(RobustSelectionError::MetricCountMismatch);
+        }
+
+        let mut scenario_values = BTreeMap::new();
+        let mut lower_order = Vec::with_capacity(action_ids.len());
+        let mut upper_order = Vec::with_capacity(action_ids.len());
+
+        for action_id in action_ids {
+            let mut values = Vec::with_capacity(receipt.scenarios.len());
+            let mut lower_values = Vec::with_capacity(receipt.scenarios.len());
+            let mut upper_values = Vec::with_capacity(receipt.scenarios.len());
+            for scenario in &receipt.scenarios {
+                let utility = utility_by_pair
+                    .get(&(action_id, scenario.scenario_id))
+                    .copied()
+                    .ok_or(RobustSelectionError::MissingMetricRecord)?;
+                values.push((
+                    scenario.scenario_id,
+                    scenario.weight,
+                    utility.lower_bound,
+                    utility.upper_bound,
+                    utility.declared_range.lower,
+                    utility.declared_range.upper,
+                ));
+                lower_values.push((
+                    scenario.scenario_id,
+                    scenario.weight,
+                    utility.lower_bound,
+                ));
+                upper_values.push((
+                    scenario.scenario_id,
+                    scenario.weight,
+                    utility.upper_bound,
+                ));
+            }
+            let lower_bound = aggregate_robust_utility(&lower_values, robust_utility);
+            let upper_bound = aggregate_robust_utility(&upper_values, robust_utility);
+            if !lower_bound.is_finite() || !upper_bound.is_finite() || lower_bound > upper_bound {
+                return Err(RobustSelectionError::NumericFailure);
+            }
+            lower_order.push((lower_bound, action_id));
+            upper_order.push((upper_bound, action_id));
+            scenario_values.insert(action_id, values);
+        }
+
+        lower_order.sort_by(|left, right| {
+            right.0.total_cmp(&left.0).then_with(|| left.1.cmp(&right.1))
+        });
+        upper_order.sort_by(|left, right| {
+            right.0.total_cmp(&left.0).then_with(|| left.1.cmp(&right.1))
+        });
+
+        Ok(Self {
+            robust_utility,
+            scenario_values,
+            lower_order,
+            upper_order,
+        })
+    }
+
+    /// Recompute one action interval, then update the global regret gap using
+    /// the cached best/runner-up endpoints from every untouched action.
+    pub(crate) fn regret_upper_bound_with_override(
+        &self,
+        action_id: u32,
+        scenario_id: u16,
+        lower: f64,
+        upper: f64,
+    ) -> Result<f64, RobustSelectionError> {
+        let values = self
+            .scenario_values
+            .get(&action_id)
+            .ok_or(RobustSelectionError::UnknownMetricAction)?;
+        if !lower.is_finite() || !upper.is_finite() || lower > upper {
+            return Err(RobustSelectionError::InvalidUtilityInterval);
+        }
+
+        let mut scenario_found = false;
+        let mut lower_values = Vec::with_capacity(values.len());
+        let mut upper_values = Vec::with_capacity(values.len());
+        for (id, weight, base_lower, base_upper, range_lower, range_upper) in values {
+            let (cell_lower, cell_upper) = if *id == scenario_id {
+                scenario_found = true;
+                if lower < *range_lower || upper > *range_upper {
+                    return Err(RobustSelectionError::InvalidUtilityInterval);
+                }
+                (lower, upper)
+            } else {
+                (*base_lower, *base_upper)
+            };
+            lower_values.push((*id, *weight, cell_lower));
+            upper_values.push((*id, *weight, cell_upper));
+        }
+        if !scenario_found {
+            return Err(RobustSelectionError::MissingMetricRecord);
+        }
+
+        let updated_lower = aggregate_robust_utility(&lower_values, self.robust_utility);
+        let updated_upper = aggregate_robust_utility(&upper_values, self.robust_utility);
+        if !updated_lower.is_finite()
+            || !updated_upper.is_finite()
+            || updated_lower > updated_upper
+        {
+            return Err(RobustSelectionError::NumericFailure);
+        }
+
+        let other_best_lower = maximum_excluding_action(&self.lower_order, action_id);
+        let selected_lower = other_best_lower
+            .map(|value| value.max(updated_lower))
+            .unwrap_or(updated_lower);
+        let other_best_upper = maximum_excluding_action(&self.upper_order, action_id);
+        let best_possible_upper = other_best_upper
+            .map(|value| value.max(updated_upper))
+            .unwrap_or(updated_upper);
+        let regret_upper_bound = (best_possible_upper - selected_lower).max(0.0);
+        if !regret_upper_bound.is_finite() {
+            return Err(RobustSelectionError::NumericFailure);
+        }
+        Ok(regret_upper_bound)
+    }
+}
+
+fn maximum_excluding_action(sorted: &[(f64, u32)], excluded_action_id: u32) -> Option<f64> {
+    match sorted.first() {
+        Some((value, action_id)) if *action_id != excluded_action_id => Some(*value),
+        Some(_) => sorted.get(1).map(|(value, _)| *value),
+        None => None,
+    }
+}
+
 pub(crate) fn counterfactual_regret_upper_bound(
     receipt: &ScoreBoundsReceipt,
     robust_utility: RobustUtility,
@@ -792,5 +998,133 @@ mod tests {
             certify_epsilon_optimal_action(&receipt, RobustUtility::Maximin, 0.2),
             Err(RobustSelectionError::MetricCountMismatch)
         );
+    } 
+    #[test]
+    fn independent_projection_index_matches_full_recomputation_for_maximin_and_fractional_cvar() {
+        let (receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.90),
+                (1, 20, 0.25),
+                (2, 10, 0.55),
+                (2, 20, 0.65),
+            ],
+            400,
+        );
+        let overrides = [
+            (1_u32, 10_u16, 0.10_f64, 0.35_f64),
+            (1, 20, 0.30, 0.70),
+            (2, 10, 0.45, 0.60),
+            (2, 20, 0.50, 0.95),
+        ];
+
+        for robust_utility in [
+            RobustUtility::Maximin,
+            RobustUtility::LowerTailCvar { tail_mass: 0.43 },
+        ] {
+            let index =
+                IndependentCounterfactualProjectionIndex::new(&receipt, robust_utility).unwrap();
+            for (action_id, scenario_id, lower, upper) in overrides {
+                let indexed = index
+                    .regret_upper_bound_with_override(action_id, scenario_id, lower, upper)
+                    .unwrap();
+                let full = counterfactual_regret_upper_bound(
+                    &receipt,
+                    robust_utility,
+                    &[(action_id, scenario_id, lower, upper)],
+                )
+                .unwrap();
+                assert_eq!(
+                    indexed, full,
+                    "action={action_id} scenario={scenario_id} utility={robust_utility:?}"
+                );
+            }
+        }
     }
+
+    #[test]
+    fn independent_projection_index_preserves_ties_and_rejects_out_of_range_overrides() {
+        let (receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.50),
+                (1, 20, 0.50),
+                (2, 10, 0.50),
+                (2, 20, 0.50),
+            ],
+            200,
+        );
+        let index =
+            IndependentCounterfactualProjectionIndex::new(&receipt, RobustUtility::Maximin)
+                .unwrap();
+        for action_id in [1_u32, 2_u32] {
+            let indexed = index
+                .regret_upper_bound_with_override(action_id, 10, 0.25, 0.75)
+                .unwrap();
+            let full = counterfactual_regret_upper_bound(
+                &receipt,
+                RobustUtility::Maximin,
+                &[(action_id, 10, 0.25, 0.75)],
+            )
+            .unwrap();
+            assert_eq!(indexed, full);
+        }
+        assert_eq!(
+            index.regret_upper_bound_with_override(1, 10, -0.1, 0.5),
+            Err(RobustSelectionError::InvalidUtilityInterval)
+        );
+        assert_eq!(
+            index.regret_upper_bound_with_override(1, 99, 0.2, 0.5),
+            Err(RobustSelectionError::MissingMetricRecord)
+        );
+    }
+
+    #[test]
+    fn independent_projection_index_matches_full_oracle_across_deterministic_overrides() {
+        let (receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.85),
+                (1, 20, 0.30),
+                (2, 10, 0.55),
+                (2, 20, 0.70),
+            ],
+            300,
+        );
+        let mut state = 0x51ec_7a11_u64;
+        let mut next_unit = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 11) as f64 / ((1_u64 << 53) as f64)
+        };
+
+        for robust_utility in [
+            RobustUtility::Maximin,
+            RobustUtility::LowerTailCvar { tail_mass: 0.37 },
+            RobustUtility::LowerTailCvar { tail_mass: 0.63 },
+        ] {
+            let index =
+                IndependentCounterfactualProjectionIndex::new(&receipt, robust_utility).unwrap();
+            for _ in 0..128 {
+                let action_id = if next_unit() < 0.5 { 1 } else { 2 };
+                let scenario_id = if next_unit() < 0.5 { 10 } else { 20 };
+                let first = next_unit();
+                let second = next_unit();
+                let lower = first.min(second);
+                let upper = first.max(second);
+                let indexed = index
+                    .regret_upper_bound_with_override(action_id, scenario_id, lower, upper)
+                    .unwrap();
+                let full = counterfactual_regret_upper_bound(
+                    &receipt,
+                    robust_utility,
+                    &[(action_id, scenario_id, lower, upper)],
+                )
+                .unwrap();
+                assert_eq!(
+                    indexed, full,
+                    "action={action_id} scenario={scenario_id} lower={lower} upper={upper} utility={robust_utility:?}"
+                );
+            }
+        }
+    }
+
 }
