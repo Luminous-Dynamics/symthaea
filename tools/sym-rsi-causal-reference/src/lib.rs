@@ -330,6 +330,7 @@ pub struct InterventionManifest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManifestIssue {
     EmptyField(&'static str),
+    UnsupportedSchemaVersion(String),
     InvalidSha256(&'static str),
     DuplicateParent(String),
     DuplicateChangeUnit(String),
@@ -379,6 +380,12 @@ pub fn validate_manifest(
     manifest: &InterventionManifest,
 ) -> Result<(), Vec<ManifestIssue>> {
     let mut issues = Vec::new();
+
+    if manifest.schema_version != "sym-rsi-intervention-manifest-v0" {
+        issues.push(ManifestIssue::UnsupportedSchemaVersion(
+            manifest.schema_version.clone(),
+        ));
+    }
 
     for (field, value) in [
         ("schema_version", manifest.schema_version.as_str()),
@@ -1020,6 +1027,16 @@ mod tests {
     #[test]
     fn valid_manifest_passes_structure_checks() {
         assert_eq!(validate_manifest(&valid_manifest()), Ok(()));
+    }
+
+    #[test]
+    fn manifest_rejects_unknown_schema_versions() {
+        let mut manifest = valid_manifest();
+        manifest.schema_version = "sym-rsi-intervention-manifest-v9".to_owned();
+        let result = validate_manifest(&manifest).expect_err("unknown schema must fail closed");
+        assert!(result.contains(&ManifestIssue::UnsupportedSchemaVersion(
+            "sym-rsi-intervention-manifest-v9".to_owned()
+        )));
     }
 
     #[test]
