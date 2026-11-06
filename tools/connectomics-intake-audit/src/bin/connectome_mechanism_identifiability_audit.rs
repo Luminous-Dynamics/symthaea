@@ -576,12 +576,12 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             .iter()
             .filter(|row| row.different_mechanism_class)
             .collect::<Vec<_>>();
-        let query_identified =
-            !query_pairs.is_empty() && query_pairs.iter().all(|row| row.pair_identified_at_budget);
-        let mechanism_identified = !mechanism_pairs.is_empty()
-            && mechanism_pairs
-                .iter()
-                .all(|row| row.pair_identified_at_budget);
+        let query_identified = query_pairs
+            .iter()
+            .all(|row| row.pair_identified_at_budget);
+        let mechanism_identified = mechanism_pairs
+            .iter()
+            .all(|row| row.pair_identified_at_budget);
         let status = if query_identified && mechanism_identified {
             "QUERY_AND_MECHANISM_IDENTIFIED"
         } else if query_identified {
