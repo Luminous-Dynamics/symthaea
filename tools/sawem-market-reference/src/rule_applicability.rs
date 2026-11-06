@@ -136,6 +136,12 @@ fn validate_revision(
     if !valid_sha256(revision.source_sha256) {
         return Err(RuleApplicabilityError::InvalidSourceDigest);
     }
+    if revision.available_at_utc < 0
+        || revision.effective_from_utc < 0
+        || revision.effective_until_utc.is_some_and(|end| end < 0)
+    {
+        return Err(RuleApplicabilityError::InvalidPublicationChronology);
+    }
     if revision
         .effective_until_utc
         .is_some_and(|end| end <= revision.effective_from_utc)
@@ -156,6 +162,9 @@ fn validate_revision(
             return Err(RuleApplicabilityError::PublishedRuleMissingPublicationTimestamp);
         }
         (RulePublicationState::Published, Some(published_at)) => {
+            if published_at < 0 {
+                return Err(RuleApplicabilityError::InvalidPublicationChronology);
+            }
             if revision.available_at_utc < published_at {
                 return Err(RuleApplicabilityError::AvailableBeforePublication);
             }
@@ -540,12 +549,74 @@ mod tests {
                 jurisdiction_id: "NA",
                 ..revision("wrong-jurisdiction", "rule/b", NEW_SHA, 90, 92, 100, None, None)
             },
+            RuleRevisionEvidence {
+                instrument_id: "GRID-CODE",
+                ..revision("wrong-instrument", "rule/c", ALT_SHA, 90, 92, 100, None, None)
+            },
+            RuleRevisionEvidence {
+                scope_id: "ENERGY/ARBITRAGE",
+                ..revision("wrong-scope", "rule/d", OLD_SHA, 90, 92, 100, None, None)
+            },
         ];
         assert_eq!(
             resolve_applicable_rule(query(150, 160), &wrong),
             Ok(RuleApplicabilityResult::NoPublishedRuleForValidTime {
                 draft_revision_count: 0,
             })
+        );
+    }
+
+    #[test]
+    fn effective_window_is_start_inclusive_and_end_exclusive() {
+        let rules = [
+            revision("v1", "code/rev1", OLD_SHA, 90, 92, 100, Some(200), None),
+            revision("v2", "code/rev2", NEW_SHA, 180, 185, 200, None, Some("v1")),
+        ];
+        let before = resolve_applicable_rule(query(199, 220), &rules).unwrap();
+        let RuleApplicabilityResult::Applicable(before) = before else {
+            panic!("v1 remains effective up to but not including the v2 boundary");
+        };
+        assert_eq!(before.revision_id, "v1");
+
+        let at_boundary = resolve_applicable_rule(query(200, 220), &rules).unwrap();
+        let RuleApplicabilityResult::Applicable(at_boundary) = at_boundary else {
+            panic!("v2 becomes effective at its start boundary");
+        };
+        assert_eq!(at_boundary.revision_id, "v2");
+    }
+
+    #[test]
+    fn not_yet_effective_published_amendment_does_not_displace_current_rule() {
+        let rules = [
+            revision("v1", "code/rev1", OLD_SHA, 90, 92, 100, None, None),
+            revision("v2", "code/rev2", NEW_SHA, 180, 185, 200, None, Some("v1")),
+        ];
+        let result = resolve_applicable_rule(query(199, 190), &rules).unwrap();
+        let RuleApplicabilityResult::Applicable(selected) = result else {
+            panic!("v2 is published but not effective for valid time 199");
+        };
+        assert_eq!(selected.revision_id, "v1");
+    }
+
+    #[test]
+    fn draft_or_published_state_metadata_must_be_consistent() {
+        let draft_with_publication = [RuleRevisionEvidence {
+            publication_state: RulePublicationState::Draft,
+            published_at_utc: Some(90),
+            ..revision("draft-bad", "draft/bad", OLD_SHA, 90, 92, 100, None, None)
+        }];
+        assert_eq!(
+            resolve_applicable_rule(query(150, 160), &draft_with_publication),
+            Err(RuleApplicabilityError::DraftHasPublicationTimestamp)
+        );
+
+        let published_without_publication = [RuleRevisionEvidence {
+            published_at_utc: None,
+            ..revision("published-bad", "published/bad", OLD_SHA, 90, 92, 100, None, None)
+        }];
+        assert_eq!(
+            resolve_applicable_rule(query(150, 160), &published_without_publication),
+            Err(RuleApplicabilityError::PublishedRuleMissingPublicationTimestamp)
         );
     }
 
