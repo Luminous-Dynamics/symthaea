@@ -220,7 +220,7 @@
     },
     "external_benchmark_context": {
       "type": "array",
-      "minItems": 7,
+      "minItems": 6,
       "items": {
         "type": "object",
         "additionalProperties": false,
