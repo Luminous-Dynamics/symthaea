@@ -697,6 +697,15 @@ mod tests {
     use serde_json::json;
 
     fn sample_catalog(ingestion: &str, rights_state: &str, permitted_uses: Vec<&str>) -> String {
+        let payload_files: Vec<serde_json::Value> = if ingestion == "imported" {
+            vec![json!({
+                "path": "receiver.sbf",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            })]
+        } else {
+            Vec::new()
+        };
+
         json!({
             "schema": CATALOG_SCHEMA,
             "version": CATALOG_VERSION,
@@ -715,11 +724,7 @@ mod tests {
                 },
                 "intended_use": "research",
                 "ingestion": ingestion,
-                "payload_files": if ingestion == "imported" {
-                    vec![{"path":"receiver.sbf","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]
-                } else {
-                    vec![]
-                }
+                "payload_files": payload_files
             }]
         }).to_string()
     }
