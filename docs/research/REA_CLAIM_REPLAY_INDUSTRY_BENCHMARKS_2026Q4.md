@@ -221,7 +221,7 @@ The independent replay implementation is refreshed stacked draft [#10740](https:
 
 The replay exact-head workflow has already passed the parent formatter, upstream Evidence differential suite and warnings-denied parent Clippy on the refreshed stack. The independent replay formatter has been iterated on exact output; the current replay head must still complete the independent conformance and Clippy steps before a pass is claimed. Do not interpret a queued or skipped job as success.
 
-The independent fuzz workspace is [#10728](https://github.com/Luminous-Dynamics/symthaea/pull/10728), with research contract [#10726](https://github.com/Luminous-Dynamics/symthaea/issues/10726). It keeps cargo-fuzz out of production dependencies and has three targets: raw request parsing, raw result parsing, and bounded framed end-to-end replay. It uses pinned nightly/cargo-fuzz, an inspectable public seed corpus, deterministic framing tests, 1 MiB per-input cap, 8 Evidence records per fuzz frame, five-second per-input timeout and 512 MiB runner RSS ceiling. Its corrected exact-head workflow passed the deterministic frame parser suite and all three bounded campaigns. This is bounded no-crash evidence for that exact run, not a parser security certification.
+The independent fuzz workspace is refreshed as [#10742](https://github.com/Luminous-Dynamics/symthaea/pull/10742), with research contract [#10726](https://github.com/Luminous-Dynamics/symthaea/issues/10726). It keeps cargo-fuzz out of production dependencies and has three targets: raw request parsing, raw result parsing, and bounded framed end-to-end replay. It uses pinned nightly/cargo-fuzz, an inspectable public seed corpus, deterministic framing tests, 1 MiB per-input cap, 8 Evidence records per fuzz frame, five-second per-input timeout and 512 MiB runner RSS ceiling. The current-parent exact-head run passed 3 frame parser tests and all three bounded campaigns: 1,492,217 request executions (32,439/s, 275 MiB peak RSS), 329,258 result executions (7,157/s, 280 MiB) and 2,463,001 framed replay executions (53,543/s, 268 MiB). The fuzz branch's verifier Cargo manifest, library and CLI blobs were checked identical to the current replay branch; the later replay changes were tests/memo only. This is bounded no-crash evidence for that exact run, not parser certification or semantic correctness.
 
 The earlier replay drafts [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710) and [#10725](https://github.com/Luminous-Dynamics/symthaea/pull/10725) were closed as superseded after their bases diverged from the producer; all implementation and metamorphic-test work is carried on the clean current-parent stack in #10740.
 
@@ -242,7 +242,7 @@ Initial laws now being added to #10740:
 - duplicate or unreferenced records are invalid, never extra votes;
 - premise weakening, unsupported assumptions and absent scope dimensions must never produce an epistemic upgrade;
 - adding a same-scope contradiction preserves conflict rather than majority-voting it away;
-- unsupported predicate families remain non-positive regardless of evidence count.
+- unsupported predicate families remain non-positive regardless of evidence count; a regression now supplies four valid provider observations to an unimplemented ProducerAuthenticity predicate and requires Unverified.
 
 The target is 100% preservation of the finite metamorphic laws and zero unexpected upgrades. These tests qualify the transformations they exercise; they do not prove general semantic correctness.
 
