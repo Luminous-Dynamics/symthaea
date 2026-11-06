@@ -2423,7 +2423,10 @@
         "result_reencoding_with_jcs_equivalent_numeric_token_must_replay_match",
         "cli_exit_code_separates_replay_match_mismatch_and_invalid_input",
         "cli_bounded_read_rejects_claim_result_per_evidence_and_aggregate_oversize",
-        "cli_does_not_write_extract_execute_or_mutate_input_artifacts"
+        "cli_does_not_write_extract_execute_or_mutate_input_artifacts",
+        "record_confidence_and_authority_labels_are_preserved_verbatim_in_claim_assessments",
+        "analyst_inference_label_cannot_be_promoted_to_artifact_truth_by_record_level_support",
+        "confidence_observed_vs_inferred_does_not_change_record_equality_but_changes_the_claim_ceiling"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2448,7 +2451,9 @@
         "self_consistent_forged_result_false_accept_rate",
         "jcs_equivalent_serialization_replay_parity",
         "cli_exit_code_accuracy_by_outcome",
-        "bounded_input_limit_enforcement_rate"
+        "bounded_input_limit_enforcement_rate",
+        "confidence_authority_label_preservation_rate",
+        "false_semantic_promotion_rate_for_analyst_inference_records"
       ],
       "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.",
       "protocol": [
