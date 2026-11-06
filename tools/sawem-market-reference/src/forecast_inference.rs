@@ -380,7 +380,6 @@ mod tests {
     #[test]
     fn invalid_bootstrap_plan_metadata_and_indexes_fail_closed() {
         let starts = [0_u32, 1].repeat(MIN_BOOTSTRAP_DRAWS as usize);
-        let starts: &'static [u32] = Box::leak(starts.into_boxed_slice());
         let base = plan(&starts, 1);
         assert_eq!(
             evaluate_forecast_skill_inference(
