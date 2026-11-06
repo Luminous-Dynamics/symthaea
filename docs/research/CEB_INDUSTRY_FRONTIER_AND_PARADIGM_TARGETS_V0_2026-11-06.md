@@ -282,6 +282,7 @@ The following are safe and useful before #10064 isolation and #10369 trust quali
 6. Audit the external observation registry for source revision, denominator, uncertainty, environment, cost and benchmark version completeness.
 7. Map the current CEB portfolio to ownership boundaries and block overlapping registries, metrics and receipts.
 8. Continue static negative-control design for admission, contamination, lifecycle and claim licensing.
+9. Author and statically review six Rust task/oracle development candidates under [#10701](https://github.com/Luminous-Dynamics/symthaea/issues/10701) / [draft PR #10704](https://github.com/Luminous-Dynamics/symthaea/pull/10704). Reconcile their family mapping with #10617 and keep them unadmitted under #10609 until all source, oracle, custody and execution prerequisites are met.
 
 Do not execute candidate-controlled build scripts, tests, macros, graders or attack payloads on the current host-opt-in runner. Do not claim independent regrading, sealed holdout, candidate execution or production isolation.
 
