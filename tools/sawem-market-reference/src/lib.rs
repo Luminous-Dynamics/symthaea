@@ -30,6 +30,7 @@ pub mod market_readiness;
 pub mod non_anticipativity;
 pub mod paired_policy_comparison;
 pub mod power_trace;
+pub mod power_trace_execution;
 pub mod rainflow_cycles;
 pub mod revenue_realization;
 pub mod rule_applicability;
