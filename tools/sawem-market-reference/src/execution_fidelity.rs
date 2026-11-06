@@ -779,7 +779,6 @@ mod tests {
     }
 }
 
-
 // Raw sample-backed aggregation is kept beside the legacy pre-aggregated
 // execution evaluator so the same public types feed a higher-assurance path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1167,7 +1166,6 @@ pub fn evaluate_trace_backed_execution<'a>(
         interval_receipts,
     })
 }
-
 
 #[cfg(test)]
 mod trace_backed_tests {
