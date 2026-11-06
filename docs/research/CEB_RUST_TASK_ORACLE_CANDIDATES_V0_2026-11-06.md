@@ -376,6 +376,7 @@ feature-matrix/
 **Canonical family:** `performance-correctness`.  
 **Provisional theme:** algorithmic correctness, state updates and performance contracts.  
 **Provisional difficulty:** Medium–high.  
+**Public source-only fixture:** [`benchmarks/ceb/public-development-fixtures/rust-topk-updates-v0/`](../../benchmarks/ceb/public-development-fixtures/rust-topk-updates-v0/). The three-crate, eight-file workspace has deterministic ordering but intentionally retains stale heap entries after same-key updates. It has not been compiled, tested or benchmarked and has no reference patch or oracle.  
 **Synthetic workspace outline:**
 
 ```text
@@ -541,7 +542,7 @@ No new CEB lane, primary metric, score, receipt, task schema, task registry, tru
 |---|---|
 | Six candidate specifications authored | Design-only |
 | Exact mapping to #10617 fault-family labels | Confirmed one-to-one against the canonical six family IDs; no sampling slots assigned |
-| Public Rust source fixtures | Four workspaces: 10-file/four-crate API migration, 8-file/three-crate async trait boundary, 8-file/three-crate in-memory event replay, and 11-file/three-crate feature/target matrix; source-only, none compiled or executed |
+| Public Rust source fixtures | Five workspaces: 10-file/four-crate API migration, 8-file/three-crate async trait boundary, 8-file/three-crate in-memory event replay, 11-file/three-crate feature/target matrix, and 8-file/three-crate top-k update; source-only, none compiled or executed |
 | Reference patches | Not created |
 | Independent grader implementations | Not created |
 | Oracle case blueprints | 37 machine-readable cases across 37 requirements; no executable oracle or test suite |
@@ -553,4 +554,4 @@ No new CEB lane, primary metric, score, receipt, task schema, task registry, tru
 | Independent regrade qualification | Not performed; blocked by #10369 |
 | Performance or SOTA comparison | None |
 
-**Honest claim:** the six candidate domains now have canonical family mappings and machine-readable requirement/oracle traceability, and four have concrete public source-only workspaces. None has been compiled, tested or executed. No candidate has a qualified oracle, task admission, benchmark result or sealed holdout, and no superiority claim is supported.
+**Honest claim:** the six candidate domains now have canonical family mappings and machine-readable requirement/oracle traceability, and five have concrete public source-only workspaces. None has been compiled, tested or executed. No candidate has a qualified oracle, task admission, benchmark result or sealed holdout, and no superiority claim is supported.
