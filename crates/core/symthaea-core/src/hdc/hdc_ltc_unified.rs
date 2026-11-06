@@ -2029,6 +2029,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Get mutable reference to weight hypervector
     pub fn weight_hv_mut(&mut self) -> &mut ContinuousHV {
+        self.clear_pre_evolution_state();
         &mut self.weight_hv
     }
 
@@ -2049,6 +2050,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Get reference to input mask
     pub fn input_mask_mut(&mut self) -> &mut ContinuousHV {
+        self.clear_pre_evolution_state();
         &mut self.input_mask
     }
 
@@ -2069,6 +2071,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Get mutable reference to tau modulator
     pub fn tau_modulator_mut(&mut self) -> &mut ContinuousHV {
+        self.clear_pre_evolution_state();
         &mut self.tau_modulator
     }
 
