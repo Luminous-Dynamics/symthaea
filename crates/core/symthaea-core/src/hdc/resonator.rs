@@ -1762,6 +1762,113 @@ mod tests {
     }
 
     #[test]
+    fn test_solution_classifies_correct_spurious_and_non_convergence_separately() {
+        let converged = ResonatorSolution {
+            vector: vec![1.0, 0.0, 0.0],
+            closest_symbol: None,
+            symbol_similarity: 0.0,
+            energy: 0.0,
+            iterations: 3,
+            converged: true,
+            confidence: 0.0,
+        };
+        let correct = converged.classify_against(&[1.0, 0.0, 0.0], 0.99).unwrap();
+        assert_eq!(correct.0, ResonatorOutcome::CorrectConvergence);
+        assert!((correct.1 - 1.0).abs() < 1e-6);
+
+        let spurious = converged.classify_against(&[0.0, 1.0, 0.0], 0.99).unwrap();
+        assert_eq!(spurious.0, ResonatorOutcome::SpuriousConvergence);
+        assert!(spurious.1.abs() < 1e-6);
+
+        let mut not_converged = converged.clone();
+        not_converged.converged = false;
+        let outcome = not_converged
+            .classify_against(&[1.0, 0.0, 0.0], 0.99)
+            .unwrap();
+        assert_eq!(outcome.0, ResonatorOutcome::NonConvergence);
+    }
+
+    #[test]
+    fn test_solve_system_does_not_claim_convergence_at_iteration_limit() {
+        let dimension = 128;
+        let config = ResonatorConfig {
+            step_size: 0.5,
+            momentum: 0.0,
+            temperature: 0.1,
+            convergence_threshold: 1.0,
+            max_iterations: 5,
+            noise_scale: 0.0,
+            energy_threshold: 0.0,
+        };
+        let mut network = ResonatorNetwork::with_config(dimension, config).unwrap();
+        let left = normalized_random_vector(dimension);
+        let target = normalized_random_vector(dimension);
+        let right: Vec<f32> = left
+            .iter()
+            .zip(target.iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(left),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(right),
+        );
+
+        let solutions = network.solve_system(&["x"], &[constraint], Some(1)).unwrap();
+        let solution = solutions.get("x").unwrap();
+
+        assert!(!solution.converged);
+        assert_eq!(solution.iterations, 1);
+        assert_eq!(network.energy_history().len(), 1);
+        assert!(!network.resonator_states()[0].converged);
+        assert_eq!(
+            solution
+                .classify_against(&target, 0.99)
+                .unwrap()
+                .0,
+            ResonatorOutcome::NonConvergence
+        );
+    }
+
+    #[test]
+    fn test_solve_system_rejects_unconstrained_unknowns() {
+        let mut network = ResonatorNetwork::new(64).unwrap();
+        let left = normalized_random_vector(64);
+        let right = normalized_random_vector(64);
+        let constraint = MultiConstraint::new(
+            Factor::Known(left),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(right),
+        );
+
+        let error = network.solve_system(&["x", "y"], &[constraint], Some(2));
+        assert!(error.is_err());
+        assert!(error.unwrap_err().to_string().contains("no solving constraint"));
+    }
+
+    #[test]
+    fn test_solve_rejects_empty_or_malformed_constraints() {
+        let mut network = ResonatorNetwork::new(32).unwrap();
+        assert!(network.solve(&[], Some(1)).is_err());
+
+        let constraint = Constraint::new(vec![1.0; 31], vec![1.0; 32]);
+        assert!(network.solve(&[constraint], Some(1)).is_err());
+
+        let mut invalid = Constraint::new(vec![1.0; 32], vec![1.0; 32]);
+        invalid.weight = f32::NAN;
+        assert!(network.solve(&[invalid], Some(1)).is_err());
+    }
+
+    #[test]
+    fn test_resonator_rejects_invalid_symbol_vectors() {
+        let mut network = ResonatorNetwork::new(32).unwrap();
+        assert!(network.add_symbol("nan", vec![f32::NAN; 32]).is_err());
+        assert!(network.add_symbol("zero", vec![0.0; 32]).is_err());
+        assert!(network.add_symbol("valid", normalized_random_vector(32)).is_ok());
+        assert!(network.add_symbol("valid", normalized_random_vector(32)).is_err());
+    }
+
+    #[test]
     #[ignore = "performance test - run with cargo test --release"]
     fn test_performance_large_dimension() {
         use std::time::Instant;
