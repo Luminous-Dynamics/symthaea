@@ -157,8 +157,7 @@ pub fn materialize_hdc_ltc_weight_program(
         candidate_neuron.try_replace_parameter_group(*id, &after.values)?;
     }
 
-    candidate_neuron.reset();
-    candidate_neuron.reset_momentum();
+    candidate_neuron.reset_after_parameter_edit();
 
     let candidate_snapshot =
         hdc_ltc_weight_model_snapshot(&candidate_neuron, target_specification_digest)?;
