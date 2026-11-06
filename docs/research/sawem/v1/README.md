@@ -392,6 +392,47 @@ The participant-side submission timestamp is retained for chronology, but **the 
 
 Benchmark case: `INTRADAY-GATE-001` now maps ten synthetic tests covering pre-gate, exact-boundary, next-auction, final-gate, missing-receipt and wrong-rule/unit cases. It does not authenticate the MO receipt, submit an order, clear an auction, or publish a schedule.
 
+### Regulatory readiness is a graph, not a launch-date flag
+
+The new `market_readiness.rs` evaluator treats readiness as a conjunction of separately evidenced prerequisites. Every requirement carries its own readiness scope, required authority and minimum evidence class. Every evidence record carries its source reference/digest, publication time, available-at time and valid-time window. The result is `Ready`, `NotReady` or `Indeterminate`; it reports the satisfied, blocked and unresolved requirements, plus future-known and wrong-scope evidence exclusions.
+
+This is deliberately stricter than a `market_live=true` flag:
+- A published Market Code is not by itself proof of NERSA approval or effectiveness.
+- A secondary report about a market launch is not a regulator approval record.
+- Market-wide pre-launch testing is not proof of a named participant's admission.
+- An invitation into testing is not permission to submit commercial bids or settle trades.
+- Evidence that became available after a historical investment decision cannot be used to reconstruct that decision.
+- Internal-testing requirements and external-commercial requirements are separate profiles.
+
+#### South African status evidence — do not collapse the timelines
+
+The public materials currently describe different stages and some stale or unresolved dates:
+
+| Instrument / milestone | Public evidence located by 6 November 2026 | What it supports | What remains unproven |
+|---|---|---|---|
+| Market Code Rev 2.3 | NTCSA lists Rev 2.3, February 2026, on its official Market Code page. | A version has been published by the Market Operator. | Formal NERSA approval and effective status must be established separately. |
+| Market Code / Trading Rules | On 5 November the Acting NERSA CEO said the rules and code needed for the market to function were not yet in place. | An up-to-date regulator-leadership account that finalisation remains work in progress. | A final approved rule instrument and its effective date. |
+| Wholesale pricing methodology | The Energy Council tracker lists the NERSA consultation as closed, with inputs being consolidated. | A consultation milestone occurred. | Final approval, publication and effective date. |
+| Vesting contracts | The Energy Council tracker lists the framework consultation as closed, with NERSA consolidating inputs. | The framework has progressed through consultation. | Final instrument and project-specific vesting terms. |
+| Trading Platform Framework | The Energy Council lists issuance on 28 September 2026 and a 27 October comment deadline. | A consultation version existed. | Its post-deadline disposition, any final framework and the exact production platform state. |
+| Internal market operations | BLSA's tracker, last updated 20 October, reports 32 participants in internal trading. | An internal operating/testing cohort was reported. | External commercial admission or settlement rights. |
+| External pre-launch test cohort | 30 October reporting says 85 external entities were invited to pre-launch simulation/testing. | A market-wide invitation/testing milestone was reported. | Admission of any particular entity, production credentials or commercial rights. |
+| External commercial opening | The 5 November Acting NERSA CEO interview describes April 2027 as the opening target. | A current target attributed to regulator leadership. | A guaranteed go-live date or actual production commencement. |
+
+There is also an NTCSA SAWEM School page that still refers to an April 2026 go-live. That conflicts with the newer November 2026 account and the BLSA October 2026 tracker. It should be retained as a stale/conflicting source, not silently used as the current launch date.
+
+Sources:
+- NTCSA Market Code page: https://www.ntcsa.co.za/wholesale-market-code/
+- NTCSA SAWEM School page: https://www.ntcsa.co.za/sawem-school/
+- 5 November 2026 Acting NERSA CEO interview: https://energy-news-network.com/industry-news/exclusive-nomfundo-maseti-takes-nersa-into-south-africas-competitive-power-market/
+- BLSA reform tracker: https://tracker.blsa.org.za/economic/?reform=Pathway+to+electricity+markets
+- Energy Council regulatory tracker: https://energycouncil.org.za/policy-tracker/
+- 30 October 2026 pre-launch test invitation report: https://www.engineeringnews.co.za/article/sawem-trading-platform-opens-to-85-external-entities-for-pre-launch-testing-2026-10-30
+
+The synthetic profile therefore keeps Market Code publication separate from effective status, and keeps market-wide testing separate from participant admission and commercial trading. The readiness evaluator does not determine which prerequisites the law requires; a versioned authority-approved requirement profile must supply that list. The current synthetic tests validate the evaluator's logic, not the real-world SAWEM state.
+
+Benchmark case: `MARKET-READINESS-GATE-001`.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
