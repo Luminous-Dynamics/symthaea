@@ -1,0 +1,75 @@
+name: Melothaea music benchmark registry
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/benchmark_registry.rs"
+      - "benchmarks/mel/registry/**"
+      - "benchmarks/mel/schemas/**"
+      - "tools/mel-benchmark-registry-harness/**"
+      - ".github/workflows/mel-benchmark-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark-registry-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_BENCHMARK_REGISTRY_REVISION=$actual" >> "$GITHUB_ENV"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Stage standalone registry crate outside root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-benchmark-registry-harness"
+          mkdir -p "$staged/src" "$staged/examples" "$staged/fixtures"
+          cp tools/mel-benchmark-registry-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-benchmark-registry-harness/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-benchmark-registry-harness/examples/profile_check.rs "$staged/examples/profile_check.rs"
+          cp tools/mel-benchmark-registry-harness/fixtures/internal-synthetic-profile-v1.json "$staged/fixtures/internal-synthetic-profile-v1.json"
+          echo "MEL_BENCHMARK_REGISTRY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "MEL_BENCHMARK_REGISTRY_DIR=$staged" >> "$GITHUB_ENV"
+      - name: Format isolated registry crate
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+      - name: Resolve and lock standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+      - name: Test exact benchmark registry module
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+      - name: Validate the committed synthetic profile
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST" --example profile_check
+      - name: Record exact source and lock identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-benchmark-registry-evidence"
+          mkdir -p "$evidence"
+          cp "$MEL_BENCHMARK_REGISTRY_DIR/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.lock" | tee "$evidence/Cargo.lock.sha256"
+          printf 'registry_module_sha256=%s\n' "$(sha256sum crates/domains/symthaea-muse/src/benchmark_registry.rs | cut -d' ' -f1)" > "$evidence/source-identities.txt"
+          printf 'profile_schema_sha256=%s\n' "$(sha256sum benchmarks/mel/schemas/music-benchmark-profile-v1.schema.json | cut -d' ' -f1)" >> "$evidence/source-identities.txt"
+          printf 'run_schema_sha256=%s\n' "$(sha256sum benchmarks/mel/schemas/music-benchmark-run-v1.schema.json | cut -d' ' -f1)" >> "$evidence/source-identities.txt"
+      - name: Upload registry evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-benchmark-registry-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-benchmark-registry-evidence/
+          if-no-files-found: error
+          retention-days: 90
