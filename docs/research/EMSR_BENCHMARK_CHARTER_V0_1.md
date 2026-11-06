@@ -193,24 +193,20 @@ For aviation and other safety-critical domains, time-to-alert, protection levels
 ## 6. Mandatory baselines
 
 1. Receiver-provided status/alerts and protection features where compatible physical hardware is available.
-2. Simple signal/receiver status threshold baseline.
-3. The 2026 raw-IF chi-square method, faithfully reproduced where source and data rights permit.
-4. Conventional supervised CNN or comparable feature model.
-5. Published cross-domain comparator from the 2026 IEEE Access study, subject to faithful reproduction.
-6. 2026 NAVITEC CNN versus MAML cross-testing comparator across TEXBAT, OAKBAT and FGI-SpoofRepo, subject to faithful reproduction.
-7. Spatio-temporal graph model cross-scenario comparator (ION GNSS+ 2026), if faithful data/protocol reproduction is possible.
-8. RAIM-driven semi-supervised maritime comparator (Advances in Space Research, 2026), if full-method and data reproduction conditions are available.
-9. Receiver-native integrity/authentication outputs as separate operational baselines: RAIM/ARAIM protection-level/status outputs, SBAS integrity status and Galileo OSNMA authentication state where available. These are not interchangeable with ML anomaly scores.
-10. No-collaboration ablation.
-11. No-provenance / no-common-mode analysis ablations.
-12. Symthaea uncertainty-aware assessment.
-13. Explainable multimodal statistical + 1D temporal + 2D time-frequency fusion baseline, with per-modality ablations and matched hardware profiling where data conditions permit.
-14. Integrated evidence-qualified service-continuity workflow.
-7. No-collaboration ablation.
-8. No-provenance / no-common-mode analysis ablations.
-9. Symthaea uncertainty-aware assessment.
-10. Explainable multimodal statistical + 1D temporal + 2D time-frequency fusion baseline, with per-modality ablations and matched hardware profiling where data conditions permit.
-11. Integrated evidence-qualified service-continuity workflow.
+2. Receiver-native integrity/authentication outputs as separate operational baselines: RAIM/ARAIM protection-level/status outputs, SBAS integrity status and Galileo OSNMA authentication state where available. These are not interchangeable with ML anomaly scores.
+3. Simple signal/receiver status threshold baseline.
+4. The 2026 raw-IF chi-square method, faithfully reproduced where source and data rights permit.
+5. Conventional supervised CNN or comparable feature model.
+6. Published cross-domain comparator from the 2026 IEEE Access study, subject to faithful reproduction.
+7. 2026 NAVITEC CNN versus MAML cross-testing comparator across TEXBAT, OAKBAT and FGI-SpoofRepo, subject to faithful reproduction.
+8. Spatio-temporal graph model cross-scenario comparator (ION GNSS+ 2026), if faithful data/protocol reproduction is possible.
+9. RAIM-driven semi-supervised maritime comparator (Advances in Space Research, 2026), if full-method and data reproduction conditions are available.
+10. Collaborative PVT-residual/C/N0 integrity comparator.
+11. Explainable multimodal statistical + 1D temporal + 2D time-frequency fusion baseline, with per-modality ablations and matched hardware profiling where data conditions permit.
+12. No-collaboration ablation.
+13. No-provenance / no-common-mode analysis ablations.
+14. Symthaea uncertainty-aware assessment.
+15. Integrated evidence-qualified service-continuity workflow.
 
 Use matched data, splits, receiver inputs, labels, time basis and false-alarm budgets. Reproducing a paper's abstract-level headline is not reproduction.
 
