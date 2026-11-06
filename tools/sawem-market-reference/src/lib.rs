@@ -24,6 +24,7 @@ pub mod liquidity_options;
 pub mod liquidity_stress;
 pub mod liquidity_waterfall;
 pub mod market_impact_attribution;
+pub mod market_readiness;
 pub mod non_anticipativity;
 pub mod paired_policy_comparison;
 pub mod rainflow_cycles;
