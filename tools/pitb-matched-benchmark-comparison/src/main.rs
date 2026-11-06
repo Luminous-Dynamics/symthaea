@@ -34,6 +34,7 @@ struct Cohort {
     split_manifest_sha256: String,
     expected_task_count: usize,
     expected_cluster_count: usize,
+    task_id_set_sha256: String,
     budget_policy_sha256: String,
     max_attempts_per_task: u32,
     max_wall_ms_per_task: u64,
@@ -58,6 +59,8 @@ struct RunRecord {
     task_id: String,
     cluster_id: String,
     repository: String,
+    repository_commit: String,
+    lean_version: String,
     source_file: String,
     target_statement_sha256: String,
     environment_sha256: String,
@@ -143,6 +146,8 @@ struct Report {
     split_manifest_sha256: String,
     expected_task_count: usize,
     expected_cluster_count: usize,
+    task_id_set_sha256: String,
+    results_jsonl_sha256: String,
     observed_task_count: usize,
     observed_cluster_count: usize,
     arm_count: usize,
@@ -164,6 +169,8 @@ struct Report {
 struct TaskIdentity {
     cluster_id: String,
     repository: String,
+    repository_commit: String,
+    lean_version: String,
     source_file: String,
     target_statement_sha256: String,
     environment_sha256: String,
@@ -227,6 +234,12 @@ fn quantile(sorted: &[f64], q: f64) -> f64 {
     sorted[index.min(sorted.len() - 1)]
 }
 
+fn canonical_task_id_set_digest(ids: &[&str]) -> String {
+    let sorted: BTreeSet<String> = ids.iter().map(|id| (*id).to_owned()).collect();
+    let bytes = serde_json::to_vec(&sorted).expect("task ID set serializes deterministically");
+    sha256(&bytes)
+}
+
 fn validate_cohort(cohort: &Cohort) -> Result<(), String> {
     if cohort.schema_version != COHORT_SCHEMA {
         return Err("unsupported cohort schema_version".into());
@@ -242,6 +255,7 @@ fn validate_cohort(cohort: &Cohort) -> Result<(), String> {
         return Err("matched comparisons must use a test split, not train/validation/development".into());
     }
     digest(&cohort.split_manifest_sha256, "cohort.split_manifest_sha256")?;
+    digest(&cohort.task_id_set_sha256, "cohort.task_id_set_sha256")?;
     digest(&cohort.budget_policy_sha256, "cohort.budget_policy_sha256")?;
     digest(&cohort.bootstrap_seed_sha256, "cohort.bootstrap_seed_sha256")?;
     if cohort.expected_task_count == 0 || cohort.expected_cluster_count == 0 {
@@ -318,6 +332,8 @@ fn validate_run(
         ("task_id", row.task_id.as_str()),
         ("cluster_id", row.cluster_id.as_str()),
         ("repository", row.repository.as_str()),
+        ("repository_commit", row.repository_commit.as_str()),
+        ("lean_version", row.lean_version.as_str()),
         ("source_file", row.source_file.as_str()),
         ("arm_id", row.arm_id.as_str()),
         ("model_id", row.model_id.as_str()),
@@ -432,6 +448,8 @@ fn validate_run(
     let identity = TaskIdentity {
         cluster_id: row.cluster_id.clone(),
         repository: row.repository.clone(),
+        repository_commit: row.repository_commit.clone(),
+        lean_version: row.lean_version.clone(),
         source_file: row.source_file.clone(),
         target_statement_sha256: row.target_statement_sha256.clone(),
         environment_sha256: row.environment_sha256.clone(),
@@ -440,6 +458,8 @@ fn validate_run(
     if let Some(expected) = task_identity {
         if expected.cluster_id != identity.cluster_id
             || expected.repository != identity.repository
+            || expected.repository_commit != identity.repository_commit
+            || expected.lean_version != identity.lean_version
             || expected.source_file != identity.source_file
             || expected.target_statement_sha256 != identity.target_statement_sha256
             || expected.environment_sha256 != identity.environment_sha256
@@ -449,16 +469,17 @@ fn validate_run(
         }
     }
 
-    let source_ok = !cohort.require_source_reproduction
-        || (row.source_reproduction_status == "passed"
-            && matches!(row.goal_alignment.as_str(), "exact" | "normalized" | "reviewed"));
+    let goal_ok = row.goal_alignment != "mismatch";
+    let source_reproduced = row.source_reproduction_status == "passed"
+        && matches!(row.goal_alignment.as_str(), "exact" | "normalized" | "reviewed");
+    let source_ok = !cohort.require_source_reproduction || source_reproduced;
     let specification_ok = !cohort.require_specification_audit || row.specification_audit_status == "passed";
     let vacuity_ok = !cohort.require_vacuity_audit || row.vacuity_audit_status == "passed";
     let assumptions_ok = !cohort.require_assumption_audit || row.assumption_audit_status == "passed";
     let raw_success = row.outcome == "solved" && row.kernel_verified;
-    let source_reproduced_success = raw_success && source_ok;
+    let source_reproduced_success = raw_success && source_reproduced && goal_ok;
     let assurance_qualified_success =
-        raw_success && source_ok && specification_ok && vacuity_ok && assumptions_ok;
+        raw_success && goal_ok && source_ok && specification_ok && vacuity_ok && assumptions_ok;
     let assurance_disqualified_success = raw_success
         && (row.goal_alignment == "mismatch"
             || row.specification_audit_status == "finding"
@@ -676,6 +697,10 @@ fn analyze(cohort: &Cohort, rows: &[RunRecord], input_sha256: String) -> Result<
         }
     }
     let observed_clusters: BTreeSet<String> = task_clusters.values().cloned().collect();
+    let observed_task_ids: Vec<&str> = by_task.keys().map(String::as_str).collect();
+    if canonical_task_id_set_digest(&observed_task_ids) != cohort.task_id_set_sha256 {
+        return Err("observed task IDs do not match the frozen cohort task_id_set_sha256".into());
+    }
     if observed_clusters.len() != cohort.expected_cluster_count {
         return Err(format!(
             "observed {} clusters; cohort pins {}",
@@ -726,6 +751,8 @@ fn analyze(cohort: &Cohort, rows: &[RunRecord], input_sha256: String) -> Result<
         split_manifest_sha256: cohort.split_manifest_sha256.clone(),
         expected_task_count: cohort.expected_task_count,
         expected_cluster_count: cohort.expected_cluster_count,
+        task_id_set_sha256: cohort.task_id_set_sha256.clone(),
+        results_jsonl_sha256: input_sha256,
         observed_task_count: by_task.len(),
         observed_cluster_count: observed_clusters.len(),
         arm_count: cohort.arms.len(),
@@ -775,6 +802,7 @@ fn synthetic_cohort() -> Cohort {
         split_manifest_sha256: fake_digest("split-manifest"),
         expected_task_count: 4,
         expected_cluster_count: 2,
+        task_id_set_sha256: canonical_task_id_set_digest(&["task-1", "task-2", "task-3", "task-4"]),
         budget_policy_sha256: fake_digest("fixed-budget-policy"),
         max_attempts_per_task: 32,
         max_wall_ms_per_task: 300_000,
@@ -815,6 +843,8 @@ fn synthetic_row(cohort: &Cohort, arm: &Arm, task_id: &str, cluster: &str, succe
         task_id: task_id.into(),
         cluster_id: cluster.into(),
         repository: format!("https://github.com/example/{cluster}"),
+        repository_commit: fake_digest(&format!("commit:{cluster}"))[..40].to_owned(),
+        lean_version: "v4.22.0".into(),
         source_file: format!("{cluster}/src/{task_id}.lean"),
         target_statement_sha256: fake_digest(&format!("target:{task_id}")),
         environment_sha256: fake_digest("environment"),
