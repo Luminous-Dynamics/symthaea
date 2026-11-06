@@ -71,10 +71,13 @@ jobs:
         run: |
           set -euo pipefail
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
 
       - name: Test four-factor contract invariants
         run: |
           set -euo pipefail
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+          cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
 
       - name: Generate source-bound protocol receipt
