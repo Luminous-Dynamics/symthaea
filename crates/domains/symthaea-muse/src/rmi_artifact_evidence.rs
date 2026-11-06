@@ -798,7 +798,7 @@ mod tests {
         let manifest = manifest();
         let mut inputs = payloads();
         inputs[0] = RmiArtifactPayloadV1 {
-            artifact_id: inputs[0].artifact_id,
+            artifact_id: inputs[0].artifact_id.clone(),
             bytes: b"partner-midX",
         };
         assert_eq!(
