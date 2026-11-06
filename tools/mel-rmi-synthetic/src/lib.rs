@@ -3117,11 +3117,12 @@ mod tests {
             let protected_after: Vec<_> =
                 midi_channel_note_events(&after, protected_channel);
 
-            assert_ne!(target_notes_before, target_notes_after);
-            assert_eq!(protected_before, protected_after);
             if input.dimension == Dimension::Tempo {
                 assert_ne!(midi_tempo(&before), midi_tempo(&after));
+            } else {
+                assert_ne!(target_notes_before, target_notes_after);
             }
+            assert_eq!(protected_before, protected_after);
             if protected.dimension == Dimension::Tempo {
                 assert_eq!(midi_tempo(&before), midi_tempo(&after));
             }
@@ -3173,6 +3174,7 @@ mod tests {
         let track_len = u32::from_be_bytes(midi[18..22].try_into().unwrap()) as usize;
         let track = &midi[22..22 + track_len];
         let mut cursor = 0usize;
+        let mut absolute_tick = 0_u32;
         let mut events = Vec::new();
         while cursor < track.len() {
             let first = track[cursor];
@@ -3184,7 +3186,7 @@ mod tests {
                 cursor += 1;
                 delta = (delta << 7) | u32::from(byte & 0x7f);
             }
-            let _ = delta;
+            absolute_tick += delta;
             let event_status = track[cursor];
             cursor += 1;
             if event_status == 0xff {
@@ -3199,7 +3201,7 @@ mod tests {
                 let event = track[cursor - 1..cursor + 2].to_vec();
                 cursor += 2;
                 if event_status == status {
-                    events.push(event);
+                    events.push((absolute_tick, event));
                 }
             } else if event_status & 0xf0 == 0xc0 {
                 cursor += 1;
