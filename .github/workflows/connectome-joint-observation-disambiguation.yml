@@ -2,6 +2,7 @@ name: Correlated joint connectome observation disambiguation
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_joint_observation_disambiguation_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_joint_observation_disambiguation_oracle.py"
