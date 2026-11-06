@@ -305,7 +305,7 @@ def fixture_errors(payload: dict, repo_root: Path) -> list[str]:
             errors.append(f"{candidate_key}: README.md missing")
         else:
             try:
-                readme_text = readme.read_text(encoding="utf-8").lower()
+                readme_text = readme.read_text(encoding="utf-8").lower().replace("*", "")
             except (OSError, UnicodeError) as exc:
                 errors.append(f"{candidate_key}: cannot read README.md: {exc}")
                 readme_text = ""
