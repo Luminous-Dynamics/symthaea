@@ -343,7 +343,7 @@
       "model_id": "anatomy-only",
       "model_kind": "ANATOMY_ONLY",
       "implementation_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-      "training_manifest_sha256": "a8b0f62ed891262789547ab8d9730f48951ad3a65e2d9e787bddcdd8066e85f7",
+      "training_manifest_sha256": "881fa40a4ed98e039ad715234de57b3a87cc9b72aa5771cb440c82eace827787",
       "training_animal_ids": [
         "WT-TRAIN-01"
       ],
@@ -361,7 +361,7 @@
       ],
       "calibration_method": "NONE",
       "calibration_animal_ids": [],
-      "calibration_manifest_sha256": "60bfd4001fb10cc239701e0929c19a41fe8d4db79f7090338e4d131f0b99947a",
+      "calibration_manifest_sha256": "cb7fd00129dc859e015b053bbdb2976ad92533793a94fe9ad25b0be4163de768",
       "calibration_receipt_sha256": null
     },
     {
