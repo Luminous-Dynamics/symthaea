@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.schema.json",
+  "title": "Set-valued connectome hypothesis coverage synthetic benchmark",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "query",
+    "hypothesis_universe",
+    "channels",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "hypothesis_universe": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/channel"
+      }
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "baseline_decision"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "baseline_decision": {
+          "type": "boolean"
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "equivalence_class_id",
+        "adjudication_status",
+        "query_decision",
+        "invalidates_policy",
+        "impact_weight"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "equivalence_class_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjudication_status": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE",
+            "INDETERMINATE"
+          ]
+        },
+        "query_decision": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "invalidates_policy": {
+          "type": "boolean"
+        },
+        "impact_weight": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "adjudication_status": {
+                "const": "ADMISSIBLE"
+              }
+            },
+            "required": [
+              "adjudication_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "query_decision": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "adjudication_status": {
+                "enum": [
+                  "INADMISSIBLE",
+                  "INDETERMINATE"
+                ]
+              }
+            },
+            "required": [
+              "adjudication_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "impact_weight": {
+                "maximum": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_rank",
+        "candidate_id"
+      ],
+      "properties": {
+        "proposal_rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_id",
+        "ancestry_id",
+        "proposals"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ancestry_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/proposal"
+          }
+        }
+      }
+    },
+    "metric_expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_count",
+        "admissible_proposal_count",
+        "validity",
+        "uniqueness",
+        "recovered_admissible_class_count",
+        "admissible_class_count",
+        "recovery",
+        "recovered_query_critical_class_count",
+        "query_critical_class_count",
+        "query_critical_recovery",
+        "impact_weighted_query_critical_recovery",
+        "inadmissible_proposal_count",
+        "indeterminate_proposal_count",
+        "unknown_proposal_count"
+      ],
+      "properties": {
+        "proposal_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "admissible_proposal_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "validity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "uniqueness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "recovered_admissible_class_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "admissible_class_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "recovery": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "recovered_query_critical_class_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_critical_class_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "query_critical_recovery": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "impact_weighted_query_critical_recovery": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "inadmissible_proposal_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "indeterminate_proposal_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unknown_proposal_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_budget",
+        "final_per_channel",
+        "final_pooled_union"
+      ],
+      "properties": {
+        "max_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "final_per_channel": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/metric_expectation"
+          }
+        },
+        "final_pooled_union": {
+          "$ref": "#/$defs/metric_expectation"
+        }
+      }
+    }
+  }
+}

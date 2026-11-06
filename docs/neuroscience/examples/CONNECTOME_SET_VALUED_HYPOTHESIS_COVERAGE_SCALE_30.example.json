@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "run_id": "set-valued-connectome-hypothesis-coverage-scale-30-v1",
+  "claim_scope": "synthetic_known_truth",
+  "query": {
+    "query_id": "rare-query-critical-class-in-large-hypothesis-space",
+    "query_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "baseline_decision": true
+  },
+  "hypothesis_universe": [
+    {
+      "candidate_id": "candidate-00",
+      "equivalence_class_id": "class-00",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-01",
+      "equivalence_class_id": "class-01",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-02",
+      "equivalence_class_id": "class-02",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-03",
+      "equivalence_class_id": "class-03",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-04",
+      "equivalence_class_id": "class-04",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-05",
+      "equivalence_class_id": "class-05",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-06",
+      "equivalence_class_id": "class-06",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-07",
+      "equivalence_class_id": "class-07",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-08",
+      "equivalence_class_id": "class-08",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-09",
+      "equivalence_class_id": "class-09",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-10",
+      "equivalence_class_id": "class-10",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-11",
+      "equivalence_class_id": "class-11",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-12",
+      "equivalence_class_id": "class-12",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-13",
+      "equivalence_class_id": "class-13",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-14",
+      "equivalence_class_id": "class-14",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-15",
+      "equivalence_class_id": "class-15",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-16",
+      "equivalence_class_id": "class-16",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-17",
+      "equivalence_class_id": "class-17",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-18",
+      "equivalence_class_id": "class-18",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-19",
+      "equivalence_class_id": "class-19",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-20",
+      "equivalence_class_id": "class-20",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-21",
+      "equivalence_class_id": "class-21",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-22",
+      "equivalence_class_id": "class-22",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-23",
+      "equivalence_class_id": "class-23",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-24",
+      "equivalence_class_id": "class-24",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-25",
+      "equivalence_class_id": "class-25",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-26",
+      "equivalence_class_id": "class-26",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-27",
+      "equivalence_class_id": "class-27",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-28",
+      "equivalence_class_id": "class-28",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-29",
+      "equivalence_class_id": "class-29",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": false,
+      "invalidates_policy": true,
+      "impact_weight": 12
+    },
+    {
+      "candidate_id": "alias-00",
+      "equivalence_class_id": "class-00",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "alias-01",
+      "equivalence_class_id": "class-00",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "alias-02",
+      "equivalence_class_id": "class-00",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "alias-03",
+      "equivalence_class_id": "class-00",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "alias-04",
+      "equivalence_class_id": "class-00",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "mode-collapse-large",
+      "ancestry_id": "source-pipeline-alpha-large",
+      "proposals": [
+        {
+          "proposal_rank": 1,
+          "candidate_id": "alias-00"
+        },
+        {
+          "proposal_rank": 2,
+          "candidate_id": "alias-01"
+        },
+        {
+          "proposal_rank": 3,
+          "candidate_id": "alias-02"
+        },
+        {
+          "proposal_rank": 4,
+          "candidate_id": "alias-03"
+        },
+        {
+          "proposal_rank": 5,
+          "candidate_id": "alias-04"
+        }
+      ]
+    },
+    {
+      "channel_id": "query-focused-large",
+      "ancestry_id": "source-pipeline-beta-large",
+      "proposals": [
+        {
+          "proposal_rank": 1,
+          "candidate_id": "candidate-29"
+        },
+        {
+          "proposal_rank": 2,
+          "candidate_id": "candidate-00"
+        },
+        {
+          "proposal_rank": 3,
+          "candidate_id": "candidate-01"
+        },
+        {
+          "proposal_rank": 4,
+          "candidate_id": "candidate-02"
+        },
+        {
+          "proposal_rank": 5,
+          "candidate_id": "candidate-03"
+        }
+      ]
+    }
+  ],
+  "oracle_expectations": {
+    "max_budget": 5,
+    "final_per_channel": {
+      "mode-collapse-large": {
+        "proposal_count": 5,
+        "admissible_proposal_count": 5,
+        "validity": 1,
+        "uniqueness": 0.2,
+        "recovered_admissible_class_count": 1,
+        "admissible_class_count": 30,
+        "recovery": 0.03333333333333333,
+        "recovered_query_critical_class_count": 0,
+        "query_critical_class_count": 1,
+        "query_critical_recovery": 0,
+        "impact_weighted_query_critical_recovery": 0,
+        "inadmissible_proposal_count": 0,
+        "indeterminate_proposal_count": 0,
+        "unknown_proposal_count": 0
+      },
+      "query-focused-large": {
+        "proposal_count": 5,
+        "admissible_proposal_count": 5,
+        "validity": 1,
+        "uniqueness": 1,
+        "recovered_admissible_class_count": 5,
+        "admissible_class_count": 30,
+        "recovery": 0.16666666666666666,
+        "recovered_query_critical_class_count": 1,
+        "query_critical_class_count": 1,
+        "query_critical_recovery": 1,
+        "impact_weighted_query_critical_recovery": 1,
+        "inadmissible_proposal_count": 0,
+        "indeterminate_proposal_count": 0,
+        "unknown_proposal_count": 0
+      }
+    },
+    "final_pooled_union": {
+      "proposal_count": 10,
+      "admissible_proposal_count": 10,
+      "validity": 1,
+      "uniqueness": 0.5,
+      "recovered_admissible_class_count": 5,
+      "admissible_class_count": 30,
+      "recovery": 0.16666666666666666,
+      "recovered_query_critical_class_count": 1,
+      "query_critical_class_count": 1,
+      "query_critical_recovery": 1,
+      "impact_weighted_query_critical_recovery": 1,
+      "inadmissible_proposal_count": 0,
+      "indeterminate_proposal_count": 0,
+      "unknown_proposal_count": 0
+    }
+  }
+}
