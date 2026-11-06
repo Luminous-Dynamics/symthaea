@@ -1,11 +1,11 @@
 name: One-time formatting pass for query-specific stopping audit
 
 on:
-  push:
-    branches:
-      - "research/query-specific-connectome-stopping-v1"
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs"
+      - ".github/workflows/format-query-specific-stopping-once.yml"
 
 permissions:
   contents: write
@@ -13,19 +13,21 @@ permissions:
 jobs:
   format-once:
     name: Format exact Rust source and commit normalized result
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login == 'Tristan-Stoltz-ERC'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact pushed commit
+      - name: Checkout exact PR head
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: true
       - name: Install stable Rust formatter
         uses: dtolnay/rust-toolchain@stable
       - name: Apply rustfmt to the single audit source
         run: rustfmt --edition 2024 tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs
       - name: Commit formatting-only change if required
+        env:
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           if git diff --quiet -- tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs; then
             echo "Rust source is already formatted."
@@ -35,4 +37,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add tools/connectomics-intake-audit/src/bin/connectome_question_specific_stopping_audit.rs
           git commit -m "style(connectomics): format question-specific stopping auditor"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${PR_BRANCH}"
