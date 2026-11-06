@@ -164,3 +164,12 @@ A successful V1/V2 result establishes only that the evaluated candidate produced
 ## Current execution owner
 
 The co-design benchmark track is now tracked in [ENG-KNOW-CODESIGN-001 #10702](https://github.com/Luminous-Dynamics/symthaea/issues/10702). This issue owns the matched design-first/checklist/knowability-conditioned/co-design experiment, non-compensatory evaluator mutations, lifecycle economics and Pareto-preserving report. This proposal remains design-only until those tasks have independent gold adjudication and owner review.
+
+
+## Statistical preregistration boundary
+
+The eight paired rows are a pilot/authoring tranche, not a powered confirmatory benchmark. The independent experimental unit is the base design family—not each CAD variant, mutation, seed or model call. Confirmatory tasks must hold out complete geometry/assembly, process and measurement-chain families. The co-design issue #10702 now requires matched arms, randomized order, sealed adjudication, exact task denominators, paired binary analysis (e.g. exact McNemar), family-cluster bootstrap for continuous cost/time outcomes, and multiplicity control for co-primary comparisons.
+
+For zero false accepts on (n) independent negative-control families, the one-sided 95% exact binomial upper bound is (1-0.05^{1/n}): 59/59 is below 5%, and 299/299 is below 1%. Mutations/variants from one base family are correlated and do not increase (n). These bounds apply only to the declared sampling frame; no universal safety or reliability guarantee follows.
+
+The eight-row matrix is only a pilot. No claim that co-design beats a frontier agent or reduces lifecycle cost is permitted until an independently adjudicated, preregistered confirmatory study is completed.
