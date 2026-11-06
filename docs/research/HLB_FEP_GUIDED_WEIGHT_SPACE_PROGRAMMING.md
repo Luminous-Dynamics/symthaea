@@ -373,6 +373,22 @@ Recent complexity-matched active-inference/RL comparisons do not establish a uni
 
 The analytical/oracle baseline is an upper bound, never a tuning signal. Weights-only and trace-assisted WSP are scored separately.
 
+## 6.1 Current field position and what a fair comparison means
+
+The field is moving quickly, and there is no single "SOTA" across these different problem classes. The relevant external reference points are:
+
+| Area | Current external reference | What it establishes | Symthaea's required comparison |
+|---|---|---|---|
+| Weight-space learning | Dayan, Eitan & Maron, ICML 2026, permutation-equivariant weight-space networks | A theoretical expressivity analysis, universality results under stated assumptions, and a reported 34% improvement over prior SOTA on their own benchmarks | Include their permutation-equivariant family as a baseline where implementable. Compare function-space generalization, symmetry handling, task transfer, parameter count, and compute. Do not equate SWI's candidate editor with a trained weight-space learner. |
+| Continuous-time networks | NIALIM / DFA-CfN / PRDFA-CfN, IEEE TNNLS 2026 | A revised closed-form approximation with an error upper bound and reported results across six sequence domains | Reproduce at least two appropriate public tasks with exact splits, missingness, sampling intervals, parameter count, and reference solver accuracy before making a CfC superiority claim. |
+| Active inference | Friston et al., Nature Communications 2026, active structure learning and the three-ball rule-discovery paradigm | Model-structure information gain can guide observation selection; BMR can efficiently compare reduced models after evidence accumulation | Reproduce the bounded task, then test whether Symthaea's state/parameter/model decomposition improves observations-to-correct-model and calibration. The paper assumes a known generative model family; it is not a result for general perception or open-ended reasoning. |
+| Weight-space programming | Takehi et al., MIT CSAIL 2026, plus OpenWSP's independent records | Direct weight inspection/editing can produce striking small-model results, but outcomes depend heavily on prompts, editor budgets, sampling, token limits, and evaluation protocol | Pin every checkpoint, prompt/editor revision, tool permission, edit budget, and evaluation. Report live and calibration runs separately; do not cite one headline as portable capability. |
+| HDC/VSA | 2025 comparative review across popular HD/VSA tasks and 121 UCI datasets | HDC has resource and compositional advantages in some settings, but conventional SVM/RVFL baselines can win selected classification tasks | Require identical feature inputs and conventional baselines. Win on compositional OOD transfer, robust online learning, memory/latency, or proof/privacy compatibility rather than assuming HDC wins ordinary classification. |
+
+A recent independent WSP replication illustrates why protocol identity matters: OpenWSP reports 12.9% on a live MATH-500 evaluation against the MIT authors' reported 48.1% and a 50.6% local calibration of the released edit. Its live evaluation used four samples per problem, compared with one for local calibration, and 84.25% of live generations hit the token limit. This is not a controlled refutation of the MIT result, but it demonstrates that raw scores from different evaluation conditions are not interchangeable. The benchmark should preserve the full evaluation configuration and keep all attempt/calibration rows visible.
+
+**Honest position today:** Symthaea has a distinctive, increasingly auditable implementation foundation—typed candidate-only parameter programs, native transactional adapters, explicit epistemic information primitives, and a symmetry-aware test. It does not yet have a production epistemic controller, an autonomous WSP proposer, a measured integrated factorial result, or a demonstrated advantage over the above external baselines. The near-term research contribution should be reproducibility, functional-equivalence-aware weight repair, and a well-controlled comparison—not a premature general-intelligence or SOTA claim.
+
 ## 7. Metrics and hard acceptance gates
 
 ### Dynamics
