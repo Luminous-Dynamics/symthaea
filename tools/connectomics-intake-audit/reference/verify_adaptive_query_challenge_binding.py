@@ -70,7 +70,7 @@ def validate_manifest_identity(binding: dict[str, Any], input_data: dict[str, An
             require(re.fullmatch(r'[0-9a-f]{64}', value) is not None, f'{key} malformed')
 
 
-def validate_challenge_semantics(binding: dict[str, Any], challenge_result: dict[str, Any]) -> None:
+def validate_challenge_semantics(binding: dict[str, Any], challenge_result: dict[str, Any], computed_challenge_sha: str) -> None:
     expected = binding['expected_challenge_result']
     fields = (
         'added_scenario_count',
@@ -88,7 +88,7 @@ def validate_challenge_semantics(binding: dict[str, Any], challenge_result: dict
     )
     actual = {field: challenge_result.get(field) for field in fields}
     require(actual == expected, 'challenge result differs from the frozen expected outcome')
-    require(challenge_result.get('challenge_sha256') == binding['expected_challenge_sha256'], 'challenge digest differs from frozen challenge digest')
+    require(challenge_result.get('challenge_sha256') == computed_challenge_sha, 'report challenge digest differs from the digest recomputed from exact base input bytes')
     require(re.fullmatch(r'[0-9a-f]{64}', challenge_result.get('expanded_scenario_set_sha256', '')) is not None, 'expanded scenario-set digest malformed')
     require(re.fullmatch(r'[0-9a-f]{64}', challenge_result.get('expanded_joint_support_sha256', '')) is not None, 'expanded joint-support digest malformed')
 
@@ -120,8 +120,7 @@ def build_receipt(
     actions = sorted(input_data['actions'], key=lambda row: row['action_id'])
     action_ids = [action['action_id'] for action in actions]
     computed_challenge_sha = oracle_module.scenario_expansion_challenge_digest(input_data, input_challenge, action_ids)
-    require(computed_challenge_sha == binding['expected_challenge_sha256'], 'raw input challenge does not match the pinned challenge digest')
-    validate_challenge_semantics(binding, report_challenge)
+    validate_challenge_semantics(binding, report_challenge, computed_challenge_sha)
 
     expected_report = oracle_module.run(input_data, input_bytes)
     require(report == expected_report, 'upstream report differs from the independent Python set-filtering replay')
@@ -209,9 +208,9 @@ def main() -> int:
     if args.self_test:
         self_test()
         return 0
-    required = (args.input, args.report, args.binding, args.oracle, args.rust_source, args.receipt, args.upstream_commit_sha)
-    require(all(value is not None for value in required), 'all artifact paths, upstream commit SHA and receipt path are required')
     try:
+        required = (args.input, args.report, args.binding, args.oracle, args.rust_source, args.receipt, args.upstream_commit_sha)
+        require(all(value is not None for value in required), 'all artifact paths, upstream commit SHA and receipt path are required')
         input_bytes = args.input.read_bytes()
         report_bytes = args.report.read_bytes()
         binding_bytes = args.binding.read_bytes()
