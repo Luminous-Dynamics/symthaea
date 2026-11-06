@@ -120,6 +120,7 @@ pub struct RecoverabilityManifestFieldsV1 {
     pub corpus_snapshot_sha256: String,
     pub search_surface_sha256: String,
     pub route_policy_sha256: String,
+    pub surface_completeness_evidence_refs: Vec<String>,
     pub surface_state: SearchSurfaceStateV1,
     pub start_node_ref: String,
     pub max_route_cost: u32,
@@ -157,6 +158,7 @@ impl From<&RecoverabilityManifestV1> for RecoverabilityManifestFieldsV1 {
             corpus_snapshot_sha256: value.corpus_snapshot_sha256.clone(),
             search_surface_sha256: value.search_surface_sha256.clone(),
             route_policy_sha256: value.route_policy_sha256.clone(),
+            surface_completeness_evidence_refs: value.surface_completeness_evidence_refs.clone(),
             surface_state: value.surface_state,
             start_node_ref: value.start_node_ref.clone(),
             max_route_cost: value.max_route_cost,
@@ -190,6 +192,7 @@ pub struct RecoverabilityAuditReportV1 {
     pub model_free: bool,
     pub benchmark_relative_only: bool,
     pub external_anchor_required: bool,
+    pub surface_completeness_evidence_refs: Vec<String>,
     pub evidence_unit_count: usize,
     pub distinct_source_family_count: usize,
     pub class_counts: BTreeMap<String, usize>,
@@ -257,6 +260,36 @@ fn validate_fields(fields: &RecoverabilityManifestFieldsV1) -> Result<(), Vec<St
     ] {
         if !is_nonzero_sha256(digest) {
             errors.push(format!("{path}: expected non-zero lowercase SHA-256"));
+        }
+    }
+
+    if fields.surface_state == SearchSurfaceStateV1::CompleteFrozenInventory
+        && fields.surface_completeness_evidence_refs.is_empty()
+    {
+        errors.push(
+            "surface_completeness_evidence_refs: complete inventory requires at least one evaluator-side evidence reference"
+                .to_string(),
+        );
+    }
+    if fields.surface_state != SearchSurfaceStateV1::CompleteFrozenInventory
+        && !fields.surface_completeness_evidence_refs.is_empty()
+    {
+        errors.push(
+            "surface_completeness_evidence_refs: only a complete frozen inventory may carry completeness evidence"
+                .to_string(),
+        );
+    }
+    let mut completeness_refs = BTreeSet::new();
+    for (index, reference) in fields.surface_completeness_evidence_refs.iter().enumerate() {
+        require_ref(
+            reference,
+            &format!("surface_completeness_evidence_refs[{index}]"),
+            &mut errors,
+        );
+        if !completeness_refs.insert(reference.as_str()) {
+            errors.push(format!(
+                "surface_completeness_evidence_refs[{index}]: duplicate reference"
+            ));
         }
     }
 
@@ -615,6 +648,7 @@ pub fn verify_recoverability_manifest(
         model_free: true,
         benchmark_relative_only: true,
         external_anchor_required: true,
+        surface_completeness_evidence_refs: fields.surface_completeness_evidence_refs.clone(),
         evidence_unit_count: fields.evidence_units.len(),
         distinct_source_family_count: families.len(),
         class_counts,
@@ -646,6 +680,9 @@ mod tests {
             corpus_snapshot_sha256: digest('a'),
             search_surface_sha256: digest('b'),
             route_policy_sha256: digest('c'),
+            surface_completeness_evidence_refs: vec![
+                "inventory-evidence:synthetic-complete-route-table-v1".into(),
+            ],
             surface_state: SearchSurfaceStateV1::CompleteFrozenInventory,
             start_node_ref: "state:start".to_string(),
             max_route_cost: 8,
@@ -793,6 +830,7 @@ mod tests {
             corpus_snapshot_sha256: fields.corpus_snapshot_sha256,
             search_surface_sha256: fields.search_surface_sha256,
             route_policy_sha256: fields.route_policy_sha256,
+            surface_completeness_evidence_refs: fields.surface_completeness_evidence_refs,
             surface_state: fields.surface_state,
             start_node_ref: fields.start_node_ref,
             max_route_cost: fields.max_route_cost,
@@ -900,6 +938,22 @@ mod tests {
             record.recoverability == RecoverabilityClassV1::NotEvaluable
                 && record.route_edge_refs.is_empty()
         }));
+    }
+
+    #[test]
+    fn complete_inventory_requires_explicit_completeness_evidence() {
+        let mut fields = base_fields();
+        fields.surface_completeness_evidence_refs.clear();
+        assert!(validate_fields(&fields).is_err());
+    }
+
+    #[test]
+    fn partial_and_unknown_surfaces_cannot_claim_inventory_completeness() {
+        let mut fields = base_fields();
+        fields.surface_state = SearchSurfaceStateV1::PartialObserved;
+        assert!(validate_fields(&fields).is_err());
+        fields.surface_completeness_evidence_refs.clear();
+        assert!(validate_fields(&fields).is_ok());
     }
 
     #[test]
