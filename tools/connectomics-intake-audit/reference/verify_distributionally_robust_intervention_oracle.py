@@ -100,6 +100,42 @@ def vertex_eig(
     return max(0.0, value)
 
 
+def pairwise_midpoint_eig(
+    left: dict[str, Any],
+    right: dict[str, Any],
+    worlds: dict[str, dict[str, Any]],
+    prediction_index: dict[tuple[str, str, str], dict[str, float]],
+    action_id: str,
+) -> float:
+    left_prior = {row['world_id']: row['probability'] for row in left['prior']}
+    right_prior = {row['world_id']: row['probability'] for row in right['prior']}
+    mixed_prior = {
+        world_id: 0.5 * (left_prior[world_id] + right_prior[world_id])
+        for world_id in worlds
+    }
+    mixed_conditional: dict[str, dict[str, float]] = {}
+    predictive: dict[str, float] = {}
+    conditional_entropy = 0.0
+    for world_id in worlds:
+        joint: dict[str, float] = {}
+        for vertex, weight, prior in (
+            (left, 0.5, left_prior[world_id]),
+            (right, 0.5, right_prior[world_id]),
+        ):
+            distribution = prediction_index[(vertex['model_vertex_id'], action_id, world_id)]
+            for outcome_id, probability in distribution.items():
+                joint[outcome_id] = joint.get(outcome_id, 0.0) + weight * prior * probability
+        conditional = {
+            outcome_id: joint_probability / mixed_prior[world_id]
+            for outcome_id, joint_probability in joint.items()
+        }
+        mixed_conditional[world_id] = conditional
+        conditional_entropy += mixed_prior[world_id] * entropy(list(conditional.values()))
+        for outcome_id, probability in joint.items():
+            predictive[outcome_id] = predictive.get(outcome_id, 0.0) + probability
+    return max(0.0, entropy(list(predictive.values())) - conditional_entropy)
+
+
 def action_result(
     action: dict[str, Any],
     models: list[dict[str, Any]],
@@ -146,6 +182,11 @@ def action_result(
         vertex_eig(model, worlds, prediction_index, action_id)
         for model in models
     ]
+    pairwise_midpoint_eigs = [
+        pairwise_midpoint_eig(models[i], models[j], worlds, prediction_index, action_id)
+        for i in range(len(models))
+        for j in range(i + 1, len(models))
+    ]
     value_per_cost = max(0.0, baseline_loss - robust_loss) / action['cost_units']
     is_feasible = action['feasibility_status'] == 'FEASIBLE'
     certificate = is_feasible and robust_loss <= certificate_tolerance + 1e-12
@@ -173,6 +214,8 @@ def action_result(
         },
         'vertex_min_eig_bits': min(vertex_eigs),
         'vertex_max_eig_bits': max(vertex_eigs),
+        'pairwise_midpoint_eig_min_bits': min(pairwise_midpoint_eigs) if pairwise_midpoint_eigs else None,
+        'pairwise_midpoint_eig_max_bits': max(pairwise_midpoint_eigs) if pairwise_midpoint_eigs else None,
         'robust_certificate': certificate,
         'certificate_status': 'ROBUST_CERTIFICATE' if certificate else 'NOT_CERTIFIABLE',
     }
@@ -291,6 +334,8 @@ def evaluate(data: dict[str, Any], input_sha256: str) -> dict[str, Any]:
             'value_per_cost_by_intervention': result['value_per_cost'],
             'vertex_min_eig_bits_by_intervention': result['vertex_min_eig_bits'],
             'vertex_max_eig_bits_by_intervention': result['vertex_max_eig_bits'],
+            'pairwise_midpoint_eig_min_bits_by_intervention': result['pairwise_midpoint_eig_min_bits'],
+            'pairwise_midpoint_eig_max_bits_by_intervention': result['pairwise_midpoint_eig_max_bits'],
             'robust_certificate_by_intervention': result['robust_certificate'],
         }
         for field, actual in checks.items():
@@ -346,6 +391,10 @@ def self_tests(data: dict[str, Any]) -> None:
     require(close(reversal['clairvoyant_lower_bound'], 0.0), 'negative control: clairvoyant reversal lower bound is not zero')
     require(close(reversal['robust_policy_loss'], 0.15), 'negative control: reversal shared-policy risk is not 0.15')
     require(close(reversal['model_uncertainty_penalty'], 0.15), 'negative control: reversal uncertainty penalty is not 0.15')
+    require(
+        reversal['pairwise_midpoint_eig_min_bits'] < reversal['vertex_min_eig_bits'],
+        'negative control: interior midpoint did not expose the non-guarantee of vertex-minimum EIG',
+    )
     require(expected['selected_intervention_id'] == 'orthogonal-robust', 'negative control: robust action selection changed')
     require(expected['vertex_min_eig_greedy_intervention_id'] == 'reversal-high-eig', 'negative control: entropy comparator changed')
 
