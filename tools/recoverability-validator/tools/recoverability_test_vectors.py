@@ -16,7 +16,7 @@ from typing import Any
 
 PREFIX = b"symthaea.science_bench_refresh.recoverability.v1\0"
 SCHEMA = "symthaea.science_bench_refresh_recoverability_manifest.v1"
-ROOT = Path(__file__).resolve().parents[1] / "fixtures" / "recoverability"
+ROOT = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def compact(value: Any) -> bytes:
