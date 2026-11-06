@@ -44,10 +44,11 @@ A 2026-11-05 development run reported:
 
 Those are observations from the prior v0.4 development run. The current
 manifest-binding verifier revision has not been rerun against the v0.4 ZIP in
-this execution environment. Nine manifest preflight/negative-control unit test
-cases have been authored, but they have not yet been executed here. The draft
-PR's GitHub workflows were skipped, not passed. Both the unit-test run and the
-full 19-subject replay remain open validation tasks.
+this execution environment. Eighteen manifest preflight/negative-control unit
+tests have been authored. A local isolated replay of the 18 branch-equivalent
+test cases passed 18/18. The exact checked-in test module has not yet completed
+its dedicated GitHub workflow. The full 19-subject replay remains open because
+the v0.4 ZIP was not available in this execution session.
 
 ## Claim boundary
 
@@ -57,3 +58,28 @@ CadQuery OCP. It does not establish AP242 conformance, native FreeCAD history,
 manufacturability, engineering approval, physical conformity, safety, or code
 compliance. The report is tied to synthetic development fixtures and must not
 be represented as a CAD agent benchmark score.
+
+
+## Manifest-bound preflight hardening
+
+The verifier now accepts only the exact `engineering-fixture-materialization-v0.4`
+manifest schema; it does not treat a v0.1 archive as interchangeable. The
+12 CAD source/edit paths, assembly path and six part-definition paths must be
+pairwise distinct. Part-definition artifacts are SHA-256 checked before
+geometry processing. The report output guard also protects every part
+definition, including when the requested output path is a symlink to one.
+
+The exact toolchain check records and pins:
+- Python 3.13.5
+- CadQuery 2.8.0
+- Open CASCADE module 7.9.3.1
+- `cadquery-ocp` distribution 7.9.3.1.1
+- Trimesh 4.11.1
+- OpenSCAD 2021.01
+
+The manifest-binding layer uses only the Python standard library; optional
+CAD/mesh dependencies are imported only when the geometry audit runs.
+
+A dedicated [Engineering Fixture Integrity workflow](../../.github/workflows/engineering-fixture-integrity.yml)
+runs the exact 18-test suite and Python byte-compilation independently of the
+repository-wide Rust workspace metadata checks.
