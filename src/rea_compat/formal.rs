@@ -54,6 +54,8 @@ pub struct FormalClaimBinding {
     pub derivation_sha256: String,
     pub request_schema: String,
     pub result_schema: String,
+    /// The v0 formal generation number is 0; the textual version remains bound too.
+    pub evaluator_rule_generation: u64,
     pub evaluator_version: String,
     pub evaluator_rule_id: String,
     pub claim_id: String,
@@ -340,6 +342,7 @@ pub fn export_formal_provider_observation(
         derivation_sha256: evaluation.derivation_sha256.clone(),
         request_schema: CLAIM_SCHEMA.to_owned(),
         result_schema: CLAIM_EVALUATION_SCHEMA.to_owned(),
+        evaluator_rule_generation: 0,
         evaluator_version: evaluation.evaluator_version.clone(),
         evaluator_rule_id: evaluation.rule_id.clone(),
         claim_id: evaluation.claim_id.clone(),
@@ -380,6 +383,7 @@ pub fn validate_formal_provider_observation(
     if envelope.schema != FORMAL_PROVIDER_OBSERVATION_SCHEMA
         || envelope.mapping_rule != FORMAL_PROVIDER_OBSERVATION_RULE
         || envelope.evidence_class != FormalEvidenceClass::ProviderObservation
+        || envelope.binding.evaluator_rule_generation != 0
     {
         return Err(FormalMappingError::new(
             FormalMappingErrorKind::InvalidEvaluation,
