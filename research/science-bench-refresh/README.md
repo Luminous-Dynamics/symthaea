@@ -319,7 +319,7 @@ The model-free route graph classifies each pinned answer-critical evidence unit 
 - UnreachableWithinBudget: no permitted route fits the frozen budget and graph.
 - NotEvaluable: the surface is not frozen/observed or the artifact is unavailable/unknown.
 
-Every reachable classification includes a deterministic shortest route witness and cost, for evaluator-side use only. A partial/unknown surface cannot yield an unreachable finding. The graph is finite and benchmark-relative; it does not say that a source is absent from the open web or world.
+Every reachable classification includes a deterministic shortest route witness and cost, for evaluator-side use only. A partial surface can preserve a concrete positive route witness, but cannot yield an unreachable finding when no route is present; an unknown surface yields only NotEvaluable. Only a frozen, complete route inventory over the exact declared finite surface can establish UnreachableWithinBudget. The graph is benchmark-relative; it does not say that a source is absent from the open web or world.
 
 ~~~sh
 cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
@@ -331,4 +331,4 @@ cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- 
 
 The manifest commitment must be anchored independently before any scored trial. The audit report sets external_anchor_required=true; it does not authenticate the benchmark runner or prove that an evaluated model followed a route.
 
-The companion CI fixture has synthetic direct, reformulation, navigation, unreachable, and unknown-source cases. It compares a separate Python reference implementation with Rust typed serialization and mutation-tests commitment, budget, route and unknown-surface behavior. These are contract checks, not retrieval-performance results.
+The companion CI fixture has synthetic direct, reformulation, navigation, unreachable, and unknown-source cases. It compares a separate Python reference implementation with Rust typed serialization, every classification and shortest-route witness; it mutation-tests commitment, budget, route, partial/unknown surface and model-field behavior. These are contract checks, not retrieval-performance results.
