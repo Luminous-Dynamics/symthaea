@@ -6,6 +6,7 @@ on:
       - "crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - "tools/mel-rmi-studio-evidence-harness/**"
       - ".github/workflows/mel-rmi-studio-artifact-evidence.yml"
   workflow_dispatch:
 
@@ -29,11 +30,25 @@ jobs:
           actual="$(git rev-parse HEAD)"
           expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
-      - name: Install stable Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
-      - name: Format the changed module
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/rmi_artifact_evidence.rs
-      - name: Test Studio artifact evidence contract
-        run: cargo test --locked -p symthaea-muse --features studio rmi_artifact_evidence::tests
+      - name: Stage standalone verifier crate outside the root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-rmi-studio-evidence-harness"
+          mkdir -p "$staged/src" "$staged/protocol/src"
+          cp tools/mel-rmi-studio-evidence-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-rmi-studio-evidence-harness/Cargo.lock "$staged/Cargo.lock"
+          cp tools/mel-rmi-studio-evidence-harness/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-rmi-studio-evidence-harness/src/evidence_digest.rs "$staged/src/evidence_digest.rs"
+          cp tools/mel-rmi-studio-evidence-harness/src/rmi_artifact_evidence.rs "$staged/src/rmi_artifact_evidence.rs"
+          cp tools/mel-rmi-studio-evidence-harness/protocol/Cargo.toml "$staged/protocol/Cargo.toml"
+          cp tools/mel-rmi-studio-evidence-harness/protocol/src/lib.rs "$staged/protocol/src/lib.rs"
+          echo "MEL_RMI_STUDIO_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Format isolated verifier harness and exact production module
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
+      - name: Test exact production Studio artifact evidence module
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_RMI_STUDIO_MANIFEST"
