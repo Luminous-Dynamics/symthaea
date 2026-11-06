@@ -554,7 +554,9 @@ fn entropy(probabilities: &[f64]) -> f64 {
 }
 
 fn clean_information(value: f64) -> f64 {
-    if value.abs() < NUMERICAL_TOLERANCE {
+    // Suppress only tiny negative round-off. Preserve genuinely small positive
+    // information gains; a numerical tolerance must not become a signal floor.
+    if value < 0.0 && value > -NUMERICAL_TOLERANCE {
         0.0
     } else {
         value
@@ -669,6 +671,31 @@ mod tests {
             compute_hierarchical_information_gains(&hypotheses),
             Err(HierarchicalInformationGainError::OutcomeMassNotNormalized { .. })
         ));
+    }
+
+    #[test]
+    fn small_positive_information_gain_is_not_thresholded_to_zero() {
+        let epsilon = 1e-6;
+        let hypotheses = vec![
+            HierarchicalHypothesis {
+                model_id: "m0".into(),
+                parameter_id: "p0".into(),
+                state_id: "s0".into(),
+                prior_probability: 0.5,
+                outcome_probabilities_by_action: vec![vec![0.5 + epsilon, 0.5 - epsilon]],
+            },
+            HierarchicalHypothesis {
+                model_id: "m1".into(),
+                parameter_id: "p0".into(),
+                state_id: "s0".into(),
+                prior_probability: 0.5,
+                outcome_probabilities_by_action: vec![vec![0.5 - epsilon, 0.5 + epsilon]],
+            },
+        ];
+        let gain = compute_hierarchical_information_gain(&hypotheses, 0).expect("gain");
+        assert!(gain.model_information_gain_nats > 0.0);
+        assert!(gain.model_information_gain_nats < NUMERICAL_TOLERANCE);
+        assert!(gain.joint_information_gain_nats > 0.0);
     }
 
     #[test]
