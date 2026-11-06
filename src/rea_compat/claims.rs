@@ -15,6 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 pub const CLAIM_SCHEMA: &str = "luminous.rea.claim.v0";
+pub const CLAIM_EVALUATION_SCHEMA: &str = "luminous.rea.claim-evaluation.v0";
 pub const CLAIM_EVALUATOR_VERSION: &str = "rea-claim-evaluator/v0";
 pub const MAX_CLAIM_JSON_BYTES: usize = 1024 * 1024;
 
@@ -768,7 +769,7 @@ pub fn evaluate_claim(
 
     let claim_ceiling = claim_ceiling(claim.predicate);
     let body = EvaluationBody {
-        schema: CLAIM_SCHEMA,
+        schema: CLAIM_EVALUATION_SCHEMA,
         evaluator_version: CLAIM_EVALUATOR_VERSION,
         rule_id,
         claim_id: &claim.claim_id,
@@ -793,7 +794,7 @@ pub fn evaluate_claim(
     let derivation_sha256 = sha256_hex(&canonical);
 
     Ok(ClaimEvaluation {
-        schema: CLAIM_SCHEMA.to_owned(),
+        schema: CLAIM_EVALUATION_SCHEMA.to_owned(),
         evaluator_version: CLAIM_EVALUATOR_VERSION.to_owned(),
         rule_id: rule_id.to_owned(),
         claim_id: claim.claim_id.clone(),
