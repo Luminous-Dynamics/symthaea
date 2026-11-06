@@ -28,6 +28,7 @@ The crate is an explicit workspace package under `crates/domains/*`; it is not c
 
 - Hash exact original bytes. Do not parse and reserialize a payload before hashing it.
 - An imported payload requires a reviewed rights record permitting the exact intended use and per-file SHA-256 digests.
+- `verify_run_receipt_input_bindings` recomputes catalogue and split hashes over exact bytes, checks that the split refers to the exact imported dataset/version, verifies every payload file, and compares the payload digest set with the receipt.
 - A pending rights record may remain in the discovery catalogue, but cannot authorize binary ingestion.
 - Event and recording groups may not cross train/validation/test partitions. Receiver, campaign and location dimensions are additionally held out when declared by an experiment.
 - Pairwise source relations are `shared_failure_domain`, `unknown`, or `no_declared_common_domain`. The last means only that both declared inventories are complete and no dependency identifier overlaps. It is not proof of physical independence.
