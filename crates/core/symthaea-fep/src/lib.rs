@@ -170,9 +170,12 @@ pub use td_learning::{
 pub use generative_model::GenerativeModel;
 
 pub use dirichlet_model_reduction::{
-    DirichletBayesianModelReductionError, DirichletBayesianModelReductionResult,
-    DirichletConcentrationTensor, ReducedDirichletModelEvidence,
-    ReducedDirichletModelHypothesis, reduce_dirichlet_models,
+    DirichletActionPrediction, DirichletBayesianModelReductionError,
+    DirichletBayesianModelReductionResult, DirichletConcentrationTensor,
+    DirichletModelInformationGain, DirichletModelInformationGainError,
+    DirichletOutcomeModelBelief, DirichletPredictedOutcome,
+    ReducedDirichletModelEvidence, ReducedDirichletModelHypothesis,
+    evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
 };
 
 pub use hierarchical_information_gain::{
