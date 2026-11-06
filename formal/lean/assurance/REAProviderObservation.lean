@@ -46,15 +46,19 @@ scope. Separate schema and rule generations prevent a new interpretation from
 silently reusing an old result.
 -/
 structure ClaimBinding where
-  claimRequestDigest : Nat
-  requestSchemaGeneration : Nat
-  resultSchemaGeneration : Nat
+  claimRequestDigest : String
+  derivationDigest : String
+  requestSchemaGeneration : String
+  resultSchemaGeneration : String
   evaluatorRuleGeneration : GenerationIdentity
-  ruleId : Nat
-  operation : Nat
-  platform : Option Nat
-  platformVersion : Option Nat
-  environment : Option Nat
+  evaluatorVersion : String
+  ruleId : String
+  claimId : String
+  subjectSha256 : String
+  operation : String
+  platform : Option String
+  platformVersion : Option String
+  environment : Option String
   predicate : ClaimPredicate
   deriving DecidableEq, Repr
 
