@@ -25,7 +25,20 @@ run_validator() {
 }
 
 cargo fmt --manifest-path "$manifest" -- --check
+rustfmt --edition 2024 --check crates/domains/symthaea-epistemic-types/src/execution_receipt.rs
 cargo test --locked --manifest-path "$manifest"
+
+echo "==> Interpreting the pinned EPI-013R receipt corpus (candidate-only)"
+cargo run --locked --manifest-path "$manifest" --bin interpret-execution-receipts -- \
+  --receipt-corpus crates/domains/symthaea-epistemic-types/tests/fixtures/EPI_013R_TOOL_EXECUTION_RECEIPTS_V0_1.json \
+  --profile-corpus crates/domains/symthaea-epistemic-types/tests/fixtures/EPI_013_OSINT_TOOL_CAPABILITY_PROFILES_V0_1.json \
+  --expected-profile-sha256 d499b680d6461dbffed9b4ea053d3758ee4bd4e7d3e26658d26334acddc35cf7 \
+  --out "$reports_dir/osint-execution-interpretations.json"
+
+grep -Fq '"receipts_seen": 8' "$reports_dir/osint-execution-interpretations.json"
+grep -Fq '"receipts_interpreted": 8' "$reports_dir/osint-execution-interpretations.json"
+grep -Fq '"passed": true' "$reports_dir/osint-execution-interpretations.json"
+grep -Fq '"authority_ceiling": "CandidateAnalysisOnly"' "$reports_dir/osint-execution-interpretations.json"
 
 echo "==> Validating candidate-only retrieval-plan anchor contract"
 cargo run --locked --manifest-path "$manifest" --bin validate-retrieval-plan -- \

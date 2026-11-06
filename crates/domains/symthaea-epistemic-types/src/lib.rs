@@ -2,6 +2,7 @@ pub mod epistemic_watchdog;
 pub mod formal_watchdog;
 pub mod global_ledger;
 pub mod memory_projection;
+pub mod execution_receipt;
 
 pub use epistemic_watchdog::*;
 pub use formal_watchdog::*;
