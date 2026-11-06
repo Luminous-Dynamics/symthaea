@@ -25,6 +25,7 @@ pub mod non_anticipativity;
 pub mod paired_policy_comparison;
 pub mod rainflow_cycles;
 pub mod revenue_realization;
+pub mod rule_applicability;
 pub mod source_time_mapping;
 pub mod warranty_compliance;
 
