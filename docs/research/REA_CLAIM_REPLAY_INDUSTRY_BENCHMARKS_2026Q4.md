@@ -39,7 +39,7 @@ These layers should compose without substituting for one another. A signed state
 - [The Update Framework specification v1.0.36 (5 August 2026)](https://theupdateframework.github.io/specification/v1.0.36/)
 - [IETF RFC 8785 — JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html)
 
-Important detail: SLSA v1.2 is the current approved specification and has separate Build and Source tracks. Build provenance traces an artifact to its source/build process; Source provenance records how revisions were created and change-managed. REA adapters should bind a track-specific predicate and preserve the consumer's expected signer/builder policy. Sigstore's own security model requires independent Rekor monitoring; a log's signed append-only property is not a semantic truth oracle. SCITT RFC 9943 is a June 2026 IETF Standards Track publication for single-issuer signed-statement transparency; its receipts prove registration and auditability, not the truth of the issuer's statement. TUF 1.0.36 (5 August 2026) addresses update metadata, rollback and freeze protections. These systems supply distinct evidence families and must not be collapsed into one trust score.
+Important detail: SLSA v1.2 is the current approved specification and has separate Build and Source tracks. Build provenance traces an artifact to its source/build process; Source provenance records how revisions were created and change-managed. REA adapters should bind a track-specific predicate and preserve the consumer's expected signer/builder policy. Sigstore's own security model requires independent Rekor monitoring; a log's signed append-only property is not a semantic truth oracle. SCITT RFC 9943 is a June 2026 IETF Standards Track publication for single-issuer signed-statement transparency; its receipts prove registration and auditability, not the truth of the issuer's statement. TUF 1.0.36 (5 August 2026) addresses update metadata, rollback and freeze protections. These systems supply distinct evidence families and must not be collapsed into one trust score. The approved v1.2 specification should be distinguished from working drafts: Build L4 and the additional Build Environment/Dependency tracks currently appear in draft material, not as approved v1.2 requirements. Do not report draft levels as achieved industry standards.
 
 ## 2. Research benchmarks and what they teach us
 
@@ -245,4 +245,40 @@ Initial laws now being added to #10740:
 - unsupported predicate families remain non-positive regardless of evidence count.
 
 The target is 100% preservation of the finite metamorphic laws and zero unexpected upgrades. These tests qualify the transformations they exercise; they do not prove general semantic correctness.
+
+
+## 10. Next paradigm — proof-carrying claim obligations
+
+A future claim result should be a **proof-obligation certificate**, not only a verdict plus digest. Keep this outside the current v0 rule contract until a separate schema/version is reviewed.
+
+For each predicate, a closed, versioned rule manifest should declare:
+- the exact proposition and claim ceiling;
+- authorized Evidence types and source-authority requirements;
+- subject, operation, environment, platform and temporal scope keys;
+- lineage and independence obligations;
+- required prerequisite and falsification conditions;
+- contradiction, missing, unknown, inapplicable and unrepresented handling;
+- permitted inference operations and their rule/version digest.
+
+The evaluation output should enumerate every obligation with one of five non-collapsible outcomes: satisfied, violated, missing, unrepresented or not-applicable. Each satisfied obligation points to the exact Evidence IDs and source scope; each unsatisfied obligation states what is missing and why. Replay then verifies the entire obligation certificate under the pinned rule manifest, not merely a top-level disposition.
+
+This enables four further capabilities without a universal trust score:
+1. **Minimal witness sets:** identify a smallest sufficient subset of Evidence for each supported obligation; removing any witness should either preserve the result via another valid witness or invalidate it predictably.
+2. **Incremental proof invalidation:** when Evidence, source lineage, rule version, artifact digest or lifecycle state changes, invalidate only the dependent obligations and preserve unaffected proofs.
+3. **Counterexample-guided evaluation:** for each positive claim, expose the exact falsifying condition and the strongest observed counterexample or unresolved contradiction.
+4. **Auditable proof transfer:** a third party can replay the certificate without trusting the producer's internal evaluator, model weights or scoring function, subject to the disclosed shared primitives.
+
+### New benchmark dimensions
+
+| Dimension | Measurement | Proposed gate |
+|---|---|---|
+| Obligation completeness | Fraction of rule-declared obligations explicitly resolved or named as unresolved | 100%; no silent obligation omission |
+| Witness validity | Exact scope/identity and authorization for every cited witness | 100% finite oracle; zero unsupported witness promotion |
+| Witness minimality | Redundant premises per supported obligation; deletion sensitivity | Remove redundant premises without changing result; every retained minimal witness is necessary |
+| Counterexample sensitivity | Correct response to seeded falsifiers and same-scope contradiction | 100% finite falsification corpus; zero majority-vote contradiction suppression |
+| Incremental invalidation | Precision/recall of obligations invalidated by a change event | 100% exact finite change-impact oracle; zero stale positive certificates |
+| Rule drift detection | Rule semantic change without version/digest change | 0 undetected rule changes |
+| Independent certificate replay | Reproduction by independent implementation(s) | 100% finite supported subset; zero false replay matches |
+
+The current v0 evaluator deliberately supports only exact provider-reported normalized-result equality. The proof-obligation architecture is the path to broader predicates, but no predicate should be promoted until its manifest, independent oracle, falsifiers, source-owned Evidence contract and replay coverage exist.
 
