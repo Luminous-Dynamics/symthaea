@@ -25,9 +25,9 @@ These results are not directly rankable. Their exact sources, metrics, task scop
 
 ## 2. The CEB portfolio
 
-The machine-readable matrix defines 13 lanes: repository resolution, repository comprehension, context retrieval, test generation, refactoring, precise debugging, pre-merge review, secure correctness, Rust engineering, optimization, human-agent complementarity, evaluator integrity and documentation executability.
+The machine-readable matrix defines 14 lanes: repository resolution, repository comprehension, context retrieval, test generation, refactoring, precise debugging, pre-merge review, secure correctness, Rust engineering, optimization, human-agent complementarity, evaluator integrity and documentation executability.
 
-Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 49 primary metrics, 16 comparator records and 16 registered source URLs. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
+Each lane records its decision question, primary metrics, external comparators, baseline arms, evidence artifacts, independent authority, hard gates and holdout design. It contains 56 primary metrics across 14 lanes. The matrix comparator/source counts and the separate normalized external-observation counts must be read from their own versioned registries rather than conflated. The registry includes 15 external benchmark/methodology sources plus one internal documentation-audit implementation reference; the normalized external-observation registry records the 15 external sources separately. The matrix is design-only and contains no CEB performance score.
 
 ### Selective autonomy comparator — AgentAbstain
 
@@ -82,7 +82,11 @@ These are proposed thresholds, not measured CEB outcomes. Sample sizes and confi
 
 - Critical security/evaluator false accepts are disqualifying; no aggregate can cancel them.
 - Positive controls must pass; a reject-everything verifier cannot qualify.
+- The reference verifier itself must pass verifier-of-verifiers checks: frozen replay against adjudicated labels, repeatability from reset state, exact case/verifier provenance, input-label consistency, always-accept/always-reject/exact-match-only baselines, and mutation sensitivity of necessary checks.
+- At least one known-valid solution and permitted semantic alternative must be accepted before a verifier is frozen. Report positive acceptance and negative rejection separately; perfect negative rejection with zero positive acceptance is a false-reject failure, not a strong verifier.
 - A validly evidenced but incorrect patch is a candidate failure, not an integrity false reject.
+- If the task specification requires feature interactions, the oracle must test those compositions; isolated visible checks alone do not establish end-to-end specification compliance.
+- Verifier mutations, reference replays and same-input label consistency are qualification evidence, not candidate-performance results.
 - Ambiguous specifications/oracles remain unresolved until independent adjudication.
 - A receipt binds evidence; it does not prove the underlying assertion is true.
 - Public controls are development artifacts, not sealed holdouts.
