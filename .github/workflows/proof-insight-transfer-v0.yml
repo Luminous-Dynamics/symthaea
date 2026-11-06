@@ -4,8 +4,6 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/bridges/symthaea-proof-insights/**"
       - "data/benchmarks/proof-insight-transfer-v0/**"
       - "docs/research/proof-insight-transfer-2026.md"
