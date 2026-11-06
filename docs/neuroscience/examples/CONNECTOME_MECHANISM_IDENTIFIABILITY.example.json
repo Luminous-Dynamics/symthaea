@@ -1,0 +1,682 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-connectome-mechanism-identifiability-v1",
+  "claim_scope": "synthetic_known_truth",
+  "query": {
+    "query_id": "does-effective-pathway-support-behavior",
+    "query_spec_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "decision_rule_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "mechanisms": [
+    {
+      "mechanism_id": "direct",
+      "mechanism_class": "DIRECT_SYNAPTIC",
+      "query_decision": true,
+      "prior_probability": 0.45,
+      "source_evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "model_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    },
+    {
+      "mechanism_id": "extra",
+      "mechanism_class": "EXTRASYNAPTIC_LATENT",
+      "query_decision": true,
+      "prior_probability": 0.45,
+      "source_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "model_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "mechanism_id": "shared",
+      "mechanism_class": "SHARED_INPUT",
+      "query_decision": false,
+      "prior_probability": 0.1,
+      "source_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "model_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ],
+  "nuisance_profiles": [
+    {
+      "nuisance_profile_id": "nominal",
+      "profile_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "description": "Nominal indicator gain and registration."
+    },
+    {
+      "nuisance_profile_id": "indicator-saturation",
+      "profile_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "description": "Saturation collapses the pathway-selective signature."
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "passive",
+      "action_kind": "PASSIVE_OBSERVATION",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "safety_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outcome_ids": [
+        "response",
+        "no-response"
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "action_kind": "QUERY_DIRECTED_PERTURBATION",
+      "cost_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "safety_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "outcome_ids": [
+        "query-positive",
+        "query-negative"
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "action_kind": "PATHWAY_SELECTIVE_PERTURBATION",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "safety_profile_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "outcome_ids": [
+        "early",
+        "late"
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "action_kind": "ORTHOGONAL_MULTI_CHANNEL_MEASUREMENT",
+      "cost_units": 3,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "safety_profile_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "outcome_ids": [
+        "early",
+        "late",
+        "other"
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "action_kind": "DISALLOWED_REFERENCE",
+      "cost_units": 0.5,
+      "feasibility_status": "DISALLOWED",
+      "feasibility_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "safety_profile_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "outcome_ids": [
+        "direct-signature",
+        "extra-signature",
+        "shared-signature"
+      ]
+    }
+  ],
+  "predictions": [
+    {
+      "intervention_id": "passive",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "outcomes": [
+        {
+          "outcome_id": "response",
+          "probability": 0.8
+        },
+        {
+          "outcome_id": "no-response",
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "intervention_id": "passive",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "outcomes": [
+        {
+          "outcome_id": "response",
+          "probability": 0.8
+        },
+        {
+          "outcome_id": "no-response",
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "intervention_id": "passive",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "outcomes": [
+        {
+          "outcome_id": "response",
+          "probability": 0.8
+        },
+        {
+          "outcome_id": "no-response",
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "intervention_id": "passive",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "outcomes": [
+        {
+          "outcome_id": "response",
+          "probability": 0.8
+        },
+        {
+          "outcome_id": "no-response",
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "intervention_id": "passive",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "outcomes": [
+        {
+          "outcome_id": "response",
+          "probability": 0.8
+        },
+        {
+          "outcome_id": "no-response",
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "intervention_id": "passive",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "outcomes": [
+        {
+          "outcome_id": "response",
+          "probability": 0.8
+        },
+        {
+          "outcome_id": "no-response",
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "outcomes": [
+        {
+          "outcome_id": "query-positive",
+          "probability": 0.9
+        },
+        {
+          "outcome_id": "query-negative",
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "outcomes": [
+        {
+          "outcome_id": "query-positive",
+          "probability": 0.9
+        },
+        {
+          "outcome_id": "query-negative",
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "outcomes": [
+        {
+          "outcome_id": "query-positive",
+          "probability": 0.1
+        },
+        {
+          "outcome_id": "query-negative",
+          "probability": 0.9
+        }
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "outcomes": [
+        {
+          "outcome_id": "query-positive",
+          "probability": 0.9
+        },
+        {
+          "outcome_id": "query-negative",
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "outcomes": [
+        {
+          "outcome_id": "query-positive",
+          "probability": 0.9
+        },
+        {
+          "outcome_id": "query-negative",
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "intervention_id": "query-probe",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "outcomes": [
+        {
+          "outcome_id": "query-positive",
+          "probability": 0.1
+        },
+        {
+          "outcome_id": "query-negative",
+          "probability": 0.9
+        }
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.9
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.1
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.9
+        }
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.5
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.5
+        }
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.5
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.5
+        }
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.5
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.5
+        }
+      ]
+    },
+    {
+      "intervention_id": "selective-pathway",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.5
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.5
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.85
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "other",
+          "probability": 0.075
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.85
+        },
+        {
+          "outcome_id": "other",
+          "probability": 0.075
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "other",
+          "probability": 0.85
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.85
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "other",
+          "probability": 0.075
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.85
+        },
+        {
+          "outcome_id": "other",
+          "probability": 0.075
+        }
+      ]
+    },
+    {
+      "intervention_id": "orthogonal-joint",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "outcomes": [
+        {
+          "outcome_id": "early",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "late",
+          "probability": 0.075
+        },
+        {
+          "outcome_id": "other",
+          "probability": 0.85
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "outcomes": [
+        {
+          "outcome_id": "direct-signature",
+          "probability": 1
+        },
+        {
+          "outcome_id": "extra-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "shared-signature",
+          "probability": 0
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "outcomes": [
+        {
+          "outcome_id": "direct-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "extra-signature",
+          "probability": 1
+        },
+        {
+          "outcome_id": "shared-signature",
+          "probability": 0
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "nominal",
+      "observation_model_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "outcomes": [
+        {
+          "outcome_id": "direct-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "extra-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "shared-signature",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "mechanism_id": "direct",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "outcomes": [
+        {
+          "outcome_id": "direct-signature",
+          "probability": 1
+        },
+        {
+          "outcome_id": "extra-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "shared-signature",
+          "probability": 0
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "mechanism_id": "extra",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "outcomes": [
+        {
+          "outcome_id": "direct-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "extra-signature",
+          "probability": 1
+        },
+        {
+          "outcome_id": "shared-signature",
+          "probability": 0
+        }
+      ]
+    },
+    {
+      "intervention_id": "infeasible-perfect",
+      "mechanism_id": "shared",
+      "nuisance_profile_id": "indicator-saturation",
+      "observation_model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "outcomes": [
+        {
+          "outcome_id": "direct-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "extra-signature",
+          "probability": 0
+        },
+        {
+          "outcome_id": "shared-signature",
+          "probability": 1
+        }
+      ]
+    }
+  ],
+  "replicate_design": {
+    "independent_unit": "synthetic_replicate",
+    "replicate_count": 7,
+    "independence_scope": "SYNTHETIC_IID_KNOWN_TRUTH",
+    "split_manifest_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "alpha": 0.05,
+  "known_answer": {
+    "expected_selected_intervention_id": "orthogonal-joint",
+    "expected_action_statuses": {
+      "passive": {
+        "query_identified": false,
+        "mechanism_identified": false
+      },
+      "query-probe": {
+        "query_identified": true,
+        "mechanism_identified": false
+      },
+      "selective-pathway": {
+        "query_identified": false,
+        "mechanism_identified": false
+      },
+      "orthogonal-joint": {
+        "query_identified": true,
+        "mechanism_identified": true
+      },
+      "infeasible-perfect": {
+        "query_identified": true,
+        "mechanism_identified": true
+      }
+    },
+    "expected_pairwise_risk": {
+      "passive|direct|extra": 0.5,
+      "query-probe|direct|extra": 0.5,
+      "query-probe|direct|shared": 0.002728,
+      "orthogonal-joint|direct|extra": 0.002861632754516722,
+      "orthogonal-joint|direct|shared": 0.0028616327545166837,
+      "orthogonal-joint|extra|shared": 0.0028616327545166464
+    }
+  }
+}
