@@ -478,7 +478,14 @@ mod tests {
 
     #[test]
     fn smaller_alpha_never_narrows_the_reported_interval() {
-        let samples = [0.1, 0.2, 0.15, 0.12, 0.18, 0.11, 0.13, 0.17, 0.16, 0.14];
+        let mut state = 0x5eed_c5a1_u64;
+        let mut samples = Vec::with_capacity(512);
+        for _ in 0..512 {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            samples.push((state >> 11) as f64 / ((1_u64 << 53) as f64));
+        }
         let permissive = stream(&samples, 0.0, 1.0, 0.02);
         let conservative = stream(&samples, 0.0, 1.0, 0.001);
         assert!(conservative.lower_bound <= permissive.lower_bound);
