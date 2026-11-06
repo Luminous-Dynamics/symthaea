@@ -572,7 +572,9 @@ pub fn assess_common_mode_independence(
     let mut source_ids = HashSet::new();
     for (index, source) in sources.iter().enumerate() {
         let path = format!("$.sources[{index}]");
-        if source.snapshot_id != *snapshot_id || source.as_of != *as_of {
+        if source.snapshot_id.as_str() != snapshot_id.as_str()
+            || source.as_of.as_str() != as_of.as_str()
+        {
             return Err(ValidationError::new(
                 &path,
                 "all source profiles must bind the same dependency snapshot ID and as-of time",
