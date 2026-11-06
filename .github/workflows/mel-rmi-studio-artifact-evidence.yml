@@ -20,14 +20,14 @@ jobs:
       - name: Check out pull request branch
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
           persist-credentials: false
       - name: Verify exact pull request head
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
       - name: Install stable Rust
         uses: dtolnay/rust-toolchain@stable
