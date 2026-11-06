@@ -1,6 +1,6 @@
 # HLB-002: Holographic Liquid Brain — HDC/CfC Neuron Audit and Research Programme
 
-**Status:** Architecture audit, canonical dilation fix, and an in-branch correction to the HDC-LTC one-step gradient implementation on branch research/hlb-002-holographic-liquid-neuron.  
+**Status:** Architecture audit, canonical dilation fix, an in-branch HDC-LTC one-step gradient correction, and a typed HDC-LTC parameter-introspection/edit API on branch research/hlb-002-holographic-liquid-neuron.  
 **Base:** main.  
 **Scope:** HDC/CfC neuron mathematics, holographic binding and memory, multi-neuron liquid networks, numerical integration quality, and evidence-qualified HLB evaluation.  
 **Evidence status:** repository code audit and published-literature review; the new Rust regression test has been added but has not been run in this environment.
@@ -147,7 +147,7 @@ Test both with Fourier forcing disabled and enabled. Keep state norms below the 
 
 **In-branch correction (not yet validated):** the updated backward() now recomputes the actual 2-/3-term equilibrium, the full-resolution input/state cosines, the sigmoid gate, time-scaled interpolation, tau clamp, optional Fourier basis, and the state-norm projection. The gradient object now contains d_tau_modulator, d_gate_weight, d_gate_bias, d_input, and d_state in addition to dW/dU and the scalar dL/dtau diagnostic. apply_gradients_inner() now applies the previously omitted tau/gate parameter gradients and bounds those groups. The updated full-resolution tau cosine also prevents an unrelated global selective-scan stride from changing the gradient's forward semantics.
 
-A finite-difference regression test has been added for seven directions (W, U, tau modulator, gate weight, gate bias, state, input), both with Fourier forcing disabled and enabled. **This test has not been executed.** It is not evidence of a passing gradient audit until the exact branch head is compiled and the test passes.
+Finite-difference regression tests have been added for seven directions (W, U, tau modulator, gate weight, gate bias, state, input), both with Fourier forcing disabled and enabled, plus a separate check through the radial state-bound projection. **These tests have not been executed.** They are not evidence of a passing gradient audit until the exact branch head is compiled and the tests pass.
 
 Acceptance:
 - relative directional-gradient error below 1e-3 for small, well-conditioned test cases (target; report actual distribution);
@@ -346,18 +346,19 @@ No SOTA claim until a common benchmark, strong baselines, and reproducible artif
 
 ## 8. Integration with SWI
 
-The HDC/CfC neuron should become a first-class SWI substrate only after its forward/backward contract is correct.
+The HDC/CfC neuron now has an initial first-class SWI parameter surface on this branch: `HdcLtcParameterManifest`, typed group IDs and roles, exact flattened parameter values, BLAKE3 architecture/manifest/parameter/model fingerprints, digest-bound typed group replacement, and transactional batch application. The setter validates exact length, finite values, destination-vector dimensions, and the per-group norm bound before mutation; successful edits reset stale W/U momentum.
 
-Required HDC-specific SWI manifest fields:
-- operator family and algebra semantics;
-- dimension and component distribution;
-- binding/unbinding contract;
-- role/filler or permutation structure;
-- normalization and norm constraints;
-- time constants and interpolation mode;
-- gate/activation parameters;
-- frequency/eigenvalue ranges;
-- known symmetries and invariant transformations.
+This is a first introspection/edit boundary, not a complete proof-carrying evolution system. The tests for manifest layout, fingerprinting, group edits, stale digests, invalid norm, wrong lengths, duplicate targets, and batch rollback have been added but have not been run. The neuron should only become a trusted SWI substrate once the actual gradient and algebraic-invariant tests pass on the exact head.
+
+The HDC-specific SWI manifest records:
+- typed group identity and mathematical role;
+- dimension, shape, flat offset, and length;
+- norm constraints;
+- architecture/configuration digest;
+- exact little-endian parameter-value digest;
+- combined model digest.
+
+The next HDC-LTC manifest version should additionally encode operator family and algebra semantics, binding/unbinding contracts, role/filler or permutation structure, interpolation mode, and any future frequency/eigenvalue ranges.
 
 A generic flat-float edit must not be allowed to violate an algebraic or dynamical invariant. HDC-aware edits should propose operations such as:
 - bounded change to a role vector;
@@ -374,9 +375,9 @@ The verifier must test both task behavior and algebraic contracts. A more accura
 ## 9. Immediate implementation order
 
 ### P0 — correctness
-1. Fix and test canonical holographic dilation (started on this branch).
-2. Reconcile HDC-LTC backward() with the actual gated/Fourier forward step.
-3. Add finite-difference tests for every learnable parameter group.
+1. Execute the canonical holographic dilation round-trip tests.
+2. Execute the in-branch HDC-LTC backward/forward finite-difference tests and fix any remaining discrepancies.
+3. Expand gradient checks to clamped tau, state-bound projection, and multi-seed directional derivatives.
 4. Make the one-step-gradient vs sequence-BPTT distinction explicit in APIs/docs.
 5. Add input/tau/dt finite and range checks at the public boundary.
 
