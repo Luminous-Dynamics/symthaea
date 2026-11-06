@@ -1,0 +1,9 @@
+[package]
+name = "ceb-event-replay-cli"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ceb-event-replay-contract = { path = "../event-contract" }
+ceb-event-replay-store = { path = "../event-store" }
