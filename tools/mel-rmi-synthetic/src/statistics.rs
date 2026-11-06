@@ -574,7 +574,10 @@ mod tests {
         let first = single_summary(&observations).targeted_delta;
         let second = single_summary(&observations).targeted_delta;
         assert_eq!(first, second);
-        assert_eq!(first.bootstrap_seed, Some(1234 ^ (1_u64 << 32) ^ (1_u64 << 48)));
+        assert_eq!(
+            first.bootstrap_seed,
+            Some(1234 ^ (1_u64 << 32) ^ (1_u64 << 48))
+        );
         assert_eq!(first.bootstrap_resamples, 2_000);
         assert!(first.ci95_lower.unwrap() <= first.mean.unwrap());
         assert!(first.mean.unwrap() <= first.ci95_upper.unwrap());
