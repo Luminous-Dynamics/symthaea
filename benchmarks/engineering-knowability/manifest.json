@@ -481,6 +481,25 @@
         }
       ],
       "comparability_boundary": "Do not compare v2.0 with v2.1. The score covers CAD geometry/topology, assembly placement and board connectivity, not manufacturing readiness, uncertainty, inspection access, lifecycle requalification or physical performance."
+    },
+    {
+      "id": "cadworld-2026-11-06",
+      "name": "CADWorld — Computer-Use Benchmark for Long-Horizon CAD",
+      "source_url": "https://cad-world.github.io/",
+      "captured_at": "2026-11-06",
+      "task_count": 200,
+      "scope": "full_200_task_freecad_workflow_cohort",
+      "run_protocol": "Live benchmark page reports 14 evaluated agents; 100 GUI steps per task; task-specific executable checks on saved FreeCAD artifacts. Extended-run board and original seven-agent paper snapshot are different evaluation snapshots.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5",
+          "harness": "CADWorld extended-run GUI agent",
+          "score": 0.415,
+          "cost_per_task_usd": null,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "The live page's 87.0% expert reference is a single-trial expert pass, not an estimated human population mean. The original September paper reports a different seven-agent snapshot with a 17.5% strongest agent. Do not merge the snapshots. The benchmark includes measurement and manufacturing workflows but does not score full claim-to-evidence-path validity, calibration/uncertainty correctness or post-service requalification."
     }
   ]
 }
