@@ -1,0 +1,97 @@
+name: HLB FEP-WSP Factorial Contract
+
+on:
+  pull_request:
+    branches: [main, research/swi-001-weight-space-introspection]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+  push:
+    branches: [research/hlb-fep-wsp-factorial-v2]
+    paths:
+      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  protocol-contract:
+    name: Validate four-factor protocol contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check protocol schema and disjoint seeds
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version == "hlb-fep-wsp-factorial-v1" and
+            .status == "protocol_only" and
+            (.factors | length == 4) and
+            ([.factors[].id] | unique | length == 4) and
+            (.profiles | length == 16) and
+            ([.profiles[].id] | unique | length == 16) and
+            ([.profiles[].execution_status] | all(. == "planned_not_executed")) and
+            (.tasks | length >= 4) and
+            (.baselines | length >= 16) and
+            (.seeds.development | length == 10) and
+            (.seeds.held_out | length == 20) and
+            (([.seeds.development[], .seeds.held_out[]] | unique | length) == 30) and
+            (.hard_gates | length >= 12)
+          ' docs/research/hlb-fep-wsp-factorial-v1.json >/dev/null
+
+      - name: Check validator formatting
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
+
+      - name: Test four-factor contract invariants
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
+
+      - name: Generate source-bound protocol receipt
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
+          sha256sum docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
+          cat research-results/SHA256SUMS
+
+      - name: Upload protocol-validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30
