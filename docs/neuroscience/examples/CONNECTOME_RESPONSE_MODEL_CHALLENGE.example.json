@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "challenge_id": "unmodelled-response-kernel-collapses-query-discrimination",
+  "base_fixture_path": "docs/neuroscience/examples/CONNECTOME_QUERY_DISCRIMINATING_INTERVENTION.example.json",
+  "challenged_fixture_path": "docs/neuroscience/examples/CONNECTOME_QUERY_INTERVENTION_MODEL_CHALLENGE.example.json",
+  "base_fixture_git_blob_sha1": "bc958185a6818ac7660ce181d8e7ed3a2e028270",
+  "challenged_fixture_git_blob_sha1": "e6361a5410bd4290cdf7c233e271e442331cae17",
+  "challenger_model": {
+    "nuisance_model_id": "challenger-unmodelled-overlap",
+    "model_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "observation_model_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "challenger_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "adjudication_status": "ADMITTED_FOR_SENSITIVITY",
+    "ancestry_group_ids": [
+      "synthetic-adversarial-kernel-family-A"
+    ]
+  },
+  "expected_outcomes": {
+    "base_decision_status": "DISCRIMINATING_INTERVENTION_AVAILABLE",
+    "challenged_decision_status": "NO_FEASIBLE_DISCRIMINATING_INTERVENTION",
+    "base_selected_intervention_id": "orthogonal-robust",
+    "challenged_selected_intervention_id": null,
+    "base_worst_case_query_loss": {
+      "high-eig-irrelevant": 0.1,
+      "cheap-confounded": 0.1,
+      "orthogonal-robust": 0,
+      "infeasible-perfect": 0
+    },
+    "challenged_worst_case_query_loss": {
+      "high-eig-irrelevant": 0.1,
+      "cheap-confounded": 0.1,
+      "orthogonal-robust": 0.1,
+      "infeasible-perfect": 0
+    },
+    "challenged_decision_value_per_cost": {
+      "high-eig-irrelevant": 0,
+      "cheap-confounded": 0,
+      "orthogonal-robust": 0,
+      "infeasible-perfect": 1
+    },
+    "robust_identifiability_status": "ROBUST_NOT_IDENTIFIABLE",
+    "robust_separating_intervention_ids": [],
+    "monotonicity_passed": true
+  },
+  "claim_scope": "synthetic_known_truth"
+}
