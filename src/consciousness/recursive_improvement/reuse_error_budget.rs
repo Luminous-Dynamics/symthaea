@@ -25,7 +25,7 @@
 //! never rounded to zero because zero would falsely imply an error-free test.
 
 use super::reuse_confidence_certificate::{
-    MAX_CERTIFICATE_SAMPLE_COUNT, BoundedScoreConfidenceCertificate, ReuseCertificateError,
+    BoundedScoreConfidenceCertificate, MAX_CERTIFICATE_SAMPLE_COUNT, ReuseCertificateError,
     ReuseConfidenceCertificate, bounded_score_confidence_certificate,
     pass_fail_confidence_certificate,
 };
@@ -207,7 +207,6 @@ impl ReuseCandidateEvidence {
 }
 
 
-
 /// Candidate evidence for one predeclared bounded-score estimand.
 ///
 /// Each value is candidate-minus-incumbent in [-1, 1]. The empirical mean is
@@ -375,7 +374,8 @@ pub fn evaluate_bounded_score_reuse_round(
         practical_improvement_threshold,
         candidates,
         0.0,
-    )?.decision())
+    )?
+    .decision())
 }
 
 /// In-crate audit path for a trusted bounded-score evaluator.
@@ -408,21 +408,17 @@ pub(crate) fn evaluate_bounded_score_reuse_round_audited(
         .into());
     }
 
-    let delta = compute_reuse_total_error_budget(
-        alpha,
-        round,
-        prior_promotions,
-        candidates_per_round,
-    )?;
+    let delta =
+        compute_reuse_total_error_budget(alpha, round, prior_promotions, candidates_per_round)?;
 
     let mut best: Option<(usize, usize, f64, BoundedScoreConfidenceCertificate)> = None;
     for (candidate_index, candidate) in candidates.iter().enumerate() {
         let certificate =
             bounded_score_confidence_certificate(&candidate.paired_differences, delta)?;
         if certificate.lower_bound() > practical_improvement_threshold
-            && best.as_ref().is_none_or(|(_, _, best_mean, _)| {
-                candidate.empirical_improvement > *best_mean
-            })
+            && best
+                .as_ref()
+                .is_none_or(|(_, _, best_mean, _)| candidate.empirical_improvement > *best_mean)
         {
             best = Some((
                 candidate_index,
@@ -578,10 +574,16 @@ impl fmt::Display for BoundedScoreRoundError {
                 write!(f, "bounded-score confidence certificate failed: {error}")
             }
             Self::InvalidPracticalImprovementThreshold => {
-                write!(f, "practical improvement threshold gamma must be finite and nonnegative")
+                write!(
+                    f,
+                    "practical improvement threshold gamma must be finite and nonnegative"
+                )
             }
             Self::InvalidCumulativeLowerBound => {
-                write!(f, "prior cumulative lower bound must be finite and nonnegative")
+                write!(
+                    f,
+                    "prior cumulative lower bound must be finite and nonnegative"
+                )
             }
         }
     }
@@ -633,16 +635,12 @@ fn compute_reuse_total_error_budget(
     let log_round_weight = -((round as f64).ln() + ((round + 1) as f64).ln());
     let log_promotion_weight =
         -(((prior_promotions + 1) as f64).ln() + ((prior_promotions + 2) as f64).ln());
-    let log_candidate_factor =
-        (prior_promotions + 1) as f64 * (candidates_per_round as f64).ln();
+    let log_candidate_factor = (prior_promotions + 1) as f64 * (candidates_per_round as f64).ln();
     let log_total =
         log_alpha + log_round_weight + log_promotion_weight - log_choose - log_candidate_factor;
     let total_error_budget = log_total.exp();
 
-    if !log_total.is_finite()
-        || !total_error_budget.is_finite()
-        || total_error_budget <= 0.0
-    {
+    if !log_total.is_finite() || !total_error_budget.is_finite() || total_error_budget <= 0.0 {
         return Err(ReuseBudgetError::AllocationUnderflow);
     }
     Ok(total_error_budget)
@@ -939,7 +937,6 @@ mod tests {
     }
 }
 
-
 #[cfg(test)]
 mod bounded_score_round_tests {
     use super::*;
@@ -954,9 +951,8 @@ mod bounded_score_round_tests {
     #[test]
     fn bounded_score_round_selects_highest_mean_among_candidates_over_gamma() {
         let candidates = [evidence(0.2, 1_000), evidence(0.3, 1_000)];
-        let decision = evaluate_bounded_score_reuse_round(
-            0.05, 1, 0, 2, 0.05, &candidates,
-        ).unwrap();
+        let decision =
+            evaluate_bounded_score_reuse_round(0.05, 1, 0, 2, 0.05, &candidates).unwrap();
         assert_eq!(
             decision,
             ReuseRoundDecision::PromoteCandidate { candidate_number: 2 }
@@ -966,9 +962,7 @@ mod bounded_score_round_tests {
     #[test]
     fn bounded_score_round_rejects_when_no_candidate_clears_gamma() {
         let candidates = [BoundedScoreCandidateEvidence::new(vec![0.0; 100]).unwrap()];
-        let decision = evaluate_bounded_score_reuse_round(
-            0.05, 1, 0, 1, 0.0, &candidates,
-        ).unwrap();
+        let decision = evaluate_bounded_score_reuse_round(0.05, 1, 0, 1, 0.0, &candidates).unwrap();
         assert_eq!(decision, ReuseRoundDecision::RejectAll);
     }
 
@@ -979,7 +973,10 @@ mod bounded_score_round_tests {
         assert!(matches!(
             result,
             Err(BoundedScoreRoundError::Budget(
-                ReuseBudgetError::CandidateCountMismatch { expected: 2, actual: 1 }
+                ReuseBudgetError::CandidateCountMismatch {
+                    expected: 2,
+                    actual: 1
+                }
             ))
         ));
     }
@@ -993,7 +990,9 @@ mod bounded_score_round_tests {
         ));
         assert!(matches!(
             evaluate_bounded_score_reuse_round(0.05, 1, 1, 1, 0.0, &candidates),
-            Err(BoundedScoreRoundError::Budget(ReuseBudgetError::PromotionCountExceedsHistory))
+            Err(BoundedScoreRoundError::Budget(
+                ReuseBudgetError::PromotionCountExceedsHistory
+            ))
         ));
     }
 
