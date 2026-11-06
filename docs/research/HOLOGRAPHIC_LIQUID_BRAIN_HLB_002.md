@@ -1,6 +1,6 @@
 # HLB-002: Holographic Liquid Brain — HDC/CfC Neuron Audit and Research Programme
 
-**Status:** Architecture audit and first correctness fix on branch research/hlb-002-holographic-liquid-neuron.  
+**Status:** Architecture audit, canonical dilation fix, and an in-branch correction to the HDC-LTC one-step gradient implementation on branch research/hlb-002-holographic-liquid-neuron.  
 **Base:** main.  
 **Scope:** HDC/CfC neuron mathematics, holographic binding and memory, multi-neuron liquid networks, numerical integration quality, and evidence-qualified HLB evaluation.  
 **Evidence status:** repository code audit and published-literature review; the new Rust regression test has been added but has not been run in this environment.
@@ -15,7 +15,7 @@ However, the current implementation should not be treated as a validated replace
 
 1. **HDC binding is not arbitrary recurrent mixing.** In ContinuousHV, bind is element-wise/Hadamard multiplication. A single learned weight hypervector therefore performs a diagonal coordinate-wise transformation. It is O(D), but it does not mix arbitrary coordinates. Cross-coordinate interaction comes mainly from global reductions (norms, cosine similarities, scalar gates), explicit permutations, and the layer structure.
 2. **The implemented closed-form step is an approximation.** It computes an equilibrium under the current state/input, calculates a scalar interpolation factor, and applies one O(D) state update. Its work is independent of the elapsed time interval, but it is still O(D) in hypervector dimension. It is not an exact closed-form solution of a fully nonlinear state-dependent ODE whose equilibrium changes continuously during the interval.
-3. **The current backward pass does not match the current forward pass.** Forward evolution uses a learned sigmoid gate, state/input-dependent time constant, and optional Fourier forcing. backward() reconstructs a simpler ungated step, omits the Fourier term, and returns no gradients for the learned gate vectors. As a result, the reported analytic gradients are not the derivatives of the actual forward operation. This should be fixed before using this neuron as a serious SWI optimization target.
+3. **The current backward pass does not match the current forward pass.** Forward evolution uses a learned sigmoid gate, state/input-dependent time constant, and optional Fourier forcing. backward() reconstructs a simpler ungated step, omits the Fourier term, and returns no gradients for the learned gate vectors. As a result, the previous analytic gradients were not the derivatives of the actual forward operation. A candidate correction has now been added on this branch; it must pass the finite-difference tests below before it can be considered validated.
 
 The recommended direction is not to discard HDC/CfC. It is to build a more expressive, order-aware, numerically characterized **HoloLiquid v2** with correct gradients, structured cross-coordinate mixing, adaptive input interpolation, stable multi-timescale dynamics, and a reproducible benchmark suite.
 
@@ -144,6 +144,10 @@ The initial finite-difference test must compare analytic and central-difference 
 - gate bias.
 
 Test both with Fourier forcing disabled and enabled. Keep state norms below the clipping threshold during the gradient check, and test the clipped regime separately with an explicitly defined subgradient policy.
+
+**In-branch correction (not yet validated):** the updated backward() now recomputes the actual 2-/3-term equilibrium, the full-resolution input/state cosines, the sigmoid gate, time-scaled interpolation, tau clamp, optional Fourier basis, and the state-norm projection. The gradient object now contains d_tau_modulator, d_gate_weight, d_gate_bias, d_input, and d_state in addition to dW/dU and the scalar dL/dtau diagnostic. apply_gradients_inner() now applies the previously omitted tau/gate parameter gradients and bounds those groups. The updated full-resolution tau cosine also prevents an unrelated global selective-scan stride from changing the gradient's forward semantics.
+
+A finite-difference regression test has been added for seven directions (W, U, tau modulator, gate weight, gate bias, state, input), both with Fourier forcing disabled and enabled. **This test has not been executed.** It is not evidence of a passing gradient audit until the exact branch head is compiled and the test passes.
 
 Acceptance:
 - relative directional-gradient error below 1e-3 for small, well-conditioned test cases (target; report actual distribution);
