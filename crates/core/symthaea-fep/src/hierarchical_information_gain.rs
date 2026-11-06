@@ -500,7 +500,7 @@ fn conditional_parameter_entropy(
     let mut value = 0.0;
     for ((model_id, _parameter_id), joint_mass) in parameter_mass {
         let parent_mass = model_mass.get(model_id).copied().unwrap_or(0.0);
-        if parent_mass > 0.0 {
+        if joint_mass > 0.0 && parent_mass > 0.0 {
             let conditional = joint_mass / parent_mass;
             value -= joint_mass * conditional.ln();
         }
@@ -536,7 +536,7 @@ fn conditional_state_entropy(
             .get(&(model_id, parameter_id))
             .copied()
             .unwrap_or(0.0);
-        if parent > 0.0 {
+        if joint_mass > 0.0 && parent > 0.0 {
             let conditional = joint_mass / parent;
             value -= joint_mass * conditional.ln();
         }
