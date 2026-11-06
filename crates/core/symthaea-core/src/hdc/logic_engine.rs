@@ -8,7 +8,7 @@
 //!
 //! ## Capabilities
 //!
-//! - **Propositional logic**: CNF conversion (Tseitin), DPLL SAT solver
+//! - **Propositional logic**: equivalence-preserving CNF conversion, DPLL SAT solver
 //! - **Truth table**: evaluation, tautology/contradiction detection
 //! - **Natural deduction**: Modus Ponens, Modus Tollens, hypothetical syllogism
 //! - **First-order logic**: unification (Robinson's algorithm), resolution prover
@@ -339,44 +339,128 @@ impl LogicEngine {
         }
     }
 
-    /// Convert to CNF (Conjunctive Normal Form)
+    /// Convert a propositional formula to an equivalent CNF over the
+    /// original variables.
+    ///
+    /// The returned representation has an important constant convention:
+    /// - no clauses (`[]`) represents TRUE;
+    /// - one empty clause (`[[]]`) represents FALSE.
+    ///
+    /// This conversion distributes disjunction over conjunction and can
+    /// therefore grow exponentially. It is intended as a simple, transparent
+    /// reference conversion for the in-process DPLL solver. A Tseitin
+    /// encoding with auxiliary variables should be added as a separate API
+    /// when a scalable equisatisfiable encoding is needed.
     pub fn to_cnf(prop: &Proposition) -> Vec<Vec<(String, bool)>> {
         let nnf = Self::to_nnf(prop);
-        let mut clauses = Vec::new();
-        Self::collect_cnf_clauses(&nnf, &mut clauses);
-        clauses
+        Self::normalize_cnf(Self::cnf_from_nnf(&nnf))
     }
 
-    fn collect_cnf_clauses(prop: &Proposition, clauses: &mut Vec<Vec<(String, bool)>>) {
+    /// Convert a formula already in negation normal form into CNF.
+    ///
+    /// A CNF is represented as a conjunction of clauses, so conjunction
+    /// concatenates clause lists while disjunction takes their Cartesian
+    /// product (distributing OR over AND).
+    fn cnf_from_nnf(prop: &Proposition) -> Vec<Vec<(String, bool)>> {
         match prop {
-            Proposition::And(p, q) => {
-                Self::collect_cnf_clauses(p, clauses);
-                Self::collect_cnf_clauses(q, clauses);
+            Proposition::True => Vec::new(),
+            Proposition::False => vec![Vec::new()],
+            Proposition::Atom(name) => vec![vec![(name.clone(), true)]],
+            Proposition::Not(inner) => match inner.as_ref() {
+                Proposition::Atom(name) => vec![vec![(name.clone(), false)]],
+                // to_nnf guarantees that negation is only applied to atoms.
+                // Keep this fallback defensive if the representation evolves.
+                _ => Self::cnf_from_nnf(&Self::to_nnf(prop)),
+            },
+            Proposition::And(left, right) => {
+                let mut clauses =
+                    Self::cnf_from_nnf(left);
+                clauses.extend(Self::cnf_from_nnf(right));
+                Self::normalize_cnf(clauses)
             }
-            _ => {
-                let mut clause = Vec::new();
-                Self::collect_literals(prop, &mut clause);
-                if !clause.is_empty() {
+            Proposition::Or(left, right) => Self::disjoin_cnf(
+                Self::cnf_from_nnf(left),
+                Self::cnf_from_nnf(right),
+            ),
+            // Implication and biconditional are eliminated by to_nnf.
+            Proposition::Implies(_, _) | Proposition::Iff(_, _) => {
+                Self::cnf_from_nnf(&Self::to_nnf(prop))
+            }
+        }
+    }
+
+    /// Form the disjunction of two CNFs using distributivity.
+    fn disjoin_cnf(
+        left: Vec<Vec<(String, bool)>>,
+        right: Vec<Vec<(String, bool)>>,
+    ) -> Vec<Vec<(String, bool)>> {
+        // TRUE OR X = TRUE. An empty clause list represents TRUE.
+        if left.is_empty() || right.is_empty() {
+            return Vec::new();
+        }
+
+        // FALSE OR X = X. Any CNF containing an empty clause is FALSE.
+        if left.iter().any(Vec::is_empty) {
+            return Self::normalize_cnf(right);
+        }
+        if right.iter().any(Vec::is_empty) {
+            return Self::normalize_cnf(left);
+        }
+
+        let mut clauses = Vec::with_capacity(left.len().saturating_mul(right.len()));
+        for left_clause in &left {
+            for right_clause in &right {
+                let mut combined = left_clause.clone();
+                combined.extend(right_clause.iter().cloned());
+
+                // A tautological clause is TRUE and can be removed from a
+                // conjunction. A contradictory literal pair is not a clause
+                // simplification: it makes the entire clause a tautology.
+                if let Some(clause) = Self::normalize_clause(combined) {
                     clauses.push(clause);
                 }
             }
         }
+        Self::normalize_cnf(clauses)
     }
 
-    fn collect_literals(prop: &Proposition, clause: &mut Vec<(String, bool)>) {
-        match prop {
-            Proposition::Atom(name) => clause.push((name.clone(), true)),
-            Proposition::Not(inner) => {
-                if let Proposition::Atom(name) = inner.as_ref() {
-                    clause.push((name.clone(), false));
+    /// Normalize a clause. None means it is tautological.
+    fn normalize_clause(
+        literals: Vec<(String, bool)>,
+    ) -> Option<Vec<(String, bool)>> {
+        let mut by_variable: HashMap<String, bool> = HashMap::new();
+        for (variable, polarity) in literals {
+            match by_variable.get(&variable) {
+                Some(existing) if *existing != polarity => return None,
+                Some(_) => {}
+                None => {
+                    by_variable.insert(variable, polarity);
                 }
             }
-            Proposition::Or(p, q) => {
-                Self::collect_literals(p, clause);
-                Self::collect_literals(q, clause);
-            }
-            _ => {}
         }
+
+        let mut normalized: Vec<(String, bool)> = by_variable.into_iter().collect();
+        normalized.sort_unstable_by(|(left_name, left_pol), (right_name, right_pol)| {
+            left_name.cmp(right_name).then(left_pol.cmp(right_pol))
+        });
+        Some(normalized)
+    }
+
+    /// Normalize a CNF, preserving the distinction between TRUE and FALSE.
+    fn normalize_cnf(clauses: Vec<Vec<(String, bool)>>) -> Vec<Vec<(String, bool)>> {
+        let mut normalized = Vec::with_capacity(clauses.len());
+        for clause in clauses {
+            if let Some(clause) = Self::normalize_clause(clause) {
+                if clause.is_empty() {
+                    // FALSE AND X = FALSE.
+                    return vec![Vec::new()];
+                }
+                normalized.push(clause);
+            }
+        }
+        normalized.sort_unstable();
+        normalized.dedup();
+        normalized
     }
 
     // ─── DPLL SAT Solver ─────────────────────────────────────────────────
@@ -473,21 +557,47 @@ impl LogicEngine {
         // Choose a variable to branch on
         let branch_var = clauses[0][0].0.clone();
 
-        // Try true
-        assignment.insert(branch_var.clone(), true);
+        // Each branch receives an isolated assignment/proof trace. Failed
+        // recursive branches must not leak partial assignments into siblings.
+        let base_assignment = assignment.clone();
+        let base_steps = steps.clone();
+
+        // Try true.
+        let mut true_assignment = base_assignment.clone();
+        let mut true_steps = base_steps.clone();
+        true_assignment.insert(branch_var.clone(), true);
         let simplified = Self::simplify_clauses(&clauses, &branch_var, true);
-        if Self::dpll_recursive(&simplified, vars, assignment, steps, depth + 1) {
+        if Self::dpll_recursive(
+            &simplified,
+            vars,
+            &mut true_assignment,
+            &mut true_steps,
+            depth + 1,
+        ) {
+            *assignment = true_assignment;
+            *steps = true_steps;
             return true;
         }
 
-        // Try false
-        assignment.insert(branch_var.clone(), false);
+        // Try false from the same pre-branch state.
+        let mut false_assignment = base_assignment.clone();
+        let mut false_steps = base_steps.clone();
+        false_assignment.insert(branch_var.clone(), false);
         let simplified = Self::simplify_clauses(&clauses, &branch_var, false);
-        if Self::dpll_recursive(&simplified, vars, assignment, steps, depth + 1) {
+        if Self::dpll_recursive(
+            &simplified,
+            vars,
+            &mut false_assignment,
+            &mut false_steps,
+            depth + 1,
+        ) {
+            *assignment = false_assignment;
+            *steps = false_steps;
             return true;
         }
 
-        assignment.remove(&branch_var);
+        *assignment = base_assignment;
+        *steps = base_steps;
         false
     }
 
@@ -1741,7 +1851,7 @@ mod tests {
 
     #[test]
     fn test_sat_three_variable() {
-        // (P ∨ Q) ∧ (¬P ∨ R) ∧ (¬Q ∨ ¬R)
+        // (P OR Q) AND (NOT P OR R) AND (NOT Q OR NOT R)
         let p = Proposition::atom("P");
         let q = Proposition::atom("Q");
         let r = Proposition::atom("R");
@@ -1752,11 +1862,137 @@ mod tests {
             .and(q.not().or(r.not()));
         let (result, _) = LogicEngine::dpll_sat(&formula);
         assert!(result.is_some());
-        let a = result.unwrap();
-        // Verify the assignment satisfies all clauses
-        assert!(
-            *a.get("P").unwrap_or(&false) || *a.get("Q").unwrap_or(&false),
-            "First clause violated"
-        );
+        let assignment = result.unwrap();
+        assert!(formula.evaluate(&assignment), "returned model must satisfy original formula");
+    }
+
+    fn cnf_evaluate(
+        cnf: &[Vec<(String, bool)>],
+        assignment: &HashMap<String, bool>,
+    ) -> bool {
+        cnf.iter().all(|clause| {
+            clause.iter().any(|(variable, polarity)| {
+                assignment.get(variable).copied().unwrap_or(false) == *polarity
+            })
+        })
+    }
+
+    fn assert_cnf_equivalent(formula: &Proposition, variables: &[&str]) {
+        let cnf = LogicEngine::to_cnf(formula);
+        for mask in 0usize..(1usize << variables.len()) {
+            let assignment: HashMap<String, bool> = variables
+                .iter()
+                .enumerate()
+                .map(|(index, name)| ((*name).to_string(), (mask & (1 << index)) != 0))
+                .collect();
+            assert_eq!(
+                formula.evaluate(&assignment),
+                cnf_evaluate(&cnf, &assignment),
+                "CNF mismatch for formula {formula} under {assignment:?}: {cnf:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_cnf_constants_preserve_true_and_false() {
+        let true_cnf = LogicEngine::to_cnf(&Proposition::True);
+        let false_cnf = LogicEngine::to_cnf(&Proposition::False);
+        assert!(true_cnf.is_empty(), "TRUE is the empty conjunction");
+        assert_eq!(false_cnf, vec![Vec::<(String, bool)>::new()]);
+        assert!(LogicEngine::dpll_sat(&Proposition::True).0.is_some());
+        assert!(LogicEngine::dpll_sat(&Proposition::False).0.is_none());
+    }
+
+    #[test]
+    fn test_cnf_distributes_or_over_and() {
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+
+        // (p AND q) OR r = (p OR r) AND (q OR r).
+        let formula = p.clone().and(q.clone()).or(r.clone());
+        assert_cnf_equivalent(&formula, &["p", "q", "r"]);
+        let cnf = LogicEngine::to_cnf(&formula);
+        assert_eq!(cnf.len(), 2);
+        assert!(cnf.iter().all(|clause| clause.len() == 2));
+
+        let assignment = HashMap::from([
+            ("p".to_string(), true),
+            ("q".to_string(), true),
+            ("r".to_string(), false),
+        ]);
+        assert!(formula.evaluate(&assignment));
+        assert!(cnf_evaluate(&cnf, &assignment));
+    }
+
+    #[test]
+    fn test_cnf_distributes_nested_conjunction_in_right_operand() {
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let formula = p.or(q.and(r));
+        assert_cnf_equivalent(&formula, &["p", "q", "r"]);
+    }
+
+    #[test]
+    fn test_cnf_normalizes_duplicate_and_tautological_literals() {
+        let p = Proposition::atom("p");
+        let duplicated = p.clone().or(p.clone());
+        let tautology = p.clone().or(p.not());
+        assert_eq!(LogicEngine::to_cnf(&duplicated), vec![vec![("p".to_string(), true)]]);
+        assert!(LogicEngine::to_cnf(&tautology).is_empty());
+        assert_cnf_equivalent(&duplicated, &["p"]);
+        assert_cnf_equivalent(&tautology, &["p"]);
+    }
+
+    #[test]
+    fn test_dpll_matches_exhaustive_truth_tables_for_small_formulas() {
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let base = vec![
+            Proposition::True,
+            Proposition::False,
+            p.clone(),
+            p.clone().not(),
+            q.clone(),
+            q.clone().not(),
+            r.clone(),
+            r.clone().not(),
+        ];
+
+        let mut formulas = base.clone();
+        for left in &base {
+            for right in &base {
+                formulas.push(left.clone().and(right.clone()));
+                formulas.push(left.clone().or(right.clone()));
+                formulas.push(left.clone().implies(right.clone()));
+                formulas.push(left.clone().iff(right.clone()));
+            }
+        }
+        formulas.push(p.clone().and(q.clone()).or(r.clone()));
+        formulas.push(p.clone().or(q.clone().and(r.clone())));
+        formulas.push(p.clone().iff(q.clone().or(r.clone())).not());
+
+        for formula in formulas {
+            assert_cnf_equivalent(&formula, &["p", "q", "r"]);
+            let expected_sat = (0usize..8).any(|mask| {
+                let assignment = HashMap::from([
+                    ("p".to_string(), (mask & 1) != 0),
+                    ("q".to_string(), (mask & 2) != 0),
+                    ("r".to_string(), (mask & 4) != 0),
+                ]);
+                formula.evaluate(&assignment)
+            });
+
+            let (model, _) = LogicEngine::dpll_sat(&formula);
+            assert_eq!(model.is_some(), expected_sat, "DPLL mismatch for {formula}");
+            if let Some(model) = model {
+                assert!(
+                    formula.evaluate(&model),
+                    "DPLL returned a non-model for {formula}: {model:?}"
+                );
+            }
+        }
     }
 }
