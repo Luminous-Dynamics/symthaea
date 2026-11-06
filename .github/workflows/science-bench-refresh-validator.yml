@@ -909,6 +909,11 @@ jobs:
             > /tmp/sbr-recoverability/post-before-rewrite-report.json
           jq -e '[.records[] | select(.evidence_unit_id == "unit:rewrite")][0].recoverability == "UnreachableWithinBudget"' \
             /tmp/sbr-recoverability/post-before-rewrite-report.json >/dev/null
+          cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
+            audit-recoverability-manifest /tmp/sbr-recoverability/rewrite-before-first-pass-manifest.json \
+            > /tmp/sbr-recoverability/rewrite-before-first-pass-report.json
+          jq -e '[.records[] | select(.evidence_unit_id == "unit:rewrite")][0].recoverability == "UnreachableWithinBudget"' \
+            /tmp/sbr-recoverability/rewrite-before-first-pass-report.json >/dev/null
 
           # Reduced route budget cannot make navigation easier; added route can improve only its target.
           cargo run --locked --quiet --manifest-path "$cargo_manifest" -- \
