@@ -1,0 +1,67 @@
+name: Static-model robust sequential connectome policy
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION_V1.md"
+      - "docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py"
+      - ".github/workflows/connectome-static-model-sequential-policy.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION_V1.md"
+      - "docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py"
+      - ".github/workflows/connectome-static-model-sequential-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-static-model-policy:
+    name: Exhaustive static versus rectangular policy comparison
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact event commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate strict schema and complete history-kernel matrices
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+
+          assert len(fixture["worlds"]) == 2
+          assert len(fixture["model_vertices"]) == 2
+          assert len(fixture["actions"]) == 3
+          for model in fixture["model_vertices"]:
+              assert len(model["stage_one_kernels"]) == 6
+              assert len(model["stage_two_kernels"]) == 8
+          assert fixture["oracle_expectations"]["static_robust_loss"] == 0.0
+          assert fixture["oracle_expectations"]["rectangular_minimax_loss"] == 0.5
+          print("Draft 2020-12 schema and complete sequential kernels: PASS")
+          PY
+      - name: Run exact static and rectangular policy-tree oracle
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py
+          python3 tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py \
+            docs/neuroscience/examples/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.example.json \
+            --report "$RUNNER_TEMP/static-model-sequential-policy.json"
+          python3 -m json.tool "$RUNNER_TEMP/static-model-sequential-policy.json" > /dev/null
+          sha256sum "$RUNNER_TEMP/static-model-sequential-policy.json"
