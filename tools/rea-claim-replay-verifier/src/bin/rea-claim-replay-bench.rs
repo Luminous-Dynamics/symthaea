@@ -1,22 +1,22 @@
 //! Reproducible workload-shaped performance characterization for REA claim replay.
 //!
 //! This is a development benchmark binary, not a production decision path.
-//! It compares raw Evidence admission with complete independent claim replay
-//! over identical Evidence sets. It reports distributions per workload cell;
+//! It separates raw Evidence admission, producer claim evaluation and complete
+//! independent replay over identical Evidence sets. It reports distributions per workload cell;
 //! it never collapses different sizes into one score.
 
-#![allow(dead_code)]
-
+#[allow(dead_code)]
 #[path = "../../../../src/rea_compat.rs"]
 mod rea_compat;
-#[path = "../lib.rs"]
-mod replay_verifier;
 
-use rea_compat::claims::{ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim};
-use replay_verifier::{
+use rea_claim_replay_verifier::{
     MAX_CLAIM_JSON_BYTES, MAX_EVIDENCE_RECORDS, MAX_RESULT_JSON_BYTES,
     MAX_TOTAL_EVIDENCE_JSON_BYTES, ReplayOutcome, replay_claim_evaluation,
 };
+use rea_compat::claims::{
+    ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
+};
+use rea_compat::VerifiedEvidence;
 use serde_json::{Value, json};
 use std::hint::black_box;
 use std::time::Instant;
@@ -30,6 +30,8 @@ const DEFAULT_SAMPLES: usize = 50;
 const WARMUP_SAMPLES: usize = 3;
 
 struct Scenario {
+    claim: ClaimRequest,
+    verified_records: Vec<VerifiedEvidence>,
     claim_bytes: Vec<u8>,
     result_bytes: Vec<u8>,
     evidence_bytes: Vec<Vec<u8>>,
@@ -119,6 +121,8 @@ fn build_scenario(evidence_count: usize, padding_bytes: usize) -> Scenario {
     assert!(result_bytes.len() <= MAX_RESULT_JSON_BYTES);
 
     Scenario {
+        claim,
+        verified_records,
         claim_bytes,
         result_bytes,
         evidence_bytes,
@@ -180,6 +184,13 @@ fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize
         }
     });
 
+    let producer_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
+        let result = evaluate_claim(&scenario.claim, &scenario.verified_records)
+            .expect("valid benchmark producer evaluation must succeed");
+        assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
+        black_box(result);
+    });
+
     let replay_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
         let receipt = replay_claim_evaluation(
             &scenario.claim_bytes,
@@ -200,6 +211,7 @@ fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize
         "evidence_total_bytes": scenario.evidence_total_bytes,
         "evidence_max_record_bytes": scenario.evidence_max_bytes,
         "admission": distribution(&admission_samples),
+        "producer_evaluation": distribution(&producer_samples),
         "independent_replay": distribution(&replay_samples)
     })
 }
@@ -235,6 +247,7 @@ fn main() {
         "percentile_method": "nearest-rank",
         "timed_operations": [
             "raw Evidence parse + schema + semantic-ID verification",
+            "producer typed-claim evaluation over already admitted Evidence values",
             "complete independent claim replay over raw claim/result/Evidence bytes"
         ],
         "scenarios": scenarios
