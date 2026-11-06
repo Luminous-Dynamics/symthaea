@@ -60,14 +60,33 @@ mod adaptive_null_simulation {
         rounds
     }
 
-    /// Proposer's next candidate index depends only on the previous coarse
-    /// decision and the promotion count. It never receives scores or outcomes.
+    /// Proposer policies use only the previous coarse decision and promotion
+    /// history. None can inspect candidate scores, per-task outcomes or labels.
     fn adaptive_candidate_index(
+        policy: usize,
         round_one_based: usize,
         prior_promotions: usize,
         last_decision: usize,
     ) -> usize {
-        (round_one_based * 7 + prior_promotions * 11 + last_decision * 13) % POOL_WIDTH
+        match policy {
+            // Mixed history policy.
+            0 => (round_one_based * 7 + prior_promotions * 11 + last_decision * 13)
+                % POOL_WIDTH,
+            // Round/turnover policy: ignores scores, responds to the last outcome.
+            1 => (round_one_based + prior_promotions + last_decision) % POOL_WIDTH,
+            // Reject-seeking branch: changes its next region after rejection.
+            2 => {
+                if last_decision == 0 {
+                    (round_one_based % 2) * 2
+                } else {
+                    (last_decision + prior_promotions) % POOL_WIDTH
+                }
+            }
+            // Promotion-history-heavy policy.
+            3 => (prior_promotions * 3 + last_decision * 2 + round_one_based)
+                % POOL_WIDTH,
+            _ => panic!("unknown adaptive selection policy {policy}"),
+        }
     }
 
     /// One-sided 95% Wilson upper limit for a binomial event frequency.
@@ -85,7 +104,7 @@ mod adaptive_null_simulation {
         center + half_width
     }
 
-    fn run_pass_fail_campaign(seed: u64) -> bool {
+    fn run_pass_fail_campaign(seed: u64, policy: usize) -> bool {
         let pool = null_candidate_pool(seed);
         let mut prior_promotions = 0usize;
         let mut last_decision = 0usize;
@@ -93,7 +112,8 @@ mod adaptive_null_simulation {
 
         for (round_index, round_pool) in pool.iter().enumerate() {
             let round = round_index + 1;
-            let candidate_index = adaptive_candidate_index(round, prior_promotions, last_decision);
+            let candidate_index =
+                adaptive_candidate_index(policy, round, prior_promotions, last_decision);
             let second_index = (candidate_index + 1) % POOL_WIDTH;
             let candidates = [
                 ReuseCandidateEvidence::new(round_pool[candidate_index].clone()).unwrap(),
@@ -128,7 +148,7 @@ mod adaptive_null_simulation {
         any_false_promotion
     }
 
-    fn run_bounded_score_campaign(seed: u64) -> bool {
+    fn run_bounded_score_campaign(seed: u64, policy: usize) -> bool {
         let pool = null_candidate_pool(seed);
         let mut prior_promotions = 0usize;
         let mut last_decision = 0usize;
@@ -173,40 +193,47 @@ mod adaptive_null_simulation {
     }
 
     #[test]
-    fn pass_fail_reuse_controls_adaptive_null_campaigns() {
-        let mut false_campaigns = 0usize;
-        for replicate in 0..REPLICATES {
-            let seed = 0x9e37_79b9_7f4a_7c15_u64
-                .wrapping_add((replicate as u64).wrapping_mul(0x5851_f42d_4c95_7f2d));
-            if run_pass_fail_campaign(seed) {
-                false_campaigns += 1;
+    fn pass_fail_reuse_controls_multiple_adaptive_null_policies() {
+        for policy in 0..4 {
+            let mut false_campaigns = 0usize;
+            for replicate in 0..REPLICATES {
+                let seed = 0x9e37_79b9_7f4a_7c15_u64
+                    .wrapping_add((policy as u64).wrapping_mul(0x243f_6a88_85a3_08d3))
+                    .wrapping_add((replicate as u64).wrapping_mul(0x5851_f42d_4c95_7f2d));
+                if run_pass_fail_campaign(seed, policy) {
+                    false_campaigns += 1;
+                }
             }
-        }
 
-        let upper = wilson_upper_95(false_campaigns, REPLICATES);
-        assert!(
-            upper <= ALPHA,
-            "adaptive pass/fail null: {false_campaigns}/{REPLICATES} campaigns promoted; \
-             Wilson 95% upper bound {upper:.4} exceeds alpha {ALPHA}"
-        );
+            let upper = wilson_upper_95(false_campaigns, REPLICATES);
+            assert!(
+                upper <= ALPHA,
+                "adaptive pass/fail null policy {policy}: {false_campaigns}/{REPLICATES} campaigns promoted; \
+                 Wilson 95% upper bound {upper:.4} exceeds alpha {ALPHA}"
+            );
+        }
     }
 
     #[test]
-    fn bounded_score_reuse_controls_adaptive_null_campaigns() {
-        let mut false_campaigns = 0usize;
-        for replicate in 0..REPLICATES {
-            let seed = 0x243f_6a88_85a3_08d3_u64
-                .wrapping_add((replicate as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15));
-            if run_bounded_score_campaign(seed) {
-                false_campaigns += 1;
+    fn bounded_score_reuse_controls_multiple_adaptive_null_policies() {
+        for policy in 0..4 {
+            let mut false_campaigns = 0usize;
+            for replicate in 0..REPLICATES {
+                let seed = 0x243f_6a88_85a3_08d3_u64
+                    .wrapping_add((policy as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15))
+                    .wrapping_add((replicate as u64).wrapping_mul(0x5851_f42d_4c95_7f2d));
+                if run_bounded_score_campaign(seed, policy) {
+                    false_campaigns += 1;
+                }
             }
-        }
 
-        let upper = wilson_upper_95(false_campaigns, REPLICATES);
-        assert!(
-            upper <= ALPHA,
-            "bounded-score null: {false_campaigns}/{REPLICATES} campaigns promoted; \
-             Wilson 95% upper bound {upper:.4} exceeds alpha {ALPHA}"
-        );
+            let upper = wilson_upper_95(false_campaigns, REPLICATES);
+            assert!(
+                upper <= ALPHA,
+                "bounded-score null policy {policy}: {false_campaigns}/{REPLICATES} campaigns promoted; \
+                 Wilson 95% upper bound {upper:.4} exceeds alpha {ALPHA}"
+            );
+        }
     }
+
 }
