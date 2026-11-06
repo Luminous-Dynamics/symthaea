@@ -357,10 +357,10 @@ Use Friston et al. (2026), [*Active inference and artificial reasoning*](https:/
 
 - Five latent factors: the colours of left, centre, and right balls (red/green/blue each); a controllable gaze location (start/left/centre/right); and a controllable choice (no-choice/red/blue/green).
 - Two outcome modalities: vision (nothing/red/green/blue) and feedback (no-feedback/correct/incorrect).
-- Gaze and choice are action-controlled; ball colours are sampled randomly at trial start. Each trial permits six decision time points.
-- Feedback preferences are softmax([0, 2, -6]) nats in the order no-feedback/correct/incorrect.
+- Gaze and choice are action-controlled; ball colours are sampled randomly at trial start. Each trial has six time points (five moves).
+- Relative log preferences for the feedback modality are [0, 2, -6] nats in the order no-feedback/correct/incorrect.
 - The planted context-dependent rule maps centre-ball red to the left ball, green to the centre ball, and blue to the right ball as the criterion for the correct colour choice.
-- The symmetry-constrained candidate model family contains 81 mappings (79 unique after degeneracies), with rule 65 as the planted ground truth.
+- The symmetry-constrained candidate model family contains 81 likelihood mappings, with rule 65 as the planted ground truth.
 - Crucially, the generative model is assumed known except for the feedback likelihood tensor. The paper evaluates active selection among candidate rule structures; it does **not** solve perception-to-world-model construction or unconstrained ARC-style rule invention.
 
 The paper reports model commitment when the winning model's log-odds crosses 16 nats in its illustrative setup. Treat this as a reproduction metric, not a universal confidence threshold. Report both time to threshold and false-commitment rate under alternative planted rules and prior misspecification.
