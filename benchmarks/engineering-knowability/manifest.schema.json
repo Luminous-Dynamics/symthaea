@@ -12,7 +12,8 @@
     "canonical_owners",
     "fixture_sources",
     "cases",
-    "limitations"
+    "limitations",
+    "standards"
   ],
   "properties": {
     "schema_version": {
@@ -117,7 +118,8 @@
           "claim_family",
           "intent",
           "required_semantics",
-          "seeded_fault"
+          "seeded_fault",
+          "standard_refs"
         ],
         "properties": {
           "id": {
@@ -159,6 +161,14 @@
               "string",
               "null"
             ]
+          },
+          "standard_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       }
@@ -168,6 +178,43 @@
       "minItems": 1,
       "items": {
         "type": "string"
+      }
+    },
+    "standards": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "role",
+          "scope_limit",
+          "source_uri",
+          "status_note"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope_limit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status_note": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       }
     }
   }
