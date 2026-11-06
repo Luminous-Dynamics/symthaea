@@ -1452,8 +1452,14 @@ impl HdcLtcUnifiedNeuron {
 
         self.clear_pre_evolution_state();
         match id {
-            HdcLtcParameterGroupId::WeightHypervector => self.weight_hv = candidate,
-            HdcLtcParameterGroupId::InputMask => self.input_mask = candidate,
+            HdcLtcParameterGroupId::WeightHypervector => {
+                self.weight_hv = candidate;
+                self.weight_momentum = ContinuousHV::zero(self.config.dimension);
+            }
+            HdcLtcParameterGroupId::InputMask => {
+                self.input_mask = candidate;
+                self.input_momentum = ContinuousHV::zero(self.config.dimension);
+            }
             HdcLtcParameterGroupId::TauModulator => self.tau_modulator = candidate,
             HdcLtcParameterGroupId::GateWeight => self.gate_weight = candidate,
             HdcLtcParameterGroupId::GateBias => self.gate_bias = candidate,
@@ -2033,6 +2039,9 @@ impl HdcLtcUnifiedNeuron {
         }
         if self.gate_weight.norm() > 2.0 {
             self.gate_weight = self.gate_weight.normalize().scale(2.0);
+        }
+        if self.gate_bias.norm() > 2.0 {
+            self.gate_bias = self.gate_bias.normalize().scale(2.0);
         }
     }
 
@@ -3402,6 +3411,34 @@ mod tests {
             ]
         );
         assert!(profile.groups.iter().all(|group| group.non_finite_count == 0));
+    }
+
+    #[test]
+    fn test_parameter_group_replacement_resets_associated_momentum() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            55,
+        );
+        neuron.weight_momentum = ContinuousHV::random(64, 551);
+        neuron.input_momentum = ContinuousHV::random(64, 552);
+
+        let weight = neuron.weight_hv_ref().values.clone();
+        neuron.try_replace_parameter_group(
+            HdcLtcParameterGroupId::WeightHypervector,
+            &weight,
+        ).unwrap();
+        assert_eq!(neuron.weight_momentum.norm(), 0.0);
+        assert!(neuron.input_momentum.norm() > 0.0);
+
+        let input = neuron.input_mask_ref().values.clone();
+        neuron.try_replace_parameter_group(
+            HdcLtcParameterGroupId::InputMask,
+            &input,
+        ).unwrap();
+        assert_eq!(neuron.input_momentum.norm(), 0.0);
     }
 
     #[test]
