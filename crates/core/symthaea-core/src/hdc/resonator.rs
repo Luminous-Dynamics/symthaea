@@ -17,7 +17,7 @@ Traditional approaches:
 
 Resonator Networks:
 - **Coupled oscillators** that "resonate" to constraint solutions
-- **O(log N)** convergence for many constraint satisfaction problems
+- **Iterative convergence** for selected constraint satisfaction problems
 - **Energy-based**: Solutions are low-energy stable states
 - **Algebra-aware**: Current continuous-Hadamard mode is approximate; exact
   inverse contracts require bipolar MAP or unitary HRR roles
@@ -494,9 +494,6 @@ impl ResonatorNetwork {
             let energy = self.compute_energy(&estimate, constraints);
             self.energy_history.push(energy);
 
-            let system_energy = self.compute_system_energy(constraints, &estimates)?;
-            self.energy_history.push(system_energy);
-
             // Update introspection state
             self.iteration_count += 1;
             if let Some(state) = self.states.first_mut() {
@@ -733,6 +730,9 @@ impl ResonatorNetwork {
                     }
                 }
             }
+
+            let system_energy = self.compute_system_energy(constraints, &estimates)?;
+            self.energy_history.push(system_energy);
 
             // Update introspection state
             self.iteration_count += 1;
