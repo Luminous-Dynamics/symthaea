@@ -168,7 +168,12 @@ fn distribution(samples: &[u128]) -> Value {
     })
 }
 
-fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize) -> Value {
+fn run_scenario(
+    evidence_count: usize,
+    padding_bytes: usize,
+    sample_count: usize,
+    warmup_samples: usize,
+) -> Value {
     let scenario = build_scenario(evidence_count, padding_bytes);
     let evidence_refs: Vec<&[u8]> = scenario
         .evidence_bytes
@@ -176,7 +181,7 @@ fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize
         .map(|bytes| bytes.as_slice())
         .collect();
 
-    let admission_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
+    let admission_samples = measure_ns(warmup_samples, sample_count, || {
         for bytes in &scenario.evidence_bytes {
             let verified = rea_compat::verify_evidence_json(bytes)
                 .expect("valid benchmark Evidence must be admitted");
@@ -184,14 +189,14 @@ fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize
         }
     });
 
-    let producer_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
+    let producer_samples = measure_ns(warmup_samples, sample_count, || {
         let result = evaluate_claim(&scenario.claim, &scenario.verified_records)
             .expect("valid benchmark producer evaluation must succeed");
         assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
         black_box(result);
     });
 
-    let replay_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
+    let replay_samples = measure_ns(warmup_samples, sample_count, || {
         let receipt = replay_claim_evaluation(
             &scenario.claim_bytes,
             &evidence_refs,
@@ -217,10 +222,17 @@ fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize
 }
 
 fn main() {
-    let sample_count = std::env::args()
-        .nth(1)
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(DEFAULT_SAMPLES);
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    let smoke_mode = arguments.first().is_some_and(|argument| argument == "--smoke");
+    let sample_count = if smoke_mode {
+        1
+    } else {
+        arguments
+            .first()
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(DEFAULT_SAMPLES)
+    };
+    let warmup_samples = if smoke_mode { 0 } else { WARMUP_SAMPLES };
     assert!(
         (1..=10_000).contains(&sample_count),
         "sample count must be between 1 and 10,000"
@@ -233,7 +245,7 @@ fn main() {
                 .iter()
                 .map(move |padding| (*count, *padding))
         })
-        .map(|(count, padding)| run_scenario(count, padding, sample_count))
+        .map(|(count, padding)| run_scenario(count, padding, sample_count, warmup_samples))
         .collect();
 
     let receipt = json!({
@@ -242,7 +254,7 @@ fn main() {
         "build_profile": if cfg!(debug_assertions) { "debug" } else { "release" },
         "target_arch": std::env::consts::ARCH,
         "target_os": std::env::consts::OS,
-        "warmup_samples_per_operation": WARMUP_SAMPLES,
+        "warmup_samples_per_operation": warmup_samples,
         "sample_count_per_operation": sample_count,
         "percentile_method": "nearest-rank",
         "timed_operations": [
