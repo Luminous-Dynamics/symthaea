@@ -475,10 +475,11 @@ fn malformed_result_evidence_references_are_rejected_as_invalid_results() {
     assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
 
     let mut duplicate_assessment = original.clone();
+    let repeated_assessment = duplicate_assessment["evidence_assessments"][0].clone();
     duplicate_assessment["evidence_assessments"]
         .as_array_mut()
         .unwrap()
-        .push(duplicate_assessment["evidence_assessments"][0].clone());
+        .push(repeated_assessment);
     assert_eq!(
         oracle_label("duplicate-result-assessment-id", "expected_replay_outcome"),
         "invalid_input"
