@@ -341,6 +341,10 @@ fn validate_run(
     ] {
         non_empty(value, &format!("run.{label}"))?;
     }
+    if !(valid_hex(&row.repository_commit, 40) || valid_hex(&row.repository_commit, 64)) {
+        return Err("run.repository_commit must be a full lowercase Git revision".into());
+    }
+    non_empty(&row.lean_version, "run.lean_version")?;
     for (label, value) in [
         ("target_statement_sha256", row.target_statement_sha256.as_str()),
         ("environment_sha256", row.environment_sha256.as_str()),
@@ -1062,5 +1066,40 @@ mod tests {
         let ungated_arm = ungated.arm_metrics.iter().find(|x| x.arm_id == "challenger").unwrap();
         assert_eq!(gated_arm.raw_kernel_verified_successes, ungated_arm.raw_kernel_verified_successes);
         assert_eq!(gated_arm.assurance_qualified_successes + 1, ungated_arm.assurance_qualified_successes);
+    }
+
+    #[test]
+    fn source_reproduction_metric_never_claims_unperformed_checks() {
+        let mut cohort = synthetic_cohort();
+        cohort.require_source_reproduction = false;
+        let mut rows = synthetic_rows(&cohort);
+        for row in &mut rows {
+            row.source_reproduction_status = "not_applicable".into();
+            row.source_reproduction_receipt_sha256 = None;
+        }
+        let report = analyze(&cohort, &rows, fake_digest("source-not-required")).unwrap();
+        for arm in &report.arm_metrics {
+            assert_eq!(arm.source_reproduced_successes, 0);
+            assert_eq!(arm.source_reproduced_success_rate, 0.0);
+        }
+        let challenger = report.arm_metrics.iter().find(|x| x.arm_id == "challenger").unwrap();
+        assert_eq!(challenger.assurance_qualified_successes, 3);
+    }
+
+    #[test]
+    fn goal_mismatch_always_blocks_assurance_qualified_success() {
+        let mut cohort = synthetic_cohort();
+        cohort.require_source_reproduction = false;
+        let mut rows = synthetic_rows(&cohort);
+        let row = rows.iter_mut().find(|r| r.arm_id == "challenger" && r.task_id == "task-1").unwrap();
+        row.goal_alignment = "mismatch".into();
+        row.goal_alignment_receipt_sha256 = Some(fake_digest("mismatch"));
+        row.source_reproduction_status = "not_applicable".into();
+        row.source_reproduction_receipt_sha256 = None;
+        let report = analyze(&cohort, &rows, fake_digest("goal-mismatch")).unwrap();
+        let challenger = report.arm_metrics.iter().find(|x| x.arm_id == "challenger").unwrap();
+        assert_eq!(challenger.raw_kernel_verified_successes, 4);
+        assert_eq!(challenger.assurance_qualified_successes, 2);
+        assert_eq!(challenger.assurance_disqualified_successes, 1);
     }
 }
