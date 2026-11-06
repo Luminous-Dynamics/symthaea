@@ -426,8 +426,10 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
         .collect()
 }
 
-const EMPTY_TRANSCRIPT_ERROR: &str =
-    "No speech transcript available; microphone capture or lexical ASR is not configured, or no speech was detected";
+const EMPTY_TRANSCRIPT_ERROR: &str = concat!(
+    "No speech transcript available; microphone capture or lexical ASR ",
+    "is not configured, or no speech was detected"
+);
 
 fn transcript_has_content(text: &str) -> bool {
     !text.trim().is_empty()
@@ -2721,6 +2723,18 @@ mod protocol_tests {
         assert!(!transcript_has_content("  \n\t  "));
         assert!(transcript_has_content("hello"));
         assert!(transcript_has_content("  hello  "));
+    }
+
+    #[cfg(feature = "voice-tts")]
+    #[test]
+    fn transcribed_response_omits_unmeasured_confidence() {
+        let response = Response::Transcribed {
+            text: "hello".into(),
+            confidence: None,
+        };
+        let value = response_json(&response);
+        assert_eq!(value["text"], "hello");
+        assert!(value.get("confidence").is_none());
     }
 
     #[tokio::test]
