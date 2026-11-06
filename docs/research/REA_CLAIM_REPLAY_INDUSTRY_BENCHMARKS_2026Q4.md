@@ -233,6 +233,42 @@ The 23-case frozen public seed covers provider-observation support/refutation, J
 
 The public seed is a conformance floor, not a broad population estimate. A blinded holdout, external adjudication and continuous-maintenance evaluation remain necessary before claims about real-world agent reliability.
 
+## 10. Fuzz qualification: smoke versus comparative evidence
+
+The current-parent fuzz implementation is [#10759](https://github.com/Luminous-Dynamics/symthaea/pull/10759). It targets raw claim requests, raw claim results, and framed end-to-end replay inputs. Its exact-head workflow completed three 46-second campaigns at pinned nightly/cargo-fuzz versions:
+
+| Target | Executions | Mean executions/s | Peak RSS |
+|---|---:|---:|---:|
+| Claim request parser | 1,852,807 | 40,278 | 338 MiB |
+| Claim result parser | 417,569 | 9,077 | 336 MiB |
+| Framed end-to-end replay | 2,873,120 | 62,459 | 319 MiB |
+
+The deterministic frame parser unit tests passed. All three campaigns completed without a recorded crash or timeout under the 512 MiB RSS cap. The three production replay source files (Cargo.toml, src/lib.rs, src/main.rs) had identical Git blob SHAs in the #10740 and #10759 trees at comparison time. The run therefore exercised the same replay implementation; #10740's subsequent changes were in its conformance tests.
+
+These numbers are a **bounded CI smoke receipt**, not a competitive fuzzing benchmark. Execution rates are not directly comparable across target types, different runner classes, compiler flags, sanitizer configurations, or corpus states. libFuzzer cov / ft values are instrumentation counters, not source-line coverage or proof of semantic completeness.
+
+### Industry methodology and next target
+
+Google FuzzBench exists because fuzzer evaluation has historically lacked a consistent methodology. Its published design uses multiple real-world benchmarks, repeated trials, raw data and statistical comparisons; its sample report uses 10 fuzzers, 24 benchmarks, 20 trials and 24-hour campaigns. OSS-Fuzz similarly separates fuzz execution from coverage inspection and supports multiple engines and sanitizers. REA should adopt those principles without pretending a 46-second CI run is equivalent.
+
+A practical REA qualification ladder:
+
+1. **PR smoke:** one 45-second run per target, bounded to 1 MiB inputs, five-second per-input timeout and 512 MiB RSS. This detects immediate harness regressions and crashes cheaply.
+2. **Scheduled comparison:** at least 10 independent trials per target, same pinned runner image/CPU class, compiler/toolchain, sanitizer set, seed corpus digest and CPU budget. Start with five minutes per trial and archive every trial's raw data.
+3. **Release qualification:** 20 independent trials per target, longer time budget, both seeded regression and evolved corpus; compare coverage/feature growth distributions and crash discovery, not just mean executions/s.
+4. **Sanitizer diversity:** run address and undefined-behavior sanitizers where the target/toolchain permits; consider memory sanitizer only when dependencies are instrumented compatibly.
+5. **Semantic mutation suite:** add known fault injections (wrong disposition, wrong request digest, duplicate keys, premise deletion, scope mutation, unreferenced evidence) and require each fault to be detected. Fuzzing parser bytes alone cannot establish that the semantic oracle is strong.
+
+Record runner image, CPU model/quotas, compiler flags, sanitizer, target SHA, corpus digest, trial number, seed, duration, executions, instrumentation counters, peak RSS, crashes, minimized reproducers and artifact digests. Compare repeated trials using medians/distributions and uncertainty, with a per-fault-family view. Keep raw data so future comparisons can be reanalyzed.
+
+**REA-specific improvement over generic fuzzing:** the benchmark's highest-value output is not raw input throughput; it is the set of new parser states and semantic invariants exercised, the time to discover a minimized counterexample, and whether every injected epistemic fault is rejected. A high-throughput fuzzer that never reaches a valid claim/result/Evidence path can be less useful than a slower target with a grammar-aware seed corpus.
+
+References:
+- [FuzzBench paper](https://research.google/pubs/fuzzbench-an-open-fuzzer-benchmarking-platform-and-service/)
+- [FuzzBench benchmark methodology and sample report](https://github.com/google/fuzzbench)
+- [OSS-Fuzz documentation](https://google.github.io/oss-fuzz/)
+- [OSS-Fuzz project setup and coverage guidance](https://google.github.io/oss-fuzz/getting-started/new-project-guide/)
+
 ## 9. New qualification paradigm — metamorphic semantic laws
 
 Issue [#10738](https://github.com/Luminous-Dynamics/symthaea/issues/10738) extends fixed examples with transformations whose expected relation is known even when no new answer label is authored.
