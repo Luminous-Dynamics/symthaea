@@ -428,6 +428,49 @@ fn validate_claim(claim: &ClaimRequest) -> Result<(), ReplayError> {
     Ok(())
 }
 
+fn validate_result_evidence_references(result: &ClaimEvaluation) -> Result<(), ReplayError> {
+    let invalid = |message: String| ReplayError::new(ReplayErrorKind::InvalidResult, message);
+    let mut requested = HashSet::with_capacity(result.requested_evidence_ids.len());
+    for id in &result.requested_evidence_ids {
+        if !is_evidence_id(id) {
+            return Err(invalid("result.requested_evidence_ids contains a malformed Evidence ID".to_owned()));
+        }
+        if !requested.insert(id.as_str()) {
+            return Err(invalid("result.requested_evidence_ids contains duplicate Evidence IDs".to_owned()));
+        }
+    }
+
+    let mut assessed = HashSet::with_capacity(result.evidence_assessments.len());
+    for assessment in &result.evidence_assessments {
+        if !is_evidence_id(&assessment.evidence_id) {
+            return Err(invalid("result.evidence_assessments contains a malformed Evidence ID".to_owned()));
+        }
+        if !requested.contains(assessment.evidence_id.as_str()) {
+            return Err(invalid("result contains an assessment for an unrequested Evidence ID".to_owned()));
+        }
+        if !assessed.insert(assessment.evidence_id.as_str()) {
+            return Err(invalid("result contains duplicate Evidence assessments".to_owned()));
+        }
+    }
+
+    let mut missing = HashSet::with_capacity(result.missing_evidence_ids.len());
+    for id in &result.missing_evidence_ids {
+        if !is_evidence_id(id) {
+            return Err(invalid("result.missing_evidence_ids contains a malformed Evidence ID".to_owned()));
+        }
+        if !requested.contains(id.as_str()) {
+            return Err(invalid("result marks an unrequested Evidence ID as missing".to_owned()));
+        }
+        if !missing.insert(id.as_str()) {
+            return Err(invalid("result.missing_evidence_ids contains duplicate Evidence IDs".to_owned()));
+        }
+        if assessed.contains(id.as_str()) {
+            return Err(invalid("result Evidence ID cannot be both assessed and missing".to_owned()));
+        }
+    }
+    Ok(())
+}
+
 fn parse_result(bytes: &[u8]) -> Result<(ClaimEvaluation, Value), ReplayError> {
     let value = parse_unique_json(bytes, MAX_RESULT_JSON_BYTES, "claim evaluation result")?;
     require_keys(
@@ -515,6 +558,19 @@ fn parse_result(bytes: &[u8]) -> Result<(ClaimEvaluation, Value), ReplayError> {
             "result digests must be lowercase SHA-256",
         ));
     }
+    if !nonempty(&result.rule_id) || !nonempty(&result.claim_id) {
+        return Err(ReplayError::new(
+            ReplayErrorKind::InvalidResult,
+            "result rule_id and claim_id must be non-empty",
+        ));
+    }
+    if !is_sha256(&result.scope.subject_sha256) || !nonempty(&result.scope.operation) {
+        return Err(ReplayError::new(
+            ReplayErrorKind::InvalidResult,
+            "result scope subject digest and operation are invalid",
+        ));
+    }
+    validate_result_evidence_references(&result)?;
     Ok((result, value))
 }
 
