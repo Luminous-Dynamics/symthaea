@@ -428,7 +428,7 @@ def main() -> int:
             f"challenge={receipt['challenge_id']}; "
             f"models={receipt['append_only_summary']['base_model_count']}->"
             f"{receipt['append_only_summary']['challenged_model_count']}; "
-            f"decision={receipt['challenged_decision_status']}; "
+            f"decision={receipt['model_expansion_comparison']['challenged_decision_status']}; "
             f"identifiability={receipt['support_overlap_audit']['status']}"
         )
         return 0
