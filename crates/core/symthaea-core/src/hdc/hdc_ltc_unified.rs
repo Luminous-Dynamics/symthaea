@@ -3649,6 +3649,58 @@ mod tests {
     }
 
     #[test]
+    fn test_hdc_ltc_optimizer_updates_gate_and_tau_parameter_groups() {
+        const DIM: usize = 64;
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: DIM,
+                tau_base: 0.25,
+                backbone_tau: 0.3,
+                ..UnifiedConfig::default()
+            },
+            42,
+        );
+        let state = neuron
+            .gate_weight_ref()
+            .scale(0.2)
+            .add(&ContinuousHV::random(DIM, 32).scale(0.05));
+        let input = neuron
+            .tau_modulator_ref()
+            .scale(0.3)
+            .add(&ContinuousHV::random(DIM, 33).scale(0.1));
+        neuron.set_state(state);
+        let target = ContinuousHV::random(DIM, 34).scale(0.1);
+
+        let before = neuron.parameter_values();
+        let gradients = neuron.backward(&input, &target, 0.13);
+        neuron.apply_gradients_no_decay(&gradients, 0.01);
+        let after = neuron.parameter_values();
+        let manifest = neuron.parameter_manifest();
+
+        for group in &manifest.groups {
+            let old = &before[group.offset..group.offset + group.len];
+            let new = &after[group.offset..group.offset + group.len];
+            let change = old
+                .iter()
+                .zip(new.iter())
+                .map(|(a, b)| (a - b).abs())
+                .sum::<f32>();
+            assert!(
+                change > 0.0,
+                "optimizer should update parameter group {}",
+                group.name
+            );
+            let norm = new.iter().map(|value| value * value).sum::<f32>().sqrt();
+            assert!(
+                norm <= group.max_norm + 1e-5,
+                "parameter group {} exceeded norm bound: {}",
+                group.name,
+                norm
+            );
+        }
+    }
+
+    #[test]
     fn test_hdc_ltc_parameter_batch_applies_multiple_groups_atomically() {
         let mut neuron = HdcLtcUnifiedNeuron::new(
             UnifiedConfig {
