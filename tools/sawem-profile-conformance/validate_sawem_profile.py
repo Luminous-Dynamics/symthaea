@@ -341,6 +341,7 @@ def main() -> None:
     source_time_mapping_kernel_path = root / "tools/sawem-market-reference/src/source_time_mapping.rs"
     market_impact_kernel_path = root / "tools/sawem-market-reference/src/market_impact_attribution.rs"
     rule_applicability_kernel_path = root / "tools/sawem-market-reference/src/rule_applicability.rs"
+    intraday_gate_kernel_path = root / "tools/sawem-market-reference/src/intraday_gate.rs"
 
     try:
         schema_bytes = schema_path.read_bytes()
@@ -370,6 +371,7 @@ def main() -> None:
         source_time_mapping_kernel_bytes = source_time_mapping_kernel_path.read_bytes()
         market_impact_kernel_bytes = market_impact_kernel_path.read_bytes()
         rule_applicability_kernel_bytes = rule_applicability_kernel_path.read_bytes()
+        intraday_gate_kernel_bytes = intraday_gate_kernel_path.read_bytes()
         schema = json.loads(schema_bytes)
         fixture = json.loads(fixture_bytes)
         comparator_schema = json.loads(comparator_schema_bytes)
@@ -418,6 +420,8 @@ def main() -> None:
             + market_impact_kernel_bytes
             + b"\n"
             + rule_applicability_kernel_bytes
+            + b"\n"
+            + intraday_gate_kernel_bytes
         ).decode("utf-8")
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot load schema or fixture: {exc}")
