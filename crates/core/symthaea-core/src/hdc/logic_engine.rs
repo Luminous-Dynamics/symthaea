@@ -8,7 +8,7 @@
 //!
 //! ## Capabilities
 //!
-//! - **Propositional logic**: equivalence-preserving CNF conversion, DPLL SAT solver
+//! - **Propositional logic**: equivalence-preserving CNF, linear-size Tseitin encoding, DPLL SAT solver
 //! - **Truth table**: evaluation, tautology/contradiction detection
 //! - **Natural deduction**: Modus Ponens, Modus Tollens, hypothetical syllogism
 //! - **First-order logic**: unification (Robinson's algorithm), resolution prover
@@ -251,10 +251,9 @@ impl TseitinEncoder {
                 return TseitinNode::Constant(left_value == right_value);
             }
             (TseitinNode::Constant(true), _) | (_, TseitinNode::Constant(true)) => {
-                return if matches!(left, TseitinNode::Constant(true)) {
-                    right.clone()
-                } else {
-                    left.clone()
+                return match &left {
+                    TseitinNode::Constant(true) => right.clone(),
+                    _ => left.clone(),
                 };
             }
             (TseitinNode::Constant(false), _) => return right.clone().negate(),
@@ -2326,6 +2325,37 @@ mod tests {
         for formula in formulas {
             assert_tseitin_unique_extension(&formula, &["p", "q", "r"]);
         }
+    }
+
+    #[test]
+    fn test_tseitin_clause_and_auxiliary_counts_are_linear_in_formula_size() {
+        fn gate_count(formula: &Proposition) -> usize {
+            match formula {
+                Proposition::Atom(_) | Proposition::True | Proposition::False => 0,
+                Proposition::Not(inner) => gate_count(inner),
+                Proposition::And(left, right)
+                | Proposition::Or(left, right)
+                | Proposition::Implies(left, right)
+                | Proposition::Iff(left, right) => {
+                    1 + gate_count(left) + gate_count(right)
+                }
+            }
+        }
+
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let formula = p
+            .clone()
+            .and(q.clone().or(r.clone()))
+            .iff(p.clone().implies(q.clone().and(r.clone())));
+        let gates = gate_count(&formula);
+        let encoding = LogicEngine::to_tseitin_cnf(&formula);
+
+        // AND/OR/IMPLIES require at most 3 clauses per gate, IFF at most 4,
+        // plus one root assertion. Simplifications can only reduce this.
+        assert!(encoding.auxiliary_variables.len() <= gates);
+        assert!(encoding.clauses.len() <= 4 * gates + 1);
     }
 
     #[test]
