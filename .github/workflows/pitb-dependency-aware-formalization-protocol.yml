@@ -1,0 +1,85 @@
+name: PITB Dependency-Aware Formalization Preregistration
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/pitb-dependency-aware-formalization-experiment-2026-11-03.md"
+      - "data/benchmarks/pitb-dependency-aware-formalization-v0/**"
+      - ".github/workflows/pitb-dependency-aware-formalization-protocol.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-protocol-venv"
+          "$RUNNER_TEMP/pitb-protocol-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Validate protocol schema and fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-protocol-venv/bin/python" - <<'PY'
+          import json
+          import math
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("data/benchmarks/pitb-dependency-aware-formalization-v0")
+          schema = json.loads((root / "protocol.schema.json").read_text())
+          protocol = json.loads((root / "protocol.synthetic.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          errors = sorted(
+              Draft202012Validator(schema).iter_errors(protocol),
+              key=lambda e: list(e.path),
+          )
+          if errors:
+              raise SystemExit("\n".join(f"{list(e.path)}: {e.message}" for e in errors))
+
+          benchmark = protocol["benchmark"]
+          if (benchmark["tasks"], benchmark["source_groups"], benchmark["graded_declarations"]) != (341, 24, 1155):
+              raise SystemExit("pinned AutoformBench manifest totals changed")
+          workload = protocol["observed_workload"]
+          if [x["tasks"] for x in workload["strata"]] != [230, 53, 58]:
+              raise SystemExit("declaration-count stratum denominators changed")
+          for model in workload["published_models"]:
+              counts = [model[k]["tasks"] for k in ("single", "two_to_four", "five_plus")]
+              if sum(counts) != 341:
+                  raise SystemExit(f"{model['model']} task denominator drift: {counts}")
+              for key in ("single", "two_to_four", "five_plus"):
+                  if model[key]["solved"] > model[key]["tasks"]:
+                      raise SystemExit(f"{model['model']} has impossible solve count in {key}")
+
+          within = workload["within_source_comparison"]
+          high = within["high_unresolved"] / within["high_tasks"]
+          low = within["under_five_unresolved"] / within["under_five_tasks"]
+          if not math.isclose(high - low, within["risk_difference"], rel_tol=0, abs_tol=1e-12):
+              raise SystemExit("within-source risk difference does not recompute")
+          if not math.isclose((high / low), within["risk_ratio"], rel_tol=0, abs_tol=1e-12):
+              raise SystemExit("within-source risk ratio does not recompute")
+
+          expected_arms = {"F0", "F1", "F2", "F3a", "F3b", "F4", "F5", "F6"}
+          if {x["id"] for x in protocol["arms"]} != expected_arms:
+              raise SystemExit("registered experiment arms changed")
+          if protocol["evidence_status"] != {
+              "pitb_runs": False,
+              "sota_gain_claimed": False,
+              "interpretation": "preregistered_experiment_design_only",
+          }:
+              raise SystemExit("protocol fixture must remain design-only until measured")
+
+          print("PITB_DEPENDENCY_AWARE_FORMALIZATION_PROTOCOL_PASS")
+          print("341 tasks / 24 source groups / 1,155 declarations; four model stratifications; F0–F6 registered")
+          PY
