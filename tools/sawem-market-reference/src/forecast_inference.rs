@@ -104,10 +104,10 @@ fn confidence_interval(
     )?
     .max(1);
 
-    let lower_index = usize::try_from(lower_rank - 1)
-        .map_err(|_| ForecastInferenceError::ArithmeticOverflow)?;
-    let upper_index = usize::try_from(upper_rank - 1)
-        .map_err(|_| ForecastInferenceError::ArithmeticOverflow)?;
+    let lower_index =
+        usize::try_from(lower_rank - 1).map_err(|_| ForecastInferenceError::ArithmeticOverflow)?;
+    let upper_index =
+        usize::try_from(upper_rank - 1).map_err(|_| ForecastInferenceError::ArithmeticOverflow)?;
     let lower = *bootstrap_sums
         .get(lower_index)
         .ok_or(ForecastInferenceError::ArithmeticOverflow)?;
@@ -219,8 +219,8 @@ pub fn evaluate_forecast_skill_inference(
         wis_bootstrap.push(wis_sum);
     }
 
-    let paired_count = u64::try_from(sample_count)
-        .map_err(|_| ForecastInferenceError::ArithmeticOverflow)?;
+    let paired_count =
+        u64::try_from(sample_count).map_err(|_| ForecastInferenceError::ArithmeticOverflow)?;
     let mae = confidence_interval(
         mae_bootstrap,
         paired_count,
@@ -248,8 +248,8 @@ pub fn evaluate_forecast_skill_inference(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::forecast_skill::compare_forecast_skill;
     use crate::forecast_metrics::ForecastCalibrationObservation;
+    use crate::forecast_skill::compare_forecast_skill;
 
     const SOURCE_SHA: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const CANDIDATE_SHA: &str = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
@@ -326,12 +326,40 @@ mod tests {
     #[test]
     fn block_bootstrap_can_be_inconclusive_when_periods_disagree() {
         let candidate = [
-            forecast("candidate-good", 100, "candidate-v1", CANDIDATE_SHA, 100, 105),
-            forecast("candidate-bad", 115, "candidate-v1", CANDIDATE_SHA, 250, 205),
+            forecast(
+                "candidate-good",
+                100,
+                "candidate-v1",
+                CANDIDATE_SHA,
+                100,
+                105,
+            ),
+            forecast(
+                "candidate-bad",
+                115,
+                "candidate-v1",
+                CANDIDATE_SHA,
+                250,
+                205,
+            ),
         ];
         let baseline = [
-            forecast("baseline-good", 100, "persistence-v1", BASELINE_SHA, 90, 105),
-            forecast("baseline-bad", 115, "persistence-v1", BASELINE_SHA, 190, 205),
+            forecast(
+                "baseline-good",
+                100,
+                "persistence-v1",
+                BASELINE_SHA,
+                90,
+                105,
+            ),
+            forecast(
+                "baseline-bad",
+                115,
+                "persistence-v1",
+                BASELINE_SHA,
+                190,
+                205,
+            ),
         ];
         let assessment = compare_forecast_skill(300, &candidate, &baseline).unwrap();
         let mut starts = Vec::new();
