@@ -149,6 +149,20 @@ These numbers are repository-specific measurements, not universal error bounds. 
 
 A September 2026 IEEE TNNLS paper, *Rederived Closed-Form Continuous-Time Neural Networks*, proposes NIALIM using Lagrange interpolation of the input-dependent integral, derives a bound on approximation error, and introduces DFA-CfN and PRDFA-CfN variants evaluated across six tasks. This is directly relevant to Symthaea’s next integrator experiment. Compare against the paper’s actual datasets, splits, metrics, and implementation—not the headline “up to 69.2% improvement” across heterogeneous tasks.
 
+### 3.4 SWI branch implementation increments
+
+The research branch now contains the following HDC/CfC work:
+
+- `from_genesis()` uses domain-separated vectors followed by modified Gram–Schmidt, matching the unit-norm initialization contract of `new()`.
+- Forward pre-activation and adaptive-gate helpers are shared by the core local-gradient implementation.
+- One-step local gradients include equilibrium, Fourier bundling, adaptive gate, cosine-based tau modulation, gate weight/bias, input and pre-evolution state paths.
+- The tau derivative is zero at the effective tau clamp boundaries.
+- The phoneme trainer applies local target updates before evolving the frame. It is not described as temporal BPTT.
+- HDC-LTC now exposes typed parameter group IDs, profile statistics, bounded read-only windows, and dimension/finite/norm-validated replacement.
+- The `structured_mixer.rs` prototype provides identity, cyclic permutation and normalized Walsh–Hadamard transforms with exact inverse methods. Unit tests check round-trip reconstruction, norm preservation, one-hot spreading, and invalid dimension handling.
+
+**Important:** the structured mixer is not yet wired into the default HDC-LTC neuron. Its tests establish operator correctness, not a task-accuracy or efficiency improvement. The new Rust tests have not run in this environment.
+
 ## 4. Paradigm shifts for the Holographic Liquid Brain
 
 ### Shift A — Separate representation, dynamics, mixing, memory and learning
@@ -169,7 +183,7 @@ The current core neuron’s state/input transforms are Hadamard products, follow
 
 That is not yet a richly coupled “liquid brain.”
 
-Research three structured mixers:
+A first independent mixer primitive is now implemented in `crates/core/symthaea-core/src/hdc/structured_mixer.rs`. It is not enabled in the default neuron. Research and compare three structured mixer families:
 
 - **Permutation / orthogonal transform:** fixed signed permutations or fast Walsh–Hadamard transforms; inexpensive, norm-preserving, and easy to ablate.
 - **Circular-convolution mixer:** HRR-like interaction with O(D log D) FFT implementation and an explicit correlation-based unbinding test.
@@ -391,6 +405,8 @@ This is a research hypothesis. To claim superiority, Symthaea must reproduce sel
 - Respect tau-clamp derivative boundaries.
 - Add finite-difference tests for equilibrium, Fourier, gate, tau, input, and state gradients.
 - Correct the phoneme local trainer to update before its frame evolution.
+- Add typed HDC-LTC parameter profiles, safe group replacement and bounded read-only windows.
+- Add an independent identity/permutation/Walsh–Hadamard mixer prototype with inverse and norm-preservation tests.
 - Add HDC-LTC parameter profiles, typed replacement, and bounded immutable parameter windows.
 - Keep the end-to-end phoneme training regression ignored until it has a measured acceptance threshold.
 
