@@ -3,35 +3,11 @@ members = ["."]
 resolver = "2"
 
 [package]
-name = "rea-claim-replay-fuzz"
+name = "rea-claim-replay-fuzz-support"
 version = "0.1.0"
 edition = "2024"
 publish = false
 
-[package.metadata]
-cargo-fuzz = true
-
-[dependencies]
-libfuzzer-sys = "=0.4.13"
-rea-claim-replay-verifier = { path = "../rea-claim-replay-verifier" }
-
-[[bin]]
-name = "claim_request"
-path = "fuzz_targets/claim_request.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "claim_result"
-path = "fuzz_targets/claim_result.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "framed_replay"
-path = "fuzz_targets/framed_replay.rs"
-test = false
-doc = false
-bench = false
+[lib]
+name = "rea_claim_replay_fuzz"
+path = "src/lib.rs"
