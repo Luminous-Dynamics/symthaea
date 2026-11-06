@@ -706,7 +706,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
     )?
     .qualified;
-    eeprintln!("authority_scope,valid_event,{valid}");
+    eprintln!("authority_scope,valid_event,{valid}");
     let mut qualified = usize::from(valid);
     let mut rejected = 0usize;
 
