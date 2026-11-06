@@ -1848,6 +1848,8 @@ fn synthetic_proof_run(task: &SorryRecord, verified: bool, run_id: &str) -> Proo
         end_line: task.location.end_line,
         end_column: task.location.end_column,
         goal_sha256: sha256(task.debug_info.goal.as_bytes()),
+        budget_policy_sha256: digest("synthetic-fixed-budget-policy"),
+        evaluation_condition_sha256: digest("synthetic-source-present-evaluation-condition"),
         declaration_signature_before_sha256: digest("synthetic-declaration-signature"),
         declaration_signature_after_sha256: digest("synthetic-declaration-signature"),
         target_is_prop: verified,
@@ -1861,6 +1863,8 @@ fn synthetic_proof_run(task: &SorryRecord, verified: bool, run_id: &str) -> Proo
             name: "synthetic-strategy".into(),
             version: "v0".into(),
             implementation_sha256: digest("synthetic-implementation"),
+            execution_stack_sha256: digest("synthetic-execution-stack"),
+            checkpoint_sha256: Some(digest("synthetic-model-checkpoint")),
             model_id: Some("synthetic-model".into()),
             model_version: Some("v0".into()),
         },
@@ -1888,7 +1892,9 @@ fn synthetic_strategy_run(task: &SorryRecord, verified: bool, run_id: &str, stra
     let mut run = synthetic_proof_run(task, verified, run_id);
     run.strategy.name = strategy_name.into();
     run.strategy.model_id = Some(strategy_name.into());
-    run.strategy.implementation_sha256 = sha256(strategy_name.as_bytes());
+    run.strategy.implementation_sha256 = sha256(format!("{strategy_name}|implementation").as_bytes());
+    run.strategy.execution_stack_sha256 = sha256(format!("{strategy_name}|execution-stack").as_bytes());
+    run.strategy.checkpoint_sha256 = Some(sha256(format!("{strategy_name}|checkpoint").as_bytes()));
     run
 }
 
