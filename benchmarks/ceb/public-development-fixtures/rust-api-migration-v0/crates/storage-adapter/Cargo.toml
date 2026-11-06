@@ -1,0 +1,9 @@
+[package]
+name = "ceb-api-migration-storage-adapter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ceb-api-migration-domain-types = { path = "../domain-types" }
+ceb-api-migration-record-parser = { path = "../record-parser" }
