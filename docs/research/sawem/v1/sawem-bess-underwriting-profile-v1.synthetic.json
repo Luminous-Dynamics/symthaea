@@ -38,7 +38,7 @@
       "raw_artifact_sha256": null,
       "source_freeze_state": "not_frozen"
     },
-    "qualification_note": "A 5 November 2026 secondary interview with the Acting NERSA CEO describes the April 2027 target for opening external commercial participation and continuing finalisation of the required market rules. Earlier 30 October reporting describes 85 entities invited into pre-launch simulation/testing. Neither report establishes that this specific participant is admitted, commercially licensed, eligible for a reserve product, or entitled to submit commercial bids or settle live trades."
+    "qualification_note": "The secondary reports describe market-wide pre-launch testing and the target opening timeline. This reporting does not establish that this specific participant is admitted, commercially licensed, eligible for a reserve product, entitled to submit commercial bids, or permitted to settle live trades. Participant admission and commercial trading remain unknown until primary, participant-specific evidence is source-frozen."
   },
   "trading_unit": {
     "trading_unit_id": "synthetic-bess-tu-001",
