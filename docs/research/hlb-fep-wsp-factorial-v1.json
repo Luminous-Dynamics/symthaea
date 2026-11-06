@@ -409,6 +409,10 @@
     {
       "id": "oracle_permutation_alignment",
       "scope": "labelled alignment upper bound only; never used by proposer or tuning"
+    },
+    {
+      "id": "bayesian_model_reduction_structure_selection",
+      "scope": "active-inference model-structure selection using posterior model reduction"
     }
   ],
   "seeds": {
@@ -466,7 +470,10 @@
       "forecast_error",
       "function_equivalence_error",
       "equivalent_healthy_false_edit_rate",
-      "cross_permutation_repair_success"
+      "cross_permutation_repair_success",
+      "state_information_gain_nats",
+      "parameter_information_gain_nats",
+      "model_structure_information_gain_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -476,7 +483,9 @@
       "invalid_edit_rejection_rate",
       "rollback_rate",
       "permutation_false_fault_rate",
-      "false_edit_rate_on_function_equivalent_models"
+      "false_edit_rate_on_function_equivalent_models",
+      "joint_information_chain_rule_error",
+      "posterior_calibration_by_uncertainty_level"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -521,7 +530,10 @@
     "No SOTA, production readiness, general self-improvement, safety certification, biological equivalence, or consciousness claim follows from this protocol.",
     "Function-preserving hidden-unit permutations are negative controls; raw parameter distance alone cannot label a behavior change.",
     "Any permutation alignment is diagnostic metadata and must not silently rewrite the source checkpoint or alter native digest semantics.",
-    "Cross-permutation repair is scored only after held-out function equivalence and preservation tests; oracle alignments are upper bounds, not proposer inputs."
+    "Cross-permutation repair is scored only after held-out function equivalence and preservation tests; oracle alignments are upper bounds, not proposer inputs.",
+    "State-, parameter-, and model-structure information gains are reported separately only when their generative models and posterior updates are explicitly defined.",
+    "Any aggregation of epistemic terms declares its factorization and is checked against a joint mutual-information chain-rule calculation; arbitrary entropy deltas cannot be added.",
+    "Bayesian Model Reduction or another model-selection procedure must be qualified against held-out model evidence and cannot commit a structural change from a probe ranking alone."
   ],
   "research_references": [
     {
@@ -575,6 +587,22 @@
     {
       "id": "symthaea_model_information_gain_pr_8394",
       "url": "https://github.com/Luminous-Dynamics/symthaea/pull/8394"
+    },
+    {
+      "id": "permutation_equivariant_weight_space_networks_icml_2026",
+      "url": "https://proceedings.mlr.press/v306/dayan26a.html"
+    },
+    {
+      "id": "weight_space_first_class_modality_icml_2026",
+      "url": "https://proceedings.mlr.press/v306/wang26mc.html"
+    },
+    {
+      "id": "weight_space_learning_survey_2026",
+      "url": "https://arxiv.org/abs/2603.10090"
+    },
+    {
+      "id": "active_inference_artificial_reasoning_nature_2026",
+      "url": "https://doi.org/10.1038/s41467-026-77209-5"
     }
   ]
 }
