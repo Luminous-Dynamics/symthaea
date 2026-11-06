@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/pitb/proof-impact-report-v0.schema.json",
+  "title": "PITB proof impact analysis report v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "old_snapshot",
+    "new_snapshot",
+    "dependency_inventory_complete",
+    "conservative_mode",
+    "changes",
+    "impacts",
+    "action_counts",
+    "summary_note"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "pitb.proof-impact-report.v0"
+    },
+    "old_snapshot": {
+      "$ref": "#/$defs/identity"
+    },
+    "new_snapshot": {
+      "$ref": "#/$defs/identity"
+    },
+    "dependency_inventory_complete": {
+      "type": "boolean"
+    },
+    "conservative_mode": {
+      "type": "boolean"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/change"
+      }
+    },
+    "impacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/impact"
+      }
+    },
+    "action_counts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    "summary_note": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot_id",
+        "repository_commit",
+        "environment_sha256",
+        "raw_snapshot_sha256"
+      ],
+      "properties": {
+        "snapshot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repository_commit": {
+          "$ref": "#/$defs/sha1"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "raw_snapshot_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "change_id",
+        "change_kind",
+        "old_sha256",
+        "new_sha256"
+      ],
+      "properties": {
+        "change_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "change_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "old_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        },
+        "new_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/sha256"
+            }
+          ]
+        }
+      }
+    },
+    "impact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id",
+        "action",
+        "reasons"
+      ],
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "enum": [
+            "retain",
+            "retrieval_refresh",
+            "source_revalidate",
+            "revalidate",
+            "reprove",
+            "rebuild",
+            "unknown_conservative"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
