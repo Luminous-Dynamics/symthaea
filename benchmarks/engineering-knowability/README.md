@@ -183,7 +183,7 @@ Only after those gates should a matched human/rule/model comparison begin. A lat
 
 ## Industry benchmark context — captured 2026-11-06
 
-The manifest records **seven separate comparison snapshots**. They are context, not a merged leaderboard:
+The manifest records **six separate comparison snapshots**. They are context, not a merged leaderboard:
 
 | Comparator | Public reference | Evaluation scope | Comparability boundary |
 |---|---|---|---|
@@ -193,7 +193,6 @@ The manifest records **seven separate comparison snapshots**. They are context, 
 | [BenchCAD 2.0 Core](https://benchcad.com/blog/benchcad-2) | GPT-6 Astra: 0.59, about $11/case, 62 min median; Claude Opus 5.5: 0.57, about $28/case, about 3.7 h median | 100 held-out Core cases, v2.0 offline sandbox; geometry/topology, placement and ECAD | This is the currently retrievable official 2.0 release; do not mix vendor-reported tool/no-tool Vision2Code scores or other scorer variants into Core |
 | [CADWorld released v0](https://cad-world.github.io/) | GPT-5.4 CUA: 25.0%; human expert reference: 87.0% | 60 released tasks across 11 workflows; 100 GUI steps/task | 200-task universe is not the same as the released 60-task v0 cohort; 87% is a single-trial expert reference, not a population estimate |
 | [CADWorld extended-run snapshot](https://cad-world.github.io/) | Claude Opus 5.5 EXT: 41.5%; Sonnet 5.5 EXT: 33.5%; GPT-6 Astra EXT: 33.0% | Indexed extended-run board lists 14 evaluated agents | Retrieved summary does not establish the exact task denominator; do not compare directly with the 60-task v0 cohort or claim all 200 tasks were scored |
-| [CADWorld original paper snapshot](https://cad-world.github.io/) | GPT-5.4 CUA: 25.0%; Opus 4.8 CUA: 23.3% | Original seven-agent, 60-task coverage evaluation | Same released v0 snapshot, not the later extended-run display |
 
 PLE's model and harness effects are material: on the 29-task development split, Opus 5.5 ranges from 0.474 (pi) to 0.551 (Claude Code), and costs/runtimes differ. The leaderboard reports three runs per model+harness pair. <Cite refs={["turn348316search0","turn348316search2","turn181350search3"]}/>
 
