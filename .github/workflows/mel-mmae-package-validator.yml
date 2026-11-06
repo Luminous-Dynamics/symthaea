@@ -55,14 +55,10 @@ jobs:
           printf 'sample-001\nsample-002\n' > "$RUNNER_TEMP/mmae-expected-ids.txt"
           # 16-bit mono PCM WAVE, 8 kHz, two non-empty sample bytes.
           for id in sample-001 sample-002; do
-            printf 'RIFF\\x26\\x00\\x00\\x00WAVEfmt \\x10\\x00\\x00\\x00\\x01\\x00\\x01\\x00\\x40\\x1f\\x00\\x00\\x80\\x3e\\x00\\x00\\x02\\x00\\x10\\x00data\\x02\\x00\\x00\\x00\\x00\\x00' > "$package/audio/$id.wav"
+            printf '%b' 'RIFF\046\000\000\000WAVEfmt \020\000\000\000\001\000\001\000\100\037\000\000\200\076\000\000\002\000\020\000data\002\000\000\000\000\000' > "$package/audio/$id.wav"
           done
           printf '{"id":"sample-001","audio_path":"audio/sample-001.wav"}\n{"id":"sample-002","audio_path":"audio/sample-002.wav"}\n' > "$package/submission.jsonl"
-          cargo +1.96.0 run --locked --manifest-path "$MMAE_VALIDATOR_MANIFEST" -- validate \\
-            --root "$package" \\
-            --expected-ids "$RUNNER_TEMP/mmae-expected-ids.txt" \\
-            --expected-count 2 \\
-            --report "$RUNNER_TEMP/mmae-package-report.json" > "$RUNNER_TEMP/mmae-package-stdout.json"
+          cargo +1.96.0 run --locked --manifest-path "$MMAE_VALIDATOR_MANIFEST" -- validate --root "$package" --expected-ids "$RUNNER_TEMP/mmae-expected-ids.txt" --expected-count 2 --report "$RUNNER_TEMP/mmae-package-report.json" > "$RUNNER_TEMP/mmae-package-stdout.json"
           grep -q '"valid": true' "$RUNNER_TEMP/mmae-package-report.json"
       - name: Upload package preflight report
         uses: actions/upload-artifact@v4
