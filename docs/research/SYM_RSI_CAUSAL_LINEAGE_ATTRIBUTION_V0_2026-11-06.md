@@ -193,11 +193,13 @@ The first no-runner slice is now present in this PR branch:
 - `summarize_equal_cluster_blocks`: requires one canonical context digest, retains block and cluster contrasts, and reports an equal-cluster point estimate. It does not calculate confidence intervals or assert cluster independence.
 - `InterventionManifest`: checks digest syntax, unique identities, known parent/change references, dependency acyclicity, symmetric conflicts, coupled-group cardinality and exclusion of candidate-side evaluator/task-contract edits.
 - Offline CLI: parses the inert 2×2 fixture corpus and synthetic manifest example.
-- Fifteen Rust unit tests are authored for fixture arithmetic/gates, manifest validation, non-finite input, cluster weighting, context mismatch, dependency cycles/conflicts and evaluator-edit exclusion.
+- Sixteen Rust unit tests are authored for fixture arithmetic/gates, manifest validation, non-finite input, cluster weighting, context mismatch, dependency cycles/conflicts and evaluator-edit exclusion.
 
 Commands from the repository root:
 
 ```sh
+cargo fmt --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- --check
+cargo clippy --manifest-path tools/sym-rsi-causal-reference/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path tools/sym-rsi-causal-reference/Cargo.toml
 cargo run --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- fixtures docs/research/fixtures/SYM_RSI_CAUSAL_LINEAGE_2X2_FIXTURES_V0_2026-11-06.json
 cargo run --manifest-path tools/sym-rsi-causal-reference/Cargo.toml -- manifest docs/research/fixtures/SYM_RSI_INTERVENTION_MANIFEST_V0_EXAMPLE_2026-11-06.json
