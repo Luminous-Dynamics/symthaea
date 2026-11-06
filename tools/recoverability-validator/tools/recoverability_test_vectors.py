@@ -214,6 +214,8 @@ def main() -> int:
     expected_commitment = commit_fields(base_fields)
     if expected_commitment != base["manifest_commitment_sha256"]:
         raise SystemExit("Python typed commitment does not match frozen fixture")
+    if base["surface_state"] != "complete_frozen_inventory" or not base["surface_completeness_evidence_refs"]:
+        raise SystemExit("complete inventory fixture lacks evaluator-side completeness evidence refs")
 
     fields_path = out_dir / "fields.json"
     fields_path.write_bytes(compact(base_fields) + b"\n")
@@ -246,6 +248,7 @@ def main() -> int:
     # Positive route witnesses survive on a partial observed surface; absent routes do not.
     partial_fields = copy.deepcopy(base_fields)
     partial_fields["surface_state"] = "partial_observed"
+    partial_fields["surface_completeness_evidence_refs"] = []
     partial_path = out_dir / "partial-surface-manifest.json"
     partial = save_manifest(partial_fields, partial_path)
     partial_rows = [classify(partial, unit) for unit in partial["evidence_units"]]
@@ -261,6 +264,7 @@ def main() -> int:
 
     unknown_fields = copy.deepcopy(base_fields)
     unknown_fields["surface_state"] = "unknown"
+    unknown_fields["surface_completeness_evidence_refs"] = []
     unknown_path = out_dir / "unknown-surface-manifest.json"
     unknown_manifest = save_manifest(unknown_fields, unknown_path)
     if any(classify(unknown_manifest, unit)["recoverability"] != "NotEvaluable" for unit in unknown_manifest["evidence_units"]):
@@ -304,6 +308,14 @@ def main() -> int:
     )
     if added_row["recoverability"] != "DirectlyReachable":
         raise SystemExit("adding a valid direct route did not improve reachability")
+
+    # A complete-inventory label without its evaluator-side evidence reference is invalid.
+    no_completeness_evidence = copy.deepcopy(base_fields)
+    no_completeness_evidence["surface_completeness_evidence_refs"] = []
+    save_manifest(
+        no_completeness_evidence,
+        out_dir / "no-completeness-evidence-manifest.json",
+    )
 
     # A post-reformulation retrieval cannot occur before the rewrite it depends on.
     out_of_order = copy.deepcopy(base_fields)
@@ -385,6 +397,7 @@ def main() -> int:
             "reformulation_requires_prior_initial_retrieval": True,
             "navigation_requires_prior_initial_retrieval": True,
             "model_free_reference_classifier": True,
+            "complete_inventory_requires_evidence_refs": True,
         },
     }
     (out_dir / "summary.json").write_bytes(
