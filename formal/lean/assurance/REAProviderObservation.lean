@@ -288,6 +288,73 @@ theorem provider_observation_cannot_close_security_control
     (by rw [hControl]; decide)
     hs
 
+/-- A changed rule identifier cannot reuse a prior result. -/
+theorem changed_rule_id_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hRule : receipt.binding.ruleId ≠ obligation.binding.ruleId) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hRule (congrArg ClaimBinding.ruleId hs.1)
+
+/-- Provider observation cannot establish cryptographic signature validity. -/
+theorem provider_observation_cannot_close_signature_validity
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hSignature : obligation.binding.predicate = .SignatureCryptographicValidity) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact provider_observation_cannot_promote_to_other_predicate
+    refinements entailments receipt obligation
+    (by rw [hSignature]; decide)
+    hs
+
+/-- Provider observation cannot establish signer identity. -/
+theorem provider_observation_cannot_close_signer_identity
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hIdentity : obligation.binding.predicate = .SignerIdentity) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact provider_observation_cannot_promote_to_other_predicate
+    refinements entailments receipt obligation
+    (by rw [hIdentity]; decide)
+    hs
+
+/-- Provider observation cannot establish whole-archive completeness. -/
+theorem provider_observation_cannot_close_archive_completeness
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hCompleteness : obligation.binding.predicate = .WholeArchiveCompleteness) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact provider_observation_cannot_promote_to_other_predicate
+    refinements entailments receipt obligation
+    (by rw [hCompleteness]; decide)
+    hs
+
+/-- Provider observation cannot establish platform acceptance. -/
+theorem provider_observation_cannot_close_platform_acceptance
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hAcceptance : obligation.binding.predicate = .PlatformAcceptance) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact provider_observation_cannot_promote_to_other_predicate
+    refinements entailments receipt obligation
+    (by rw [hAcceptance]; decide)
+    hs
+
 /--
 Changing confidence/authority descriptors does not alter the exact receipt
 identity, evidence class, claim scope or admissibility relation.
@@ -357,6 +424,7 @@ theorem provider_aliases_do_not_create_independence
 #print axioms changed_request_schema_cannot_support
 #print axioms changed_result_schema_cannot_support
 #print axioms changed_rule_generation_cannot_support
+#print axioms changed_rule_id_cannot_support
 #print axioms changed_platform_cannot_support
 #print axioms changed_platform_version_cannot_support
 #print axioms changed_environment_cannot_support
@@ -365,8 +433,12 @@ theorem provider_aliases_do_not_create_independence
 #print axioms provider_observation_cannot_promote_to_other_predicate
 #print axioms provider_observation_cannot_close_member_integrity
 #print axioms provider_observation_cannot_close_producer_authenticity
+#print axioms provider_observation_cannot_close_signature_validity
+#print axioms provider_observation_cannot_close_signer_identity
 #print axioms provider_observation_cannot_close_signer_trust
 #print axioms provider_observation_cannot_close_package_authorization
+#print axioms provider_observation_cannot_close_archive_completeness
+#print axioms provider_observation_cannot_close_platform_acceptance
 #print axioms provider_observation_cannot_close_security_control
 #print axioms confidence_authority_are_non_amplifying
 #print axioms provider_observation_refutation_remains_meta_claim
