@@ -2,7 +2,7 @@
 
 This directory contains the **design-only** adversarial and positive-control catalog for the CEB benchmark-integrity lane.
 
-- [Attack catalog V0](attack-catalog.v0.json): 39 negative/adversarial and 11 positive/valid-state controls.
+- [Attack catalog V0](attack-catalog.v0.json): 41 negative/adversarial and 12 positive/valid-state controls.
 - [Protocol and targets](../../../docs/research/CEB_BENCHMARK_INTEGRITY_PROTOCOL_V0_2026-11-04.md): threat model, metrics, confidence bounds, lifecycle and qualification protocol.
 - [Task CEB-VER-001](../catalog.v0.json): benchmark integrity task in the main CEB catalog.
 - [Tracking issue #10138](https://github.com/Luminous-Dynamics/symthaea/issues/10138).
