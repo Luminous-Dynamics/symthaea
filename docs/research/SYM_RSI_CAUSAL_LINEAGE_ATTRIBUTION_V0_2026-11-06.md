@@ -191,9 +191,9 @@ The first no-runner slice is now present in this PR branch:
 - Standalone Rust package: `tools/sym-rsi-causal-reference/`. Its nested `[workspace]` keeps it outside the production root workspace and avoids relying on the still-unmerged #10472/#10496/#10499/#10515 draft stack.
 - `Factorial2x2`: computes A/B marginal effects, conditional effects and A×B interaction from same-base outcomes.
 - `summarize_equal_cluster_blocks`: requires one canonical context digest, retains block and cluster contrasts, and reports an equal-cluster point estimate. It does not calculate confidence intervals or assert cluster independence.
-- `InterventionManifest`: checks digest syntax, unique identities, known parent/change references, dependency acyclicity, symmetric conflicts, coupled-group cardinality and exclusion of candidate-side evaluator/task-contract edits.
+- `InterventionManifest`: checks digest syntax, patch-diff identities, affected paths, preregistered mechanisms and predicted intermediate effects, rollback/transplant references, unique identities, known parent/change references, dependency acyclicity, symmetric conflicts, coupled-group cardinality and exclusion of candidate-side evaluator/task-contract edits.
 - Offline CLI: parses the inert 2×2 fixture corpus and synthetic manifest example.
-- Sixteen Rust unit tests are authored for fixture arithmetic/gates, manifest validation, non-finite input, cluster weighting, context mismatch, dependency cycles/conflicts and evaluator-edit exclusion.
+- Eighteen Rust unit tests are authored for fixture arithmetic/gates, manifest validation, non-finite input, cluster weighting, context mismatch, dependency cycles/conflicts and evaluator-edit exclusion.
 
 Commands from the repository root:
 
