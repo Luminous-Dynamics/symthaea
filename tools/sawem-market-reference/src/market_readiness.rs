@@ -82,8 +82,8 @@ pub enum MarketReadinessError {
     InvalidPublicationChronology,
     DuplicateRequirement,
     DuplicateEvidenceId,
-    DuplicateSourceReference,
     ConflictingEvidence,
+    NoRequirementsForScope,
     EmptyRequirementSet,
 }
 
@@ -154,6 +154,14 @@ pub fn assess_market_readiness<'a>(
         }
     }
 
+    if !inputs
+        .requirements
+        .iter()
+        .any(|requirement| requirement.scope == inputs.scope)
+    {
+        return Err(MarketReadinessError::NoRequirementsForScope);
+    }
+
     for (index, evidence) in inputs.evidence.iter().copied().enumerate() {
         if !nonempty(evidence.evidence_id)
             || !nonempty(evidence.requirement_id)
@@ -173,9 +181,6 @@ pub fn assess_market_readiness<'a>(
         for previous in &inputs.evidence[..index] {
             if previous.evidence_id == evidence.evidence_id {
                 return Err(MarketReadinessError::DuplicateEvidenceId);
-            }
-            if previous.source_ref == evidence.source_ref {
-                return Err(MarketReadinessError::DuplicateSourceReference);
             }
         }
     }
@@ -545,7 +550,7 @@ mod tests {
             Err(MarketReadinessError::DuplicateEvidenceId)
         );
 
-        let duplicate_sources = [
+        let shared_source = [
             evidence(
                 "evidence-one",
                 "market-code-approval",
@@ -555,20 +560,46 @@ mod tests {
                 99,
             ),
             ReadinessEvidence {
+                requirement_id: "trading-rules-approval",
                 source_ref: "evidence-one",
                 ..evidence(
                     "evidence-two",
-                    "market-code-approval",
+                    "trading-rules-approval",
                     ReadinessAuthority::Regulator,
                     ReadinessEvidenceClass::OfficialAuthorityRecord,
-                    ReadinessEvidenceDisposition::NotSatisfied,
+                    ReadinessEvidenceDisposition::Satisfied,
                     99,
                 )
             },
         ];
+        // One official instrument may support more than one separately scoped
+        // requirement; evidence IDs remain unique, source identity may be shared.
+        let other_requirement = requirement(
+            "trading-rules-approval",
+            ReadinessAuthority::Regulator,
+            ReadinessEvidenceClass::OfficialAuthorityRecord,
+        );
         assert_eq!(
-            assess_market_readiness(inputs(&requirements, &duplicate_sources)),
-            Err(MarketReadinessError::DuplicateSourceReference)
+            assess_market_readiness(inputs(&[requirements[0], other_requirement], &shared_source))
+                .unwrap()
+                .state,
+            MarketReadinessState::Ready
+        );
+    }
+
+    #[test]
+    fn requirement_profile_must_contain_entries_for_requested_scope() {
+        let internal_only = [ReadinessRequirement {
+            scope: ReadinessScope::InternalTesting,
+            ..requirement(
+                "platform-test-access",
+                ReadinessAuthority::MarketOperator,
+                ReadinessEvidenceClass::OperatorParticipantRecord,
+            )
+        }];
+        assert_eq!(
+            assess_market_readiness(inputs(&internal_only, &[])),
+            Err(MarketReadinessError::NoRequirementsForScope)
         );
     }
 
