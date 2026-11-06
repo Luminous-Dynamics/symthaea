@@ -65,3 +65,8 @@ ISO 10360-2:2009 is specifically for Cartesian CMMs using contacting discrete-po
 ## Claim ceiling
 
 A passing synthetic result would establish only that the exact candidate profile planned admissible evidence paths on the evaluated fixtures. It would not establish actual instrument capability, calibration, measurement uncertainty, physical observability, product conformity, safety, approval or release authority.
+
+
+## Interoperability boundary
+
+The benchmark composes [MBD-INTEROP-001 #10595](https://github.com/Luminous-Dynamics/symthaea/issues/10595), which owns AP242 Edition 4, QIF/ISO 23952 and MTConnect semantic round-trip testing. This corpus does not create another standards bridge. It depends on exact product/feature/datum/PMI identities and inspection-result links surviving the declared exchange profile; file parsing or visually preserved PMI is not enough.
