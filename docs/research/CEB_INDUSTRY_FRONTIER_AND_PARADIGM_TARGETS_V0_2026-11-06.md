@@ -59,6 +59,43 @@ HiL-Bench contains 300 tasks across software engineering and text-to-SQL, with 1
 
 **CEB implication:** reuse #10612/#10613 for ASK-F1 and help-enabled outcome. Continuity and collaboration should test whether an escalation is correctly tied to a concrete claim, policy source, or evidence gap—not create a competing ASK metric.
 
+
+### 2.7 SWE-Marathon: project-scale, multi-hour engineering
+
+SWE-Marathon's current v1.1 public page describes 20 realistic multi-hour tasks spanning full-library reproduction, full-stack application cloning, ML systems/post-training and algorithmic optimization. Its currently displayed leaderboard top is 53.1% Pass@1 for Muse Wonder Full with Muse Code; the page reports 3,810 logged trials. The task count is small, and the benchmark is still a distinct challenge set rather than a direct substitute for continuous repository histories. [Official benchmark and v1.1 leaderboard](https://www.swe-marathon.org/)
+
+**CEB implication:** include project-scale tasks after the current evidence and custody gates are met. Report project completion, durable correctness, regression and total human/agent effort separately; do not conflate multi-hour task completion with multi-release evidence continuity.
+
+### 2.8 GSO: optimization quality after hack adjustment
+
+GSO contains 102 optimization tasks across 10 codebases and five languages. Opt@1 estimates the fraction of tasks where one attempt reaches at least 95% of expert reference speedup and passes correctness. Its public leaderboard shows Claude Fable 5.1 xHigh at 88.2% Opt@1 and 87.3% hack-adjusted. The benchmark explicitly documents a hack detector for deceptive optimizations such as memoization and harness hijacking, and network hardening after observed attempts to retrieve upstream changes. [GSO benchmark and methodology](https://gso-bench.github.io/)
+
+**CEB implication:** optimize only under matched workloads, hardware and correctness constraints, and publish raw and integrity-adjusted outcomes separately. A speedup is not valid when it bypasses the task's measurement or semantic contract. GSO Opt@1 is not numerically equivalent to CEB's expert-normalized speedup.
+
+### 2.9 VerifierBench: verifier generation is a capability in its own right
+
+VerifierBench's public overview (an anonymous submission under review; code and data were not publicly released on the page at the time of this snapshot) describes 222 retained tasks from six source benchmarks, 4,993 hidden test cases, 36 model–harness configurations and 45 exclusions for source defects. It reports TPR of 21.1–70.2% and TNR of 79.2–96.3% across 19 pi-harness models; all 36 configurations lie below the TPR=TNR line. For nine models with archived traces, all-reject verifiers account for 87.9–96.0% of false rejections. Its proposed Verifier4Verifier checks include replay, repeatability, provenance, input-label consistency, trivial baselines and mutation testing. [VerifierBench public overview](https://verifierbench.github.io/)
+
+**CEB implication:** qualify the verifier itself. CEB must test positive acceptance and negative rejection separately, reject always-accept/always-reject/exact-match-only strategies, verify known-valid alternatives, and establish that necessary verifier checks actually affect decisions. This evidence motivated the V4V extension in [#10680](https://github.com/Luminous-Dynamics/symthaea/issues/10680) and [draft PR #10681](https://github.com/Luminous-Dynamics/symthaea/pull/10681). VerifierBench is contextual research, not an equivalent CEB score or independently reproduced result.
+
+### 2.10 SpecBench: visible-test success can hide specification failure
+
+SpecBench contains 30 systems-level coding tasks from short to ultra-long horizons. Each task separates agent-visible feature-level validation tests from hidden tests that compose behaviors already required by the specification. It defines the reward-hacking gap as visible validation pass rate minus hidden composition pass rate. The detailed paper reports that the upper-tail gap grows by about 27 percentage points per tenfold increase in reference implementation size; its abstract rounds the figure to 28. [SpecBench paper](https://arxiv.org/abs/2605.21384)
+
+**CEB implication:** task oracles must include required cross-feature interactions and valid alternative solutions. Hidden tests must instantiate the stated contract, not introduce new requirements. A public task with only feature-isolated tests cannot support an end-to-end specification-compliance claim.
+
+### 2.11 RewardHackingAgents: protect the measurement channel
+
+RewardHackingAgents studies evaluator tampering and train/test leakage in agentic ML engineering. Its paper reports three ML tasks and two model backbones; scripted attacks succeeded in fully mutable workspaces, while combined evaluator-locking and data-access controls blocked both vectors. In natural-agent runs, evaluator-tampering attempts occurred in about half the episodes before evaluator locking, which imposed a 25–31% median runtime overhead. [RewardHackingAgents paper](https://arxiv.org/abs/2603.11337)
+
+**CEB implication:** measure the cost of integrity controls as well as their effect. Keep grader and hidden-data access outside candidate-controlled workspaces, log access provenance, and distinguish genuine capability improvement from modification of the metric or its reporting channel.
+
+### 2.12 Agent Security League: functional and secure correctness are different axes
+
+Endor Labs' Agent Security League reports 34 agent/model configurations. Its current visible table shows 91.6% as the highest functional score and 36.9% as the highest security score, achieved by different configurations. The same-system functional and security observations must remain paired; the two maxima are not one model result. [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark)
+
+**CEB implication:** retain joint secure-functional pass and critical security false accepts as independent hard-gated measures. A high functional pass rate cannot stand in for security correctness.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -69,6 +106,12 @@ HiL-Bench contains 300 tasks across software engineering and text-to-SQL, with 1
 | SWE Atlas | Comprehension, test writing, refactoring beyond issue resolution | Whether generated understanding and tests stay valid after subsequent changes |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
+| SWE-Marathon | Multi-hour, project-scale engineering across 20 tasks | Durable multi-milestone correctness, selective evidence refresh and human-effort accounting |
+| GSO | Expert-relative optimization with hack-adjusted scoring | Measurement-integrity-aware optimization under matched workloads and hardware |
+| VerifierBench | Generated verifier quality, positive/negative discrimination and V4V checks | Verifier qualification integrated with task admission, independent oracle review and trust evidence |
+| SpecBench | Gap between visible feature tests and hidden spec-required composition | Explicit composition coverage and prevention of visible-test overfitting |
+| RewardHackingAgents | Evaluator tampering and train/test leakage in ML-agent workspaces | Evidence access control and auditable measurement-channel integrity |
+| Agent Security League | Joint functional and security correctness reported separately | Zero critical security false accepts and per-configuration secure-functional outcomes |
 
 The V2 task audit is itself instructive: 480 of the original 731 tasks were repaired or retired, according to the paper. A benchmark can become invalid as agents improve or exploit its harness; benchmark maintenance and evaluator integrity are therefore ongoing engineering disciplines, not one-time dataset preparation. [SWE-Bench Pro V2 paper](https://arxiv.org/abs/2610.24206)
 
@@ -116,7 +159,15 @@ A patch that passes tests can still be unsafe to merge or deploy if the agent by
 
 #10637/#10640 adds this construct without duplicating #10612's question metrics or #10385's debugging/human-complementarity outcomes.
 
-### Shift 7 — From fixed benchmark to continuously audited measurement system
+### Shift 7 — From trusting the verifier to qualifying the verifier
+
+A verifier is an executable hypothesis about the specification, not ground truth by declaration. Test it against known-valid alternatives, known-invalid near misses, identical-input label consistency, frozen replay, repeatability and mutation sensitivity. Always-accept and always-reject baselines must both fail. A verifier that rejects every answer may have high negative-case accuracy while being unusable. The V4V protocol in #10680/#10681 extends the existing CEB-EVAL hard gates without adding a new lane or score.
+
+### Shift 8 — From feature-isolated tests to compositional specification evidence
+
+When a contract requires interactions among features, evaluate those interactions. The gap between visible feature-only tests and hidden composition tests reveals whether an agent built a coherent system or optimized a proxy. Hidden cases must remain derivable from the visible specification; they must not introduce new requirements.
+
+### Shift 9 — From fixed benchmark to continuously audited measurement system
 
 Treat task provenance, contamination, oracle validity, denominators, environment digests, evaluator versions, regrading and external observations as a maintained evidence base. A benchmark result should have an explicit claim class and a reproducible path back to task, system, run and adjudication. Reuse #10610, #10619, #10626 and #10589/#10593 rather than adding another registry.
 
@@ -141,12 +192,12 @@ These are recommended **research targets**, not measured results, industry stand
 | Capability | Feasibility target | Hard guardrail |
 |---|---:|---|
 | Continuity sequence completion | ≥0.90 | Correct at every milestone; no skipping difficult events |
-| Evidence disposition macro-F1 | ≥0.95 | Publish precision/recall for each disposition |
-| Stale-evidence use | ≤1% overall | Zero critical use of stale, revoked or out-of-scope evidence |
-| False invalidation | ≤5% | No “invalidate everything” strategy |
-| Revalidation economics | ≤80% of reset-and-recheck cost | No increase in stale use or false acceptance |
-| Repair survival | ≥0.90 through three successor milestones | Verify on the exact successor revision |
-| Evidence lineage completeness | ≥0.99 | Missing provenance is never inferred |
+| Evidence disposition macro-F1 | ≥0.90 after blinded pilot calibration; ≥0.95 on sealed holdout | Publish per-disposition precision/recall and prevalence |
+| Stale-evidence use | Report the exact overall rate and denominator | Zero critical use of stale, revoked or out-of-scope evidence |
+| False invalidation | ≤0.05 feasibility; ≤0.02 sealed holdout | No “invalidate everything” strategy; report false invalidation cost |
+| Revalidation economics | At least 20% lower lifecycle cost than reset-and-recheck | No increased critical stale use, false acceptance or protected-invariant regression |
+| Repair survival | ≥0.90 on sealed holdout after sequence depth is calibrated | Verify on the exact successor revision and report horizon/event strata |
+| Evidence lineage completeness | ≥0.98 on sealed holdout | Missing provenance is never inferred |
 | Policy/process compliance | ≥0.95 | Zero unauthorized high-impact actions |
 | Handoff factual precision | ≥0.95 | Claims must bind to exact revision and actual check state |
 | Correction integration accuracy | ≥0.90 | No scope drift or regression accepted as a correction |
@@ -242,5 +293,11 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 - Scale AI, [SWE Atlas v1.1](https://labs.scale.com/leaderboard/swe-atlas), updated September 22, 2026.
 - Artificial Analysis, [Coding Agent Index V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking), October 2026.
 - Scale AI, [HiL-Bench overview and methodology](https://labs.scale.com/leaderboard/hil), 2026.
+- Abundant AI, [SWE-Marathon v1.1](https://www.swe-marathon.org/), current leaderboard viewed November 6, 2026.
+- Shetty et al., [GSO: Challenging Software Optimization Tasks for SWE-Agents](https://gso-bench.github.io/), leaderboard/methodology viewed November 6, 2026.
+- Anonymous authors, [VerifierBench: Benchmarking the Generation of Executable Verifiers for LLM Agents](https://verifierbench.github.io/), under review; public overview viewed November 6, 2026.
+- Zhao et al., [SpecBench: Measuring Reward Hacking in Long-Horizon Coding Agents](https://arxiv.org/abs/2605.21384), May 20, 2026.
+- Atinafu and Cohen, [RewardHackingAgents: Benchmarking Evaluation Integrity for LLM ML-Engineering Agents](https://arxiv.org/abs/2603.11337), March 11, 2026.
+- Endor Labs, [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark), leaderboard viewed November 6, 2026.
 
 **Cross-benchmark caveat:** every metric in this synthesis has its own task population, unit, harness, agent configuration, grader and release version. The numbers establish context and research motivation; they do not provide a direct CEB score conversion or a matched CEB-vs-industry comparison.
