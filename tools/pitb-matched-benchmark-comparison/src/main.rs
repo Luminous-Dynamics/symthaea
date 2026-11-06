@@ -1213,6 +1213,31 @@ mod tests {
     }
 
     #[test]
+    fn holm_adjustment_controls_the_complete_pairwise_family() {
+        let adjusted = holm_adjust_p_values(&[0.01, 0.04, 0.03]);
+        assert_eq!(adjusted.len(), 3);
+        assert!((adjusted[0] - 0.03).abs() < 1e-12);
+        assert!((adjusted[1] - 0.06).abs() < 1e-12);
+        assert!((adjusted[2] - 0.06).abs() < 1e-12);
+    }
+
+    #[test]
+    fn larger_cluster_family_uses_deterministic_monte_carlo_sign_flips() {
+        let clusters: BTreeMap<String, ClusterDiff> = (0..21)
+            .map(|index| (
+                format!("cluster-{index:02}"),
+                ClusterDiff { task_differences: vec![if index % 2 == 0 { 1.0 } else { 0.0 }] },
+            ))
+            .collect();
+        let a = cluster_sign_flip_p_value(&clusters, 10_000, &fake_digest("sign-flip-seed"));
+        let b = cluster_sign_flip_p_value(&clusters, 10_000, &fake_digest("sign-flip-seed"));
+        assert_eq!(a, b);
+        assert_eq!(a.0, "monte_carlo_cluster_sign_flip");
+        assert_eq!(a.1, 10_000);
+        assert!((0.0..=1.0).contains(&a.2));
+    }
+
+    #[test]
     fn source_reproduction_metric_never_claims_unperformed_checks() {
         let mut cohort = synthetic_cohort();
         cohort.require_source_reproduction = false;
