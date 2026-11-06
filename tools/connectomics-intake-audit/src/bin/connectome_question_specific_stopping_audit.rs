@@ -168,7 +168,10 @@ fn sha256_text(value: &str) -> String {
 }
 
 fn valid_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn require(condition: bool, message: &str) -> Result<(), String> {
@@ -190,60 +193,118 @@ struct FrameStats {
 fn validate_frame(frame: &SamplingFrame) -> Result<FrameStats, String> {
     let ids = &frame.candidate_unit_ids;
     require(!ids.is_empty(), "candidate frame is empty")?;
-    require(ids.windows(2).all(|window| window[0] < window[1]), "candidate frame IDs must be unique and sorted")?;
+    require(
+        ids.windows(2).all(|window| window[0] < window[1]),
+        "candidate frame IDs must be unique and sorted",
+    )?;
     let population = ids.len();
     require(
         frame.candidate_frame_sha256 == sha256_text(&format!("{}\n", ids.join("\n"))),
         "candidate frame digest mismatch",
     )?;
-    require(valid_sha256(&frame.source_frame_receipt_sha256), "source frame receipt digest malformed")?;
+    require(
+        valid_sha256(&frame.source_frame_receipt_sha256),
+        "source frame receipt digest malformed",
+    )?;
     let expected_source_receipt = sha256_text(&format!(
         "synthetic-frame-v1\nframe-size={}\n{}\n",
         population, frame.candidate_frame_sha256
     ));
-    require(frame.source_frame_receipt_sha256 == expected_source_receipt, "source frame receipt does not bind the exact candidate frame")?;
-    require(frame.sampling_design == "SRS_WITHOUT_REPLACEMENT", "V1 only supports SRS without replacement")?;
+    require(
+        frame.source_frame_receipt_sha256 == expected_source_receipt,
+        "source frame receipt does not bind the exact candidate frame",
+    )?;
+    require(
+        frame.sampling_design == "SRS_WITHOUT_REPLACEMENT",
+        "V1 only supports SRS without replacement",
+    )?;
 
     let sampled = &frame.sampled_units;
-    require(frame.sample_size == sampled.len(), "declared sample size differs from sample ledger")?;
-    require(!sampled.is_empty() && sampled.len() <= population, "sample size is outside the finite frame")?;
     require(
-        sampled.windows(2).all(|window| window[0].unit_id < window[1].unit_id),
+        frame.sample_size == sampled.len(),
+        "declared sample size differs from sample ledger",
+    )?;
+    require(
+        !sampled.is_empty() && sampled.len() <= population,
+        "sample size is outside the finite frame",
+    )?;
+    require(
+        sampled
+            .windows(2)
+            .all(|window| window[0].unit_id < window[1].unit_id),
         "sample unit IDs must be unique and sorted",
     )?;
     let candidate_set: BTreeSet<&str> = ids.iter().map(String::as_str).collect();
-    require(sampled.iter().all(|row| candidate_set.contains(row.unit_id.as_str())), "sample contains unit outside frozen candidate frame")?;
+    require(
+        sampled
+            .iter()
+            .all(|row| candidate_set.contains(row.unit_id.as_str())),
+        "sample contains unit outside frozen candidate frame",
+    )?;
     let inclusion = sampled.len() as f64 / population as f64;
     for row in sampled {
         require(
             ["QUERY_FLIP", "NO_QUERY_FLIP", "UNRESOLVED"].contains(&row.outcome.as_str()),
             "unknown sample outcome",
         )?;
-        require(row.inclusion_probability.is_finite(), "inclusion probability is not finite")?;
-        require(row.inclusion_probability > 0.0 && row.inclusion_probability <= 1.0, "inclusion probability must be positive and at most one")?;
-        require((row.inclusion_probability - inclusion).abs() <= 1e-12, "inclusion probability differs from SRSWOR n/N")?;
+        require(
+            row.inclusion_probability.is_finite(),
+            "inclusion probability is not finite",
+        )?;
+        require(
+            row.inclusion_probability > 0.0 && row.inclusion_probability <= 1.0,
+            "inclusion probability must be positive and at most one",
+        )?;
+        require(
+            (row.inclusion_probability - inclusion).abs() <= 1e-12,
+            "inclusion probability differs from SRSWOR n/N",
+        )?;
     }
 
     let sample_ids: Vec<&str> = sampled.iter().map(|row| row.unit_id.as_str()).collect();
     let sample_ids_sha = sha256_text(&format!("{}\n", sample_ids.join("\n")));
-    require(frame.sampled_unit_set_sha256 == sample_ids_sha, "sample unit-set digest mismatch")?;
+    require(
+        frame.sampled_unit_set_sha256 == sample_ids_sha,
+        "sample unit-set digest mismatch",
+    )?;
     let ledger = sampled
         .iter()
-        .map(|row| format!("{}\t{}\t{:.6}\n", row.unit_id, row.outcome, row.inclusion_probability))
+        .map(|row| {
+            format!(
+                "{}\t{}\t{:.6}\n",
+                row.unit_id, row.outcome, row.inclusion_probability
+            )
+        })
         .collect::<String>();
     let ledger_sha = sha256_text(&ledger);
-    require(frame.sample_outcome_ledger_sha256 == ledger_sha, "sample outcome ledger digest mismatch")?;
+    require(
+        frame.sample_outcome_ledger_sha256 == ledger_sha,
+        "sample outcome ledger digest mismatch",
+    )?;
     let receipt = format!(
         "SRS_WOR_V1\nN={}\nn={}\n{}\n{}\n{}\n",
-        population, sampled.len(), frame.candidate_frame_sha256, sample_ids_sha, ledger_sha
+        population,
+        sampled.len(),
+        frame.candidate_frame_sha256,
+        sample_ids_sha,
+        ledger_sha
     );
-    require(frame.sampling_receipt_sha256 == sha256_text(&receipt), "sampling receipt digest mismatch")?;
+    require(
+        frame.sampling_receipt_sha256 == sha256_text(&receipt),
+        "sampling receipt digest mismatch",
+    )?;
 
     Ok(FrameStats {
         population_size: population,
         sample_size: sampled.len(),
-        observed_query_flips: sampled.iter().filter(|row| row.outcome == "QUERY_FLIP").count(),
-        unresolved_sample_units: sampled.iter().filter(|row| row.outcome == "UNRESOLVED").count(),
+        observed_query_flips: sampled
+            .iter()
+            .filter(|row| row.outcome == "QUERY_FLIP")
+            .count(),
+        unresolved_sample_units: sampled
+            .iter()
+            .filter(|row| row.outcome == "UNRESOLVED")
+            .count(),
     })
 }
 
@@ -258,7 +319,12 @@ fn log_choose(n: usize, k: usize) -> f64 {
     log_factorial(n) - log_factorial(k) - log_factorial(n - k)
 }
 
-fn hypergeometric_cdf(population: usize, positives: usize, sample_size: usize, observed: usize) -> f64 {
+fn hypergeometric_cdf(
+    population: usize,
+    positives: usize,
+    sample_size: usize,
+    observed: usize,
+) -> f64 {
     if positives > population || sample_size > population {
         return 0.0;
     }
@@ -270,12 +336,14 @@ fn hypergeometric_cdf(population: usize, positives: usize, sample_size: usize, o
     let denominator = log_choose(population, sample_size);
     let log_probabilities: Vec<f64> = (lower..=upper)
         .map(|hits| {
-            log_choose(positives, hits)
-                + log_choose(population - positives, sample_size - hits)
+            log_choose(positives, hits) + log_choose(population - positives, sample_size - hits)
                 - denominator
         })
         .collect();
-    let peak = log_probabilities.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let peak = log_probabilities
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
     if !peak.is_finite() {
         return 0.0;
     }
@@ -287,10 +355,24 @@ fn hypergeometric_cdf(population: usize, positives: usize, sample_size: usize, o
     .clamp(0.0, 1.0)
 }
 
-fn upper_population_count(population: usize, sample_size: usize, observed: usize, alpha: f64) -> Result<usize, String> {
-    require(population > 0 && sample_size > 0 && sample_size <= population, "invalid finite frame or sample size")?;
-    require(observed <= sample_size, "observed flip count exceeds sample size")?;
-    require(alpha.is_finite() && alpha > 0.0 && alpha < 1.0, "alpha must be strictly between zero and one")?;
+fn upper_population_count(
+    population: usize,
+    sample_size: usize,
+    observed: usize,
+    alpha: f64,
+) -> Result<usize, String> {
+    require(
+        population > 0 && sample_size > 0 && sample_size <= population,
+        "invalid finite frame or sample size",
+    )?;
+    require(
+        observed <= sample_size,
+        "observed flip count exceeds sample size",
+    )?;
+    require(
+        alpha.is_finite() && alpha > 0.0 && alpha < 1.0,
+        "alpha must be strictly between zero and one",
+    )?;
     let mut low = 0usize;
     let mut high = population;
     while low < high {
@@ -305,26 +387,65 @@ fn upper_population_count(population: usize, sample_size: usize, observed: usize
 }
 
 fn global_stop(case: &Case) -> Result<Option<String>, String> {
-    require(case.snapshots.len() >= 2, "at least two global snapshots are required")?;
-    require(case.global_stop_policy.relative_delta_tolerance.is_finite() && case.global_stop_policy.relative_delta_tolerance > 0.0, "global drift tolerance is invalid")?;
-    require(case.global_stop_policy.consecutive_stable_transitions > 0, "stable transition count must be positive")?;
+    require(
+        case.snapshots.len() >= 2,
+        "at least two global snapshots are required",
+    )?;
+    require(
+        case.global_stop_policy.relative_delta_tolerance.is_finite()
+            && case.global_stop_policy.relative_delta_tolerance > 0.0,
+        "global drift tolerance is invalid",
+    )?;
+    require(
+        case.global_stop_policy.consecutive_stable_transitions > 0,
+        "stable transition count must be positive",
+    )?;
     for pair in case.snapshots.windows(2) {
-        require(pair[0].edit_count < pair[1].edit_count, "snapshot edit counts must strictly increase")?;
+        require(
+            pair[0].edit_count < pair[1].edit_count,
+            "snapshot edit counts must strictly increase",
+        )?;
     }
-    let first_names: BTreeSet<&str> = case.snapshots[0].graph_invariants.iter().map(|row| row.invariant_id.as_str()).collect();
+    let first_names: BTreeSet<&str> = case.snapshots[0]
+        .graph_invariants
+        .iter()
+        .map(|row| row.invariant_id.as_str())
+        .collect();
     require(!first_names.is_empty(), "graph invariant set is empty")?;
     for snapshot in &case.snapshots {
-        require(!snapshot.snapshot_id.trim().is_empty(), "snapshot ID is empty")?;
-        let names: BTreeSet<&str> = snapshot.graph_invariants.iter().map(|row| row.invariant_id.as_str()).collect();
-        require(names.len() == snapshot.graph_invariants.len(), "duplicate invariant ID in a snapshot")?;
-        require(names == first_names, "graph invariant identity changed between checkpoints")?;
-        require(snapshot.graph_invariants.iter().all(|row| row.value.is_finite()), "graph invariant value is not finite")?;
+        require(
+            !snapshot.snapshot_id.trim().is_empty(),
+            "snapshot ID is empty",
+        )?;
+        let names: BTreeSet<&str> = snapshot
+            .graph_invariants
+            .iter()
+            .map(|row| row.invariant_id.as_str())
+            .collect();
+        require(
+            names.len() == snapshot.graph_invariants.len(),
+            "duplicate invariant ID in a snapshot",
+        )?;
+        require(
+            names == first_names,
+            "graph invariant identity changed between checkpoints",
+        )?;
+        require(
+            snapshot
+                .graph_invariants
+                .iter()
+                .all(|row| row.value.is_finite()),
+            "graph invariant value is not finite",
+        )?;
     }
 
     let mut stable_run = 0usize;
     for index in 1..case.snapshots.len() {
         let previous: std::collections::BTreeMap<&str, f64> = case.snapshots[index - 1]
-            .graph_invariants.iter().map(|row| (row.invariant_id.as_str(), row.value)).collect();
+            .graph_invariants
+            .iter()
+            .map(|row| (row.invariant_id.as_str(), row.value))
+            .collect();
         let stable = case.snapshots[index].graph_invariants.iter().all(|row| {
             let prior = previous[row.invariant_id.as_str()];
             (row.value - prior).abs() / prior.abs().max(1e-12)
@@ -345,15 +466,26 @@ fn world_agreement(worlds: &[World]) -> Result<(bool, bool), String> {
     let mut admissible_decisions = BTreeSet::new();
     for world in worlds {
         require(!world.world_id.trim().is_empty(), "world ID is empty")?;
-        require(world_ids.insert(world.world_id.as_str()), "duplicate world ID")?;
+        require(
+            world_ids.insert(world.world_id.as_str()),
+            "duplicate world ID",
+        )?;
         match world.biological_disposition.as_str() {
             "ADMISSIBLE" => {
-                let decision = world.query_decision.ok_or_else(|| "admissible world lacks query decision".to_owned())?;
+                let decision = world
+                    .query_decision
+                    .ok_or_else(|| "admissible world lacks query decision".to_owned())?;
                 admissible_decisions.insert(decision);
             }
-            "INADMISSIBLE" => require(world.query_decision.is_none(), "inadmissible world must not carry query decision")?,
+            "INADMISSIBLE" => require(
+                world.query_decision.is_none(),
+                "inadmissible world must not carry query decision",
+            )?,
             "INDETERMINATE" | "DISPUTED" => {
-                require(world.query_decision.is_none(), "indeterminate/disputed world must not carry promoted query decision")?;
+                require(
+                    world.query_decision.is_none(),
+                    "indeterminate/disputed world must not carry promoted query decision",
+                )?;
                 unresolved = true;
             }
             _ => return Err("unknown biological disposition".to_owned()),
@@ -366,22 +498,55 @@ fn world_agreement(worlds: &[World]) -> Result<(bool, bool), String> {
 }
 
 fn evaluate_case(case: &Case, frame: &SamplingFrame) -> Result<CaseResult, String> {
-    require(case.frame_id == frame.frame_id, "case references a different sampling frame")?;
-    require(valid_sha256(&case.dataset_revision_sha256), "dataset revision digest malformed")?;
-    require(valid_sha256(&case.frame_coverage_receipt_sha256), "frame coverage receipt digest malformed")?;
-    require(case.frame_coverage_status == "CLOSED" || case.frame_coverage_status == "INCOMPLETE", "unknown frame coverage status")?;
+    require(
+        case.frame_id == frame.frame_id,
+        "case references a different sampling frame",
+    )?;
+    require(
+        valid_sha256(&case.dataset_revision_sha256),
+        "dataset revision digest malformed",
+    )?;
+    require(
+        valid_sha256(&case.frame_coverage_receipt_sha256),
+        "frame coverage receipt digest malformed",
+    )?;
+    require(
+        case.frame_coverage_status == "CLOSED" || case.frame_coverage_status == "INCOMPLETE",
+        "unknown frame coverage status",
+    )?;
     let coverage_receipt = sha256_text(&format!(
         "coverage-v1\n{}\n{}\n{}\n{}\n",
-        case.frame_id, case.frame_coverage_status, frame.candidate_frame_sha256, frame.source_frame_receipt_sha256
+        case.frame_id,
+        case.frame_coverage_status,
+        frame.candidate_frame_sha256,
+        frame.source_frame_receipt_sha256
     ));
-    require(case.frame_coverage_receipt_sha256 == coverage_receipt, "frame coverage receipt does not bind the declared status and source frame")?;
-    require(case.confidence_level.is_finite() && case.confidence_level > 0.0 && case.confidence_level < 1.0, "confidence level is invalid")?;
-    require(case.residual_query_flip_tolerance.is_finite() && case.residual_query_flip_tolerance > 0.0 && case.residual_query_flip_tolerance <= 1.0, "query-flip tolerance is invalid")?;
+    require(
+        case.frame_coverage_receipt_sha256 == coverage_receipt,
+        "frame coverage receipt does not bind the declared status and source frame",
+    )?;
+    require(
+        case.confidence_level.is_finite()
+            && case.confidence_level > 0.0
+            && case.confidence_level < 1.0,
+        "confidence level is invalid",
+    )?;
+    require(
+        case.residual_query_flip_tolerance.is_finite()
+            && case.residual_query_flip_tolerance > 0.0
+            && case.residual_query_flip_tolerance <= 1.0,
+        "query-flip tolerance is invalid",
+    )?;
     let stats = validate_frame(frame)?;
     let global_snapshot = global_stop(case)?;
     let (agreement, unresolved_worlds) = world_agreement(&case.worlds)?;
     let alpha = 1.0 - case.confidence_level;
-    let upper_count = upper_population_count(stats.population_size, stats.sample_size, stats.observed_query_flips, alpha)?;
+    let upper_count = upper_population_count(
+        stats.population_size,
+        stats.sample_size,
+        stats.observed_query_flips,
+        alpha,
+    )?;
     let upper_prevalence = upper_count as f64 / stats.population_size as f64;
 
     let query_status = if unresolved_worlds || stats.unresolved_sample_units > 0 {
@@ -416,19 +581,41 @@ fn evaluate_case(case: &Case, frame: &SamplingFrame) -> Result<CaseResult, Strin
 }
 
 fn run(input_bytes: &[u8]) -> Result<Report, String> {
-    let input: Input = serde_json::from_slice(input_bytes).map_err(|error| format!("invalid strict input: {error}"))?;
+    let input: Input = serde_json::from_slice(input_bytes)
+        .map_err(|error| format!("invalid strict input: {error}"))?;
     require(input.schema_version == 1, "unsupported schema version")?;
-    require(input.claim_scope == "synthetic_known_truth", "V1 only accepts synthetic known-truth fixtures")?;
-    require(input.preregistration.frozen_before_sampling, "preregistration was not frozen before sampling")?;
-    require(valid_sha256(&input.preregistration.preregistration_sha256), "preregistration digest malformed")?;
+    require(
+        input.claim_scope == "synthetic_known_truth",
+        "V1 only accepts synthetic known-truth fixtures",
+    )?;
+    require(
+        input.preregistration.frozen_before_sampling,
+        "preregistration was not frozen before sampling",
+    )?;
+    require(
+        valid_sha256(&input.preregistration.preregistration_sha256),
+        "preregistration digest malformed",
+    )?;
     require(!input.run_id.trim().is_empty(), "run ID is empty")?;
-    require(!input.query_binding.query_id.trim().is_empty(), "query ID is empty")?;
-    require(valid_sha256(&input.query_binding.query_spec_sha256), "query specification digest malformed")?;
-    require(valid_sha256(&input.query_binding.decision_loss_sha256), "decision-loss digest malformed")?;
+    require(
+        !input.query_binding.query_id.trim().is_empty(),
+        "query ID is empty",
+    )?;
+    require(
+        valid_sha256(&input.query_binding.query_spec_sha256),
+        "query specification digest malformed",
+    )?;
+    require(
+        valid_sha256(&input.query_binding.decision_loss_sha256),
+        "decision-loss digest malformed",
+    )?;
 
     let mut frames = std::collections::BTreeMap::new();
     for frame in &input.sampling_frames {
-        require(frames.insert(frame.frame_id.as_str(), frame).is_none(), "duplicate sampling frame ID")?;
+        require(
+            frames.insert(frame.frame_id.as_str(), frame).is_none(),
+            "duplicate sampling frame ID",
+        )?;
     }
     require(!frames.is_empty(), "no sampling frame was supplied")?;
     for frame in frames.values() {
@@ -439,12 +626,23 @@ fn run(input_bytes: &[u8]) -> Result<Report, String> {
     let mut results = Vec::new();
     for case in &input.cases {
         require(case_ids.insert(case.case_id.as_str()), "duplicate case ID")?;
-        let frame = frames.get(case.frame_id.as_str()).ok_or_else(|| "case references unknown sampling frame".to_owned())?;
+        let frame = frames
+            .get(case.frame_id.as_str())
+            .ok_or_else(|| "case references unknown sampling frame".to_owned())?;
         let result = evaluate_case(case, frame)?;
-        require(result == case.expected_to_result(), "case known-answer expectation mismatch")?;
-        results.push(CaseReport { case_id: case.case_id.clone(), result });
+        require(
+            result == case.expected_to_result(),
+            "case known-answer expectation mismatch",
+        )?;
+        results.push(CaseReport {
+            case_id: case.case_id.clone(),
+            result,
+        });
     }
-    require(results.len() >= 4, "synthetic adversarial corpus must contain at least four cases")?;
+    require(
+        results.len() >= 4,
+        "synthetic adversarial corpus must contain at least four cases",
+    )?;
 
     Ok(Report {
         schema_version: 1,
@@ -512,16 +710,47 @@ mod tests {
             frame_id: "f".into(),
             frame_coverage_status: "CLOSED".into(),
             frame_coverage_receipt_sha256: "b".repeat(64),
-            global_stop_policy: GlobalStopPolicy { relative_delta_tolerance: 0.005, consecutive_stable_transitions: 2 },
+            global_stop_policy: GlobalStopPolicy {
+                relative_delta_tolerance: 0.005,
+                consecutive_stable_transitions: 2,
+            },
             snapshots: vec![
-                Snapshot { snapshot_id: "S1".into(), edit_count: 1, graph_invariants: vec![GraphInvariant { invariant_id: "density".into(), value: 0.2 }] },
-                Snapshot { snapshot_id: "S2".into(), edit_count: 2, graph_invariants: vec![GraphInvariant { invariant_id: "density".into(), value: 0.2008 }] },
-                Snapshot { snapshot_id: "S3".into(), edit_count: 3, graph_invariants: vec![GraphInvariant { invariant_id: "density".into(), value: 0.2009 }] },
+                Snapshot {
+                    snapshot_id: "S1".into(),
+                    edit_count: 1,
+                    graph_invariants: vec![GraphInvariant {
+                        invariant_id: "density".into(),
+                        value: 0.2,
+                    }],
+                },
+                Snapshot {
+                    snapshot_id: "S2".into(),
+                    edit_count: 2,
+                    graph_invariants: vec![GraphInvariant {
+                        invariant_id: "density".into(),
+                        value: 0.2008,
+                    }],
+                },
+                Snapshot {
+                    snapshot_id: "S3".into(),
+                    edit_count: 3,
+                    graph_invariants: vec![GraphInvariant {
+                        invariant_id: "density".into(),
+                        value: 0.2009,
+                    }],
+                },
             ],
             worlds: vec![],
             confidence_level: 0.95,
             residual_query_flip_tolerance: 0.01,
-            expected: Expected { global_stop_snapshot_id: Some("S3".into()), query_world_agreement: false, residual_upper_count: None, residual_upper_prevalence: None, query_stop_status: "QUERY_UNRESOLVED".into(), joint_disposition: "GLOBAL_ONLY".into() },
+            expected: Expected {
+                global_stop_snapshot_id: Some("S3".into()),
+                query_world_agreement: false,
+                residual_upper_count: None,
+                residual_upper_prevalence: None,
+                query_stop_status: "QUERY_UNRESOLVED".into(),
+                joint_disposition: "GLOBAL_ONLY".into(),
+            },
         };
         assert_eq!(global_stop(&case).unwrap(), Some("S3".into()));
     }
@@ -529,8 +758,16 @@ mod tests {
     #[test]
     fn indeterminate_world_never_counts_as_agreement() {
         let worlds = vec![
-            World { world_id: "a".into(), biological_disposition: "ADMISSIBLE".into(), query_decision: Some(true) },
-            World { world_id: "b".into(), biological_disposition: "INDETERMINATE".into(), query_decision: None },
+            World {
+                world_id: "a".into(),
+                biological_disposition: "ADMISSIBLE".into(),
+                query_decision: Some(true),
+            },
+            World {
+                world_id: "b".into(),
+                biological_disposition: "INDETERMINATE".into(),
+                query_decision: None,
+            },
         ];
         assert_eq!(world_agreement(&worlds).unwrap(), (false, true));
     }
