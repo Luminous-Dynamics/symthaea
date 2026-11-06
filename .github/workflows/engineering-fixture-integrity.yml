@@ -2,6 +2,7 @@ name: Engineering Fixture Integrity
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "benchmarks/engineering-fixture-integrity/**"
       - ".github/workflows/engineering-fixture-integrity.yml"
