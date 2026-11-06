@@ -36,6 +36,10 @@
         },
         "statistical_inference": {
           "type": "string"
+        },
+        "evidence_continuity": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -45,7 +49,8 @@
         "evaluator_epochs",
         "source_build_lineage",
         "canonical_receipts",
-        "statistical_inference"
+        "statistical_inference",
+        "evidence_continuity"
       ],
       "additionalProperties": false
     },
@@ -1114,6 +1119,114 @@
         "confirmation_material_write_access"
       ],
       "additionalProperties": false
+    },
+    "research_state_continuity": {
+      "type": "object",
+      "properties": {
+        "state_snapshot_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "record_schema_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "required_record_types": {
+          "type": "array",
+          "minItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "accepted_finding_with_evidence",
+              "rejected_hypothesis",
+              "null_or_negative_result",
+              "counterexample_and_failure",
+              "candidate_lineage_and_patch_digest",
+              "evaluator_epoch_and_task_contract",
+              "inclusive_cost_and_retry_record",
+              "open_question_and_next_test"
+            ]
+          }
+        },
+        "provenance_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stale_evidence_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cold_restart_restore_test_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "successor_migration_test_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_recovery_audit_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ablation_arms": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "full_verified_state",
+              "no_state",
+              "untyped_history",
+              "shuffled_verified_state",
+              "accepted_findings_only"
+            ]
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "enum": [
+              "provenance_complete_record_recovery",
+              "false_currentness_rate",
+              "evidence_revalidation_precision_recall",
+              "duplicated_experiment_rate",
+              "fresh_family_confirmed_yield"
+            ]
+          }
+        }
+      },
+      "required": [
+        "state_snapshot_digest",
+        "record_schema_digest",
+        "required_record_types",
+        "provenance_policy",
+        "stale_evidence_policy",
+        "cold_restart_restore_test_ref",
+        "successor_migration_test_ref",
+        "independent_recovery_audit_ref",
+        "ablation_arms",
+        "metrics"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -1135,7 +1248,8 @@
     "analysis_plan",
     "governance",
     "reporting",
-    "evaluator_binding"
+    "evaluator_binding",
+    "research_state_continuity"
   ],
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema",
