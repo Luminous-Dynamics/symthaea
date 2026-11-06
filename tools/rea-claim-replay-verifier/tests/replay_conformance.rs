@@ -1017,3 +1017,131 @@ fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
     assert_eq!(replay.evidence_count, 4);
     assert_eq!(replay.rule_id, "no-registered-predicate-rule/v0");
 }
+
+#[test]
+fn deleting_the_only_supporting_premise_cannot_preserve_a_supported_result() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    // The old result says supported, but the replay input omits its only
+    // referenced premise. The checker must recompute underdetermined.
+    let replay = replay_claim_evaluation(&claim_bytes, &[], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("referenced-evidence-missing")
+    );
+    assert_eq!(
+        replay.reported_disposition,
+        Disposition::SupportedWithinScope
+    );
+}
+
+#[test]
+fn three_same_scope_contradictions_do_not_outvote_one_supporting_observation() {
+    let supporting = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut records = vec![supporting.clone()];
+    let mut bytes = Vec::new();
+
+    for index in 0..3 {
+        let mut value = supporting.value.clone();
+        value["provider"]["id"] = json!(format!("contradictory-provider-{index}"));
+        value["provider"]["name"] = json!(format!("Contradictory Provider {index}"));
+        value["analysis_profile"]["provider"] = value["provider"].clone();
+        value["analysis_profile"]["digest"] =
+            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+        value["normalized_result"]["status"] = json!("partial");
+        value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+        let raw = serde_json::to_vec(&value).unwrap();
+        records.push(rea_compat::verify_evidence_json(&raw).unwrap());
+        bytes.push(raw);
+    }
+
+    let mut claim = provider_claim(supporting.evidence_id.clone());
+    claim.evidence_ids.extend(
+        records
+            .iter()
+            .skip(1)
+            .map(|record| record.evidence_id.clone()),
+    );
+    let (claim_bytes, result_bytes) = produce(&claim, &records);
+
+    let mut evidence_inputs = vec![fixture_bytes()];
+    evidence_inputs.extend(bytes.iter().map(Vec::as_slice));
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &evidence_inputs, &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("same-scope-disagreement")
+    );
+    assert_eq!(replay.reported_disposition, Disposition::Conflicted);
+}
+
+#[test]
+fn inferred_analyst_derived_evidence_does_not_promote_beyond_provider_observation() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut value = original.value.clone();
+    value["confidence"] = json!("inferred");
+    value["authority"] = json!("analyst-inference");
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(
+        result["disposition"],
+        json!("supported_within_scope")
+    );
+    assert_eq!(
+        result["evidence_assessments"][0]["confidence"],
+        json!("inferred")
+    );
+    assert_eq!(
+        result["evidence_assessments"][0]["authority"],
+        json!("analyst-inference")
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line.as_str().unwrap().contains(
+                "does not prove the underlying real-world proposition"
+            ))
+    );
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("basic-provider-report-support")
+    );
+}
+
+#[test]
+fn mismatched_source_predicate_type_is_inapplicable_not_silent_promotion() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut value = original.value.clone();
+    value["predicate_type"] = json!("rea.other-analysis");
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Inapplicable);
+    assert_eq!(replay.reported_disposition, Disposition::Inapplicable);
+}
+
