@@ -223,7 +223,9 @@ fn run_scenario(
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let smoke_mode = arguments.first().is_some_and(|argument| argument == "--smoke");
+    let smoke_mode = arguments
+        .first()
+        .is_some_and(|argument| argument == "--smoke");
     let sample_count = if smoke_mode {
         1
     } else {
