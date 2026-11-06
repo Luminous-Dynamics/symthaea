@@ -1367,6 +1367,20 @@ fn repository_cluster_sign_flip_p_value(
     Ok((extreme + 1) as f64 / (replicates + 1) as f64)
 }
 
+fn holm_adjusted_p_values(raw_p_values: &[f64]) -> Vec<f64> {
+    let mut order: Vec<usize> = (0..raw_p_values.len()).collect();
+    order.sort_by(|left, right| raw_p_values[*left].total_cmp(&raw_p_values[*right]));
+    let mut adjusted = vec![0.0_f64; raw_p_values.len()];
+    let mut adjusted_so_far = 0.0_f64;
+    let family_size = raw_p_values.len();
+    for (rank, index) in order.into_iter().enumerate() {
+        let candidate = (raw_p_values[index] * (family_size - rank) as f64).min(1.0);
+        adjusted_so_far = adjusted_so_far.max(candidate);
+        adjusted[index] = adjusted_so_far;
+    }
+    adjusted
+}
+
 fn pairwise_clustered_comparisons(
     runs: &[ProofRun],
     evaluation: &Dataset,
@@ -1535,14 +1549,10 @@ fn pairwise_clustered_comparisons(
         }
     }
 
-    let mut order: Vec<usize> = (0..comparisons.len()).collect();
-    order.sort_by(|left, right| comparisons[*left].0.total_cmp(&comparisons[*right].0));
-    let mut adjusted_so_far = 0.0_f64;
-    let family_size = comparisons.len();
-    for (rank, index) in order.into_iter().enumerate() {
-        let candidate = (comparisons[index].0 * (family_size - rank) as f64).min(1.0);
-        adjusted_so_far = adjusted_so_far.max(candidate);
-        comparisons[index].1.holm_adjusted_p_value = adjusted_so_far;
+    let raw_p_values: Vec<f64> = comparisons.iter().map(|(raw_p, _)| *raw_p).collect();
+    let adjusted_p_values = holm_adjusted_p_values(&raw_p_values);
+    for (index, adjusted) in adjusted_p_values.into_iter().enumerate() {
+        comparisons[index].1.holm_adjusted_p_value = adjusted;
     }
     Ok(comparisons.into_iter().map(|(_, comparison)| comparison).collect())
 }
@@ -2030,6 +2040,16 @@ fn run_self_tests() -> Result<(), String> {
         return Err("cluster bootstrap must be deterministic for the same frozen pair".into());
     }
     println!("SELF_TEST_PASS repository and nested file bootstrap are deterministic");
+
+    let holm = holm_adjusted_p_values(&[0.01, 0.04, 0.03]);
+    if holm.len() != 3
+        || (holm[0] - 0.03).abs() > 1e-12
+        || (holm[1] - 0.06).abs() > 1e-12
+        || (holm[2] - 0.06).abs() > 1e-12
+    {
+        return Err(format!("Holm multiple-comparison correction failed: {holm:?}"));
+    }
+    println!("SELF_TEST_PASS Holm correction preserves monotonic adjusted p-values");
 
     Ok(())
 }
