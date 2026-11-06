@@ -52,7 +52,9 @@ structure ClaimBinding where
   evaluatorRuleGeneration : GenerationIdentity
   ruleId : Nat
   operation : Nat
-  environment : Nat
+  platform : Option Nat
+  platformVersion : Option Nat
+  environment : Option Nat
   predicate : ClaimPredicate
   deriving DecidableEq, Repr
 
@@ -104,6 +106,83 @@ theorem provider_observation_support_binds_full_request
     (hs : ProviderObservationSupports refinements entailments receipt obligation) :
     receipt.binding = obligation.binding := by
   exact hs.1
+
+/-- A changed canonical request digest cannot reuse a prior result. -/
+theorem changed_claim_digest_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hDigest : receipt.binding.claimRequestDigest ≠ obligation.binding.claimRequestDigest) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hDigest (congrArg ClaimBinding.claimRequestDigest hs.1)
+
+/-- A changed request schema generation cannot reuse a prior result. -/
+theorem changed_request_schema_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hSchema : receipt.binding.requestSchemaGeneration ≠ obligation.binding.requestSchemaGeneration) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hSchema (congrArg ClaimBinding.requestSchemaGeneration hs.1)
+
+/-- A changed result schema generation cannot reuse a prior result. -/
+theorem changed_result_schema_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hSchema : receipt.binding.resultSchemaGeneration ≠ obligation.binding.resultSchemaGeneration) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hSchema (congrArg ClaimBinding.resultSchemaGeneration hs.1)
+
+/-- A changed evaluator generation cannot reuse a prior result. -/
+theorem changed_rule_generation_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hRule : receipt.binding.evaluatorRuleGeneration ≠ obligation.binding.evaluatorRuleGeneration) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hRule (congrArg ClaimBinding.evaluatorRuleGeneration hs.1)
+
+/-- A changed target platform cannot reuse a provider observation. -/
+theorem changed_platform_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hPlatform : receipt.binding.platform ≠ obligation.binding.platform) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hPlatform (congrArg ClaimBinding.platform hs.1)
+
+/-- A changed platform version cannot reuse a provider observation. -/
+theorem changed_platform_version_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hVersion : receipt.binding.platformVersion ≠ obligation.binding.platformVersion) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hVersion (congrArg ClaimBinding.platformVersion hs.1)
+
+/-- A changed represented environment cannot reuse a provider observation. -/
+theorem changed_environment_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (receipt : ProviderObservationReceipt)
+    (obligation : ProviderObservationObligation)
+    (hEnvironment : receipt.binding.environment ≠ obligation.binding.environment) :
+    ¬ ProviderObservationSupports refinements entailments receipt obligation := by
+  intro hs
+  exact hEnvironment (congrArg ClaimBinding.environment hs.1)
 
 /-- The formal evidence class remains distinct from all existing stronger classes. -/
 theorem provider_observation_is_a_distinct_evidence_class :
@@ -274,6 +353,13 @@ theorem provider_aliases_do_not_create_independence
     leftObligation.base rightObligation.base hSameRoot
 
 #print axioms provider_observation_support_binds_full_request
+#print axioms changed_claim_digest_cannot_support
+#print axioms changed_request_schema_cannot_support
+#print axioms changed_result_schema_cannot_support
+#print axioms changed_rule_generation_cannot_support
+#print axioms changed_platform_cannot_support
+#print axioms changed_platform_version_cannot_support
+#print axioms changed_environment_cannot_support
 #print axioms provider_observation_is_a_distinct_evidence_class
 #print axioms provider_observation_support_has_exact_predicate
 #print axioms provider_observation_cannot_promote_to_other_predicate
