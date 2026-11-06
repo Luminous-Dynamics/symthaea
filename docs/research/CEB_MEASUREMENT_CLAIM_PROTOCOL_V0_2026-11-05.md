@@ -81,7 +81,8 @@ These are proposed thresholds, not measured CEB outcomes. Sample sizes and confi
 ## 6. Hard gates
 
 - Critical security/evaluator false accepts are disqualifying; no aggregate can cancel them.
-- CEB-OPT must reject benchmark-input memorization, harness-aware bypass and in-scope workload overfitting while accepting contract-permitted caching that preserves semantics and resource limits. Report raw measurements and integrity adjudication separately.
+- CEB-OPT must reject benchmark-input memorization, harness-aware bypass and in-scope workload overfitting while accepting contract-permitted caching that preserves semantics and resource limits.
+- CEB-TEST must trace each specification-required feature interaction to acceptance evidence. Hidden tests may operationalize frozen requirements but must not invent new ones; valid semantic alternatives must pass. Report raw measurements and integrity adjudication separately.
 - Positive controls must pass; a reject-everything verifier cannot qualify.
 - The reference verifier itself must pass verifier-of-verifiers checks: frozen replay against adjudicated labels, repeatability from reset state, exact case/verifier provenance, input-label consistency, always-accept/always-reject/exact-match-only baselines, and mutation sensitivity of necessary checks.
 - At least one known-valid solution and permitted semantic alternative must be accepted before a verifier is frozen. Report positive acceptance and negative rejection separately; perfect negative rejection with zero positive acceptance is a false-reject failure, not a strong verifier.
