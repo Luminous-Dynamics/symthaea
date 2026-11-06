@@ -367,7 +367,7 @@ def main() -> int:
     print(
         "CEB_INTEGRITY_CATALOG_PASS: "
         f"negative_controls={negatives} positive_controls={positives} "
-        "v4v_controls=10 optimization_controls=4 eval_lane=CEB-EVAL opt_lane=CEB-OPT"
+        "v4v_controls=10 optimization_controls=4 spec_composition_controls=3 eval_lane=CEB-EVAL opt_lane=CEB-OPT test_lane=CEB-TEST"
     )
     print("CEB_CLAIM_BOUNDARY: static catalog validation is not verifier execution or runner qualification")
     return 0
