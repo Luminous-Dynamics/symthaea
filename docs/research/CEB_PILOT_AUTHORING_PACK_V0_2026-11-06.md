@@ -15,7 +15,7 @@ No executable code, build scripts, tests, graders, hidden answer keys, task mani
 
 ## 2. First-tranche inventory
 
-<text>Design inventory only — 24 continuity blueprints, 24 collaboration episode patterns.</text>
+**Design inventory only — 24 continuity blueprints, 24 collaboration episode patterns.**
 
 | Track | Inventory | Coverage |
 |---|---:|---|
