@@ -67,12 +67,8 @@ pub struct ApplicableRuleRevision<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuleApplicabilityResult<'a> {
     Applicable(ApplicableRuleRevision<'a>),
-    NoPublishedRuleForValidTime {
-        draft_revision_count: u32,
-    },
-    IndeterminateFutureRevisionNotKnown {
-        excluded_revision_count: u32,
-    },
+    NoPublishedRuleForValidTime { draft_revision_count: u32 },
+    IndeterminateFutureRevisionNotKnown { excluded_revision_count: u32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,10 +99,7 @@ fn valid_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-fn matches_scope(
-    revision: RuleRevisionEvidence<'_>,
-    query: RuleApplicabilityQuery<'_>,
-) -> bool {
+fn matches_scope(revision: RuleRevisionEvidence<'_>, query: RuleApplicabilityQuery<'_>) -> bool {
     revision.authority_id == query.authority_id
         && revision.jurisdiction_id == query.jurisdiction_id
         && revision.instrument_id == query.instrument_id
@@ -121,9 +114,7 @@ fn effective_at(revision: RuleRevisionEvidence<'_>, valid_at_utc: i64) -> bool {
             .unwrap_or(true)
 }
 
-fn validate_revision(
-    revision: RuleRevisionEvidence<'_>,
-) -> Result<(), RuleApplicabilityError> {
+fn validate_revision(revision: RuleRevisionEvidence<'_>) -> Result<(), RuleApplicabilityError> {
     if !nonempty(revision.revision_id)
         || !nonempty(revision.authority_id)
         || !nonempty(revision.jurisdiction_id)
@@ -179,10 +170,7 @@ fn validate_revision(
     Ok(())
 }
 
-fn find_revision_index(
-    revisions: &[RuleRevisionEvidence<'_>],
-    revision_id: &str,
-) -> Option<usize> {
+fn find_revision_index(revisions: &[RuleRevisionEvidence<'_>], revision_id: &str) -> Option<usize> {
     revisions
         .iter()
         .position(|revision| revision.revision_id == revision_id)
@@ -315,9 +303,11 @@ pub fn resolve_applicable_rule<'a>(
 
     if known_candidates.is_empty() {
         if future_known_count > 0 {
-            return Ok(RuleApplicabilityResult::IndeterminateFutureRevisionNotKnown {
-                excluded_revision_count: future_known_count,
-            });
+            return Ok(
+                RuleApplicabilityResult::IndeterminateFutureRevisionNotKnown {
+                    excluded_revision_count: future_known_count,
+                },
+            );
         }
         return Ok(RuleApplicabilityResult::NoPublishedRuleForValidTime {
             draft_revision_count: draft_count,
@@ -326,9 +316,10 @@ pub fn resolve_applicable_rule<'a>(
 
     let mut maximal_candidates = Vec::new();
     for candidate in known_candidates.iter().copied() {
-        let superseded_by_another = known_candidates.iter().copied().any(|other| {
-            other != candidate && is_descendant_of(revisions, other, candidate)
-        });
+        let superseded_by_another = known_candidates
+            .iter()
+            .copied()
+            .any(|other| other != candidate && is_descendant_of(revisions, other, candidate));
         if !superseded_by_another {
             maximal_candidates.push(candidate);
         }
@@ -341,26 +332,27 @@ pub fn resolve_applicable_rule<'a>(
     let published_at_utc = selected
         .published_at_utc
         .ok_or(RuleApplicabilityError::PublishedRuleMissingPublicationTimestamp)?;
-    let superseded_known_revision_count = u32::try_from(
-        known_candidates.len().saturating_sub(1),
-    )
-    .map_err(|_| RuleApplicabilityError::ArithmeticOverflow)?;
+    let superseded_known_revision_count =
+        u32::try_from(known_candidates.len().saturating_sub(1))
+            .map_err(|_| RuleApplicabilityError::ArithmeticOverflow)?;
 
-    Ok(RuleApplicabilityResult::Applicable(ApplicableRuleRevision {
-        revision_id: selected.revision_id,
-        authority_id: selected.authority_id,
-        jurisdiction_id: selected.jurisdiction_id,
-        instrument_id: selected.instrument_id,
-        scope_id: selected.scope_id,
-        source_ref: selected.source_ref,
-        source_sha256: selected.source_sha256,
-        published_at_utc,
-        available_at_utc: selected.available_at_utc,
-        effective_from_utc: selected.effective_from_utc,
-        effective_until_utc: selected.effective_until_utc,
-        superseded_known_revision_count,
-        future_known_excluded_count: future_known_count,
-    }))
+    Ok(RuleApplicabilityResult::Applicable(
+        ApplicableRuleRevision {
+            revision_id: selected.revision_id,
+            authority_id: selected.authority_id,
+            jurisdiction_id: selected.jurisdiction_id,
+            instrument_id: selected.instrument_id,
+            scope_id: selected.scope_id,
+            source_ref: selected.source_ref,
+            source_sha256: selected.source_sha256,
+            published_at_utc,
+            available_at_utc: selected.available_at_utc,
+            effective_from_utc: selected.effective_from_utc,
+            effective_until_utc: selected.effective_until_utc,
+            superseded_known_revision_count,
+            future_known_excluded_count: future_known_count,
+        },
+    ))
 }
 
 #[cfg(test)]
@@ -458,8 +450,26 @@ mod tests {
     fn overlapping_unrelated_revisions_are_ambiguous_not_arbitrarily_ordered() {
         let rules = [
             revision("v1", "code/rev1", OLD_SHA, 90, 92, 100, None, None),
-            revision("branch-a", "code/a", NEW_SHA, 180, 185, 200, None, Some("v1")),
-            revision("branch-b", "code/b", ALT_SHA, 181, 186, 200, None, Some("v1")),
+            revision(
+                "branch-a",
+                "code/a",
+                NEW_SHA,
+                180,
+                185,
+                200,
+                None,
+                Some("v1"),
+            ),
+            revision(
+                "branch-b",
+                "code/b",
+                ALT_SHA,
+                181,
+                186,
+                200,
+                None,
+                Some("v1"),
+            ),
         ];
         assert_eq!(
             resolve_applicable_rule(query(220, 220), &rules),
@@ -520,16 +530,8 @@ mod tests {
             effective_from_utc: 200,
             ..revision("draft", "draft/code", OLD_SHA, 0, 10, 200, None, None)
         };
-        let future_published = revision(
-            "future",
-            "code/future",
-            NEW_SHA,
-            180,
-            185,
-            300,
-            None,
-            None,
-        );
+        let future_published =
+            revision("future", "code/future", NEW_SHA, 180, 185, 300, None, None);
         assert_eq!(
             resolve_applicable_rule(query(220, 220), &[draft, future_published]),
             Ok(RuleApplicabilityResult::NoPublishedRuleForValidTime {
@@ -543,15 +545,42 @@ mod tests {
         let wrong = [
             RuleRevisionEvidence {
                 authority_id: "NTCSA",
-                ..revision("wrong-authority", "rule/a", OLD_SHA, 90, 92, 100, None, None)
+                ..revision(
+                    "wrong-authority",
+                    "rule/a",
+                    OLD_SHA,
+                    90,
+                    92,
+                    100,
+                    None,
+                    None,
+                )
             },
             RuleRevisionEvidence {
                 jurisdiction_id: "NA",
-                ..revision("wrong-jurisdiction", "rule/b", NEW_SHA, 90, 92, 100, None, None)
+                ..revision(
+                    "wrong-jurisdiction",
+                    "rule/b",
+                    NEW_SHA,
+                    90,
+                    92,
+                    100,
+                    None,
+                    None,
+                )
             },
             RuleRevisionEvidence {
                 instrument_id: "GRID-CODE",
-                ..revision("wrong-instrument", "rule/c", ALT_SHA, 90, 92, 100, None, None)
+                ..revision(
+                    "wrong-instrument",
+                    "rule/c",
+                    ALT_SHA,
+                    90,
+                    92,
+                    100,
+                    None,
+                    None,
+                )
             },
             RuleRevisionEvidence {
                 scope_id: "ENERGY/ARBITRAGE",
@@ -612,7 +641,16 @@ mod tests {
 
         let published_without_publication = [RuleRevisionEvidence {
             published_at_utc: None,
-            ..revision("published-bad", "published/bad", OLD_SHA, 90, 92, 100, None, None)
+            ..revision(
+                "published-bad",
+                "published/bad",
+                OLD_SHA,
+                90,
+                92,
+                100,
+                None,
+                None,
+            )
         }];
         assert_eq!(
             resolve_applicable_rule(query(150, 160), &published_without_publication),
@@ -624,7 +662,16 @@ mod tests {
     fn inconsistent_source_digest_and_invalid_publication_order_are_rejected() {
         let inconsistent = [
             revision("v1", "same/source", OLD_SHA, 90, 92, 100, None, None),
-            revision("v2", "same/source", NEW_SHA, 180, 185, 200, None, Some("v1")),
+            revision(
+                "v2",
+                "same/source",
+                NEW_SHA,
+                180,
+                185,
+                200,
+                None,
+                Some("v1"),
+            ),
         ];
         assert_eq!(
             resolve_applicable_rule(query(220, 220), &inconsistent),
