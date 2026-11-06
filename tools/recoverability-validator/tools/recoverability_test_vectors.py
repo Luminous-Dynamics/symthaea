@@ -142,7 +142,7 @@ def shortest_route(
                     and not used_navigation
                 )
             else:
-                order_ok = used_initial and navigation_operation
+                order_ok = used_initial and not pending_reformulation and navigation_operation
             if not order_ok:
                 continue
 
