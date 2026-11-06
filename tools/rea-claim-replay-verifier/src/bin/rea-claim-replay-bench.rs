@@ -35,7 +35,6 @@ struct Scenario {
     claim_bytes: Vec<u8>,
     result_bytes: Vec<u8>,
     evidence_bytes: Vec<Vec<u8>>,
-    evidence_refs: Vec<&'static [u8]>,
     evidence_total_bytes: usize,
     evidence_max_bytes: usize,
 }
@@ -120,15 +119,10 @@ fn build_scenario(evidence_count: usize, padding_bytes: usize) -> Scenario {
     let result_bytes = serde_json::to_vec(&produced).expect("serialize benchmark result");
     assert!(result_bytes.len() <= MAX_RESULT_JSON_BYTES);
 
-    // Own the byte vectors for the full benchmark lifetime. This reference
-    // vector is populated in run_scenario after Scenario construction.
-    let evidence_refs = Vec::new();
-
     Scenario {
         claim_bytes,
         result_bytes,
         evidence_bytes,
-        evidence_refs,
         evidence_total_bytes,
         evidence_max_bytes,
     }
@@ -176,11 +170,11 @@ fn run_scenario(
     padding_bytes: usize,
     sample_count: usize,
 ) -> Value {
-    let mut scenario = build_scenario(evidence_count, padding_bytes);
-    scenario.evidence_refs = scenario
+    let scenario = build_scenario(evidence_count, padding_bytes);
+    let evidence_refs: Vec<&[u8]> = scenario
         .evidence_bytes
         .iter()
-        .map(Vec::as_slice)
+        .map(|bytes| bytes.as_slice())
         .collect();
 
     let admission_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
@@ -194,7 +188,7 @@ fn run_scenario(
     let replay_samples = measure_ns(WARMUP_SAMPLES, sample_count, || {
         let receipt = replay_claim_evaluation(
             &scenario.claim_bytes,
-            &scenario.evidence_refs,
+            &evidence_refs,
             &scenario.result_bytes,
         )
         .expect("valid benchmark replay must succeed");
