@@ -2981,6 +2981,175 @@ mod tests {
         );
     }
 
+    fn one_step_mse(
+        mut neuron: HdcLtcUnifiedNeuron,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        dt: f32,
+    ) -> f32 {
+        neuron.evolve_closed_form(dt, input);
+        neuron
+            .state()
+            .values
+            .iter()
+            .zip(target.values.iter())
+            .map(|(&actual, &expected)| (actual - expected).powi(2))
+            .sum::<f32>()
+            / target.dim() as f32
+    }
+
+    fn central_difference_parameter<F>(
+        neuron: &HdcLtcUnifiedNeuron,
+        input: &ContinuousHV,
+        target: &ContinuousHV,
+        dt: f32,
+        epsilon: f32,
+        perturb: F,
+    ) -> f32
+    where
+        F: Fn(&mut HdcLtcUnifiedNeuron, f32),
+    {
+        let mut plus = neuron.clone();
+        perturb(&mut plus, epsilon);
+        let mut minus = neuron.clone();
+        perturb(&mut minus, -epsilon);
+        (one_step_mse(plus, input, target, dt)
+            - one_step_mse(minus, input, target, dt))
+            / (2.0 * epsilon)
+    }
+
+    fn assert_finite_difference_close(name: &str, analytic: f32, numerical: f32) {
+        assert!(
+            analytic.is_finite() && numerical.is_finite(),
+            "{name}: non-finite gradient, analytic={analytic}, numerical={numerical}"
+        );
+        let scale = analytic.abs().max(numerical.abs()).max(1e-3);
+        let relative_error = (analytic - numerical).abs() / scale;
+        assert!(
+            relative_error < 1e-2,
+            "{name}: analytic={analytic:.8e}, numerical={numerical:.8e}, relative error={relative_error:.3e}"
+        );
+    }
+
+    #[test]
+    fn test_backward_matches_forward_finite_differences_with_and_without_fourier() {
+        const DIM: usize = 64;
+        const DT: f32 = 0.13;
+        const EPSILON: f32 = 1e-2;
+
+        for fourier_frequencies in [Vec::new(), vec![0.7, 1.3]] {
+            let config = UnifiedConfig {
+                dimension: DIM,
+                tau_base: 0.25,
+                backbone_tau: 0.3,
+                gating_steepness: 1.2,
+                fourier_frequencies,
+                fourier_amplitude: 0.08,
+                ..UnifiedConfig::default()
+            };
+            let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+            neuron.set_state(ContinuousHV::random(DIM, 12).scale(0.15));
+            neuron.set_evolution_clock(0.37, 0);
+
+            let input = ContinuousHV::random(DIM, 13).scale(0.3);
+            let target = ContinuousHV::random(DIM, 14).scale(0.1);
+            let gradients = neuron.backward(&input, &target, DT);
+
+            // Each finite difference perturbs one parameter in an isolated
+            // clone, then measures the exact public forward transition.
+            let index = 3;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.weight_hv.values[index] += delta,
+            );
+            assert_finite_difference_close("weight_hv", gradients.dw.values[index], numerical);
+
+            let index = 5;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.input_mask.values[index] += delta,
+            );
+            assert_finite_difference_close("input_mask", gradients.du.values[index], numerical);
+
+            let index = 7;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.tau_modulator.values[index] += delta,
+            );
+            assert_finite_difference_close(
+                "tau_modulator",
+                gradients.d_tau_modulator.values[index],
+                numerical,
+            );
+
+            let index = 9;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.gate_weight.values[index] += delta,
+            );
+            assert_finite_difference_close(
+                "gate_weight",
+                gradients.d_gate_weight.values[index],
+                numerical,
+            );
+
+            let index = 11;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.gate_bias.values[index] += delta,
+            );
+            assert_finite_difference_close(
+                "gate_bias",
+                gradients.d_gate_bias.values[index],
+                numerical,
+            );
+
+            let index = 13;
+            let numerical = central_difference_parameter(
+                &neuron,
+                &input,
+                &target,
+                DT,
+                EPSILON,
+                |candidate, delta| candidate.state.values[index] += delta,
+            );
+            assert_finite_difference_close("state", gradients.d_state.values[index], numerical);
+
+            let mut plus_input = input.clone();
+            plus_input.values[15] += EPSILON;
+            let mut minus_input = input.clone();
+            minus_input.values[15] -= EPSILON;
+            let numerical = (one_step_mse(neuron.clone(), &plus_input, &target, DT)
+                - one_step_mse(neuron.clone(), &minus_input, &target, DT))
+                / (2.0 * EPSILON);
+            assert_finite_difference_close(
+                "input",
+                gradients.d_input.values[15],
+                numerical,
+            );
+        }
+    }
+
     #[test]
     fn test_set_fourier_frequencies_neuron() {
         let config = UnifiedConfig {
