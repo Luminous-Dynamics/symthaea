@@ -305,3 +305,30 @@ Keep these axes separate: terminal/execution disposition; answer/abstention stat
 Scored labels are disallowed on contaminated, budget-violating, failed, invalid, timed-out and not-started trials. They remain visible in the outcome report and in the planned denominator. `runner_execution_proven` remains false and `external_anchor_required` remains true: the report hash binds content only, not the authenticity of the collector or evaluator.
 
 The validator deliberately does not compute calibration error or infer causal effects. Use the row-level pair/condition data in a separate preregistered analysis; distinguish fixed-benchmark accuracy from generalized accuracy and account for task/world dependence (for example, a well-specified GLMM when justified). Exact-head CI and independent runner evidence remain required.
+
+
+## Model-free benchmark recoverability audit
+
+The follow-on SCI-RETRIEVAL-RECOVERABILITY-001 / #10690 adds an evaluator-side recoverability diagnostic that composes with the pre-run intervention plan (#8929) and post-run outcome receipt (#8960). It does not create another plan, outcome, search receipt, source graph, or runtime retriever.
+
+The model-free route graph classifies each pinned answer-critical evidence unit under one exact corpus snapshot, search surface, route policy, and budget:
+
+- DirectlyReachable: exact evidence is reachable through initial retrieval.
+- ReformulationRecoverable: evidence requires an allowed query reformulation and a post-reformulation retrieval.
+- NavigationRecoverable: evidence requires a declared structural operation such as opening a document, following a link/TOC, pagination, or in-document find.
+- UnreachableWithinBudget: no permitted route fits the frozen budget and graph.
+- NotEvaluable: the surface is not frozen/observed or the artifact is unavailable/unknown.
+
+Every reachable classification includes a deterministic shortest route witness and cost, for evaluator-side use only. A partial/unknown surface cannot yield an unreachable finding. The graph is finite and benchmark-relative; it does not say that a source is absent from the open web or world.
+
+~~~sh
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  commit-recoverability-manifest recoverability-fields.json
+
+cargo run --locked --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  audit-recoverability-manifest recoverability-manifest.json
+~~~
+
+The manifest commitment must be anchored independently before any scored trial. The audit report sets external_anchor_required=true; it does not authenticate the benchmark runner or prove that an evaluated model followed a route.
+
+The companion CI fixture has synthetic direct, reformulation, navigation, unreachable, and unknown-source cases. It compares a separate Python reference implementation with Rust typed serialization and mutation-tests commitment, budget, route and unknown-surface behavior. These are contract checks, not retrieval-performance results.
