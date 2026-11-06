@@ -1,0 +1,58 @@
+name: Set-valued connectome hypothesis coverage contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_set_valued_hypothesis_coverage.py"
+      - ".github/workflows/connectome-set-valued-hypothesis-coverage.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE_BENCHMARK_V1.md"
+      - "docs/neuroscience/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_set_valued_hypothesis_coverage.py"
+      - ".github/workflows/connectome-set-valued-hypothesis-coverage.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-set-valued-coverage:
+    name: Validate exact set-valued hypothesis coverage
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          print("Draft 2020-12 set-valued hypothesis coverage schema: PASS")
+          PY
+      - name: Run independent oracle and adversarial self-tests
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_set_valued_hypothesis_coverage.py
+          python3 tools/connectomics-intake-audit/reference/verify_set_valued_hypothesis_coverage.py \
+            --input docs/neuroscience/examples/CONNECTOME_SET_VALUED_HYPOTHESIS_COVERAGE.example.json \
+            --output "$RUNNER_TEMP/set-valued-coverage-report.json" \
+            --self-test
+          cat "$RUNNER_TEMP/set-valued-coverage-report.json"
