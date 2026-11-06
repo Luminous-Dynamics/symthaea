@@ -164,8 +164,12 @@ pub fn evaluate_decision_regret<'a>(
         inputs.network_topology_source_sha256,
         inputs.settlement_basis_source_sha256,
     ];
+    let mut unique_basis_references = BTreeSet::new();
     for (reference, digest) in basis_refs.into_iter().zip(basis_hashes) {
         validate_ref_and_hash(reference, digest)?;
+        if !unique_basis_references.insert(reference) {
+            return Err(DecisionRegretError::InvalidEvidenceReference);
+        }
     }
     let mut declared = BTreeSet::new();
     for scenario_id in inputs.declared_scenario_ids.iter().copied() {
@@ -397,9 +401,9 @@ mod tests {
             probability_source_sha256: SOURCE_SHA,
             probability_available_at_utc: 80,
             probability_bps,
-            policy_result_source_ref: if scenario_id == "low" {
+            policy_result_source_ref: if scenario_id == "low" || scenario_id == "a" {
                 "policy-result/low"
-            } else if scenario_id == "high" {
+            } else if scenario_id == "high" || scenario_id == "b" {
                 "policy-result/high"
             } else {
                 "policy-result/third"
@@ -407,9 +411,9 @@ mod tests {
             policy_result_sha256: SOURCE_SHA,
             policy_result_available_at_utc: 200,
             policy_net_cash_minor_zar: policy,
-            perfect_information_result_source_ref: if scenario_id == "low" {
+            perfect_information_result_source_ref: if scenario_id == "low" || scenario_id == "a" {
                 "oracle-result/low"
-            } else if scenario_id == "high" {
+            } else if scenario_id == "high" || scenario_id == "b" {
                 "oracle-result/high"
             } else {
                 "oracle-result/third"
