@@ -6,6 +6,7 @@
 #[path = "rea_compat/claims.rs"]
 pub mod claims;
 
+#[allow(unused_imports)] // Preserve the complete public claim API in isolated adapter tests.
 pub use claims::{
     CLAIM_EVALUATION_SCHEMA, CLAIM_EVALUATOR_VERSION, CLAIM_SCHEMA, ClaimDisposition, ClaimError,
     ClaimErrorKind, ClaimEvaluation, ClaimPredicate, ClaimRequest, ClaimScope, EvidenceAssessment,
