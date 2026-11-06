@@ -480,7 +480,7 @@ mod tests {
                 "future",
                 1_000,
                 CapabilityMeasurementKind::CapabilityLimitTest,
-                )
+            )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&future)),
@@ -513,7 +513,7 @@ mod tests {
                 "bad-digest",
                 1_000,
                 CapabilityMeasurementKind::CapabilityLimitTest,
-                )
+            )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&bad_digest)),
