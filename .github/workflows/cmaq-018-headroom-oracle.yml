@@ -1,0 +1,32 @@
+name: CMAQ-018 denoised selectable-headroom oracle
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "research/cmaq-018-headroom-oracle/**"
+      - ".github/workflows/cmaq-018-headroom-oracle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/cmaq-018-headroom-oracle/**"
+      - ".github/workflows/cmaq-018-headroom-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-finite-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path research/cmaq-018-headroom-oracle/Cargo.toml -- --check
+      - name: Unit tests
+        run: cargo test --locked --manifest-path research/cmaq-018-headroom-oracle/Cargo.toml --all-targets
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path research/cmaq-018-headroom-oracle/Cargo.toml --all-targets -- -D warnings
