@@ -2,7 +2,7 @@
 
 This is the first executable claim-evaluation slice for issue #10629. It deliberately supports only one positive rule:
 
-- provider_reported_observation: a selected, semantically verified REA Evidence record reports an exact normalized_result for the same subject digest, operation and represented environment scope.
+- provider_reported_observation: a selected, semantically verified REA Evidence record reports an JCS-canonical normalized_result for the same subject digest, operation and represented environment scope.
 
 The evaluator re-runs verify_evidence_value for every supplied premise. It does not trust a caller-constructed VerifiedEvidence struct or an unverified Evidence ID. Claim JSON import rejects duplicate object keys recursively, including inside asserted_value.
 
@@ -15,7 +15,7 @@ The evaluator re-runs verify_evidence_value for every supplied premise. It does 
 - inapplicable: all evaluated evidence is outside the stated subject, operation, predicate or represented scope.
 - unverified: no predicate-specific rule is registered, or unverified assumptions are present.
 
-V0 treats exact JSON equality as an observation comparison, not a semantic equivalence relation. It does not interpret arbitrary normalized-result schemas.
+V0 compares normalized_result and asserted_value by RFC 8785 JCS canonical bytes. This gives JSON-number equivalence under the binary64/JCS rules (for example, 42 and 42.0 canonicalize identically) while preserving array order and string code points. This remains structural JSON equality, not domain-semantic equivalence; it does not interpret arbitrary normalized-result schemas.
 
 ## Explicit non-claims
 
