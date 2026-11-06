@@ -279,6 +279,7 @@ mod hdc_ltc_learning_tests; // Comprehensive learning dynamics tests for HdcLtcU
 pub mod hdc_ltc_neuron; // HDC-LTC neuron integration with Hebbian learning
 pub mod hdc_ltc_unified; // Revolutionary unified HDC-LTC: state AS hypervector with closed-form solution
 pub mod hdc_ltc_unified_validation; // Numerical validation of closed-form solution accuracy
+pub mod structured_mixer; // Experimental orthogonal cross-coordinate HDC mixing
 pub mod hebbian;
 pub mod morphogenetic;
 pub mod predictor; // Unified predictor trait for Symthaea integration (links prediction to Φ)
@@ -558,6 +559,9 @@ pub use binary_hv::BinaryHV;
 
 // Re-export unified HV types
 pub use unified_hv::{ContinuousHV, HV};
+pub use structured_mixer::{
+    HdcStructuredMixer, HdcStructuredMixerError, HdcStructuredMixerKind,
+};
 
 // Re-export configuration types (dimension unification)
 pub use config::{
