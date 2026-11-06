@@ -180,7 +180,34 @@ where \\(B\\) is the multivariate beta function. The implementation accumulates 
 
 Tests include the exact Beta-Binomial evidence ratio for a Beta(1,1) full prior and Beta(2,1) reduced prior (reduced/full evidence ratio \\(4/3\\)), explicit support-restricted evidence when excluded outcomes are unobserved, zero evidence when an excluded outcome is observed, additivity across independent likelihood columns, model-prior odds, ordered-parameterization binding, and negative controls for malformed support and incompatible reduced posteriors.
 
-This is the appropriate BMR substrate for the [2026 three-ball active structure-learning paper](https://doi.org/10.1038/s41467-026-77209-5), whose categorical likelihood parameters are represented by Dirichlet counts. It remains a primitive: the complete POMDP, policy evaluator, model-space construction, and prospective model expected-information-gain adapter are not yet wired into Symthaea's production selector.
+This is the appropriate categorical BMR substrate for the [2026 three-ball active structure-learning paper](https://doi.org/10.1038/s41467-026-77209-5), whose likelihood parameters are represented by Dirichlet counts. A one-step model-EIG scorer is now built on top of this primitive, but the complete POMDP, exact paper model-space generator, action-conditioned state posterior, full expected-free-energy policy evaluator, and production `ActiveInferenceAgent::select_action` integration are not yet implemented.
+
+### 2.3.3 One-step prospective model EIG from Dirichlet BMR
+
+The categorical BMR module now also exposes `evaluate_dirichlet_model_information_gain`. It implements the model-structure component of the paper's one-step expected information gain:
+
+```text
+IG_model(action)
+  = H(Q(m | current evidence))
+    - sum_o Q(o | action, current full model)
+             * H(Q(m | current evidence, hypothetical outcome o))
+```
+
+For each possible outcome, the caller supplies:
+- Its predictive probability under the current full / Bayesian-model-average parent model.
+- The expected sufficient-statistic increment for the Dirichlet likelihood tensor (typically outcome modality outer-product posterior expectations over the parent-state factors).
+
+The evaluator adds the hypothetical increment to the current full posterior, runs BMR to obtain the posterior over reduced models for that outcome, and averages posterior model entropy under the supplied full-parent predictive distribution. It separately computes the current model posterior from the current full posterior. It does **not** multiply the outcome probability by another Bayes-factor mixture term; that would double-count evidence and would not match the model-EIG expression in the paper.
+
+The evaluator enforces:
+- The full Dirichlet prior is the model-prior-weighted arithmetic average of the reduced-model priors, as in the paper's Bayesian model average.
+- Every action's predicted outcome probabilities are finite, positive, and sum to one.
+- Every hypothetical posterior-count increment matches the exact likelihood tensor dimensions and is finite/non-negative.
+- Current and post-outcome model beliefs are derived from the same parameterization and support-bound BMR contract.
+
+A deterministic Beta/Bernoulli unit test reproduces the analytic two-model case: equal-prior Beta(4,1) and Beta(1,4) hypotheses have parent Beta(2.5,2.5); a success moves the posterior model belief to 0.8/0.2, a failure to 0.2/0.8, and the expected model EIG is approximately 0.1927448 nats. An uninformative outcome with no sufficient-statistic increment yields zero model EIG. A malformed parent prior and non-normalized predictive mass are rejected.
+
+**Scope boundary:** this is a one-step model-EIG scorer, not a complete expected-free-energy planner. The caller must still produce calibrated action-conditioned predictive outcomes and state/posterior increments. Parameter EIG, state EIG, risk/preference cost, ambiguity, action costs, multi-step planning, the full three-ball POMDP, and production `ActiveInferenceAgent::select_action` integration remain separate work. The full expected-free-energy score should add the components once, with consistent sign conventions; do not double-count BMR log evidence as a separate reward term.
 
 ### 2.4 WSP must pass exact-protocol replication, not headline comparison
 
