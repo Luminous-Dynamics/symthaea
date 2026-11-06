@@ -803,3 +803,78 @@ Every external result should carry:
 An aggregate RSI-Index such as RSIGym's 0.4809 remains a useful within-suite reference, not a universal measure of self-improvement or an unseen-population guarantee. RSIGym's own repository says final evaluations reuse tasks available during development and separately bills research-agent inference/final evaluation from platform-service budget. Report known-suite optimization separately from fresh-task and fresh-family transfer.
 
 Source: https://github.com/evolvent-ai/RSIGym
+
+
+## 16. Evaluator evolution, external RSI protocols, and industry signal — 2026-11-06
+
+### The evaluator can become an evolutionary bottleneck
+
+**The Red Queen Gödel Machine (RQGM, arXiv:2606.26294, 2026-06-24)** co-evolves agents and evaluators under *controlled utility evolution*: the evaluator is frozen within an epoch, and evaluator replacement is decided at explicit epoch boundaries using anchor data. The paper reports:
+- coding improvements over its frozen-evaluator baseline, with 1.35x–1.72x fewer search tokens in reported comparisons;
+- 1.78x–1.86x higher paper-acceptance rates for co-evolved writers under its diverse reviewer panel;
+- 9 percentage points higher ground-truth accuracy for co-evolved proof graders.
+
+These are paper-reported results, not independent replications or guarantees for Symthaea. The central research lesson is nevertheless important: evaluation quality may itself need to evolve, especially where the target is difficult to reduce to a static executable test. But a judge and candidate that co-evolve without an independent anchor can drift into shared delusion.
+
+New follow-on: [#10708 — controlled evaluator evolution across frozen utility epochs](https://github.com/Luminous-Dynamics/symthaea/issues/10708). The proposal preserves #10573 as the only promotion authority. Evaluator challengers must pass objective, expert-adjudicated and adversarial anchors; the evaluator is frozen within each epoch; historical scores are never silently overwritten; and a fixed evaluator-independent confirmation lane remains across epochs. Do not claim one cumulative REUSE guarantee across evaluator changes without a separately reviewed theorem.
+
+Source: https://arxiv.org/abs/2606.26294
+
+### RSIBench: a direct harness-evolution protocol comparator
+
+RSIBench (November 2026) freezes model weights, task environments, verifiers, budgets and task splits while permitting harness changes. Its published protocol describes:
+- 168 tasks across six separately reported domains: Terminal, Environment, SWE, Science, Frontier and Repository Reconstruction;
+- 84 public train tasks and 84 sealed test tasks;
+- three training rollouts per task and five inheritance rounds;
+- train-side candidate selection using declared targets, cumulative anchors, pass@3 and trajectory post-review;
+- final A0 versus A_last evaluation at avg@3 on the untouched test split;
+- causal rollback / keep-one attribution for registered harness surfaces and physical modules.
+
+The public formal-results matrix is still in progress; its protocol is a comparator, not a completed SOTA leaderboard. The documentation reports no validation split, making train-side causal gates and explicit anchor discipline particularly important.
+
+Integrate the protocol into [#10497 — R4 meta-improvement](https://github.com/Luminous-Dynamics/symthaea/issues/10497) as a distinct frozen-model/frozen-environment harness arm. Keep six domain scores separate. Add causal rollback attribution where module boundaries allow, and keep terminal inherited quality primary rather than selecting the most favorable intermediate checkpoint.
+
+Sources:
+- https://harness-rsibench.com/
+- https://harness-rsibench.com/docs/
+
+### RSI-Env: persistent research state with independent host control
+
+**RSI-Env (arXiv:2611.01736, 2026-11-01)** separates an editable RSI environment from an independent Host Controller responsible for services, validity, evaluation, versioning and lineage. It compares Self against fixed external Teachers and defines three settings:
+- Open-General: improvement direction unspecified;
+- Capability-Directed: broad capability goal supplied, benchmark formulation left to the Improver;
+- Benchmark-Guided: named target and corresponding feedback available.
+
+The paper reports a seven-task study from a Qwen3.8-27B starting system. In Open-General Self, GPQA Diamond rises from 65.2% to 73.2% and AIME 2026 from 53.3% to 56.7%; Knowledge Self raises SimpleQA from 82% to 85%, then 88% across system updates. The authors also note challenges preserving gains across capabilities. These results are specific to the studied tasks and runs.
+
+Integrate its three feedback/autonomy regimes and fixed-Teacher comparison into #10497 as separate settings. Treat persistent research-state retention, failed-attempt retention, capability preservation and independent host ownership as explicit dimensions.
+
+Source: https://arxiv.org/abs/2611.01736
+
+### Scientific outcome verification: FIRE-Bench
+
+**FIRE-Bench (ICML 2026)** asks agents to rediscover established, verifiable findings from recent ML papers by independently designing and running experiments. It avoids relying exclusively on LLM-as-judge evaluations of generated papers. Its reported frontier-agent results remain below 50 F1, with high run-to-run variance and recurring experimental-design, execution and evidence-reasoning failures.
+
+Use it as a rediscovery and experiment-execution benchmark for Symthaea's scientific-research capability, not as an RSI benchmark in itself. The distinction is important: a system that can rediscover valid findings has demonstrated scientific competence; it has not yet demonstrated that its own research procedure improves recursively.
+
+Source: https://proceedings.mlr.press/v306/wang26d.html
+
+### Industry signal: AI-assisted R&D acceleration
+
+Reuters reported on 2026-11-05 that an independent METR assessment estimated Anthropic's model capabilities on well-specified benchmark tasks improved about 1.9x faster since October 2025 than during the preceding period. METR emphasized high uncertainty (roughly 1.5x–2.5x) and said AI had not yet made highly significant, fully autonomous contributions to the most important stages of model training. The estimate relied on confidential research, interviews and unreleased-model data; it is an industry-level signal, not a public reproducible RSI benchmark.
+
+This motivates an additional R4 metric: **externally confirmed research throughput per complete resource budget**, alongside capability lift. Measure both the productivity of AI-assisted human R&D and fully autonomous inherited-improver performance; do not conflate the two.
+
+Source: https://www.reuters.com/technology/anthropics-models-improving-nearly-twice-fast-with-help-ai-study-finds-2026-11-05/
+
+### Revised comparison portfolio
+
+Keep the estimands separate:
+1. RSIBench — fixed-model harness evolution and causal rollback.
+2. RSI-Env — open-ended, capability-directed and benchmark-guided persistent system evolution.
+3. AIDE² / #10497 — inherited research-agent and meta-procedure improvement, including a distinct ignition phase.
+4. RQGM / #10708 — epochal co-evolution of agents and evaluators.
+5. AI4AI successor / #10691 — clean-start learning-algorithm design.
+6. FIRE-Bench — execution-grounded scientific rediscovery.
+
+Do not produce a combined cross-benchmark leaderboard. Publish exact versions, model/harness identities, budgets, split and checkpoint-selection policies, independent replicate counts, per-domain outcomes, uncertainty, failures, and all costs. A higher score under a changed evaluator is not evidence of improved capability unless it survives the fixed evaluator-independent confirmation lane.
