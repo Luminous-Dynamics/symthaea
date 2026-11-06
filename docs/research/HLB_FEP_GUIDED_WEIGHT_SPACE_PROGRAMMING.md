@@ -323,6 +323,8 @@ Add a three-ball-style rule-discovery task with hidden object attributes, compet
 
 Friston et al. (2026) use a three-ball paradigm to illustrate active sampling for rule discovery. Their paper explicitly assumes a known generative-model family and focuses on selecting observations that distinguish its candidate likelihood mappings; it does not solve general perception-to-world-model construction or arbitrary ARC-style reasoning. Symthaea should preserve that limitation.
 
+The paper's concrete rule is: if the centre ball is green, choose green; if the centre is red, choose the colour of the left ball; if the centre is blue, choose the colour of the right ball. The agent only sees the colour of a ball after foveating its location, so it must choose where to look as well as which colour to report. Feedback is correct or incorrect, with a no-response option. The stated prior log probabilities for (no feedback, correct, incorrect) are (0, 2, -6) nats. Under the paper's symmetry-constrained rule family, the candidate likelihood space contains 81 models; the fully observed state/response combination count is 3×3×3×4 = 108. These concrete facts anchor our reproduction/adaptation, but the exact generative-model tensor layout, Dirichlet priors, policy horizon, and all supplement-specific numerical settings still need a line-by-line transcription before we label a run an exact reproduction.
+
 Two evaluation tracks must remain separate:
 
 1. **Exact reproduction:** transcribe and independently verify the paper/supplement's state space, rule set, observation and outcome likelihoods, action constraints, preference distribution, horizon, and model-commitment stopping rule. Record the source/supplement revision and all choices.
