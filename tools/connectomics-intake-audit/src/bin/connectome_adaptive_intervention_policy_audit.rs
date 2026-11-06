@@ -683,36 +683,30 @@ fn canonical_digests(prepared: &Prepared) -> Result<(String, String, String, Str
             })
         })
         .collect::<Vec<_>>();
-    let potential_rows = prepared
-        .input
-        .worlds
-        .iter()
-        .enumerate()
-        .flat_map(|(world_index, world)| {
-            prepared
+    let mut potential_rows = Vec::new();
+    for (world_index, world) in prepared.input.worlds.iter().enumerate() {
+        for (nuisance_index, nuisance) in prepared.input.nuisance_models.iter().enumerate() {
+            let state_index =
+                world_index * prepared.input.nuisance_models.len() + nuisance_index;
+            let observations = prepared
                 .input
-                .nuisance_models
+                .actions
                 .iter()
                 .enumerate()
-                .map(move |(nuisance_index, nuisance)| {
-                    let state_index =
-                        world_index * prepared.input.nuisance_models.len() + nuisance_index;
-                    let observations = prepared.input.actions.iter().enumerate().map(
-                        |(action_index, action)| {
-                            json!({
-                                "action_id": action.action_id,
-                                "outcome_id": prepared.outcomes[state_index][action_index],
-                            })
-                        },
-                    ).collect::<Vec<_>>();
+                .map(|(action_index, action)| {
                     json!({
-                        "world_id": world.world_id,
-                        "nuisance_model_id": nuisance.nuisance_model_id,
-                        "observations": observations,
+                        "action_id": action.action_id,
+                        "outcome_id": prepared.outcomes[state_index][action_index],
                     })
                 })
-        })
-        .collect::<Vec<_>>();
+                .collect::<Vec<_>>();
+            potential_rows.push(json!({
+                "world_id": world.world_id,
+                "nuisance_model_id": nuisance.nuisance_model_id,
+                "observations": observations,
+            }));
+        }
+    }
 
     Ok((
         sha256_json(&json!(world_rows))?,
