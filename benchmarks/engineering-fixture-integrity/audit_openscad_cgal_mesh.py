@@ -147,7 +147,17 @@ def package_path(root: Path, relative_path: str) -> Path:
     require(not candidate.is_absolute(), f"Absolute package path forbidden: {relative_path}")
     require(".." not in candidate.parts, f"Parent traversal forbidden: {relative_path}")
     resolved_root = root.resolve()
-    resolved = (resolved_root / candidate).resolve()
+    lexical = resolved_root / candidate
+    current = resolved_root
+    for component in candidate.parts:
+        if component in {"", "."}:
+            continue
+        current = current / component
+        require(
+            not current.is_symlink(),
+            f"Symlinked package path forbidden: {relative_path}",
+        )
+    resolved = lexical.resolve()
     require(resolved.is_relative_to(resolved_root), f"Path escapes package root: {relative_path}")
     require(resolved.is_file(), f"Manifest artifact missing: {relative_path}")
     return resolved
@@ -162,7 +172,7 @@ def validate_manifest_digest(value: Any, label: str) -> str:
 
 
 def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, Path, str]], Path, str, str]:
-    manifest_path = root / "materialization-manifest.json"
+    manifest_path = package_path(root, "materialization-manifest.json")
     require(manifest_path.is_file(), "materialization-manifest.json is required")
     manifest_bytes = manifest_path.read_bytes()
     try:
@@ -181,7 +191,9 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
             "Manifest must contain exactly six CAD-HISTORY cases")
     subjects: list[tuple[str, Path, str]] = []
     seen_ids: set[str] = set()
-    seen_paths: set[str] = set()
+    # Compare resolved identities, not raw strings. This also reserves the
+    # manifest itself so it cannot be rebound as a geometry artifact.
+    seen_paths: set[Path] = {manifest_path.resolve()}
     for case in cad_cases:
         require(isinstance(case, dict), "CAD case must be an object")
         fixture_id = case.get("fixture_id")
@@ -201,11 +213,14 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
             require(variant.get("valid_brep") is True and variant.get("solid_count") == 1,
                     f"{fixture_id}/{name} is not declared as one valid B-rep solid")
             rel = variant.get("artifact")
-            require(isinstance(rel, str) and rel not in seen_paths,
-                    f"Missing or duplicate CAD artifact path: {rel!r}")
-            seen_paths.add(rel)
+            require(isinstance(rel, str), f"Missing CAD artifact path: {rel!r}")
             expected = validate_manifest_digest(variant.get("sha256"), rel)
             artifact = package_path(root, rel)
+            require(
+                artifact not in seen_paths,
+                f"Duplicate canonical CAD artifact path: {rel!r}",
+            )
+            seen_paths.add(artifact)
             actual = sha256(artifact)
             require(actual == expected,
                     f"Manifest digest mismatch for {rel}: expected {expected}, got {actual}")
@@ -219,9 +234,12 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
     assembly_rel = assembly.get("artifact")
     require(isinstance(assembly_rel, str), "Manifest assembly artifact path is missing")
     assembly_digest = validate_manifest_digest(assembly.get("sha256"), assembly_rel)
-    require(assembly_rel not in seen_paths, "Assembly artifact path aliases a CAD source/edit artifact")
-    seen_paths.add(assembly_rel)
     assembly_path = package_path(root, assembly_rel)
+    require(
+        assembly_path not in seen_paths,
+        "Assembly artifact path aliases another package artifact",
+    )
+    seen_paths.add(assembly_path)
     require(sha256(assembly_path) == assembly_digest,
             f"Manifest digest mismatch for assembly artifact {assembly_rel}")
     require(assembly.get("valid_brep") is True
@@ -235,11 +253,15 @@ def load_manifest_subjects(root: Path) -> tuple[dict[str, Any], list[tuple[str, 
         require(isinstance(part, dict) and part.get("valid_brep") is True,
                 "Each part definition must be declared a valid B-rep")
         part_rel = part.get("artifact")
-        require(isinstance(part_rel, str) and part_rel not in seen_paths,
-                f"Missing or duplicate assembly part-definition artifact path: {part_rel!r}")
-        seen_paths.add(part_rel)
+        require(isinstance(part_rel, str),
+                f"Missing assembly part-definition artifact path: {part_rel!r}")
         expected = validate_manifest_digest(part.get("sha256"), part_rel)
         part_path = package_path(root, part_rel)
+        require(
+            part_path not in seen_paths,
+            f"Duplicate canonical assembly part-definition artifact path: {part_rel!r}",
+        )
+        seen_paths.add(part_path)
         require(sha256(part_path) == expected,
                 f"Manifest digest mismatch for assembly part definition {part_rel}")
 
