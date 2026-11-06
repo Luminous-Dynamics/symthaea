@@ -234,4 +234,101 @@ fn unreferenced_evidence_is_not_silently_added_to_the_replay_set() {
     )
     .unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::UnexpectedEvidence);
+
+#[test]
+fn independent_expected_labels_cover_wrong_scope_and_missing_platform_version() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+
+    let mut wrong_subject = provider_claim(evidence.evidence_id.clone());
+    wrong_subject.scope.subject_sha256 =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
+    let (claim_bytes, result_bytes) = produce(&wrong_subject, std::slice::from_ref(&evidence));
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::Inapplicable);
+
+    let mut wrong_operation = provider_claim(evidence.evidence_id.clone());
+    wrong_operation.scope.operation = "verify_signature".to_owned();
+    let (claim_bytes, result_bytes) = produce(&wrong_operation, std::slice::from_ref(&evidence));
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::Inapplicable);
+
+    let mut unrepresented_platform_version = provider_claim(evidence.evidence_id.clone());
+    unrepresented_platform_version.scope.platform_version =
+        Some("Android 17 / API 37".to_owned());
+    let (claim_bytes, result_bytes) =
+        produce(&unrepresented_platform_version, std::slice::from_ref(&evidence));
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::Underdetermined);
+}
+
+#[test]
+fn independent_expected_label_refutes_a_same_scope_numeric_near_miss() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut claim = provider_claim(evidence.evidence_id.clone());
+    claim.asserted_value["entries"][0]["size"] = json!(42.0001);
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::RefutedWithinScope);
+}
+
+#[test]
+fn recorded_assumptions_cannot_make_a_claim_supported() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut claim = provider_claim(evidence.evidence_id.clone());
+    claim
+        .assumptions
+        .push("the scanner database is complete".to_owned());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, ClaimDisposition::Unverified);
+}
+
+#[test]
+fn result_schema_and_rule_version_mutations_are_rejected_before_replay() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let mut unknown_field: Value = serde_json::from_slice(&result_bytes).unwrap();
+    unknown_field["unreviewed_authority"] = json!("trusted");
+    let unknown_bytes = serde_json::to_vec(&unknown_field).unwrap();
+    let error = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &unknown_bytes)
+        .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+
+    let mut wrong_rule: Value = serde_json::from_slice(&result_bytes).unwrap();
+    wrong_rule["evaluator_version"] = json!("rea-claim-evaluator/v99");
+    let wrong_rule_bytes = serde_json::to_vec(&wrong_rule).unwrap();
+    let error = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &wrong_rule_bytes)
+        .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
+}
+
+#[test]
+fn duplicate_evidence_input_is_rejected_even_when_both_records_are_valid() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[fixture_bytes(), fixture_bytes()],
+        &result_bytes,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::DuplicateEvidence);
+}
+
 }
