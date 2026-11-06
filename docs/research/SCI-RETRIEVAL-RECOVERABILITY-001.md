@@ -44,7 +44,7 @@ For each required, pinned evidence unit, a finite graph binds the initial state 
 | UnreachableWithinBudget | No permitted route fits the frozen graph and budget |
 | NotEvaluable | Search surface is not frozen/observed or artifact availability is unknown/unavailable |
 
-A direct route takes precedence over a reformulation or navigation route; reformulation takes precedence over navigation. The report includes the deterministic shortest route witness and route cost. These witnesses and gold artifact references are evaluator-side only.
+A direct route takes precedence over a reformulation or navigation route; reformulation takes precedence over navigation. The report includes the deterministic shortest route witness and route cost. These witnesses and gold artifact references are evaluator-side only. The reported family-reference count is descriptive: this module does not resolve opaque source-family references against Mycelix provenance, and it must not be interpreted as an independent-source count.
 
 The classification is relative to a particular finite corpus snapshot, search surface, route policy, and budget. UnreachableWithinBudget is not an open-world claim that the source is absent. Reachability is asymmetric: a concrete pinned route is positive evidence even when the observed surface is partial; a missing route is not evidence of unreachability unless the declared finite surface and route inventory are frozen and complete. Thus a partial surface can preserve DirectlyReachable, ReformulationRecoverable, or NavigationRecoverable witnesses, but an item with no observed route becomes NotEvaluable. An entirely unknown surface makes every item NotEvaluable.
 
@@ -54,7 +54,7 @@ Implementation lives in research/science-bench-refresh/src/recoverability.rs. Th
 - pinned corpus, search-surface and route-policy SHA-256 digests;
 - start node, finite positive route budget and unit;
 - bounded nodes and typed operation edges;
-- required evidence-unit IDs, artifact digests, source-family refs and availability state;
+- required evidence-unit IDs, artifact digests, declared source-family refs and availability state;
 - a domain-separated commitment over the typed manifest fields.
 
 CLI:
