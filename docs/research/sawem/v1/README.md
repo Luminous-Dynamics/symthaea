@@ -226,6 +226,16 @@ The fitter does not estimate statistical confidence bounds or authenticate raw s
 
 Benchmark cases: `BMS-MULTIDIM-CAPABILITY-SURFACE-001` and `BMS-CAPABILITY-CELL-CALIBRATION-001`. No field-derived grid has yet been fitted; calibration and validation against M5BAT remain `not_run`.
 
+### Warranty enforcement: contractual envelope over measured operation
+
+The new `warranty_compliance.rs` module evaluates measured BMS/plant intervals against an effective-dated warranty schedule. It checks only limits that are actually supplied and source-bound: minimum/maximum SOC, maximum cell temperature, charge/discharge power, cumulative throughput and per-warranty-period throughput budgets.
+
+Throughput is not silently defined as a universal cycle count. The contract must explicitly state whether the relevant accounting basis is charge-only, discharge-only or charge-plus-discharge; the warranty-period calendar and timezone must also be supplied. The evaluator reports missing SOC/temperature/power/energy measurements, uncovered horizon time, duplicate sources, future-known telemetry and period-budget coverage. A complete result means only **within the supplied contractual limits for the measured horizon**. It is not a prediction of remaining useful life or a legal determination that an OEM warranty claim will be accepted.
+
+This complements the SOC × temperature × SOH capability surface: the surface constrains what the BESS may safely deliver in a measured operating state, while the warranty evaluator tests whether operation stayed inside contractual bounds and consumed a source-defined throughput budget. The limits are not interchangeable; warranty compliance does not replace engineering safety limits.
+
+Benchmark case: `WARRANTY-001` now has six synthetic known-answer and hostile-control tests. The next validation must use the actual OEM schedule and a rights-cleared field trace. Compare the same dispatch on SAM's detailed voltage/temperature/degradation/lifetime model and any OEM model where available, but keep each tool's chemistry, data domain and warranty assumptions explicit. NREL SAM reference: https://sam.nrel.gov/battery-storage/. No real warranty schedule, OEM telemetry or remaining-life prediction has been tested here.
+
 ### Revenue realization: decomposing the haircut into evidence
 
 The new `revenue_realization.rs` module bridges theoretical gross revenue to realized net cash through explicitly signed, source-bound adjustments. It separates:
