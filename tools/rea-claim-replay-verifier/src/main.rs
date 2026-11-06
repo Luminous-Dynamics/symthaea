@@ -18,9 +18,8 @@ const MAX_RESULT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_TOTAL_EVIDENCE_BYTES: usize = 128 * 1024 * 1024;
 
 fn read_bounded(path: &Path, max_bytes: usize, label: &str) -> Result<Vec<u8>, String> {
-    let file = File::open(path).map_err(|error| {
-        format!("cannot open {label} '{}': {error}", path.display())
-    })?;
+    let file = File::open(path)
+        .map_err(|error| format!("cannot open {label} '{}': {error}", path.display()))?;
     let mut bytes = Vec::new();
     file.take((max_bytes as u64).saturating_add(1))
         .read_to_end(&mut bytes)
