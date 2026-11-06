@@ -318,6 +318,7 @@ pub struct HdcLtcParameterGroupReplacement {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HdcLtcParameterError {
     LengthMismatch { expected: usize, actual: usize },
+    DestinationLengthMismatch { name: String, expected: usize, actual: usize },
     NonFiniteValue { index: usize },
     GroupNormExceeded { name: String, max_norm_micros: u64 },
     UnknownParameterGroup { name: String },
@@ -334,6 +335,10 @@ impl std::fmt::Display for HdcLtcParameterError {
             Self::LengthMismatch { expected, actual } => {
                 write!(f, "HDC-LTC parameter count mismatch: expected {expected}, received {actual}")
             }
+            Self::DestinationLengthMismatch { name, expected, actual } => write!(
+                f,
+                "HDC-LTC destination group {name} has length {actual}, expected {expected}"
+            ),
             Self::NonFiniteValue { index } => {
                 write!(f, "HDC-LTC parameter at flat index {index} is not finite")
             }
@@ -1438,6 +1443,22 @@ impl HdcLtcUnifiedNeuron {
         }
 
         let dim = self.config.dimension;
+        for (name, actual) in [
+            ("weight_hv", self.weight_hv.values.len()),
+            ("input_mask", self.input_mask.values.len()),
+            ("tau_modulator", self.tau_modulator.values.len()),
+            ("gate_weight", self.gate_weight.values.len()),
+            ("gate_bias", self.gate_bias.values.len()),
+        ] {
+            if actual != dim {
+                return Err(HdcLtcParameterError::DestinationLengthMismatch {
+                    name: name.to_string(),
+                    expected: dim,
+                    actual,
+                });
+            }
+        }
+
         let mut offset = 0usize;
         self.weight_hv.values.copy_from_slice(&values[offset..offset + dim]);
         offset += dim;
