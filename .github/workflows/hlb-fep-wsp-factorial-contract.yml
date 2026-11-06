@@ -10,6 +10,12 @@ on:
       - "crates/core/symthaea-core/Cargo.toml"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "crates/core/symthaea-core/src/weight_space_program.rs"
+      - "src/dynamics/cfc/weight_program_adapter.rs"
+      - "src/dynamics/cfc/mod.rs"
+      - "crates/core/symthaea-core/src/weight_space_program.rs"
+      - "src/dynamics/cfc/weight_program_adapter.rs"
+      - "src/dynamics/cfc/mod.rs"
   push:
     branches: [research/hlb-fep-wsp-factorial-v2]
     paths:
@@ -72,12 +78,14 @@ jobs:
           set -euo pipefail
           rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
           rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
 
       - name: Test four-factor contract invariants
         run: |
           set -euo pipefail
           cargo metadata --locked --format-version 1 --no-deps > /dev/null
           cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
+          cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
 
       - name: Generate source-bound protocol receipt
