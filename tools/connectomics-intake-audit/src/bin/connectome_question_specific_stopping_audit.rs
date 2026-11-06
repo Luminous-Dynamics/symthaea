@@ -147,6 +147,7 @@ struct Report {
     status: &'static str,
     claim_scope: String,
     query_id: String,
+    baseline_decision: bool,
     sampling_frame_count: usize,
     case_count: usize,
     results: Vec<CaseReport>,
@@ -312,6 +313,7 @@ fn global_stop(case: &Case) -> Result<Option<String>, String> {
     let first_names: BTreeSet<&str> = case.snapshots[0].graph_invariants.iter().map(|row| row.invariant_id.as_str()).collect();
     require(!first_names.is_empty(), "graph invariant set is empty")?;
     for snapshot in &case.snapshots {
+        require(!snapshot.snapshot_id.trim().is_empty(), "snapshot ID is empty")?;
         let names: BTreeSet<&str> = snapshot.graph_invariants.iter().map(|row| row.invariant_id.as_str()).collect();
         require(names.len() == snapshot.graph_invariants.len(), "duplicate invariant ID in a snapshot")?;
         require(names == first_names, "graph invariant identity changed between checkpoints")?;
@@ -338,8 +340,11 @@ fn global_stop(case: &Case) -> Result<Option<String>, String> {
 fn world_agreement(worlds: &[World]) -> Result<(bool, bool), String> {
     require(!worlds.is_empty(), "no reconstruction worlds were supplied")?;
     let mut unresolved = false;
+    let mut world_ids = BTreeSet::new();
     let mut admissible_decisions = BTreeSet::new();
     for world in worlds {
+        require(!world.world_id.trim().is_empty(), "world ID is empty")?;
+        require(world_ids.insert(world.world_id.as_str()), "duplicate world ID")?;
         match world.biological_disposition.as_str() {
             "ADMISSIBLE" => {
                 let decision = world.query_decision.ok_or_else(|| "admissible world lacks query decision".to_owned())?;
@@ -441,6 +446,7 @@ fn run(input_bytes: &[u8]) -> Result<Report, String> {
         status: "SYNTHETIC_CONTRACT_VALIDATED",
         claim_scope: input.claim_scope,
         query_id: input.query_binding.query_id,
+        baseline_decision: input.query_binding.baseline_decision,
         sampling_frame_count: frames.len(),
         case_count: results.len(),
         results,
