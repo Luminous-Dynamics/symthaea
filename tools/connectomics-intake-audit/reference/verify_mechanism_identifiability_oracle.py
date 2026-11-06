@@ -48,7 +48,7 @@ def pair_key(action_id: str, mechanism_a: str, mechanism_b: str) -> str:
     return f"{action_id}|{left}|{right}"
 
 
-def verify(data: dict[str, Any]) -> dict[str, Any]:
+def verify(data: dict[str, Any], raw_input: bytes) -> dict[str, Any]:
     require(data["schema_version"] == 1, "unsupported schema version")
     require(data["claim_scope"] == "synthetic_known_truth", "V1 executable oracle accepts only synthetic known-truth fixtures")
     require(data["query"]["query_id"].strip(), "query ID must be non-empty")
@@ -187,6 +187,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         "tool": "connectome-mechanism-identifiability-oracle",
         "run_id": data["run_id"],
         "claim_scope": data["claim_scope"],
+        "input_sha256": __import__("hashlib").sha256(raw_input).hexdigest(),
         "replicate_count": n,
         "alpha": alpha,
         "mechanism_count": len(mechanisms),
@@ -204,7 +205,7 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def self_test(data: dict[str, Any]) -> None:
-    baseline = verify(copy.deepcopy(data))
+    baseline = verify(copy.deepcopy(data), b'known-answer-self-test')
     require(baseline["selected_intervention_id"] == "orthogonal-joint", "starter fixture known answer failed")
 
     missing = copy.deepcopy(data)
@@ -236,15 +237,45 @@ def self_test(data: dict[str, Any]) -> None:
     print("mechanism-identifiability negative controls: PASS")
 
 
+def compare_json(expected: Any, actual: Any, path: str = "$") -> None:
+    if isinstance(expected, bool) or isinstance(actual, bool):
+        require(expected == actual, f"report mismatch at {path}")
+        return
+    if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+        require(math.isfinite(float(actual)), f"non-finite report value at {path}")
+        require(abs(float(expected) - float(actual)) <= 1e-8, f"numeric report mismatch at {path}: {expected} != {actual}")
+        return
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        require(set(expected) == set(actual), f"report keys differ at {path}")
+        for key in expected:
+            compare_json(expected[key], actual[key], f"{path}.{key}")
+        return
+    if isinstance(expected, list) and isinstance(actual, list):
+        require(len(expected) == len(actual), f"report list length differs at {path}")
+        for index, (left, right) in enumerate(zip(expected, actual)):
+            compare_json(left, right, f"{path}[{index}]")
+        return
+    require(expected == actual, f"report value mismatch at {path}")
+
+
 def main() -> int:
-    if len(sys.argv) not in (2, 3) or (len(sys.argv) == 3 and sys.argv[2] != "--self-test"):
-        print("usage: verify_mechanism_identifiability_oracle.py FIXTURE.json [--self-test]", file=sys.stderr)
-        return 2
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("fixture", type=Path)
+    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--compare-report", type=Path)
+    args = parser.parse_args()
     try:
-        data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-        report = verify(data)
-        if len(sys.argv) == 3:
+        raw = args.fixture.read_bytes()
+        data = json.loads(raw)
+        report = verify(data, raw)
+        if args.self_test:
             self_test(data)
+        if args.compare_report is not None:
+            actual = json.loads(args.compare_report.read_text(encoding="utf-8"))
+            compare_json(report, actual)
+            print("Rust report matches independent Python tuple-product oracle.")
         print(json.dumps(report, indent=2, sort_keys=True))
         print("mechanism-identifiability independent oracle: PASS")
         return 0
