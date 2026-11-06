@@ -114,6 +114,8 @@ pub struct Estimate {
     pub clusters: usize,
     /// Number of bootstrap replicates used (zero when no interval is estimable).
     pub bootstrap_resamples: usize,
+    /// Exact metric-specific bootstrap seed, absent when no interval is estimable.
+    pub bootstrap_seed: Option<u64>,
 }
 
 /// Counts of each explicit missing-outcome category.
@@ -272,6 +274,23 @@ pub fn summarize_paired_effects(
     Ok(summaries)
 }
 
+fn dimension_seed_code(dimension: Dimension) -> u64 {
+    match dimension {
+        Dimension::Motif => 1,
+        Dimension::Rhythm => 2,
+        Dimension::Tempo => 3,
+        Dimension::Role => 4,
+        Dimension::Texture => 5,
+    }
+}
+
+fn direction_seed_code(direction: InfluenceDirection) -> u64 {
+    match direction {
+        InfluenceDirection::PartnerToAgent => 1,
+        InfluenceDirection::AgentToPartner => 2,
+    }
+}
+
 fn summarize_group(
     dimension: Dimension,
     direction: InfluenceDirection,
@@ -330,7 +349,9 @@ fn summarize_group(
         }
     }
 
-    let group_seed = config.seed ^ ((dimension as u64) << 32) ^ ((direction as u64) << 48);
+    let group_seed = config.seed
+        ^ (dimension_seed_code(dimension) << 32)
+        ^ (direction_seed_code(direction) << 48);
     let estimate = |index: usize| {
         estimate_cluster_means(&metrics[index], config.resamples, group_seed ^ index as u64)
     };
@@ -376,6 +397,7 @@ fn estimate_cluster_means(
             ci95_upper: None,
             clusters: 0,
             bootstrap_resamples: 0,
+            bootstrap_seed: None,
         };
     }
 
@@ -392,6 +414,7 @@ fn estimate_cluster_means(
             ci95_upper: None,
             clusters: 1,
             bootstrap_resamples: 0,
+            bootstrap_seed: None,
         };
     }
 
@@ -414,6 +437,7 @@ fn estimate_cluster_means(
         ci95_upper: Some(percentile(&bootstrap_means, 0.975)),
         clusters: count,
         bootstrap_resamples: resamples,
+        bootstrap_seed: Some(seed),
     }
 }
 
@@ -550,6 +574,8 @@ mod tests {
         let first = single_summary(&observations).targeted_delta;
         let second = single_summary(&observations).targeted_delta;
         assert_eq!(first, second);
+        assert_eq!(first.bootstrap_seed, Some(1234 ^ (1_u64 << 32) ^ (1_u64 << 48)));
+        assert_eq!(first.bootstrap_resamples, 2_000);
         assert!(first.ci95_lower.unwrap() <= first.mean.unwrap());
         assert!(first.mean.unwrap() <= first.ci95_upper.unwrap());
     }
