@@ -1,0 +1,426 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-heldout-response-adequacy-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_binding": {
+    "dataset_id": "synthetic-neural-response-trajectory-fixture",
+    "dataset_revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "species": "synthetic",
+    "evidence_tier": "SYNTHETIC",
+    "source_access_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "split_manifest": {
+    "split_unit": "synthetic_unit",
+    "training_units": [
+      "U-TRAIN-01"
+    ],
+    "calibration_units": [
+      "U-CAL-01",
+      "U-CAL-02"
+    ],
+    "lockbox_units": [
+      "U-LOCK-01",
+      "U-LOCK-02",
+      "U-LOCK-03"
+    ],
+    "split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "time_grid_ms": [
+    0,
+    100,
+    200,
+    300
+  ],
+  "models": [
+    {
+      "model_id": "baseline-response-model",
+      "model_family": "nominal-connectome-response-model",
+      "model_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "observation_kernel_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "training_data_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "model_id": "challenger-response-model",
+      "model_family": "expanded-observation-kernel",
+      "model_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "observation_kernel_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "training_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "single-cell-activation",
+      "intervention_kind": "OPTOGENETIC",
+      "feasibility_status": "FEASIBLE",
+      "intervention_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "units": [
+    {
+      "unit_id": "U-CAL-01",
+      "split": "CALIBRATION",
+      "observation_status": "OBSERVED",
+      "source_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "observed_trajectory_id": "A"
+    },
+    {
+      "unit_id": "U-CAL-02",
+      "split": "CALIBRATION",
+      "observation_status": "OBSERVED",
+      "source_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "observed_trajectory_id": "B"
+    },
+    {
+      "unit_id": "U-LOCK-01",
+      "split": "LOCKBOX",
+      "observation_status": "OBSERVED",
+      "source_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "observed_trajectory_id": "B"
+    },
+    {
+      "unit_id": "U-LOCK-02",
+      "split": "LOCKBOX",
+      "observation_status": "OBSERVED",
+      "source_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "observed_trajectory_id": "C"
+    },
+    {
+      "unit_id": "U-LOCK-03",
+      "split": "LOCKBOX",
+      "observation_status": "FAILED",
+      "source_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  ],
+  "predictions": [
+    {
+      "model_id": "baseline-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-CAL-01",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.8
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "model_id": "baseline-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-CAL-02",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.8
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "model_id": "baseline-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-LOCK-01",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.8
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "model_id": "baseline-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-LOCK-02",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.8
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "model_id": "baseline-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-LOCK-03",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.8
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.2
+        }
+      ]
+    },
+    {
+      "model_id": "challenger-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-CAL-01",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.6
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.3
+        },
+        {
+          "trajectory_id": "C",
+          "values": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "model_id": "challenger-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-CAL-02",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.6
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.3
+        },
+        {
+          "trajectory_id": "C",
+          "values": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "model_id": "challenger-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-LOCK-01",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.6
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.3
+        },
+        {
+          "trajectory_id": "C",
+          "values": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "model_id": "challenger-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-LOCK-02",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.6
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.3
+        },
+        {
+          "trajectory_id": "C",
+          "values": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "probability": 0.1
+        }
+      ]
+    },
+    {
+      "model_id": "challenger-response-model",
+      "intervention_id": "single-cell-activation",
+      "unit_id": "U-LOCK-03",
+      "predicted_trajectories": [
+        {
+          "trajectory_id": "A",
+          "values": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "probability": 0.6
+        },
+        {
+          "trajectory_id": "B",
+          "values": [
+            0,
+            1,
+            1,
+            0
+          ],
+          "probability": 0.3
+        },
+        {
+          "trajectory_id": "C",
+          "values": [
+            0,
+            1,
+            0,
+            1
+          ],
+          "probability": 0.1
+        }
+      ]
+    }
+  ],
+  "expected_outcomes": {
+    "calibration_unit_count": 2,
+    "lockbox_observed_unit_count": 2,
+    "lockbox_failed_unit_count": 1,
+    "baseline_lockbox_zero_support_count": 1,
+    "challenger_lockbox_zero_support_count": 0,
+    "baseline_lockbox_coverage_90_count": 1,
+    "challenger_lockbox_coverage_90_count": 1,
+    "calibration_claim_status": "SYNTHETIC_KNOWN_ANSWER_ONLY_NOT_A_CALIBRATION_CLAIM"
+  }
+}
