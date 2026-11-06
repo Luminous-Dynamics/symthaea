@@ -81,11 +81,13 @@ pub use paired_evaluation::{
     PairedEvaluationError,
 };
 pub use reuse_confidence_certificate::{
-    pass_fail_confidence_certificate, ReuseCertificateError, ReuseConfidenceCertificate,
+    bounded_score_confidence_certificate, pass_fail_confidence_certificate,
+    BoundedScoreConfidenceCertificate, ReuseCertificateError, ReuseConfidenceCertificate,
     MAX_CERTIFICATE_SAMPLE_COUNT,
 };
 pub use reuse_error_budget::{
-    allocate_reuse_error_budget, evaluate_reuse_round, ReuseBudgetError,
+    allocate_reuse_error_budget, evaluate_bounded_score_reuse_round, evaluate_reuse_round,
+    BoundedScoreCandidateEvidence, BoundedScoreRoundError, ReuseBudgetError,
     ReuseCandidateEvidence, ReuseErrorAllocation, ReuseRoundDecision, ReuseRoundError,
     MAX_REUSE_ROUND,
 };
