@@ -366,6 +366,21 @@ pub fn compute_recoverability_manifest_commitment(
     Ok(framed_commitment(b"manifest-fields", &payload))
 }
 
+fn reconstruct_route(
+    start: &SearchState,
+    mut current: &SearchState,
+    predecessors: &BTreeMap<SearchState, (SearchState, String)>,
+) -> Option<Vec<String>> {
+    let mut edge_refs = Vec::new();
+    while current != start {
+        let (previous, edge_ref) = predecessors.get(current)?;
+        edge_refs.push(edge_ref.clone());
+        current = previous;
+    }
+    edge_refs.reverse();
+    Some(edge_refs)
+}
+
 fn find_route(
     fields: &RecoverabilityManifestFieldsV1,
     adjacency: &BTreeMap<String, Vec<&RecoverabilityEdgeV1>>,
@@ -379,13 +394,17 @@ fn find_route(
         used_post_reformulation_retrieval: false,
         used_navigation: false,
     };
-    let mut best: BTreeMap<SearchState, (u32, Vec<String>)> = BTreeMap::new();
-    let mut queue: BinaryHeap<Reverse<(u32, Vec<String>, SearchState)>> = BinaryHeap::new();
-    best.insert(start.clone(), (0, Vec::new()));
-    queue.push(Reverse((0, Vec::new(), start)));
+    // Dijkstra expands equal-cost states in stable structural order. The first
+    // equal-cost predecessor wins; adjacency lists are sorted by edge_ref.
+    // Keeping predecessor links avoids cloning every full path at each edge.
+    let mut best_costs: BTreeMap<SearchState, u32> = BTreeMap::new();
+    let mut predecessors: BTreeMap<SearchState, (SearchState, String)> = BTreeMap::new();
+    let mut queue: BinaryHeap<Reverse<(u32, SearchState)>> = BinaryHeap::new();
+    best_costs.insert(start.clone(), 0);
+    queue.push(Reverse((0, start.clone())));
 
-    while let Some(Reverse((cost, path, state))) = queue.pop() {
-        if best.get(&state) != Some(&(cost, path.clone())) {
+    while let Some(Reverse((cost, state))) = queue.pop() {
+        if best_costs.get(&state) != Some(&cost) {
             continue;
         }
 
@@ -404,7 +423,7 @@ fn find_route(
         if reached && qualifies {
             return Some(RouteWitness {
                 cost,
-                edge_refs: path,
+                edge_refs: reconstruct_route(&start, &state, &predecessors)?,
             });
         }
 
@@ -432,8 +451,6 @@ fn find_route(
                 continue;
             }
 
-            let mut next_path = path.clone();
-            next_path.push(edge.edge_ref.clone());
             let next_state = SearchState {
                 node_ref: edge.to_node_ref.clone(),
                 used_initial_retrieval: state.used_initial_retrieval
@@ -445,13 +462,14 @@ fn find_route(
                         && edge.operation == RouteOperationV1::PostReformulationRetrieval),
                 used_navigation: state.used_navigation || edge.operation.is_navigation(),
             };
-            let candidate = (next_cost, next_path.clone());
-            let improve = best
+
+            let improve = best_costs
                 .get(&next_state)
-                .is_none_or(|existing| candidate < *existing);
+                .is_none_or(|existing| next_cost < *existing);
             if improve {
-                best.insert(next_state.clone(), candidate.clone());
-                queue.push(Reverse((candidate.0, candidate.1, next_state)));
+                best_costs.insert(next_state.clone(), next_cost);
+                predecessors.insert(next_state.clone(), (state.clone(), edge.edge_ref.clone()));
+                queue.push(Reverse((next_cost, next_state)));
             }
         }
     }
