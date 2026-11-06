@@ -24,9 +24,10 @@ fn frozen_oracle_corpus_has_independent_expected_labels() {
         corpus["provenance"]["authored_independently_of_production_evaluator"],
         json!(true)
     );
-    assert!(
-        corpus["cases"].as_array().unwrap().len() >= 18,
-        "the frozen finite oracle must retain all expected cases"
+    assert_eq!(
+        corpus["cases"].as_array().unwrap().len(),
+        23,
+        "the frozen public seed has exactly 23 independently labeled cases"
     );
 }
 
@@ -46,7 +47,7 @@ fn oracle_label(case_id: &str, field: &str) -> String {
         .as_array()
         .expect("oracle cases are an array")
         .iter()
-        .find(|case| case["id"] == case_id)
+        .find(|case| case["id"].as_str() == Some(case_id))
         .unwrap_or_else(|| panic!("oracle case '{case_id}' is missing"))[field]
         .as_str()
         .unwrap_or_else(|| panic!("oracle case '{case_id}' has no {field}"))
