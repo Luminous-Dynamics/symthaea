@@ -1,0 +1,56 @@
+{
+  "evidence_id": "ev_a4e49bdca4cbf80c2ec8e4d7eba116af403bc33a4937ffb7fca00b6aab6590c4",
+  "subject": {
+    "name": "sample.apk",
+    "digest": {
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "local_path": "/tmp/sample.apk",
+    "format": "apk",
+    "architecture": null
+  },
+  "provider": {
+    "id": "rea.static",
+    "name": "REA Static",
+    "version": "1.2.3"
+  },
+  "analysis_profile": {
+    "provider": {
+      "id": "rea.static",
+      "name": "REA Static",
+      "version": "1.2.3"
+    },
+    "parameters": {
+      "mode": "static"
+    },
+    "digest": "ff7fbe668a874e8ad9cf87ca1bd96201dacd8bf83fbcbee44cd37b2a5c8c8db4"
+  },
+  "predicate_type": "rea.analysis",
+  "operation": "inspect_artifact",
+  "parameters": {
+    "depth": 1
+  },
+  "caller_input_path": "/tmp/sample.apk",
+  "raw_result": null,
+  "normalized_result": {
+    "entries": [
+      {
+        "path": "classes.dex",
+        "size": 42
+      }
+    ],
+    "status": "complete"
+  },
+  "confidence": "observed",
+  "authority": "shipped-artifact",
+  "environment": null,
+  "limitations": [],
+  "relationship_coverage": null,
+  "locations": [
+    {
+      "kind": "artifact-path",
+      "path": "classes.dex"
+    }
+  ],
+  "evidence_links": []
+}
