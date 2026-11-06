@@ -91,6 +91,8 @@ pub mod confirmatory_unblinding;
 pub mod critic;
 #[cfg(feature = "theory")]
 pub mod evidence_digest;
+#[cfg(feature = "studio")]
+pub mod rmi_artifact_evidence;
 #[cfg(feature = "theory")]
 pub mod experiment_manifest;
 pub mod export;
