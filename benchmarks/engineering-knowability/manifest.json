@@ -534,6 +534,46 @@
         }
       ],
       "comparability_boundary": "The live page's 87.0% expert reference is a single-trial expert pass, not an estimated human population mean. The original September paper reports a different seven-agent snapshot with a 17.5% strongest agent. Do not merge the snapshots. The benchmark includes measurement and manufacturing workflows but does not score full claim-to-evidence-path validity, calibration/uncertainty correctness or post-service requalification."
+    },
+    {
+      "id": "benchcad-2.1-standard-core-2026-11-05",
+      "name": "BenchCAD 2.1 Core — standard harness",
+      "source_url": "https://benchcad.com/leaderboard",
+      "captured_at": "2026-11-06",
+      "task_count": 100,
+      "scope": "v2.1_standard_100_held_out_core_cases",
+      "run_protocol": "Standard v2.1: 60 rounds and 500,000 output tokens per case (thinking included), reasoning carried across rounds; mean of five full passes over all 100 Core cases; displayed ±95%; API list price.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5 (max)",
+          "harness": "BenchCAD standard v2.1",
+          "score": 0.49,
+          "displayed_uncertainty_95": 0.013,
+          "cost_per_task_usd": 8.1,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "A distinct release from BenchCAD 2.0. v2.1 scores are not comparable with v2.0 because rounds, token budget, reasoning carry and Task 6 matching changed. This score is the standard board; do not merge with the customized-harness board."
+    },
+    {
+      "id": "benchcad-2.1-customized-core-2026-11-05",
+      "name": "BenchCAD 2.1 Core — customized harness board",
+      "source_url": "https://benchcad.com/leaderboard",
+      "captured_at": "2026-11-06",
+      "task_count": 100,
+      "scope": "v2.1_customized_harness_100_held_out_core_cases",
+      "run_protocol": "Customized harness board. Claude Opus 5.5 in Claude Code: mean of runs over all 100 Core cases, number of passes not specified in the leaderboard summary; displayed ±95%; API list price.",
+      "entries": [
+        {
+          "model": "Claude Opus 5.5 (max)",
+          "harness": "Claude Code; BenchCAD customized-harness board",
+          "score": 0.653,
+          "displayed_uncertainty_95": 0.014,
+          "cost_per_task_usd": 20,
+          "median_duration_minutes": null
+        }
+      ],
+      "comparability_boundary": "Separate from the standard v2.1 board. The leaderboard also shows an OpenAI internal-model/Codex row scored with the BenchCAD 2.0 scorer; that row is excluded from this v2.1-scored entry. Customized-harness scores are not comparable with the standard harness board or BenchCAD 2.0."
     }
   ]
 }
