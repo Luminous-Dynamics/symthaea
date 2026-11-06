@@ -470,6 +470,29 @@ The evaluator rejects future-known receipts, expired/not-yet-valid claims, depen
 
 This is a certificate assembler and dependency/temporal integrity checker, not a source authenticator or independent model verifier. It does not validate signatures, issuer authority, upstream evaluator correctness or actual source facts. A supportable certificate is only as strong as its independently verified receipts and the correctness of the designated specialist evaluators. Benchmark case: `UNDERWRITING-PROOF-CERTIFICATE-001`.
 
+### Regulatory execution-authority gate: analysis is not order submission
+
+The new `execution_authority.rs` module keeps four workflow stages separate: analysis/forecasting/optimisation, bid/offer preparation, internal simulation submission and external commercial transmission.
+
+For an external commercial bid/offer, the evaluator requires:
+- a final source-bound regulatory instrument, marked in force and effective at the evaluation time;
+- explicit execution-control semantics from that applicable instrument;
+- verified participant admission;
+- verified evidence for every accreditation stage: design approval, factory acceptance testing, integration testing, market simulation, pilot operation and commercial approval;
+- source-bound API/platform submission permission; and
+- where required, a human approval bound to the exact canonical bid/offer manifest digest and participant identity, with an authorised reviewer and review receipt available by the submission time.
+
+A draft, superseded or unknown regulatory instrument blocks external submission. Internal simulation is reported only as `SimulationOnlyPermitted` and does not authorize commercial transmission. Analysis, forecasting, optimisation and preparation are not blocked merely because submission authority is unresolved.
+
+**Regulatory status caveat:** TechCentral's 6 October 2026 reporting on NERSA's draft SAWEM Trading Platform Regulatory Framework describes a proposed manual-review restriction on automated bid/offer submission during an initial phase after commercial launch. The Energy Council's live tracker still labels the framework open for comments, with a 27 October 2026 deadline. These sources do not establish the final approved rule or its effective date. The software therefore treats draft/unknown policy as a block on commercial automation, not as permission or as a legally final prohibition. The final NERSA/NTCSA instrument, participant accreditation and platform permissions must be ingested and verified before the control profile can change.
+
+Sources:
+- TechCentral, 6 October 2026: https://techcentral.co.za/nersa-eyes-five-year-ban-on-automated-electricity-trading/274888/
+- Energy Council policy tracker: https://energycouncil.org.za/policy/the-south-african-wholesale-electricity-market-sawem-trading-platform-framework-2026/
+- NERSA market surveillance mandate: https://www.nersa.org.za/
+
+Benchmark case: `MARKET-EXECUTION-AUTHORITY-GATE-001`. This is a synthetic policy-evaluator test, not an API integration, legal opinion, participant admission or live order-submission capability.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
