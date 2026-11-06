@@ -438,7 +438,7 @@ mod tests {
                 "wrong-campaign",
                 1_000,
                 CapabilityMeasurementKind::CapabilityLimitTest,
-                )
+            )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&wrong_campaign)),
@@ -451,7 +451,7 @@ mod tests {
                 "wrong-direction",
                 1_000,
                 CapabilityMeasurementKind::CapabilityLimitTest,
-                )
+            )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&wrong_direction)),
@@ -464,7 +464,7 @@ mod tests {
                 "outside-cell",
                 1_000,
                 CapabilityMeasurementKind::CapabilityLimitTest,
-                )
+            )
         }];
         assert_eq!(
             fit_capability_cell(inputs(&outside)),
