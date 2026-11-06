@@ -32,6 +32,8 @@ V1 qualifies **new-animal / known-pair** transport. Pair- and target-held-out ge
 - A known neuron pair may occur in train and lockbox animals in the `NEW_ANIMAL_SAME_PAIR` track. This is intentional and does not qualify as new-pair generalization.
 - Models declare exact training animal IDs and an explicit supported-condition set. They may not claim support for a genotype/context absent from the training manifest unless an independently justified external-training receipt is supplied.
 - A lockbox outcome must not influence model selection, threshold selection, calibration, nuisance-set construction, intervention choice or report editing.
+- Canonical split SHA-256 is recomputed over the domain tag `connectome-cohort-transport-split-v1`, the ordered labels TRAIN/VALIDATION/LOCKBOX, and sorted animal IDs using length-prefixed UTF-8 fields. A stale digest or changed membership rejects the run.
+- Each model training-manifest SHA-256 is recomputed over `connectome-cohort-training-manifest-v1`, model ID, split digest, sorted training animal IDs and sorted training-condition IDs. Validation and lockbox animals are never allowed in this manifest.
 - Report per-animal metrics and the animal-macro aggregate. Do not count trials, frames, timepoints or pairs within one animal as independent biological replicates.
 
 ## 5. Observation dispositions
