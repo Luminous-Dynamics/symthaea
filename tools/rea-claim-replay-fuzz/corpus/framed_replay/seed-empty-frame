@@ -1,5 +1,4 @@
-2
-{}
-2
+458
+{"schema":"luminous.rea.claim.v0","claim_id":"fuzz-seed-no-premise","predicate":"producer_authenticity","scope":{"subject_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","operation":"inspect_artifact","platform":null,"platform_version":null,"environment_id":null},"asserted_value":null,"source_predicate_type":null,"evidence_ids":[],"assumptions":[],"falsification_condition":"a source-authenticated producer statement is present"}2
 {}
 0
