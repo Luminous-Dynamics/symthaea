@@ -1,0 +1,55 @@
+name: MEL-013A exact artifact byte verification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/genealogy.rs"
+      - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "tools/mel-genealogy-byte-harness/Cargo.toml"
+      - "tools/mel-genealogy-byte-harness/src/lib.rs"
+      - ".github/workflows/mel-013a-artifact-bytes.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  genealogy-byte-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Format changed production source and standalone harness
+        run: |
+          rustfmt --check --edition 2024 \
+            crates/domains/symthaea-muse/src/genealogy.rs \
+            crates/domains/symthaea-muse-protocol/src/lib.rs \
+            crates/domains/symthaea-muse/src/bin/muse_studio.rs \
+            tools/mel-genealogy-byte-harness/src/lib.rs
+      - name: Compile and test production genealogy source in standalone harness
+        run: cargo test --manifest-path tools/mel-genealogy-byte-harness/Cargo.toml
+      - name: Record unrelated root-workspace compile blocker
+        shell: bash
+        run: |
+          set +e
+          cargo metadata --format-version 1 --no-deps > "$RUNNER_TEMP/root-workspace-metadata.json" 2> "$RUNNER_TEMP/root-workspace-metadata.err"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            cat "$RUNNER_TEMP/root-workspace-metadata.err"
+            echo "::warning::Repository-wide Cargo metadata is blocked by an existing missing workspace member; the standalone genealogy harness above remains the exact-source test."
+          fi
