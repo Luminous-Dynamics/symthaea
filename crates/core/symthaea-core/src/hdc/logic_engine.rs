@@ -2309,6 +2309,44 @@ mod tests {
     }
 
     #[test]
+    fn test_tseitin_generated_small_formulas_have_unique_extensions() {
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let base = vec![
+            Proposition::True,
+            Proposition::False,
+            p.clone(),
+            p.clone().not(),
+            q.clone(),
+            q.clone().not(),
+            r.clone(),
+            r.clone().not(),
+        ];
+
+        for left in &base {
+            for right in &base {
+                assert_tseitin_unique_extension(
+                    &left.clone().and(right.clone()),
+                    &["p", "q", "r"],
+                );
+                assert_tseitin_unique_extension(
+                    &left.clone().or(right.clone()),
+                    &["p", "q", "r"],
+                );
+                assert_tseitin_unique_extension(
+                    &left.clone().implies(right.clone()),
+                    &["p", "q", "r"],
+                );
+                assert_tseitin_unique_extension(
+                    &left.clone().iff(right.clone()),
+                    &["p", "q", "r"],
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_tseitin_nested_formulas_have_unique_extensions() {
         let p = Proposition::atom("p");
         let q = Proposition::atom("q");
