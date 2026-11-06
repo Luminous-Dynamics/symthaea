@@ -258,6 +258,7 @@ Investigate whether low-surprise, low-change state regions can skip some computa
 - Hasani et al., Closed-form continuous-time neural networks, Nature Machine Intelligence (2022): establishes CfC's solver-free approximate temporal update and strong efficiency trade-offs.
 - Liang et al., Rederived Closed-Form Continuous-Time Neural Networks, IEEE TNNLS 37(9), 4381–4395 (2026): NIALIM/Lagrange interpolation addresses the zero-order input approximation in high-resolution and irregular sampling; DFA-CfN and PRDFA-CfN report results across six task families.
 - Qian et al., A liquid neural network with physical evolution for variable continuous time series prediction, Journal of Computational Science 94 (2026): HCFC combines synaptic dynamics and Hamiltonian evolution and reports irregular-time-series comparisons.
+- Banerjee, Xu, and Gupta, *Efficient Continuous-Depth Modeling with GRU Equivalents*, ICML 2026, PMLR 306, 6194–6209: CoDA uses Mori–Zwanzig/Koopman ideas to replace repeated nonlinear ODE layers with a compact GRU, one low-dimensional linear ODE, and a dense layer. The paper reports 6.7× training and 1.8× inference speedups without accuracy loss on LFM-1.2B. HLB should include continuous-depth compression as a baseline, not assume a liquid neuron is automatically more efficient.
 - Standard baselines should include LTC (with high-accuracy ODE solver), CfC, ODE-RNN, GRU-D, Neural CDE, and strong state-space sequence models. Use matched parameter and compute budgets.
 
 ### HDC and holographic memory
@@ -406,11 +407,12 @@ The verifier must test both task behavior and algebraic contracts. A more accura
 ## 10. References
 
 1. Hasani et al. (2022). Closed-form continuous-time neural networks. Nature Machine Intelligence. https://www.nature.com/articles/s42256-022-00556-7
-2. Liang et al. (2026). Rederived Closed-Form Continuous-Time Neural Networks. IEEE Transactions on Neural Networks and Learning Systems 37(9), 4381–4395. https://doi.org/10.1109/TNNLS.2026.3669345
-3. Qian et al. (2026). A liquid neural network with physical evolution for variable continuous time series prediction. Journal of Computational Science 94, 102757. https://doi.org/10.1016/j.jocs.2025.102757
-4. Zhou et al. (2026). SynapseHD: A unified training framework for bridging spiking neural networks and hyperdimensional computing. Neurocomputing 659, 131757. https://doi.org/10.1016/j.neucom.2025.131757
-5. Salik et al. (2026). Hyper-dimensional computing architectures for AI applications: A comprehensive survey of principles, performance, and future prospects. Results in Engineering 29, 109589. https://doi.org/10.1016/j.rineng.2026.109589
-6. (DATE 2026). Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration. https://doi.org/10.23919/DATE69613.2026.11539261
+2. Banerjee, A., Xu, B., and Gupta, S. (ICML 2026). Efficient Continuous-Depth Modeling with GRU Equivalents. PMLR 306, 6194–6209. https://proceedings.mlr.press/v306/banerjee26b.html
+3. Liang et al. (2026). Rederived Closed-Form Continuous-Time Neural Networks. IEEE Transactions on Neural Networks and Learning Systems 37(9), 4381–4395. https://doi.org/10.1109/TNNLS.2026.3669345
+4. Qian et al. (2026). A liquid neural network with physical evolution for variable continuous time series prediction. Journal of Computational Science 94, 102757. https://doi.org/10.1016/j.jocs.2025.102757
+5. Zhou et al. (2026). SynapseHD: A unified training framework for bridging spiking neural networks and hyperdimensional computing. Neurocomputing 659, 131757. https://doi.org/10.1016/j.neucom.2025.131757
+6. Salik et al. (2026). Hyper-dimensional computing architectures for AI applications: A comprehensive survey of principles, performance, and future prospects. Results in Engineering 29, 109589. https://doi.org/10.1016/j.rineng.2026.109589
+7. (DATE 2026). Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration. https://doi.org/10.23919/DATE69613.2026.11539261
 
 ---
 
