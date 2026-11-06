@@ -100,6 +100,26 @@ Metrics:
 
 Do not compare an implementable forecast policy against a perfect-foresight oracle and call the difference model error. Do not give a model realized future data before its decision frontier.
 
+#### Decision-quality ladder: keep three comparisons separate
+
+A credible comparison must report three different objects:
+
+1. **Perfect-information oracle (PI):** selects the best action after the realized future is known. It is a non-implementable upper bound for a maximization objective. The policy-to-PI gap is expected value of perfect information (EVPI) under the declared scenario distribution; it is not forecast error, not achievable project revenue, and not proof that the candidate policy is suboptimal among implementable policies.
+2. **Best implementable non-anticipative policy (BINP):** an implementable reference that obeys the same information frontier, physical limits, market rules and settlement basis. It may be produced by a scenario-tree optimizer, a rolling-horizon solver or an independently implemented benchmark. This is the relevant policy-quality comparator.
+3. **Candidate policy:** the proposed Symthaea policy or a vendor/rule-based policy, evaluated on the exact same frozen scenario tree and realized outcomes.
+
+Report at least:
+- expected net-cash gap to PI (EVPI) and expected net-cash gap to BINP (implementable-policy regret);
+- upper-tail regret VaR/CVaR at 95% and worst-case regret;
+- share of PI value retained by the candidate, with the denominator and sign conventions shown;
+- non-anticipativity violations (must be zero);
+- feasibility violations, reserve shortfall, delivered-energy shortfall and settlement coverage;
+- runtime, memory, solver gap and policy-quality cost.
+
+The current Rust `decision_regret.rs` evaluator computes the first gap only: it scores candidate outcomes against a source-matched PI bound and audits the candidate's shared-information actions. It does **not** find or certify the BINP. A separate implementable-policy comparator and out-of-sample solver benchmark remain required before saying the candidate is near-optimal or has lower regret than industry.
+
+Scenario probabilities must themselves be calibrated or independently justified; the evaluator only checks that supplied probabilities are source-bound, known by the decision time and sum to 100%. Publish expected values together with distributional downside and probability uncertainty. A perfect-foresight bound using a miscalibrated scenario distribution is not a bankability conclusion.
+
 ### Track D — bankability, liquidity and lifecycle risk
 
 Metrics:
@@ -137,6 +157,26 @@ Metrics:
 - percentage of findings with exact source/line/page and model-input lineage.
 
 Target **zero false-safe** for the finite hostile corpus; report false-blocks and indeterminate decisions separately rather than silently lowering the gate.
+
+## 2A. Public field-data anchors and staged-validation ladder
+
+Published field results are reference targets, not Luminous results. The M5BAT Applied Energy study (DOI: [10.1016/j.apenergy.2025.127340](https://doi.org/10.1016/j.apenergy.2025.127340); dataset record DOI: [10.18154/RWTH-2025-06555](https://doi.org/10.18154/RWTH-2025-06555)) reports two schedule-execution tests over 61 hours for its selected LMO subsystem: unfulfilled energy fell from **1,094 kWh** under the reference parametrization to **238 kWh** under data-driven parametrization (**78.2%** reduction); balancing-energy cost fell by **71.7%**, and Test 2 balancing costs were **1.8% of trading revenue**. Those figures are specific to the study's asset/test scope, not universal targets and not Symthaea results.
+
+The [Public Battery Field Data registry](https://github.com/Astrolabe-Analytics/public-battery-field-data) version 1.2.0 (registry commit `04803c0606facc96e899b2d648759646b989c609`) lists 35 releases, 3,187 batteries, 3,040 unit-years, 115.6 MWh and 331,704 observation-hours. It is a discovery catalogue; its aggregate totals are not themselves a benchmark result. Raw data are not redistributed by that registry.
+
+Use the following staged cohorts without mixing incompatible units, chemistries, licenses or time resolutions:
+
+| Dataset | Appropriate role | Boundary |
+|---|---|---|
+| M5BAT Applied Energy Test 1/Test 2 archive | Primary schedule-execution reproduction and blind validation | Acquire from the cited DOI record; preserve the exact archive and Test 1/Test 2 split; do not substitute the separate April 2023 registry release |
+| M5BAT April 2023 operational release | 1-second POC and unit-level power/SOC/mode/context replay | CC BY 4.0; 10 units, 6.714 MWh subset; the Pb1 string is separately counted under m5bat-pbacid |
+| M5BAT Pb1 / flooded lead-acid release | Multi-year degradation and operational-state robustness | CC BY 4.0; one 1.066 MWh string; processed data with documented forward-fill and counter-reset caveats |
+| PNNL/EPRI stationary storage | External cross-technology validation | CC BY 4.0; 11 systems; nine have rated/computed energy values; chemistry and rating provenance stay stratified |
+| Aitio sub-Saharan African lead-acid fleets | Transferability research for African distributed/backup storage | CC BY-NC 4.0; non-commercial only unless separately licensed; not a grid-scale BESS dispatch comparator |
+
+The M5BAT registry release and the Applied Energy Test 1/Test 2 dataset are distinct source records. Do not claim they are the same experiment unless the publisher archive manifests demonstrate identity. Keep all raw archives outside the public source repository; retain the untouched archive and member hashes, license/attribution, source retrieval time, timestamp/offset provenance, data-column map, missing-data report and an immutable extraction manifest before fitting or evaluating any model.
+
+First gate: reproduce the paper's published Test 1 and Test 2 values within the documented rounding/tolerance. Only after reproduction may a candidate be evaluated against the stretch gates in `m5bat-field-benchmark-v1.json`. A failure to reproduce the published baseline blocks superiority claims rather than being repaired by changing the cohort or cleaning rules.
 
 ## 3. Paired-comparison protocol
 
