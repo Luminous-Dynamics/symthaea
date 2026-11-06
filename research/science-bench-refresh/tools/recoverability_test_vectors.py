@@ -86,6 +86,7 @@ def shortest_route(
             (mode == "direct" and used_initial and not used_reform and not used_navigation)
             or (
                 mode == "reformulation"
+                and used_initial
                 and used_reform
                 and used_post
                 and not used_navigation
@@ -112,7 +113,8 @@ def shortest_route(
             next_state = (
                 edge["to_node_ref"],
                 used_initial or operation == "initial_retrieval",
-                used_reform or operation == "query_reformulation",
+                used_reform
+                or (used_initial and operation == "query_reformulation"),
                 used_post
                 or (used_reform and operation == "post_reformulation_retrieval"),
                 used_navigation
@@ -201,6 +203,48 @@ def main() -> int:
     tampered["max_route_cost"] += 1
     tampered_path = out_dir / "tampered-manifest.json"
     tampered_path.write_bytes(compact(tampered) + b"\n")
+
+    # A query rewrite cannot count as recoverability until the first-pass
+    # retrieval has occurred, even when a later retrieval reaches the artifact.
+    reordered = copy.deepcopy(base)
+    reordered["nodes"].append({"node_ref": "state:rewrite-before-first-pass"})
+    reordered["nodes"].append({"node_ref": "state:after-first-pass"})
+    reordered["edges"] = [
+        edge for edge in reordered["edges"]
+        if edge["edge_ref"] not in {"route:rewrite-query", "route:rewrite-search"}
+    ]
+    reordered["edges"].extend([
+        {
+            "edge_ref": "route:rewrite-too-early",
+            "from_node_ref": "state:start",
+            "to_node_ref": "state:rewrite-before-first-pass",
+            "operation": "query_reformulation",
+            "cost": 1,
+        },
+        {
+            "edge_ref": "route:first-pass-after-rewrite",
+            "from_node_ref": "state:rewrite-before-first-pass",
+            "to_node_ref": "state:after-first-pass",
+            "operation": "initial_retrieval",
+            "cost": 1,
+        },
+        {
+            "edge_ref": "route:second-search-after-rewrite",
+            "from_node_ref": "state:after-first-pass",
+            "to_node_ref": "evidence:rewrite",
+            "operation": "post_reformulation_retrieval",
+            "cost": 1,
+        },
+    ])
+    reordered_path = out_dir / "rewrite-before-first-pass-manifest.json"
+    reordered_manifest = save_manifest(fields_of(reordered), reordered_path)
+    reordered_row = next(
+        classify(reordered_manifest, unit)
+        for unit in reordered_manifest["evidence_units"]
+        if unit["evidence_unit_id"] == "unit:rewrite"
+    )
+    if reordered_row["recoverability"] != "UnreachableWithinBudget":
+        raise SystemExit("reformulation before first retrieval was incorrectly counted")
 
     # An agent/model annotation is not part of the model-free manifest contract.
     model_field = copy.deepcopy(base)
