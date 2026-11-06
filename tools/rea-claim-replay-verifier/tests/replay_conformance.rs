@@ -944,8 +944,7 @@ fn evidence_transport_order_is_commutative_for_a_fixed_claim_reference_order() {
             .iter()
             .map(|index| evidence_bytes[*index].as_slice())
             .collect();
-        let replay =
-            replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+        let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
         assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
         assert_eq!(
             replay.expected_disposition,
@@ -969,15 +968,13 @@ fn raw_evidence_whitespace_is_nonsemantic_but_tampering_remains_detectable() {
     assert_eq!(pretty_verified.evidence_id, evidence.evidence_id);
     assert_ne!(pretty_verified.raw_file_sha256, evidence.raw_file_sha256);
 
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&pretty], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&pretty], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
 
     let mut tampered: Value = serde_json::from_slice(fixture_bytes()).unwrap();
     tampered["normalized_result"]["entries"][0]["size"] = json!(4200);
     let tampered_bytes = serde_json::to_vec(&tampered).unwrap();
-    let error = replay_claim_evaluation(&claim_bytes, &[&tampered_bytes], &result_bytes)
-        .unwrap_err();
+    let error =
+        replay_claim_evaluation(&claim_bytes, &[&tampered_bytes], &result_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidEvidence);
 }
-
