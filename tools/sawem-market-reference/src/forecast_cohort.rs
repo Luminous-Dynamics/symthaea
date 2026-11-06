@@ -112,7 +112,7 @@ pub struct ForecastCohortAudit {
     pub other_declared_exclusion_count: u64,
     pub population_coverage_bps: u16,
     pub post_hoc_selection_count: u64,
-    pub generalization_claim_allowed: bool,
+    pub full_population_generalization_claim_allowed: bool,
     pub selection_bias_warning: bool,
 }
 
@@ -214,6 +214,13 @@ pub fn audit_forecast_calibration_cohort(
         if selection.selection_basis == CohortSelectionBasis::Unknown {
             return Err(ForecastCohortAuditError::UnregisteredSelectionRule);
         }
+        if inputs.objective == CohortObjective::FullPopulation
+            && selection.disposition == CohortDisposition::Excluded
+            && (selection.exclusion_reason == CohortExclusionReason::ContractedRevenue
+                || selection.exclusion_reason == CohortExclusionReason::PerformanceOutlier)
+        {
+            return Err(ForecastCohortAuditError::InvalidMerchantOnlyExclusion);
+        }
         if inputs.objective == CohortObjective::MerchantOnly
             && selection.disposition == CohortDisposition::Excluded
             && selection.exclusion_reason != CohortExclusionReason::ContractedRevenue
@@ -284,10 +291,14 @@ pub fn audit_forecast_calibration_cohort(
     };
     let selection_bias_warning = inputs.objective == CohortObjective::SensitivitySubset
         || performance_outlier > 0
-        || post_hoc > 0;
-    let generalization_claim_allowed = !selection_bias_warning
-        && inputs.objective != CohortObjective::SensitivitySubset
-        && included > 0;
+        || post_hoc > 0
+        || (inputs.objective == CohortObjective::FullPopulation
+            && (incomplete_telemetry > 0 || contracted_revenue > 0));
+    let full_population_generalization_claim_allowed = inputs.objective
+        == CohortObjective::FullPopulation
+        && coverage_bps == 10_000
+        && !selection_bias_warning
+        && included == population_count;
 
     Ok(ForecastCohortAudit {
         cohort_id: inputs.cohort_id.to_owned(),
@@ -303,7 +314,7 @@ pub fn audit_forecast_calibration_cohort(
         other_declared_exclusion_count: other,
         population_coverage_bps: coverage_bps,
         post_hoc_selection_count: post_hoc,
-        generalization_claim_allowed,
+        full_population_generalization_claim_allowed,
         selection_bias_warning,
     })
 }
@@ -392,6 +403,41 @@ mod tests {
             ),
             selection(
                 "battery-c",
+                CohortDisposition::Included,
+                CohortExclusionReason::None,
+                CohortSelectionBasis::PreRegisteredEligibilityRule,
+            ),
+        ];
+        let result = audit_forecast_calibration_cohort(inputs(
+            &population,
+            &selections,
+            CohortObjective::FullPopulation,
+        ))
+        .unwrap();
+        assert_eq!(result.claim_class, ForecastCohortClaimClass::PopulationGeneralization);
+        assert_eq!(result.population_coverage_bps, 10_000);
+        assert!(result.full_population_generalization_claim_allowed);
+        assert!(!result.selection_bias_warning);
+    }
+
+    #[test]
+    fn incomplete_telemetry_exclusion_discloses_that_full_population_coverage_is_not_met() {
+        let population = population();
+        let selections = [
+            selection(
+                "battery-a",
+                CohortDisposition::Included,
+                CohortExclusionReason::None,
+                CohortSelectionBasis::PreRegisteredEligibilityRule,
+            ),
+            selection(
+                "battery-b",
+                CohortDisposition::Included,
+                CohortExclusionReason::None,
+                CohortSelectionBasis::PreRegisteredEligibilityRule,
+            ),
+            selection(
+                "battery-c",
                 CohortDisposition::Excluded,
                 CohortExclusionReason::IncompleteTelemetry,
                 CohortSelectionBasis::PreRegisteredEligibilityRule,
@@ -403,10 +449,9 @@ mod tests {
             CohortObjective::FullPopulation,
         ))
         .unwrap();
-        assert_eq!(result.claim_class, ForecastCohortClaimClass::PopulationGeneralization);
         assert_eq!(result.population_coverage_bps, 6_666);
-        assert!(result.generalization_claim_allowed);
-        assert!(!result.selection_bias_warning);
+        assert!(!result.full_population_generalization_claim_allowed);
+        assert!(result.selection_bias_warning);
     }
 
     #[test]
@@ -473,7 +518,7 @@ mod tests {
         .unwrap();
         assert_eq!(result.claim_class, ForecastCohortClaimClass::SensitivityOnly);
         assert!(result.selection_bias_warning);
-        assert!(!result.generalization_claim_allowed);
+        assert!(!result.full_population_generalization_claim_allowed);
         assert_eq!(result.performance_outlier_excluded_count, 1);
     }
 
@@ -507,7 +552,7 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(result.claim_class, ForecastCohortClaimClass::MerchantSubset);
-        assert!(!result.generalization_claim_allowed);
+        assert!(!result.full_population_generalization_claim_allowed);
         assert!(!result.selection_bias_warning);
         assert_eq!(result.contracted_revenue_excluded_count, 1);
     }
@@ -591,8 +636,6 @@ mod tests {
                 CohortSelectionBasis::PreRegisteredEligibilityRule,
             ),
         ];
-        let mut late_plan = inputs(&population, &selections, CohortObjective::FullPopulation);
-        let _ = &mut late_plan;
         assert_eq!(
             audit_forecast_calibration_cohort(ForecastCohortAuditInputs {
                 plan_registered_at_utc: 31,
