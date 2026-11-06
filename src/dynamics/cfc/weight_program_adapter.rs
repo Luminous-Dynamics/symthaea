@@ -791,8 +791,8 @@ mod tests {
             .iter()
             .map(|source_unit| source[*source_unit].clone())
             .collect::<Vec<_>>();
-        let source = signature_set(source, 'a', 'p');
-        let candidate = signature_set(candidate, 'b', 'p');
+        let source = signature_set(source, 'a', 'c');
+        let candidate = signature_set(candidate, 'b', 'c');
         let alignment =
             align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
@@ -808,8 +808,8 @@ mod tests {
     fn activation_signature_alignment_exposes_ambiguous_units() {
         let source = vec![vec![0.0, 1.0], vec![0.0, 1.0], vec![2.0, 3.0]];
         let candidate = vec![vec![2.0, 3.0], vec![0.0, 1.0], vec![0.0, 1.0]];
-        let source = signature_set(source, 'a', 'p');
-        let candidate = signature_set(candidate, 'b', 'p');
+        let source = signature_set(source, 'a', 'c');
+        let candidate = signature_set(candidate, 'b', 'c');
         let alignment =
             align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
@@ -819,14 +819,14 @@ mod tests {
 
     #[test]
     fn activation_alignment_rejects_different_probe_sets_and_layers() {
-        let source = signature_set(vec![vec![0.0, 1.0]], 'a', 'p');
-        let different_probes = signature_set(vec![vec![0.0, 1.0]], 'b', 'q');
+        let source = signature_set(vec![vec![0.0, 1.0]], 'a', 'c');
+        let different_probes = signature_set(vec![vec![0.0, 1.0]], 'b', 'd');
         assert!(matches!(
             align_cfc_hidden_unit_signatures(&source, &different_probes),
             Err(CfCPermutationAlignmentError::ProbeSetMismatch { .. })
         ));
 
-        let mut different_layer = signature_set(vec![vec![0.0, 1.0]], 'b', 'p');
+        let mut different_layer = signature_set(vec![vec![0.0, 1.0]], 'b', 'c');
         different_layer.layer_index = 1;
         assert!(matches!(
             align_cfc_hidden_unit_signatures(&source, &different_layer),
@@ -838,29 +838,29 @@ mod tests {
     fn activation_signature_alignment_rejects_malformed_inputs() {
         assert!(matches!(
             align_cfc_hidden_unit_signatures(
-                &signature_set(Vec::new(), 'a', 'p'),
-                &signature_set(Vec::new(), 'b', 'p')
+                &signature_set(Vec::new(), 'a', 'c'),
+                &signature_set(Vec::new(), 'b', 'c')
             ),
             Err(CfCPermutationAlignmentError::EmptyHiddenUnitSet)
         ));
         assert!(matches!(
             align_cfc_hidden_unit_signatures(
-                &signature_set(vec![vec![0.0]], 'a', 'p'),
-                &signature_set(vec![vec![0.0, 1.0]], 'b', 'p')
+                &signature_set(vec![vec![0.0]], 'a', 'c'),
+                &signature_set(vec![vec![0.0, 1.0]], 'b', 'c')
             ),
             Err(CfCPermutationAlignmentError::SignatureLengthMismatch { .. })
         ));
         assert!(matches!(
             align_cfc_hidden_unit_signatures(
-                &signature_set(vec![vec![f64::NAN]], 'a', 'p'),
-                &signature_set(vec![vec![0.0]], 'b', 'p')
+                &signature_set(vec![vec![f64::NAN]], 'a', 'c'),
+                &signature_set(vec![vec![0.0]], 'b', 'c')
             ),
             Err(CfCPermutationAlignmentError::NonFiniteSignature { .. })
         ));
         assert!(matches!(
             align_cfc_hidden_unit_signatures(
-                &signature_set(vec![vec![0.0], vec![1.0]], 'a', 'p'),
-                &signature_set(vec![vec![0.0]], 'b', 'p')
+                &signature_set(vec![vec![0.0], vec![1.0]], 'a', 'c'),
+                &signature_set(vec![vec![0.0]], 'b', 'c')
             ),
             Err(CfCPermutationAlignmentError::HiddenUnitCountMismatch { .. })
         ));
