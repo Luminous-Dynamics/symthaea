@@ -36,7 +36,8 @@
     "run_count",
     "strategy_summaries",
     "verified_success_run_count",
-    "unique_successful_task_count"
+    "unique_successful_task_count",
+    "pairwise_clustered_comparisons"
   ],
   "properties": {
     "schema_version": {
@@ -365,6 +366,219 @@
     "unique_successful_task_count": {
       "type": "integer",
       "minimum": 0
+    },
+    "pairwise_clustered_comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "strategy_a_name",
+          "strategy_a_version",
+          "strategy_a_model_id",
+          "strategy_a_model_version",
+          "strategy_b_name",
+          "strategy_b_version",
+          "strategy_b_model_id",
+          "strategy_b_model_version",
+          "task_denominator",
+          "strategy_a_attempted_tasks",
+          "strategy_b_attempted_tasks",
+          "strategy_a_attempt_coverage",
+          "strategy_b_attempt_coverage",
+          "strategy_a_unique_verified_tasks",
+          "strategy_b_unique_verified_tasks",
+          "both_solved_tasks",
+          "a_only_solved_tasks",
+          "b_only_solved_tasks",
+          "neither_solved_tasks",
+          "paired_risk_difference_b_minus_a",
+          "repository_cluster_count",
+          "repository_file_cluster_count",
+          "repository_bootstrap_replicates",
+          "repository_bootstrap_ci95_low",
+          "repository_bootstrap_ci95_high",
+          "nested_repository_file_bootstrap_replicates",
+          "nested_repository_file_bootstrap_ci95_low",
+          "nested_repository_file_bootstrap_ci95_high",
+          "repository_cluster_sign_flip_replicates",
+          "repository_cluster_sign_flip_p_value",
+          "holm_adjusted_p_value",
+          "deterministic_seed_sha256",
+          "inference_note"
+        ],
+        "properties": {
+          "strategy_a_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy_a_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy_a_model_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "strategy_a_model_version": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "strategy_b_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy_b_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy_b_model_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "strategy_b_model_version": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "task_denominator": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "strategy_a_attempted_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "strategy_b_attempted_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "strategy_a_attempt_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "strategy_b_attempt_coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "strategy_a_unique_verified_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "strategy_b_unique_verified_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "both_solved_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "a_only_solved_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "b_only_solved_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "neither_solved_tasks": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "paired_risk_difference_b_minus_a": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "repository_cluster_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "repository_file_cluster_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "repository_bootstrap_replicates": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "repository_bootstrap_ci95_low": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "repository_bootstrap_ci95_high": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "nested_repository_file_bootstrap_replicates": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "nested_repository_file_bootstrap_ci95_low": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "nested_repository_file_bootstrap_ci95_high": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "repository_cluster_sign_flip_replicates": {
+            "type": "integer",
+            "minimum": 100
+          },
+          "repository_cluster_sign_flip_p_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "holm_adjusted_p_value": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "deterministic_seed_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "inference_note": {
+            "type": "string",
+            "minLength": 20
+          }
+        }
+      }
     }
   }
 }
