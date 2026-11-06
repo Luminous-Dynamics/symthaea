@@ -25,6 +25,7 @@ The checked-in document is intentionally `TEMPLATE_NOT_PREREGISTERED`, so the CL
 - The paired pilot has at least five seeds; at least two complete-loop reruns are required; recursive-progress claims require at least two complete outer cycles.
 - Per-round development/audit fields, the full null-control set, statistical analysis fields, reporting fields and authority guardrails are required.
 - Claim dependencies prevent recursive-progress and ignition labels from being selected without their required lower-level evidence profiles.
+- Research-state continuity binds record classes, cold-restart restore, successor migration, independent recovery audit, and full/no-state/untyped/shuffled/accepted-only ablations. It measures recovery quality and downstream research utility rather than memory volume.
 
 ## Important limits
 
