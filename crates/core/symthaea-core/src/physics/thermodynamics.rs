@@ -31,6 +31,25 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
+/// A finite SI energy value expressed in joules.
+///
+/// This unit-bearing wrapper keeps physical energy distinct from dimensionless
+/// model costs, information quantities and raw operation counts.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct PhysicalEnergyJoules(f64);
+
+impl PhysicalEnergyJoules {
+    /// Construct a finite energy value in joules.
+    pub fn new(value_j: f64) -> Option<Self> {
+        value_j.is_finite().then_some(Self(value_j))
+    }
+
+    /// Return the numeric value in joules.
+    pub const fn get(self) -> f64 {
+        self.0
+    }
+}
+
 #[path = "landauer_erasure.rs"]
 mod landauer_erasure;
 
@@ -154,8 +173,9 @@ impl ThermoEncoder {
         &self,
         bits_erased: f64,
         temperature_k: f64,
-    ) -> Option<f64> {
+    ) -> Option<PhysicalEnergyJoules> {
         landauer_erasure::erasure_heat_floor_j(bits_erased, temperature_k, K_BOLTZMANN)
+            .and_then(PhysicalEnergyJoules::new)
     }
 
     /// Legacy one-bit Landauer reference: k_B * T * ln(2).
@@ -593,6 +613,10 @@ mod tests {
         let one_bit_300k = encoder.landauer_erasure_heat_floor(1.0, 300.0).unwrap();
         let two_bits_300k = encoder.landauer_erasure_heat_floor(2.0, 300.0).unwrap();
         let one_bit_310k = encoder.landauer_erasure_heat_floor(1.0, 310.0).unwrap();
+
+        let one_bit_300k = one_bit_300k.get();
+        let two_bits_300k = two_bits_300k.get();
+        let one_bit_310k = one_bit_310k.get();
 
         assert!((one_bit_300k - K_BOLTZMANN * 300.0 * std::f64::consts::LN_2).abs() < 1e-35);
         assert!((two_bits_300k - 2.0 * one_bit_300k).abs() < 1e-35);
