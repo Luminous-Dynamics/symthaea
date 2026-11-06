@@ -134,6 +134,11 @@ struct Comparison {
     bootstrap_probability_left_better: f64,
     left_cost_per_qualified_task_microusd: Option<f64>,
     right_cost_per_qualified_task_microusd: Option<f64>,
+    paired_cost_per_qualified_task_difference_microusd: Option<f64>,
+    bootstrap_cost_valid_replicates: usize,
+    bootstrap_cost_ci_95_low_microusd: Option<f64>,
+    bootstrap_cost_ci_95_high_microusd: Option<f64>,
+    bootstrap_probability_left_cheaper: Option<f64>,
     interpretation: String,
 }
 
@@ -523,22 +528,33 @@ fn strategy_summary(strategy: &AggregatedStrategy, task_count: usize) -> Strateg
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct BootstrapDraw {
+    pass_rate_difference: f64,
+    cost_per_qualified_task_difference_microusd: Option<f64>,
+}
+
 fn paired_difference(
     clusters: &[Cluster],
     left: &AggregatedStrategy,
     right: &AggregatedStrategy,
     rng: &mut XorShift64,
-) -> Result<f64, String> {
+) -> Result<BootstrapDraw, String> {
     if clusters.is_empty() {
         return Err("no repository clusters".into());
     }
     let mut left_solved = 0.0;
     let mut right_solved = 0.0;
     let mut weight = 0.0;
+    let mut left_cost = 0_u128;
+    let mut right_cost = 0_u128;
+    let mut left_qualified = 0_u64;
+    let mut right_qualified = 0_u64;
     // Two-stage paired cluster bootstrap:
     // 1) sample repositories with replacement;
     // 2) within each sampled repository, sample source files with replacement;
     // 3) retain all task rows inside each selected source-file cluster.
+    // Both strategies use exactly the same sampled task occurrences.
     for _ in 0..clusters.len() {
         let repo = &clusters[rng.index(clusters.len())];
         if repo.files.is_empty() {
@@ -554,13 +570,27 @@ fn paired_difference(
                 left_solved += if l.solved { 1.0 } else { 0.0 };
                 right_solved += if r.solved { 1.0 } else { 0.0 };
                 weight += 1.0;
+                left_cost = left_cost.saturating_add(l.cost_microusd as u128);
+                right_cost = right_cost.saturating_add(r.cost_microusd as u128);
+                left_qualified += u64::from(l.solved);
+                right_qualified += u64::from(r.solved);
             }
         }
     }
     if weight == 0.0 {
         return Err("bootstrap draw contains no tasks".into());
     }
-    Ok((left_solved - right_solved) / weight)
+    let cost_delta = if left_qualified > 0 && right_qualified > 0 {
+        let left_rate = left_cost as f64 / left_qualified as f64;
+        let right_rate = right_cost as f64 / right_qualified as f64;
+        Some(left_rate - right_rate)
+    } else {
+        None
+    };
+    Ok(BootstrapDraw {
+        pass_rate_difference: (left_solved - right_solved) / weight,
+        cost_per_qualified_task_difference_microusd: cost_delta,
+    })
 }
 
 fn percentile(sorted: &[f64], q: f64) -> f64 {
@@ -605,14 +635,38 @@ fn compare(
 
     let mut rng = XorShift64::new(seed);
     let mut samples = Vec::with_capacity(replicates);
+    let mut cost_samples = Vec::with_capacity(replicates);
     let mut wins = 0usize;
+    let mut left_cheaper = 0usize;
     for _ in 0..replicates {
-        let delta = paired_difference(&clusters, left, right, &mut rng)?;
-        if delta > 0.0 { wins += 1; }
-        samples.push(delta);
+        let draw = paired_difference(&clusters, left, right, &mut rng)?;
+        if draw.pass_rate_difference > 0.0 { wins += 1; }
+        samples.push(draw.pass_rate_difference);
+        if let Some(cost_delta) = draw.cost_per_qualified_task_difference_microusd {
+            if cost_delta < 0.0 { left_cheaper += 1; }
+            cost_samples.push(cost_delta);
+        }
     }
     samples.sort_by(|a, b| a.total_cmp(b));
+    cost_samples.sort_by(|a, b| a.total_cmp(b));
     let raw_delta = left_rate - right_rate;
+    let left_cost_point = if left_unique > 0 {
+        Some(left.total_cost_microusd as f64 / left_unique as f64)
+    } else { None };
+    let right_cost_point = if right_unique > 0 {
+        Some(right.total_cost_microusd as f64 / right_unique as f64)
+    } else { None };
+    let cost_point_delta = match (left_cost_point, right_cost_point) {
+        (Some(l), Some(r)) => Some(l - r),
+        _ => None,
+    };
+    let cost_low = if cost_samples.is_empty() { None } else { Some(percentile(&cost_samples, 0.025)) };
+    let cost_high = if cost_samples.is_empty() { None } else { Some(percentile(&cost_samples, 0.975)) };
+    let probability_left_cheaper = if cost_samples.is_empty() {
+        None
+    } else {
+        Some(left_cheaper as f64 / cost_samples.len() as f64)
+    };
     let comparison = Comparison {
         left_strategy_id: left.id.clone(),
         right_strategy_id: right.id.clone(),
@@ -630,13 +684,14 @@ fn compare(
         bootstrap_ci_95_low: percentile(&samples, 0.025),
         bootstrap_ci_95_high: percentile(&samples, 0.975),
         bootstrap_probability_left_better: wins as f64 / replicates as f64,
-        left_cost_per_qualified_task_microusd: if left_unique > 0 {
-            Some(left.total_cost_microusd as f64 / left_unique as f64)
-        } else { None },
-        right_cost_per_qualified_task_microusd: if right_unique > 0 {
-            Some(right.total_cost_microusd as f64 / right_unique as f64)
-        } else { None },
-        interpretation: "Paired two-stage cluster bootstrap: resample repositories, then source files within repositories, retaining all task outcomes within selected files. This addresses repository/file clustering but does not remove model/scaffold/budget confounding; those must be matched by experimental design.".into(),
+        left_cost_per_qualified_task_microusd: left_cost_point,
+        right_cost_per_qualified_task_microusd: right_cost_point,
+        paired_cost_per_qualified_task_difference_microusd: cost_point_delta,
+        bootstrap_cost_valid_replicates: cost_samples.len(),
+        bootstrap_cost_ci_95_low_microusd: cost_low,
+        bootstrap_cost_ci_95_high_microusd: cost_high,
+        bootstrap_probability_left_cheaper: probability_left_cheaper,
+        interpretation: "Paired two-stage cluster bootstrap: resample repositories, then source files within repositories, retaining all task outcomes within selected files. Pass-rate uncertainty uses every replicate; cost-per-qualified-task uncertainty is conditional on both strategies having at least one qualified completion in that replicate. Positive cost difference means the left strategy costs more per qualified completion. This addresses repository/file clustering but does not remove model/scaffold/budget confounding; those must be matched by experimental design.".into(),
     };
 
     let split_blob = git_blob_sha1(split_bytes)?;
