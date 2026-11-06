@@ -77,8 +77,8 @@ pub struct ParameterGroupSnapshot {
 
 /// Immutable model context against which a WeightProgram is authorized to run.
 ///
-/// The three digests must be the exact architecture, manifest and parameter
-/// fingerprints produced by the model adapter. A stale digest rejects the
+/// The architecture, manifest, model and target-specification digests must be
+/// exact values produced or bound by the model/task adapter. A stale digest rejects the
 /// proposal rather than rebasing it implicitly.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WeightModelSnapshot {
@@ -766,6 +766,22 @@ mod tests {
         assert_eq!(
             proposal.validate_and_materialize(&base),
             Err(WeightProgramError::StaleDigest("target specification"))
+        );
+    }
+
+    #[test]
+    fn cfc_group_role_mismatch_is_rejected() {
+        let mut base = snapshot();
+        base.groups[0].role = ParameterGroupRole::Projection;
+        let proposal = program(WeightProgramOperation::ScaleRange {
+            target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+            start: 0,
+            end: 1,
+            factor: 1.1,
+        });
+        assert_eq!(
+            proposal.validate_and_materialize(&base),
+            Err(WeightProgramError::InvalidConstraints)
         );
     }
 
