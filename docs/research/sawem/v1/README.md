@@ -356,6 +356,14 @@ Supersession is explicit. The resolver validates a complete predecessor chain, r
 
 Benchmark case: `RULE-SUPERSESSION-001` now maps 14 synthetic Rust tests. This is a rule-version selection engine, not legal interpretation. It does not infer transitional provisions, determine the meaning of a clause, authenticate the regulator, or prove participant/product admission. Mycelix's source authority/provenance verification and downstream product eligibility must remain separate stages.
 
+### Intraday gate eligibility using Market Operator receipt time
+
+The new `intraday_gate.rs` module operationalises the SAWEM Rev 2.3 §10(1) gate sequence as source-supplied UTC timestamps. The current Code describes six-hour auctions with closures at 18:00 on the preceding day and 00:00, 06:00, 12:00 and 18:00 on the Trading Day. Re-declarations received before a gate enter that auction; a late receipt may still qualify for a later remaining-hours auction if its gate remains before the target Trading Period. The MO publishes a revised schedule within an hour after clearing. The evaluator does not calculate the new schedule.
+
+The participant-side submission timestamp is retained for chronology, but **the Market Operator receipt timestamp controls the gate result**. Missing receipt time is indeterminate. Equality at the gate is treated as late because the Code says the submission must be prior to gate closure. Source-clock conversion is an upstream responsibility; the evaluator accepts UTC gate timestamps bound to the exact rule revision and source digest.
+
+Benchmark case: `INTRADAY-GATE-001` now maps ten synthetic tests covering pre-gate, exact-boundary, next-auction, final-gate, missing-receipt and wrong-rule/unit cases. It does not authenticate the MO receipt, submit an order, clear an auction, or publish a schedule.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
@@ -470,7 +478,7 @@ The next implementation slice should validate:
 5. daily / six-day / seven-day energy limits reconcile;
 6. unconstrained and constrained schedules remain separately traceable;
 7. energy and reserve commitments do not double-count available power / energy;\n8. reserve up/down capability includes charge-reduction/discharge-reduction headroom and respects minimum stable charging;\n9. reserve product response deadlines and sustain durations are distinct, source-backed fields;\n10. missing product sustain profile remains indeterminate;
-11. intra-day re-declaration respects the selected Code / Rule version and gate timing;
+11. full intra-day schedule re-declaration and revised-schedule lifecycle beyond gate eligibility;
 12. instructed-versus-metered differences use the correct Trading Period and sign convention;
 13. balancing payment components can be cumulative;
 14. settlement reruns and due-date chronology are preserved;
