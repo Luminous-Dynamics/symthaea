@@ -59,6 +59,26 @@ Lorentz boosts. The regression test now checks rapidities -1.7, -0.4, 0,
 0.7 and 1.7 for related-pair count, ordering fraction and selected maximum
 chain IDs.
 
+## Optimized algorithm differential checks
+
+A separate Python implementation of the Rust design's Fenwick dominance
+counter and reconstructed longest-nondecreasing-subsequence algorithm was
+compared with brute-force pair counting and O(N²) dynamic programming on
+1,000 independently seeded quantized point sets (48 points per set, six
+coordinate bins per axis). This deliberately creates equal-u, equal-v,
+identical-coordinate and incomparable pairs. All pair counts and longest
+chain lengths matched, and every reconstructed consecutive chain edge was
+causally related.
+
+A separate boost sweep for N=512, 1,024 and 4,096 found bit-for-bit identical
+pair counts and selected chain IDs under rapidities -1.7, -0.4, 0, 0.7 and
+1.7 in the independent implementation.
+
+These are Python design-reference checks, not Rust execution evidence. The
+Rust crate now includes smaller deterministic brute-force differential
+tests for its Fenwick and LNDS implementations, but those tests remain
+unexecuted until the pinned Rust toolchain is available.
+
 ## What these results do and do not establish
 
 They establish that an independent reference implementation of the stated
