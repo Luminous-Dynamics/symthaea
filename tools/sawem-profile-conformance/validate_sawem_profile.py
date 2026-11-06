@@ -197,6 +197,7 @@ EXPECTED_CASE_IDS = {
     "FIELD-SOURCE-CLOCK-ALIGNMENT-001",
     "MARKET-PRICE-IMPACT-001",
     "MARKET-READINESS-GATE-001",
+    "UNDERWRITING-PROOF-CERTIFICATE-001",
 }
 
 
@@ -329,6 +330,7 @@ def main() -> None:
     benchmark_corpus_path = root / "docs/research/sawem/v1/sawem-bess-benchmark-corpus-v1.json"
     kernel_path = root / "tools/sawem-market-reference/src/lib.rs"
     credit_cover_kernel_path = root / "tools/sawem-market-reference/src/credit_cover.rs"
+    decision_certificate_kernel_path = root / "tools/sawem-market-reference/src/decision_certificate.rs"
     decision_regret_kernel_path = root / "tools/sawem-market-reference/src/decision_regret.rs"
     liquidity_options_kernel_path = root / "tools/sawem-market-reference/src/liquidity_options.rs"
     liquidity_stress_kernel_path = root / "tools/sawem-market-reference/src/liquidity_stress.rs"
@@ -366,6 +368,7 @@ def main() -> None:
         benchmark_corpus_bytes = benchmark_corpus_path.read_bytes()
         kernel_bytes = kernel_path.read_bytes()
         credit_cover_kernel_bytes = credit_cover_kernel_path.read_bytes()
+        decision_certificate_kernel_bytes = decision_certificate_kernel_path.read_bytes()
         decision_regret_kernel_bytes = decision_regret_kernel_path.read_bytes()
         liquidity_options_kernel_bytes = liquidity_options_kernel_path.read_bytes()
         liquidity_stress_kernel_bytes = liquidity_stress_kernel_path.read_bytes()
@@ -403,6 +406,8 @@ def main() -> None:
             kernel_bytes
             + b"\n"
             + credit_cover_kernel_bytes
+            + b"\n"
+            + decision_certificate_kernel_bytes
             + b"\n"
             + decision_regret_kernel_bytes
             + b"\n"
