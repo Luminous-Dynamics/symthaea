@@ -468,6 +468,53 @@ mod tests {
         }
     }
 
+    fn log_normal_density(value: f64, mean: f64, variance: f64) -> f64 {
+        -0.5 * ((2.0 * std::f64::consts::PI * variance).ln()
+            + (value - mean).powi(2) / variance)
+    }
+
+    /// Independent Simpson integration of E_q[p_reduced(theta) / p_full(theta)].
+    fn simpson_log_evidence_ratio(
+        posterior: &DiagonalGaussian,
+        full_prior: &DiagonalGaussian,
+        reduced_prior: &DiagonalGaussian,
+    ) -> f64 {
+        assert_eq!(posterior.mean.len(), 1);
+        assert_eq!(full_prior.mean.len(), 1);
+        assert_eq!(reduced_prior.mean.len(), 1);
+
+        let q_mean = posterior.mean[0];
+        let q_variance = posterior.variance[0];
+        let p0_mean = full_prior.mean[0];
+        let p0_variance = full_prior.variance[0];
+        let pr_mean = reduced_prior.mean[0];
+        let pr_variance = reduced_prior.variance[0];
+
+        let standard_deviation = q_variance.sqrt();
+        let lower = q_mean - 9.0 * standard_deviation;
+        let upper = q_mean + 9.0 * standard_deviation;
+        let intervals = 20_000usize;
+        let step = (upper - lower) / intervals as f64;
+        let mut weighted_sum = 0.0;
+
+        for index in 0..=intervals {
+            let value = lower + index as f64 * step;
+            let log_integrand = log_normal_density(value, q_mean, q_variance)
+                + log_normal_density(value, pr_mean, pr_variance)
+                - log_normal_density(value, p0_mean, p0_variance);
+            let weight = if index == 0 || index == intervals {
+                1.0
+            } else if index % 2 == 0 {
+                2.0
+            } else {
+                4.0
+            };
+            weighted_sum += weight * log_integrand.exp();
+        }
+
+        ((step / 3.0) * weighted_sum).ln()
+    }
+
     #[test]
     fn identical_reduced_and_full_priors_have_zero_log_evidence_ratio() {
         let prior = gaussian(&[0.0, 1.0], &[1.0, 2.0]);
@@ -502,8 +549,14 @@ mod tests {
             }],
         )
         .expect("integrable Gaussian ratio");
-        // Reference value independently checked by numerical integration.
+        // Fixed reference and an independently evaluated Simpson integral.
+        let quadrature = simpson_log_evidence_ratio(
+            &posterior,
+            &full_prior,
+            &gaussian(&[0.2], &[0.2]),
+        );
         assert!((result.models[0].log_evidence_ratio - 0.3500401567802551).abs() < 1e-11);
+        assert!((result.models[0].log_evidence_ratio - quadrature).abs() < 1e-9);
     }
 
     #[test]
