@@ -81,6 +81,9 @@ jobs:
           event_report_bad_rows="$(awk -F, 'NF != 40 { count++ } END { print count + 0 }' "$event_report")"
           agent_summary_count="$(grep -c '^RMI_AGENT_AGGREGATE,' "$summary")"
           partner_summary_count="$(grep -c '^RMI_PARTNER_AGGREGATE,' "$summary")"
+          paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,' "$summary")"
+          agent_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=agent,' "$summary")"
+          partner_paired_summary_count="$(grep -c '^RMI_PAIRED_BOOTSTRAP,track=partner,' "$summary")"
           test "$rule_count" -eq 160
           test "$fixed_passes" -eq 0
           test "$imitation_passes" -eq 0
@@ -101,6 +104,9 @@ jobs:
           test "$event_report_bad_rows" -eq 0
           test "$agent_summary_count" -eq 30
           test "$partner_summary_count" -eq 5
+          test "$paired_summary_count" -eq 35
+          test "$agent_paired_summary_count" -eq 30
+          test "$partner_paired_summary_count" -eq 5
       - name: Upload replayable RMI evidence
         uses: actions/upload-artifact@v4
         with:
