@@ -403,7 +403,24 @@
           "description": "The unchanged baseline/empty patch does not satisfy the issue-specific contract.",
           "status": "not_executed"
         }
-      ]
+      ],
+      "source_fixture": {
+        "path": "benchmarks/ceb/public-development-fixtures/rust-event-replay-v0/",
+        "status": "public_source_only_not_compiled_or_executed",
+        "file_count": 8,
+        "has_cargo_lock": false,
+        "reference_patch_present": false,
+        "executable_oracle_present": false,
+        "task_manifest_present": false,
+        "demonstrated_scope": "deterministic in-process duplicate-delivery defect only",
+        "excluded_scope": [
+          "persistence",
+          "crash recovery",
+          "acknowledgement atomicity",
+          "concurrency",
+          "out-of-order delivery"
+        ]
+      }
     },
     {
       "candidate_key": "security-boundary",
@@ -743,6 +760,16 @@
       "status": "public_source_only_not_compiled_or_executed",
       "file_count": 8,
       "purpose": "Minimal three-crate workspace exposing a borrowed boxed-future trait method and an erased trait-object consumer; the current future alias does not declare Send.",
+      "admission_status": "not_admitted",
+      "holdout_eligible": false
+    },
+    {
+      "candidate_key": "issue-reproduction",
+      "path": "benchmarks/ceb/public-development-fixtures/rust-event-replay-v0/",
+      "status": "public_source_only_not_compiled_or_executed",
+      "file_count": 8,
+      "purpose": "Minimal three-crate workspace whose in-memory event processor intentionally applies duplicate delivery twice under a deterministic replay scenario.",
+      "limitation": "Demonstrates only in-process duplicate replay. It does not model durable commit, acknowledgement atomicity, crash/restart, concurrent processing, or ordering guarantees.",
       "admission_status": "not_admitted",
       "holdout_eligible": false
     }
