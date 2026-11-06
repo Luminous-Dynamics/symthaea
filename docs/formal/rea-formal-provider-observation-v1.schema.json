@@ -50,6 +50,7 @@
         "derivation_sha256",
         "request_schema",
         "result_schema",
+        "evaluator_rule_generation",
         "evaluator_version",
         "evaluator_rule_id",
         "claim_id",
@@ -105,17 +106,29 @@
           "minLength": 1
         },
         "platform": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "platform_version": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "environment_id": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "asserted_value": {},
         "source_predicate_type": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "requested_evidence_ids": {
           "type": "array",
@@ -135,6 +148,11 @@
         "falsification_condition": {
           "type": "string",
           "minLength": 1
+        },
+        "evaluator_rule_generation": {
+          "type": "integer",
+          "const": 0,
+          "minimum": 0
         }
       }
     },
@@ -213,19 +231,31 @@
               "minLength": 1
             },
             "platform": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "platform_version": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "environment_id": {
-              "type": ["string", "null"]
+              "type": [
+                "string",
+                "null"
+              ]
             }
           }
         },
         "asserted_value": {},
         "source_predicate_type": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "requested_evidence_ids": {
           "type": "array",
@@ -270,19 +300,34 @@
                 ]
               },
               "provider_id": {
-                "type": ["string", "null"]
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "provider_name": {
-                "type": ["string", "null"]
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "provider_version": {
-                "type": ["string", "null"]
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "confidence": {
-                "type": ["string", "null"]
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "authority": {
-                "type": ["string", "null"]
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "reason": {
                 "type": "string",
@@ -340,7 +385,9 @@
             "const": "supported_within_scope"
           }
         },
-        "required": ["rea_disposition"]
+        "required": [
+          "rea_disposition"
+        ]
       },
       "then": {
         "properties": {
@@ -357,7 +404,9 @@
             "const": "refuted_within_scope"
           }
         },
-        "required": ["rea_disposition"]
+        "required": [
+          "rea_disposition"
+        ]
       },
       "then": {
         "properties": {
@@ -379,7 +428,9 @@
             ]
           }
         },
-        "required": ["rea_disposition"]
+        "required": [
+          "rea_disposition"
+        ]
       },
       "then": {
         "properties": {
