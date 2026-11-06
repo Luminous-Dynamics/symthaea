@@ -1139,6 +1139,62 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn decision_directed_crn_cvar_charges_every_action_replication() {
+        let receipt = score_receipt(1_000, [0.85, 0.70], true);
+        let mut cfg = config(0.01, 5_000, 2);
+        cfg.robust_utility = RobustUtility::LowerTailCvar { tail_mass: 0.5 };
+        let allocation =
+            allocate_next_score_batch_decision_directed(&receipt, &cfg).unwrap();
+        assert_eq!(allocation.disposition, AllocationDisposition::AllocateMore);
+        let batch = allocation.next_batch.as_ref().unwrap();
+        assert_eq!(batch.seed_mode, ReplicationSeedMode::CommonRandomNumbersWithinScenario);
+        assert_eq!(batch.cells.len(), 2);
+        assert_eq!(batch.cells[0].replication_count, 2);
+        assert_eq!(batch.cells[1].replication_count, 2);
+        assert_eq!(batch.cells[0].seeds, batch.cells[1].seeds);
+
+        let selected = allocation
+            .cell_priorities
+            .iter()
+            .find(|cell| {
+                cell.action_id == batch.cells[0].action_id
+                    && cell.scenario_id == batch.scenario_id
+            })
+            .unwrap();
+        assert_eq!(selected.projected_batch_cost, 4);
+        assert!(selected.certificate_gap_contraction > 0.0);
+        assert!(
+            (selected.priority - selected.certificate_gap_contraction / 4.0).abs() < 1.0e-12
+        );
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&receipt, &cfg, &allocation),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn decision_directed_policy_abstains_when_no_projected_batch_changes_the_gap() {
+        // Both scenarios tie at the full-range Hoeffding cap. Contracting only
+        // one scenario leaves the other tied endpoint controlling the Maximin
+        // interval, so no candidate batch changes the global regret gap.
+        let receipt = score_receipt(4, [0.8, 0.7], true);
+        let cfg = config(0.01, 200, 1);
+        let allocation =
+            allocate_next_score_batch_decision_directed(&receipt, &cfg).unwrap();
+        assert_eq!(
+            allocation.disposition,
+            AllocationDisposition::NoCertificateContraction
+        );
+        assert!(allocation.next_batch.is_none());
+        assert!(allocation.cell_priorities.iter().all(|cell| cell.priority == 0.0));
+        assert_eq!(
+            verify_adaptive_allocation_receipt(&receipt, &cfg, &allocation),
+            Ok(())
+        );
+    }
+
     fn config(epsilon: f64, max_total: usize, batch: usize) -> AdaptiveAllocationConfig {
         AdaptiveAllocationConfig {
             policy_version: "spectra-test-allocator-v1".to_owned(),
