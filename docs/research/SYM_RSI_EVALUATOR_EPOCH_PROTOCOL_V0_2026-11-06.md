@@ -204,6 +204,19 @@ Raw scores from different evaluator epochs are different measurements unless sho
 - Report per-epoch candidate results and the fixed external confirmation result separately.
 - A changed evaluator may explain a score discontinuity; it does not establish that candidate capability changed.
 
+### Selective invalidation, not historical erasure
+
+RQGM describes discarding utility records produced by a replaced evaluator and recomputing the active archive ranking, because old evaluator scores must not influence the new evaluator's search trajectory. Symthaea should preserve the same statistical intent while retaining stronger auditability:
+
+1. Keep the original raw evaluation record, evaluator ID, source/build digest, task identity and decision immutable in the audit history.
+2. On evaluator replacement, mark every evaluator-dependent derived value (fitness, rank, posterior, clade productivity contribution, selection cache or aggregate) from the displaced evaluator as **stale for active selection**.
+3. Recompute active evaluator-dependent values under the new evaluator from newly generated scores or bridge evidence. Never silently reinterpret an old evaluator's score as a score from the new evaluator.
+4. Preserve evaluator-independent artifacts (source/build identity, deterministic test outputs, proof-checker results, execution/resource receipts) only when their semantics truly do not depend on the displaced evaluator and their provenance remains valid.
+5. Keep historical decisions as they were made. A new evaluator may disagree with an old decision; report the disagreement as a new observation, never rewrite the old decision.
+6. Record the invalidation/recomputation dependency set so an auditor can determine exactly which derived values were removed from selection and which independent facts were retained.
+
+This is **selective invalidation**: old utility evidence stops affecting current search, but the historical evidence itself remains available for audit and reproduction. It prevents both stale-ranking bias and silent deletion of unfavorable history.
+
 ## 9. Experimental comparison
 
 Run these arms under matched task access, candidate budget, total tokens/compute, evaluator calls, human adjudication budget and stopping rules:
