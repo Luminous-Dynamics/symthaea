@@ -374,7 +374,28 @@ mod tests {
             "the parameter fingerprint must distinguish equivalent parameterizations"
         );
         assert_eq!(candidate.receipt.edited_group_count, 5);
+        assert!(candidate.receipt.changed_parameter_count > 0);
         assert!(candidate.receipt.changed_parameter_count <= 40);
+
+        let inconsistent_program = WeightProgram {
+            format_version: 1,
+            architecture_digest: snapshot.architecture_digest.clone(),
+            manifest_digest: snapshot.manifest_digest.clone(),
+            base_model_digest: snapshot.model_digest.clone(),
+            target_specification_digest: digest('d'),
+            fault_hypothesis_ids: vec!["negative-control:partial-permutation".into()],
+            evidence_receipt_ids: vec!["receipt:permutation-probe-set-v1".into()],
+            max_changed_parameters: 8,
+            max_total_l2_delta: 100.0,
+            max_abs_delta: 100.0,
+            operations: vec![WeightProgramOperation::ReplaceGroup {
+                target: WeightProgramTarget::CfC(CfCWeightGroupId::CellInputProjection { cell: 0 }),
+                values: permute_rows(&input, 4, 2, &permutation),
+            }],
+        };
+        let inconsistent =
+            materialize_cfc_weight_program(&original, digest('d'), &inconsistent_program)
+                .expect("deliberately incomplete permutation candidate");
 
         let inputs = [
             ndarray::Array1::from_vec(vec![0.25, -0.75]),
@@ -396,6 +417,22 @@ mod tests {
             squared_error.sqrt() < 1e-5,
             "permutation-only parameter change must preserve outputs, error={}",
             squared_error.sqrt()
+        );
+
+        let mut original_negative_control = original.clone();
+        let mut inconsistent_negative_control = inconsistent.network;
+        let mut negative_control_squared_error = 0.0_f64;
+        for input in &inputs {
+            let expected = original_negative_control.forward(input, 0.1);
+            let actual = inconsistent_negative_control.forward(input, 0.1);
+            for (a, b) in expected.iter().zip(actual.iter()) {
+                negative_control_squared_error += f64::from((*a - *b).powi(2));
+            }
+        }
+        assert!(
+            negative_control_squared_error.sqrt() > 1e-6,
+            "partial permutation must change the function, error={}",
+            negative_control_squared_error.sqrt()
         );
     }
 
