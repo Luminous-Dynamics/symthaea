@@ -10,6 +10,23 @@ Freeze the exact same-start, matched-total-budget comparison between an evolved 
 
 The JSON file is intentionally populated with `__REQUIRED_BEFORE_PREREGISTRATION__` placeholders. The presence of a syntactically valid JSON file does not mean the experiment is ready. The template must be completed, independently reviewed and committed before execution or outcome observation.
 
+## Structural schema
+
+The companion file
+`SYM_RSI_R4_IGNITION_PREREGISTRATION_SCHEMA_V0_2026-11-06.json`
+defines the JSON shape, required keys, primitive types, two-arm structure,
+minimum pilot/rerun counts, control count and several fail-closed authority
+flags.
+
+The JSON Schema is deliberately a **structural** check only. It does not
+compare the two arms' referenced artifact digests, calculate or verify equal
+total-cost budgets, verify split disjointness, authenticate a custodian, prove
+that confirmation material is inaccessible, or decide whether the selected
+claim is supported. A later semantic validator under #10749 must reject
+unresolved placeholders when a document is marked preregistered and verify
+cross-field invariants. Human review and independent infrastructure evidence
+remain necessary.
+
 ## How to use
 
 1. Copy the JSON template to a new immutable experiment-specific path.
