@@ -6,7 +6,7 @@ pub const MAX_RESULT_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_EVIDENCE_BYTES: usize = 128 * 1024 * 1024;
 pub const MAX_EVIDENCE_RECORDS: usize = 8;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ReplayInput<'a> {
     pub claim: &'a [u8],
     pub result: &'a [u8],
