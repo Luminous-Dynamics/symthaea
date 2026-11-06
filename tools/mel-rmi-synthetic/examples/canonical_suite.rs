@@ -355,8 +355,7 @@ fn format_estimate(estimate: Estimate) -> String {
     ) {
         (Some(mean), Some(lower), Some(upper), Some(seed)) => format!(
             "{mean:.4}[{lower:.4},{upper:.4}];clusters={};resamples={};seed={seed:016x}",
-            estimate.clusters,
-            estimate.bootstrap_resamples,
+            estimate.clusters, estimate.bootstrap_resamples,
         ),
         (Some(mean), _, _, _) => format!("{mean:.4}[CI=NA];clusters={}", estimate.clusters),
         (None, _, _, _) => "NA".to_owned(),
