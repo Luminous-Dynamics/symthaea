@@ -6,9 +6,7 @@
 //! Exit codes: 0 = replay match, 1 = well-formed but semantically mismatched
 //! result, 2 = invalid input, resource limit, IO or canonicalization failure.
 
-use rea_claim_replay_verifier::{
-    MAX_EVIDENCE_RECORDS, ReplayOutcome, replay_claim_evaluation,
-};
+use rea_claim_replay_verifier::{MAX_EVIDENCE_RECORDS, ReplayOutcome, replay_claim_evaluation};
 use std::env;
 use std::fs::File;
 use std::io::Read;
