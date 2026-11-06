@@ -122,7 +122,10 @@ impl RmiTrialArtifactManifestV1 {
 
         let input_ids = unique_nonempty_ids(&self.input_event_ids)?;
         let output_ids = unique_nonempty_ids(&self.output_event_ids)?;
-        if input_ids.iter().any(|event_id| output_ids.contains(event_id)) {
+        if input_ids
+            .iter()
+            .any(|event_id| output_ids.contains(event_id))
+        {
             return Err(RmiArtifactEvidenceError::DuplicateEventId);
         }
 
@@ -240,12 +243,18 @@ pub fn verify_rmi_artifact_bytes<'a>(
 
     let mut supplied: BTreeMap<String, &[u8]> = BTreeMap::new();
     for payload in payloads {
-        if supplied.insert(payload.artifact_id.clone(), payload.bytes).is_some() {
+        if supplied
+            .insert(payload.artifact_id.clone(), payload.bytes)
+            .is_some()
+        {
             return Err(RmiArtifactEvidenceError::DuplicatePayload);
         }
     }
 
-    if supplied.keys().any(|artifact_id| !expected_ids.contains(artifact_id.as_str())) {
+    if supplied
+        .keys()
+        .any(|artifact_id| !expected_ids.contains(artifact_id.as_str()))
+    {
         return Err(RmiArtifactEvidenceError::UnexpectedPayload);
     }
     for artifact_id in &expected_ids {
@@ -258,8 +267,8 @@ pub fn verify_rmi_artifact_bytes<'a>(
         let bytes = supplied
             .get(&artifact.artifact_id)
             .ok_or(RmiArtifactEvidenceError::MissingPayload)?;
-        let actual_len = u64::try_from(bytes.len())
-            .map_err(|_| RmiArtifactEvidenceError::ByteLengthMismatch)?;
+        let actual_len =
+            u64::try_from(bytes.len()).map_err(|_| RmiArtifactEvidenceError::ByteLengthMismatch)?;
         if actual_len != artifact.byte_len {
             return Err(RmiArtifactEvidenceError::ByteLengthMismatch);
         }
@@ -273,8 +282,8 @@ pub fn verify_rmi_artifact_bytes<'a>(
         let bytes = supplied
             .get(*artifact_id)
             .ok_or(RmiArtifactEvidenceError::MissingPayload)?;
-        let len = u64::try_from(bytes.len())
-            .map_err(|_| RmiArtifactEvidenceError::ByteLengthMismatch)?;
+        let len =
+            u64::try_from(bytes.len()).map_err(|_| RmiArtifactEvidenceError::ByteLengthMismatch)?;
         total_verified_bytes = total_verified_bytes
             .checked_add(len)
             .ok_or(RmiArtifactEvidenceError::ByteLengthMismatch)?;
@@ -938,14 +947,9 @@ mod tests {
     fn signed_receipt_and_consent_verifier_are_required() {
         let manifest = manifest();
         let envelope = receipt(&manifest);
-        let verified = verify_rmi_studio_evidence(
-            &manifest,
-            &payloads(),
-            &envelope,
-            &AcceptTestReceipt,
-            200,
-        )
-        .unwrap();
+        let verified =
+            verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200)
+                .unwrap();
         assert_eq!(verified.transaction_id, "studio-tx-1");
         assert_eq!(verified.verifier_id, "test-only-verifier");
 
@@ -955,8 +959,8 @@ mod tests {
                 &payloads(),
                 &envelope,
                 &UnavailableRmiStudioReceiptVerifier,
-                200,
-            ),
+                200,),
+            )
             Err(RmiArtifactEvidenceError::ReceiptVerifierUnavailable)
         );
     }
@@ -968,13 +972,8 @@ mod tests {
         envelope.body.artifact_ids.pop();
         envelope.body_sha256 = canonical_json_sha256(&envelope.body).unwrap();
         assert_eq!(
-            verify_rmi_studio_evidence(
-                &manifest,
-                &payloads(),
-                &envelope,
-                &AcceptTestReceipt,
-                200,
-            ),
+            verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200,),
+            )
             Err(RmiArtifactEvidenceError::ReceiptContextMismatch)
         );
     }
@@ -986,13 +985,8 @@ mod tests {
         envelope.body.purpose = RmiArtifactPurposeV1::ModelTraining;
         envelope.body_sha256 = canonical_json_sha256(&envelope.body).unwrap();
         assert_eq!(
-            verify_rmi_studio_evidence(
-                &manifest,
-                &payloads(),
-                &envelope,
-                &AcceptTestReceipt,
-                200,
-            ),
+            verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200,),
+            )
             Err(RmiArtifactEvidenceError::ReceiptContextMismatch)
         );
     }
@@ -1003,13 +997,8 @@ mod tests {
         let mut envelope = receipt(&manifest);
         envelope.body.transaction_id = "other-transaction".to_owned();
         assert_eq!(
-            verify_rmi_studio_evidence(
-                &manifest,
-                &payloads(),
-                &envelope,
-                &AcceptTestReceipt,
-                200,
-            ),
+            verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 200,),
+            )
             Err(RmiArtifactEvidenceError::ReceiptDigestMismatch)
         );
     }
@@ -1019,13 +1008,8 @@ mod tests {
         let manifest = manifest();
         let envelope = receipt(&manifest);
         assert_eq!(
-            verify_rmi_studio_evidence(
-                &manifest,
-                &payloads(),
-                &envelope,
-                &AcceptTestReceipt,
-                99,
-            ),
+            verify_rmi_studio_evidence(&manifest, &payloads(), &envelope, &AcceptTestReceipt, 99,),
+            )
             Err(RmiArtifactEvidenceError::ReceiptContextMismatch)
         );
     }
