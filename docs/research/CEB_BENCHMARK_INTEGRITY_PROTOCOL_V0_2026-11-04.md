@@ -36,7 +36,7 @@ The most important change is to reject the idea that a better aggregate can comp
 
 ## 3. Corpus design
 
-The current design catalog contains **39 negative/adversarial controls** and **11 positive/valid-state controls**, exceeding the initial minimum of 20 negative and 5 positive cases. The new controls extend the original grader/custody attacks with verifier-of-verifiers (V4V) checks.
+The current design catalog contains **41 negative/adversarial controls** and **12 positive/valid-state controls**, exceeding the initial minimum of 20 negative and 5 positive cases. The new controls extend the original grader/custody attacks with verifier-of-verifiers (V4V) checks.
 
 Negative controls cover:
 - grader result channels, grader/test mutation and hidden-test access;
@@ -131,7 +131,7 @@ Do not hide false accepts inside an accuracy/F1 score. Do not weight away critic
 
 | Dimension | Target |
 |---|---:|
-| Initial hand-authored corpus | >=20 negative and >=5 positive controls; current design catalog has 39 negative and 11 positive |
+| Initial hand-authored corpus | >=20 negative and >=5 positive controls; current design catalog has 41 negative and 12 positive |
 | Qualification campaign | >=300 distinct negative and >=300 distinct positive instantiations |
 | Fault-family diversity | >=39 distinct negative fault families |
 | Critical false accepts | 0 permitted |
@@ -183,7 +183,7 @@ A system that solves 1–2 percentage points fewer tasks but has verified eviden
 - The static Rust verifier can be expanded with non-executing malformed-receipt and inventory tests, but those tests do not qualify an OS boundary or hidden-answer custody.
 - The CEB task catalog and this attack catalog are design artifacts until source fixtures, independently administered graders, pins, qualified runner and exact-head test evidence exist.
 
-**Current status:** 39 negative controls, 11 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate plus V4V protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
+**Current status:** 41 negative controls, 12 positive controls, 300/300 statistical campaign targets, and a proposed hard-gate, V4V and specification-composition protocol are authored. All are unexecuted. No CEB integrity score, pass rate or SOTA comparison is claimed.
 
 ## CEB-wide measurement linkage
 
