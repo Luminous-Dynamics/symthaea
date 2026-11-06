@@ -204,7 +204,7 @@ pub fn evaluate_cash_risk<'a>(
         worst_case_net_cash_minor_zar: worst_case,
         probability_of_negative_net_cash_bps: u16::try_from(loss_probability)
             .map_err(|_| CashRiskError::ArithmeticOverflow)?,
-        negative_cash_scenario_count,
+        negative_cash_scenario_count: negative_scenario_count,
     })
 }
 
@@ -292,7 +292,11 @@ mod tests {
             ..scenario("future-probability", 10_000, 100)
         }];
         assert_eq!(
-            evaluate_cash_risk(inputs(&future, 500)),
+            evaluate_cash_risk(inputs(&future_result, 500)),
+            Err(CashRiskError::FutureKnownScenario)
+        );
+        assert_eq!(
+            evaluate_cash_risk(inputs(&future_probability, 500)),
             Err(CashRiskError::FutureKnownScenario)
         );
 
