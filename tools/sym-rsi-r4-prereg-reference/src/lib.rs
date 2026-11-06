@@ -8,8 +8,6 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 
-const TEMPLATE_PATH: &str =
-    "../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json";
 const SCHEMA_VERSION: &str = "sym-rsi-r4-ignition-preregistration-v0";
 const PLACEHOLDERS: [&str; 2] = [
     "__REQUIRED_BEFORE_PREREGISTRATION__",
@@ -651,7 +649,7 @@ mod tests {
     }
 
     fn valid_specimen() -> Value {
-        let source = include_str!(TEMPLATE_PATH);
+        let source = include_str!("../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json");
         let mut value: Value = serde_json::from_str(source).expect("template JSON parses");
         let mut next_digest = 1_u64;
         fill_placeholders(&mut value, "", &mut next_digest);
@@ -707,8 +705,8 @@ mod tests {
     #[test]
     fn rejects_split_identity_collision() {
         let mut value = valid_specimen();
-        value["splits"]["validation"]["manifest_digest"] =
-            value["splits"]["discovery"]["manifest_digest"].clone();
+        let discovery_digest = value["splits"]["discovery"]["manifest_digest"].clone();
+        value["splits"]["validation"]["manifest_digest"] = discovery_digest;
         let report = validate_preregistration(&value);
         assert!(report.issues.iter().any(|issue| issue.starts_with("SPLIT_IDENTITY_COLLISION")));
     }
