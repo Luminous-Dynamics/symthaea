@@ -51,6 +51,7 @@ pub enum ReuseBudgetError {
     CandidateSampleTooLarge { actual: usize, maximum: usize },
     InvalidPairedDifference(i8),
     CandidateCountMismatch { expected: usize, actual: usize },
+    CandidateSampleCountMismatch { expected: usize, actual: usize },
 }
 
 impl fmt::Display for ReuseBudgetError {
@@ -106,6 +107,12 @@ impl fmt::Display for ReuseBudgetError {
             }
             Self::CandidateCountMismatch { expected, actual } => {
                 write!(f, "expected {expected} candidate summaries, got {actual}")
+            }
+            Self::CandidateSampleCountMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "candidate paired sample count {actual} differs from incumbent sample count {expected}"
+                )
             }
         }
     }
@@ -407,6 +414,16 @@ pub(crate) fn evaluate_bounded_score_reuse_round_audited(
 
     let delta =
         compute_reuse_total_error_budget(alpha, round, prior_promotions, candidates_per_round)?;
+    let expected_sample_count = candidates[0].sample_count();
+    for candidate in &candidates[1..] {
+        if candidate.sample_count() != expected_sample_count {
+            return Err(ReuseBudgetError::CandidateSampleCountMismatch {
+                expected: expected_sample_count,
+                actual: candidate.sample_count(),
+            }
+            .into());
+        }
+    }
 
     let mut best: Option<(usize, usize, f64, BoundedScoreConfidenceCertificate)> = None;
     for (candidate_index, candidate) in candidates.iter().enumerate() {
@@ -478,6 +495,17 @@ pub(crate) fn evaluate_reuse_round_audited(
     }
     let allocation =
         allocate_reuse_error_budget(alpha, round, prior_promotions, candidates_per_round, rho)?;
+    let expected_sample_count = candidates[0].paired_differences.len();
+    for candidate in &candidates[1..] {
+        let actual_sample_count = candidate.paired_differences.len();
+        if actual_sample_count != expected_sample_count {
+            return Err(ReuseBudgetError::CandidateSampleCountMismatch {
+                expected: expected_sample_count,
+                actual: actual_sample_count,
+            }
+            .into());
+        }
+    }
 
     let mut best: Option<(usize, usize, f64)> = None;
     for (candidate_index, candidate) in candidates.iter().enumerate() {
@@ -878,6 +906,20 @@ mod tests {
     }
 
     #[test]
+    fn round_selector_rejects_different_paired_sample_counts() {
+        let candidates = [evidence(10, 0, 100), evidence(10, 0, 99)];
+        assert_eq!(
+            evaluate_reuse_round(0.05, 1, 0, 2, 0.5, &candidates),
+            Err(ReuseRoundError::Budget(
+                ReuseBudgetError::CandidateSampleCountMismatch {
+                    expected: 100,
+                    actual: 99
+                }
+            ))
+        );
+    }
+
+    #[test]
     fn round_selector_rejects_candidate_count_mismatch() {
         let one = [evidence(10, 0, 100)];
         assert_eq!(
@@ -961,6 +1003,20 @@ mod bounded_score_round_tests {
         let candidates = [BoundedScoreCandidateEvidence::new(vec![0.0; 100]).unwrap()];
         let decision = evaluate_bounded_score_reuse_round(0.05, 1, 0, 1, 0.0, &candidates).unwrap();
         assert_eq!(decision, ReuseRoundDecision::RejectAll);
+    }
+
+    #[test]
+    fn bounded_score_round_rejects_different_paired_sample_counts() {
+        let candidates = [evidence(0.2, 1_000), evidence(0.3, 999)];
+        assert_eq!(
+            evaluate_bounded_score_reuse_round(0.05, 1, 0, 2, 0.0, &candidates),
+            Err(BoundedScoreRoundError::Budget(
+                ReuseBudgetError::CandidateSampleCountMismatch {
+                    expected: 1_000,
+                    actual: 999
+                }
+            ))
+        );
     }
 
     #[test]
