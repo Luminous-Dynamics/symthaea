@@ -223,6 +223,8 @@ pub struct HdcLtcUnifiedNeuron {
     pre_evolution_state: Option<ContinuousHV>,
     #[serde(skip)]
     pre_evolution_time: f64,
+    #[serde(skip)]
+    pre_evolution_dt: f32,
 
     /// Weight hypervector for state transformation (W)
     /// Replaces weight MATRIX with single HV - uses binding
@@ -665,6 +667,7 @@ impl HdcLtcUnifiedNeuron {
             state: ContinuousHV::zero(dim),
             pre_evolution_state: None,
             pre_evolution_time: 0.0,
+            pre_evolution_dt: 0.0,
             weight_hv: ortho[0].clone(),
             input_mask: ortho[1].clone(),
             tau_modulator: ortho[2].clone(),
@@ -746,8 +749,9 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// Reuses the same allocation after the first capture so steady-state evolution
     /// does not allocate an additional hypervector on every frame.
-    fn capture_pre_evolution_state(&mut self) {
+    fn capture_pre_evolution_state(&mut self, dt: f32) {
         self.pre_evolution_time = self.total_time;
+        self.pre_evolution_dt = dt;
         match self.pre_evolution_state.as_mut() {
             Some(previous) => previous.values.copy_from_slice(&self.state.values),
             None => self.pre_evolution_state = Some(self.state.clone()),
@@ -973,7 +977,7 @@ impl HdcLtcUnifiedNeuron {
     /// O(D) where D is hypervector dimension - independent of Δt!
     #[inline]
     pub fn evolve_closed_form(&mut self, dt: f32, input: &ContinuousHV) {
-        self.capture_pre_evolution_state();
+        self.capture_pre_evolution_state(dt);
         // Compute equilibrium state
         let x_inf = self.compute_equilibrium(input);
 
@@ -1796,7 +1800,7 @@ impl HdcLtcUnifiedNeuron {
                 self.pre_evolution_time,
                 input,
                 target,
-                dt,
+                self.pre_evolution_dt,
             ),
             None => self.backward_at_current(input, target, dt),
         }
@@ -1804,8 +1808,8 @@ impl HdcLtcUnifiedNeuron {
 
     /// Compute the same one-step local gradient at the neuron's current state.
     ///
-    /// Use this before evolving when the learning objective is explicitly
-    /// current-state/local-target training (e.g. train_local_target_step).
+    /// Use this when the learning objective is explicitly evaluated at the
+    /// current state rather than against a completed forward step.
     pub fn backward_at_current(
         &self,
         input: &ContinuousHV,
@@ -2410,14 +2414,14 @@ impl HdcLtcUnifiedNetwork {
         }
     }
 
-    /// Apply a layer-local target update using gradients evaluated at each
-    /// neuron's pre-evolution state, then evolve that layer.
+    /// Evolve each layer, calculate its local target gradient against the
+    /// exact pre-evolution state of that prediction, then update its parameters.
     ///
     /// This is greedy/local supervised learning, not temporal BPTT or a full
     /// chain-rule gradient through the network. It is useful for controlled
     /// neuron-learning experiments where every layer receives the same target
-    /// representation. The layer is trained and evolved before its output is
-    /// supplied to the next layer, preserving the actual forward dependency.
+    /// representation. The layer's prediction is produced before its update,
+    /// and the post-evolution output is supplied to the next layer.
     pub fn train_local_target_step(
         &mut self,
         dt: f32,
@@ -2433,9 +2437,9 @@ impl HdcLtcUnifiedNetwork {
             };
 
             for neuron in &mut self.layers[layer_idx] {
-                let gradients = neuron.backward_at_current(&layer_input, target, dt);
-                neuron.apply_gradients_no_decay(&gradients, learning_rate);
                 neuron.evolve_closed_form(dt, &layer_input);
+                let gradients = neuron.backward(&layer_input, target, dt);
+                neuron.apply_gradients_no_decay(&gradients, learning_rate);
             }
 
             self.cache_layer_output(layer_idx);
@@ -3551,6 +3555,7 @@ mod tests {
         let dt = 0.011;
         let epsilon = 1e-3;
         let index = 13;
+        neuron.evolve_closed_form(dt, &input);
         let gradients = neuron.backward(&input, &target, dt);
 
         let loss_at = |mut candidate: HdcLtcUnifiedNeuron| {
@@ -3594,7 +3599,9 @@ mod tests {
         let dt = 0.017;
         let epsilon = 5e-3;
         let index = 9;
-        let gradients = neuron.backward(&input, &target, dt);
+        let mut forward = neuron.clone();
+        forward.evolve_closed_form(dt, &input);
+        let gradients = forward.backward(&input, &target, dt);
 
         fn loss(
             original: &HdcLtcUnifiedNeuron,
@@ -3684,6 +3691,87 @@ mod tests {
             gradients.d_state.values[index],
             state_gradient_fd
         );
+    }
+
+    #[test]
+    fn test_backward_after_forward_uses_retained_pre_evolution_state() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: vec![1.0, 3.0],
+            fourier_amplitude: 0.07,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 190);
+        let input = ContinuousHV::random(64, 191).scale(0.12);
+        let target = ContinuousHV::random(64, 192).scale(0.12);
+        neuron.set_state(ContinuousHV::random(64, 193).scale(0.09));
+
+        let dt = 0.013;
+        let epsilon = 1e-3;
+        let index = 17;
+        let pre_state = neuron.state().clone();
+        let pre_time = neuron.total_time();
+
+        neuron.evolve_closed_form(dt, &input);
+        let post_state = neuron.state().clone();
+        let gradients = neuron.backward(&input, &target, dt);
+
+        let loss = |mut candidate: HdcLtcUnifiedNeuron| {
+            candidate.evolve_closed_form(dt, &input);
+            candidate
+                .state()
+                .values
+                .iter()
+                .zip(target.values.iter())
+                .map(|(&prediction, &expected)| (prediction - expected).powi(2))
+                .sum::<f32>()
+                / 64.0
+        };
+
+        let mut plus = neuron.clone();
+        plus.weight_hv.values[index] += epsilon;
+        let mut minus = neuron.clone();
+        minus.weight_hv.values[index] -= epsilon;
+        let finite_difference = (loss(plus) - loss(minus)) / (2.0 * epsilon);
+
+        // The retained pre-step state is required; using the live post-state
+        // would produce a different derivative, especially with Fourier input.
+        assert!(pre_state.similarity(&post_state) < 0.999_999);
+        assert!(pre_time < neuron.total_time());
+        assert!(
+            (gradients.dw.values[index] - finite_difference).abs() < 2e-3,
+            "post-forward weight gradient mismatch: analytic={}, finite_difference={}",
+            gradients.dw.values[index],
+            finite_difference
+        );
+    }
+
+    #[test]
+    fn test_backward_snapshot_is_invalidated_by_parameter_or_integrator_change() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(
+            UnifiedConfig {
+                dimension: 64,
+                ..UnifiedConfig::default()
+            },
+            194,
+        );
+        let input = ContinuousHV::random(64, 195);
+        let target = ContinuousHV::random(64, 196);
+
+        neuron.evolve_closed_form(0.01, &input);
+        assert!(neuron.pre_evolution_state.is_some());
+
+        neuron.set_tau_base(0.04);
+        assert!(neuron.pre_evolution_state.is_none());
+
+        neuron.evolve_closed_form(0.01, &input);
+        assert!(neuron.pre_evolution_state.is_some());
+
+        neuron.evolve_rk4(0.01, &input);
+        assert!(neuron.pre_evolution_state.is_none());
+
+        let gradients = neuron.backward(&input, &target, 0.01);
+        assert!(gradients.dw.values.iter().all(|value| value.is_finite()));
     }
 
     #[test]
