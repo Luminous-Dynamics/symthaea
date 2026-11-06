@@ -10,13 +10,17 @@ use std::fmt;
 pub const RESOURCE_FRONTIER_METHOD_ID: &str =
     "spectra-componentwise-resource-feasible-pareto-frontier-v1";
 
-/// Integer resource quantities: replications, milliseconds (CPU/GPU/wall),
-/// human seconds, and micro-units of the contract's frozen currency.
+/// Integer resource quantities: replications, CPU/GPU milliseconds, serialized
+/// wall-time charges, human seconds and micro-units of the frozen currency.
+/// wall_millis is additive only for a serialized execution plan; it is not a
+/// parallel-job makespan estimator.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ResourceUnits {
     pub simulation_replications: u64,
     pub cpu_millis: u64,
     pub gpu_millis: u64,
+    /// Additive charged duration under a frozen serialized schedule.
+    /// Parallel makespan needs a separate schedule-level calculation.
     pub wall_millis: u64,
     pub human_seconds: u64,
     pub currency_microunits: u64,
