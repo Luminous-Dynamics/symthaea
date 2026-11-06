@@ -83,9 +83,44 @@ impl ResourceUnits {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ResourceCostQualification {
+    pub simulation_replications: bool,
+    pub cpu_millis: bool,
+    pub gpu_millis: bool,
+    pub wall_millis: bool,
+    pub human_seconds: bool,
+    pub currency_microunits: bool,
+}
+
+impl ResourceCostQualification {
+    pub const fn all_qualified() -> Self {
+        Self {
+            simulation_replications: true,
+            cpu_millis: true,
+            gpu_millis: true,
+            wall_millis: true,
+            human_seconds: true,
+            currency_microunits: true,
+        }
+    }
+
+    fn is_complete(self) -> bool {
+        self.simulation_replications
+            && self.cpu_millis
+            && self.gpu_millis
+            && self.wall_millis
+            && self.human_seconds
+            && self.currency_microunits
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceCostUpperBound {
     pub units: ResourceUnits,
+    /// All six dimensions must be explicitly bounded; true plus amount zero
+    /// represents a known zero, while false means unknown and fails closed.
+    pub qualification: ResourceCostQualification,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,6 +170,7 @@ pub enum ResourceFrontierError {
     EmptyCandidateId,
     DuplicateCandidateId,
     InvalidProjectedBenefit,
+    IncompleteCostEvidence,
     ResourceLedgerOverflow,
     CostExceedsRemainingBudget,
     ReplayMismatch,
@@ -149,6 +185,7 @@ impl fmt::Display for ResourceFrontierError {
             Self::EmptyCandidateId => "candidate ID must be nonempty",
             Self::DuplicateCandidateId => "candidate IDs must be unique",
             Self::InvalidProjectedBenefit => "projected certificate-gap contraction must be finite and nonnegative",
+            Self::IncompleteCostEvidence => "all six resource dimensions require explicit conservative upper bounds",
             Self::ResourceLedgerOverflow => "resource charge accumulation overflowed u64",
             Self::CostExceedsRemainingBudget => "actual resource charge exceeds remaining budget",
             Self::ReplayMismatch => "resource frontier receipt does not reproduce from its contract and candidates",
@@ -202,6 +239,9 @@ pub fn build_resource_feasible_pareto_frontier(
             || candidate.projected_certificate_gap_contraction < 0.0
         {
             return Err(ResourceFrontierError::InvalidProjectedBenefit);
+        }
+        if !candidate.upper_cost.qualification.is_complete() {
+            return Err(ResourceFrontierError::IncompleteCostEvidence);
         }
     }
 
@@ -304,7 +344,7 @@ mod tests {
     fn candidate(id:&str,benefit:f64,cost:ResourceUnits)->ResourceProjectionCandidate {
         ResourceProjectionCandidate {
             candidate_id:id.into(),projected_certificate_gap_contraction:benefit,
-            upper_cost:ResourceCostUpperBound{units:cost}
+            upper_cost:ResourceCostUpperBound{units:cost,qualification:ResourceCostQualification::all_qualified()}
         }
     }
 
@@ -389,6 +429,9 @@ mod tests {
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[candidate(" ",1.0,ResourceUnits::default())]),Err(ResourceFrontierError::EmptyCandidateId));
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[candidate("x",f64::NAN,ResourceUnits::default())]),Err(ResourceFrontierError::InvalidProjectedBenefit));
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[candidate("x",-0.1,ResourceUnits::default())]),Err(ResourceFrontierError::InvalidProjectedBenefit));
+        let mut unqualified = candidate("unqualified",1.0,ResourceUnits::default());
+        unqualified.upper_cost.qualification.gpu_millis = false;
+        assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&[unqualified]),Err(ResourceFrontierError::IncompleteCostEvidence));
         assert_eq!(build_resource_feasible_pareto_frontier(&contract(budget),&one.iter().cloned().chain(one.iter().cloned()).collect::<Vec<_>>()),Err(ResourceFrontierError::DuplicateCandidateId));
     }
 
