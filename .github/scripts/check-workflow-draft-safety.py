@@ -174,7 +174,7 @@ def require_ready_event(path: Path, pr_block: list[str]) -> None:
         )
 
 
-def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, int]:
+def validate_generic(path: Path, text: str, pr_block: list[str] | None) -> tuple[int, int]:
     jobs = parse_jobs(text)
     runner_jobs = 0
     draft_guarded = 0
@@ -192,7 +192,7 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    if runner_jobs and pr_block is not None:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
@@ -306,7 +306,7 @@ jobs:
     # This fixture is genuinely manual-only: no pull_request event means no
     # PR runner root exists, so ready_for_review is neither needed nor parsed.
     assert pull_request_block(manual) is None
-    assert validate_generic(Path("manual.yml"), manual, []) == (1, 0)
+    assert validate_generic(Path("manual.yml"), manual, None) == (1, 0)
 
 
 def main() -> int:
