@@ -298,7 +298,8 @@
         "per_arm_cost_ledger",
         "target_disagreement_report"
       ],
-      "note": "A positive synthetic control checks protocol wiring only; it is not a real benchmark result."
+      "note": "A positive synthetic control checks protocol wiring only; it is not a real benchmark result.",
+      "hard_gate": false
     },
     {
       "fixture_id": "ERB-P02",
@@ -311,7 +312,8 @@
         "disagreement_ceiling",
         "abstention_reason"
       ],
-      "note": "Honest uncertainty is a valid evaluator behavior, not a scoring failure."
+      "note": "Honest uncertainty is a valid evaluator behavior, not a scoring failure.",
+      "hard_gate": false
     },
     {
       "fixture_id": "ERB-P03",
@@ -325,7 +327,8 @@
         "full_cost_ledger",
         "clustered_uncertainty"
       ],
-      "note": "Cost superiority is only a claim after matched target access and independent confirmation."
+      "note": "Cost superiority is only a claim after matched target access and independent confirmation.",
+      "hard_gate": false
     },
     {
       "fixture_id": "ERB-P04",
@@ -339,7 +342,8 @@
         "missingness_reason",
         "denominator_policy"
       ],
-      "note": "Failing closed is preferable to fabricating a measurement."
+      "note": "Failing closed is preferable to fabricating a measurement.",
+      "hard_gate": false
     }
   ],
   "scoring_policy": {
