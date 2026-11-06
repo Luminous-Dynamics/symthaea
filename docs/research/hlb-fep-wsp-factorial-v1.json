@@ -483,6 +483,14 @@
     {
       "id": "categorical_dirichlet_model_average_then_bmr",
       "scope": "Bayesian model average over categorical likelihood mappings with sequential posterior Dirichlet count updates and post-observation reduced-model evidence"
+    },
+    {
+      "id": "dirichlet_bmr_prospective_model_eig",
+      "scope": "One-step categorical model expected information gain computed from the current and hypothetical-outcome Dirichlet BMR posteriors; uses full Bayesian-model-average parent predictive outcome probabilities and the exact weighted-average prior constraint"
+    },
+    {
+      "id": "no_model_structure_eig",
+      "scope": "Ablation removing model-structure expected information gain while keeping state/parameter EIG, preference vector, action costs, and horizon fixed"
     }
   ],
   "seeds": {
@@ -552,7 +560,11 @@
       "dirichlet_model_evidence_log_ratio_nats",
       "rule_65_posterior_probability",
       "occams_razor_log_odds_nats",
-      "trials_to_log_odds_threshold_16_nats"
+      "trials_to_log_odds_threshold_16_nats",
+      "prospective_model_information_gain_nats",
+      "expected_posterior_model_entropy_nats",
+      "model_average_prior_coherence_error",
+      "predictive_outcome_mass_error"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -635,7 +647,9 @@
     "The three-ball implementation records the paper's published rule (centre green→green; centre red→left colour; centre blue→right colour), foveated single-ball observation, and outcome preference log probabilities (no feedback=0, correct=2, incorrect=-6 nats); any changed mechanism is labelled as an adaptation.",
     "The three-ball categorical likelihood reproduction must use Dirichlet model reduction over the full-model posterior and prior concentrations; the diagonal-Gaussian BMR primitive must not be substituted for this conjugate categorical case.",
     "Three-ball model evidence must use the registered model family and Dirichlet column ordering, and the reported Occam threshold must be expressed as posterior model log-odds in nats; model commitment is evaluated at the declared 16-nat threshold as a replication metric, not as a universal constant.",
-    "Dirichlet BMR requires positive concentrations on active coordinates and an explicit active-support mask; inactive coordinates must have exactly zero concentration, and any posterior count in an excluded coordinate makes that reduced model's evidence zero. Empty or malformed support and non-integrable reduced posteriors are rejected."
+    "Dirichlet BMR requires positive concentrations on active coordinates and an explicit active-support mask; inactive coordinates must have exactly zero concentration, and any posterior count in an excluded coordinate makes that reduced model's evidence zero. Empty or malformed support and non-integrable reduced posteriors are rejected.",
+    "The one-step Dirichlet model-EIG evaluator must compute current and post-outcome model beliefs from BMR, weight posterior model entropy by the full Bayesian-model-average parent predictive outcome distribution, and must not reweight the predictive distribution by Bayes factors a second time.",
+    "The parent Dirichlet prior used for prospective model EIG must equal the reduced-model-prior arithmetic mean under the registered model probabilities; predictive outcome probabilities must be normalized, and hypothetical sufficient-statistic increments must match the exact parameterization and be finite and non-negative."
   ],
   "research_references": [
     {
