@@ -24,6 +24,7 @@ pub const EVALUATOR_VERSION: &str = "rea-claim-evaluator/v0";
 pub const MAX_CLAIM_JSON_BYTES: usize = 1024 * 1024;
 pub const MAX_RESULT_JSON_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_TOTAL_EVIDENCE_JSON_BYTES: usize = 128 * 1024 * 1024;
+pub const MAX_EVIDENCE_RECORDS: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, SerdeDeserialize)]
 #[serde(rename_all = "snake_case")]
@@ -166,6 +167,7 @@ pub enum ReplayErrorKind {
     InvalidEvidence,
     DuplicateEvidence,
     UnexpectedEvidence,
+    ResourceLimit,
     Canonicalization,
 }
 
@@ -416,6 +418,16 @@ fn validate_claim(claim: &ClaimRequest) -> Result<(), ReplayError> {
             "source_predicate_type is not valid for this predicate",
         ));
     }
+    if claim.evidence_ids.len() > MAX_EVIDENCE_RECORDS {
+        return Err(ReplayError::new(
+            ReplayErrorKind::ResourceLimit,
+            format!(
+                "claim references {} Evidence records; limit is {}",
+                claim.evidence_ids.len(),
+                MAX_EVIDENCE_RECORDS
+            ),
+        ));
+    }
     let mut seen = HashSet::new();
     for id in &claim.evidence_ids {
         if !is_evidence_id(id) {
@@ -524,6 +536,16 @@ pub fn replay_claim_evaluation(
     result_json: &[u8],
 ) -> Result<ReplayReceipt, ReplayError> {
     let claim = parse_claim(claim_json)?;
+    if evidence_json.len() > MAX_EVIDENCE_RECORDS {
+        return Err(ReplayError::new(
+            ReplayErrorKind::ResourceLimit,
+            format!(
+                "replay supplied {} Evidence records; limit is {}",
+                evidence_json.len(),
+                MAX_EVIDENCE_RECORDS
+            ),
+        ));
+    }
     let (reported, reported_value) = parse_result(result_json)?;
 
     let mut total_bytes = 0usize;
