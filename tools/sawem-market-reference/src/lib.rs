@@ -21,6 +21,7 @@ pub mod liquidity_stress;
 pub mod liquidity_waterfall;
 pub mod non_anticipativity;
 pub mod revenue_realization;
+pub mod warranty_compliance;
 
 const EPSILON: f64 = 1.0e-9;
 
