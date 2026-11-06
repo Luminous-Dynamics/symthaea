@@ -1,3 +1,5 @@
+/home/runner/work/symthaea/symthaea/research/science-bench-refresh/src/recoverability.rs:
+
 //! Model-independent recoverability audit for a frozen benchmark search surface.
 //!
 //! The evaluator classifies whether an exact required evidence artifact is
@@ -226,13 +228,17 @@ enum RouteMode {
 
 fn is_nonzero_sha256(value: &str) -> bool {
     value.len() == 64
-        && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
         && value.bytes().any(|byte| byte != b'0')
 }
 
 fn require_ref(value: &str, path: &str, errors: &mut Vec<String>) {
     if value.trim().is_empty() || value.len() > MAX_REFERENCE_BYTES {
-        errors.push(format!("{path}: reference must be non-empty and at most {MAX_REFERENCE_BYTES} bytes"));
+        errors.push(format!(
+            "{path}: reference must be non-empty and at most {MAX_REFERENCE_BYTES} bytes"
+        ));
     }
 }
 
@@ -277,7 +283,11 @@ fn validate_fields(fields: &RecoverabilityManifestFieldsV1) -> Result<(), Vec<St
 
     let mut node_refs = BTreeSet::new();
     for (index, node) in fields.nodes.iter().enumerate() {
-        require_ref(&node.node_ref, &format!("nodes[{index}].node_ref"), &mut errors);
+        require_ref(
+            &node.node_ref,
+            &format!("nodes[{index}].node_ref"),
+            &mut errors,
+        );
         if !node_refs.insert(node.node_ref.as_str()) {
             errors.push(format!("nodes[{index}].node_ref: duplicate node reference"));
         }
@@ -288,7 +298,11 @@ fn validate_fields(fields: &RecoverabilityManifestFieldsV1) -> Result<(), Vec<St
 
     let mut edge_refs = BTreeSet::new();
     for (index, edge) in fields.edges.iter().enumerate() {
-        require_ref(&edge.edge_ref, &format!("edges[{index}].edge_ref"), &mut errors);
+        require_ref(
+            &edge.edge_ref,
+            &format!("edges[{index}].edge_ref"),
+            &mut errors,
+        );
         if !edge_refs.insert(edge.edge_ref.as_str()) {
             errors.push(format!("edges[{index}].edge_ref: duplicate edge reference"));
         }
@@ -321,10 +335,14 @@ fn validate_fields(fields: &RecoverabilityManifestFieldsV1) -> Result<(), Vec<St
             &mut errors,
         );
         if !evidence_ids.insert(unit.evidence_unit_id.as_str()) {
-            errors.push(format!("evidence_units[{index}].evidence_unit_id: duplicate ID"));
+            errors.push(format!(
+                "evidence_units[{index}].evidence_unit_id: duplicate ID"
+            ));
         }
         if !node_refs.contains(unit.target_node_ref.as_str()) {
-            errors.push(format!("evidence_units[{index}].target_node_ref: unknown node"));
+            errors.push(format!(
+                "evidence_units[{index}].target_node_ref: unknown node"
+            ));
         }
         if !is_nonzero_sha256(&unit.artifact_sha256) {
             errors.push(format!(
@@ -412,9 +430,9 @@ fn find_route(
 
         let reached = state.node_ref == target_node_ref;
         let qualifies = match mode {
-            RouteMode::Direct => state.used_initial_retrieval
-                && !state.used_reformulation
-                && !state.used_navigation,
+            RouteMode::Direct => {
+                state.used_initial_retrieval && !state.used_reformulation && !state.used_navigation
+            }
             RouteMode::Reformulation => {
                 state.used_initial_retrieval
                     && state.used_reformulation
@@ -485,8 +503,7 @@ fn classify_unit(
     adjacency: &BTreeMap<String, Vec<&RecoverabilityEdgeV1>>,
     unit: &RequiredEvidenceUnitV1,
 ) -> RecoverabilityRecordV1 {
-    let artifact_unavailable =
-        unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
+    let artifact_unavailable = unit.artifact_availability != ArtifactAvailabilityV1::PresentPinned;
     let surface_unknown = fields.surface_state == SearchSurfaceStateV1::Unknown;
 
     // A concrete pinned route is positive evidence even when the route inventory
@@ -494,12 +511,9 @@ fn classify_unit(
     // inventory of the declared finite search surface.
     let result = if artifact_unavailable || surface_unknown {
         (RecoverabilityClassV1::NotEvaluable, None)
-    } else if let Some(route) = find_route(
-        fields,
-        adjacency,
-        &unit.target_node_ref,
-        RouteMode::Direct,
-    ) {
+    } else if let Some(route) =
+        find_route(fields, adjacency, &unit.target_node_ref, RouteMode::Direct)
+    {
         (RecoverabilityClassV1::DirectlyReachable, Some(route))
     } else if let Some(route) = find_route(
         fields,
@@ -507,10 +521,7 @@ fn classify_unit(
         &unit.target_node_ref,
         RouteMode::Reformulation,
     ) {
-        (
-            RecoverabilityClassV1::ReformulationRecoverable,
-            Some(route),
-        )
+        (RecoverabilityClassV1::ReformulationRecoverable, Some(route))
     } else if let Some(route) = find_route(
         fields,
         adjacency,
@@ -530,10 +541,7 @@ fn classify_unit(
         source_family_ref: unit.source_family_ref.clone(),
         recoverability: result.0,
         shortest_route_cost: result.1.as_ref().map(|route| route.cost),
-        route_edge_refs: result
-            .1
-            .map(|route| route.edge_refs)
-            .unwrap_or_default(),
+        route_edge_refs: result.1.map(|route| route.edge_refs).unwrap_or_default(),
     }
 }
 
@@ -630,15 +638,33 @@ mod tests {
             max_route_cost: 8,
             budget_unit: "synthetic_action_credit".to_string(),
             nodes: vec![
-                RecoverabilityNodeV1 { node_ref: "state:start".into() },
-                RecoverabilityNodeV1 { node_ref: "evidence:direct".into() },
-                RecoverabilityNodeV1 { node_ref: "state:rewrite".into() },
-                RecoverabilityNodeV1 { node_ref: "evidence:rewrite".into() },
-                RecoverabilityNodeV1 { node_ref: "document:known".into() },
-                RecoverabilityNodeV1 { node_ref: "page:second".into() },
-                RecoverabilityNodeV1 { node_ref: "evidence:navigation".into() },
-                RecoverabilityNodeV1 { node_ref: "evidence:unreachable".into() },
-                RecoverabilityNodeV1 { node_ref: "evidence:unknown".into() },
+                RecoverabilityNodeV1 {
+                    node_ref: "state:start".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "evidence:direct".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "state:rewrite".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "evidence:rewrite".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "document:known".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "page:second".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "evidence:navigation".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "evidence:unreachable".into(),
+                },
+                RecoverabilityNodeV1 {
+                    node_ref: "evidence:unknown".into(),
+                },
             ],
             edges: vec![
                 RecoverabilityEdgeV1 {
@@ -761,7 +787,10 @@ mod tests {
             .iter()
             .map(|record| (record.evidence_unit_id.as_str(), record.recoverability))
             .collect();
-        assert_eq!(actual["unit:direct"], RecoverabilityClassV1::DirectlyReachable);
+        assert_eq!(
+            actual["unit:direct"],
+            RecoverabilityClassV1::DirectlyReachable
+        );
         assert_eq!(
             actual["unit:rewrite"],
             RecoverabilityClassV1::ReformulationRecoverable
@@ -788,7 +817,10 @@ mod tests {
             .iter()
             .map(|record| (record.evidence_unit_id.as_str(), record.recoverability))
             .collect();
-        assert_eq!(actual["unit:direct"], RecoverabilityClassV1::DirectlyReachable);
+        assert_eq!(
+            actual["unit:direct"],
+            RecoverabilityClassV1::DirectlyReachable
+        );
         assert_eq!(
             actual["unit:rewrite"],
             RecoverabilityClassV1::ReformulationRecoverable
@@ -802,12 +834,15 @@ mod tests {
             RecoverabilityClassV1::NotEvaluable
         );
         assert_eq!(actual["unit:unknown"], RecoverabilityClassV1::NotEvaluable);
-        assert!(result.records
-            .iter()
-            .find(|record| record.evidence_unit_id == "unit:unreachable")
-            .unwrap()
-            .route_edge_refs
-            .is_empty());
+        assert!(
+            result
+                .records
+                .iter()
+                .find(|record| record.evidence_unit_id == "unit:unreachable")
+                .unwrap()
+                .route_edge_refs
+                .is_empty()
+        );
     }
 
     #[test]
@@ -827,10 +862,20 @@ mod tests {
         let mut fields = base_fields();
         fields.max_route_cost = 3;
         let before = report(fields.clone());
-        let before_class = before.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability;
+        let before_class = before
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:navigation")
+            .unwrap()
+            .recoverability;
         fields.max_route_cost = 2;
         let after = report(fields);
-        let after_class = after.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability;
+        let after_class = after
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:navigation")
+            .unwrap()
+            .recoverability;
         assert!(after_class.rank() >= before_class.rank());
     }
 
@@ -839,7 +884,12 @@ mod tests {
         let mut fields = base_fields();
         let before = report(fields.clone());
         assert_eq!(
-            before.records.iter().find(|r| r.evidence_unit_id == "unit:unreachable").unwrap().recoverability,
+            before
+                .records
+                .iter()
+                .find(|r| r.evidence_unit_id == "unit:unreachable")
+                .unwrap()
+                .recoverability,
             RecoverabilityClassV1::UnreachableWithinBudget
         );
         fields.edges.push(RecoverabilityEdgeV1 {
@@ -851,7 +901,12 @@ mod tests {
         });
         let after = report(fields);
         assert_eq!(
-            after.records.iter().find(|r| r.evidence_unit_id == "unit:unreachable").unwrap().recoverability,
+            after
+                .records
+                .iter()
+                .find(|r| r.evidence_unit_id == "unit:unreachable")
+                .unwrap()
+                .recoverability,
             RecoverabilityClassV1::DirectlyReachable
         );
     }
@@ -901,8 +956,12 @@ mod tests {
     #[test]
     fn post_reformulation_retrieval_before_reformulation_does_not_qualify() {
         let mut fields = base_fields();
-        fields.edges.retain(|edge| edge.edge_ref != "route:rewrite-query");
-        fields.edges.retain(|edge| edge.edge_ref != "route:rewrite-search");
+        fields
+            .edges
+            .retain(|edge| edge.edge_ref != "route:rewrite-query");
+        fields
+            .edges
+            .retain(|edge| edge.edge_ref != "route:rewrite-search");
         fields.nodes.push(RecoverabilityNodeV1 {
             node_ref: "state:pre-retrieval".into(),
         });
@@ -937,10 +996,22 @@ mod tests {
     fn removing_an_edge_cannot_improve_recoverability() {
         let mut fields = base_fields();
         let before = report(fields.clone());
-        fields.edges.retain(|edge| edge.edge_ref != "route:open-document");
+        fields
+            .edges
+            .retain(|edge| edge.edge_ref != "route:open-document");
         let after = report(fields);
-        let before_class = before.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability;
-        let after_class = after.records.iter().find(|r| r.evidence_unit_id == "unit:navigation").unwrap().recoverability;
+        let before_class = before
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:navigation")
+            .unwrap()
+            .recoverability;
+        let after_class = after
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:navigation")
+            .unwrap()
+            .recoverability;
         assert!(after_class.rank() >= before_class.rank());
     }
 
@@ -1007,8 +1078,16 @@ mod tests {
         });
         let first = report(fields.clone());
         let second = report(fields);
-        let route1 = first.records.iter().find(|r| r.evidence_unit_id == "unit:unreachable").unwrap();
-        let route2 = second.records.iter().find(|r| r.evidence_unit_id == "unit:unreachable").unwrap();
+        let route1 = first
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:unreachable")
+            .unwrap();
+        let route2 = second
+            .records
+            .iter()
+            .find(|r| r.evidence_unit_id == "unit:unreachable")
+            .unwrap();
         assert_eq!(route1.route_edge_refs, route2.route_edge_refs);
     }
 }
