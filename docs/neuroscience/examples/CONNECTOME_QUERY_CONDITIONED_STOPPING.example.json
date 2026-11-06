@@ -47,7 +47,6 @@
               true,
               false
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -55,7 +54,9 @@
             "query_status": "QUERY_UNSTABLE",
             "safe_to_stop_for_query": false,
             "certificate_sha256": null,
-            "certificate_generation": 0
+            "certificate_generation": 0,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
           }
         },
         {
@@ -76,7 +77,6 @@
               true,
               false
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -84,7 +84,9 @@
             "query_status": "QUERY_UNSTABLE",
             "safe_to_stop_for_query": false,
             "certificate_sha256": null,
-            "certificate_generation": 0
+            "certificate_generation": 0,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
           }
         },
         {
@@ -103,7 +105,6 @@
             "query_decisions": [
               true
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -111,7 +112,9 @@
             "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
             "safe_to_stop_for_query": true,
             "certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-            "certificate_generation": 1
+            "certificate_generation": 1,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
           }
         }
       ],
@@ -134,12 +137,13 @@
           "global_forecast_status": "SYNTHETIC_FIXTURE",
           "query_evaluation": {
             "admissible_world_ids": [
-              "world-b"
+              "world-b",
+              "world-b-unresolved-graph"
             ],
             "query_decisions": [
+              false,
               false
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -147,7 +151,9 @@
             "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
             "safe_to_stop_for_query": true,
             "certificate_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "certificate_generation": 1
+            "certificate_generation": 1,
+            "unresolved_graph_world_count": 1,
+            "unresolved_query_decision_world_count": 0
           }
         },
         {
@@ -161,12 +167,13 @@
           "global_forecast_status": "SYNTHETIC_FIXTURE",
           "query_evaluation": {
             "admissible_world_ids": [
-              "world-b"
+              "world-b",
+              "world-b-unresolved-graph"
             ],
             "query_decisions": [
+              false,
               false
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -174,7 +181,9 @@
             "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
             "safe_to_stop_for_query": true,
             "certificate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
-            "certificate_generation": 2
+            "certificate_generation": 2,
+            "unresolved_graph_world_count": 1,
+            "unresolved_query_decision_world_count": 0
           }
         },
         {
@@ -188,12 +197,13 @@
           "global_forecast_status": "SYNTHETIC_FIXTURE",
           "query_evaluation": {
             "admissible_world_ids": [
-              "world-b"
+              "world-b",
+              "world-b-unresolved-graph"
             ],
             "query_decisions": [
+              false,
               false
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -201,7 +211,9 @@
             "query_status": "QUERY_STABLE_WITHIN_DECLARED_SCOPE",
             "safe_to_stop_for_query": true,
             "certificate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-            "certificate_generation": 3
+            "certificate_generation": 3,
+            "unresolved_graph_world_count": 1,
+            "unresolved_query_decision_world_count": 0
           }
         },
         {
@@ -222,7 +234,6 @@
               false,
               true
             ],
-            "unresolved_world_count": 0,
             "world_frame_status": "COMPLETE_WITHIN_DECLARED_SCOPE",
             "observation_identifiability": "IDENTIFIABLE",
             "missed_candidate_upper_bound": 0,
@@ -230,7 +241,9 @@
             "query_status": "QUERY_UNSTABLE",
             "safe_to_stop_for_query": false,
             "certificate_sha256": null,
-            "certificate_generation": 4
+            "certificate_generation": 4,
+            "unresolved_graph_world_count": 0,
+            "unresolved_query_decision_world_count": 0
           }
         }
       ],
