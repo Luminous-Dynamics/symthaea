@@ -2,6 +2,7 @@ name: Connectome query-flipping witness audit
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - "tools/connectomics-intake-audit/src/bin/connectome_query_flipping_witness_audit.rs"
       - "tools/connectomics-intake-audit/reference/verify_query_flipping_witness_oracle.py"
