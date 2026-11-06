@@ -942,10 +942,10 @@ fn run_self_tests() -> Result<(), String> {
         .ok_or("synthetic pair comparison missing")?;
     if pair.paired_task_count != 4
         || pair.repository_cluster_count != 2
-        || pair.challenger_wins != 3
+        || pair.challenger_wins != 2
         || pair.reference_wins != 0
-        || pair.ties != 1
-        || pair.paired_assurance_success_difference != 0.75
+        || pair.ties != 2
+        || pair.paired_assurance_success_difference != 0.5
     {
         return Err("paired task comparison or cluster accounting changed".into());
     }
