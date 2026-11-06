@@ -174,6 +174,11 @@ fn validate_manifest(manifest: &Value) -> Result<(), String> {
         "wsp_trace_assisted",
         "swi_constrained_wsp_with_verifier",
         "perfect_information_oracle",
+        "bayesian_model_reduction_structure_selection",
+        "raw_flat_weight_distance_editor",
+        "activation_probe_alignment_editor",
+        "permutation_equivariant_weight_space_editor",
+        "oracle_permutation_alignment",
     ];
     for baseline in required_baselines {
         if !baseline_ids.contains(baseline) {
