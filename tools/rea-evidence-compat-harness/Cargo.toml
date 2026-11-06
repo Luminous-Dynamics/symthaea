@@ -24,3 +24,6 @@ sha2 = { version = "=0.10.9", features = ["oid"] }
 [[test]]
 name = "root_bundle_adapter"
 path = "tests/root_bundle_adapter.rs"
+[[test]]
+name = "root_formal_claim_adapter"
+path = "tests/root_formal_claim_adapter.rs"
