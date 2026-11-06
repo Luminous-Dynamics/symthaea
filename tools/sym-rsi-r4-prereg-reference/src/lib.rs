@@ -196,6 +196,40 @@ fn check_arm_bindings(report: &mut ValidationReport, root: &Value) {
     if !non_empty(left_backend) || left_backend != right_backend {
         report.issue("BACKEND_MISMATCH", "both researcher arms must use the same model/backend version");
     }
+    let identity_fields = [
+        "artifact_digest",
+        "source_tree_digest",
+        "executable_digest",
+        "prompt_tool_contract_digest",
+        "memory_state_digest",
+    ];
+    let identities_equal = identity_fields.iter().all(|field| {
+        string_at(
+            root,
+            &["starting_state", "outer_loop_arms", "evolved_researcher", field],
+        ) == string_at(
+            root,
+            &["starting_state", "outer_loop_arms", "reference_researcher", field],
+        )
+    });
+    if identities_equal {
+        report.issue(
+            "IDENTICAL_OUTER_RESEARCHERS",
+            "evolved and reference outer-loop researcher artifact identities are identical",
+        );
+    }
+    require_string(
+        report,
+        root,
+        &["starting_state", "outer_loop_arms", "declared_differences"],
+    );
+    for field in [
+        "execution_order_randomization",
+        "common_random_numbers_policy",
+        "permitted_arm_specific_differences",
+    ] {
+        require_string(report, root, &["matched_conditions", field]);
+    }
     require_sha256(
         report,
         root,
@@ -269,6 +303,8 @@ fn check_budget(report: &mut ValidationReport, root: &Value) {
         );
     }
     require_string(report, root, &["budget", "total_budget"]);
+    require_string(report, root, &["budget", "currency_and_price_basis"]);
+    require_string(report, root, &["budget", "accounting_boundary"]);
 
     let Some(caps) = at(root, &["budget", "per_arm_caps"]).and_then(Value::as_object) else {
         report.issue("BUDGET_CAPS_MISSING", "budget.per_arm_caps must be an object");
@@ -344,6 +380,11 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
     require_string(
         report,
         root,
+        &["splits", "validation", "custodian"],
+    );
+    require_string(
+        report,
+        root,
         &["splits", "sealed_confirmation", "custodian_independent_of_candidate"],
     );
     require_string(
@@ -351,12 +392,39 @@ fn check_splits(report: &mut ValidationReport, root: &Value) {
         root,
         &["splits", "sealed_confirmation", "one_shot_policy"],
     );
+    require_string(
+        report,
+        root,
+        &["splits", "fresh_family_transfer", "custodian_independent_of_candidate"],
+    );
     require_bool(
         report,
         root,
         &["splits", "fresh_family_transfer", "retuning_prohibited"],
         true,
     );
+    for field in [
+        "task_manifest_digest",
+        "task_family_manifest_digest",
+        "cluster_definition_digest",
+    ] {
+        require_sha256(report, root, &["task_population", field]);
+    }
+    require_string(
+        report,
+        root,
+        &["task_population", "licensing_and_data_rights_review_ref"],
+    );
+    let domains = at(root, &["task_population", "capability_domains"])
+        .and_then(Value::as_array);
+    if !domains.is_some_and(|items| {
+        !items.is_empty()
+            && items
+                .iter()
+                .all(|item| item.as_str().is_some_and(|name| !name.trim().is_empty()))
+    }) {
+        report.issue("CAPABILITY_DOMAINS_MISSING", "at least one non-empty capability domain is required");
+    }
     for field in [
         "workspace_mount_audit_ref",
         "credentials_and_egress_test_ref",
