@@ -2756,12 +2756,13 @@ fn persist_keeper_bundle(
     audio_key: &str,
     wav: &[u8],
     recipe_bytes: &[u8],
-    score: &Score,
+    score_bytes: &[u8],
+    recipe_object_sha256: &str,
     spec: &CompositionSpec,
     seed: u64,
     state: &MusicalState,
     sequence: u64,
-) -> std::io::Result<(PathBuf, bool)> {
+) -> std::io::Result<(PathBuf, bool, KeeperBundleVerificationV1)> {
     let root = Path::new("data/taste/audio");
     std::fs::create_dir_all(root)?;
     let staging = root.join(format!(
@@ -2774,23 +2775,56 @@ fn persist_keeper_bundle(
     let result = (|| {
         write_synced(&staging.join("audio.wav"), wav)?;
         write_synced(&staging.join("recipe.json"), recipe_bytes)?;
+        write_synced(&staging.join("score.json"), score_bytes)?;
 
         let midi_path = staging.join("performance.mid");
         let midi_available = symthaea_muse::midi_export::export_performance_midi(
-            score, spec, seed, state, &midi_path,
+            // The score used to create the WAV is the exact symbolic source
+            // whose canonical JSON bytes are bound in score.json.
+            &serde_json::from_slice::<Score>(score_bytes).map_err(|error| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, error)
+            })?,
+            spec,
+            seed,
+            state,
+            &midi_path,
         )
         .is_ok();
-        if midi_available {
+        let midi_sha256 = if midi_available {
             std::fs::File::open(&midi_path)?.sync_all()?;
+            Some(sha256_hex(&std::fs::read(&midi_path)?))
         } else {
             let _ = std::fs::remove_file(&midi_path);
-        }
+            None
+        };
 
-        // The directory rename publishes the complete canonical keeper bundle
-        // in one filesystem operation. Existing flat-file keepers remain
-        // readable through the compatibility paths below.
+        // The directory rename publishes one complete, immutable-layout
+        // bundle. The verifier must then reopen the *published destination*,
+        // not trust the staging buffers used to create it.
         std::fs::rename(&staging, &destination)?;
-        Ok((destination.clone(), midi_available))
+        let expected = KeeperBundleExpectedDigestsV1 {
+            audio_sha256: sha256_hex(wav),
+            recipe_file_sha256: sha256_hex(recipe_bytes),
+            score_sha256: sha256_hex(score_bytes),
+            midi_sha256,
+            recipe_object_sha256: recipe_object_sha256.to_owned(),
+        };
+        match verify_published_keeper_bundle(
+            &destination,
+            audio_key,
+            &expected,
+            unix_time_ms(),
+        ) {
+            Ok(receipt) => Ok((destination.clone(), expected.midi_sha256.is_some(), receipt)),
+            Err(error) => {
+                // No keeper index row will reference an unverified bundle.
+                let _ = std::fs::remove_dir_all(&destination);
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    error.to_string(),
+                ))
+            }
+        }
     })();
 
     if result.is_err() {
