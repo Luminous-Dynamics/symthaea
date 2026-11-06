@@ -119,7 +119,22 @@
       "human_active_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__",
       "human_review_and_rework_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__"
     },
-    "failure_accounting": "Every failed, rejected, invalid, timed-out, interrupted and not-run attempt is retained with its allocated and realized cost. Missing outcomes are not silently scored as zero or discarded."
+    "failure_accounting": "Every failed, rejected, invalid, timed-out, interrupted and not-run attempt is retained with its allocated and realized cost. Missing outcomes are not silently scored as zero or discarded.",
+    "shared_envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "same_envelope_for_all_arms": true,
+    "inclusive_cost_boundary": true,
+    "includes_failed_invalid_retries": true,
+    "includes_human_review_and_rework": true,
+    "arm_budget_bindings": {
+      "evolved_outer_loop": {
+        "envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "inclusive": true
+      },
+      "reference_outer_loop": {
+        "envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "inclusive": true
+      }
+    }
   },
   "task_population": {
     "task_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
@@ -163,6 +178,13 @@
       "credentials_and_egress_test_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
       "canary_file_test_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
       "reviewer": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "disjointness_audit": {
+      "overlap_unit": "task_instance_id_and_task_family_id",
+      "expected_overlap_count": 0,
+      "audit_method_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "independent_auditor": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "evidence_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
     }
   },
   "seed_and_replication_plan": {
@@ -174,7 +196,8 @@
     "confirmatory_power_or_precision_analysis_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
     "randomization_plan_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
     "independent_full_loop_reruns_required": 2,
-    "all_trajectories_retained": true
+    "all_trajectories_retained": true,
+    "minimum_complete_outer_cycles": 2
   },
   "rounds": {
     "planned_outer_loop_steps": "__REQUIRED_BEFORE_PREREGISTRATION__",
@@ -281,5 +304,14 @@
     "code_artifact_and_build_digests_required": true,
     "null_and_negative_control_results_required": true,
     "limitations_and_unidentified_effects_required": true
+  },
+  "evaluator_binding": {
+    "implementation_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "task_contract_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "epoch_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "shared_across_arms": true,
+    "candidate_write_access": false,
+    "confirmation_material_write_access": false
   }
 }
