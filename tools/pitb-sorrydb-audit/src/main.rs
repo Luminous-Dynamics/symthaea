@@ -1812,6 +1812,14 @@ fn synthetic_proof_run(task: &SorryRecord, verified: bool, run_id: &str) -> Proo
     }
 }
 
+fn synthetic_strategy_run(task: &SorryRecord, verified: bool, run_id: &str, strategy_name: &str) -> ProofRun {
+    let mut run = synthetic_proof_run(task, verified, run_id);
+    run.strategy.name = strategy_name.into();
+    run.strategy.model_id = Some(strategy_name.into());
+    run.strategy.implementation_sha256 = sha256(strategy_name.as_bytes());
+    run
+}
+
 fn synthetic_proof_runs() -> Vec<ProofRun> {
     let task = synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
     vec![
@@ -2055,26 +2063,46 @@ fn run_self_tests() -> Result<(), String> {
 }
 
 fn synthetic_report() -> Result<Value, String> {
+    let mut task_a = synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
+    task_a.repo.remote = "https://github.com/example/project-a".into();
+    task_a.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_a.repo.remote, task_a.repo.commit, task_a.location.path, task_a.location.start_line
+    );
+    let mut task_b = synthetic_record("task-b", "x : Nat\n⊢ x + 0 = x", "Demo/B.lean", 20);
+    task_b.repo.remote = "https://github.com/example/project-b".into();
+    task_b.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_b.repo.remote, task_b.repo.commit, task_b.location.path, task_b.location.start_line
+    );
+    let mut task_c = synthetic_record("task-c", "x : Nat\n⊢ x = x + 0", "Demo/C.lean", 5);
+    task_c.repo.remote = "https://github.com/example/project-b".into();
+    task_c.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_c.repo.remote, task_c.repo.commit, task_c.location.path, task_c.location.start_line
+    );
     let full = Dataset {
         documentation: "synthetic snapshot".into(),
-        sorries: vec![
-            synthetic_record("task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0),
-            synthetic_record("task-b", "x : Nat\n⊢ x + 0 = x", "Demo/A.lean", 20),
-            synthetic_record("task-c", "x : Nat\n⊢ x = x + 0", "Demo/B.lean", 5),
-        ],
+        sorries: vec![task_a.clone(), task_b.clone(), task_c.clone()],
     };
     let evaluation = Dataset {
         documentation: "synthetic evaluation".into(),
-        sorries: vec![
-            full.sorries[0].clone(),
-            full.sorries[2].clone(),
-        ],
+        sorries: full.sorries.clone(),
     };
     let full_bytes = serde_json::to_vec(&full).map_err(|e| e.to_string())?;
     let evaluation_bytes = serde_json::to_vec(&evaluation).map_err(|e| e.to_string())?;
-    let proof_runs = synthetic_proof_runs();
+    let proof_runs = vec![
+        synthetic_strategy_run(&task_a, true, "a-task-a-success", "strategy-a"),
+        synthetic_strategy_run(&task_a, false, "a-task-a-retry", "strategy-a"),
+        synthetic_strategy_run(&task_b, false, "a-task-b-fail", "strategy-a"),
+        synthetic_strategy_run(&task_c, true, "a-task-c-success", "strategy-a"),
+        synthetic_strategy_run(&task_a, false, "b-task-a-fail", "strategy-b"),
+        synthetic_strategy_run(&task_b, true, "b-task-b-success", "strategy-b"),
+        synthetic_strategy_run(&task_c, true, "b-task-c-success", "strategy-b"),
+    ];
     let (verified_success_run_count, unique_successful_task_count, strategy_summaries) =
         summarize_proof_runs(&proof_runs, &evaluation)?;
+    let clustered_comparisons = pairwise_clustered_comparisons(&proof_runs, &evaluation)?;
     let mut run_bytes = Vec::new();
     for run in &proof_runs {
         run_bytes.extend_from_slice(&serde_json::to_vec(run).map_err(|e| e.to_string())?);
@@ -2096,33 +2124,33 @@ fn synthetic_report() -> Result<Value, String> {
         "verified_success_run_count": verified_success_run_count,
         "unique_successful_task_count": unique_successful_task_count,
         "strategy_summaries": strategy_summaries,
-        "pairwise_clustered_comparisons": [],
+        "pairwise_clustered_comparisons": clustered_comparisons,
         "full_task_count": 3,
-        "evaluation_task_count": 2,
+        "evaluation_task_count": 3,
         "documented_full_task_count": DOCUMENTED_FULL_COUNT,
         "full_count_documentation_drift": true,
         "full_unique_task_id_count": 3,
         "full_unique_goal_count": 3,
-        "evaluation_unique_task_id_count": 2,
-        "evaluation_unique_goal_count": 2,
-        "evaluation_exact_record_matches_in_full_snapshot": 2,
-        "repository_count_full": 1,
-        "repository_count_evaluation": 1,
-        "lean_version_counts_evaluation": {"v4.27.0": 2},
+        "evaluation_unique_task_id_count": 3,
+        "evaluation_unique_goal_count": 3,
+        "evaluation_exact_record_matches_in_full_snapshot": 3,
+        "repository_count_full": 2,
+        "repository_count_evaluation": 2,
+        "lean_version_counts_evaluation": {"v4.27.0": 3},
         "zero_based_start_column_task_count_full": 1,
         "zero_based_start_column_task_count_evaluation": 1,
         "cluster_summary_evaluation": {
-            "repository_count": 1,
-            "repository_commit_count": 1,
-            "source_file_count": 2,
-            "tasks_per_repository_min": 2,
+            "repository_count": 2,
+            "repository_commit_count": 2,
+            "source_file_count": 3,
+            "tasks_per_repository_min": 1,
             "tasks_per_repository_max": 2,
             "tasks_per_source_file_max": 1,
-            "source_file_task_histogram": {"1": 2},
+            "source_file_task_histogram": {"1": 3},
             "top_source_file_clusters": []
         },
         "source_reconstruction_requirement": "synthetic source reconstruction policy",
-        "benchmark_integrity_warnings": ["synthetic documentation drift control"],
+        "benchmark_integrity_warnings": ["synthetic documentation drift control", "synthetic project-clustered paired inference control"],
         "admission_boundary": "Synthetic fixture only: source repositories and referenced checker/semantic receipt bytes have not been independently reconstructed or authenticated."
     });
     if !report.is_object() {
