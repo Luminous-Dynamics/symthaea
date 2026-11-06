@@ -1,3 +1,4 @@
+// One-time rustfmt normalization trigger; removed after formatter commit.
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
