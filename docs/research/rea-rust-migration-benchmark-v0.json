@@ -2362,7 +2362,10 @@
         "https://github.com/Luminous-Dynamics/symthaea/pull/10591",
         "https://github.com/Luminous-Dynamics/symthaea/issues/10410",
         "https://github.com/Luminous-Dynamics/symthaea/issues/9911",
-        "https://github.com/Luminous-Dynamics/symthaea/issues/6283"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/6283",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/2270",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10630"
       ],
       "objective": "Qualify whether an investigator's typed conclusion is entailed by exact, scoped, dependency-aware evidence; preserve contradictions, missing evidence, inapplicability and unknown provenance instead of turning them into confidence or majority votes.",
       "principle": "Evidence does not vote; claims must be entailed within declared scope. Receipt validity, cryptographic validity, signer trust, package authorization, completeness, runtime behavior and semantic truth are distinct propositions.",
@@ -2407,7 +2410,15 @@
         "stale_unknown_resolution_or_missing_history_predecessor",
         "high_eig_probe_without_terminal_action_change",
         "low_eig_probe_preventing_high_consequence_decision_error",
-        "raw_scanner_finding_does_not_imply_named_masvs_control_pass"
+        "raw_scanner_finding_does_not_imply_named_masvs_control_pass",
+        "claim_request_derivation_digest_changes_when_asserted_value_changes_even_if_both_values_contradict",
+        "claim_request_derivation_binds_ordered_evidence_ids_assumptions_and_scope",
+        "request_and_result_schema_ids_are_distinct_and_validated_separately",
+        "provider_reported_observation_is_not_upgraded_to_cyber_claim_kind",
+        "historically_valid_evidence_is_not_automatically_current_at_query_time",
+        "knowledge_time_cutoff_is_not_inferred_from_event_or_receipt_time",
+        "repository_revision_change_invalidates_only_affected_claim_evidence",
+        "stale_or_superseded_evidence_remains_historically_replayable_but_not_current"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2421,7 +2432,14 @@
         "false_independence_and_confidence_uplift_rate",
         "selective_risk_vs_claim_coverage",
         "investigator_time_and_calls_to_expose_seeded_overclaim",
-        "evaluator_latency_memory_and_derivation_size"
+        "evaluator_latency_memory_and_derivation_size",
+        "claim_request_digest_binding_accuracy",
+        "result_schema_validation_rate",
+        "schema_field_placement_and_required_field_accuracy",
+        "target_time_scope_leakage_rate",
+        "knowledge_as_of_cutoff_accuracy",
+        "selective_revalidation_precision_recall_after_repository_change",
+        "historical_replay_vs_current_validity_separation_accuracy"
       ],
       "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.",
       "protocol": [
@@ -2436,7 +2454,13 @@
         "freeze a held-out adversarial suite before model evaluation and use blinded independent adjudication",
         "compare raw synthesis, synthesis with evidence/lineage context, and synthesis gated by the typed evaluator",
         "connect next-experiment decisions to #9911 while preserving its distinct EVSI/regret metrics",
-        "report per-predicate denominators, abstentions, missing evidence, unsupported cases and confidence intervals; no composite score"
+        "report per-predicate denominators, abstentions, missing evidence, unsupported cases and confidence intervals; no composite score",
+        "bind the canonical complete request digest into every derivation, including asserted value, source predicate, ordered evidence IDs, scope, assumptions and falsification condition",
+        "keep request schema and result schema identifiers distinct and validate both at their appropriate boundaries",
+        "do not infer lifecycle/currentness from REA Evidence v1; compose #10600 valid-time and knowledge-time projection only when source-owned evidence exists",
+        "do not infer continued validity after repository evolution; compose #10630 selective revalidation and #9112 decision-use validity",
+        "cyber claim progression and negative-evidence coverage remain owned by #2270/#453; generic provider observation support cannot promote a CyberClaim kind",
+        "for agent benchmarking separate factual accuracy, schema/field-placement accuracy, answer coverage, abstention, and grader adjudication quality"
       ],
       "claim_boundaries": {
         "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
@@ -2446,6 +2470,13 @@
         "completeness": "One verified member does not establish complete archive/package traversal.",
         "independence": "Provider-name diversity or unknown ancestry does not prove independent corroboration.",
         "semantics": "Byte integrity or package signature does not establish benignness, installability, runtime behavior or control compliance."
+      },
+      "ownership_boundaries": {
+        "generic_rea_claim_evaluation": "This family evaluates whether an exact provider-reported normalized observation is supported by an exact verified REA Evidence record. It is not a generic semantic truth engine.",
+        "cyber_claim_semantics": "CyberClaim families and non-laundering transitions belong to #2270; generic REA observation support cannot promote cyber claim kinds.",
+        "lifecycle_time": "Valid time, knowledge time, supersession, stale/conflict actions and source-family temporal reasoning belong to #10600.",
+        "repository_continuity": "Evidence retention, invalidation and selective revalidation across repository revisions belong to #10630.",
+        "measurement_validity": "Benchmark sampling, dependence, uncertainty and generalization remain under #6283."
       }
     }
   ],
