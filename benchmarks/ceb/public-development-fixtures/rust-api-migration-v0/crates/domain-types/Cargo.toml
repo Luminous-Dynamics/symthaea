@@ -1,0 +1,5 @@
+[package]
+name = "ceb-api-migration-domain-types"
+version = "0.1.0"
+edition = "2021"
+publish = false
