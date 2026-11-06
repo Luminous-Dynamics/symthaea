@@ -676,6 +676,28 @@ mod tests {
     }
 
     #[test]
+    fn malformed_parameterization_digest_is_rejected_before_evidence_calculation() {
+        let mut posterior = gaussian(&[0.0], &[1.0]);
+        posterior.parameterization_digest = "missing-or-malformed".into();
+        let prior = gaussian(&[0.0], &[1.0]);
+        let result = reduce_models(
+            &posterior,
+            &prior,
+            &[ReducedModelHypothesis {
+                model_id: "full".into(),
+                prior_probability: 1.0,
+                parameter_prior: prior.clone(),
+            }],
+        );
+        assert!(matches!(
+            result,
+            Err(BayesianModelReductionError::InvalidParameterizationDigest {
+                distribution: "full posterior"
+            })
+        ));
+    }
+
+    #[test]
     fn mismatched_full_prior_parameterization_digest_is_rejected() {
         let posterior = gaussian(&[0.0, 0.2], &[1.0, 0.5]);
         let full_prior = gaussian_with_digest(&[0.0, 0.0], &[1.0, 1.0], 'b');
