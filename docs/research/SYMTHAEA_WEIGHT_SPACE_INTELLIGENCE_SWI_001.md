@@ -521,7 +521,7 @@ H1–H6 are the initial programme. H7 is a later WSL research track and should n
 ### P3 — extend architecture-aware editing
 - HDC-LTC now has typed parameter-group IDs, profiles, bounded windows, and validated replacement for its five learnable hypervectors.
 - Structured orthogonal mixing and unitary HRR circular convolution are now available as independent primitives; benchmark and task-level ablations are next.
-- Validate HDC local gradients and FFT/HRR round trips on the exact branch head.
+- Validate HDC local gradients, zero-time identity across integrators, and FFT/HRR round trips on the exact branch head.
 - Define typed Broca projection/expert group IDs.
 - Replace string target selection at the SWI boundary with typed selectors.
 - Add model-specific preservation suites.
