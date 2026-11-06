@@ -149,7 +149,10 @@ fn forged_result_disposition_does_not_pass_on_a_self_digest_alone() {
     // The derivation digest is unkeyed. Recompute it over the forged body so
     // replay must reject the semantic lie, not merely a stale self-hash.
     let mut forged_body = forged.clone();
-    forged_body.as_object_mut().unwrap().remove("derivation_sha256");
+    forged_body
+        .as_object_mut()
+        .unwrap()
+        .remove("derivation_sha256");
     let forged_canonical = rea_compat::canonical_jcs_bytes(&forged_body).unwrap();
     forged["derivation_sha256"] = json!(rea_compat::sha256_hex(&forged_canonical));
 
@@ -255,28 +258,29 @@ fn independent_expected_labels_cover_wrong_scope_and_missing_platform_version() 
     wrong_subject.scope.subject_sha256 =
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned();
     let (claim_bytes, result_bytes) = produce(&wrong_subject, std::slice::from_ref(&evidence));
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, ClaimDisposition::Inapplicable);
 
     let mut wrong_operation = provider_claim(evidence.evidence_id.clone());
     wrong_operation.scope.operation = "verify_signature".to_owned();
     let (claim_bytes, result_bytes) = produce(&wrong_operation, std::slice::from_ref(&evidence));
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, ClaimDisposition::Inapplicable);
 
     let mut unrepresented_platform_version = provider_claim(evidence.evidence_id.clone());
-    unrepresented_platform_version.scope.platform_version =
-        Some("Android 17 / API 37".to_owned());
-    let (claim_bytes, result_bytes) =
-        produce(&unrepresented_platform_version, std::slice::from_ref(&evidence));
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    unrepresented_platform_version.scope.platform_version = Some("Android 17 / API 37".to_owned());
+    let (claim_bytes, result_bytes) = produce(
+        &unrepresented_platform_version,
+        std::slice::from_ref(&evidence),
+    );
+    let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Underdetermined);
+    assert_eq!(
+        replay.expected_disposition,
+        ClaimDisposition::Underdetermined
+    );
 }
 
 #[test]
@@ -286,10 +290,12 @@ fn independent_expected_label_refutes_a_same_scope_numeric_near_miss() {
     claim.asserted_value["entries"][0]["size"] = json!(42.0001);
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::RefutedWithinScope);
+    assert_eq!(
+        replay.expected_disposition,
+        ClaimDisposition::RefutedWithinScope
+    );
 }
 
 #[test]
@@ -301,8 +307,7 @@ fn recorded_assumptions_cannot_make_a_claim_supported() {
         .push("the scanner database is complete".to_owned());
     let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
 
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, ClaimDisposition::Unverified);
 }
@@ -316,15 +321,15 @@ fn result_schema_and_rule_version_mutations_are_rejected_before_replay() {
     let mut unknown_field: Value = serde_json::from_slice(&result_bytes).unwrap();
     unknown_field["unreviewed_authority"] = json!("trusted");
     let unknown_bytes = serde_json::to_vec(&unknown_field).unwrap();
-    let error = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &unknown_bytes)
-        .unwrap_err();
+    let error =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &unknown_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
 
     let mut wrong_rule: Value = serde_json::from_slice(&result_bytes).unwrap();
     wrong_rule["evaluator_version"] = json!("rea-claim-evaluator/v99");
     let wrong_rule_bytes = serde_json::to_vec(&wrong_rule).unwrap();
-    let error = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &wrong_rule_bytes)
-        .unwrap_err();
+    let error =
+        replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &wrong_rule_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidResult);
 }
 
@@ -359,7 +364,10 @@ fn replay_result_comparison_uses_jcs_not_json_number_token_spelling() {
     let replay =
         replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &equivalent_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
+    assert_eq!(
+        replay.expected_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
 }
 
 fn temporary_cli_dir() -> PathBuf {
@@ -367,10 +375,7 @@ fn temporary_cli_dir() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system clock follows Unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!(
-        "rea-claim-replay-{}-{nonce}",
-        std::process::id()
-    ))
+    std::env::temp_dir().join(format!("rea-claim-replay-{}-{nonce}", std::process::id()))
 }
 
 #[test]
@@ -394,10 +399,17 @@ fn bounded_cli_emits_machine_readable_replay_match() {
         .arg(&evidence_path)
         .output()
         .unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let receipt: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(receipt["outcome"], json!("replay_match"));
-    assert_eq!(receipt["expected_disposition"], json!("supported_within_scope"));
+    assert_eq!(
+        receipt["expected_disposition"],
+        json!("supported_within_scope")
+    );
     std::fs::remove_dir_all(directory).unwrap();
 }
 
@@ -431,4 +443,3 @@ fn bounded_cli_returns_distinct_nonzero_exit_for_semantic_mismatch() {
     assert_eq!(receipt["outcome"], json!("replay_mismatch"));
     std::fs::remove_dir_all(directory).unwrap();
 }
-
