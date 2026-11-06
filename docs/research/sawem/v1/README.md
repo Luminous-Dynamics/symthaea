@@ -451,6 +451,25 @@ The synthetic profile therefore keeps Market Code publication separate from effe
 
 Benchmark case: `MARKET-READINESS-GATE-001`.
 
+### Conjunctive proof-obligation decision certificate
+
+The new `decision_certificate.rs` module is the integration boundary between the specialist evaluators and a defensible investment conclusion.
+
+Each certificate binds:
+- exact project revision and digest;
+- decision timestamp and evidence-frontier digest;
+- jurisdiction/rule profile and digest;
+- model/evaluator suite digest;
+- scenario census and count;
+- canonical input-manifest digest; and
+- individual claims, proof obligations, evidence receipts, evaluator receipts, dependencies, validity windows and invalidation conditions.
+
+Critical and material obligations are conjunctive, not weighted. A high NPV cannot compensate for missing grid allocation, unsupported participant admission, an invalid battery envelope or an unresolved contractual right. A critical rejected/invalidated obligation yields `DoNotProceed`; a critical unresolved obligation yields `NotSupportable`; a conditional critical or unresolved/conditional material obligation yields `Conditional`. Only complete qualification of critical and material claims produces `SupportableWithinDeclaredScope`.
+
+The evaluator rejects future-known receipts, expired/not-yet-valid claims, dependency cycles, missing dependencies, unsupported dependencies and qualified claims without both evidence and evaluator receipts. Every conditional claim must declare its invalidation conditions.
+
+This is a certificate assembler and dependency/temporal integrity checker, not a source authenticator or independent model verifier. It does not validate signatures, issuer authority, upstream evaluator correctness or actual source facts. A supportable certificate is only as strong as its independently verified receipts and the correctness of the designated specialist evaluators. Benchmark case: `UNDERWRITING-PROOF-CERTIFICATE-001`.
+
 ### South African market phase as of 5 November 2026
 
 Engineering News reported on 30 October that invitations had been issued to 85 external entities for pre-launch simulation/testing, while broader launch was scheduled for April 2027. On 5 November, the Energy News Network interviewed the Acting NERSA CEO, who described finalisation of the market rules as a priority ahead of external market opening in April 2027. Both are secondary reporting; neither proves that any specific participant is admitted or commercially trading. The profile therefore records `pre_launch_testing_reported`, `participant_admission_state=unknown` and `commercial_trading_state=unknown`, with a null raw-source digest and `source_freeze_state=not_frozen`.
