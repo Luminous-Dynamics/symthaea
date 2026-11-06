@@ -205,10 +205,21 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         if intervention_map[action_id]["feasibility_status"] == "FEASIBLE"
     )
     require(feasible_ids, "no feasible intervention candidates")
-    expected_selected = sorted(
+    ranked_feasible = sorted(
         feasible_ids,
         key=lambda action_id: (-computed[action_id]["decision_value_per_cost"], action_id),
-    )[0]
+    )
+    best_candidate = ranked_feasible[0]
+    expected_selected = (
+        best_candidate
+        if computed[best_candidate]["decision_value_per_cost"] > 1e-12
+        else None
+    )
+    expected_decision_status = (
+        "DISCRIMINATING_INTERVENTION_AVAILABLE"
+        if expected_selected is not None
+        else "NO_FEASIBLE_DISCRIMINATING_INTERVENTION"
+    )
     expected_entropy_greedy = sorted(
         feasible_ids,
         key=lambda action_id: (-computed[action_id]["worst_case_eig_bits"], action_id),
@@ -225,13 +236,16 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
             require(action_id in oracle[field], f"oracle expectation missing {field}/{action_id}")
             require(abs(oracle[field][action_id] - computed[action_id][field]) <= 1e-8, f"oracle mismatch for {field}/{action_id}")
     require(expected_selected == oracle["expected_selected_intervention_id"], "robust decision objective selected the wrong intervention")
+    require(expected_decision_status == oracle["expected_decision_status"], "decision availability status mismatch")
     require(expected_entropy_greedy == oracle["expected_entropy_greedy_intervention_id"], "entropy-greedy baseline selected the wrong intervention")
-    require(intervention_map[expected_selected]["feasibility_status"] == "FEASIBLE", "selected intervention is not feasible")
-    require(expected_selected != "infeasible-perfect", "disallowed perfect intervention was selected")
-    require(computed[expected_selected]["worst_case_expected_posterior_query_loss"] < baseline_risk, "selected action does not reduce worst-case query loss")
+    if expected_selected is not None:
+        require(intervention_map[expected_selected]["feasibility_status"] == "FEASIBLE", "selected intervention is not feasible")
+        require(expected_selected != "infeasible-perfect", "disallowed perfect intervention was selected")
+        require(computed[expected_selected]["worst_case_expected_posterior_query_loss"] < baseline_risk, "selected action does not reduce worst-case query loss")
 
     return {
         "baseline_expected_query_loss": baseline_risk,
+        "decision_status": expected_decision_status,
         "selected_intervention_id": expected_selected,
         "entropy_greedy_intervention_id": expected_entropy_greedy,
         "per_intervention": computed,
