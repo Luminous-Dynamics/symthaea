@@ -389,6 +389,40 @@ mod tests {
             assert!((repaired - expected).abs() < 1e-5);
         }
 
+        // Behavioral check: use a fixed held-out sequence on separate clones.
+        let inputs = [
+            ndarray::Array1::from_vec(vec![0.25, -0.75]),
+            ndarray::Array1::from_vec(vec![-0.4, 0.6]),
+            ndarray::Array1::from_vec(vec![0.9, 0.1]),
+            ndarray::Array1::from_vec(vec![-0.2, -0.8]),
+        ];
+        let mut healthy_eval = healthy.clone();
+        let mut faulty_eval = faulty.clone();
+        let mut repaired_eval = candidate.network.clone();
+        let mut faulty_output_error = 0.0_f64;
+        let mut repaired_output_error = 0.0_f64;
+        for input in &inputs {
+            let expected = healthy_eval.forward(input, 0.2);
+            let faulty_output = faulty_eval.forward(input, 0.2);
+            let repaired_output = repaired_eval.forward(input, 0.2);
+            for ((expected, faulty), repaired) in expected
+                .iter()
+                .zip(faulty_output.iter())
+                .zip(repaired_output.iter())
+            {
+                faulty_output_error += f64::from((*expected - *faulty).powi(2));
+                repaired_output_error += f64::from((*expected - *repaired).powi(2));
+            }
+        }
+        assert!(
+            faulty_output_error.sqrt() > 1e-9,
+            "the planted tau fault must affect held-out outputs"
+        );
+        assert!(
+            repaired_output_error.sqrt() < 1e-6,
+            "the isolated repair should recover the healthy output sequence"
+        );
+
         let healthy_now = cfc_weight_model_snapshot(&healthy, task_digest).expect("healthy current");
         assert_eq!(
             repair.validate_and_materialize(&healthy_now),
