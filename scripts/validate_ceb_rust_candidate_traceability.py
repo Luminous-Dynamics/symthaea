@@ -423,6 +423,8 @@ def fixture_errors(payload: dict, repo_root: Path) -> list[str]:
 
 def self_test() -> list[str]:
     errors: list[str] = []
+    if git_blob_sha1(b"hello\\n") != "ce013625030ba8dba906f756967f9e9ca394464a":
+        errors.append("Git blob SHA-1 known-vector self-test failed")
     minimal = {
         "format_id": "CEB-RUST-CANDIDATE-ORACLE-TRACEABILITY",
         "status": "public_development_design_only",
@@ -505,7 +507,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_RUST_CANDIDATE_TRACEABILITY_SELF_TEST_PASS: 5 negative controls")
+        print("CEB_RUST_CANDIDATE_TRACEABILITY_SELF_TEST_PASS: 5 negative controls + Git blob SHA-1 known vector")
 
     crosswalk_path = args.repo_root / CROSSWALK
     try:
