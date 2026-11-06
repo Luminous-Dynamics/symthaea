@@ -1001,6 +1001,7 @@ fn more_provider_observations_do_not_upgrade_an_unimplemented_predicate() {
 
     let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
     claim.predicate = ClaimPredicate::ProducerAuthenticity;
+    claim.source_predicate_type = None;
     claim.evidence_ids = evidence_values
         .iter()
         .map(|evidence| evidence.evidence_id.clone())
