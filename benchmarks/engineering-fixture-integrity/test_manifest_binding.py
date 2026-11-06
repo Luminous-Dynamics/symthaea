@@ -186,6 +186,55 @@ class ManifestBindingTests(unittest.TestCase):
         with self.assertRaisesRegex(AUDIT.AuditError, "Invalid SHA-256"):
             AUDIT.load_manifest_subjects(self.root)
 
+    def test_non_v04_manifest_schema_is_rejected(self) -> None:
+        self.manifest["schema_version"] = "engineering-fixture-materialization-v0.1"
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "Expected exact manifest schema"):
+            AUDIT.load_manifest_subjects(self.root)
+
+    def test_duplicate_part_definition_path_is_rejected(self) -> None:
+        self.part_definitions[1]["artifact"] = self.part_definitions[0]["artifact"]
+        self.part_definitions[1]["sha256"] = self.part_definitions[0]["sha256"]
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "duplicate assembly part-definition artifact path"):
+            AUDIT.load_manifest_subjects(self.root)
+
+    def test_assembly_artifact_cannot_be_reused_as_part_definition(self) -> None:
+        self.part_definitions[0]["artifact"] = self.manifest["assembly"]["artifact"]
+        self.part_definitions[0]["sha256"] = self.manifest["assembly"]["sha256"]
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "duplicate assembly part-definition artifact path"):
+            AUDIT.load_manifest_subjects(self.root)
+
+    def test_output_guard_protects_part_definition_artifacts(self) -> None:
+        _, subjects, assembly_path, _, _ = AUDIT.load_manifest_subjects(self.root)
+        protected_part = self.root / self.part_definitions[0]["artifact"]
+        with self.assertRaisesRegex(AUDIT.AuditError, "cannot overwrite an input STEP"):
+            AUDIT.ensure_safe_output_path(
+                protected_part,
+                self.root,
+                self.manifest,
+                assembly_path,
+                subjects,
+            )
+
+    def test_output_guard_rejects_symlink_to_input_part_definition(self) -> None:
+        _, subjects, assembly_path, _, _ = AUDIT.load_manifest_subjects(self.root)
+        protected_part = self.root / self.part_definitions[0]["artifact"]
+        output_link = self.root / "audit-output.json"
+        output_link.symlink_to(protected_part)
+        try:
+            with self.assertRaisesRegex(AUDIT.AuditError, "cannot overwrite an input STEP"):
+                AUDIT.ensure_safe_output_path(
+                    output_link,
+                    self.root,
+                    self.manifest,
+                    assembly_path,
+                    subjects,
+                )
+        finally:
+            output_link.unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
