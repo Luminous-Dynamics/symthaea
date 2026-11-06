@@ -39,9 +39,10 @@ No inferential interval, familywise alpha, stopping rule, robust objective, scen
 
 Let A be the number of actions and S the number of scenarios.
 
-- One-time metric indexing and robust-interval preparation is O(A·S log(A·S)) for ordered maps and O(A·S log S) for CVaR aggregation.
-- Per independent candidate, Maximin projection is O(S) and CVaR projection is O(S log S); the global best/runner-up endpoint update is O(1).
-- There are A·S candidate cells. Rebuilding the complete projection for each candidate costs O(A²·S²) for Maximin and O(A²·S² log S) for CVaR (including the A·S candidate count). The indexed path costs O(A·S²) for Maximin and O(A·S² log S) for CVaR after one-time index preparation. The expected structural improvement is one factor of A, not an omitted scenario factor.
+- One-time metric indexing and robust-interval preparation is O(A·S log(A·S)) for ordered maps, plus O(A·S log S) for the initial CVaR aggregates.
+- Per independent candidate, Maximin projection is O(S) and CVaR projection is O(S log S); the cached global best/runner-up endpoint update is O(1).
+- The full oracle rebuilds ordered action/scenario maps over the A×S metric grid for every candidate. Its per-candidate map cost is O(A·S log(A·S)); CVaR additionally aggregates O(A·S log S). Across A·S candidate cells, this is O(A²·S² log(A·S)) for Maximin and O(A²·S²[log(A·S)+log S]) for CVaR.
+- The indexed path pays the ordered-map cost once, then costs O(A·S²) for Maximin or O(A·S² log S) for CVaR across all candidate cells. The asymptotic gain therefore includes both removal of repeated full-grid map construction and replacement of A action aggregates with one affected-action aggregate; exact speedup depends on A and S.
 - CRN complexity is unchanged by this PR.
 
 These are structural operation-count expectations, not measured latency results. The next optimization frontier is a per-action dynamic minimum index for Maximin and a deterministic weighted order-statistics structure for CVaR. Any such structure must preserve the registered ordering and a reviewed numerical-equivalence contract; a faster but arithmetically different reduction must not silently replace the oracle.
