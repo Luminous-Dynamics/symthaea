@@ -99,13 +99,12 @@ pub struct OrganismConfig {
     /// `symthaea-fep`'s own default (1.0) via `..Default::default()`; exposed here so Phase 4
     /// can treat it as a heritable, mutable trait (see `genome`).
     pub action_temperature: f64,
-    /// `None` (the default) reproduces this crate's exact pre-existing behavior: the resource
-    /// observation is passed to perception raw/unquantized, and no perceptual-resolution energy
-    /// cost is charged. `Some(grain)` activates the Hoffman Fitness-Beats-Truth experiment
-    /// (`tests/hoffman_fitness_beats_truth.rs`, `HOFFMAN_INTERFACE_THEORY_PLAN_2026-07-22.md`
-    /// Phase 1): the resource observation is coarse-grained to bucket width `grain` before
-    /// perception sees it, and a real Landauer cost is charged for the resolved detail. See
-    /// `genome`'s module docs for the full rationale and bounds.
+    /// `None` (the default) preserves unquantized observations and charges
+    /// no perceptual-resolution model cost. `Some(grain)` activates the
+    /// Hoffman Fitness-Beats-Truth experiment: observations are coarsened to
+    /// bucket width `grain` before perception, and the ALife dimensionless
+    /// information-cost policy charges for the modeled resolution. This is
+    /// not a measured physical bit-erasure cost.
     pub perceptual_grain: Option<f64>,
     /// `None` (the default) reproduces this crate's exact pre-existing behavior: foraging gain
     /// scales linearly with the true `resource_level` (more is always better). `Some(sigma)`
@@ -211,13 +210,13 @@ pub struct OrganismTick {
     /// |predicted resource observation from `act()` − actual resource level| — consumes
     /// `act()`'s return value instead of discarding it.
     pub act_prediction_error: f64,
-    /// Real bits of information processed this tick (perception's `belief_change` +
-    /// action-selection's Shannon entropy) -- what `physical_cost`'s Landauer term is charged
-    /// against. Phase 3 telemetry, not decorative.
+    /// Modelled information quantity for this tick (belief-change proxy plus
+    /// action-distribution Shannon entropy). It is not a measured count of
+    /// physical bit erasures.
     pub bits_processed: f64,
-    /// Landauer + Prigogine energy cost actually charged this tick (Phase 3b: a real,
-    /// unavoidable thermodynamic floor added on top of `metabolic_cost`/`forage_activity_cost`,
-    /// not an alternative to them).
+    /// Legacy field name for the dimensionless Landauer/Prigogine-inspired
+    /// model cost charged this tick in ALife energy units. It is not a real
+    /// thermodynamic floor or an SI energy measurement.
     pub physical_cost: f64,
     /// Whether the organism is dead after this tick (`energy <= death_energy_threshold`).
     pub is_dead: bool,
@@ -540,8 +539,8 @@ impl Organism {
         let gated_obs = self.boundary.gate_observation(&raw_obs, &self.agent.belief);
 
         // 3. Perceive: update belief from the gated observation. Consumed via belief_resource
-        //    below, and via belief_change feeding Phase 3's real Landauer bit-count (not
-        //    discarded).
+        //    below, and via belief_change feeding Phase 3's modeled information-cost input
+        //    (not discarded).
         let perception = self.agent.perceive(&gated_obs);
 
         // 4. Select action (always run for real; forced_action only overrides which one is

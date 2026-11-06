@@ -14,24 +14,24 @@
 //! survive comfortably; by `activity_cost=0.08` both die unconditionally regardless of
 //! resolution. In the narrow band between (`0.065`-`0.075`), fine-grained organisms died far
 //! *more* often than coarse-grained ones (at `0.07`: fine 7/8 deaths vs coarse 0/8; at `0.075`:
-//! fine 8/8 vs coarse 7/8) -- i.e. resolution's own real Landauer tax, on its own, was enough to
-//! push already-marginal organisms over the death threshold *before* any decision-quality benefit
+//! fine 8/8 vs coarse 7/8) -- i.e. the resolution model-cost penalty was enough to push
+//! already-marginal organisms over the death threshold *before* any decision-quality benefit
 //! from finer resolution had a chance to matter. This is a stronger, more dramatic demonstration
 //! of the same direction as the original invasion experiment, not the hoped-for reversal.
 //!
 //! Consistent with the very first research pass's prediction: under a *monotonic* payoff (more
 //! true resource -> more energy, unconditionally), coarse bucketing already tracks "high vs low
 //! enough to forage" about as well as fine bucketing does for a binary threshold decision -- so
-//! raising the overall cost bar sharpens fine's built-in tax into lethality rather than creating
+//! raising the overall cost bar sharpens fine's built-in model-cost penalty into lethality rather than creating
 //! room for a resolution-driven advantage. A genuine positive control (a task where truth-
 //! tracking pays off) likely needs a *non-monotonic* payoff (interior optimum -- e.g. too much
 //! resource is spoilage/danger, not just more gain), matching this plan's originally-scoped
 //! Phase 2, not a monotonic-environment cost tweak. Not attempted here; left as the concrete next
 //! step if this line of research continues.
 //!
-//! Kept as a real, asserted finding rather than deleted: this is genuine evidence about the
-//! resolution cost's magnitude relative to the survival margin, worth having as a regression
-//! test even though it isn't the positive control it set out to be.
+//! Kept as an asserted simulation finding rather than deleted: it is evidence about the
+//! configured resolution model cost relative to the survival margin, worth retaining as a
+//! regression test even though it isn't the positive control it set out to be.
 
 use symthaea_alife::{Environment, Organism, OrganismConfig};
 

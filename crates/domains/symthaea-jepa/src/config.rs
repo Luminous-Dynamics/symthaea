@@ -1,15 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! JEPA configuration: latent dimensions, EMA momentum, energy tracking.
+//! JEPA configuration: latent dimensions, EMA momentum, and a legacy operation-cost estimate.
 
 use serde::{Deserialize, Serialize};
 
 /// Configuration for the JEPA (Joint Embedding Predictive Architecture) engine.
 ///
 /// JEPA predicts future states in a learned latent space rather than reconstructing
-/// raw observations. This reduces the thermodynamic cost of free energy minimization
-/// by operating on compressed representations (128D latent vs 16,384D HDC).
+/// raw observations. The 128D latent representation can reduce the architecture's
+/// operation count relative to 16,384D HDC vectors. Whether this reduces measured
+/// hardware energy at matched accuracy must be established by workload measurement;
+/// latent compression alone is not a thermodynamic measurement.
 ///
 /// # References
 /// - LeCun (2022): "A Path Towards Autonomous Machine Intelligence"
@@ -36,10 +38,11 @@ pub struct JepaConfig {
     /// Learning rate for context encoder and predictor (default 0.001).
     pub learning_rate: f32,
 
-    /// Energy cost per forward pass in joules (Landauer tracking).
-    /// Computed from actual FLOP count: each multiply-accumulate erases ~1 bit,
-    /// costing kT ln 2 ≈ 2.87e-21 J at 300K (Landauer 1961).
-    /// Override with 0.0 to use automatic FLOP-based estimation.
+    /// Legacy model-estimated energy per forward pass, represented in joule-scaled
+    /// units. The automatic estimate uses architecture-derived operation counts
+    /// and a fixed scenario conversion factor; it is not a hardware energy
+    /// measurement and does not count FLOPs as physical bit erasures.
+    /// Override with 0.0 to use the legacy operation-count estimate.
     pub energy_cost_per_forward: f64,
 
     /// How strongly substrate `tau_factor` modulates JEPA prediction horizons.
@@ -52,33 +55,38 @@ pub struct JepaConfig {
     pub variance_floor: f32,
 }
 
-/// Landauer limit: kT ln 2 at 300K (joules per bit erasure).
-/// Landauer (1961), "Irreversibility and Heat Generation in the Computing Process".
+/// Reference Landauer heat bound at 300 K for one logically irreversible bit
+/// erasure under the relevant thermal-bath assumptions.
+/// This physical reference is not a per-FLOP energy cost: a floating-point
+/// operation is not, by itself, evidence of a one-bit memory-erasure event.
+/// Retained under its legacy public name for compatibility.
 pub const LANDAUER_KT_LN2_300K: f64 = 2.87e-21;
 
-/// Hardware overhead factor: measured energy per FLOP / Landauer floor.
+/// Legacy scenario conversion factor used by the operation-count estimate.
 ///
-/// Derived from actual hardware (Intel i9-8950HK, 14nm Coffee Lake):
-///   - Single-core turbo: 4.8 GHz, ~15W per-core TDP
-///   - JEPA runs scalar f32 (no AVX vectorization in matmul loops)
-///   - Energy/FLOP = 15W / 4.8e9 Hz = 3.12e-9 J
-///   - Overhead = 3.12e-9 / 2.87e-21 = 1.09e12
+/// The historical derivation uses nominal CPU TDP divided by clock frequency
+/// (15 W / 4.8 GHz) and compares that scale with the 300 K Landauer erasure
+/// reference. TDP/clock is not a measured energy-per-FLOP value: it does not
+/// account for instructions per cycle, vector width, utilization, memory and
+/// accelerator work, DVFS, idle/package power, or workload-specific energy.
 ///
-/// This is ~10^8× higher than theoretical 7nm limits (Theis & Wong 2017)
-/// because: (a) 14nm process, (b) scalar execution, (c) full-core power
-/// not just switching energy. The value is honest — it reflects what this
-/// specific CPU actually dissipates per floating-point operation.
+/// Retained for output/API compatibility; do not cite it as hardware telemetry
+/// or as an empirical measurement of this CPU's energy per floating-point op.
 pub const HARDWARE_OVERHEAD: f64 = 1.09e12;
 
 impl JepaConfig {
-    /// Compute energy per forward pass from actual FLOP count.
+    /// Compute the legacy scenario estimate from architecture-derived
+    /// operation counts.
     ///
-    /// FLOPs per forward:
+    /// Counted operations:
     /// - Context encoder: input_dim × latent_dim (matmul) + latent_dim (SiLU)
     /// - Target encoder: same as context (but no backward, so counted separately)
     /// - Predictor: (latent_dim + num_actions) × latent_dim (layer 1) + latent_dim × latent_dim (layer 2)
     ///
-    /// Each FLOP ≈ 1 bit erasure at Landauer floor, multiplied by silicon overhead.
+    /// This multiplies the estimated count by a fixed operation-cost scenario.
+    /// It does not treat each FLOP as an erased bit in physical memory and is
+    /// not a measurement of this workload's joules per inference. The separate
+    /// Landauer constant is only a reference for logically irreversible erasure.
     pub fn compute_energy_per_forward(&self) -> f64 {
         let encoder_flops = self.input_dim * self.latent_dim + self.latent_dim; // matmul + activation
         let predictor_l1 = (self.latent_dim + self.num_actions) * self.latent_dim;
