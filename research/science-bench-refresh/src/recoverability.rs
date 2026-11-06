@@ -5,6 +5,7 @@
 //! within a fixed budget. It does not execute a retriever, query the network,
 //! use an LLM judge, or claim open-world search completeness.
 
+use crate::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Reverse;
