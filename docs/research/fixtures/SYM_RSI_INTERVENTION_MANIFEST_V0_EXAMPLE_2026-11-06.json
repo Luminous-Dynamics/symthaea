@@ -1,0 +1,52 @@
+{
+  "schema_version": "sym-rsi-intervention-manifest-v0",
+  "experiment_id": "synthetic-two-parent-0001",
+  "base_candidate_id": "base-0001",
+  "parent_candidate_ids": [
+    "lineage-a",
+    "lineage-b"
+  ],
+  "source_tree_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "executable_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_build_evidence_ref": "synthetic-unverified-build-reference",
+  "evaluation_context_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "task_population_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "evaluator_digest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "seed_plan_digest": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "budget_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "analysis_plan_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "change_units": [
+    {
+      "id": "change-a",
+      "origin_parent_id": "lineage-a",
+      "class": "algorithm",
+      "requires": [],
+      "conflicts": [],
+      "coupled_group": null,
+      "source_diff_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "affected_paths": [
+        "crates/core/example/src/update.rs"
+      ],
+      "declared_mechanism": "Changes the parameter update from fixed-rate gradient descent to a predeclared adaptive update.",
+      "predicted_intermediate_effect": "Lower update variance at matched training steps, without changing the task loss or compute budget.",
+      "rollback_procedure_ref": "synthetic-procedure:remove-change-a",
+      "transplant_procedure_ref": "synthetic-procedure:apply-change-a-to-clean-base"
+    },
+    {
+      "id": "change-b",
+      "origin_parent_id": "lineage-b",
+      "class": "algorithm",
+      "requires": [],
+      "conflicts": [],
+      "coupled_group": null,
+      "source_diff_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "affected_paths": [
+        "crates/core/example/src/memory.rs"
+      ],
+      "declared_mechanism": "Adds a bounded retrieval gate to the training-time memory lookup.",
+      "predicted_intermediate_effect": "Improves retrieval precision at fixed lookup count.",
+      "rollback_procedure_ref": "synthetic-procedure:remove-change-b",
+      "transplant_procedure_ref": "synthetic-procedure:apply-change-b-to-clean-base"
+    }
+  ]
+}
