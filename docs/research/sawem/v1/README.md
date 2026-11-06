@@ -295,6 +295,10 @@ Targets are stretch acceptance criteria. The comparison is only meaningful after
 
 The first new synthetic case is `DISPATCH-EXECUTION-FIDELITY-001`. It does not replace the M5BAT replay. The public dataset source, licence, benchmark claims, Test 1 → Test 2 split, intake requirements and stretch gates are frozen in [`m5bat-field-benchmark-v1.json`](m5bat-field-benchmark-v1.json). The actual ZIP has not yet been staged into this branch and no field-data metrics have been computed. The field replay, load-dependent inverter/transformer parametrization, SOC-dependent power derating, and any revenue comparison remain `not_run`.
 
+The `power_trace.rs` kernel is now compiled and test-mapped through `POWER-TRACE-ENERGY-INTEGRATION-001`. It performs exact signed trapezoid integration from milliwatt samples, reports gaps/uncovered time, and refuses to interpolate or extrapolate through missing samples. Its six tests are synthetic known-answer/hostile tests only. It has **not** been run against the M5BAT archive.
+
+Do not conflate the 2025 Test 1/Test 2 archive (RWTH DOI 10.18154/RWTH-2025-06555) with the separate April 2023 operational archive (RWTH DOI 10.18154/RWTH-2024-04895). The latter is a distinct 97 MB, 11-series field dataset (10 battery units plus a 10 kV point-of-connection series), licensed CC BY 4.0, and the public field-data registry documents browser/manual retrieval. It can be a preparatory integration dataset, but it does not replace the 2025 article's schedule-execution validation cohort. Raw archive bytes, member hashes and parsed field measurements remain unstaged.
+
 References:
 - Article: https://doi.org/10.1016/j.apenergy.2025.127340
 - Public field dataset and supplementary file: https://publications.rwth-aachen.de/record/1015732
