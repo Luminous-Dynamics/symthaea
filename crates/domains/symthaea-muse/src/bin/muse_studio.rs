@@ -2977,6 +2977,7 @@ fn verify_keeper_bundle_readback(
             )
         })?;
         if artifact.media_type != expected_media_type
+            || artifact.byte_len == 0
             || artifact.sha256.len() != 64
             || !artifact.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
         {
@@ -3245,6 +3246,15 @@ mod keeper_bundle_integrity_tests {
         assert!(!verified.manifest.midi_available);
         assert!(verified.artifact_sha256("performance.mid").is_none());
         assert_eq!(verified.manifest.artifacts.len(), 3);
+        let _ = std::fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn keeper_bundle_readback_rejects_zero_length_required_artifacts() {
+        let path = temp_bundle_path("empty-required");
+        create_fixture_bundle(&path, false);
+        std::fs::write(path.join("score.json"), []).unwrap();
+        assert!(verify_keeper_bundle_readback(&path, "test-bundle-1").is_err());
         let _ = std::fs::remove_dir_all(path);
     }
 }
