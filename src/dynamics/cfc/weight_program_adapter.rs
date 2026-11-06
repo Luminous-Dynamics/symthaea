@@ -301,10 +301,15 @@ pub fn cfc_hidden_unit_activation_signatures(
     let mut signatures = vec![Vec::with_capacity(probes.len()); hidden_dim];
 
     for (probe_index, probe) in probes.iter().enumerate() {
-        if probe.input.len() != network.config().input_dim {
+        let expected_input_dim = if layer_index == 0 {
+            network.config().input_dim
+        } else {
+            network.config().hidden_dim
+        };
+        if probe.input.len() != expected_input_dim {
             return Err(CfCPermutationAlignmentError::ProbeInputDimensionMismatch {
                 probe_index,
-                expected: network.config().input_dim,
+                expected: expected_input_dim,
                 actual: probe.input.len(),
             });
         }
@@ -855,6 +860,43 @@ mod tests {
         assert_eq!(alignment.probe_digest, digest('p'));
         assert!(alignment.mean_squared_activation_error < 1e-15);
         assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
+    }
+
+    #[test]
+    fn activation_signatures_use_hidden_dimension_for_deeper_layers() {
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-deep-layer-probe-v1");
+        let config = CfCNetworkConfig {
+            input_dim: 3,
+            hidden_dim: 4,
+            num_layers: 2,
+            output_dim: 2,
+            residual: false,
+            ..Default::default()
+        };
+        let network = CfCNetwork::from_genesis(config, &genesis, "two-layer-probe");
+        let probes = vec![CfCFunctionalProbe {
+            input: vec![0.2, -0.3, 0.7, 0.1],
+            dt: 0.05,
+        }];
+        let signatures =
+            cfc_hidden_unit_activation_signatures(&network, 1, &probes)
+                .expect("layer one accepts hidden-sized input");
+        assert_eq!(signatures.len(), 4);
+        assert!(signatures.iter().all(|signature| signature.len() == 1));
+
+        let invalid = vec![CfCFunctionalProbe {
+            input: vec![0.2, -0.3, 0.7],
+            dt: 0.05,
+        }];
+        assert!(matches!(
+            cfc_hidden_unit_activation_signatures(&network, 1, &invalid),
+            Err(CfCPermutationAlignmentError::ProbeInputDimensionMismatch {
+                expected: 4,
+                actual: 3,
+                ..
+            })
+        ));
     }
 
     #[test]
