@@ -42,6 +42,22 @@ Source: https://doi.org/10.1109/NAVITEC202669090.2026.11692526
 
 **Benchmark implication:** Add MAML/meta-learning and leave-one-dataset-out evaluation as mandatory research comparators after faithfully reproducing the published protocol. Compare feature extraction stages and scenario diversity under locked event/receiver/dataset splits. Do not treat the abstract's qualitative result as a numerical performance guarantee.
 
+### 2.2.2 Cross-scenario spatio-temporal graph model
+
+Li et al., *Spatio-Temporal Graph Neural Network for GNSS Spoofing Detection: A Cross-Scenario Generalization Study*, ION GNSS+ 2026 (14–18 September 2026), reports a 96.4% detection rate and 2.26% false-alarm rate under a mixed TEXBAT split. Under a cross-scenario protocol excluding ds6 and ds8 from training while retaining ds7, overall detection falls to 58.6%. The paper reports particularly difficult transfer to dynamic matched-power spoofing.
+
+Source: https://doi.org/10.33012/2026.20700
+
+**Benchmark implication:** Include a spatio-temporal graph model as a comparator only with matched scenario labels, graph construction and event splits. Require leave-one-scenario-family-out and progressively harder held-out scenarios. Report per-scenario recall, false alarms and detection delay; do not hide the 58.6% cross-scenario result behind the mixed-split score.
+
+### 2.2.3 RAIM-driven semi-supervised model
+
+Jiang et al., *A RAIM-Driven Latent Space Diffusion Approach for GNSS Spoofing Detection*, Advances in Space Research (available online 30 July 2026), proposes a semi-supervised latent-space diffusion approach with an adaptive GCN-derived RAIM weighting mechanism for shipboard navigation scenarios.
+
+Source: https://doi.org/10.1016/j.asr.2026.07.097
+
+**Benchmark implication:** Treat this as a maritime-specific research comparator after verifying the full method, data, baselines and reproducibility. Compare it with conventional RAIM residual monitoring and receiver-native integrity outputs. A learned RAIM weight matrix must not be assumed to satisfy a certified aviation or maritime integrity risk without independent qualification.
+
 ### 2.3 Collaborative integrity
 
 *Multicriteria Collaborative GNSS Integrity Monitoring*, IEEE Journal of Indoor and Seamless Positioning and Navigation (4 May 2026), combines PVT residuals and carrier-to-noise observations across receivers. It reports real jamming data and simulated spoofing data.
@@ -96,6 +112,22 @@ Luminous should not claim to outperform receiver firmware, antenna arrays, CRPA 
 
 NIST IR 8323 Rev. 2 initial public draft (6 May 2026) is a useful PNT risk-management mapping reference aligned to CSF 2.0; it is a draft, not a final normative standard:
 https://csrc.nist.gov/pubs/ir/8323/r2/ipd
+
+## 3.1 Ground-truth and oracle independence
+
+A benchmark cannot claim independent detection evidence if its labels, event times, receiver telemetry and adjudication all derive from the same source or campaign assumption.
+
+For each evaluation set, preserve:
+- ground-truth issuer and method;
+- event-onset time source, time basis and uncertainty;
+- receiver under test versus independent reference receiver identity;
+- whether the label is directly measured, operator-reported, simulated, inferred or independently adjudicated;
+- dependencies shared between label source, detector inputs and evaluation environment;
+- adjudication disagreements and unknown truth states.
+
+The evaluator must distinguish physical-event truth, receiver-integrity truth, and service-level consequence. A recorded interference event is not automatically proof that the navigation solution was invalid; a navigation residual is not automatically proof of an interference event.
+
+Where truth provenance is insufficient, report the case as ambiguous/indeterminate or place it in a separate exploratory stratum. Do not silently turn model-derived labels into oracle ground truth. The benchmark receipt should bind the adjudication manifest and its exact digest.
 
 ## 4. Paradigm shifts
 
@@ -166,7 +198,14 @@ For aviation and other safety-critical domains, time-to-alert, protection levels
 4. Conventional supervised CNN or comparable feature model.
 5. Published cross-domain comparator from the 2026 IEEE Access study, subject to faithful reproduction.
 6. 2026 NAVITEC CNN versus MAML cross-testing comparator across TEXBAT, OAKBAT and FGI-SpoofRepo, subject to faithful reproduction.
-7. Collaborative PVT-residual/C/N0 integrity comparator.
+7. Spatio-temporal graph model cross-scenario comparator (ION GNSS+ 2026), if faithful data/protocol reproduction is possible.
+8. RAIM-driven semi-supervised maritime comparator (Advances in Space Research, 2026), if full-method and data reproduction conditions are available.
+9. Receiver-native integrity/authentication outputs as separate operational baselines: RAIM/ARAIM protection-level/status outputs, SBAS integrity status and Galileo OSNMA authentication state where available. These are not interchangeable with ML anomaly scores.
+10. No-collaboration ablation.
+11. No-provenance / no-common-mode analysis ablations.
+12. Symthaea uncertainty-aware assessment.
+13. Explainable multimodal statistical + 1D temporal + 2D time-frequency fusion baseline, with per-modality ablations and matched hardware profiling where data conditions permit.
+14. Integrated evidence-qualified service-continuity workflow.
 7. No-collaboration ablation.
 8. No-provenance / no-common-mode analysis ablations.
 9. Symthaea uncertainty-aware assessment.
