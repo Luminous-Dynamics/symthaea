@@ -36,22 +36,33 @@
     {
       "repository_id": "pumpprobe",
       "url": "https://github.com/leiferlab/pumpprobe",
-      "revision_status": "UNPINNED",
-      "commit_sha": null,
+      "observed_ref": "main",
+      "revision_status": "COMMIT_PINNED",
+      "commit_sha": "1dbc5e0a2b609d54bc9b1c90c73d4e3bf183d3c7",
       "license": "GPL-3.0"
     },
     {
       "repository_id": "wormdatamodel",
       "url": "https://github.com/leiferlab/wormdatamodel",
-      "revision_status": "UNPINNED",
-      "commit_sha": null,
+      "observed_ref": "master",
+      "revision_status": "COMMIT_PINNED",
+      "commit_sha": "2ab956199e3931de41a190d2b9985e961df3810c",
       "license": null
     },
     {
       "repository_id": "wormbrain",
       "url": "https://github.com/leiferlab/wormbrain",
-      "revision_status": "UNPINNED",
-      "commit_sha": null,
+      "observed_ref": "master",
+      "revision_status": "COMMIT_PINNED",
+      "commit_sha": "d94f7a1456622f77eebcc181de1d8504618764c4",
+      "license": null
+    },
+    {
+      "repository_id": "mistofrutta",
+      "url": "https://github.com/francescorandi/mistofrutta",
+      "observed_ref": "master",
+      "revision_status": "COMMIT_PINNED",
+      "commit_sha": "11ac8c3e40743b6e35f54568e2de36b95466bbc4",
       "license": null
     }
   ],
