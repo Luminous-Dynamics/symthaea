@@ -224,12 +224,13 @@ pub fn evaluate_warranty_compliance<'a>(
     if inputs.samples.is_empty() {
         return Err(WarrantyComplianceError::EmptySampleSet);
     }
-    if inputs.period_budgets.iter().any(|budget| {
-        !nonempty(budget.period_id)
-            || !nonempty(budget.source_ref)
-            || !valid_sha256(budget.source_sha256)
-    }) {
-        return Err(WarrantyComplianceError::InvalidEvidenceReference);
+    for budget in inputs.period_budgets {
+        if !nonempty(budget.period_id) || !nonempty(budget.source_ref) {
+            return Err(WarrantyComplianceError::InvalidEvidenceReference);
+        }
+        if !valid_sha256(budget.source_sha256) {
+            return Err(WarrantyComplianceError::InvalidSourceDigest);
+        }
     }
     for (index, budget) in inputs.period_budgets.iter().enumerate() {
         if inputs.period_budgets[..index]
@@ -265,6 +266,8 @@ pub fn evaluate_warranty_compliance<'a>(
 
     let mut charge_energy_sum = 0_u128;
     let mut discharge_energy_sum = 0_u128;
+    let mut charge_energy_complete = true;
+    let mut discharge_energy_complete = true;
     let mut throughput_complete = true;
     let mut period_energy = std::collections::BTreeMap::<&str, u128>::new();
     let mut period_energy_complete = std::collections::BTreeMap::<&str, bool>::new();
@@ -283,6 +286,16 @@ pub fn evaluate_warranty_compliance<'a>(
             || sample.interval_end_utc > inputs.horizon_end_utc
             || sample.interval_start_utc >= sample.interval_end_utc
             || sample.observed_at_utc < sample.interval_end_utc
+            || sample.observed_at_utc > sample.available_at_utc
+            || sample.minimum_soc_bps.is_some_and(|value| value > 10_000)
+            || sample.maximum_soc_bps.is_some_and(|value| value > 10_000)
+            || matches!(
+                (sample.minimum_soc_bps, sample.maximum_soc_bps),
+                (Some(minimum), Some(maximum)) if minimum > maximum
+            )
+            || sample
+                .maximum_cell_temperature_milli_c
+                .is_some_and(|value| value < -273_150)
         {
             return Err(WarrantyComplianceError::InvalidSample);
         }
@@ -405,8 +418,14 @@ pub fn evaluate_warranty_compliance<'a>(
                 basis,
                 WarrantyThroughputBasis::DischargeOnly | WarrantyThroughputBasis::ChargePlusDischarge
             );
-            if required_charge && sample.charge_energy_wh.is_none()
-                || required_discharge && sample.discharge_energy_wh.is_none()
+            if sample.charge_energy_wh.is_none() {
+                charge_energy_complete = false;
+            }
+            if sample.discharge_energy_wh.is_none() {
+                discharge_energy_complete = false;
+            }
+            if (required_charge && sample.charge_energy_wh.is_none())
+                || (required_discharge && sample.discharge_energy_wh.is_none())
             {
                 throughput_complete = false;
                 period_energy_complete.insert(sample.warranty_period_id, false);
@@ -488,7 +507,8 @@ pub fn evaluate_warranty_compliance<'a>(
         violation_count: discharge_power_violations,
     };
 
-    let measured_throughput = if throughput_complete {
+    let throughput_specified = envelope.throughput_basis.is_some();
+    let measured_throughput = if throughput_specified && throughput_complete {
         Some(match envelope.throughput_basis {
             Some(WarrantyThroughputBasis::ChargeOnly) => charge_energy_sum,
             Some(WarrantyThroughputBasis::DischargeOnly) => discharge_energy_sum,
@@ -591,8 +611,10 @@ pub fn evaluate_warranty_compliance<'a>(
         discharge_power,
         cumulative_throughput: cumulative,
         period_throughput,
-        measured_charge_energy_wh: throughput_complete.then_some(charge_energy_sum),
-        measured_discharge_energy_wh: throughput_complete.then_some(discharge_energy_sum),
+        measured_charge_energy_wh: (throughput_specified && charge_energy_complete)
+            .then_some(charge_energy_sum),
+        measured_discharge_energy_wh: (throughput_specified && discharge_energy_complete)
+            .then_some(discharge_energy_sum),
         measured_warranty_throughput_wh: measured_throughput,
         period_budget_exceeded_count,
         period_budget_indeterminate_count,
