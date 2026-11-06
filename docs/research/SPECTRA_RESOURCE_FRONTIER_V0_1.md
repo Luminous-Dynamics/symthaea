@@ -60,7 +60,7 @@ File: tools/spectra-uvsd-fit/src/resource_frontier.rs
 - Conservative ResourceCostUpperBound with explicit six-dimensional qualification.
 - ResourceFrontierContract with version, currency and remaining budget.
 - Deterministic Pareto filtering, stable tie handling and dispositions for every candidate.
-- Currency-bound ResourceChargeLedger with checked accumulation and remaining-budget computation.
+- Currency-bound ResourceChargeLedger with checked accumulation and remaining-budget computation from the original total budget. The frontier contract's remaining_budget is already post-charge and must not be decremented a second time.
 - Independent replay by recomputing the entire frontier and comparing every output field.
 
 ## Tests declared
