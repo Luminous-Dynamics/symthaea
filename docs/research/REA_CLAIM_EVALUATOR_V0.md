@@ -41,3 +41,7 @@ The derivation digest is an integrity commitment, not an issuer signature or tru
 The module tests cover exact provider-report support, disagreement/refutation, same-scope conflict preservation, subject and operation mismatch, platform-version scope underdetermination, unimplemented predicate fail-closed behavior, missing evidence, assumptions, forged VerifiedEvidence metadata, recursive duplicate-key rejection and deterministic derivation commitments.
 
 The isolated REA Evidence compatibility harness also compiles the root adapter and executes a root API smoke test. These tests are authored in this branch; do not represent them as passing until the exact-head workflow completes.
+
+The derivation commits to the complete canonical claim request, not merely to the final disposition. It carries the request SHA-256 and reproduces the asserted value, source predicate type, ordered Evidence ID list and assumptions in the result body. Two different assertions that both fail to match the observed normalized result therefore cannot collapse to the same derivation commitment.
+
+Raw claim import also requires every schema-required field to be present, including nullable source_predicate_type and the evidence_ids / assumptions arrays. Serde defaults do not make omitted request fields silently equivalent to explicit null or empty arrays.
