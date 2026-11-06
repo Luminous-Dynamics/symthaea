@@ -1754,6 +1754,9 @@ pub mod scenario_dgp;
 /// Simultaneous finite-sample confidence bounds for candidate score Monte Carlo.
 pub mod score_bounds;
 
+/// Componentwise resource budget accounting and acquisition Pareto frontiers.
+pub mod resource_frontier;
+
 /// Robust indifference-zone certificates for Monte Carlo design selection.
 pub mod ranking;
 
