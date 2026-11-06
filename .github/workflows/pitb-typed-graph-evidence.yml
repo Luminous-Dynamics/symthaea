@@ -7,6 +7,7 @@ on:
       - "tools/pitb-sorrydb-audit/**"
       - "tools/pitb-sorrydb-evidence-closure/**"
       - "tools/pitb-sorrydb-integrity/**"
+      - "docs/research/pitb-cross-benchmark-assurance-frontier-2026-11-06.md"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -286,16 +287,51 @@ jobs:
           run_bytes = Path(sys.argv[2]).read_bytes()
           if report["run_input_sha256"] != hashlib.sha256(run_bytes).hexdigest():
               raise SystemExit("synthetic proof-run report digest differs from JSONL bytes")
-          if len(runs) != 2 or report["run_count"] != 2 or report["verified_success_run_count"] != 1 or report["unique_successful_task_count"] != 1:
+          if len(runs) != 7 or report["run_count"] != 7 or report["verified_success_run_count"] != 4 or report["unique_successful_task_count"] != 3:
               raise SystemExit("synthetic proof-run denominators changed")
-          summary = report["strategy_summaries"][0]
-          if summary["attempts"] != 2 or summary["verified_success_attempts"] != 1:
-              raise SystemExit("synthetic per-strategy attempt denominator changed")
-          if summary["unique_tasks_solved"] != 1 or summary["unique_task_success_rate"] != 0.5:
-              raise SystemExit("synthetic per-strategy unique task coverage changed")
-          if abs(summary["cost_per_unique_verified_task_usd"] - 0.01) > 1e-12:
-              raise SystemExit("synthetic cost per unique verified task changed")
-          print("PITB_SORRYDB_REPORT_AND_PROOF_RUN_SCHEMA_PASS")
+          summaries = {row["strategy_name"]: row for row in report["strategy_summaries"]}
+          if set(summaries) != {"strategy-a", "strategy-b"}:
+              raise SystemExit("synthetic comparison must include both strategies")
+          a = summaries["strategy-a"]
+          b = summaries["strategy-b"]
+          if (a["attempts"], a["verified_success_attempts"], a["unique_tasks_solved"]) != (4, 2, 2):
+              raise SystemExit("strategy-a retries or solved-task collapse changed")
+          if (b["attempts"], b["verified_success_attempts"], b["unique_tasks_solved"]) != (3, 2, 2):
+              raise SystemExit("strategy-b attempt or solved-task counts changed")
+          if abs(a["unique_task_success_rate"] - (2 / 3)) > 1e-12 or abs(b["unique_task_success_rate"] - (2 / 3)) > 1e-12:
+              raise SystemExit("per-strategy unique task rates changed")
+          if abs(a["cost_per_unique_verified_task_usd"] - 0.01) > 1e-12:
+              raise SystemExit("strategy-a cost per unique verified task changed")
+          if abs(b["cost_per_unique_verified_task_usd"] - 0.0075) > 1e-12:
+              raise SystemExit("strategy-b cost per unique verified task changed")
+          comparisons = report["pairwise_clustered_comparisons"]
+          if len(comparisons) != 1:
+              raise SystemExit("synthetic report must emit one paired comparison")
+          comparison = comparisons[0]
+          expected_pair = {
+              "task_denominator": 3,
+              "strategy_a_attempted_tasks": 3,
+              "strategy_b_attempted_tasks": 3,
+              "strategy_a_unique_verified_tasks": 2,
+              "strategy_b_unique_verified_tasks": 2,
+              "both_solved_tasks": 1,
+              "a_only_solved_tasks": 1,
+              "b_only_solved_tasks": 1,
+              "neither_solved_tasks": 0,
+              "repository_cluster_count": 2,
+              "repository_file_cluster_count": 3,
+              "repository_bootstrap_replicates": 10000,
+              "nested_repository_file_bootstrap_replicates": 10000,
+              "repository_cluster_sign_flip_replicates": 50000,
+              "repository_cluster_sign_flip_p_value": 1.0,
+              "holm_adjusted_p_value": 1.0,
+          }
+          for key, value in expected_pair.items():
+              if comparison[key] != value:
+                  raise SystemExit(f"clustered comparison {key}: expected {value!r}, got {comparison[key]!r}")
+          if abs(comparison["paired_risk_difference_b_minus_a"]) > 1e-12:
+              raise SystemExit("balanced synthetic strategy pair must have zero risk difference")
+          print("PITB_SORRYDB_REPORT_AND_CLUSTERED_COMPARISON_SCHEMA_PASS")
           PY
 
       - name: Audit real pinned SorryDB snapshot and evaluation split
