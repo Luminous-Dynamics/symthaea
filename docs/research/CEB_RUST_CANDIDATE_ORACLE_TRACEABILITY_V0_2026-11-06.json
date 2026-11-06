@@ -524,7 +524,28 @@
           "why_spec_derived": "This tests command/data separation and path authority together."
         }
       ],
-      "unresolved_before_fixture": "Pin OS and filesystem behavior, allowed executable policy, symlink race threat model, normalization rules and whether descriptor-relative operations are required."
+      "unresolved_before_fixture": "Pin OS and filesystem behavior, allowed executable policy, symlink race threat model, normalization rules and whether descriptor-relative operations are required.",
+      "source_fixture": {
+        "path": "benchmarks/ceb/public-development-fixtures/rust-workspace-security-v0/",
+        "status": "public_source_only_not_compiled_or_executed",
+        "file_count": 8,
+        "has_cargo_lock": false,
+        "reference_patch_present": false,
+        "executable_oracle_present": false,
+        "task_manifest_present": false,
+        "demonstrated_scope": [
+          "untrusted path interpolated into returned shell-command string",
+          "lexical absolute/parent traversal rejection only"
+        ],
+        "excluded_scope": [
+          "shell invocation",
+          "process execution",
+          "symlink-safe containment",
+          "descriptor-relative file access",
+          "race resistance",
+          "qualified security policy"
+        ]
+      }
     },
     {
       "candidate_key": "feature-target-matrix",
@@ -826,6 +847,16 @@
       "file_count": 8,
       "purpose": "Three-crate standard-library-only workspace with a binary-heap top-k baseline that keeps stale entries after same-key updates.",
       "limitation": "Demonstrates only stale-entry correctness. No insert/remove matrix, numeric-domain qualification, resource budget, hardware profile, benchmark run or speedup result exists.",
+      "admission_status": "not_admitted",
+      "holdout_eligible": false
+    },
+    {
+      "candidate_key": "security-boundary",
+      "path": "benchmarks/ceb/public-development-fixtures/rust-workspace-security-v0/",
+      "status": "public_source_only_not_compiled_or_executed",
+      "file_count": 8,
+      "purpose": "Three-crate workspace exposes shell-string interpolation of a workspace path and a lexical path helper that does not resolve symlinks.",
+      "limitation": "Constructs command text only; it never invokes a shell/process. No symlink-safe filesystem operation, direct-argv runner, platform-specific containment, or threat-model qualification exists.",
       "admission_status": "not_admitted",
       "holdout_eligible": false
     }
