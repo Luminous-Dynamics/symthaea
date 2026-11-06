@@ -137,6 +137,7 @@
 //!   Principle in Mind, Brain, and Behavior.
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
+pub mod bayesian_model_reduction;
 mod agent;
 mod bridge;
 pub mod free_energy;
