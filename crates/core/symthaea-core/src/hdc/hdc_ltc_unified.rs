@@ -575,13 +575,41 @@ impl HdcLtcUnifiedNeuron {
         label: &str,
     ) -> Self {
         let dim = config.dimension;
+
+        // Match new()'s initialization contract while retaining GenesisSeed's
+        // domain-separated determinism. The raw genesis HV components are
+        // uniform in [-1, 1] (norm ~= sqrt(D/3)); feeding those directly into
+        // Hadamard state transforms creates a different dynamical regime from
+        // new()'s unit-norm orthogonal vectors. Modified Gram-Schmidt makes
+        // both constructors use unit-norm, low-interference parameter vectors.
+        let mut parameters = vec![
+            genesis.hv(&format!("{label}::weight_hv"), dim),
+            genesis.hv(&format!("{label}::input_mask"), dim),
+            genesis.hv(&format!("{label}::tau_modulator"), dim),
+            genesis.hv(&format!("{label}::gate_weight"), dim),
+            genesis.hv(&format!("{label}::gate_bias"), dim),
+        ];
+
+        for index in 0..parameters.len() {
+            for previous in 0..index {
+                let projection = parameters[index].dot(&parameters[previous]);
+                parameters[index] = parameters[index]
+                    .subtract(&parameters[previous].scale(projection));
+            }
+
+            let norm = parameters[index].norm();
+            if norm > 1e-10 {
+                parameters[index] = parameters[index].scale(1.0 / norm);
+            }
+        }
+
         Self {
             state: ContinuousHV::zero(dim),
-            weight_hv: genesis.hv(&format!("{label}::weight_hv"), dim),
-            input_mask: genesis.hv(&format!("{label}::input_mask"), dim),
-            tau_modulator: genesis.hv(&format!("{label}::tau_modulator"), dim),
-            gate_weight: genesis.hv(&format!("{label}::gate_weight"), dim),
-            gate_bias: genesis.hv(&format!("{label}::gate_bias"), dim).scale(0.1),
+            weight_hv: parameters[0].clone(),
+            input_mask: parameters[1].clone(),
+            tau_modulator: parameters[2].clone(),
+            gate_weight: parameters[3].clone(),
+            gate_bias: parameters[4].scale(0.1),
             weight_momentum: ContinuousHV::zero(dim),
             input_momentum: ContinuousHV::zero(dim),
             running_mean: 0.0,
@@ -2821,6 +2849,42 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_genesis_initialization_matches_unit_orthogonal_scale() {
+        let genesis = crate::genesis::GenesisSeed::from_phrase("hdc-ltc-init-contract");
+        let config = UnifiedConfig {
+            dimension: 256,
+            ..UnifiedConfig::default()
+        };
+        let neuron = HdcLtcUnifiedNeuron::from_genesis(config, &genesis, "test-neuron");
+        let parameters = [
+            neuron.weight_hv_ref(),
+            neuron.input_mask_ref(),
+            &neuron.tau_modulator,
+            &neuron.gate_weight,
+        ];
+
+        for (index, parameter) in parameters.iter().enumerate() {
+            let norm = parameter.norm();
+            assert!(
+                (norm - 1.0).abs() < 1e-3,
+                "genesis parameter {index} should have unit norm, got {norm}"
+            );
+            for other in parameters.iter().skip(index + 1) {
+                let similarity = parameter.similarity(other);
+                assert!(
+                    similarity.abs() < 0.02,
+                    "genesis parameter vectors should be near-orthogonal, got {similarity}"
+                );
+            }
+        }
+
+        assert!(
+            (neuron.gate_bias.norm() - 0.1).abs() < 1e-3,
+            "gate bias should retain the 0.1 initialization scale"
+        );
     }
 
     #[test]
