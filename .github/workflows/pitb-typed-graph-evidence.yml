@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/pitb-graph-evidence/**"
+      - "tools/pitb-grouped-benchmark-splits/**"
       - ".github/workflows/pitb-typed-graph-evidence.yml"
   workflow_dispatch:
 
@@ -140,5 +141,178 @@ jobs:
         with:
           name: pitb-typed-graph-evidence-summary
           path: ${{ runner.temp }}/pitb-graph-evidence-summary.json
+          if-no-files-found: warn
+          retention-days: 30
+
+
+  grouped-benchmark-split-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install JSON Schema validator
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pitb-splits-venv"
+          "$RUNNER_TEMP/pitb-splits-venv/bin/pip" install "jsonschema==4.25.1"
+
+      - name: Stage isolated grouped split planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/pitb-grouped-benchmark-splits"
+          mkdir -p "$staged/src" "$staged/schema"
+          cp tools/pitb-grouped-benchmark-splits/Cargo.toml "$staged/Cargo.toml"
+          cp tools/pitb-grouped-benchmark-splits/Cargo.lock "$staged/Cargo.lock"
+          cp tools/pitb-grouped-benchmark-splits/src/main.rs "$staged/src/main.rs"
+          cp tools/pitb-grouped-benchmark-splits/schema/*.json "$staged/schema/"
+          echo "PITB_GROUPED_SPLITS_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+          echo "PITB_GROUPED_SPLITS_DIR=$staged" >> "$GITHUB_ENV"
+
+      - name: Format and test Rust split planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2021 "$PITB_GROUPED_SPLITS_DIR/src/main.rs"
+          cargo fmt --check --manifest-path "$PITB_GROUPED_SPLITS_MANIFEST"
+          cargo test --locked --manifest-path "$PITB_GROUPED_SPLITS_MANIFEST"
+
+      - name: Generate and schema-check synthetic project-disjoint folds
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_GROUPED_SPLITS_MANIFEST" -- \
+            --self-test-report "$RUNNER_TEMP/grouped-folds.synthetic.json"
+          "$RUNNER_TEMP/pitb-splits-venv/bin/python" - \
+            "$RUNNER_TEMP/grouped-folds.synthetic.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("tools/pitb-grouped-benchmark-splits/schema/grouped-benchmark-splits-v0.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          report = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(report))
+          if errors:
+              raise SystemExit("synthetic grouped-fold schema errors: " + "; ".join(e.message for e in errors))
+          if report["repository_count"] != 17 or report["fold_count"] != 5:
+              raise SystemExit("synthetic repository/fold counts changed")
+          if report["task_count"] != len(report["assignments"]):
+              raise SystemExit("synthetic task assignment denominator changed")
+          if report["repository_disjoint"] is not True or report["every_task_assigned_once"] is not True:
+              raise SystemExit("synthetic project-disjoint boundary changed")
+          by_repository = {}
+          for row in report["assignments"]:
+              by_repository.setdefault(row["repository_key"], set()).add(row["fold_id"])
+          if any(len(folds) != 1 for folds in by_repository.values()):
+              raise SystemExit("one synthetic repository leaked across folds")
+          if report["max_tasks_per_fold"] - report["min_tasks_per_fold"] > report["max_repository_group_size"]:
+              raise SystemExit("synthetic fold load exceeds largest-project balance bound")
+          print("PITB_GROUPED_SPLIT_SYNTHETIC_SCHEMA_PASS")
+          PY
+
+      - name: Download and verify exact SorryDB evaluation split
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="74b3b63f8ba890d675f362924b21ac55db410383"
+          url="https://raw.githubusercontent.com/SorryDB/SorryDB/$source_commit/data/SorryDB_2601/SorryDB_2601_1000_evaluation_split.json"
+          split="$RUNNER_TEMP/SorryDB_2601_1000_evaluation_split.json"
+          curl --fail --silent --show-error --location "$url" -o "$split"
+          blob="$(git hash-object --stdin < "$split")"
+          test "$blob" = "af3b663429dc4689ee728d2fb5c7d8d5034476f7"
+          echo "SORRYDB_EVALUATION_SPLIT_GIT_BLOB_PASS $blob"
+          echo "PITB_SORRYDB_SPLIT=$split" >> "$GITHUB_ENV"
+
+      - name: Generate five project-disjoint folds from real SorryDB tasks
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path "$PITB_GROUPED_SPLITS_MANIFEST" -- \
+            --plan "$PITB_SORRYDB_SPLIT" \
+            "$RUNNER_TEMP/sorrydb-project-disjoint-folds.json" \
+            --folds 5 \
+            --seed sorrydb-2601-project-folds-v1 \
+            --source-blob-sha1 af3b663429dc4689ee728d2fb5c7d8d5034476f7
+
+      - name: Validate project-disjoint denominators and cluster integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/pitb-splits-venv/bin/python" - \
+            "$RUNNER_TEMP/sorrydb-project-disjoint-folds.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("tools/pitb-grouped-benchmark-splits/schema/grouped-benchmark-splits-v0.schema.json").read_text())
+          report = json.loads(Path(sys.argv[1]).read_text())
+          errors = list(Draft202012Validator(schema).iter_errors(report))
+          if errors:
+              raise SystemExit("real SorryDB grouped-fold schema errors: " + "; ".join(e.message for e in errors))
+          expected = {
+              "task_count": 1000,
+              "repository_count": 78,
+              "repository_commit_pair_count": 107,
+              "repository_file_cluster_count": 339,
+              "fold_count": 5,
+          }
+          for field, value in expected.items():
+              if report[field] != value:
+                  raise SystemExit(f"{field}: expected {value}, observed {report[field]}")
+          if report["source_dataset_git_blob_sha1"] != "af3b663429dc4689ee728d2fb5c7d8d5034476f7":
+              raise SystemExit("wrong upstream SorryDB source split identity")
+          if report["task_count"] != len(report["assignments"]):
+              raise SystemExit("not every evaluation task has an assignment")
+          by_task = {}
+          by_repository = {}
+          for row in report["assignments"]:
+              if row["task_id"] in by_task:
+                  raise SystemExit(f"duplicate task assignment {row['task_id']}")
+              by_task[row["task_id"]] = row["fold_id"]
+              by_repository.setdefault(row["repository_key"], set()).add(row["fold_id"])
+          if len(by_task) != 1000:
+              raise SystemExit("expected 1,000 unique task assignments")
+          if any(len(folds) != 1 for folds in by_repository.values()):
+              raise SystemExit("repository appears in more than one fold")
+          if any(fold["task_count"] != len(fold["task_ids"]) for fold in report["folds"]):
+              raise SystemExit("fold task_count differs from its task ID list")
+          if report["max_tasks_per_fold"] - report["min_tasks_per_fold"] > report["max_repository_group_size"]:
+              raise SystemExit("fold balance exceeds largest indivisible repository cluster")
+          print("PITB_SORRYDB_PROJECT_DISJOINT_FOLDS_PASS")
+          print(json.dumps({
+              "tasks": report["task_count"],
+              "repositories": report["repository_count"],
+              "folds": [
+                  {"fold": f["fold_id"], "tasks": f["task_count"], "repositories": f["repository_count"]}
+                  for f in report["folds"]
+              ],
+              "min_tasks_per_fold": report["min_tasks_per_fold"],
+              "max_tasks_per_fold": report["max_tasks_per_fold"],
+              "max_repository_cluster": report["max_repository_group_size"],
+          }, sort_keys=True))
+          PY
+
+      - name: Retain project-disjoint fold manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pitb-sorrydb-project-disjoint-folds
+          path: |
+            ${{ runner.temp }}/grouped-folds.synthetic.json
+            ${{ runner.temp }}/sorrydb-project-disjoint-folds.json
+            ${{ runner.temp }}/pitb-grouped-benchmark-splits/src/main.rs
+            ${{ runner.temp }}/pitb-grouped-benchmark-splits/Cargo.lock
           if-no-files-found: warn
           retention-days: 30
