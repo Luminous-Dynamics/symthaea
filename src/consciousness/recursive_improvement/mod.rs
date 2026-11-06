@@ -46,6 +46,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Core infrastructure for MAGI Loop
+pub mod candidate_archive;
 pub mod core;
 pub mod types;
 
@@ -64,6 +65,11 @@ pub mod world_prediction;
 // Re-export key types from core infrastructure
 pub use types::{
     ActionContext, InputModality, SemanticInput, TimeWindow, calculate_trend, instant_now,
+};
+
+pub use candidate_archive::{
+    CandidateArchive, CandidateArchiveError, CandidateRecord, CapabilityVector,
+    EvaluationContext, EvaluationPartition,
 };
 
 pub use core::{
