@@ -310,6 +310,8 @@ Diagnostics: alignment precision, activation/functional probe budget, weight-dis
 
 Compare raw flattened-weight inspection, activation-probe alignment, permutation-equivariant weight-space editors, SWI's typed group alignment, and a labelled oracle-alignment upper bound. The oracle is verifier-only. A permutation-only change must not be called a defect; a repair must still be evaluated using native model fingerprints and actual behavior.
 
+**Executable anchor now present on this branch:** `src/dynamics/cfc/weight_program_adapter.rs::consistent_hidden_unit_permutation_preserves_cfc_function` materializes the equivalence-preserving permutation through the actual `WeightProgram → materialize_cfc_weight_program → cloned SWI candidate` path. It checks that the native fingerprint changes while a four-step temporal probe sequence remains equivalent. The paired partial-permutation negative control changes only the input-projection rows and must change the output sequence. The fixture is intentionally narrow: one small, one-layer, no-backbone CfC network. It validates one exact symmetry family, not arbitrary multi-layer/backbone transformations or an alignment algorithm.
+
 
 ## 6. Baselines and fairness requirements
 
@@ -404,6 +406,26 @@ The analytical/oracle baseline is an upper bound, never a tuning signal. Weights
 11. Protocol validation never emits an accuracy, capability, efficiency, SOTA, safety, or consciousness claim.
 
 For healthy-model false-edit rate, report exact binomial confidence intervals. Do not declare a low false-edit rate from a tiny control sample. A target such as an upper 95% confidence bound below 1% requires hundreds of independent healthy trials (approximately 300 zero-false-edit trials as a rough planning minimum); confirm the exact interval before stating that gate is met.
+
+## 7.1 Competitive targets and claim ladder
+
+These are preregistered **aspiration thresholds**, not current results. Freeze the task, data, seeds, model sizes, and budget before assessing them; adapt the threshold only when a task-specific meaningful-effect margin has been justified in advance.
+
+| Capability | Qualification target | Competitive target |
+|---|---|---|
+| CfC/LTC temporal modeling | Reproduce a published baseline under the exact dataset, split, missingness, and elapsed-time protocol; report error against a high-accuracy numerical reference | At matched parameters and compute, either reduce forecast error by at least 5% or achieve non-inferior error (within a predeclared 1% relative margin) with at least 20% lower p95 latency or memory |
+| HDC/VSA | Exact algebra contracts, calibrated retrieval precision/recall, and corruption curves against MAP, HRR, OnlineHD and conventional controls | Show a reproducible Pareto advantage: at least 20% lower memory or query latency at no more than a 1 percentage-point task-performance loss, or a meaningful held-out compositional-transfer gain |
+| FEP diagnosis | Prospective information gain predicts realized disambiguation; posterior calibration and regret beat random/greedy controls | At the same diagnosis accuracy (within 1 percentage point), reduce median diagnostic probes by at least 20% versus the strongest budget-matched baseline |
+| WSP repair | At least 90% repair success on the registered planted-fault suite, with no hidden-label leakage and independently verified preservation | Demonstrate a healthy-model false-edit upper 95% exact-binomial bound below 1% (requires roughly 300 independent healthy cases with zero false edits), while keeping collateral regression within the predeclared task margin |
+| Integrated H×C×F×W | Every factor has verified activation/bypass receipts; report all main effects and interactions | Improve the joint repair–retention–probe-cost frontier by at least 10% versus the strongest single-component and conventional baselines, with paired 95% confidence intervals excluding no improvement |
+
+**Claim ladder:**
+1. *Correctness*: numerical contracts, candidate isolation, exact fingerprints, and negative controls pass.
+2. *Task qualification*: the declared tasks and all baselines execute with complete source-bound receipts.
+3. *Competitive*: the relevant capability reaches its predeclared target under matched compute and data.
+4. *Field-leading*: the advantage survives independent replication, multiple public datasets or fault families, multiplicity correction, and disclosure of all failed/negative runs.
+
+A single synthetic fixture, one seed, one successful PR workflow, or an aggregate score is not evidence of SOTA. Report latency, memory, energy, and accuracy as a Pareto surface rather than compressing them into an arbitrary scalar. An integrated win cannot be inferred from the full profile alone; estimate the registered factor interactions.
 
 ## 8. A staged implementation programme
 
