@@ -208,7 +208,7 @@ A matching replay receipt remains a reproducibility result, not a signature, tru
 
 The producer implementation is [#10665](https://github.com/Luminous-Dynamics/symthaea/pull/10665). Its focused REA workflow passed on exact head `e2160007bcd8eb03c283465c08ba07e34372b75f` after the raw Evidence move/clone reduction, named provider metadata record, bundle-adapter Clippy cleanup and test-slice borrowing fixes. This is focused compatibility/claim-evaluator qualification, not full-workspace qualification or general semantic truth.
 
-The independent replay implementation is refreshed stacked draft [#10725](https://github.com/Luminous-Dynamics/symthaea/pull/10725), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It includes:
+The independent replay implementation is refreshed stacked draft [#10740](https://github.com/Luminous-Dynamics/symthaea/pull/10740), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It includes:
 - a frozen public seed oracle with 23 explicit expected-disposition/replay-outcome cases, authored independently of the production evaluator;
 - a standalone, bounded, read-only `rea-claim-replay` CLI with exit 0 for match, 1 for semantic mismatch, and 2 for invalid input / IO / resource failure;
 - separate request/result parsing, recursive duplicate-key rejection, required-nullable-field checks and closed result schemas;
@@ -223,7 +223,7 @@ The replay exact-head workflow has already passed the parent formatter, upstream
 
 The independent fuzz workspace is [#10728](https://github.com/Luminous-Dynamics/symthaea/pull/10728), with research contract [#10726](https://github.com/Luminous-Dynamics/symthaea/issues/10726). It keeps cargo-fuzz out of production dependencies and has three targets: raw request parsing, raw result parsing, and bounded framed end-to-end replay. It uses pinned nightly/cargo-fuzz, an inspectable public seed corpus, deterministic framing tests, 1 MiB per-input cap, 8 Evidence records per fuzz frame, five-second per-input timeout and 512 MiB runner RSS ceiling. Its corrected exact-head workflow passed the deterministic frame parser suite and all three bounded campaigns. This is bounded no-crash evidence for that exact run, not a parser security certification.
 
-The older replay draft [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710) was closed as superseded after its branch diverged from the parent; its work was carried to #10725.
+The earlier replay drafts [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710) and [#10725](https://github.com/Luminous-Dynamics/symthaea/pull/10725) were closed as superseded after their bases diverged from the producer; all implementation and metamorphic-test work is carried on the clean current-parent stack in #10740.
 
 ### Additional finite-oracle gates
 
@@ -235,7 +235,7 @@ The public seed is a conformance floor, not a broad population estimate. A blind
 
 Issue [#10738](https://github.com/Luminous-Dynamics/symthaea/issues/10738) extends fixed examples with transformations whose expected relation is known even when no new answer label is authored.
 
-Initial laws now being added to #10725:
+Initial laws now being added to #10740:
 - recursive JSON object-key permutation is representation-only; Evidence ID and replay must remain equivalent under JCS;
 - reordering raw Evidence transport records is representation-only when the claim's exact ordered Evidence ID list is unchanged;
 - reordering the claim's Evidence ID list is semantic input mutation and the old result must not replay;
