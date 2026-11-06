@@ -130,6 +130,22 @@ For Terminal-Bench specifically, Epoch's September 4 review reports public scori
 
 **CEB implication:** attach validity evidence to the exact suite release, task universe, verifier revision and leaderboard observation. A family-level label ("SWE-Bench Pro", "Terminal-Bench") is too coarse. When an external suite is revised, preserve the old verdict and its scope, qualify the new release independently, and regrade/rerun only according to its documented change semantics. Reuse the existing CEB external-observation and release-lifecycle ownership (#10571/#10589 and #10610/#10611); do not create a second benchmark registry or an opaque benchmark-quality score.
 
+### 2.17 CRBugBench: pre-merge review and human-agent complementarity
+
+CRBugBench evaluates whether review agents detect human-verified bugs in the changes that introduced them. Its October 2026 report describes **1,000 review tasks across 98 public repositories plus 800 additional tasks from proprietary industry repositories**. The best reported configuration, Claude Opus 5 + Copilot CLI, detects **71.9% of human-verified bugs within its top five findings**. Performance falls on complex/non-local defects and proprietary code, where repository context matters more. The authors also report that exploration-nudging prompts can improve performance by up to 5.8% at about 10% higher cost. These are paper-specific observations and not a CEB result. [Microsoft Research CRBugBench summary](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/) · [arXiv:2610.13668](https://arxiv.org/abs/2610.13668)
+
+A PREreview of the preprint summarizes the reported comparison as **50.0% human-only, 71.9% best-agent, and 82.1% human-plus-agent** bug detection. The same review reports that multi-agent configurations add about 2.8% on average at 3.68× cost, and proposes—but does not test—a skeptical second reviewer that tries to disprove the first review instead of merely refining it. These figures are a reviewer-authored summary of the preprint, not an independent CEB reproduction or a universally transferable expected gain. [PREreview, October 13, 2026](https://prereview.org/reviews/23335998)
+
+The PREreview also describes three LLM judges matching submitted findings to known bugs. This creates two distinct truth problems: whether the defect itself is genuinely present (supported by human-confirmed bug/fix provenance), and whether a free-form review finding correctly matches that defect (a separate adjudication problem). Human-confirmed bug provenance is valuable, but the finding-to-defect matching instrument still requires false-match and missed-match audits. Nor should a majority of LLM judges be treated as independent ground truth.
+
+**CEB implication:** extend existing #10419 CEB-REVIEW and #10367/#10637 human-agent complementarity work with three distinct second-review conditions: ordinary self-refinement, a blind independent second review that does not see the first findings, and a disconfirm-first reviewer that actively refutes each proposed finding and searches for high-severity omissions. Keep all arms on the same PR, source revision, specification and total effort/cost budget. Add clean/no-known-defect PR controls to estimate false-positive burden; score defect-level recall separately from finding-level actionable precision, location quality, severity and reviewer time. Preserve independent human adjudication for a sample of finding-to-defect matches, and reuse #9431 for correlated judge-error analysis rather than creating another ensemble framework.
+
+### 2.18 Human-centered software-engineering agent behavior
+
+Google Research's 2026 taxonomy synthesizes **91 sets of developer-defined agent rules** and validates the taxonomy through interviews with **15 experienced professional developers**. It identifies four recurring expectations: adhere to standards and processes, ensure code quality and reliability, solve problems effectively, and collaborate with the developer. It is a qualitative behavior taxonomy, not a performance leaderboard. [Google Research, AIware '26](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/)
+
+**CEB implication:** use these categories as a content-validity cross-check for the existing #10637/#10640 collaboration protocol. Map each episode to a concrete behavior and observable consequence—authority compliance, process adherence, correction integration, factual handoff or reviewer burden. Do not create a new rubric registry or claim population validity from 15 interviews alone.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -139,8 +155,10 @@ For Terminal-Bench specifically, Epoch's September 4 review reports public scori
 | SWE-Milestone | Multi-milestone implementation, dependency DAGs, F2P/P2P regressions, compounding errors | Typed claim/evidence disposition and selective proof refresh across milestones |
 | SWE-CI | Long repository histories and maintainability under repeated evolution | Separating product evolution from evaluator/metrology drift and claim-admissibility changes |
 | SWE Atlas | Comprehension, test writing, refactoring beyond issue resolution | Whether generated understanding and tests stay valid after subsequent changes |
+| CRBugBench | Human-verified pre-merge bug detection in 1,000 public tasks / 98 repositories plus 800 proprietary tasks | Human-agent complementarity, disconfirm-first review, clean-PR false-positive controls and independent finding-to-defect adjudication |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
+| Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
 | SWE-Marathon | Multi-hour, project-scale engineering across 20 tasks | Durable multi-milestone correctness, selective evidence refresh and human-effort accounting |
 | Rust-SWE-bench | Rust-specific repository repair across 500 tasks / 34 repositories; type/trait semantics and issue reproduction | Matched CEB ablations for repository understanding, type/trait reasoning, causal reproduction and evidence continuity |
 | SWE-bench-Live | Continuously refreshed tasks across languages, repositories and operating systems | Task-admission quality, license/contamination disclosure, stable release denominators and evidence lifecycle |
@@ -328,6 +346,10 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 **The honest present claim:** CEB has a more developed design for evaluating engineering evidence, continuity and collaboration. It has not yet demonstrated that Symthaea outperforms any industry system on these dimensions.
 
 ## 10. Sources and comparison notes
+
+- Microsoft Research, [CRBugBench: (When) Should a Software Factory be Lights-off?](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/), October 2026; [arXiv:2610.13668](https://arxiv.org/abs/2610.13668).
+- PREreview, [review of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026 (reviewer summary of human/agent complementarity and a proposed, not tested, skeptical second-reviewer arm).
+- Dong et al., [Towards AI as a Collaborative Partner: A Taxonomy of AI Agent Behavior in Software Engineering](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/), AIware '26 (to appear).
 
 - Scale AI, [SWE-Bench Pro V2 release/methodology](https://labs.scale.com/blog/swe-bench-pro-v2), September 22, 2026; [live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), viewed November 6, 2026.
 - Epoch AI, [SWE-Bench Pro review](https://epoch.ai/benchmarks/swe-bench-pro/review), September 1, 2026 (pre-V2 release; verdict scope must not be transferred to V2).
