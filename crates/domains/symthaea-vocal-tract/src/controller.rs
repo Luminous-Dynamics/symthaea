@@ -39,7 +39,7 @@ pub struct VocalTractConfig {
     pub network_layers: usize,
     /// Neurons per layer.
     pub neurons_per_layer: usize,
-    /// Learning rate for output projection and BPTT.
+    /// Learning rate for output projection and one-step local HDC-LTC updates.
     pub learning_rate: f32,
     /// Base fundamental frequency (Hz).
     pub base_f0: f32,
@@ -442,7 +442,7 @@ impl VocalTractController {
         frame
     }
 
-    /// Train the output projection via BPTT.
+    /// Train the output projection and apply one-step local HDC-LTC target updates.
     ///
     /// Uses `target` as the ground-truth FormantFrame.
     pub fn train_step(
@@ -1093,7 +1093,7 @@ impl VocalTractController {
         }
     }
 
-    /// Train on phoneme transitions (BPTT sequence training).
+    /// Train on phoneme transitions with teacher forcing and one-step local HDC-LTC updates.
     ///
     /// Unlike `train_on_phoneme_targets()` which resets between phonemes, this
     /// method trains the LTC network to smoothly transition between phoneme pairs.
