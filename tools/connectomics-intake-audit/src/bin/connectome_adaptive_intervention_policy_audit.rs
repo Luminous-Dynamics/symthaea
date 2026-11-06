@@ -167,11 +167,10 @@ fn valid_token(value: &str) -> bool {
     let bytes = value.as_bytes();
     !bytes.is_empty()
         && bytes.len() <= 128
-        && bytes[0].is_ascii_lowercase().then_some(()).is_some()
-            || (!bytes.is_empty() && bytes[0].is_ascii_digit())
-        && bytes
-            .iter()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._:-".contains(byte))
+        && (bytes[0].is_ascii_lowercase() || bytes[0].is_ascii_digit())
+        && bytes.iter().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._:-".contains(byte)
+        })
 }
 
 fn validate_unique<I>(values: I, label: &str) -> Result<(), String>
@@ -279,7 +278,7 @@ fn prepare(mut input: Input) -> Result<Prepared, String> {
             64,
             "nuisance-model digest",
         )?;
-        if nuisance.description.trim().is_empty() || !nuisance.description.is_ascii() {
+        if nuisance.description.trim().is_empty() {
             return Err(format!(
                 "nuisance model {} has an empty or non-ASCII description",
                 nuisance.nuisance_model_id
