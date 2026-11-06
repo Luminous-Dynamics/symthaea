@@ -245,6 +245,334 @@ fn native_group_id(target: &CfCWeightGroupId) -> CfCParameterGroupId {
     }
 }
 
+
+/// One frozen functional probe used to construct hidden-unit activation signatures.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CfCFunctionalProbe {
+    /// Input vector for one CfC time step.
+    pub input: Vec<f32>,
+    /// Elapsed time for this step.
+    pub dt: f32,
+}
+
+/// Activation signatures for one layer, indexed by hidden unit then probe index.
+///
+/// The source model is cloned and reset before the probe sequence. The caller's
+/// network is never mutated. These signatures are diagnostic metadata only.
+pub fn cfc_hidden_unit_activation_signatures(
+    network: &CfCNetwork,
+    layer_index: usize,
+    probes: &[CfCFunctionalProbe],
+) -> Result<Vec<Vec<f64>>, CfCPermutationAlignmentError> {
+    if probes.is_empty() {
+        return Err(CfCPermutationAlignmentError::EmptyProbeSet);
+    }
+    if layer_index >= network.config().num_layers {
+        return Err(CfCPermutationAlignmentError::InvalidLayerIndex {
+            layer_index,
+            layer_count: network.config().num_layers,
+        });
+    }
+
+    let mut evaluation = network.clone();
+    evaluation.reset();
+    let hidden_dim = network.config().hidden_dim;
+    let mut signatures = vec![Vec::with_capacity(probes.len()); hidden_dim];
+
+    for (probe_index, probe) in probes.iter().enumerate() {
+        if probe.input.len() != network.config().input_dim && layer_index == 0 {
+            return Err(CfCPermutationAlignmentError::ProbeInputDimensionMismatch {
+                probe_index,
+                expected: network.config().input_dim,
+                actual: probe.input.len(),
+            });
+        }
+        if !probe.dt.is_finite() || probe.dt < 0.0 {
+            return Err(CfCPermutationAlignmentError::InvalidProbeElapsedTime {
+                probe_index,
+                dt: probe.dt,
+            });
+        }
+        if let Some(value_index) = probe.input.iter().position(|value| !value.is_finite()) {
+            return Err(CfCPermutationAlignmentError::NonFiniteProbeInput {
+                probe_index,
+                value_index,
+            });
+        }
+
+        let input = ndarray::Array1::from_vec(probe.input.clone());
+        let _ = evaluation.forward(&input, probe.dt);
+        let states = evaluation.state();
+        let layer_state = states.get(layer_index).ok_or(
+            CfCPermutationAlignmentError::InvalidLayerIndex {
+                layer_index,
+                layer_count: states.len(),
+            },
+        )?;
+        for (unit_index, value) in layer_state.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(CfCPermutationAlignmentError::NonFiniteActivation {
+                    layer_index,
+                    unit_index,
+                    probe_index,
+                });
+            }
+            signatures[unit_index].push(f64::from(value));
+        }
+    }
+
+    Ok(signatures)
+}
+
+/// Result of matching source hidden units to candidate hidden units by probes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CfCHiddenUnitAlignment {
+    /// For each source unit, the index of its corresponding candidate unit.
+    pub source_to_candidate: Vec<usize>,
+    /// Mean squared activation-signature error across all matched units/probes.
+    pub mean_squared_activation_error: f64,
+    /// Minimum global assignment-cost increase when any selected pair is forbidden.
+    ///
+    /// A value near zero indicates that multiple assignments explain the probes
+    /// equally well. Positive infinity means there is no alternative complete
+    /// assignment. Consumers should abstain from alignment when this margin is
+    /// below a task-calibrated threshold.
+    pub minimum_assignment_margin: f64,
+}
+
+/// Fail-closed errors for functional hidden-unit correspondence.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum CfCPermutationAlignmentError {
+    #[error("at least one hidden unit is required")]
+    EmptyHiddenUnitSet,
+    #[error("source and candidate have different hidden-unit counts: {source} vs {candidate}")]
+    HiddenUnitCountMismatch { source: usize, candidate: usize },
+    #[error("activation signature set for {side} is empty")]
+    EmptySignatureSet { side: &'static str },
+    #[error("{side} activation signature {unit_index} has {actual} probes, expected {expected}")]
+    SignatureLengthMismatch {
+        side: &'static str,
+        unit_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("{side} activation signature {unit_index} contains a non-finite value at probe {probe_index}")]
+    NonFiniteSignature {
+        side: &'static str,
+        unit_index: usize,
+        probe_index: usize,
+    },
+    #[error("no finite complete hidden-unit assignment exists")]
+    NoFeasibleAssignment,
+    #[error("at least one functional probe is required")]
+    EmptyProbeSet,
+    #[error("layer index {layer_index} is outside 0..{layer_count}")]
+    InvalidLayerIndex {
+        layer_index: usize,
+        layer_count: usize,
+    },
+    #[error("probe {probe_index} input has length {actual}, expected {expected}")]
+    ProbeInputDimensionMismatch {
+        probe_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("probe {probe_index} has invalid elapsed time {dt}")]
+    InvalidProbeElapsedTime { probe_index: usize, dt: f32 },
+    #[error("probe {probe_index} input element {value_index} is non-finite")]
+    NonFiniteProbeInput {
+        probe_index: usize,
+        value_index: usize,
+    },
+    #[error("layer {layer_index}, unit {unit_index}, probe {probe_index} produced a non-finite activation")]
+    NonFiniteActivation {
+        layer_index: usize,
+        unit_index: usize,
+        probe_index: usize,
+    },
+}
+
+/// Infer a one-to-one hidden-unit correspondence from frozen activation probes.
+///
+/// This is a diagnostic alignment, not an edit: it does not reorder tensors,
+/// alter native fingerprints, or authorize a WeightProgram. Matching minimizes
+/// total mean-squared activation-signature distance with a deterministic
+/// Hungarian assignment. The global assignment margin exposes ambiguity.
+pub fn align_cfc_hidden_unit_signatures(
+    source_signatures: &[Vec<f64>],
+    candidate_signatures: &[Vec<f64>],
+) -> Result<CfCHiddenUnitAlignment, CfCPermutationAlignmentError> {
+    if source_signatures.is_empty() {
+        return Err(CfCPermutationAlignmentError::EmptyHiddenUnitSet);
+    }
+    if candidate_signatures.is_empty() {
+        return Err(CfCPermutationAlignmentError::EmptySignatureSet { side: "candidate" });
+    }
+    if source_signatures.len() != candidate_signatures.len() {
+        return Err(CfCPermutationAlignmentError::HiddenUnitCountMismatch {
+            source: source_signatures.len(),
+            candidate: candidate_signatures.len(),
+        });
+    }
+
+    let probe_count = source_signatures[0].len();
+    if probe_count == 0 {
+        return Err(CfCPermutationAlignmentError::EmptySignatureSet { side: "source" });
+    }
+    for (side, signatures) in [
+        ("source", source_signatures),
+        ("candidate", candidate_signatures),
+    ] {
+        for (unit_index, signature) in signatures.iter().enumerate() {
+            if signature.len() != probe_count {
+                return Err(CfCPermutationAlignmentError::SignatureLengthMismatch {
+                    side,
+                    unit_index,
+                    expected: probe_count,
+                    actual: signature.len(),
+                });
+            }
+            if let Some(probe_index) = signature.iter().position(|value| !value.is_finite()) {
+                return Err(CfCPermutationAlignmentError::NonFiniteSignature {
+                    side,
+                    unit_index,
+                    probe_index,
+                });
+            }
+        }
+    }
+
+    let unit_count = source_signatures.len();
+    let costs = source_signatures
+        .iter()
+        .map(|source| {
+            candidate_signatures
+                .iter()
+                .map(|candidate| {
+                    source
+                        .iter()
+                        .zip(candidate.iter())
+                        .map(|(left, right)| (left - right).powi(2))
+                        .sum::<f64>()
+                        / probe_count as f64
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    let (source_to_candidate, best_total_cost) =
+        minimum_cost_assignment(&costs).ok_or(CfCPermutationAlignmentError::NoFeasibleAssignment)?;
+
+    let mut minimum_assignment_margin = f64::INFINITY;
+    for (source_unit, candidate_unit) in source_to_candidate.iter().copied().enumerate() {
+        let mut alternative_costs = costs.clone();
+        alternative_costs[source_unit][candidate_unit] = f64::INFINITY;
+        if let Some((_alternative_assignment, alternative_total_cost)) =
+            minimum_cost_assignment(&alternative_costs)
+        {
+            minimum_assignment_margin = minimum_assignment_margin
+                .min((alternative_total_cost - best_total_cost).max(0.0));
+        }
+    }
+
+    Ok(CfCHiddenUnitAlignment {
+        source_to_candidate,
+        mean_squared_activation_error: best_total_cost / unit_count as f64,
+        minimum_assignment_margin,
+    })
+}
+
+fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Option<(Vec<usize>, f64)> {
+    let n = costs.len();
+    if n == 0 || costs.iter().any(|row| row.len() != n) {
+        return None;
+    }
+
+    // One-indexed Hungarian algorithm. Positive infinity marks a forbidden edge.
+    let mut row_potential = vec![0.0_f64; n + 1];
+    let mut column_potential = vec![0.0_f64; n + 1];
+    let mut matched_row = vec![0_usize; n + 1];
+    let mut predecessor = vec![0_usize; n + 1];
+
+    for row in 1..=n {
+        matched_row[0] = row;
+        let mut current_column = 0_usize;
+        let mut minimum_reduced_cost = vec![f64::INFINITY; n + 1];
+        let mut used = vec![false; n + 1];
+
+        loop {
+            used[current_column] = true;
+            let current_row = matched_row[current_column];
+            let mut delta = f64::INFINITY;
+            let mut next_column = 0_usize;
+
+            for column in 1..=n {
+                if used[column] {
+                    continue;
+                }
+                let edge_cost = costs[current_row - 1][column - 1];
+                if edge_cost.is_finite() {
+                    let reduced_cost =
+                        edge_cost - row_potential[current_row] - column_potential[column];
+                    if reduced_cost < minimum_reduced_cost[column] {
+                        minimum_reduced_cost[column] = reduced_cost;
+                        predecessor[column] = current_column;
+                    }
+                }
+                if minimum_reduced_cost[column] < delta {
+                    delta = minimum_reduced_cost[column];
+                    next_column = column;
+                }
+            }
+
+            if !delta.is_finite() {
+                return None;
+            }
+            for column in 0..=n {
+                if used[column] {
+                    row_potential[matched_row[column]] += delta;
+                    column_potential[column] -= delta;
+                } else if minimum_reduced_cost[column].is_finite() {
+                    minimum_reduced_cost[column] -= delta;
+                }
+            }
+
+            current_column = next_column;
+            if matched_row[current_column] == 0 {
+                break;
+            }
+        }
+
+        loop {
+            let previous_column = predecessor[current_column];
+            matched_row[current_column] = matched_row[previous_column];
+            current_column = previous_column;
+            if current_column == 0 {
+                break;
+            }
+        }
+    }
+
+    let mut assignment = vec![usize::MAX; n];
+    for column in 1..=n {
+        if matched_row[column] == 0 {
+            return None;
+        }
+        assignment[matched_row[column] - 1] = column - 1;
+    }
+    let mut total_cost = 0.0_f64;
+    for (row, column) in assignment.iter().copied().enumerate() {
+        let edge_cost = *costs.get(row)?.get(column)?;
+        if !edge_cost.is_finite() {
+            return None;
+        }
+        total_cost += edge_cost;
+    }
+    total_cost
+        .is_finite()
+        .then_some((assignment, total_cost))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
