@@ -576,9 +576,7 @@ fn evaluate(input: &Input, input_bytes: &[u8]) -> Result<Report, String> {
             .iter()
             .filter(|row| row.different_mechanism_class)
             .collect::<Vec<_>>();
-        let query_identified = query_pairs
-            .iter()
-            .all(|row| row.pair_identified_at_budget);
+        let query_identified = query_pairs.iter().all(|row| row.pair_identified_at_budget);
         let mechanism_identified = mechanism_pairs
             .iter()
             .all(|row| row.pair_identified_at_budget);
@@ -875,3 +873,4 @@ mod tests {
         );
     }
 }
+
