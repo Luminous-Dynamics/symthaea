@@ -106,6 +106,7 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
     require(set(options_by_history) == set(histories), "second-stage option history coverage is incomplete")
 
     models = {}
+    global_root_histories = set()
     for model in models_rows:
         model_id = model["model_vertex_id"]
         require(valid_sha(model["model_sha256"]), f"{model_id} model digest malformed")
@@ -127,9 +128,10 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
             for outcome_id in stage_one[(root_id, world_id)]
         }
         require(
-            observed_root_histories == set(histories),
-            f"{model_id} root-action outcomes do not match the frozen history alphabet",
+            observed_root_histories.issubset(set(histories)),
+            f"{model_id} root-action emits an undeclared history category",
         )
+        global_root_histories.update(observed_root_histories)
 
         stage_two = {}
         expected_stage_two = {
@@ -154,6 +156,11 @@ def validate_input(data: dict[str, Any]) -> dict[str, Any]:
             f"{model_id} stage-two outcomes do not match the frozen outcome alphabet",
         )
         models[model_id] = {"row": model, "prior": prior, "stage_one": stage_one, "stage_two": stage_two}
+
+    require(
+        global_root_histories == set(histories),
+        "union of model-vertex root-action outcomes does not match the frozen history alphabet",
+    )
 
     split = data["split_manifest"]
     require(valid_sha(split["split_sha256"]), "split digest malformed")
