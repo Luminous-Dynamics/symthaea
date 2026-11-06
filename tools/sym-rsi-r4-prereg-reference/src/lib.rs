@@ -798,6 +798,9 @@ mod tests {
         let mut next_digest = 1_u64;
         fill_placeholders(&mut value, "", &mut next_digest);
         value["document_status"] = Value::String("PREREGISTERED".to_owned());
+        let starting_research_state =
+            value["starting_state"]["shared_inner_agent"]["memory_research_state_digest"].clone();
+        value["research_state_continuity"]["state_snapshot_digest"] = starting_research_state;
         value["seed_and_replication_plan"]["confirmatory_seed_count"] =
             Value::Number(10_u64.into());
         value["rounds"]["planned_outer_loop_steps"] = Value::Number(4_u64.into());
