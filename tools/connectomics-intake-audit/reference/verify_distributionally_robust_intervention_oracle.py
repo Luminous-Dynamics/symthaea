@@ -194,6 +194,7 @@ def action_result(
     return {
         'intervention_id': action_id,
         'feasibility_status': action['feasibility_status'],
+        'optimization_status': 'OPTIMIZED',
         'outcome_ids': outcome_ids,
         'robust_policy_loss': robust_loss,
         'shared_policy': shared_policy,
@@ -302,13 +303,22 @@ def evaluate(data: dict[str, Any], input_sha256: str) -> dict[str, Any]:
     require(not (train & validation or train & lockbox or validation & lockbox), 'split leakage across independent units')
 
     base_loss, baseline_decision, baseline_vertex_risks = baseline_robust_loss(models, worlds)
-    per_action = {
-        action['intervention_id']: action_result(
-            action, models, worlds, prediction_index, base_loss,
-            data['query']['certificate_max_expected_loss'],
-        )
-        for action in actions
-    }
+    per_action = {}
+    for action in actions:
+        action_id = action['intervention_id']
+        if action['feasibility_status'] == 'FEASIBLE':
+            per_action[action_id] = action_result(
+                action, models, worlds, prediction_index, base_loss,
+                data['query']['certificate_max_expected_loss'],
+            )
+        else:
+            per_action[action_id] = {
+                'intervention_id': action_id,
+                'feasibility_status': action['feasibility_status'],
+                'optimization_status': 'EXCLUDED_BEFORE_OPTIMIZATION',
+                'robust_certificate': False,
+                'certificate_status': 'NOT_ELIGIBLE',
+            }
     feasible_ids = sorted(
         action_id for action_id, result in per_action.items()
         if result['feasibility_status'] == 'FEASIBLE'
@@ -327,6 +337,20 @@ def evaluate(data: dict[str, Any], input_sha256: str) -> dict[str, Any]:
     expected = data['oracle_expectations']
     require(close(expected['baseline_robust_loss'], base_loss), 'baseline robust-loss known answer mismatch')
     for action_id, result in per_action.items():
+        if result['optimization_status'] == 'EXCLUDED_BEFORE_OPTIMIZATION':
+            for field in (
+                'robust_loss_by_intervention',
+                'clairvoyant_lower_bound_by_intervention',
+                'uncertainty_penalty_by_intervention',
+                'value_per_cost_by_intervention',
+                'vertex_min_eig_bits_by_intervention',
+                'vertex_max_eig_bits_by_intervention',
+                'pairwise_midpoint_eig_min_bits_by_intervention',
+                'pairwise_midpoint_eig_max_bits_by_intervention',
+            ):
+                require(expected[field].get(action_id) is None, f"excluded action {action_id} must not have an optimization result in {field}")
+            require(expected['robust_certificate_by_intervention'].get(action_id) is False, f"excluded action {action_id} cannot be certified")
+            continue
         checks = {
             'robust_loss_by_intervention': result['robust_policy_loss'],
             'clairvoyant_lower_bound_by_intervention': result['clairvoyant_lower_bound'],
@@ -350,7 +374,11 @@ def evaluate(data: dict[str, Any], input_sha256: str) -> dict[str, Any]:
     require(selected_id == 'orthogonal-robust', 'synthetic known-answer robust intervention was not selected')
     require(per_action['reversal-high-eig']['clairvoyant_lower_bound'] == 0.0, 'reversal fixture lost its perfect clairvoyant lower bound')
     require(per_action['reversal-high-eig']['robust_policy_loss'] > per_action['reversal-high-eig']['clairvoyant_lower_bound'], 'reversal fixture failed to expose model-identity leakage')
-    require(not per_action['infeasible-perfect']['robust_certificate'], 'disallowed perfect intervention was incorrectly certified')
+    require(
+        per_action['infeasible-perfect']['optimization_status'] == 'EXCLUDED_BEFORE_OPTIMIZATION',
+        'disallowed intervention entered optimisation',
+    )
+    require('shared_policy' not in per_action['infeasible-perfect'], 'disallowed intervention received a decision policy')
     require(per_action['orthogonal-robust']['robust_certificate'], 'orthogonal intervention did not pass the robust certificate tolerance')
 
     return {
