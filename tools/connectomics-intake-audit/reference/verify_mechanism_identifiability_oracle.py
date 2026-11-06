@@ -84,6 +84,7 @@ def verify(data: dict[str, Any], raw_input: bytes) -> dict[str, Any]:
         require(row["mechanism_class"] in allowed_classes, "unsupported mechanism class")
     for row in nuisance:
         require(valid_sha(row["profile_sha256"]), "nuisance profile digest malformed")
+        require(bool(row["description"].strip()), "nuisance profile description must be non-empty")
     for action in interventions:
         require(action["cost_units"] > 0 and math.isfinite(action["cost_units"]), "intervention cost must be finite and positive")
         require(action["feasibility_status"] in {"FEASIBLE", "DISALLOWED", "INACCESSIBLE", "NOT_ASSESSED"}, "unknown feasibility status")
@@ -151,6 +152,7 @@ def verify(data: dict[str, Any], raw_input: bytes) -> dict[str, Any]:
         query_identified = bool(query_pairs) and all(row["pair_identified_at_budget"] for row in query_pairs)
         mechanism_identified = bool(mechanism_pairs) and all(row["pair_identified_at_budget"] for row in mechanism_pairs)
         action_reports[action_id] = {
+            "action_kind": intervention_by_id[action_id]["action_kind"],
             "feasibility_status": intervention_by_id[action_id]["feasibility_status"],
             "cost_units": intervention_by_id[action_id]["cost_units"],
             "query_identified": query_identified,
