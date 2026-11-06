@@ -850,6 +850,147 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
     Ok(summary)
 }
 
+/// Exact payload artifact supplied to the receipt/input binder.
+///
+/// The path must match a file path in the selected imported dataset catalogue
+/// entry. The bytes are hashed exactly as supplied, without parse/reserialize.
+pub struct PayloadArtifact<'a> {
+    pub path: &'a str,
+    pub bytes: &'a [u8],
+}
+
+/// Verify that a structurally valid run receipt is bound to the exact catalogue,
+/// split manifest, and imported payload bytes.
+///
+/// This checks:
+/// - the catalogue and split SHA-256 values over exact original bytes;
+/// - the split's exact dataset ID and pinned version against the catalogue;
+/// - that the selected dataset is imported under reviewed rights;
+/// - every declared payload path and digest against supplied raw bytes;
+/// - exact equality between the payload digest set and the receipt.
+///
+/// It does not re-run the detector, validate physical labels, or prove that the
+/// independent verifier is organizationally independent.
+pub fn verify_run_receipt_input_bindings(
+    receipt_input: &str,
+    catalog_bytes: &[u8],
+    split_bytes: &[u8],
+    payloads: &[PayloadArtifact<'_>],
+) -> Result<ReceiptSummary, ValidationError> {
+    let summary = validate_run_receipt(receipt_input)?;
+    let receipt: RunReceipt = serde_json::from_str(receipt_input)
+        .map_err(|error| ValidationError::new("$", format!("invalid run receipt JSON: {error}")))?;
+
+    verify_sha256(
+        catalog_bytes,
+        &receipt.dataset_catalog_sha256,
+        "$.dataset_catalog_sha256",
+    )?;
+    verify_sha256(
+        split_bytes,
+        &receipt.split_manifest_sha256,
+        "$.split_manifest_sha256",
+    )?;
+
+    let catalog_text = std::str::from_utf8(catalog_bytes)
+        .map_err(|error| ValidationError::new("$.dataset_catalog", format!("catalogue is not UTF-8: {error}")))?;
+    let split_text = std::str::from_utf8(split_bytes)
+        .map_err(|error| ValidationError::new("$.split_manifest", format!("split manifest is not UTF-8: {error}")))?;
+
+    validate_dataset_catalog(catalog_text)?;
+    validate_split_manifest(split_text)?;
+
+    let catalog: DatasetCatalog = serde_json::from_str(catalog_text)
+        .map_err(|error| ValidationError::new("$.dataset_catalog", format!("invalid catalogue JSON: {error}")))?;
+    let split: SplitManifest = serde_json::from_str(split_text)
+        .map_err(|error| ValidationError::new("$.split_manifest", format!("invalid split JSON: {error}")))?;
+
+    if split.dataset_id.is_empty() || split.dataset_version.is_empty() {
+        return Err(ValidationError::new(
+            "$.split_manifest",
+            "split manifest must bind a dataset ID and exact version",
+        ));
+    }
+
+    let dataset = catalog
+        .entries
+        .iter()
+        .find(|entry| entry.id == split.dataset_id)
+        .ok_or_else(|| {
+            ValidationError::new(
+                "$.split_manifest.dataset_id",
+                format!("dataset {:?} is absent from the exact catalogue", split.dataset_id),
+            )
+        })?;
+
+    if dataset.version != split.dataset_version {
+        return Err(ValidationError::new(
+            "$.split_manifest.dataset_version",
+            format!(
+                "split version {:?} does not match catalogue version {:?}",
+                split.dataset_version, dataset.version
+            ),
+        ));
+    }
+    if dataset.ingestion != IngestionState::Imported || dataset.rights.state != RightsState::Reviewed {
+        return Err(ValidationError::new(
+            "$.dataset_catalog.entries",
+            "a run receipt may bind only an imported dataset with reviewed rights",
+        ));
+    }
+    if payloads.len() != dataset.payload_files.len() {
+        return Err(ValidationError::new(
+            "$.payloads",
+            format!(
+                "supplied payload count {} does not match catalogue file count {}",
+                payloads.len(),
+                dataset.payload_files.len()
+            ),
+        ));
+    }
+
+    let mut supplied_paths = HashSet::new();
+    for (index, payload) in payloads.iter().enumerate() {
+        if !nonempty(payload.path) || !supplied_paths.insert(payload.path) {
+            return Err(ValidationError::new(
+                format!("$.payloads[{index}].path"),
+                "payload paths must be non-empty and unique",
+            ));
+        }
+    }
+
+    let mut verified_digests = Vec::with_capacity(dataset.payload_files.len());
+    for (index, declared) in dataset.payload_files.iter().enumerate() {
+        let payload = payloads
+            .iter()
+            .find(|payload| payload.path == declared.path)
+            .ok_or_else(|| {
+                ValidationError::new(
+                    format!("$.payloads[{index}]"),
+                    format!("declared payload {:?} was not supplied", declared.path),
+                )
+            })?;
+        verify_sha256(
+            payload.bytes,
+            &declared.sha256,
+            &format!("$.dataset_catalog.entries.payload_files[{index}].sha256"),
+        )?;
+        verified_digests.push(declared.sha256.clone());
+    }
+
+    let mut receipt_digests = receipt.dataset_payload_sha256.clone();
+    verified_digests.sort();
+    receipt_digests.sort();
+    if verified_digests != receipt_digests {
+        return Err(ValidationError::new(
+            "$.dataset_payload_sha256",
+            "receipt payload digest set does not exactly match the selected catalogue entry",
+        ));
+    }
+
+    Ok(summary)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1124,6 +1265,127 @@ mod tests {
         let error = validate_run_receipt(&input)
             .expect_err("executor cannot independently verify its own run");
         assert!(error.to_string().contains("must differ"));
+    }
+
+    fn bound_run_fixture() -> (String, String, String) {
+        let payload = b"synthetic-receiver-payload-v1";
+        let payload_sha256 = sha256_hex(payload);
+        let catalog = json!({
+            "schema": CATALOG_SCHEMA,
+            "version": CATALOG_VERSION,
+            "state": "FROZEN_DESIGN",
+            "entries": [{
+                "id": "SYNTHETIC-RECEIVER-DATA",
+                "kind": "recorded_receiver",
+                "version": "fixture-v1",
+                "source_uri": "https://example.org/synthetic-receiver-data",
+                "rights": {
+                    "state": "reviewed",
+                    "license_expression": "CC0-1.0",
+                    "permitted_uses": ["research"],
+                    "source_terms_uri": "https://example.org/terms",
+                    "reviewed_by": "test-rights-reviewer",
+                    "reviewed_at": "2026-11-06T00:00:00Z"
+                },
+                "intended_use": "research",
+                "ingestion": "imported",
+                "payload_files": [{
+                    "path": "receiver.bin",
+                    "sha256": payload_sha256
+                }]
+            }]
+        }).to_string();
+        let split = json!({
+            "schema": SPLIT_SCHEMA,
+            "version": SPLIT_VERSION,
+            "dataset_id": "SYNTHETIC-RECEIVER-DATA",
+            "dataset_version": "fixture-v1",
+            "held_out_dimensions": ["receiver_group"],
+            "records": [
+                {"record_id":"train-1","split":"train","event_group":"event-train","recording_group":"recording-train","receiver_group":"rx-train","campaign_group":"campaign-train","location_group":"site-train"},
+                {"record_id":"validation-1","split":"validation","event_group":"event-validation","recording_group":"recording-validation","receiver_group":"rx-validation","campaign_group":"campaign-validation","location_group":"site-validation"},
+                {"record_id":"test-1","split":"test","event_group":"event-test","recording_group":"recording-test","receiver_group":"rx-test","campaign_group":"campaign-test","location_group":"site-test"}
+            ]
+        }).to_string();
+        let receipt = json!({
+            "schema": RECEIPT_SCHEMA,
+            "version": RECEIPT_VERSION,
+            "run_id": "bound-run-1",
+            "executor_id": "executor-1",
+            "state": "complete",
+            "git_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "dataset_catalog_sha256": sha256_hex(catalog.as_bytes()),
+            "dataset_payload_sha256": [payload_sha256],
+            "split_manifest_sha256": sha256_hex(split.as_bytes()),
+            "code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "model_sha256": null,
+            "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "toolchain": "rustc-1.96.0",
+            "environment_sha256": "abababababababababababababababababababababababababababababababab",
+            "seed": 7,
+            "cases": [{
+                "case_id":"synthetic-case-1",
+                "outcome":"pass",
+                "reason_code":null,
+                "output_sha256":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+            }],
+            "independent_verification": {
+                "state":"verified",
+                "verifier_id":"independent-verifier-1",
+                "verifier_sha256":"dededededededededededededededededededededededededededededededede",
+                "report_sha256":"abababababababababababababababababababababababababababababababab"
+            }
+        }).to_string();
+        (catalog, split, receipt)
+    }
+
+    #[test]
+    fn verifies_exact_receipt_catalog_split_and_payload_bindings() {
+        let (catalog, split, receipt) = bound_run_fixture();
+        let payloads = [PayloadArtifact {
+            path: "receiver.bin",
+            bytes: b"synthetic-receiver-payload-v1",
+        }];
+        let summary = verify_run_receipt_input_bindings(
+            &receipt,
+            catalog.as_bytes(),
+            split.as_bytes(),
+            &payloads,
+        ).expect("exact input bindings should verify");
+        assert_eq!(summary.run_id, "bound-run-1");
+        assert_eq!(summary.pass_count, 1);
+    }
+
+    #[test]
+    fn rejects_payload_bytes_that_do_not_match_catalogue_digest() {
+        let (catalog, split, receipt) = bound_run_fixture();
+        let payloads = [PayloadArtifact {
+            path: "receiver.bin",
+            bytes: b"tampered-receiver-payload",
+        }];
+        let error = verify_run_receipt_input_bindings(
+            &receipt,
+            catalog.as_bytes(),
+            split.as_bytes(),
+            &payloads,
+        ).expect_err("payload tampering must fail closed");
+        assert!(error.to_string().contains("SHA-256 mismatch"));
+    }
+
+    #[test]
+    fn rejects_split_version_that_does_not_match_exact_catalogue() {
+        let (catalog, split, receipt) = bound_run_fixture();
+        let wrong_split = split.replace("fixture-v1", "fixture-v2");
+        let error = verify_run_receipt_input_bindings(
+            &receipt,
+            catalog.as_bytes(),
+            wrong_split.as_bytes(),
+            &[PayloadArtifact {
+                path: "receiver.bin",
+                bytes: b"synthetic-receiver-payload-v1",
+            }],
+        ).expect_err("split must bind exact catalogue version");
+        assert!(error.to_string().contains("split_manifest_sha256"));
     }
 
     #[test]
