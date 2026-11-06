@@ -713,7 +713,11 @@ impl HdcLtcUnifiedNeuron {
         }
 
         let denom = (bundle_norm_sq * gw_norm_sq).sqrt();
-        let sim = if denom < 1e-10 { 0.0 } else { dot / denom };
+        let sim = if denom < 1e-10 {
+            0.0
+        } else {
+            (dot / denom).clamp(-1.0, 1.0)
+        };
         let gate_activation = sim + bias_sum * inv_dim;
 
         // Sigmoid gating with steepness control
@@ -1794,7 +1798,7 @@ fn cosine_similarity_full(a: &ContinuousHV, b: &ContinuousHV) -> f32 {
     if denominator < 1e-10 {
         0.0
     } else {
-        dot / denominator
+        (dot / denominator).clamp(-1.0, 1.0)
     }
 }
 
@@ -1822,7 +1826,14 @@ fn cosine_similarity_with_gradients(
         return (0.0, zeros.clone(), zeros);
     }
 
-    let similarity = dot / denominator;
+    let raw_similarity = dot / denominator;
+    let similarity = raw_similarity.clamp(-1.0, 1.0);
+    // ContinuousHV::similarity clamps cosine to [-1, 1]. The clamp's
+    // derivative is zero outside its active interval.
+    if raw_similarity <= -1.0 || raw_similarity >= 1.0 {
+        let zeros = ContinuousHV::zero(a.values.len());
+        return (similarity, zeros.clone(), zeros);
+    }
     let grad_a = a
         .values
         .iter()
