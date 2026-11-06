@@ -104,7 +104,25 @@ Endor Labs' Agent Security League reports 34 agent/model configurations. Its Nov
 
 **CEB implication:** retain joint secure-functional pass and critical security false accepts as independent hard-gated measures. Also benchmark the integrity auditor: manual spot checks, known training-recall controls, independent trajectory review and auditor false-negative accounting should qualify the anti-cheating pipeline. A high functional pass rate cannot stand in for security correctness, and an automated auditor's "clean" label is not ground truth by itself.
 
-### 2.13 External benchmark validity is version-scoped
+### 2.13 Rust-SWE-bench: direct Rust repository-repair comparator
+
+Rust-SWE-bench contains **500 real repository-level tasks from 34 Rust repositories**. Its study identifies three bottlenecks directly aligned with the CEB Rust pilot: repository-wide code comprehension, strict Rust type/trait semantics and issue reproduction. In the reported study, ReAct-style agents resolved up to 21.2%; RUSTFORGER, which adds isolated environment setup and Rust metaprogramming-based dynamic tracing for issue reproduction, reached 28.6% with Claude Sonnet 3.7 and uniquely solved 46 tasks across the tested systems. These are paper-specific results from the tested 2026 models and harnesses, not current CEB results or a claim that 28.6% is the present leaderboard ceiling. [Xiang et al., Rust-SWE-bench (ICSE 2026)](https://arxiv.org/abs/2602.22764)
+
+**CEB implication:** use Rust-SWE-bench as the closest language-specific issue-resolution anchor. Test the same pinned tasks and model/harness where licensing and protocol permit. Compare repository-twin context, type/trait reasoning, deterministic reproduction, causal diagnosis and the full CEB evidence process as matched ablations. CEB's contribution should be whether those mechanisms improve accepted regression-safe repair, evidence lineage, repair survival and reviewer effort—not merely whether it reproduces RUSTFORGER's issue-resolution score.
+
+### 2.14 SWE-bench-Live: continuous task sourcing at ecosystem scale
+
+As of its August 21, 2026 update, SWE-bench-Live/MultiLang reports **1,077 task instances across 431 repositories and eight languages**, with more than 100 tasks in each language split. The project provides an automated task-creation pipeline and evaluation sandboxes; its submission verification also requires agent trajectories so maintainers can inspect whether only the intended prompt and environment were exposed. Its environment-construction update reports at least 98% success while reducing language-model API cost by 82% and Docker image storage by 78% for one 856-issue/93-repository build cohort. These are dataset-maintenance and environment-construction results, not agent solve-rate results. [SWE-bench-Live repository and August 2026 update](https://github.com/microsoft/SWE-bench-Live) · [Project site](https://swe-bench-live.github.io/)
+
+**CEB implication:** borrow the continuously refreshed task-sourcing discipline, trajectory custody and reproducible environment factory—but retain CEB's explicit task validity, contamination transparency, denominator preservation and release lifecycle. A live benchmark can become fresher without automatically becoming more valid; every new task still needs source/license provenance, two-sided oracle controls and admission review.
+
+### 2.15 FrontierSWE v2: ultra-long-horizon project engineering
+
+FrontierSWE v2 contains **34 open-ended engineering/research tasks**, each allowing up to 20 hours, across implementation, scientific computing, performance optimization, visual reasoning and AI research. It runs five trials per task and reports mean@5, best/worst trial spread, cost and wall-clock time. The current official leaderboard snapshot shows GPT-6 Astra at **65.5 ± 8.9** and Claude Opus 5.5 at **62.3 ± 9.8**. The benchmark uses its Proximus agent harness and task-native programmatic verifiers with partial credit. These mean@5 results must not be compared directly to binary Pass@1 task-resolution rates such as SWE-Marathon or SWE-Bench. [FrontierSWE v2 official leaderboard](https://www.frontierswe.com/) · [V2 methodology and task catalogue](https://github.com/Proximal-Labs/frontier-swe-v2) · [Epoch AI benchmark profile](https://epoch.ai/benchmarks/frontierswe)
+
+**CEB implication:** add a project-scale experimental horizon to the roadmap without introducing a new measurement lane. Evaluate whether requirements, decisions and evidence survive a multi-hour build and subsequent change events. Pair the project's task-native completion signal with CEB's independent evidence/authority/cost dimensions. A strong project result does not itself establish continuous maintenance or evidence validity across later releases.
+
+### 2.16 External benchmark validity is version-scoped
 
 External benchmark names are not validity guarantees. Epoch AI's published review list currently classifies the pre-V2 SWE-Bench Pro release, SWE-bench Verified and Terminal-Bench 4.0.0 as *Flawed*. Its review rubric treats scoring defects that can affect at least 20% of a benchmark's total score as sufficient for that verdict. This is a useful independent warning signal, not a universal ground-truth authority and not a substitute for inspecting the affected task versions. [Epoch AI reviewed-benchmark index](https://epoch.ai/data/benchmark-reviews-documentation/included-benchmarks)
 
@@ -124,6 +142,9 @@ For Terminal-Bench specifically, Epoch's September 4 review reports public scori
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
 | SWE-Marathon | Multi-hour, project-scale engineering across 20 tasks | Durable multi-milestone correctness, selective evidence refresh and human-effort accounting |
+| Rust-SWE-bench | Rust-specific repository repair across 500 tasks / 34 repositories; type/trait semantics and issue reproduction | Matched CEB ablations for repository understanding, type/trait reasoning, causal reproduction and evidence continuity |
+| SWE-bench-Live | Continuously refreshed tasks across languages, repositories and operating systems | Task-admission quality, license/contamination disclosure, stable release denominators and evidence lifecycle |
+| FrontierSWE v2 | 20-hour open-ended engineering and research projects with task-native partial-credit verification | Evidence/requirement continuity through project-scale work and later change events, with human and compute economics |
 | GSO | Expert-relative optimization with hack-adjusted scoring | Measurement-integrity-aware optimization under matched workloads and hardware |
 | VerifierBench | Generated verifier quality, positive/negative discrimination and V4V checks | Verifier qualification integrated with task admission, independent oracle review and trust evidence |
 | SpecBench | Gap between visible feature tests and hidden spec-required composition | Explicit composition coverage and prevention of visible-test overfitting |
@@ -187,6 +208,10 @@ When a contract requires interactions among features, evaluate those interaction
 ### Shift 9 — From fixed benchmark to continuously audited measurement system
 
 Treat task provenance, contamination, oracle validity, denominators, environment digests, evaluator versions, external review status, regrading and external observations as a maintained evidence base. Validity attaches to an exact release and task universe, not just a benchmark family name. A benchmark result should have an explicit claim class and a reproducible path back to task, system, run, grader revision and adjudication. Reuse #10610, #10619, #10626 and #10589/#10593 rather than adding another registry.
+
+### Shift 10 — From one task horizon to a multi-horizon engineering ecology
+
+One-shot issue repair, multi-hour projects and multi-release maintenance are different experimental horizons. A benchmark should not treat one as a proxy for the others. CEB should build nested comparisons where a common set of declared invariants is tested at three horizons: (a) patch-level repair, (b) project-scale integration, and (c) sequential evolution with changing dependencies, configurations and policies. The same claim/evidence contracts should travel across the horizons, while cost and task-native outcomes remain separately reported. This is an experimental composition over existing lanes, not a new lane or composite score.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
@@ -314,6 +339,9 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 - Scale AI, [SWE Atlas v1.1](https://labs.scale.com/leaderboard/swe-atlas), updated September 22, 2026.
 - Artificial Analysis, [Coding Agent Index V2 methodology](https://artificialanalysis.ai/methodology/coding-agents-benchmarking), October 2026; includes three-attempt task aggregation, resource accounting, reward-hacking review and an LLM-judge trajectory audit for passing Terminal-Bench runs.
 - Endor Labs, [Meta's New Muse Wonder: record FuncPass, but mid-table SecPass](https://www.endorlabs.com/learn/metas-new-muse-wonder-record-funcpass-but-mid-table-secpass), November 3, 2026; documents the post-audit Agent Security League re-score and a training-recall case missed by the automated anti-cheating pipeline.
+- Xiang et al., [Evaluating and Improving Automated Repository-Level Rust Issue Resolution with LLM-based Agents](https://arxiv.org/abs/2602.22764), ICSE 2026; Rust-SWE-bench (500 tasks / 34 repositories) and RUSTFORGER issue-reproduction study.
+- Microsoft, [SWE-bench-Live repository](https://github.com/microsoft/SWE-bench-Live), August 21, 2026 multilingual task update (1,077 tasks / 431 repositories / eight languages).
+- Proximal Labs, [FrontierSWE v2](https://www.frontierswe.com/), [methodology/task catalogue](https://github.com/Proximal-Labs/frontier-swe-v2), September 2026; 34 tasks, 20-hour trials and mean@5 leaderboard.
 - Scale AI, [HiL-Bench overview and methodology](https://labs.scale.com/leaderboard/hil), 2026.
 - Abundant AI, [SWE-Marathon v1.1](https://www.swe-marathon.org/), current leaderboard viewed November 6, 2026.
 - Shetty et al., [GSO: Challenging Software Optimization Tasks for SWE-Agents](https://gso-bench.github.io/), leaderboard/methodology viewed November 6, 2026.
