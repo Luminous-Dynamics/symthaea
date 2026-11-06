@@ -1,0 +1,72 @@
+name: ConnectomeBench2 provenance and denominator audit
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_AND_DENOMINATORS_V1.md"
+      - "docs/neuroscience/CONNECTOMEBENCH2_DENOMINATOR_AUDIT.schema.json"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_DENOMINATOR_AUDIT_V1.example.json"
+      - "tools/connectomics-intake-audit/reference/audit_connectomebench2_denominators.py"
+      - ".github/workflows/connectomebench2-denominator-audit.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOMEBENCH2_PROVENANCE_AND_DENOMINATORS_V1.md"
+      - "docs/neuroscience/CONNECTOMEBENCH2_DENOMINATOR_AUDIT.schema.json"
+      - "docs/neuroscience/examples/CONNECTOMEBENCH2_DENOMINATOR_AUDIT_V1.example.json"
+      - "tools/connectomics-intake-audit/reference/audit_connectomebench2_denominators.py"
+      - ".github/workflows/connectomebench2-denominator-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-source-card-audit:
+    name: Validate source-card arithmetic without promoting unresolved counts
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 source manifest
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          schema = json.loads(Path("docs/neuroscience/CONNECTOMEBENCH2_DENOMINATOR_AUDIT.schema.json").read_text())
+          manifest = json.loads(Path("docs/neuroscience/examples/CONNECTOMEBENCH2_DENOMINATOR_AUDIT_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(manifest)
+          print("ConnectomeBench2 denominator manifest schema: PASS")
+          PY
+      - name: Recompute sample-type and split arithmetic
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/audit_connectomebench2_denominators.py
+          python3 tools/connectomics-intake-audit/reference/audit_connectomebench2_denominators.py --manifest docs/neuroscience/examples/CONNECTOMEBENCH2_DENOMINATOR_AUDIT_V1.example.json --output "$RUNNER_TEMP/connectomebench2-v1-denominator-audit.json"
+      - name: Assert unresolved discrepancy and V2 claim ceiling
+        run: |
+          REPORT_PATH="$RUNNER_TEMP/connectomebench2-v1-denominator-audit.json" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          report = json.loads(Path(os.environ["REPORT_PATH"]).read_text())
+          assert report["sample_type_count_sum"] == 401461
+          assert report["reported_dataset_rows"] == 401170
+          assert report["sample_type_difference"] == 291
+          assert report["sample_type_partition_status"] == "MISMATCH"
+          assert report["sample_type_partition_disposition"] == "UNRESOLVED_CARD_INCONSISTENCY"
+          assert report["split_count_sum"] == 401170
+          assert report["split_total_matches"] is True
+          assert report["v2_commit_sha"] is None
+          assert report["v2_reproduction_status"] == "NOT_REPRODUCED"
+          assert report["paper_expert_decisions"] == "NOT_COMPARABLE_WITH_DATASET_ROWS"
+          print("V1/main card discrepancy and V2 claim ceiling: PASS")
+          PY

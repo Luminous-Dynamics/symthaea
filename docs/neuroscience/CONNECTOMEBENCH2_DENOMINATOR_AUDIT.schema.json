@@ -1,0 +1,560 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOMEBENCH2_DENOMINATOR_AUDIT.schema.json",
+  "title": "ConnectomeBench2 provenance and denominator audit manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "audit_id",
+    "audit_date",
+    "scope",
+    "sources",
+    "observations",
+    "sample_type_counts",
+    "split_counts",
+    "em_coverage",
+    "task_contract",
+    "v2_artifact_pin",
+    "expected_checks",
+    "claim_scope",
+    "leakage_controls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audit_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "scope": {
+      "const": "metadata_only_source_card_known_answer"
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    },
+    "sample_type_counts": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/count"
+      }
+    },
+    "split_counts": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/count"
+      }
+    },
+    "em_coverage": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/coverage"
+      }
+    },
+    "task_contract": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "leakage_controls": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string"
+      }
+    },
+    "v2_artifact_pin": {
+      "$ref": "#/$defs/v2_pin"
+    },
+    "expected_checks": {
+      "$ref": "#/$defs/checks"
+    },
+    "claim_scope": {
+      "enum": [
+        "metadata_only",
+        "full_v2_artifact_audit"
+      ]
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "source_kind",
+        "uri",
+        "revision_label",
+        "revision_identity_status",
+        "commit_sha",
+        "commit_short",
+        "notes"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+        },
+        "source_kind": {
+          "enum": [
+            "paper",
+            "dataset_card",
+            "dataset_revision"
+          ]
+        },
+        "uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_identity_status": {
+          "enum": [
+            "immutable_full_commit_pinned",
+            "short_identifier_only",
+            "revision_label_only_unpinned"
+          ]
+        },
+        "commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "commit_short": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{7,12}$"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "revision_identity_status": {
+                "const": "immutable_full_commit_pinned"
+              }
+            },
+            "required": [
+              "revision_identity_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revision_identity_status": {
+                "const": "short_identifier_only"
+              }
+            },
+            "required": [
+              "revision_identity_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_short": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revision_identity_status": {
+                "const": "revision_label_only_unpinned"
+              }
+            },
+            "required": [
+              "revision_identity_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_sha": {
+                "type": "null"
+              },
+              "commit_short": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "source_id",
+        "revision_label",
+        "metric",
+        "value",
+        "qualifier",
+        "unit",
+        "scope",
+        "precision"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._:-]{0,95}$"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "qualifier": {
+          "enum": [
+            "exact",
+            "greater_than",
+            "approximately",
+            "reported_rounded"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "expert_labelled_decisions",
+            "associated_images",
+            "dataset_rows",
+            "parquet_shards",
+            "rows_with_em",
+            "percent_rows",
+            "gigabytes"
+          ]
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "precision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "value",
+        "unit",
+        "source_id",
+        "revision_label",
+        "status"
+      ],
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unit": {
+          "const": "rows"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "const": "reported"
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_type",
+        "percent_has_em",
+        "qualifier",
+        "source_id",
+        "revision_label"
+      ],
+      "properties": {
+        "sample_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "percent_has_em": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "qualifier": {
+          "enum": [
+            "exact",
+            "approximately"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_label": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "sample_types",
+        "mask_requirement",
+        "geometry_view",
+        "label_definition"
+      ],
+      "properties": {
+        "task_id": {
+          "enum": [
+            "false_split_correction",
+            "false_merge_identification",
+            "split_mask_generation"
+          ]
+        },
+        "sample_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "mask_requirement": {
+          "enum": [
+            "has_dual_mask",
+            "has_single_mask"
+          ]
+        },
+        "geometry_view": {
+          "enum": [
+            "dual_segment",
+            "single_segment",
+            "single_segment_input_with_dual_target"
+          ]
+        },
+        "label_definition": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "v2_pin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision_label",
+        "identity_status",
+        "commit_sha",
+        "shard_count_reported",
+        "shard_manifest_status",
+        "note"
+      ],
+      "properties": {
+        "revision_label": {
+          "const": "v2"
+        },
+        "identity_status": {
+          "enum": [
+            "immutable_full_commit_pinned",
+            "revision_label_only_unpinned"
+          ]
+        },
+        "commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "shard_count_reported": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "shard_manifest_status": {
+          "enum": [
+            "not_materialized",
+            "materialized_unverified",
+            "all_shards_hashed_and_counted"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "identity_status": {
+                "const": "revision_label_only_unpinned"
+              }
+            },
+            "required": [
+              "identity_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_sha": {
+                "type": "null"
+              },
+              "shard_manifest_status": {
+                "enum": [
+                  "not_materialized",
+                  "materialized_unverified"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "identity_status": {
+                "const": "immutable_full_commit_pinned"
+              }
+            },
+            "required": [
+              "identity_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_type_count_sum",
+        "reported_dataset_rows",
+        "sample_type_difference",
+        "split_count_sum",
+        "split_total_matches",
+        "sample_type_partition_status",
+        "sample_type_partition_disposition",
+        "paper_decision_unit_comparison",
+        "v2_reproduction_status"
+      ],
+      "properties": {
+        "sample_type_count_sum": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reported_dataset_rows": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_type_difference": {
+          "type": "integer"
+        },
+        "split_count_sum": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "split_total_matches": {
+          "type": "boolean"
+        },
+        "sample_type_partition_status": {
+          "enum": [
+            "MATCH",
+            "MISMATCH"
+          ]
+        },
+        "sample_type_partition_disposition": {
+          "enum": [
+            "UNRESOLVED_CARD_INCONSISTENCY",
+            "RECONCILED_FROM_SOURCE_ARTIFACTS"
+          ]
+        },
+        "paper_decision_unit_comparison": {
+          "const": "NOT_COMPARABLE_WITH_DATASET_ROWS_UNTIL_COUNTING_RULES_RECONCILED"
+        },
+        "v2_reproduction_status": {
+          "enum": [
+            "NOT_STARTED",
+            "NOT_REPRODUCED",
+            "REPRODUCED_ON_PINNED_V2"
+          ]
+        }
+      }
+    }
+  }
+}
