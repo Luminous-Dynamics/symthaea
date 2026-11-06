@@ -179,3 +179,27 @@ Before scoring any candidate:
 5. The scorer must count all tasks and preserve every Unknown, Unsupported, abstention, failure and ungraded case.
 
 Only after those gates should a matched human/rule/model comparison begin. A later physical Model–Fixture–Article campaign must be separately authorized through ENG-REF #6121 and existing article, calibration, safety and evidence authorities.
+
+
+## Industry benchmark context — captured 2026-11-06
+
+The machine-readable manifest pins four external comparison snapshots. They are **context**, not a merged leaderboard and not scores for this knowability benchmark.
+
+| Comparator | Publicly reported reference | What it measures | What remains outside its score |
+|---|---|---|---|
+| [Physical-Engineering's Last Exam (PLE), all 85](https://ple-bench.com/leaderboard?set=all) | Claude Opus 5.5 + Claude Code: 0.506, $17.18/task, 63 min median; GPT-6 Astra + Codex: 0.483, $9.15/task, 25 min median | Four professional engineering disciplines; three full runs per model+harness pair; six-hour/task; official rubric judge | The published mean is not a metrology capability, calibration, physical conformity or post-service requalification result |
+| [PLE public development, 29 tasks](https://ple-bench.com/leaderboard?set=dev) | Claude Opus 5.5 + Claude Code: 0.551; Claude Opus 5.5 + Codex: 0.549; GPT-6 Astra + Codex: 0.530 | Same public development split and three-run protocol | Not comparable with PLE hidden 56, all-85 or committed-artifact submission mode |
+| [Parametric CAD Bench V3](https://cadbench.ai/leaderboard) | Claude Opus 5.5 + Claude Code: 0.6103 (displayed 95% CI ±0.0753), 99/100 scored, $573.94 total | 100 public tasks: 30 text creation, 30 create-and-edit, 40 engineering drawings; separate programmatic FreeCAD validator | Does not score inspection access, calibrated measurement capability, maintenance or physical conformity |
+| [BenchCAD 2.0 Core](https://benchcad.com/blog/benchcad-2) | GPT-6 Astra: 0.59, about $11/task, 62 min median; Claude Opus 5.5: 0.57, about $28/task, 222 min median | 100 held-out hardware-engineering cases; geometry/topology, assembly placement and ECAD connectivity | Does not score manufacturability, physical performance, metrology, inspectability or lifecycle requalification; v2.0 is not comparable with v2.1 |
+
+These comparisons show why model-only ranking is insufficient. PLE's live board varies both model and harness; on the 29-task development set, the same Claude Opus 5.5 system has visible harness-dependent score and cost changes. Benchmark records must therefore identify the full model × harness × effort × task-split × evaluator protocol. Never pool the above means or use the highest point estimate as a statistically decisive ranking without considering the stated uncertainty and protocol.
+
+### The opportunity beyond current SOTA
+
+Current external CAD and engineering benchmarks establish useful—but separate—capabilities: a generated CAD artifact can be geometrically similar, a drawing can be reconstructed, a mechanism can be assembled, or a net graph can be recovered. The knowability benchmark asks a different question:
+
+> Does the designed article retain a feasible, identifiable, uncertainty-aware evidence path for every critical claim after assembly, service, remount and repair?
+
+This is intended as an orthogonal capability layer, not a claim that the current 12 blueprints beat or even reproduce an external leaderboard. No PLE, BenchCAD or CAD Bench task is imported into this corpus; their dataset terms and scoring boundaries remain separate.
+
+The immediate extension is [ENG-KNOW-CODESIGN-001 #10702](https://github.com/Luminous-Dynamics/symthaea/issues/10702): test whether integrating inspection, measurement, diagnosis and requalification affordances during design reduces late blockers and lifecycle burden without sacrificing functional feasibility. It composes #10652 with existing SE-OPT #3686, ENG-REF #6121 and canonical metrology/tolerance/lifecycle owners; it creates no new optimizer or measurement authority.
