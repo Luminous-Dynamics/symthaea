@@ -21,6 +21,10 @@ const MAX_EDGES: usize = 50_000;
 const MAX_EVIDENCE_UNITS: usize = 50_000;
 const MAX_REFERENCE_BYTES: usize = 256;
 
+/// Completeness of the finite route inventory, not merely whether the corpus
+/// snapshot has a stable identifier. Only CompleteFrozenInventory can support
+/// a negative reachability claim; PartialObserved can support positive route
+/// witnesses, while Unknown supports neither.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchSurfaceStateV1 {
