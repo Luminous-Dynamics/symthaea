@@ -8,8 +8,7 @@ pub mod claims;
 
 pub use claims::{
     CLAIM_EVALUATION_SCHEMA, CLAIM_EVALUATOR_VERSION, CLAIM_SCHEMA, ClaimDisposition, ClaimError,
-    ClaimErrorKind,
-    ClaimEvaluation, ClaimPredicate, ClaimRequest, ClaimScope, EvidenceAssessment,
+    ClaimErrorKind, ClaimEvaluation, ClaimPredicate, ClaimRequest, ClaimScope, EvidenceAssessment,
     EvidenceAssessmentKind, MAX_CLAIM_JSON_BYTES, evaluate_claim, parse_claim_json, validate_claim,
 };
 
