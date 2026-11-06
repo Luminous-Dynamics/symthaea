@@ -84,7 +84,7 @@ pub struct CausalSet2D {
 impl CausalSet2D {
     /// Validate and construct an event set in [0,u_extent] x [0,v_extent].
     pub fn new(
-        events: Vec<Event2D>,
+        mut events: Vec<Event2D>,
         u_extent: f64,
         v_extent: f64,
     ) -> Result<Self, CausalSetError> {
@@ -109,6 +109,18 @@ impl CausalSet2D {
             }
             if !ids.insert(event.id) {
                 return Err(CausalSetError::DuplicateEventId { id: event.id });
+            }
+        }
+
+        // IEEE -0.0 and +0.0 represent the same spacetime coordinate. Store
+        // one canonical zero so total-order sorting and coordinate grouping
+        // preserve the mathematical partial order.
+        for event in &mut events {
+            if event.u == 0.0 {
+                event.u = 0.0;
+            }
+            if event.v == 0.0 {
+                event.v = 0.0;
             }
         }
 
@@ -202,18 +214,61 @@ impl CausalSet2D {
     }
 
     /// Count unordered pairs related by the partial order.
+    ///
+    /// In 1+1D null coordinates, a ≺ b iff u_a <= u_b and v_a <= v_b,
+    /// with at least one strict inequality. Sorting by (u, v) and querying
+    /// a Fenwick tree for prior v <= v_b counts every related pair once.
+    /// Identical-coordinate events are excluded because neither strictly
+    /// precedes the other. Complexity: O(N log N) time and O(N) memory.
     pub fn related_pair_count(&self) -> u64 {
-        let mut count = 0_u64;
-        for i in 0..self.events.len() {
-            for j in (i + 1)..self.events.len() {
-                let a = self.events[i];
-                let b = self.events[j];
-                if a.causally_precedes(b) || b.causally_precedes(a) {
-                    count += 1;
+        let n = self.events.len();
+        if n < 2 {
+            return 0;
+        }
+
+        let mut order: Vec<usize> = (0..n).collect();
+        order.sort_by(|&a, &b| {
+            self.events[a]
+                .u
+                .total_cmp(&self.events[b].u)
+                .then_with(|| self.events[a].v.total_cmp(&self.events[b].v))
+                .then_with(|| self.events[a].id.cmp(&self.events[b].id))
+        });
+
+        let mut v_coordinates: Vec<f64> = self.events.iter().map(|event| event.v).collect();
+        v_coordinates.sort_by(f64::total_cmp);
+        v_coordinates.dedup_by(|a, b| *a == *b);
+
+        let mut fenwick = FenwickTree::new(v_coordinates.len());
+        let mut related = 0_u64;
+        let mut previous_coordinate: Option<(f64, f64)> = None;
+        let mut previous_duplicates = 0_u64;
+
+        for event_index in order {
+            let event = self.events[event_index];
+            match previous_coordinate {
+                Some((u, v)) if u == event.u && v == event.v => {
+                    previous_duplicates += 1;
+                }
+                _ => {
+                    previous_coordinate = Some((event.u, event.v));
+                    previous_duplicates = 0;
                 }
             }
+
+            let v_index = v_coordinates
+                .binary_search_by(|candidate| candidate.total_cmp(&event.v))
+                .expect("event v coordinate was included in compression");
+            let previous_in_lower_orthant = fenwick.prefix_sum(v_index + 1);
+
+            // All earlier sorted events have u <= event.u. The Fenwick
+            // prefix restricts to v <= event.v. Remove exact-coordinate
+            // duplicates, which are not causally related.
+            related += previous_in_lower_orthant - previous_duplicates;
+            fenwick.add(v_index, 1);
         }
-        count
+
+        related
     }
 
     /// Myrheim ordering fraction r = R / binom(N,2), where R counts
@@ -226,8 +281,13 @@ impl CausalSet2D {
         Some(self.related_pair_count() as f64 / (n * (n - 1.0) / 2.0))
     }
 
-    /// Longest-chain event IDs, in causal order. Dynamic programming over
-    /// the transitive order takes O(N^2) time and O(N) auxiliary memory.
+    /// Longest-chain event IDs, in causal order.
+    ///
+    /// In 1+1D null coordinates this is a longest nondecreasing subsequence
+    /// of v after sorting by (u, v, id). Equal-coordinate events are grouped
+    /// and represented once because identical events are incomparable.
+    /// The reconstructed chain is therefore boost-invariant under positive
+    /// rescalings of u and v. Complexity: O(N log N) time and O(N) memory.
     pub fn longest_chain_ids(&self) -> Vec<usize> {
         let n = self.events.len();
         if n == 0 {
@@ -235,11 +295,6 @@ impl CausalSet2D {
         }
 
         let mut order: Vec<usize> = (0..n).collect();
-        // Lexicographic (u, v, id) is a linear extension of the causal
-        // order: if a ≺ b then u_a <= u_b and v_a <= v_b, with at least
-        // one strict. Positive rescalings u -> a*u, v -> b*v (including
-        // Lorentz boosts) preserve this ordering, so tie-breaking between
-        // multiple maximum chains is boost-invariant as well.
         order.sort_by(|&a, &b| {
             self.events[a]
                 .u
@@ -248,34 +303,51 @@ impl CausalSet2D {
                 .then_with(|| self.events[a].id.cmp(&self.events[b].id))
         });
 
-        let mut best_ending_here = vec![1_usize; n];
+        let mut tails_values: Vec<f64> = Vec::new();
+        let mut tails_events: Vec<usize> = Vec::new();
         let mut parent: Vec<Option<usize>> = vec![None; n];
 
-        for j in 0..n {
-            let event_j = self.events[order[j]];
-            for i in 0..j {
-                let event_i = self.events[order[i]];
-                if event_i.causally_precedes(event_j)
-                    && best_ending_here[i] + 1 > best_ending_here[j]
-                {
-                    best_ending_here[j] = best_ending_here[i] + 1;
-                    parent[j] = Some(i);
+        let mut cursor = 0;
+        while cursor < n {
+            let representative = order[cursor];
+            let event = self.events[representative];
+
+            // Process one representative per identical coordinate. Sorting
+            // by id makes this the deterministic lowest-id representative.
+            let mut next = cursor + 1;
+            while next < n {
+                let candidate = self.events[order[next]];
+                if candidate.u == event.u && candidate.v == event.v {
+                    next += 1;
+                } else {
+                    break;
                 }
             }
-        }
 
-        let mut end = 0;
-        for i in 1..n {
-            if best_ending_here[i] > best_ending_here[end] {
-                end = i;
+            // Longest nondecreasing subsequence: equal v values may chain
+            // when u strictly increases. Identical (u, v) points were
+            // grouped above and cannot chain with each other.
+            let position = tails_values.partition_point(|&tail| tail <= event.v);
+            if position > 0 {
+                parent[representative] = Some(tails_events[position - 1]);
             }
+
+            if position == tails_values.len() {
+                tails_values.push(event.v);
+                tails_events.push(representative);
+            } else {
+                tails_values[position] = event.v;
+                tails_events[position] = representative;
+            }
+
+            cursor = next;
         }
 
-        let mut chain = Vec::with_capacity(best_ending_here[end]);
-        let mut cursor = Some(end);
-        while let Some(index) = cursor {
-            chain.push(self.events[order[index]].id);
-            cursor = parent[index];
+        let mut chain = Vec::with_capacity(tails_events.len());
+        let mut current = tails_events.last().copied();
+        while let Some(index) = current {
+            chain.push(self.events[index].id);
+            current = parent[index];
         }
         chain.reverse();
         chain
@@ -368,6 +440,37 @@ fn ln_gamma(z: f64) -> f64 {
     }
     let t = shifted + 7.5;
     0.5 * (2.0 * PI).ln() + (shifted + 0.5) * t.ln() - t + x.ln()
+}
+
+/// Fenwick tree over nonnegative integer counts.
+struct FenwickTree {
+    tree: Vec<u64>,
+}
+
+impl FenwickTree {
+    fn new(size: usize) -> Self {
+        Self { tree: vec![0; size + 1] }
+    }
+
+    fn add(&mut self, index: usize, value: u64) {
+        let mut cursor = index + 1;
+        while cursor < self.tree.len() {
+            self.tree[cursor] += value;
+            let low_bit = cursor & (!cursor + 1);
+            cursor += low_bit;
+        }
+    }
+
+    /// Sum of the first prefix_len compressed coordinates.
+    fn prefix_sum(&self, prefix_len: usize) -> u64 {
+        let mut cursor = prefix_len;
+        let mut total = 0_u64;
+        while cursor > 0 {
+            total += self.tree[cursor];
+            cursor &= cursor - 1;
+        }
+        total
+    }
 }
 
 /// Small, deterministic SplitMix64 generator. This is for reproducible
