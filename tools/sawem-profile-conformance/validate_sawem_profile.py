@@ -188,6 +188,7 @@ EXPECTED_CASE_IDS = {
     "CASH-RISK-DISTRIBUTION-001",
     "DECISION-REGRET-EVPI-001",
     "PAIRED-POLICY-COMPARISON-001",
+    "POWER-TRACE-ENERGY-INTEGRATION-001",
     "BMS-MULTIDIM-CAPABILITY-SURFACE-001",
     "NON-ANTICIPATIVITY-POLICY-AUDIT-001",
     "REVENUE-REALIZATION-BRIDGE-001",
@@ -344,6 +345,7 @@ def main() -> None:
     cash_risk_kernel_path = root / "tools/sawem-market-reference/src/cash_risk.rs"
     non_anticipativity_kernel_path = root / "tools/sawem-market-reference/src/non_anticipativity.rs"
     paired_policy_comparison_kernel_path = root / "tools/sawem-market-reference/src/paired_policy_comparison.rs"
+    power_trace_kernel_path = root / "tools/sawem-market-reference/src/power_trace.rs"
     revenue_realization_kernel_path = root / "tools/sawem-market-reference/src/revenue_realization.rs"
     warranty_compliance_kernel_path = root / "tools/sawem-market-reference/src/warranty_compliance.rs"
     rainflow_cycles_kernel_path = root / "tools/sawem-market-reference/src/rainflow_cycles.rs"
@@ -379,6 +381,7 @@ def main() -> None:
         cash_risk_kernel_bytes = cash_risk_kernel_path.read_bytes()
         non_anticipativity_kernel_bytes = non_anticipativity_kernel_path.read_bytes()
         paired_policy_comparison_kernel_bytes = paired_policy_comparison_kernel_path.read_bytes()
+        power_trace_kernel_bytes = power_trace_kernel_path.read_bytes()
         revenue_realization_kernel_bytes = revenue_realization_kernel_path.read_bytes()
         warranty_compliance_kernel_bytes = warranty_compliance_kernel_path.read_bytes()
         rainflow_cycles_kernel_bytes = rainflow_cycles_kernel_path.read_bytes()
@@ -431,6 +434,8 @@ def main() -> None:
             + non_anticipativity_kernel_bytes
             + b"\n"
             + paired_policy_comparison_kernel_bytes
+            + b"\n"
+            + power_trace_kernel_bytes
             + b"\n"
             + revenue_realization_kernel_bytes
             + b"\n"
