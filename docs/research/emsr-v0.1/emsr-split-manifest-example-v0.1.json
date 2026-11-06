@@ -1,0 +1,40 @@
+{
+  "schema": "emsr.split-manifest",
+  "version": "0.1.0",
+  "dataset_id": "SYNTHETIC-EMSR-SPLIT-EXAMPLE",
+  "dataset_version": "fixture-v0.1",
+  "held_out_dimensions": [
+    "receiver_group",
+    "campaign_group",
+    "location_group"
+  ],
+  "records": [
+    {
+      "record_id": "synthetic-record-train-001",
+      "split": "train",
+      "event_group": "synthetic-event-train",
+      "recording_group": "synthetic-recording-train",
+      "receiver_group": "synthetic-receiver-train",
+      "campaign_group": "synthetic-campaign-train",
+      "location_group": "synthetic-location-train"
+    },
+    {
+      "record_id": "synthetic-record-validation-001",
+      "split": "validation",
+      "event_group": "synthetic-event-validation",
+      "recording_group": "synthetic-recording-validation",
+      "receiver_group": "synthetic-receiver-validation",
+      "campaign_group": "synthetic-campaign-validation",
+      "location_group": "synthetic-location-validation"
+    },
+    {
+      "record_id": "synthetic-record-test-001",
+      "split": "test",
+      "event_group": "synthetic-event-test",
+      "recording_group": "synthetic-recording-test",
+      "receiver_group": "synthetic-receiver-test",
+      "campaign_group": "synthetic-campaign-test",
+      "location_group": "synthetic-location-test"
+    }
+  ]
+}
