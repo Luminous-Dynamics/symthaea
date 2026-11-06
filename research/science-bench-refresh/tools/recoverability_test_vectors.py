@@ -141,7 +141,7 @@ def classify(manifest: dict[str, Any], unit: dict[str, Any]) -> dict[str, Any]:
             label, route = "ReformulationRecoverable", reformulation
         elif navigation is not None:
             label, route = "NavigationRecoverable", navigation
-        elif manifest["surface_state"] == "frozen_observed":
+        elif manifest["surface_state"] == "complete_frozen_inventory":
             label, route = "UnreachableWithinBudget", None
         else:
             label, route = "NotEvaluable", None
@@ -202,7 +202,7 @@ def main() -> int:
 
     # A partial surface is a valid manifest but no unit can be classed.
     partial_fields = copy.deepcopy(base_fields)
-    partial_fields["surface_state"] = "partial"
+    partial_fields["surface_state"] = "partial_observed"
     partial_path = out_dir / "partial-surface-manifest.json"
     partial = save_manifest(partial_fields, partial_path)
     partial_rows = [classify(partial, unit) for unit in partial["evidence_units"]]
