@@ -120,6 +120,19 @@ The current Rust `decision_regret.rs` evaluator computes the first gap only: it 
 
 Scenario probabilities must themselves be calibrated or independently justified; the evaluator only checks that supplied probabilities are source-bound, known by the decision time and sum to 100%. Publish expected values together with distributional downside and probability uncertainty. A perfect-foresight bound using a miscalibrated scenario distribution is not a bankability conclusion.
 
+#### Paired policy comparison: the actual competitive test
+
+The new `paired_policy_comparison.rs` evaluator is the policy-to-policy counterpart to EVPI. It compares two implementable policies with:
+- one identical scenario census and probability manifest;
+- exactly the same market-rule, asset, topology and settlement source/digest basis;
+- identical decision coverage and information-node IDs, hashes and availability timestamps;
+- independent non-anticipativity audits for both policies;
+- paired outcome records with separate candidate/comparator source receipts.
+
+It reports candidate-minus-comparator expected net cash, candidate/comparator/tie probability, best and worst paired outcomes, and lower-tail delta VaR/CVaR. A positive delta favours the candidate. A negative lower-tail CVaR exposes downside hidden by the expected delta.
+
+This is the required comparison contract for external engines, but not an execution adapter: no PLEXOS, Aurora Chronos, HOMER, SAM, PyPSA or GridPath output has yet been imported or scored by this module. A vendor comparison remains `not_run` until each engine's version/build, feature entitlements, source data, solver and run receipts are frozen and the paired outputs are independently reproduced.
+
 ### Track D — bankability, liquidity and lifecycle risk
 
 Metrics:
