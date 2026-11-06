@@ -217,7 +217,7 @@ pub fn build_forecast_baseline<'a>(
         .collect::<Vec<_>>();
     eligible.sort_by_key(|item| (item.valid_period_start_utc, item.record_id));
 
-    let (q10, q50, q90, used): (i64, i64, i64, Vec<&HistoricalPriceObservation<'a>>) = match query
+    let (q10, q50, q90, used): (i64, i64, i64, Vec<HistoricalPriceObservation<'a>>) = match query
         .method
     {
         ForecastBaselineMethod::PersistenceWithEmpiricalIncrements => {
