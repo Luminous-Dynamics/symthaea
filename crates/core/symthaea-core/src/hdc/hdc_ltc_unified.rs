@@ -2118,6 +2118,18 @@ impl HdcLtcUnifiedNeuron {
         self.input_momentum = ContinuousHV::zero(self.config.dimension);
     }
 
+    /// Reset all transient state tied to an earlier parameterization.
+    ///
+    /// Use on an isolated candidate after an external weight-space edit:
+    /// hidden state, temporal clock, update counter, momentum, and running
+    /// dynamical statistics must not be carried across a changed substrate.
+    pub fn reset_after_parameter_edit(&mut self) {
+        self.reset();
+        self.reset_momentum();
+        self.running_mean = 0.0;
+        self.running_var = 1.0;
+    }
+
     /// Get statistics
     pub fn stats(&self) -> UnifiedNeuronStats {
         UnifiedNeuronStats {
