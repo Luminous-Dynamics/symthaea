@@ -2,8 +2,8 @@
 mod execution_receipt;
 
 use execution_receipt::{
-    interpret_tool_execution_receipt_json, ExecutionEvidenceInterpretationV1,
-    ReceiptInterpretationError,
+    ExecutionEvidenceInterpretationV1, ReceiptInterpretationError,
+    interpret_tool_execution_receipt_json,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -53,23 +53,27 @@ fn parse_args() -> Result<Args, String> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--receipt-corpus" => {
-                receipt_corpus = Some(PathBuf::from(
-                    args.next().ok_or_else(|| "--receipt-corpus requires a path".to_string())?,
-                ));
+                receipt_corpus =
+                    Some(PathBuf::from(args.next().ok_or_else(|| {
+                        "--receipt-corpus requires a path".to_string()
+                    })?));
             }
             "--profile-corpus" => {
-                profile_corpus = Some(PathBuf::from(
-                    args.next().ok_or_else(|| "--profile-corpus requires a path".to_string())?,
-                ));
+                profile_corpus =
+                    Some(PathBuf::from(args.next().ok_or_else(|| {
+                        "--profile-corpus requires a path".to_string()
+                    })?));
             }
             "--expected-profile-sha256" => {
                 expected_profile_sha256 = Some(
-                    args.next().ok_or_else(|| "--expected-profile-sha256 requires a value".to_string())?,
+                    args.next()
+                        .ok_or_else(|| "--expected-profile-sha256 requires a value".to_string())?,
                 );
             }
             "--out" => {
                 output = Some(PathBuf::from(
-                    args.next().ok_or_else(|| "--out requires a path".to_string())?,
+                    args.next()
+                        .ok_or_else(|| "--out requires a path".to_string())?,
                 ));
             }
             "--help" | "-h" => return Err(usage().to_string()),
@@ -105,14 +109,20 @@ fn main() -> ExitCode {
     let receipt_bytes = match fs::read(&args.receipt_corpus) {
         Ok(bytes) => bytes,
         Err(error) => {
-            eprintln!("cannot read receipt corpus {}: {error}", args.receipt_corpus.display());
+            eprintln!(
+                "cannot read receipt corpus {}: {error}",
+                args.receipt_corpus.display()
+            );
             return ExitCode::from(2);
         }
     };
     let profile_bytes = match fs::read(&args.profile_corpus) {
         Ok(bytes) => bytes,
         Err(error) => {
-            eprintln!("cannot read profile corpus {}: {error}", args.profile_corpus.display());
+            eprintln!(
+                "cannot read profile corpus {}: {error}",
+                args.profile_corpus.display()
+            );
             return ExitCode::from(2);
         }
     };
