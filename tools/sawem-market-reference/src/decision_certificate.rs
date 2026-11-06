@@ -361,8 +361,8 @@ pub fn evaluate_underwriting_certificate<'a>(
                 .map(|receipt| receipt.receipt_id),
             invalidation_condition_count: u32::try_from(obligation.invalidation_conditions.len())
                 .map_err(|_| {
-                    UnderwritingCertificateError::ArithmeticOverflow
-                })?,
+                UnderwritingCertificateError::ArithmeticOverflow
+            })?,
         });
     }
 
