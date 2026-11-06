@@ -6,8 +6,8 @@ mod replay_verifier;
 use rea_compat::claims::{
     ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, evaluate_claim,
 };
-use serde_json::{Value, json};
 use replay_verifier::{ReplayErrorKind, ReplayOutcome, replay_claim_evaluation};
+use serde_json::{Value, json};
 
 fn fixture_bytes() -> &'static [u8] {
     include_bytes!(
@@ -35,7 +35,8 @@ fn provider_claim(evidence_id: String) -> ClaimRequest {
         source_predicate_type: Some("rea.analysis".to_owned()),
         evidence_ids: vec![evidence_id],
         assumptions: Vec::new(),
-        falsification_condition: "A same-scope verified Evidence record has a different normalized_result".to_owned(),
+        falsification_condition:
+            "A same-scope verified Evidence record has a different normalized_result".to_owned(),
     }
 }
 
@@ -55,7 +56,10 @@ fn independent_replay_matches_supported_provider_observation() {
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, replay.reported_disposition);
-    assert_eq!(replay.recomputed_derivation_sha256, replay.reported_derivation_sha256);
+    assert_eq!(
+        replay.recomputed_derivation_sha256,
+        replay.reported_derivation_sha256
+    );
 }
 
 #[test]
@@ -67,7 +71,10 @@ fn independent_replay_uses_jcs_equivalence_for_json_numbers() {
 
     let replay = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::SupportedWithinScope);
+    assert_eq!(
+        replay.expected_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
 }
 
 #[test]
@@ -107,7 +114,10 @@ fn independent_replay_keeps_missing_premises_underdetermined() {
 
     let replay = replay_claim_evaluation(&claim_bytes, &[], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, ClaimDisposition::Underdetermined);
+    assert_eq!(
+        replay.expected_disposition,
+        ClaimDisposition::Underdetermined
+    );
     assert_eq!(replay.missing_evidence_count, 1);
 }
 
@@ -147,9 +157,13 @@ fn changed_request_cannot_reuse_an_old_result() {
     let mut changed = claim;
     changed.falsification_condition = "A different falsification condition".to_owned();
     let changed_bytes = serde_json::to_vec(&changed).unwrap();
-    let replay = replay_claim_evaluation(&changed_bytes, &[fixture_bytes()], &result_bytes).unwrap();
+    let replay =
+        replay_claim_evaluation(&changed_bytes, &[fixture_bytes()], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
-    assert_ne!(replay.reported_derivation_sha256, replay.recomputed_derivation_sha256);
+    assert_ne!(
+        replay.reported_derivation_sha256,
+        replay.recomputed_derivation_sha256
+    );
 }
 
 #[test]
@@ -177,12 +191,8 @@ fn duplicate_json_keys_are_rejected_recursively_in_claims_and_results() {
         "\"claim_id\":\"replay-fixture-0001\",\"claim_id\":\"forged\"",
         1,
     );
-    let error = replay_claim_evaluation(
-        &claim_bytes,
-        &[fixture_bytes()],
-        result_text.as_bytes(),
-    )
-    .unwrap_err();
+    let error = replay_claim_evaluation(&claim_bytes, &[fixture_bytes()], result_text.as_bytes())
+        .unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidJson);
 }
 
