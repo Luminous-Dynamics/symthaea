@@ -4,6 +4,8 @@
 **Parent:** [#10663 CEB pilot authoring pack](https://github.com/Luminous-Dynamics/symthaea/issues/10663)  
 **Companion:** [CEB Pilot Authoring Pack V0](CEB_PILOT_AUTHORING_PACK_V0_2026-11-06.md)
 
+**Name:** CEB means **Computational Engineering Bench**, the Symthaea-native engineering evaluation programme introduced in [PR #10115](https://github.com/Luminous-Dynamics/symthaea/pull/10115). This synthesis retains that official name while reflecting the broader lifecycle scope now covered by its lanes.
+
 ## 1. Executive thesis
 
 The next step in software-engineering-agent evaluation is not another isolated patch leaderboard. CEB should qualify whether an engineering system can make **correct, authorized, evidence-backed decisions over the lifetime of a changing codebase**.
@@ -23,9 +25,13 @@ CEB should integrate these benchmarks as context and use common tasks where feas
 
 Scale AI's refreshed public split contains 642 tasks across 11 repositories. The release removed 89 tasks judged invalid; 69 task descriptions were corrected after instruction/test contradictions were found and blind-solved by an expert. Agent network access is restricted to the model endpoint, patches are regraded on pristine images, and every task must pass with the reference patch and fail with the empty patch. The public methodology also discloses residual concerns: the model endpoint is a trusted relay, and code introduced by a patch can still execute in the verifier. [Scale AI methodology and release notes](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full)
 
-The currently visible full-split leaderboard shows Opus 5 / Claude Code at **99.40 ± 0.40**, Gemini 4 Argon at 99.22 ± 0.45 and Fable 5.1 at 99.10 ± 0.50. The companion 51-task Hard split ranges from 52.9% to 98.0% across frontier systems in the V2 paper. These numbers demonstrate both saturation on the full split and the value of difficulty stratification. [Live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full) · [V2 paper, 16 October 2026](https://arxiv.org/abs/2610.24206)
+The refreshed public leaderboard reports Claude Opus 5 at **99.4% (638/642)**, Kimi K3 at **97.7% (627/642)** and GPT-Astra at **96.9%** on the 642-task public split. The companion 51-task Hard split is a more discriminating public probe. [Scale's V2 release and public/private results](https://labs.scale.com/blog/swe-bench-pro-v2) · [Live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full) · [V2 paper, 16 October 2026](https://arxiv.org/abs/2610.24206)
 
-**CEB implication:** use patch correctness as a necessary baseline and safety gate, not the sole north-star. Do not claim superiority by comparing CEB's sequence or evidence metrics to SWE-Bench resolve rate.
+**Version-scoped validity warning:** Epoch AI reviewed the pre-V2 SWE-Bench Pro release on September 1, 2026 and rated that release *Flawed*, citing multiple audits estimating that roughly 30% or more of tasks had scoring defects. That review describes the older 1,865-task suite (731 public); it predates the September 22 V2 refresh and must not be mechanically transferred to V2. V2 is a materially revised release: Scale reports removing 89 invalid tasks, refreshing task instructions, verifiers and images, and adding expert/agentic review. However, V2 should not be called independently verified merely because it is newer. A V2-specific task-level audit remains the correct evidentiary standard. [Epoch AI's pre-V2 review](https://epoch.ai/benchmarks/swe-bench-pro/review) · [Scale V2 release notes](https://labs.scale.com/blog/swe-bench-pro-v2)
+
+**Saturation is not the same as generalization:** Scale reports a large public/private gap—for Claude Opus 5, 638/642 public tasks versus 222/272 private tasks—and explicitly notes that the near-ceiling public result may reflect training-time exposure to public repositories and fixes. Network locking reduces evaluation-time retrieval; it cannot erase information learned during training. Keep public and private results separate, and do not interpret the public 99% result as proof that the underlying capability is solved. [Scale V2 public/private analysis](https://labs.scale.com/blog/swe-bench-pro-v2)
+
+**CEB implication:** use patch correctness as a necessary baseline and safety gate, not the sole north-star. Distinguish the pre-V2 review from the V2 release, and do not claim superiority by comparing CEB's sequence or evidence metrics to SWE-Bench resolve rate.
 
 ### 2.2 SWE-Milestone: continuous evolution is the closest adjacent construct
 
@@ -43,7 +49,7 @@ SWE-CI contains 100 repository-maintenance tasks. Each task's evolution history 
 
 ### 2.4 SWE Atlas: breadth outside issue resolution
 
-SWE Atlas v1.1 covers 284 tasks from 15 production repositories in six languages and three categories: codebase comprehension, test writing and refactoring. Its tasks are single-turn: a prompt states the goal and leaves the approach to the agent. V1.1 changed its judge and grading criteria, so scores from v1.0 are not directly comparable. [Scale AI SWE Atlas methodology/results](https://labs.scale.com/leaderboard/swe-atlas)
+SWE Atlas v1.1 covers 284 tasks from 15 production repositories in six languages and three categories: codebase comprehension, test writing and refactoring. Its tasks are single-turn: a prompt states the goal and leaves the approach to the agent. V1.1 re-ran models with a new judge (GPT-6.1 Sol, majority of three votes), refined grading criteria and restricted network access; scores from v1.0 are therefore not directly comparable. [Scale AI SWE Atlas v1.1 methodology/results](https://labs.scale.com/leaderboard/swe-atlas)
 
 **CEB implication:** use repository Q&A, tests and refactoring as component-level probes, but measure whether their outputs remain valid across later source, configuration and policy events.
 
@@ -74,7 +80,9 @@ GSO contains 102 optimization tasks across 10 codebases and five languages. Opt@
 
 ### 2.9 VerifierBench: verifier generation is a capability in its own right
 
-VerifierBench's public overview (an anonymous submission under review; code and data were not publicly released on the page at the time of this snapshot) describes 222 retained tasks from six source benchmarks, 4,993 hidden test cases, 36 model–harness configurations and 45 exclusions for source defects. It reports TPR of 21.1–70.2% and TNR of 79.2–96.3% across 19 pi-harness models; all 36 configurations lie below the TPR=TNR line. For nine models with archived traces, all-reject verifiers account for 87.9–96.0% of false rejections. Its proposed Verifier4Verifier checks include replay, repeatability, provenance, input-label consistency, trivial baselines and mutation testing. [VerifierBench public overview](https://verifierbench.github.io/)
+VerifierBench is now supported by a named arXiv preprint dated October 19, 2026, which supersedes the earlier characterization of the work as only an anonymous under-review submission. The paper authors are Jianing Yin, Ziyi Chen, Hao Wang, Yiyou Sun, Zijian Jin, Dawn Song and Daoan Zhang. The preprint describes 222 tasks from six agent benchmarks and 4,993 hidden cases, including valid alternatives and attacks. Its reported experiment spans 19 models in a common harness, with normalized balanced accuracy from 10.6 to 62.1; generated verifiers reject invalid solutions more reliably than they accept valid ones, and many false rejections come from verifiers that accept no tested solution. The project page separately reports 36 model–harness configurations and 45 source-task exclusions. These are different counts and should not be collapsed into "36 models" or treated as the same experimental denominator. The preprint is public research, not evidence of peer review or independent CEB reproduction. [VerifierBench paper (October 19, 2026)](https://arxiv.org/abs/2610.28679) · [Project page and dataset overview](https://verifierbench.github.io/)
+
+The paper describes a six-check Verifier4Verifier (V4V) audit for source verifiers and test suites. The important operational failure is asymmetric discrimination: rejecting invalid submissions is not sufficient if valid alternatives are rejected or no valid solution is accepted. The exact paper results and project-page configuration inventory must remain source-scoped.
 
 **CEB implication:** qualify the verifier itself. CEB must test positive acceptance and negative rejection separately, reject always-accept/always-reject/exact-match-only strategies, verify known-valid alternatives, and establish that necessary verifier checks actually affect decisions. This evidence motivated the V4V extension in [#10680](https://github.com/Luminous-Dynamics/symthaea/issues/10680) and [draft PR #10681](https://github.com/Luminous-Dynamics/symthaea/pull/10681). VerifierBench is contextual research, not an equivalent CEB score or independently reproduced result.
 
@@ -96,11 +104,20 @@ Endor Labs' Agent Security League reports 34 agent/model configurations. Its cur
 
 **CEB implication:** retain joint secure-functional pass and critical security false accepts as independent hard-gated measures. A high functional pass rate cannot stand in for security correctness.
 
+### 2.13 External benchmark validity is version-scoped
+
+External benchmark names are not validity guarantees. Epoch AI's published review list currently classifies the pre-V2 SWE-Bench Pro release, SWE-bench Verified and Terminal-Bench 4.0.0 as *Flawed*. Its review rubric treats scoring defects that can affect at least 20% of a benchmark's total score as sufficient for that verdict. This is a useful independent warning signal, not a universal ground-truth authority and not a substitute for inspecting the affected task versions. [Epoch AI reviewed-benchmark index](https://epoch.ai/data/benchmark-reviews-documentation/included-benchmarks)
+
+For Terminal-Bench specifically, Epoch's September 4 review reports public scoring defects in 30 of 66 v4.0.0 tasks (45.5%), including writable pass signals, answer leakage and false negatives. The Terminal-Bench maintainers describe 4.1 as a verifier-hardening release, and the v4.1 GitHub milestone showed 93% completion with six open issues at its October 29 update. The official benchmark catalogue retrieved for this review still lists Terminal-Bench 4.0 as the current released version; a milestone or roadmap is not a released, regraded benchmark. Therefore, preserve 4.0.0 results as historical observations with defect warnings, and do not silently treat planned 4.1 fixes as completed remediation. [Epoch AI v4.0.0 review](https://epoch.ai/benchmarks/terminal-bench-4/review) · [Terminal-Bench 4.1 milestone](https://github.com/harbor-framework/terminal-bench/milestone/2) · [Official benchmark catalogue](https://www.tbench.ai/benchmarks) · [Maintainer 4.0 release notes](https://www.tbench.ai/news/terminal-bench-4-0)
+
+**CEB implication:** attach validity evidence to the exact suite release, task universe, verifier revision and leaderboard observation. A family-level label ("SWE-Bench Pro", "Terminal-Bench") is too coarse. When an external suite is revised, preserve the old verdict and its scope, qualify the new release independently, and regrade/rerun only according to its documented change semantics. Reuse the existing CEB external-observation and release-lifecycle ownership (#10571/#10589 and #10610/#10611); do not create a second benchmark registry or an opaque benchmark-quality score.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
 |---|---|---|
-| SWE-Bench Pro V2 | Real-issue patch resolution, task repair, reference/empty controls, pristine-image regrading | Ongoing evidence validity, policy authority, dependency-aware reuse and long-term decision traceability |
+| SWE-Bench Pro V2 | Real-issue patch resolution, task repair, reference/empty controls, pristine-image regrading | Separate V2 from the older Flawed review; independently audit V2, public/private split and training-exposure risk; then measure ongoing evidence validity and long-term decision traceability |
+| Terminal-Bench 4.0.0 | Terminal, systems, science, operations and tool-use tasks; continuous versioning | Treat 4.0.0 as historically useful but externally reviewed as Flawed; require task-level adjudication and a released, regraded successor before claiming remediation |
 | SWE-Milestone | Multi-milestone implementation, dependency DAGs, F2P/P2P regressions, compounding errors | Typed claim/evidence disposition and selective proof refresh across milestones |
 | SWE-CI | Long repository histories and maintainability under repeated evolution | Separating product evolution from evaluator/metrology drift and claim-admissibility changes |
 | SWE Atlas | Comprehension, test writing, refactoring beyond issue resolution | Whether generated understanding and tests stay valid after subsequent changes |
@@ -169,7 +186,7 @@ When a contract requires interactions among features, evaluate those interaction
 
 ### Shift 9 — From fixed benchmark to continuously audited measurement system
 
-Treat task provenance, contamination, oracle validity, denominators, environment digests, evaluator versions, regrading and external observations as a maintained evidence base. A benchmark result should have an explicit claim class and a reproducible path back to task, system, run and adjudication. Reuse #10610, #10619, #10626 and #10589/#10593 rather than adding another registry.
+Treat task provenance, contamination, oracle validity, denominators, environment digests, evaluator versions, external review status, regrading and external observations as a maintained evidence base. Validity attaches to an exact release and task universe, not just a benchmark family name. A benchmark result should have an explicit claim class and a reproducible path back to task, system, run, grader revision and adjudication. Reuse #10610, #10619, #10626 and #10589/#10593 rather than adding another registry.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
@@ -181,7 +198,7 @@ Do not publish one opaque weighted number. Maintain hard gates and a Pareto surf
 4. **Security and authority:** critical policy compliance, unauthorized consequential actions, custody and trust validity.
 5. **Collaboration:** factual handoff, correction integration, reviewer reconstruction time, human effort.
 6. **Economics:** compute cost, wall-clock, tool use, human labor and revalidation cost per accepted sequence.
-7. **Measurement integrity:** contamination, oracle quality, verifier trust, denominator fidelity, regrade reproducibility.
+7. **Measurement integrity:** contamination, oracle quality, verifier trust, exact-release validity, denominator fidelity and regrade reproducibility.
 
 A result can be strong on one dimension and unacceptable on another. Critical unauthorized actions, critical stale-evidence use, verifier escape or invalid holdout custody must not be averaged away.
 
@@ -286,7 +303,10 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 
 ## 10. Sources and comparison notes
 
-- Scale AI, [SWE-Bench Pro V2 release/methodology and live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), updated September 22, 2026; leaderboard viewed November 6, 2026.
+- Scale AI, [SWE-Bench Pro V2 release/methodology](https://labs.scale.com/blog/swe-bench-pro-v2), September 22, 2026; [live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), viewed November 6, 2026.
+- Epoch AI, [SWE-Bench Pro review](https://epoch.ai/benchmarks/swe-bench-pro/review), September 1, 2026 (pre-V2 release; verdict scope must not be transferred to V2).
+- Epoch AI, [Terminal-Bench 4.0.0 review](https://epoch.ai/benchmarks/terminal-bench-4/review), September 4, 2026; [Terminal-Bench 4.1 milestone](https://github.com/harbor-framework/terminal-bench/milestone/2), updated October 29, 2026; [official benchmark catalogue](https://www.tbench.ai/benchmarks), viewed November 6, 2026.
+- Epoch AI, [included benchmark reviews](https://epoch.ai/data/benchmark-reviews-documentation/included-benchmarks), retrieved November 6, 2026.
 - Dan et al., [SWE-Bench Pro V2: A Cleaner, Harder-to-Game Coding Benchmark](https://arxiv.org/abs/2610.24206), 16 October 2026.
 - Deng et al., [SWE-Milestone: Evaluating AI Agents on Continuous Software Evolution](https://proceedings.mlr.press/v306/deng26d.html), ICML 2026, PMLR 306.
 - Chen et al., [SWE-CI: Evaluating Agent Capabilities in Maintaining Codebases via Continuous Integration](https://arxiv.org/abs/2603.03823), 4 March 2026.
@@ -295,7 +315,7 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 - Scale AI, [HiL-Bench overview and methodology](https://labs.scale.com/leaderboard/hil), 2026.
 - Abundant AI, [SWE-Marathon v1.1](https://www.swe-marathon.org/), current leaderboard viewed November 6, 2026.
 - Shetty et al., [GSO: Challenging Software Optimization Tasks for SWE-Agents](https://gso-bench.github.io/), leaderboard/methodology viewed November 6, 2026.
-- Anonymous authors, [VerifierBench: Benchmarking the Generation of Executable Verifiers for LLM Agents](https://verifierbench.github.io/), under review; public overview viewed November 6, 2026.
+- Yin et al., [VerifierBench: Benchmarking the Generation of Executable Verifiers for LLM Agents](https://arxiv.org/abs/2610.28679), arXiv preprint, October 19, 2026; [project page and dataset overview](https://verifierbench.github.io/) (accessed November 6, 2026).
 - Zhao et al., [SpecBench: Measuring Reward Hacking in Long-Horizon Coding Agents](https://arxiv.org/abs/2605.21384), May 20, 2026.
 - Atinafu and Cohen, [RewardHackingAgents: Benchmarking Evaluation Integrity for LLM ML-Engineering Agents](https://arxiv.org/abs/2603.11337), March 11, 2026.
 - Endor Labs, [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark), leaderboard viewed November 6, 2026.
