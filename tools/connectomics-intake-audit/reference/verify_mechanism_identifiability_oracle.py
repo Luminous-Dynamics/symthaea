@@ -149,8 +149,8 @@ def verify(data: dict[str, Any], raw_input: bytes) -> dict[str, Any]:
                 })
         query_pairs = [row for row in pair_reports if row["different_query_decision"]]
         mechanism_pairs = [row for row in pair_reports if row["different_mechanism_class"]]
-        query_identified = bool(query_pairs) and all(row["pair_identified_at_budget"] for row in query_pairs)
-        mechanism_identified = bool(mechanism_pairs) and all(row["pair_identified_at_budget"] for row in mechanism_pairs)
+        query_identified = all(row["pair_identified_at_budget"] for row in query_pairs)
+        mechanism_identified = all(row["pair_identified_at_budget"] for row in mechanism_pairs)
         action_reports[action_id] = {
             "action_kind": intervention_by_id[action_id]["action_kind"],
             "feasibility_status": intervention_by_id[action_id]["feasibility_status"],
