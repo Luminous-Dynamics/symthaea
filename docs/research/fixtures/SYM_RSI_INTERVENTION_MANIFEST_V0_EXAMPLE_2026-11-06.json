@@ -22,7 +22,15 @@
       "class": "algorithm",
       "requires": [],
       "conflicts": [],
-      "coupled_group": null
+      "coupled_group": null,
+      "source_diff_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "affected_paths": [
+        "crates/core/example/src/update.rs"
+      ],
+      "declared_mechanism": "Changes the parameter update from fixed-rate gradient descent to a predeclared adaptive update.",
+      "predicted_intermediate_effect": "Lower update variance at matched training steps, without changing the task loss or compute budget.",
+      "rollback_procedure_ref": "synthetic-procedure:remove-change-a",
+      "transplant_procedure_ref": "synthetic-procedure:apply-change-a-to-clean-base"
     },
     {
       "id": "change-b",
@@ -30,7 +38,15 @@
       "class": "algorithm",
       "requires": [],
       "conflicts": [],
-      "coupled_group": null
+      "coupled_group": null,
+      "source_diff_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "affected_paths": [
+        "crates/core/example/src/memory.rs"
+      ],
+      "declared_mechanism": "Adds a bounded retrieval gate to the training-time memory lookup.",
+      "predicted_intermediate_effect": "Improves retrieval precision at fixed lookup count.",
+      "rollback_procedure_ref": "synthetic-procedure:remove-change-b",
+      "transplant_procedure_ref": "synthetic-procedure:apply-change-b-to-clean-base"
     }
   ]
 }
