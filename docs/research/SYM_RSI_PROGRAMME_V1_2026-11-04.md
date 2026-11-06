@@ -698,3 +698,210 @@ Sources:
 - Xu et al., *SelfImprove-Bench: Evaluating Generalization in Self-Improving Agents*, arXiv:2611.02797 (2026-11-02): https://arxiv.org/abs/2611.02797
 - Sun et al., *Which Self-Improvements Should We Trust?*, arXiv:2609.33180 (2026-09-27): https://arxiv.org/abs/2609.33180
 - Chen et al., *Auditing the Product, Not the Recursion*, arXiv:2610.27610 (2026-10-20): https://arxiv.org/abs/2610.27610
+
+
+## 14. Bounded-score REUSE and November 6 benchmark update
+
+### Why bounded-score evaluation is a separate kernel
+
+The REUSE pass/fail implementation in #10576 is a valid and useful first specialization, but Symthaea's benchmark evidence also includes normalized continuous scores. Thresholding those scores into pass/fail can discard useful effect information and makes the result depend on a chosen threshold.
+
+Issue [#10668 — bounded-score REUSE](https://github.com/Luminous-Dynamics/symthaea/issues/10668) specifies the additive Appendix A.1 route from Sun et al. (2026-09-27, arXiv:2609.33180). For independently sampled paired differences $Z_i\in[-1,1]$, it computes a lower confidence bound using:
+- the empirical mean $\bar Z$;
+- an upper confidence limit on $E[Z^2]$ obtained by inverting Bernoulli KL;
+- the empirical-Bernstein deviation $\epsilon(v,L)=2L/(3n)+\sqrt{(2L/(3n))^2+2vL/n}$;
+- $L=\ln(2/\delta)$ and $\mathrm{LCB}=\bar Z-\epsilon$.
+
+For this route, the complete per-comparison REUSE allocation is used for the bounded-score LCB; it is not split by the pass/fail rho parameter. A candidate is eligible only when its LCB exceeds the preregistered practical threshold gamma >= 0. If multiple candidates qualify, choose the one with the largest empirical mean, and add its LCB to the private cumulative progress certificate. The proposer still receives only the coarse round decision.
+
+The bounded-score vector must contain independent paired units. Correlated task rows must first be reduced under the frozen cluster/task-family sampling design. The numerical helper does not authenticate this provenance or make a curated benchmark representative of a target population.
+
+### New external benchmark evidence
+
+- **SelfImprove-Bench (arXiv:2611.02797, 2026-11-02)** defines an Exploring / Planning / Reasoning task space and a G0-G4 generalization ladder. Include its controllable task templates as a direct transfer diagnostic, but add real software and scientific R&D task families: game-world gains alone do not establish generalization to the kinds of work Symthaea targets.
+- **RSIGym (arXiv:2610.10310, 2026-10-07)** supplies a strong infrastructure comparator with Data, Harness and Joint tracks and a reported leading RSI-Index of 0.4809. Its public results README states that final evaluations reuse tasks available during development and that research-agent inference / official evaluation are billed outside the platform-service budget. Treat the reported RSI-Index as an optimization-on-a-known-suite result, not an independently sampled unseen-population transfer result. Symthaea should report both known-task score and sealed, fresh-family transfer.
+- **HyperAgents (Meta, 2026-03-24)** already demonstrates that the meta-procedure itself can evolve, so Symthaea's novelty claim cannot simply be "we have a self-modifying meta-agent". The discriminating target is stronger experimental qualification: same-start matched-budget improver swaps, cross-domain meta-transfer, multi-parent lineage, complete task accounting, and independent promotion.
+- **AI4AI-Bench (arXiv:2608.20318, 2026-08-20)** isolates algorithmic redesign from data and harness changes. Its best reported score is 0.250 on ten frozen training-algorithm tasks. Keep that benchmark as a distinct Algorithm track; do not describe prompt or harness improvements as algorithmic RSI.
+
+Sources:
+- SelfImprove-Bench: https://arxiv.org/abs/2611.02797
+- RSIGym: https://arxiv.org/abs/2610.10310 and https://github.com/evolvent-ai/RSIGym
+- HyperAgents: https://ai.meta.com/research/publications/hyperagents/
+- AI4AI-Bench: https://arxiv.org/abs/2608.20318
+
+### Revised comparison protocol
+
+For every external comparison, freeze model/checkpoint bytes, task and family manifests, tool permissions, evaluator build, harness, inference budget, training budget, retry policy, and all costs. Report the raw per-domain outcomes rather than only a normalized composite.
+
+Add these result lanes:
+1. **Known-suite optimization:** development tasks may be reused, matching RSIGym-style experiments.
+2. **Fresh-task transfer:** new instances from families held out from search.
+3. **Fresh-family transfer:** task families never used for candidate generation or selection.
+4. **Difficulty extrapolation:** preregistered harder tasks and shifted resource regimes.
+5. **Improver transfer:** old and new meta-agents start from identical research states and compete under matched budgets on a different domain.
+6. **Algorithm transfer:** changes to objectives/update rules are retrained from scratch under matched data and compute, then evaluated on held-out tasks.
+
+These lanes must never be collapsed into one unqualified "RSI score". For each report, include best-so-far and final candidate, false promotions, rejected candidates, independent replications, resource consumption, retention floors, and population uncertainty.
+
+### Current engineering status and claim boundary
+
+- #10576's pass/fail REUSE branch has a focused exact-head workflow; its standalone harness is separate from root-workspace compilation.
+- This branch adds the bounded-score empirical-Bernstein confidence kernel and per-round decision path as a draft implementation of #10668.
+- Both branches remain non-authorizing numerical kernels. The independent evaluator service, authenticated immutable history, feedback firewall, source-to-executable provenance, sampling-frame qualification, and multi-metric error allocation remain required before any real RSI promotion claim.
+- Source-authored tests are not test execution. Focused CI must pass at the exact PR head, and root-workspace integration must be qualified separately.
+
+
+## 15. Benchmark integrity and transfer-distance update — 2026-11-06
+
+### AI4AI-Bench: preserve the result, qualify the benchmark
+
+AI4AI-Bench (arXiv:2608.20318) is an important first reference for algorithmic RSI because it asks agents to edit training algorithms, then applies the source patch in a fresh container and trains from scratch. The paper reports mean normalized score 0.166 and best 0.250 across 29 configurations.
+
+Do **not** use 0.250 as an uncontested SOTA target. An independent full audit published 2026-11-03 reviewed all 10 task contracts/evaluators and 290 result pages, and classified the reviewed v1 as flawed:
+- Four of ten tasks had confirmed score-changing defects: visible/reused RAGEN held-out seed and substantial train/final-board overlap; DDPO reward optimization that collapsed alignment/diversity; NPO's declared optimum exceeded the actual metric ceiling; BTRM's single-run baseline sat within seed variation.
+- All tasks selected the best of up to three checkpoints on the final test metric; best and last differed in 148 of 271 completed cells.
+- There was one run per configuration, without independent seed replications.
+- The audit classified zero cells as novel research under its rubric and 49% as no gain over the shipped recipe.
+
+This is a third-party audit, not infallible ground truth. Retain the paper's published measurements and the audit's corrected analyses as separate evidence records. The right response is an audited replication/successor benchmark, not silently replacing the paper's published score or ignoring the defects.
+
+The follow-on is [SYM-RSI-ALGO-ROBUST-001 #10691](https://github.com/Luminous-Dynamics/symthaea/issues/10691). It requires source-backed classification of algorithm/config/harness changes, clean-start training, repeated seeds, validation-only checkpoint selection, independently held confirmation data, reachable metric optima, anti-scorer-gaming guardrails, and cost matching. It must reuse #10569/#10573 and existing receipt/statistics owners rather than create another evaluator or receipt contract.
+
+Sources:
+- AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+- Independent 2026-11-03 full audit: https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+
+### Generalization ladder: make the transfer distance explicit
+
+SelfImprove-Bench (arXiv:2611.02797, submitted 2026-11-02) organizes Exploring, Planning and Reasoning tasks and introduces G0-G4 generalization evaluation. It reports that gains from existing RSI methods vary inconsistently across generalization levels.
+
+For Symthaea, use the following explicit operational ladder, while extending beyond game scenarios to code, scientific research and training-algorithm design:
+
+| Level | Operational meaning | Symthaea evidence |
+|---|---|---|
+| G0 | Replay original discovery conditions | Reproducibility only; not generalization |
+| G1 | Fresh instances/seeds, same task family and difficulty | Unseen task instances |
+| G2 | Higher difficulty within the same task family | Difficulty extrapolation |
+| G3 | Different task family within the same capability | Cross-family transfer |
+| G4 | Different capability or application domain | Cross-domain transfer |
+
+This table is Symthaea's operational mapping of transfer distance, not a claim that game task performance alone establishes general research capability. Every RSI report must publish the full G0-G4 vector and per-task results; no endpoint aggregate can conceal a G0 gain with a G3/G4 regression.
+
+Source: https://arxiv.org/abs/2611.02797
+
+### Benchmark claim discipline
+
+Every external result should carry:
+- the exact benchmark revision and task-family split;
+- baseline and checkpoint-selection rules;
+- model/checkpoint, harness, toolchain and source identities;
+- number of independent full-loop and training replications;
+- whether test data affected candidate or checkpoint selection;
+- raw per-domain outcomes, uncertainty and all resource costs;
+- an independent benchmark-validity review for scorer bounds, leakage, construct validity and missing outcomes.
+
+An aggregate RSI-Index such as RSIGym's 0.4809 remains a useful within-suite reference, not a universal measure of self-improvement or an unseen-population guarantee. RSIGym's own repository says final evaluations reuse tasks available during development and separately bills research-agent inference/final evaluation from platform-service budget. Report known-suite optimization separately from fresh-task and fresh-family transfer.
+
+Source: https://github.com/evolvent-ai/RSIGym
+
+
+## 16. Evaluator evolution, external RSI protocols, and industry signal — 2026-11-06
+
+### The evaluator can become an evolutionary bottleneck
+
+**The Red Queen Gödel Machine (RQGM, arXiv:2606.26294, 2026-06-24)** co-evolves agents and evaluators under *controlled utility evolution*: the evaluator is frozen within an epoch, and evaluator replacement is decided at explicit epoch boundaries using anchor data. The paper reports:
+- coding improvements over its frozen-evaluator baseline, with 1.35x–1.72x fewer search tokens in reported comparisons;
+- 1.78x–1.86x higher paper-acceptance rates for co-evolved writers under its diverse reviewer panel;
+- 9 percentage points higher ground-truth accuracy for co-evolved proof graders.
+
+These are paper-reported results, not independent replications or guarantees for Symthaea. The central research lesson is nevertheless important: evaluation quality may itself need to evolve, especially where the target is difficult to reduce to a static executable test. But a judge and candidate that co-evolve without an independent anchor can drift into shared delusion.
+
+New follow-on: [#10708 — controlled evaluator evolution across frozen utility epochs](https://github.com/Luminous-Dynamics/symthaea/issues/10708). The proposal preserves #10573 as the only promotion authority. Evaluator challengers must pass objective, expert-adjudicated and adversarial anchors; the evaluator is frozen within each epoch; historical scores are never silently overwritten; and a fixed evaluator-independent confirmation lane remains across epochs. Do not claim one cumulative REUSE guarantee across evaluator changes without a separately reviewed theorem.
+
+Source: https://arxiv.org/abs/2606.26294
+
+### RSIBench: a direct harness-evolution protocol comparator
+
+RSIBench (November 2026) freezes model weights, task environments, verifiers, budgets and task splits while permitting harness changes. Its published protocol describes:
+- 168 tasks across six separately reported domains: Terminal, Environment, SWE, Science, Frontier and Repository Reconstruction;
+- 84 public train tasks and 84 sealed test tasks;
+- three training rollouts per task and five inheritance rounds;
+- train-side candidate selection using declared targets, cumulative anchors, pass@3 and trajectory post-review;
+- final A0 versus A_last evaluation at avg@3 on the untouched test split;
+- causal rollback / keep-one attribution for registered harness surfaces and physical modules.
+
+The public formal-results matrix is still in progress; its protocol is a comparator, not a completed SOTA leaderboard. The documentation reports no validation split, making train-side causal gates and explicit anchor discipline particularly important.
+
+Integrate the protocol into [#10497 — R4 meta-improvement](https://github.com/Luminous-Dynamics/symthaea/issues/10497) as a distinct frozen-model/frozen-environment harness arm. Keep six domain scores separate. Add causal rollback attribution where module boundaries allow, and keep terminal inherited quality primary rather than selecting the most favorable intermediate checkpoint.
+
+Sources:
+- https://harness-rsibench.com/
+- https://harness-rsibench.com/docs/
+
+### RSI-Env: persistent research state with independent host control
+
+**RSI-Env (arXiv:2611.01736, 2026-11-01)** separates an editable RSI environment from an independent Host Controller responsible for services, validity, evaluation, versioning and lineage. It compares Self against fixed external Teachers and defines three settings:
+- Open-General: improvement direction unspecified;
+- Capability-Directed: broad capability goal supplied, benchmark formulation left to the Improver;
+- Benchmark-Guided: named target and corresponding feedback available.
+
+The paper reports a seven-task study from a Qwen3.8-27B starting system. In Open-General Self, GPQA Diamond rises from 65.2% to 73.2% and AIME 2026 from 53.3% to 56.7%; Knowledge Self raises SimpleQA from 82% to 85%, then 88% across system updates. The authors also note challenges preserving gains across capabilities. These results are specific to the studied tasks and runs.
+
+Integrate its three feedback/autonomy regimes and fixed-Teacher comparison into #10497 as separate settings. Treat persistent research-state retention, failed-attempt retention, capability preservation and independent host ownership as explicit dimensions.
+
+Source: https://arxiv.org/abs/2611.01736
+
+### Scientific outcome verification: FIRE-Bench
+
+**FIRE-Bench (ICML 2026)** asks agents to rediscover established, verifiable findings from recent ML papers by independently designing and running experiments. It avoids relying exclusively on LLM-as-judge evaluations of generated papers. Its reported frontier-agent results remain below 50 F1, with high run-to-run variance and recurring experimental-design, execution and evidence-reasoning failures.
+
+Use it as a rediscovery and experiment-execution benchmark for Symthaea's scientific-research capability, not as an RSI benchmark in itself. The distinction is important: a system that can rediscover valid findings has demonstrated scientific competence; it has not yet demonstrated that its own research procedure improves recursively.
+
+Source: https://proceedings.mlr.press/v306/wang26d.html
+
+### Industry signal: AI-assisted R&D acceleration
+
+Reuters reported on 2026-11-05 that an independent METR assessment estimated Anthropic's model capabilities on well-specified benchmark tasks improved about 1.9x faster since October 2025 than during the preceding period. METR emphasized high uncertainty (roughly 1.5x–2.5x) and said AI had not yet made highly significant, fully autonomous contributions to the most important stages of model training. The estimate relied on confidential research, interviews and unreleased-model data; it is an industry-level signal, not a public reproducible RSI benchmark.
+
+This motivates an additional R4 metric: **externally confirmed research throughput per complete resource budget**, alongside capability lift. Measure both the productivity of AI-assisted human R&D and fully autonomous inherited-improver performance; do not conflate the two.
+
+Source: https://www.reuters.com/technology/anthropics-models-improving-nearly-twice-fast-with-help-ai-study-finds-2026-11-05/
+
+### Revised comparison portfolio
+
+Keep the estimands separate:
+1. RSIBench — fixed-model harness evolution and causal rollback.
+2. RSI-Env — open-ended, capability-directed and benchmark-guided persistent system evolution.
+3. AIDE² / #10497 — inherited research-agent and meta-procedure improvement, including a distinct ignition phase.
+4. RQGM / #10708 — epochal co-evolution of agents and evaluators.
+5. AI4AI successor / #10691 — clean-start learning-algorithm design.
+6. FIRE-Bench — execution-grounded scientific rediscovery.
+
+Do not produce a combined cross-benchmark leaderboard. Publish exact versions, model/harness identities, budgets, split and checkpoint-selection policies, independent replicate counts, per-domain outcomes, uncertainty, failures, and all costs. A higher score under a changed evaluator is not evidence of improved capability unless it survives the fixed evaluator-independent confirmation lane.
+
+
+### Clade metaproductivity and evaluator-dependent state — 2026-11-06
+
+RQGM's published technical description adds a second important mechanism beyond evaluator epochs: **Clade Metaproductivity (CMP)**. It evaluates an archive node using the productivity of its descendant subtree, rather than only its immediate task score. An ancestor that enables a better descendant can therefore remain valuable even when its own score does not improve. RQGM uses Thompson sampling over clade scores to balance exploration and exploitation, and assigns attention to the least-measured role/task to avoid concentrating evaluation on already-observed areas.
+
+The R4 follow-on is recorded in the [#10497 discussion](https://github.com/Luminous-Dynamics/symthaea/issues/10497). Symthaea should compare:
+- greedy child-fitness / single-champion selection;
+- fixed-meta Pareto archive selection;
+- CMP with uncertainty-aware Thompson sampling;
+- uniform/random lineage selection as a coverage baseline;
+- diversity-preserving CMP with a declared minimum lineage-coverage constraint.
+
+For Symthaea, define CMP as independently confirmed descendant improvement yield per complete lineage research budget, with protected-capability floors and explicit censoring/uncertainty for lineages that have had fewer opportunities. Descendants are correlated; do not count every descendant as an independent statistical replicate. Estimate uncertainty at the independent full-loop-seed/root-lineage level. Selection may use development/validation evidence only; sealed confirmation must not affect Thompson posteriors, lineage choice or stopping.
+
+RQGM's evaluator replacement procedure also discards old evaluator-dependent utility records and recomputes active clade rankings. Symthaea's stronger audit requirement should implement **selective invalidation**:
+- preserve raw historical task/evaluator/build/decision records immutably;
+- mark evaluator-dependent derived fitness, rank, posterior, CMP and selection-cache entries from the superseded evaluator stale for active selection;
+- recompute active derived values under the newly frozen evaluator from fresh evaluations or valid bridge evidence;
+- retain evaluator-independent artifacts only where their semantics and provenance remain valid;
+- never rewrite historical decisions.
+
+This prevents old utility values from steering the new epoch without deleting audit history. The explicit state-transition and proof obligations are in [#10708](https://github.com/Luminous-Dynamics/symthaea/issues/10708) and its evaluator-epoch protocol PR.
+
+RQGM references:
+- Paper (v3 posted 2026-10-08): https://arxiv.org/abs/2606.26294
+- Cambridge technical explainer: https://mlsys.cst.cam.ac.uk/publications/iacob2026-red-queen/
