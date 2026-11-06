@@ -141,6 +141,7 @@ mod agent;
 mod bridge;
 pub mod free_energy;
 pub mod generative_model;
+pub mod hierarchical_information_gain;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
@@ -165,6 +166,12 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use hierarchical_information_gain::{
+    EpistemicLevel, HierarchicalActionInformationGain, HierarchicalHypothesis,
+    HierarchicalInformationGainError, compute_hierarchical_information_gain,
+    compute_hierarchical_information_gains, most_informative_action_at_level,
+};
 
 pub use haptic_semantic_binder::HapticSemanticBinder;
 
