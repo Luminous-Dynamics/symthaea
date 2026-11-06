@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import copy
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -69,7 +68,7 @@ def load_json(path: Path) -> dict:
     return value
 
 
-def semantic_errors(payload: dict) -> list[str]:
+def semantic_errors(payload: dict, require_full_catalog: bool = True) -> list[str]:
     errors: list[str] = []
 
     if payload.get("format_id") != "CEB-RUST-CANDIDATE-ORACLE-TRACEABILITY":
@@ -105,7 +104,7 @@ def semantic_errors(payload: dict) -> list[str]:
     candidate_keys = [row.get("candidate_key") for row in candidates if isinstance(row, dict)]
     if len(candidate_keys) != len(candidates) or len(candidate_keys) != len(set(candidate_keys)):
         errors.append("candidate_key values must be present and unique")
-    if set(candidate_keys) != set(EXPECTED_FAMILY_BY_CANDIDATE):
+    if require_full_catalog and set(candidate_keys) != set(EXPECTED_FAMILY_BY_CANDIDATE):
         errors.append("candidate set does not match the six reviewed Rust candidate themes")
 
     canonical_families = payload.get("canonical_family_ids")
@@ -232,7 +231,7 @@ def semantic_errors(payload: dict) -> list[str]:
         if source_fixture.get("task_manifest_present") is not False:
             errors.append(f"{key}: task manifest must remain absent")
 
-    if len(set(family_ids)) != len(EXPECTED_FAMILY_BY_CANDIDATE):
+    if len(set(family_ids)) != len(candidate_keys):
         errors.append("candidate family IDs must be one-to-one")
 
     for fixture in fixtures:
@@ -383,7 +382,7 @@ def self_test() -> list[str]:
     minimal["candidates"] = [one]
     minimal["public_development_fixtures"] = [fixture]
 
-    if semantic_errors(minimal):
+    if semantic_errors(minimal, require_full_catalog=False):
         errors.append("self-test baseline unexpectedly failed")
     for label, mutation in [
         ("duplicate requirement ID", lambda p: p["candidates"][0]["requirements"].append(copy.deepcopy(p["candidates"][0]["requirements"][0]))),
