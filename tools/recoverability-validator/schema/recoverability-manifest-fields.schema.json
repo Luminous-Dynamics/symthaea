@@ -44,8 +44,8 @@
     },
     "surface_state": {
       "enum": [
-        "frozen_observed",
-        "partial",
+        "complete_frozen_inventory",
+        "partial_observed",
         "unknown"
       ]
     },
