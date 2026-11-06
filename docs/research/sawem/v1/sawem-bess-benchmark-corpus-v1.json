@@ -450,7 +450,7 @@
       "track": "evidence_and_lifecycle",
       "title": "Effective-dated rule revision and historical applicability replay",
       "scenario": "Resolve the published rule revision for an exact authority, jurisdiction, instrument and product scope at a transaction/project valid-time, using only rule records actually available at the historical decision's knowledge-time. Explicit supersession chains resolve overlapping revisions. Drafts are not treated as effective rules; future-known amendments never rewrite prior decisions; ambiguous parallel amendments, missing predecessors, cross-authority supersession and cycles fail closed. Selection of a rule revision is only an input to downstream product-eligibility evaluation. Effective windows are start-inclusive/end-exclusive. A published future-effective amendment does not displace the currently effective revision before its start time. Publication-state metadata must be internally consistent.",
-      "owner": "Symthaea (decision applicability) + Mycelix (evidence provenance)",
+      "owner": "cross-system",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
       "oracle_state": "draft_expected_disposition",
