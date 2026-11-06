@@ -759,7 +759,25 @@
           "why_spec_derived": "The interaction combines the required update, removal and tie semantics."
         }
       ],
-      "unresolved_before_fixture": "Freeze key type, total ordering, numeric policy, tie-breaker, workload distribution, memory ceiling, hardware and measurement protocol."
+      "unresolved_before_fixture": "Freeze key type, total ordering, numeric policy, tie-breaker, workload distribution, memory ceiling, hardware and measurement protocol.",
+      "source_fixture": {
+        "path": "benchmarks/ceb/public-development-fixtures/rust-topk-updates-v0/",
+        "status": "public_source_only_not_compiled_or_executed",
+        "file_count": 8,
+        "has_cargo_lock": false,
+        "reference_patch_present": false,
+        "executable_oracle_present": false,
+        "task_manifest_present": false,
+        "demonstrated_scope": "same-key update leaves stale binary-heap entry eligible in top-k result",
+        "excluded_scope": [
+          "complete insert/update/remove matrix",
+          "numeric-domain policy",
+          "resource bounds",
+          "hardware benchmark",
+          "expert-normalized speedup",
+          "caching integrity results"
+        ]
+      }
     }
   ],
   "public_development_fixtures": [
@@ -798,6 +816,16 @@
       "file_count": 11,
       "purpose": "Three-crate workspace with an intentionally unforwarded client feature and Unix/Windows modules included without target cfg gating.",
       "limitation": "No target cross-compilation or feature builds have been run; the exact supported feature/target matrix must be frozen before task admission.",
+      "admission_status": "not_admitted",
+      "holdout_eligible": false
+    },
+    {
+      "candidate_key": "bounded-topk",
+      "path": "benchmarks/ceb/public-development-fixtures/rust-topk-updates-v0/",
+      "status": "public_source_only_not_compiled_or_executed",
+      "file_count": 8,
+      "purpose": "Three-crate standard-library-only workspace with a binary-heap top-k baseline that keeps stale entries after same-key updates.",
+      "limitation": "Demonstrates only stale-entry correctness. No insert/remove matrix, numeric-domain qualification, resource budget, hardware profile, benchmark run or speedup result exists.",
       "admission_status": "not_admitted",
       "holdout_eligible": false
     }
