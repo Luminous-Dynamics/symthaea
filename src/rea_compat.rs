@@ -10,7 +10,8 @@ pub mod claims;
 pub use claims::{
     CLAIM_EVALUATION_SCHEMA, CLAIM_EVALUATOR_VERSION, CLAIM_SCHEMA, ClaimDisposition, ClaimError,
     ClaimErrorKind, ClaimEvaluation, ClaimPredicate, ClaimRequest, ClaimScope, EvidenceAssessment,
-    EvidenceAssessmentKind, MAX_CLAIM_JSON_BYTES, evaluate_claim, parse_claim_json, validate_claim,
+    EvidenceAssessmentKind, MAX_CLAIM_EVIDENCE_RECORDS, MAX_CLAIM_JSON_BYTES, evaluate_claim,
+    parse_claim_json, validate_claim,
 };
 
 #[allow(unused_imports)] // This adapter intentionally re-exports the complete Evidence API.
