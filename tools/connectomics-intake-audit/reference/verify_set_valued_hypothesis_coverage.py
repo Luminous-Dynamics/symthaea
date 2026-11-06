@@ -224,7 +224,17 @@ def evaluate(data: dict[str, Any]) -> dict[str, Any]:
 
 def self_test(data: dict[str, Any]) -> None:
     altered = json.loads(json.dumps(data))
-    altered['hypothesis_universe'][1]['query_decision'] = False
+    first_by_class: dict[str, int] = {}
+    duplicate_pair: tuple[int, int] | None = None
+    for index, candidate in enumerate(altered['hypothesis_universe']):
+        class_id = candidate['equivalence_class_id']
+        if class_id in first_by_class:
+            duplicate_pair = (first_by_class[class_id], index)
+            break
+        first_by_class[class_id] = index
+    require(duplicate_pair is not None, 'self-test fixture must include two candidate identities in one biological equivalence class')
+    first_index, second_index = duplicate_pair
+    altered['hypothesis_universe'][second_index]['query_decision'] = not altered['hypothesis_universe'][first_index]['query_decision']
     try:
         evaluate_without_expectations(altered)
     except ValueError as exc:
