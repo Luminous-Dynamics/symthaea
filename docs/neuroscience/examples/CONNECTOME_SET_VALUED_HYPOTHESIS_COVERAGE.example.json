@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "run_id": "set-valued-connectome-hypothesis-coverage-known-answer-v1",
+  "claim_scope": "synthetic_known_truth",
+  "query": {
+    "query_id": "critical-connectome-path-exists",
+    "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "baseline_decision": true
+  },
+  "hypothesis_universe": [
+    {
+      "candidate_id": "candidate-A",
+      "equivalence_class_id": "class-A",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-D",
+      "equivalence_class_id": "class-A",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-B",
+      "equivalence_class_id": "class-B",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": false,
+      "invalidates_policy": true,
+      "impact_weight": 8
+    },
+    {
+      "candidate_id": "candidate-C",
+      "equivalence_class_id": "class-C",
+      "adjudication_status": "ADMISSIBLE",
+      "query_decision": true,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-E",
+      "equivalence_class_id": "class-E",
+      "adjudication_status": "INADMISSIBLE",
+      "query_decision": null,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    },
+    {
+      "candidate_id": "candidate-F",
+      "equivalence_class_id": "class-F",
+      "adjudication_status": "INDETERMINATE",
+      "query_decision": null,
+      "invalidates_policy": false,
+      "impact_weight": 0
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "mode-collapsed",
+      "ancestry_id": "source-pipeline-alpha",
+      "proposals": [
+        {
+          "proposal_rank": 1,
+          "candidate_id": "candidate-A"
+        },
+        {
+          "proposal_rank": 2,
+          "candidate_id": "candidate-D"
+        },
+        {
+          "proposal_rank": 3,
+          "candidate_id": "candidate-C"
+        },
+        {
+          "proposal_rank": 4,
+          "candidate_id": "candidate-E"
+        },
+        {
+          "proposal_rank": 5,
+          "candidate_id": "candidate-UNKNOWN"
+        }
+      ]
+    },
+    {
+      "channel_id": "query-diverse",
+      "ancestry_id": "source-pipeline-beta",
+      "proposals": [
+        {
+          "proposal_rank": 1,
+          "candidate_id": "candidate-B"
+        },
+        {
+          "proposal_rank": 2,
+          "candidate_id": "candidate-C"
+        },
+        {
+          "proposal_rank": 3,
+          "candidate_id": "candidate-A"
+        },
+        {
+          "proposal_rank": 4,
+          "candidate_id": "candidate-E"
+        },
+        {
+          "proposal_rank": 5,
+          "candidate_id": "candidate-F"
+        }
+      ]
+    }
+  ],
+  "oracle_expectations": {
+    "max_budget": 5,
+    "final_per_channel": {
+      "mode-collapsed": {
+        "proposal_count": 5,
+        "admissible_proposal_count": 3,
+        "validity": 0.6,
+        "uniqueness": 0.6666666666666666,
+        "recovered_admissible_class_count": 2,
+        "admissible_class_count": 3,
+        "recovery": 0.6666666666666666,
+        "recovered_query_critical_class_count": 0,
+        "query_critical_class_count": 1,
+        "query_critical_recovery": 0,
+        "impact_weighted_query_critical_recovery": 0,
+        "inadmissible_proposal_count": 1,
+        "indeterminate_proposal_count": 0,
+        "unknown_proposal_count": 1
+      },
+      "query-diverse": {
+        "proposal_count": 5,
+        "admissible_proposal_count": 3,
+        "validity": 0.6,
+        "uniqueness": 1,
+        "recovered_admissible_class_count": 3,
+        "admissible_class_count": 3,
+        "recovery": 1,
+        "recovered_query_critical_class_count": 1,
+        "query_critical_class_count": 1,
+        "query_critical_recovery": 1,
+        "impact_weighted_query_critical_recovery": 1,
+        "inadmissible_proposal_count": 1,
+        "indeterminate_proposal_count": 1,
+        "unknown_proposal_count": 0
+      }
+    },
+    "final_pooled_union": {
+      "proposal_count": 10,
+      "admissible_proposal_count": 6,
+      "validity": 0.6,
+      "uniqueness": 0.5,
+      "recovered_admissible_class_count": 3,
+      "admissible_class_count": 3,
+      "recovery": 1,
+      "recovered_query_critical_class_count": 1,
+      "query_critical_class_count": 1,
+      "query_critical_recovery": 1,
+      "impact_weighted_query_critical_recovery": 1,
+      "inadmissible_proposal_count": 2,
+      "indeterminate_proposal_count": 1,
+      "unknown_proposal_count": 1
+    }
+  }
+}
