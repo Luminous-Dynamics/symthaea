@@ -574,11 +574,10 @@ fn compute_cell_priorities(
             .get(&action_interval.action_id)
             .copied()
             .unwrap_or(false);
-        let mut action_metrics = receipt
-            .metrics
-            .iter()
-            .filter(|metric| metric.action_id == action_interval.action_id)
-            .collect::<Vec<_>>();
+        let mut action_metrics = metrics_by_action
+            .get(&action_interval.action_id)
+            .cloned()
+            .unwrap_or_default();
         action_metrics.sort_by_key(|metric| metric.scenario_id);
 
         let tail_contributions = scenario_tail_contributions(
@@ -636,6 +635,14 @@ fn compute_decision_directed_cell_priorities(
             )
         })
         .collect();
+    let mut metrics_by_action: BTreeMap<u32, Vec<&super::score_bounds::ActionScenarioMetricBounds>> =
+        BTreeMap::new();
+    for metric in &receipt.metrics {
+        metrics_by_action
+            .entry(metric.action_id)
+            .or_default()
+            .push(metric);
+    }
     let mut priorities = Vec::with_capacity(receipt.metrics.len());
     // Independent mode repeatedly changes only one action × scenario cell.
     // Build one exact index and reuse all untouched action aggregates.
@@ -687,7 +694,8 @@ fn compute_decision_directed_cell_priorities(
                             metric.scenario_id,
                             sample_count,
                             remaining_budget,
-                            independent_projection_index.as_ref(),
+                            None,
+                            None,
                         )?;
                         crn_projection_cache.insert(metric.scenario_id, projection);
                     }
@@ -701,6 +709,7 @@ fn compute_decision_directed_cell_priorities(
                         sample_count,
                         remaining_budget,
                         independent_projection_index.as_ref(),
+                        Some(metric),
                     )?;
                 }
             }
@@ -729,6 +738,7 @@ fn project_decision_directed_batch(
     sample_count: usize,
     remaining_budget: usize,
     independent_projection_index: Option<&IndependentCounterfactualProjectionIndex>,
+    candidate_metric: Option<&super::score_bounds::ActionScenarioMetricBounds>,
 ) -> Result<(f64, f64, usize, f64), AdaptiveAllocationError> {
     let target_action_ids = match config.seed_mode {
         ReplicationSeedMode::IndependentPerCell => vec![candidate_action_id],
@@ -765,14 +775,26 @@ fn project_decision_directed_batch(
         .ok_or(AdaptiveAllocationError::ReplicationCountOverflow)?;
     let mut overrides = Vec::with_capacity(target_action_ids.len());
     for target_action_id in &target_action_ids {
-        let target_metric = receipt
-            .metrics
-            .iter()
-            .find(|candidate| {
-                candidate.action_id == *target_action_id
-                    && candidate.scenario_id == scenario_id
-            })
-            .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
+        let target_metric = match config.seed_mode {
+            ReplicationSeedMode::IndependentPerCell => {
+                let candidate = candidate_metric
+                    .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?;
+                if candidate.action_id != *target_action_id
+                    || candidate.scenario_id != scenario_id
+                {
+                    return Err(AdaptiveAllocationError::MissingScoreSampleCell);
+                }
+                candidate
+            }
+            ReplicationSeedMode::CommonRandomNumbersWithinScenario => receipt
+                .metrics
+                .iter()
+                .find(|candidate| {
+                    candidate.action_id == *target_action_id
+                        && candidate.scenario_id == scenario_id
+                })
+                .ok_or(AdaptiveAllocationError::MissingScoreSampleCell)?,
+        };
         if target_metric.target_utility.sample_count != sample_count {
             return Err(AdaptiveAllocationError::CommonRandomNumberCountMismatch);
         }
@@ -1283,6 +1305,7 @@ mod tests {
                     scenario_id,
                     candidate.sample_count,
                     remaining_budget,
+                    None,
                     None,
                 )
                 .unwrap();
