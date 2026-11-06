@@ -453,7 +453,8 @@ mod tests {
     #[test]
     fn rejects_duplicate_fixture_ids() {
         let mut value = as_value(&valid_pack());
-        value["fixtures"][1]["fixture_id"] = value["fixtures"][0]["fixture_id"].clone();
+        let duplicate_id = value["fixtures"][0]["fixture_id"].clone();
+        value["fixtures"][1]["fixture_id"] = duplicate_id;
         let report = validate_fixture_pack(&from_value(value));
         assert!(report.issues.iter().any(|issue| issue.starts_with("DUPLICATE_FIXTURE_ID:")));
     }
