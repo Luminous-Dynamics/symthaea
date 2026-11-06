@@ -260,14 +260,18 @@
         "weight_distance_vs_function_distance",
         "candidate_parameter_count",
         "candidate_evaluation_cost",
-        "candidate_only_wsp_materialization"
+        "candidate_only_wsp_materialization",
+        "minimum_assignment_margin",
+        "activation_signature_alignment_error",
+        "alignment_abstention_rate"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
         "deliberately_inconsistent_permutation_that_changes_function",
         "healthy_unpermuted_network",
         "faulty_network_with_held_out_permutation",
-        "incomplete_hidden_unit_permutation_that_changes_function"
+        "incomplete_hidden_unit_permutation_that_changes_function",
+        "ambiguous_duplicate_activation_signatures"
       ]
     },
     {
@@ -551,7 +555,9 @@
       "posterior_model_entropy_after_bmr_nats",
       "bmr_nonintegrable_ratio_rejection_rate",
       "bmr_parameterization_mismatch_rejection_rate",
-      "bmr_invalid_parameterization_digest_rejection_rate"
+      "bmr_invalid_parameterization_digest_rejection_rate",
+      "minimum_hidden_unit_assignment_margin",
+      "ambiguous_alignment_abstention_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -605,7 +611,8 @@
     "The CfC symmetry fixture must execute the function-preserving hidden-unit permutation through WeightProgram and the candidate-only SWI adapter, verify distinct native fingerprints with held-out functional equivalence, and verify that an incomplete permutation changes outputs.",
     "The three-ball task is labelled an exact reproduction only when the paper/supplement state space, rule set, preference distribution, observation likelihoods, action constraints, and stopping rule are transcribed and independently verified; otherwise it must be named a task adaptation.",
     "BMR log evidence is used only for post-observation model comparison; it is not added directly to prospective expected information gain or pragmatic value.",
-    "All Gaussian distributions supplied to BMR (full posterior, full prior, and each reduced prior) carry the same canonical parameterization digest binding coordinate identities, semantic roles, tensor shapes, and coordinate order; missing, malformed, or mismatched digests are rejected before evidence calculation."
+    "All Gaussian distributions supplied to BMR (full posterior, full prior, and each reduced prior) carry the same canonical parameterization digest binding coordinate identities, semantic roles, tensor shapes, and coordinate order; missing, malformed, or mismatched digests are rejected before evidence calculation.",
+    "Activation-based hidden-unit correspondence is diagnostic only: the source model is unchanged, native fingerprints are not rewritten, and low-margin or ambiguous assignments must abstain. Report probe-set identity, signature error, and assignment margin for every attempted alignment."
   ],
   "research_references": [
     {
