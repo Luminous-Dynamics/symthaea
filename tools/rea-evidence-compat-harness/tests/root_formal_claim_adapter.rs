@@ -191,6 +191,15 @@ fn formal_envelope_serialization_round_trips_and_rejects_unknown_fields() {
     let altered = serde_json::to_vec(&value).unwrap();
     let error = parse_formal_provider_observation_json(&altered).unwrap_err();
     assert_eq!(error.kind, FormalMappingErrorKind::InvalidJson);
+
+    let text = String::from_utf8(bytes).unwrap();
+    let duplicate = text.replacen(
+        "\"schema\":\"luminous.rea.formal-provider-observation.v1\"",
+        "\"schema\":\"luminous.rea.formal-provider-observation.v1\",\"schema\":\"forged\"",
+        1,
+    );
+    let error = parse_formal_provider_observation_json(duplicate.as_bytes()).unwrap_err();
+    assert_eq!(error.kind, FormalMappingErrorKind::InvalidJson);
 }
 
 #[test]
