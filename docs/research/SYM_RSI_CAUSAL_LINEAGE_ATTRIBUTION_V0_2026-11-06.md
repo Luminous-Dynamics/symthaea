@@ -239,6 +239,23 @@ Symthaea should pursue a three-tier reproduction:
 2. **Hardware-matched reproduction:** only compare numerical timing/performance where accelerator, software stack, compiler, clocks, run count, evaluator and budget are aligned. NanoChat reference evidence is single-B200/5-minute/10-seed; NanoGPT is 8×H100; SOL-ExecBench is B200. Hardware-normalized guesses are not valid SOTA comparisons.
 3. **Cross-hardware portability:** port the mechanism or smaller task variant to less expensive hardware and report quality, throughput, memory and energy/cost frontiers separately. A reduced-device result is not a reproduction of the H100/B200 leaderboard number.
 
+#### Public artifact cross-check
+
+I fetched Recursive's public `nanochat_autoresearch/results/val_bpb.csv` and independently recomputed its six 10-seed means and sample standard deviations (60 rows total; artifact blob SHA `bee7f708875ee2ae4411ae1fbc33fd5f8f177d10`):
+
+| Configuration | n | Mean BPB | Sample SD |
+|---|---:|---:|---:|
+| Vanilla Transformer | 10 | 1.058732 | 0.010078 |
+| Optimized from vanilla | 10 | 0.934429 | 0.012189 |
+| Karpathy seed | 10 | 0.975100 | 0.011221 |
+| Karpathy's best | 10 | 0.964564 | 0.015373 |
+| Community best | 10 | 0.937210 | 0.007932 |
+| Optimized from Karpathy | 10 | 0.910875 | 0.006731 |
+
+The community-best to optimized-from-Karpathy mean difference is 0.026335 BPB. This checks the public aggregation arithmetic only; it is not a fresh training run or a between-method significance test.
+
+The NanoGPT artifacts show 77.3376 s mean time over 13 candidate runs vs 80.6114 s over 10 same-hardware #83 baseline reruns. Both means satisfy the benchmark's ≤3.28 validation-loss threshold at the reported one-sided p-values (0.0078 and 0.0047 respectively). The candidate's mean loss is 3.27893 vs 3.27850 for the baseline—slightly worse by 0.00043—so this is a time-to-threshold improvement, not a validation-quality improvement. The artifact README says official PrimeIntellect leaderboard timing remains pending.
+
 A second, more interesting experiment isolates cross-task learning:
 - Run **independent per-task search** against **joint multi-task search** at identical aggregate compute, inference, evaluator and human-review budgets.
 - Hold out related kernels / training variants so that reusable patterns are transferred without exposing the final tasks during search.
