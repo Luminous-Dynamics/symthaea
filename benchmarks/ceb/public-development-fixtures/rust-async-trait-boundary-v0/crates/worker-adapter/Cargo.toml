@@ -1,0 +1,9 @@
+[package]
+name = "ceb-async-boundary-worker-adapter"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ceb-async-boundary-domain-types = { path = "../domain-types" }
+ceb-async-boundary-contract = { path = "../async-contract" }
