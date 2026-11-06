@@ -8,6 +8,7 @@ the separate clairvoyant lower bound. It never lets the policy inspect a model I
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import itertools
 import json
@@ -460,16 +461,22 @@ def self_tests(data: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) != 2:
-        print('usage: verify_distributionally_robust_intervention_oracle.py FIXTURE.json', file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser()
+    parser.add_argument('fixture', type=Path)
+    parser.add_argument('--report', type=Path)
+    args = parser.parse_args()
     try:
-        raw = Path(sys.argv[1]).read_bytes()
+        raw = args.fixture.read_bytes()
         data = json.loads(raw)
         report = evaluate(data, sha256(raw))
         self_tests(data)
-        print(json.dumps(report, indent=2, sort_keys=True))
-        print('distributionally robust common-policy oracle: PASS')
+        rendered = json.dumps(report, indent=2, sort_keys=True) + '\n'
+        if args.report is not None:
+            args.report.write_text(rendered, encoding='utf-8')
+            print(f"distributionally robust common-policy oracle: PASS; report_sha256={sha256(rendered.encode('utf-8'))}")
+        else:
+            print(rendered, end='')
+            print('distributionally robust common-policy oracle: PASS')
         return 0
     except Exception as exc:
         print(f'distributionally robust intervention oracle: FAIL: {exc}', file=sys.stderr)
