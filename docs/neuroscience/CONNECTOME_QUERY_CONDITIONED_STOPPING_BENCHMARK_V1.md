@@ -40,6 +40,8 @@ Keep separate:
 - region-boundary completeness and margin;
 - query-specific certificate version and invalidation history.
 
+**Important distinction:** unresolved graph identity is not the same as an unresolved query consequence. Several admissible graph worlds may remain structurally different while every world still entails the same query answer. That can support `QUERY_STABLE_WITHIN_DECLARED_SCOPE` without claiming exact reconstruction identity. A null/unknown query decision, two opposing query decisions, non-identifiability, open boundaries or an exceeded missed-candidate bound must block the certificate.
+
 Do not infer that a global metric's convergence means synaptic completeness. Do not infer that a non-significant perturbation is a functional zero. Do not treat a sampled frame as exhaustive if all-list-missed sensitivity remains nonzero. Do not promote an exact reconstruction identification claim where only the query decision is stable.
 
 Allowed terminal states:
