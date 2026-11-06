@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-emsr-evidence"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Fail-closed dataset, split, and run-receipt validation for defensive EMSR research"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
