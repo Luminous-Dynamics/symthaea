@@ -243,6 +243,89 @@ pub fn bound_few_for_many_portfolio_degradation(
     })
 }
 
+
+/// Stable identifier for exact small-K portfolio-family identification.
+pub const FEW_FOR_MANY_EXACT_FAMILY_METHOD_ID: &str =
+    "spectra-few-for-many-exact-small-k-family-identification-v1";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PortfolioFamilyOptimalityStatus {
+    CertifiedOptimal,
+    Unresolved,
+}
+
+/// Exact small-K family result. Optimality is conditional on the upstream
+/// simultaneous action × objective intervals and the enumerated portfolio
+/// family. It does not authenticate those inputs.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FewForManyPortfolioFamilyCertificate {
+    pub method_id: &'static str,
+    pub portfolio_count: usize,
+    pub selected_candidate: FewForManyPortfolioBound,
+    /// Lower bound on the minimum achievable degradation across the complete
+    /// enumerated family: min_S L(S).
+    pub best_possible_degradation_lower_bound: f64,
+    /// Upper bound for the selected candidate minus min_S L(S), floored at 0.
+    pub optimality_gap_upper_bound: f64,
+    pub status: PortfolioFamilyOptimalityStatus,
+}
+
+/// Enumerate the complete nonempty portfolio family up to the frozen cap,
+/// evaluate every portfolio, and certify a minimizer only when the selected
+/// candidate's upper degradation bound is no greater than the minimum lower
+/// bound across the entire family.
+pub fn certify_exact_bounded_portfolio_family(
+    intervals: &[ActionObjectiveInterval],
+    contract: &FewForManyPortfolioContract,
+    max_candidates: usize,
+) -> Result<FewForManyPortfolioFamilyCertificate, FewForManyPortfolioError> {
+    let portfolios = enumerate_bounded_portfolios(
+        &contract.feasible_action_ids,
+        contract.max_portfolio_size,
+        max_candidates,
+    )?;
+    let portfolio_count = portfolios.len();
+    let mut bounds = Vec::with_capacity(portfolio_count);
+    for portfolio in portfolios {
+        bounds.push(bound_few_for_many_portfolio_degradation(
+            intervals,
+            contract,
+            &portfolio,
+        )?);
+    }
+    let best_possible_degradation_lower_bound = bounds
+        .iter()
+        .map(|bound| bound.degradation_lower_bound)
+        .fold(f64::INFINITY, f64::min);
+    let selected_candidate = bounds
+        .into_iter()
+        .min_by(|left, right| {
+            left.degradation_upper_bound
+                .total_cmp(&right.degradation_upper_bound)
+                .then_with(|| left.portfolio_action_ids.cmp(&right.portfolio_action_ids))
+        })
+        .ok_or(FewForManyPortfolioError::EmptyEnumerationUniverse)?;
+    let optimality_gap_upper_bound =
+        (selected_candidate.degradation_upper_bound - best_possible_degradation_lower_bound)
+            .max(0.0);
+    let status = if selected_candidate.degradation_upper_bound
+        <= best_possible_degradation_lower_bound
+    {
+        PortfolioFamilyOptimalityStatus::CertifiedOptimal
+    } else {
+        PortfolioFamilyOptimalityStatus::Unresolved
+    };
+
+    Ok(FewForManyPortfolioFamilyCertificate {
+        method_id: FEW_FOR_MANY_EXACT_FAMILY_METHOD_ID,
+        portfolio_count,
+        selected_candidate,
+        best_possible_degradation_lower_bound,
+        optimality_gap_upper_bound,
+        status,
+    })
+}
+
 /// Exact small-K oracle. Enumerates all nonempty portfolios of size <= cap,
 /// in lexicographic action-ID order, only if the candidate count is <= budget.
 pub fn enumerate_bounded_portfolios(
@@ -599,4 +682,37 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn exact_portfolio_family_certifies_the_unique_point_interval_optimum() {
+        let result = certify_exact_bounded_portfolio_family(&points(), &contract(2, 0.0), 6).unwrap();
+        assert_eq!(result.portfolio_count, 6);
+        assert_eq!(result.selected_candidate.portfolio_action_ids, vec![1, 2]);
+        assert_eq!(result.best_possible_degradation_lower_bound, 0.0);
+        assert_eq!(result.optimality_gap_upper_bound, 0.0);
+        assert_eq!(result.status, PortfolioFamilyOptimalityStatus::CertifiedOptimal);
+    }
+
+    #[test]
+    fn exact_portfolio_family_does_not_claim_optimality_when_intervals_overlap() {
+        let intervals = vec![
+            ActionObjectiveInterval { action_id: 1, objective_id: 10, lower_bound: 0.7, upper_bound: 1.0 },
+            ActionObjectiveInterval { action_id: 1, objective_id: 20, lower_bound: 0.0, upper_bound: 0.4 },
+            ActionObjectiveInterval { action_id: 2, objective_id: 10, lower_bound: 0.0, upper_bound: 0.5 },
+            ActionObjectiveInterval { action_id: 2, objective_id: 20, lower_bound: 0.7, upper_bound: 1.0 },
+            ActionObjectiveInterval { action_id: 3, objective_id: 10, lower_bound: 0.2, upper_bound: 0.7 },
+            ActionObjectiveInterval { action_id: 3, objective_id: 20, lower_bound: 0.2, upper_bound: 0.7 },
+        ];
+        let result = certify_exact_bounded_portfolio_family(&intervals, &contract(2, 0.5), 6).unwrap();
+        assert!(result.optimality_gap_upper_bound > 0.0);
+        assert_eq!(result.status, PortfolioFamilyOptimalityStatus::Unresolved);
+    }
+
+    #[test]
+    fn exact_portfolio_family_refuses_to_exceed_enumeration_budget() {
+        assert_eq!(
+            certify_exact_bounded_portfolio_family(&points(), &contract(2, 0.0), 5),
+            Err(FewForManyPortfolioError::EnumerationBudgetExceeded)
+        );
+    }
+
 }
