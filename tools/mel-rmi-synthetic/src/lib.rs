@@ -1881,6 +1881,215 @@ impl<T> MetricMeasurement<T> {
     }
 }
 
+/// Render a deterministic, valid Standard MIDI File containing musical
+/// events for a target feature and a separate protected feature.
+///
+/// This is a synthetic symbolic realization, not a human performance or an
+/// audio render. Each feature family is encoded on its own MIDI channel so the
+/// evaluator can inspect the target intervention and protected-feature
+/// preservation independently.
+pub fn render_synthetic_midi_v1(
+    target: Feature,
+    protected: Feature,
+    event_tag: &[u8],
+) -> Result<Vec<u8>, HarnessError> {
+    if target.dimension == protected.dimension || event_tag.len() > 64 {
+        return Err(HarnessError::InvalidTask);
+    }
+
+    #[derive(Clone)]
+    struct MidiEvent {
+        tick: u32,
+        priority: u8,
+        bytes: Vec<u8>,
+    }
+
+    fn channel_for(dimension: Dimension) -> u8 {
+        match dimension {
+            Dimension::Motif => 0,
+            Dimension::Rhythm => 1,
+            Dimension::Tempo => 2,
+            Dimension::Role => 3,
+            Dimension::Texture => 4,
+        }
+    }
+
+    fn push_event(events: &mut Vec<MidiEvent>, tick: u32, priority: u8, bytes: Vec<u8>) {
+        events.push(MidiEvent {
+            tick,
+            priority,
+            bytes,
+        });
+    }
+
+    fn add_note(
+        events: &mut Vec<MidiEvent>,
+        channel: u8,
+        pitch: u8,
+        velocity: u8,
+        start: u32,
+        duration: u32,
+    ) {
+        push_event(
+            events,
+            start,
+            2,
+            vec![0x90 | channel, pitch.min(127), velocity.min(127)],
+        );
+        push_event(
+            events,
+            start + duration.max(1),
+            1,
+            vec![0x80 | channel, pitch.min(127), 0],
+        );
+    }
+
+    fn add_feature(events: &mut Vec<MidiEvent>, feature: Feature) {
+        let channel = channel_for(feature.dimension);
+        let value = feature.value;
+        let reduced = value.rem_euclid(128) as u8;
+
+        match feature.dimension {
+            Dimension::Motif => {
+                let shift = value.rem_euclid(12) as u8;
+                let pitches = [60_u8, 64, 67, 65];
+                for (index, pitch) in pitches.into_iter().enumerate() {
+                    add_note(
+                        events,
+                        channel,
+                        pitch + shift,
+                        88,
+                        index as u32 * 480,
+                        360,
+                    );
+                }
+            }
+            Dimension::Rhythm => {
+                let rotation = value.rem_euclid(8) as u32;
+                let pattern = 0b1001_0101_u8.rotate_left(rotation);
+                for step in 0..8 {
+                    if (pattern >> step) & 1 == 1 {
+                        add_note(events, channel, 60, 80, step * 240, 120);
+                    }
+                }
+            }
+            Dimension::Tempo => {
+                let bpm = 60_u32 + value.rem_euclid(61) as u32;
+                let micros_per_quarter = 60_000_000_u32 / bpm;
+                let tempo = micros_per_quarter.to_be_bytes();
+                // The high byte is not included in the three-byte MIDI tempo value.
+                push_event(
+                    events,
+                    0,
+                    0,
+                    vec![0xff, 0x51, 0x03, tempo[1], tempo[2], tempo[3]],
+                );
+                for (index, pitch) in [60_u8, 64, 67].into_iter().enumerate() {
+                    add_note(events, channel, pitch, 84, index as u32 * 480, 360);
+                }
+            }
+            Dimension::Role => {
+                let (program, base_pitch) = match value.rem_euclid(4) {
+                    0 => (32_u8, 36_u8), // bass
+                    1 => (48_u8, 48_u8), // strings / inner voice
+                    2 => (4_u8, 60_u8),  // keyboard accompaniment
+                    _ => (73_u8, 72_u8), // flute / upper lead
+                };
+                push_event(
+                    events,
+                    0,
+                    0,
+                    vec![0xc0 | channel, program.saturating_add(reduced % 3).min(127)],
+                );
+                for index in 0..3 {
+                    add_note(
+                        events,
+                        channel,
+                        base_pitch + index * 3,
+                        82,
+                        index as u32 * 480,
+                        360,
+                    );
+                }
+            }
+            Dimension::Texture => {
+                let voices = 1 + value.rem_euclid(5) as u8;
+                let chord = [60_u8, 64, 67, 71, 74];
+                for pitch in chord.into_iter().take(voices as usize) {
+                    add_note(events, channel, pitch, 76, 0, 960);
+                }
+            }
+        }
+    }
+
+    let mut events = Vec::new();
+    // Track name includes a bounded event marker for byte-level lineage fixtures.
+    let mut track_name = b"RMI synthetic ".to_vec();
+    track_name.extend_from_slice(event_tag);
+    push_event(
+        &mut events,
+        0,
+        0,
+        {
+            let mut bytes = vec![0xff, 0x03];
+            bytes.push(track_name.len().min(127) as u8);
+            bytes.extend_from_slice(&track_name[..track_name.len().min(127)]);
+            bytes
+        },
+    );
+    // 4/4 time signature, 480 ticks per quarter note.
+    push_event(
+        &mut events,
+        0,
+        0,
+        vec![0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08],
+    );
+    add_feature(&mut events, target);
+    add_feature(&mut events, protected);
+
+    events.sort_by_key(|event| (event.tick, event.priority, event.bytes.clone()));
+
+    fn encode_vlq(mut value: u32, output: &mut Vec<u8>) {
+        let mut buffer = [0_u8; 4];
+        let mut index = 3;
+        buffer[index] = (value & 0x7f) as u8;
+        while {
+            value >>= 7;
+            value != 0
+        } {
+            index -= 1;
+            buffer[index] = ((value & 0x7f) as u8) | 0x80;
+        }
+        output.extend_from_slice(&buffer[index..]);
+    }
+
+    let mut track = Vec::new();
+    let mut prior_tick = 0_u32;
+    for event in events {
+        let delta = event
+            .tick
+            .checked_sub(prior_tick)
+            .ok_or(HarnessError::InvalidTask)?;
+        encode_vlq(delta, &mut track);
+        track.extend_from_slice(&event.bytes);
+        prior_tick = event.tick;
+    }
+    encode_vlq(0, &mut track);
+    track.extend_from_slice(&[0xff, 0x2f, 0x00]);
+
+    let track_len = u32::try_from(track.len()).map_err(|_| HarnessError::InvalidTask)?;
+    let mut midi = Vec::with_capacity(22 + track.len());
+    midi.extend_from_slice(b"MThd");
+    midi.extend_from_slice(&6_u32.to_be_bytes());
+    midi.extend_from_slice(&0_u16.to_be_bytes()); // format 0
+    midi.extend_from_slice(&1_u16.to_be_bytes()); // one track
+    midi.extend_from_slice(&480_u16.to_be_bytes());
+    midi.extend_from_slice(b"MTrk");
+    midi.extend_from_slice(&track_len.to_be_bytes());
+    midi.extend_from_slice(&track);
+    Ok(midi)
+}
+
 /// Errors produced by task, intervention, policy, and manifest validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HarnessError {
@@ -2845,6 +3054,113 @@ mod tests {
                 reason: "audio_only_adapter_has_no_midi_clock".to_owned()
             }
         );
+    }
+
+    #[test]
+    fn synthetic_midi_is_a_valid_smf_with_note_events() {
+        let midi = render_synthetic_midi_v1(
+            Feature {
+                dimension: Dimension::Motif,
+                value: 5,
+            },
+            Feature {
+                dimension: Dimension::Texture,
+                value: 3,
+            },
+            b"midi-fixture",
+        )
+        .unwrap();
+        assert_eq!(&midi[0..4], b"MThd");
+        assert_eq!(&midi[14..18], b"MTrk");
+        assert!(midi.len() > 60);
+        assert!(midi.windows(3).any(|window| window == [0x90, 65, 88]));
+        assert!(midi.windows(3).any(|window| window == [0x90, 74, 76]));
+        assert!(midi.ends_with(&[0x00, 0xff, 0x2f, 0x00]));
+    }
+
+    #[test]
+    fn synthetic_midi_changes_target_events_and_preserves_protected_channel() {
+        for fixture in canonical_fixture_suite_v1() {
+            let input = fixture.interventions.control.current_partner_feature;
+            let output = Feature {
+                dimension: fixture.task.target_dimension,
+                value: fixture
+                    .task
+                    .expected_response
+                    .apply(input.value)
+                    .unwrap(),
+            };
+            let protected = fixture.interventions.control.unrelated_feature;
+            let before =
+                render_synthetic_midi_v1(input, protected, b"input").unwrap();
+            let after =
+                render_synthetic_midi_v1(output, protected, b"output").unwrap();
+
+            let target_channel = match input.dimension {
+                Dimension::Motif => 0x90,
+                Dimension::Rhythm => 0x91,
+                Dimension::Tempo => 0x92,
+                Dimension::Role => 0x93,
+                Dimension::Texture => 0x94,
+            };
+            let protected_channel = match protected.dimension {
+                Dimension::Motif => 0x90,
+                Dimension::Rhythm => 0x91,
+                Dimension::Tempo => 0x92,
+                Dimension::Role => 0x93,
+                Dimension::Texture => 0x94,
+            };
+            let target_notes_before: Vec<_> = midi_channel_note_events(&before, target_channel);
+            let target_notes_after: Vec<_> = midi_channel_note_events(&after, target_channel);
+            let protected_before: Vec<_> =
+                midi_channel_note_events(&before, protected_channel);
+            let protected_after: Vec<_> =
+                midi_channel_note_events(&after, protected_channel);
+
+            assert_ne!(target_notes_before, target_notes_after);
+            assert_eq!(protected_before, protected_after);
+        }
+    }
+
+    fn midi_channel_note_events(midi: &[u8], status: u8) -> Vec<Vec<u8>> {
+        let track_len = u32::from_be_bytes(midi[18..22].try_into().unwrap()) as usize;
+        let track = &midi[22..22 + track_len];
+        let mut cursor = 0usize;
+        let mut events = Vec::new();
+        while cursor < track.len() {
+            let first = track[cursor];
+            cursor += 1;
+            let mut delta = u32::from(first & 0x7f);
+            let mut byte = first;
+            while byte & 0x80 != 0 {
+                byte = track[cursor];
+                cursor += 1;
+                delta = (delta << 7) | u32::from(byte & 0x7f);
+            }
+            let _ = delta;
+            let event_status = track[cursor];
+            cursor += 1;
+            if event_status == 0xff {
+                let meta_type = track[cursor];
+                cursor += 1;
+                let length = usize::from(track[cursor]);
+                cursor += 1 + length;
+                if meta_type == 0x2f {
+                    break;
+                }
+            } else if event_status & 0xf0 == 0x80 || event_status & 0xf0 == 0x90 {
+                let event = track[cursor - 1..cursor + 2].to_vec();
+                cursor += 2;
+                if event_status == status {
+                    events.push(event);
+                }
+            } else if event_status & 0xf0 == 0xc0 {
+                cursor += 1;
+            } else {
+                panic!("unexpected MIDI status byte: {event_status:#x}");
+            }
+        }
+        events
     }
 
     #[test]
