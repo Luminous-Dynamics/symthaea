@@ -3555,8 +3555,10 @@ mod tests {
         let dt = 0.011;
         let epsilon = 1e-3;
         let index = 13;
-        neuron.evolve_closed_form(dt, &input);
-        let gradients = neuron.backward(&input, &target, dt);
+        let original = neuron.clone();
+        let mut forward = original.clone();
+        forward.evolve_closed_form(dt, &input);
+        let gradients = forward.backward(&input, &target, dt);
 
         let loss_at = |mut candidate: HdcLtcUnifiedNeuron| {
             candidate.evolve_closed_form(dt, &input);
@@ -3570,9 +3572,9 @@ mod tests {
                 / 64.0
         };
 
-        let mut plus = neuron.clone();
+        let mut plus = original.clone();
         plus.weight_hv.values[index] += epsilon;
-        let mut minus = neuron.clone();
+        let mut minus = original.clone();
         minus.weight_hv.values[index] -= epsilon;
         let finite_difference = (loss_at(plus) - loss_at(minus)) / (2.0 * epsilon);
 
@@ -3709,6 +3711,7 @@ mod tests {
         let dt = 0.013;
         let epsilon = 1e-3;
         let index = 17;
+        let pre_forward = neuron.clone();
         let pre_state = neuron.state().clone();
         let pre_time = neuron.total_time();
 
@@ -3728,9 +3731,9 @@ mod tests {
                 / 64.0
         };
 
-        let mut plus = neuron.clone();
+        let mut plus = pre_forward.clone();
         plus.weight_hv.values[index] += epsilon;
-        let mut minus = neuron.clone();
+        let mut minus = pre_forward.clone();
         minus.weight_hv.values[index] -= epsilon;
         let finite_difference = (loss(plus) - loss(minus)) / (2.0 * epsilon);
 
