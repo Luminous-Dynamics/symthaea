@@ -150,6 +150,42 @@ class ManifestBindingTests(unittest.TestCase):
         with self.assertRaisesRegex(AUDIT.AuditError, "exactly six CAD-HISTORY cases"):
             AUDIT.load_manifest_subjects(self.root)
 
+    def test_symlink_escape_is_rejected(self) -> None:
+        outside = self.root.parent / f"{self.root.name}-outside.step"
+        link = self.root / "cad" / "outside-link.step"
+        outside.write_bytes(b"outside artifact")
+        try:
+            link.symlink_to(outside)
+            variant = self.cad_cases[0]["variants"][0]
+            variant["artifact"] = "cad/outside-link.step"
+            variant["sha256"] = digest(b"outside artifact")
+            self.write_manifest()
+            with self.assertRaisesRegex(AUDIT.AuditError, "Path escapes package root"):
+                AUDIT.load_manifest_subjects(self.root)
+        finally:
+            if link.is_symlink():
+                link.unlink()
+            if outside.exists():
+                outside.unlink()
+
+    def test_duplicate_fixture_id_is_rejected(self) -> None:
+        self.cad_cases[1]["fixture_id"] = self.cad_cases[0]["fixture_id"]
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "Missing or duplicate fixture ID"):
+            AUDIT.load_manifest_subjects(self.root)
+
+    def test_incomplete_source_edited_pair_is_rejected(self) -> None:
+        self.cad_cases[0]["variants"].pop()
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "must declare exactly two variants"):
+            AUDIT.load_manifest_subjects(self.root)
+
+    def test_malformed_sha256_is_rejected(self) -> None:
+        self.cad_cases[0]["variants"][0]["sha256"] = "not-a-sha256"
+        self.write_manifest()
+        with self.assertRaisesRegex(AUDIT.AuditError, "Invalid SHA-256"):
+            AUDIT.load_manifest_subjects(self.root)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
