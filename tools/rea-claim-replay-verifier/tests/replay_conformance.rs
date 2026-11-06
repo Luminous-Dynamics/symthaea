@@ -73,6 +73,34 @@ fn oracle_replay_outcome(case_id: &str) -> ReplayOutcome {
     }
 }
 
+
+fn json_with_reversed_object_keys(value: &Value) -> String {
+    match value {
+        Value::Object(object) => {
+            let members = object
+                .iter()
+                .rev()
+                .map(|(key, value)| {
+                    format!(
+                        "{}:{}",
+                        serde_json::to_string(key).unwrap(),
+                        json_with_reversed_object_keys(value)
+                    )
+                })
+                .collect::<Vec<_>>();
+            format!("{{{}}}", members.join(","))
+        }
+        Value::Array(values) => {
+            let elements = values
+                .iter()
+                .map(json_with_reversed_object_keys)
+                .collect::<Vec<_>>();
+            format!("[{}]", elements.join(","))
+        }
+        _ => serde_json::to_string(value).unwrap(),
+    }
+}
+
 fn provider_claim(evidence_id: String) -> ClaimRequest {
     ClaimRequest {
         schema: rea_compat::CLAIM_SCHEMA.to_owned(),
@@ -801,3 +829,74 @@ fn ordered_evidence_references_are_bound_to_the_exact_claim_request() {
     assert_eq!(error.outcome, ReplayOutcome::ReplayMismatch);
     assert_ne!(error.claim_request_sha256, error.reported_derivation_sha256);
 }
+
+#[test]
+fn recursive_json_object_key_permutations_preserve_semantic_replay() {
+    let original_evidence: Value = serde_json::from_slice(fixture_bytes()).unwrap();
+    let reordered_evidence = json_with_reversed_object_keys(&original_evidence);
+    let verified =
+        rea_compat::verify_evidence_json(reordered_evidence.as_bytes()).unwrap();
+    assert_eq!(
+        verified.evidence_id,
+        rea_compat::verify_evidence_json(fixture_bytes())
+            .unwrap()
+            .evidence_id
+    );
+
+    let claim = provider_claim(verified.evidence_id.clone());
+    let claim_value = serde_json::to_value(&claim).unwrap();
+    let claim_bytes = json_with_reversed_object_keys(&claim_value).into_bytes();
+
+    let result = evaluate_claim(&claim, std::slice::from_ref(&verified)).unwrap();
+    let result_value = serde_json::to_value(&result).unwrap();
+    let result_bytes = json_with_reversed_object_keys(&result_value).into_bytes();
+
+    let replay = replay_claim_evaluation(
+        &claim_bytes,
+        &[reordered_evidence.as_bytes()],
+        &result_bytes,
+    )
+    .unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("basic-provider-report-support")
+    );
+    assert_eq!(
+        replay.recomputed_derivation_sha256,
+        replay.reported_derivation_sha256
+    );
+}
+
+#[test]
+fn evidence_transport_order_does_not_change_bound_claim_replay() {
+    let first = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut second_value = first.value.clone();
+    second_value["provider"]["id"] = json!("second-transport-order-provider");
+    second_value["provider"]["name"] = json!("Second Transport Order Provider");
+    second_value["analysis_profile"]["provider"] = second_value["provider"].clone();
+    second_value["analysis_profile"]["digest"] =
+        json!(rea_compat::analysis_profile_digest(&second_value["analysis_profile"]).unwrap());
+    second_value["evidence_id"] = json!(rea_compat::compute_evidence_id(&second_value).unwrap());
+    let second_bytes = serde_json::to_vec(&second_value).unwrap();
+    let second = rea_compat::verify_evidence_json(&second_bytes).unwrap();
+
+    let mut claim = provider_claim(first.evidence_id.clone());
+    claim.evidence_ids.push(second.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[first, second]);
+
+    // Transport order is not semantic order: evidence is keyed by its bound ID.
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&second_bytes, fixture_bytes()], &result_bytes)
+            .unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("basic-provider-report-support")
+    );
+    assert_eq!(
+        replay.recomputed_derivation_sha256,
+        replay.reported_derivation_sha256
+    );
+}
+
