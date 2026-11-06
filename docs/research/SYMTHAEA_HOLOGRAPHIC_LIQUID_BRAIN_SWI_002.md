@@ -87,7 +87,7 @@ File: `crates/core/symthaea-core/src/hdc/unified_hv.rs`
 
 The current `ContinuousHV::bind` is Hadamard/elementwise multiplication. The code’s binding-algebra audit correctly documents that for continuous random components in `[-1, 1]`, this operation is commutative but not self-inverse: `A ⊙ A` does not recover the all-ones identity. A previous bipolar-VSA assumption would be incorrect for this continuous distribution.
 
-This is not a defect in Hadamard binding itself. Different VSAs have different algebraic contracts:
+This is not a defect in Hadamard binding itself. Different VSAs have different algebraic contracts. The branch now includes a separate FFT-based HRR implementation (`crates/core/symthaea-core/src/hdc/hrr.rs`) with deterministic unitary roles: spectral coefficients are phase-normalized and mirrored to preserve a real time-domain vector, so circular correlation exactly unbinds (up to floating-point error). It is not substituted for the Hadamard operator. The HRR role and both backends remain explicit and independently testable. Different VSAs have different algebraic contracts:
 
 | Algebra | Typical binding | Unbinding contract |
 |---|---|---|
@@ -159,7 +159,9 @@ The research branch now contains the following HDC/CfC work:
 - The tau derivative is zero at the effective tau clamp boundaries.
 - The phoneme trainer applies local target updates before evolving the frame. It is not described as temporal BPTT.
 - HDC-LTC now exposes typed parameter group IDs, profile statistics, bounded read-only windows, and dimension/finite/norm-validated replacement.
-- The `structured_mixer.rs` prototype provides identity, cyclic permutation and normalized Walsh–Hadamard transforms with exact inverse methods. Unit tests check round-trip reconstruction, norm preservation, one-hot spreading, and invalid dimension handling.
+- The `structured_mixer.rs` prototype provides identity, cyclic permutation and normalized Walsh–Hadamard transforms with exact inverse methods.
+- The `hrr.rs` prototype implements O(D log D) circular convolution/correlation using a radix-2 FFT and unitary HRR roles, with exact unbinding for unitary roles.
+- HRR and structured-mixer tests specify round-trip reconstruction, norm preservation, one-hot spreading, role-slot retrieval, commutativity, and invalid-shape rejection.
 
 **Important:** the structured mixer is not yet wired into the default HDC-LTC neuron. Its tests establish operator correctness, not a task-accuracy or efficiency improvement. The new Rust tests have not run in this environment.
 
@@ -282,12 +284,15 @@ Baselines:
 - core iterative update;
 - standalone per-coordinate liquid neuron;
 - standard CfC / LTC;
-- NIALIM / DFA-CfN / PRDFA-CfN where a reproducible implementation and matched protocol are available;
+- NIALIM / DFA-CfN / PRDFA-CfN (2026 IEEE TNNLS) where a reproducible implementation and matched protocol are available;
 - RK4 / adaptive reference solver.
 
 ### 5.2 HLB-HDC: algebra and associative memory
 
 Test each binding backend over:
+- Hadamard continuous binding (current default);
+- bipolar MAP/Hadamard and BSC/XOR (new comparison backends to implement);
+- HRR circular convolution with unitary and non-unitary roles (unitary HRR operator now implemented);
 - D = 256, 1,024, 4,096, 16,384, 65,536;
 - bundle load (number of stored items);
 - comparison/query count;
@@ -321,9 +326,10 @@ Baselines:
 - EMA bank (strong low-complexity baseline);
 - AR / linear state-space models;
 - GRU/LSTM;
-- standard LTC/CfC;
+- standard LTC/CfC and NIALIM-style CfC variants;
 - Neural CDE / ODE-RNN where appropriate;
-- SSMs (S4/Mamba-style) where their discrete-time assumptions are reasonably matched.
+- SSMs (S4/Mamba-style) where their discrete-time assumptions are reasonably matched;
+- low-rank RNN / neural-engineering-framework models, including online FORCE-style teacher-trained approaches.
 
 ### 5.4 HLB-LEARN: actual learning ability
 
@@ -383,7 +389,7 @@ These are engineering gates. They are not claims of current performance or SOTA.
 
 ## 7. What would make this different from the field?
 
-The most credible differentiation is not simply “HDC plus CfC.” Both HDC/VSA and liquid-network research are active fields.
+The most credible differentiation is not simply “HDC plus CfC.” Both HDC/VSA and liquid-network research are active fields. A 2025 systematic HDC/VSA benchmark review covers seven established tasks plus 121 UCI datasets and reports that HDC methods can still be surpassed by off-the-shelf classifiers, despite improvements in few-shot learning and robustness. The HLB programme must therefore include well-tuned conventional baselines, not just HDC variants. In continuous-time modelling, the 2026 NIALIM/DFA-CfN paper is a direct comparator for the current zero-order/frozen-input CfC path. For structured coupling, recent NeurIPS low-rank RNN results motivate a parameter-matched low-rank baseline, not just dense RNNs.
 
 The potentially distinctive contribution is a **verified, algebra-aware, error-controlled hyperdimensional liquid substrate** with:
 - multiple explicit VSA algebras and tested inverse contracts;
@@ -407,6 +413,7 @@ This is a research hypothesis. To claim superiority, Symthaea must reproduce sel
 - Correct the phoneme local trainer to update before its frame evolution.
 - Add typed HDC-LTC parameter profiles, safe group replacement and bounded read-only windows.
 - Add an independent identity/permutation/Walsh–Hadamard mixer prototype with inverse and norm-preservation tests.
+- Add a separate unitary-HRR circular-convolution/correlation backend with O(D log D) radix-2 FFT and unitary-role tests.
 - Add HDC-LTC parameter profiles, typed replacement, and bounded immutable parameter windows.
 - Keep the end-to-end phoneme training regression ignored until it has a measured acceptance threshold.
 
@@ -435,12 +442,15 @@ The ignored phoneme training test remains ignored. No new phoneme accuracy, nume
 ## 10. References
 
 1. Liang, X. et al. (2026). *Rederived Closed-Form Continuous-Time Neural Networks.* IEEE Transactions on Neural Networks and Learning Systems, 37(9), 4381–4395. DOI: https://doi.org/10.1109/TNNLS.2026.3669345. PubMed: https://pubmed.ncbi.nlm.nih.gov/41790819/
-2. Salik, A. Y. et al. (2026). *Hyper-dimensional computing architectures for AI applications: A comprehensive survey of principles, performance, and future prospects.* Results in Engineering, 29, 109589. DOI: https://doi.org/10.1016/j.rineng.2026.109589
-3. IEEE CIS Task Force on Hyperdimensional Computing and Vector Symbolic Architectures: https://cis.taskforce.ieee.org/hdcvsa/
-4. *A comparison of vector symbolic architectures.* Artificial Intelligence Review (2021). https://link.springer.com/article/10.1007/s10462-021-10110-3
-5. *Vector symbolic algebras for the Abstraction and Reasoning Corpus.* npj Unconventional Computing (2026). https://www.nature.com/articles/s44335-026-00100-5
-6. *Vector Symbolic Architectures as a Computing Framework for Emerging Hardware.* https://pmc.ncbi.nlm.nih.gov/articles/PMC10588678/
-7. NIALIM / DFA-CfN implementation release: https://github.com/nuist-xf/DFA-CfNs
+2. Vergés, P. et al. (2025). *Classification using hyperdimensional computing: a review with comparative analysis.* Artificial Intelligence Review 58, 173. https://doi.org/10.1007/s10462-025-11181-2
+3. Arora, A. and Pillow, J. (2025). *Efficient Training of Minimal and Maximal Low-Rank Recurrent Neural Networks.* NeurIPS 2025. https://proceedings.neurips.cc/paper_files/paper/2025/hash/902244a9e85ebc8535ce111cf96f3e04-Abstract-Conference.html
+4. Salik, A. Y. et al. (2026). *Hyper-dimensional computing architectures for AI applications: A comprehensive survey of principles, performance, and future prospects.* Results in Engineering, 29, 109589. DOI: https://doi.org/10.1016/j.rineng.2026.109589
+5. IEEE CIS Task Force on Hyperdimensional Computing and Vector Symbolic Architectures: https://cis.taskforce.ieee.org/hdcvsa/
+6. *A comparison of vector symbolic architectures.* Artificial Intelligence Review (2021). https://link.springer.com/article/10.1007/s10462-021-10110-3
+7. *Vector symbolic algebras for the Abstraction and Reasoning Corpus.* npj Unconventional Computing (2026). https://www.nature.com/articles/s44335-026-00100-5
+8. *Vector Symbolic Architectures as a Computing Framework for Emerging Hardware.* https://pmc.ncbi.nlm.nih.gov/articles/PMC10588678/
+9. NIALIM / DFA-CfN implementation release: https://github.com/nuist-xf/DFA-CfNs
+10. *Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration.* DATE 2026. DOI: https://doi.org/10.23919/DATE69613.2026.11539261
 
 ---
 
