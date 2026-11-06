@@ -864,6 +864,32 @@ mod tests {
             ),
             Err(CfCPermutationAlignmentError::HiddenUnitCountMismatch { .. })
         ));
+
+        let mut invalid_digest = signature_set(vec![vec![0.0]], 'a', 'c');
+        invalid_digest.model_digest = "not-a-256-bit-digest".into();
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(
+                &invalid_digest,
+                &signature_set(vec![vec![0.0]], 'b', 'c')
+            ),
+            Err(CfCPermutationAlignmentError::InvalidSignatureDigest {
+                side: "source",
+                field: "model"
+            })
+        ));
+
+        let mut unsupported_version = signature_set(vec![vec![0.0]], 'a', 'c');
+        unsupported_version.format_version = 2;
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(
+                &unsupported_version,
+                &signature_set(vec![vec![0.0]], 'b', 'c')
+            ),
+            Err(CfCPermutationAlignmentError::UnsupportedSignatureVersion {
+                side: "source",
+                version: 2
+            })
+        ));
     }
 
     fn permute_rows(values: &[f32], rows: usize, cols: usize, permutation: &[usize]) -> Vec<f32> {
@@ -1025,18 +1051,33 @@ mod tests {
                 dt: 0.1,
             })
             .collect::<Vec<_>>();
+        let source_state_before = original.state();
         let source_signatures =
             cfc_hidden_unit_activation_signatures(&original, 0, &probes)
                 .expect("source activation signatures");
         let candidate_signatures =
             cfc_hidden_unit_activation_signatures(&permuted, 0, &probes)
                 .expect("candidate activation signatures");
+        assert_eq!(original.state(), source_state_before);
+        assert_eq!(source_signatures.model_digest, snapshot.model_digest);
+        assert_eq!(
+            candidate_signatures.model_digest,
+            candidate.candidate_native_model_digest
+        );
+        assert_eq!(source_signatures.probe_digest, candidate_signatures.probe_digest);
         let alignment = align_cfc_hidden_unit_signatures(
             &source_signatures,
             &candidate_signatures,
         )
         .expect("activation-based hidden-unit alignment");
         assert_eq!(alignment.source_to_candidate, vec![1, 3, 0, 2]);
+        assert_eq!(alignment.source_model_digest, snapshot.model_digest);
+        assert_eq!(
+            alignment.candidate_model_digest,
+            candidate.candidate_native_model_digest
+        );
+        assert_eq!(alignment.probe_digest, source_signatures.probe_digest);
+        assert_eq!(alignment.layer_index, 0);
         assert!(alignment.mean_squared_activation_error < 1e-10);
         assert!(alignment.minimum_assignment_margin > 0.0);
 
