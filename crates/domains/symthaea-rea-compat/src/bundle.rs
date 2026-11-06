@@ -1442,7 +1442,7 @@ fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, Bundl
     Ok(value)
 }
 
-fn trimmed_text<'a>(value: &'a Value, context: &str) -> Result<String, BundleError> {
+fn trimmed_text(value: &Value, context: &str) -> Result<String, BundleError> {
     let value = string_value(value, context)?;
     let value = trim_ecmascript_whitespace(value);
     if value.is_empty() {
