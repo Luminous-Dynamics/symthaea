@@ -645,6 +645,8 @@ pub struct CaseResult {
     pub case_id: String,
     pub outcome: CaseOutcome,
     pub reason_code: Option<String>,
+    /// SHA-256 of the exact raw per-case output/evidence artifact.
+    pub output_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -662,6 +664,8 @@ pub struct RunReceipt {
     pub schema: String,
     pub version: String,
     pub run_id: String,
+    /// Identity of the process/operator that executed and submitted this run.
+    pub executor_id: String,
     pub state: RunState,
     pub git_commit: String,
     pub dataset_catalog_sha256: String,
@@ -706,6 +710,9 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
     }
     if !nonempty(&receipt.run_id) {
         return Err(ValidationError::new("$.run_id", "run ID must be non-empty"));
+    }
+    if !nonempty(&receipt.executor_id) {
+        return Err(ValidationError::new("$.executor_id", "executor identity must be non-empty"));
     }
     if !is_lower_hex(&receipt.git_commit, 40) && !is_lower_hex(&receipt.git_commit, 64) {
         return Err(ValidationError::new(
@@ -773,6 +780,12 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
                 "case IDs must be non-empty and unique",
             ));
         }
+        if !is_lower_hex(&case.output_sha256, 64) {
+            return Err(ValidationError::new(
+                format!("$.cases[{index}].output_sha256"),
+                "each case requires a lowercase SHA-256 digest for its exact output/evidence artifact",
+            ));
+        }
         match case.outcome {
             CaseOutcome::Pass => summary.pass_count += 1,
             CaseOutcome::Fail => summary.fail_count += 1,
@@ -793,6 +806,12 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
                 return Err(ValidationError::new(
                     "$.independent_verification.verifier_id",
                     "verified reconstruction requires an independent verifier identity",
+                ));
+            }
+            if verification.verifier_id.as_deref() == Some(receipt.executor_id.as_str()) {
+                return Err(ValidationError::new(
+                    "$.independent_verification.verifier_id",
+                    "verifier identity must differ from the run executor identity",
                 ));
             }
             for (path, value) in [
@@ -1031,6 +1050,7 @@ mod tests {
             "schema": RECEIPT_SCHEMA,
             "version": RECEIPT_VERSION,
             "run_id": "run-1",
+            "executor_id": "executor-1",
             "state": "complete",
             "git_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "dataset_catalog_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -1042,7 +1062,7 @@ mod tests {
             "toolchain": "rustc-1.96.0",
             "environment_sha256": "abababababababababababababababababababababababababababababababab",
             "seed": 7,
-            "cases": [{"case_id":"case-1","outcome":"pass","reason_code":null}],
+            "cases": [{"case_id":"case-1","outcome":"pass","reason_code":null,"output_sha256":"abababababababababababababababababababababababababababababababab"}],
             "independent_verification": {
                 "state":"verified",
                 "verifier_id":null,
@@ -1055,11 +1075,12 @@ mod tests {
     }
 
     #[test]
-    fn valid_receipt_is_not_a_safety_or_performance_qualification() {
+    fn rejects_executor_self_verification() {
         let input = json!({
             "schema": RECEIPT_SCHEMA,
             "version": RECEIPT_VERSION,
-            "run_id": "run-2",
+            "run_id": "run-self-verify",
+            "executor_id": "same-identity",
             "state": "complete",
             "git_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "dataset_catalog_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -1071,7 +1092,43 @@ mod tests {
             "toolchain": "rustc-1.96.0",
             "environment_sha256": "abababababababababababababababababababababababababababababababab",
             "seed": 7,
-            "cases": [{"case_id":"case-1","outcome":"pass","reason_code":null}],
+            "cases": [{
+                "case_id":"case-1",
+                "outcome":"pass",
+                "reason_code":null,
+                "output_sha256":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+            }],
+            "independent_verification": {
+                "state":"verified",
+                "verifier_id":"same-identity",
+                "verifier_sha256":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+                "report_sha256":"dededededededededededededededededededededededededededededededede"
+            }
+        }).to_string();
+        let error = validate_run_receipt(&input)
+            .expect_err("executor cannot independently verify its own run");
+        assert!(error.to_string().contains("must differ"));
+    }
+
+    #[test]
+    fn valid_receipt_is_not_a_safety_or_performance_qualification() {
+        let input = json!({
+            "schema": RECEIPT_SCHEMA,
+            "version": RECEIPT_VERSION,
+            "run_id": "run-2",
+            "executor_id": "executor-2",
+            "state": "complete",
+            "git_commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "dataset_catalog_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "dataset_payload_sha256": ["cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"],
+            "split_manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "code_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "model_sha256": null,
+            "configuration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "toolchain": "rustc-1.96.0",
+            "environment_sha256": "abababababababababababababababababababababababababababababababab",
+            "seed": 7,
+            "cases": [{"case_id":"case-1","outcome":"pass","reason_code":null,"output_sha256":"abababababababababababababababababababababababababababababababab"}],
             "independent_verification": {
                 "state":"verified",
                 "verifier_id":"independent-verifier-1",
