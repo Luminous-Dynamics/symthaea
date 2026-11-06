@@ -6,7 +6,9 @@
 //! Exit codes: 0 = replay match, 1 = well-formed but semantically mismatched
 //! result, 2 = invalid input, resource limit, IO or canonicalization failure.
 
-use rea_claim_replay_verifier::{ReplayOutcome, replay_claim_evaluation};
+use rea_claim_replay_verifier::{
+    MAX_EVIDENCE_RECORDS, ReplayOutcome, replay_claim_evaluation,
+};
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -40,6 +42,13 @@ fn run() -> Result<i32, String> {
         return Err(
             "usage: rea-claim-replay <claim.json> <result.json> [evidence-1.json ...]".to_owned(),
         );
+    }
+
+    let evidence_count = arguments.len().saturating_sub(2);
+    if evidence_count > MAX_EVIDENCE_RECORDS {
+        return Err(format!(
+            "received {evidence_count} Evidence paths; limit is {MAX_EVIDENCE_RECORDS}"
+        ));
     }
 
     let claim_path = PathBuf::from(&arguments[0]);
