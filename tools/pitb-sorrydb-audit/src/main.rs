@@ -1956,6 +1956,81 @@ fn run_self_tests() -> Result<(), String> {
         return Err("duplicate proof-run IDs were accepted".into());
     }
     println!("SELF_TEST_PASS per-strategy attempt/success denominators and duplicate run rejection");
+
+    let mut task_a = synthetic_record("cluster-task-a", "x : Nat\n⊢ x = x", "Demo/A.lean", 0);
+    task_a.repo.remote = "https://github.com/example/project-a".into();
+    task_a.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_a.repo.remote, task_a.repo.commit, task_a.location.path, task_a.location.start_line
+    );
+    let mut task_b = synthetic_record("cluster-task-b", "x : Nat\n⊢ x + 0 = x", "Demo/B.lean", 0);
+    task_b.repo.remote = "https://github.com/example/project-b".into();
+    task_b.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_b.repo.remote, task_b.repo.commit, task_b.location.path, task_b.location.start_line
+    );
+    let mut task_c = synthetic_record("cluster-task-c", "x : Nat\n⊢ x = x + 0", "Demo/C.lean", 0);
+    task_c.repo.remote = "https://github.com/example/project-b".into();
+    task_c.debug_info.url = format!(
+        "{}/blob/{}/{}#L{}",
+        task_c.repo.remote, task_c.repo.commit, task_c.location.path, task_c.location.start_line
+    );
+    let cluster_eval = Dataset {
+        documentation: "synthetic cluster comparison".into(),
+        sorries: vec![task_a.clone(), task_b.clone(), task_c.clone()],
+    };
+    let mut cluster_runs = Vec::new();
+    let mut push_strategy_run = |task: &SorryRecord, solved: bool, strategy_name: &str, run_id: &str| {
+        let mut run = synthetic_proof_run(task, solved, run_id);
+        run.strategy.name = strategy_name.into();
+        run.strategy.implementation_sha256 = sha256(strategy_name.as_bytes());
+        run.strategy.model_id = Some(strategy_name.into());
+        cluster_runs.push(run);
+    };
+    push_strategy_run(&task_a, true, "strategy-a", "cluster-a-task-a-pass");
+    push_strategy_run(&task_a, false, "strategy-a", "cluster-a-task-a-retry");
+    push_strategy_run(&task_b, false, "strategy-a", "cluster-a-task-b-fail");
+    push_strategy_run(&task_c, true, "strategy-a", "cluster-a-task-c-pass");
+    push_strategy_run(&task_a, false, "strategy-b", "cluster-b-task-a-fail");
+    push_strategy_run(&task_b, true, "strategy-b", "cluster-b-task-b-pass");
+    push_strategy_run(&task_c, true, "strategy-b", "cluster-b-task-c-pass");
+    drop(push_strategy_run);
+
+    let comparisons = pairwise_clustered_comparisons(&cluster_runs, &cluster_eval)?;
+    if comparisons.len() != 1 {
+        return Err("clustered comparison must emit exactly one pair".into());
+    }
+    let comparison = &comparisons[0];
+    if comparison.task_denominator != 3
+        || comparison.strategy_a_attempted_tasks != 3
+        || comparison.strategy_b_attempted_tasks != 3
+        || comparison.strategy_a_unique_verified_tasks != 2
+        || comparison.strategy_b_unique_verified_tasks != 2
+        || comparison.both_solved_tasks != 1
+        || comparison.a_only_solved_tasks != 1
+        || comparison.b_only_solved_tasks != 1
+        || comparison.neither_solved_tasks != 0
+        || comparison.repository_cluster_count != 2
+        || comparison.repository_file_cluster_count != 3
+        || comparison.paired_risk_difference_b_minus_a.abs() > 1e-12
+        || comparison.repository_cluster_sign_flip_p_value != 1.0
+        || comparison.holm_adjusted_p_value != 1.0
+    {
+        return Err(format!("clustered paired comparison denominators or balance are incorrect: {comparison:?}"));
+    }
+    println!("SELF_TEST_PASS paired comparison preserves fixed tasks, retries and repository/file cluster counts");
+
+    let repeated = pairwise_clustered_comparisons(&cluster_runs, &cluster_eval)?;
+    if repeated[0].deterministic_seed_sha256 != comparison.deterministic_seed_sha256
+        || repeated[0].repository_bootstrap_ci95_low != comparison.repository_bootstrap_ci95_low
+        || repeated[0].repository_bootstrap_ci95_high != comparison.repository_bootstrap_ci95_high
+        || repeated[0].nested_repository_file_bootstrap_ci95_low != comparison.nested_repository_file_bootstrap_ci95_low
+        || repeated[0].nested_repository_file_bootstrap_ci95_high != comparison.nested_repository_file_bootstrap_ci95_high
+    {
+        return Err("cluster bootstrap must be deterministic for the same frozen pair".into());
+    }
+    println!("SELF_TEST_PASS repository and nested file bootstrap are deterministic");
+
     Ok(())
 }
 
