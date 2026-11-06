@@ -171,6 +171,12 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
     let repeated_selection_optimism =
         repeated_in_sample.selected_selection_value - repeated_in_sample.selected_heldout_value;
 
+    // Capture scalar diagnostics before moving the lane structures into the report.
+    let heldout_share_of_one_shot_apparent_gain =
+        positive_gain_share(one_shot.heldout_gain, one_shot.selection_gain);
+    let heldout_share_of_repeated_in_sample_gain =
+        positive_gain_share(heldout_repeated.heldout_gain, repeated_in_sample.selection_gain);
+
     let variance_decomposition = match &design.selection.coupling {
         CouplingDisposition::SharedInvariant { .. } => VarianceDecompositionResult {
             disposition: VarianceDecompositionDisposition::ComputedUnderDeclaredSharedInvariant,
@@ -197,14 +203,8 @@ pub fn evaluate_headroom(design: &HeadroomDesign) -> Result<HeadroomReport, Head
         heldout_repeated_oracle: heldout_repeated,
         one_shot_selection_optimism,
         repeated_selection_optimism,
-        heldout_share_of_one_shot_apparent_gain: positive_gain_share(
-            one_shot.heldout_gain,
-            one_shot.selection_gain,
-        ),
-        heldout_share_of_repeated_in_sample_gain: positive_gain_share(
-            heldout_repeated.heldout_gain,
-            repeated_in_sample.selection_gain,
-        ),
+        heldout_share_of_one_shot_apparent_gain,
+        heldout_share_of_repeated_in_sample_gain,
         variance_decomposition,
         actual_selector_status: ActualSelectorStatus::NotMeasuredInThisReference,
     })
