@@ -127,4 +127,4 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 6. RSIBench-Data: https://arxiv.org/abs/2607.25886
 7. EvalResearchBench: https://arxiv.org/abs/2610.04184
 8. RSI evidence census: https://arxiv.org/abs/2610.27610
-9. METR research productivity coverage (2026-11-05): https://www.reuters.com/technology/anthropics-models-improving-nearly-twice-fast-study-finds-2026-11-05/
+9. METR research productivity coverage (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
