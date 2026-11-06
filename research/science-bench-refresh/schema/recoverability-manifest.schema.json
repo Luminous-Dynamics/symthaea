@@ -12,6 +12,7 @@
     "search_surface_sha256",
     "route_policy_sha256",
     "surface_state",
+    "surface_completeness_receipt_sha256",
     "start_node_ref",
     "max_route_cost",
     "budget_unit",
@@ -177,6 +178,17 @@
     },
     "manifest_commitment_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "surface_completeness_receipt_sha256": {
+      "description": "Digest reference to the separate independently reviewed receipt asserting that this finite route inventory is complete. The recoverability CLI records the reference but does not verify its issuer or contents.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "$defs": {
