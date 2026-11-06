@@ -216,7 +216,7 @@ def main() -> int:
         "NotEvaluable": 4,
     }
     base_by_id = {row["evidence_unit_id"]: row for row in expected_records}
-    lower_by_id = {row["evidence_unit_id"]: classify(lower, unit) for unit in lower["evidence_units"]}
+    lower_by_id = {unit["evidence_unit_id"]: classify(lower, unit) for unit in lower["evidence_units"]}
     if any(
         rank[lower_by_id[key]["recoverability"]] < rank[row["recoverability"]]
         for key, row in base_by_id.items()
