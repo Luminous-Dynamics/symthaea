@@ -34,6 +34,8 @@ pub enum ForecastInferenceError {
     BlockStartCountMismatch,
     BlockStartOutsideTargetSet,
     EmptyPairedLossSet,
+    MixedSeriesForBootstrap,
+    NonChronologicalOrGappedTargets,
     ArithmeticOverflow,
 }
 
@@ -152,6 +154,20 @@ pub fn evaluate_forecast_skill_inference(
     }
 
     let sample_count = deltas.len();
+    let first_series = deltas[0].series_id;
+    for (index, delta) in deltas.iter().enumerate() {
+        if delta.series_id != first_series {
+            return Err(ForecastInferenceError::MixedSeriesForBootstrap);
+        }
+        if index > 0 {
+            let previous = deltas[index - 1];
+            if previous.valid_period_start_utc >= delta.valid_period_start_utc
+                || previous.valid_period_end_utc != delta.valid_period_start_utc
+            {
+                return Err(ForecastInferenceError::NonChronologicalOrGappedTargets);
+            }
+        }
+    }
     let block_length = plan.block_length as usize;
     let blocks_per_draw = sample_count.div_ceil(block_length);
     let expected_starts = (plan.draw_count as usize)
@@ -274,11 +290,11 @@ mod tests {
     fn skill() -> ForecastSkillAssessment<'static> {
         let candidate = [
             forecast("candidate-1", 100, "candidate-v1", CANDIDATE_SHA, 100, 105),
-            forecast("candidate-2", 200, "candidate-v1", CANDIDATE_SHA, 200, 205),
+            forecast("candidate-2", 115, "candidate-v1", CANDIDATE_SHA, 200, 205),
         ];
         let baseline = [
             forecast("baseline-1", 100, "persistence-v1", BASELINE_SHA, 90, 105),
-            forecast("baseline-2", 200, "persistence-v1", BASELINE_SHA, 190, 205),
+            forecast("baseline-2", 115, "persistence-v1", BASELINE_SHA, 190, 205),
         ];
         compare_forecast_skill(300, &candidate, &baseline).unwrap()
     }
@@ -312,11 +328,11 @@ mod tests {
     fn block_bootstrap_can_be_inconclusive_when_periods_disagree() {
         let candidate = [
             forecast("candidate-good", 100, "candidate-v1", CANDIDATE_SHA, 100, 105),
-            forecast("candidate-bad", 200, "candidate-v1", CANDIDATE_SHA, 250, 205),
+            forecast("candidate-bad", 115, "candidate-v1", CANDIDATE_SHA, 250, 205),
         ];
         let baseline = [
             forecast("baseline-good", 100, "persistence-v1", BASELINE_SHA, 90, 105),
-            forecast("baseline-bad", 200, "persistence-v1", BASELINE_SHA, 190, 205),
+            forecast("baseline-bad", 115, "persistence-v1", BASELINE_SHA, 190, 205),
         ];
         let assessment = compare_forecast_skill(300, &candidate, &baseline).unwrap();
         let mut starts = Vec::new();
@@ -326,13 +342,41 @@ mod tests {
         for _ in 0..(MIN_BOOTSTRAP_DRAWS / 2) {
             starts.extend_from_slice(&[1, 1]);
         }
-        let result = evaluate_forecast_skill_inference(&assessment, CircularBlockBootstrapPlan {
-            block_start_indices: &starts,
-            ..plan(&[], 1)
-        }).unwrap();
+        let result = evaluate_forecast_skill_inference(
+            &assessment,
+            CircularBlockBootstrapPlan {
+                plan_id: "bootstrap/predeclared/001",
+                plan_source_ref: "benchmark/holdout/bootstrap-plan",
+                plan_sha256: PLAN_SHA,
+                block_length: 1,
+                draw_count: MIN_BOOTSTRAP_DRAWS,
+                confidence_level_bps: 9_500,
+                block_start_indices: &starts,
+            },
+        )
+        .unwrap();
         assert!(!result.mae.improvement_supported);
         assert!(result.mae.lower_improvement_numerator < 0);
         assert!(result.mae.upper_improvement_numerator > 0);
+    }
+
+    #[test]
+    fn bootstrap_rejects_multiple_series_and_time_gaps() {
+        let mut assessment = skill();
+        assessment.paired_loss_deltas[1].series_id = "OTHER/SERIES";
+        let starts = [0_u32, 1].repeat(MIN_BOOTSTRAP_DRAWS as usize);
+        let starts: &'static [u32] = Box::leak(starts.into_boxed_slice());
+        assert_eq!(
+            evaluate_forecast_skill_inference(&assessment, plan(starts, 1)),
+            Err(ForecastInferenceError::MixedSeriesForBootstrap)
+        );
+
+        let mut assessment = skill();
+        assessment.paired_loss_deltas[1].valid_period_start_utc = 201;
+        assert_eq!(
+            evaluate_forecast_skill_inference(&assessment, plan(starts, 1)),
+            Err(ForecastInferenceError::NonChronologicalOrGappedTargets)
+        );
     }
 
     #[test]
