@@ -17,7 +17,8 @@
     "task_contract",
     "v2_artifact_pin",
     "expected_checks",
-    "claim_scope"
+    "claim_scope",
+    "leakage_controls"
   ],
   "properties": {
     "schema_version": {
