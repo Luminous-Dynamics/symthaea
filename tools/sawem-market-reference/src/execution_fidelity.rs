@@ -1213,7 +1213,8 @@ mod trace_backed_tests {
                     source_sha256: SOURCE_SHA,
                     horizon_start_utc_seconds: start,
                     horizon_end_utc_seconds: end,
-                    maximum_integrable_gap_seconds: end - start,
+                    maximum_integrable_gap_seconds: u32::try_from(end - start)
+                        .expect("synthetic interval gap fits u32"),
                     samples,
                 },
             },
