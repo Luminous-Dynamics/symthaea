@@ -658,6 +658,7 @@
         "dataset_catalog_sha256",
         "dataset_payload_sha256",
         "split_manifest_sha256",
+        "ground_truth_manifest_sha256",
         "code_sha256",
         "model_sha256",
         "configuration_sha256",
@@ -744,6 +745,9 @@
         },
         "independent_verification": {
           "$ref": "#/$defs/independentVerification"
+        },
+        "ground_truth_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
         }
       },
       "allOf": [
@@ -943,6 +947,32 @@
           "items": {
             "$ref": "#/$defs/pairwiseIndependence"
           }
+        }
+      }
+    },
+    "groundTruthManifestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "schema": {
+          "const": "emsr.ground-truth-manifest"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "status": {
+          "enum": [
+            "synthetic_only",
+            "provenance_pending",
+            "independence_unassessed",
+            "qualified_for_benchmark",
+            "ambiguous"
+          ]
         }
       }
     }
