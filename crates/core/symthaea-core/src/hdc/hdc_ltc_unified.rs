@@ -1435,6 +1435,7 @@ impl HdcLtcUnifiedNeuron {
             });
         }
 
+        self.clear_pre_evolution_state();
         match id {
             HdcLtcParameterGroupId::WeightHypervector => self.weight_hv = candidate,
             HdcLtcParameterGroupId::InputMask => self.input_mask = candidate,
@@ -1465,6 +1466,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Update the Fourier basis frequencies used in equilibrium modulation.
     pub fn set_fourier_frequencies(&mut self, freqs: &[f32]) {
+        self.clear_pre_evolution_state();
         self.config.fourier_frequencies = freqs.to_vec();
     }
 
@@ -1490,6 +1492,7 @@ impl HdcLtcUnifiedNeuron {
     ///
     /// Clamped to [0.01, 1.0] to prevent degenerate dynamics.
     pub fn set_tau_base(&mut self, tau: f32) {
+        self.clear_pre_evolution_state();
         self.config.tau_base = tau.clamp(0.01, 1.0);
     }
 
@@ -1502,6 +1505,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Restore the evolution clock (see [`Self::evolution_clock`]).
     pub fn set_evolution_clock(&mut self, total_time: f64, update_count: u64) {
+        self.clear_pre_evolution_state();
         self.total_time = total_time;
         self.update_count = update_count;
     }
@@ -1521,6 +1525,7 @@ impl HdcLtcUnifiedNeuron {
 
     /// Hebbian-like weight update based on state correlation
     pub fn hebbian_update(&mut self, input: &ContinuousHV, learning_rate: Option<f32>) {
+        self.clear_pre_evolution_state();
         let lr = learning_rate.unwrap_or(self.config.learning_rate);
 
         // Correlation between input and state (Hebbian: what fires together wires together)
@@ -1547,6 +1552,7 @@ impl HdcLtcUnifiedNeuron {
         negative: &ContinuousHV,
         lr: f32,
     ) {
+        self.clear_pre_evolution_state();
         // Pull toward positive examples
         let pos_delta = positive.subtract(&self.state);
         let pos_gradient = self.weight_hv.bind(&pos_delta);
@@ -1581,6 +1587,7 @@ impl HdcLtcUnifiedNeuron {
     /// # STDP Window
     /// Uses exponential windows with tau_plus=20ms (LTP) and tau_minus=20ms (LTD)
     pub fn stdp_update(&mut self, pre: &ContinuousHV, post: &ContinuousHV, dt: f32, lr: f32) {
+        self.clear_pre_evolution_state();
         // STDP time constants (in same units as dt)
         const TAU_PLUS: f32 = 0.02; // 20ms for LTP
         const TAU_MINUS: f32 = 0.02; // 20ms for LTD
@@ -1633,6 +1640,7 @@ impl HdcLtcUnifiedNeuron {
         beta1: f32,
         beta2: f32,
     ) {
+        self.clear_pre_evolution_state();
         const EPSILON: f32 = 1e-8;
 
         // Update biased first moment estimate (momentum)
@@ -1680,6 +1688,7 @@ impl HdcLtcUnifiedNeuron {
         lr: f32,
         target_activity: f32,
     ) {
+        self.clear_pre_evolution_state();
         // Standard Hebbian correlation
         let correlation = input.bind(&self.state);
 
@@ -1730,6 +1739,7 @@ impl HdcLtcUnifiedNeuron {
         margin: f32,
         lr: f32,
     ) {
+        self.clear_pre_evolution_state();
         // Compute distances (using 1 - similarity as distance proxy)
         let dist_pos = 1.0 - self.state.similarity(positive);
         let dist_neg = 1.0 - self.state.similarity(negative);
@@ -1766,28 +1776,18 @@ impl HdcLtcUnifiedNeuron {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // BACKPROPAGATION THROUGH TIME (BPTT)
+    // ONE-STEP LOCAL GRADIENTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Compute analytical BPTT gradients for a single closed-form step.
+    /// Compute analytical one-step local gradients for the adaptive closed-form map.
     ///
-    /// Re-runs the forward pass internally, then backpropagates through:
-    /// ```text
-    /// x' = σ × x_∞ + (1-σ) × x
-    /// x_∞ = f(bundle(W⊙x, U⊙u, optional Fourier basis))
-    /// σ = 1 - exp(-dt/τ) × (1 - sigmoid(k × gate_activation))
-    /// τ = clamp(τ₀ × (1 + β×||x||) × (1 + 0.2×cosine(u, τ_mod)))
-    /// ```
+    /// After `evolve_closed_form()`, this uses the retained pre-evolution state
+    /// and Fourier phase, while `target` is expressed in post-evolution output
+    /// space. Without a compatible retained step, it falls back to current state.
     ///
-    /// Returns one-step local derivatives at the current state; it is not
-    /// temporal BPTT through a sequence. Since HDC binding is Hadamard product,
-    /// ∂(A⊙B)/∂A = B element-wise.
-    /// Compute one-step local gradients for the most recent adaptive
-    /// closed-form evolution. When called after evolve_closed_form(), this
-    /// reconstructs the exact pre-evolution state and Fourier phase while the
-    /// caller supplies the target in the post-evolution output space.
-    ///
-    /// This is local credit assignment for one step, not temporal BPTT.
+    /// This is local credit assignment for one step, not BPTT through time or
+    /// a full chain-rule gradient through the network's layer composition.
+    /// Since HDC binding is Hadamard product, ∂(A⊙B)/∂A = B element-wise.
     pub fn backward(
         &self,
         input: &ContinuousHV,
@@ -1953,14 +1953,14 @@ impl HdcLtcUnifiedNeuron {
         }
     }
 
-    /// Apply BPTT gradients with SGD + momentum, weight decay, and norm clipping.
+    /// Apply one-step local gradients with SGD + momentum, weight decay, and norm clipping.
     pub fn apply_gradients(&mut self, grads: &HdcLtcGradients, lr: f32) {
         self.apply_gradients_inner(grads, lr, true)
     }
 
     /// Apply gradients without per-step weight decay.
     ///
-    /// Use this for BPTT training where thousands of gradient steps occur per
+    /// Use this for sequence trainers where thousands of local gradient steps occur per
     /// epoch. The standard `apply_gradients` applies weight_decay (default
     /// 0.0001) per step, which over 67K steps/epoch decays weights to ~0.1%
     /// of original (`(1-0.0001)^67646 ≈ 0.001`), destroying the network.
@@ -1969,6 +1969,7 @@ impl HdcLtcUnifiedNeuron {
     }
 
     fn apply_gradients_inner(&mut self, grads: &HdcLtcGradients, lr: f32, apply_decay: bool) {
+        self.clear_pre_evolution_state();
         let m = self.config.momentum;
         let decay_factor = if apply_decay {
             1.0 - self.config.weight_decay
@@ -3422,6 +3423,74 @@ mod tests {
             "State should evolve, got norm={}",
             norm
         );
+    }
+
+    #[test]
+    fn test_backward_after_evolution_uses_retained_pre_state_and_fourier_phase() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            fourier_frequencies: vec![0.7, 2.3],
+            fourier_amplitude: 0.05,
+            ..UnifiedConfig::default()
+        };
+        let mut initial = HdcLtcUnifiedNeuron::new(config, 781);
+        initial.set_state(ContinuousHV::random(64, 782).scale(0.08));
+        initial.set_evolution_clock(0.137, 4);
+
+        let input = ContinuousHV::random(64, 783).scale(0.15);
+        let target = ContinuousHV::random(64, 784).scale(0.15);
+        let dt = 0.013;
+
+        // Reference gradient from the exact pre-forward state and Fourier phase.
+        let expected = initial.backward_at_current(&input, &target, dt);
+
+        // Production ordering: evolve, then evaluate the local output-space target.
+        let mut after_forward = initial.clone();
+        after_forward.evolve_closed_form(dt, &input);
+        assert!((after_forward.pre_evolution_time - 0.137).abs() < 1e-9);
+        assert_eq!(
+            after_forward.pre_evolution_state.as_ref().unwrap().values,
+            initial.state().values
+        );
+
+        let actual = after_forward.backward(&input, &target, dt);
+        let max_diff = |left: &ContinuousHV, right: &ContinuousHV| {
+            left.values
+                .iter()
+                .zip(right.values.iter())
+                .map(|(a, b)| (a - b).abs())
+                .fold(0.0f32, f32::max)
+        };
+
+        assert!(max_diff(&actual.dw, &expected.dw) < 1e-6);
+        assert!(max_diff(&actual.du, &expected.du) < 1e-6);
+        assert!(max_diff(&actual.d_tau_modulator, &expected.d_tau_modulator) < 1e-6);
+        assert!(max_diff(&actual.d_gate_weight, &expected.d_gate_weight) < 1e-6);
+        assert!(max_diff(&actual.d_gate_bias, &expected.d_gate_bias) < 1e-6);
+        assert!(max_diff(&actual.d_input, &expected.d_input) < 1e-6);
+        assert!(max_diff(&actual.d_state, &expected.d_state) < 1e-6);
+        assert!((actual.dtau_scalar - expected.dtau_scalar).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_external_state_mutation_invalidates_retained_pre_state() {
+        let config = UnifiedConfig {
+            dimension: 64,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 791);
+        let input = ContinuousHV::random(64, 792);
+        let target = ContinuousHV::random(64, 793);
+        neuron.evolve_closed_form(0.01, &input);
+        assert!(neuron.pre_evolution_state.is_some());
+
+        neuron.state_mut().values[3] += 0.1;
+        assert!(neuron.pre_evolution_state.is_none());
+
+        let explicit = neuron.backward_at_current(&input, &target, 0.01);
+        let fallback = neuron.backward(&input, &target, 0.01);
+        assert!(explicit.dw.values.iter().zip(fallback.dw.values.iter())
+            .all(|(a, b)| (a - b).abs() < 1e-7));
     }
 
     #[test]
