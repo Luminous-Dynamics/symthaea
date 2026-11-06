@@ -203,3 +203,37 @@ A matching replay receipt remains a reproducibility result, not a signature, tru
 **SCITT makes the statement-truth boundary explicit.** RFC 9943 says an issuer may make false statements and that registration proves the statement was produced by an issuer; relying parties still determine accuracy. This is not a weakness unique to SCITT: transparent registration is intentionally orthogonal to semantic truth. REA should link a SCITT receipt to the signed statement digest, verify issuer identity/policy separately, and then evaluate the statement's predicate against artifact- and time-scoped Evidence. [RFC 9943 §9.2](https://www.rfc-editor.org/rfc/rfc9943.html#section-9.2).
 
 **TUF is a metadata-update security framework.** Its threat model includes rollback, freeze, fast-forward, mix-and-match, threshold-key compromise and wrong-software installation. A TUF-qualified target record is strong evidence about what a trusted repository authorized as a target under a metadata version/expiry policy. It is not a substitute for inspecting the target's internal semantics or proving runtime behavior. [TUF specification](https://github.com/theupdateframework/specification/blob/master/tuf-spec.md).
+
+## 8. Implementation update — 2026-11-06
+
+The producer implementation is [#10665](https://github.com/Luminous-Dynamics/symthaea/pull/10665), whose focused REA workflow passed at exact head `08947cc924386d75190a0ca3a9660b5a0425cd31` (40 tests across the focused harnesses). That is a focused compatibility/claim-evaluator result, not full-workspace qualification or general semantic truth.
+
+The independent verifier is in refreshed stacked draft [#10710](https://github.com/Luminous-Dynamics/symthaea/pull/10710), tracked by [#10673](https://github.com/Luminous-Dynamics/symthaea/issues/10673). It now includes:
+- a frozen public seed oracle at `tools/rea-claim-replay-verifier/tests/fixtures/rea-claim-replay-v0-oracle.json`, with 23 explicit expected-disposition/replay-outcome cases, authored independently of the production evaluator;
+- a standalone, bounded, read-only `rea-claim-replay` CLI: exit 0 for replay match, 1 for semantic mismatch, 2 for invalid input / IO / resource failure;
+- duplicate-key rejection and schema validation for raw claim and result JSON;
+- verification of semantic Evidence IDs from raw Evidence inputs;
+- rejection of duplicate, malformed, missing-inconsistent, unrequested and unreferenced Evidence identifiers in the claim/result/replay set;
+- complete-result comparison under RFC 8785 canonical bytes, not a self-reported derivation hash;
+- explicit fail-closed treatment of unsupported predicates, assumptions and scope dimensions absent from REA Evidence v1;
+- a pinned Rust 1.99.1 toolchain, isolated Cargo manifest, generated lockfile artifact, formatting, conformance tests and warnings-denied Clippy gates.
+
+The independent implementation deliberately reuses the REA Evidence identity verifier and JCS canonicalization primitive. It is independent at the claim scope/disposition/replay implementation level, not a second cryptographic primitive or canonicalizer. The new verifier's exact-head workflow is queued/in progress in this draft; no replay tests or Clippy result are claimed as passing yet.
+
+### Additional finite-oracle gates
+
+The public seed corpus now explicitly covers:
+- provider-observation support and refutation;
+- JCS numeric equivalence and numeric near-miss;
+- same-scope contradiction preservation;
+- wrong subject/operation and unrepresented platform version;
+- missing Evidence and unimplemented authenticity;
+- unsupported assumptions;
+- forged disposition even after recomputing an unkeyed derivation digest;
+- changed falsification condition with an old result;
+- duplicate raw JSON keys, omitted nullable fields, unknown fields and version drift;
+- duplicate/unrequested Evidence inputs;
+- malformed, duplicate, unrequested and conflicting result Evidence references;
+- CLI output and stable semantic-match/mismatch exit distinctions.
+
+The frozen public seed is a conformance floor, not a broad population estimate. A hidden holdout and external adjudication are still required before making claims about real-world agent reliability.
