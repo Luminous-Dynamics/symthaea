@@ -242,7 +242,7 @@
         },
         "intervention_kind": {
           "enum": [
-            "optogenetic",
+            "OPTOGENETIC",
             "ELECTRICAL",
             "PHARMACOLOGICAL",
             "SENSORY",
