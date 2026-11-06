@@ -258,7 +258,16 @@
           "why_spec_derived": "This composes object safety, Send, lifetime and error requirements."
         }
       ],
-      "unresolved_before_fixture": "Freeze the public trait signature, executor, macro dependency policy, MSRV, target triples, object-safety form and permitted lifetime relationships."
+      "unresolved_before_fixture": "Freeze the public trait signature, executor, macro dependency policy, MSRV, target triples, object-safety form and permitted lifetime relationships.",
+      "source_fixture": {
+        "path": "benchmarks/ceb/public-development-fixtures/rust-async-trait-boundary-v0/",
+        "status": "public_source_only_not_compiled_or_executed",
+        "file_count": 8,
+        "has_cargo_lock": false,
+        "reference_patch_present": false,
+        "executable_oracle_present": false,
+        "task_manifest_present": false
+      }
     },
     {
       "candidate_key": "issue-reproduction",
@@ -725,6 +734,15 @@
       "status": "source_only_not_compiled_or_executed",
       "file_count": 10,
       "purpose": "Minimal four-crate workspace showing an internal typed parser, an exposed legacy Option adapter, a storage compatibility consumer and a CLI consumer to migrate.",
+      "admission_status": "not_admitted",
+      "holdout_eligible": false
+    },
+    {
+      "candidate_key": "trait-async",
+      "path": "benchmarks/ceb/public-development-fixtures/rust-async-trait-boundary-v0/",
+      "status": "public_source_only_not_compiled_or_executed",
+      "file_count": 8,
+      "purpose": "Minimal three-crate workspace exposing a borrowed boxed-future trait method and an erased trait-object consumer; the current future alias does not declare Send.",
       "admission_status": "not_admitted",
       "holdout_eligible": false
     }
