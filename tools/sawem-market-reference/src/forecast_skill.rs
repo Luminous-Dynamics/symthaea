@@ -51,6 +51,17 @@ impl ExactLossSkill {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PairedForecastLossDelta<'a> {
+    pub series_id: &'a str,
+    pub valid_period_start_utc: i64,
+    pub valid_period_end_utc: i64,
+    /// Baseline minus candidate. Positive means candidate has lower loss.
+    pub median_mae_improvement_minor_zar_per_mwh: i128,
+    /// Baseline minus candidate WIS numerator. Positive means candidate is better.
+    pub weighted_interval_improvement_numerator: i128,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ForecastSkillAssessment<'a> {
     pub evaluation_as_of_utc: i64,
@@ -75,6 +86,8 @@ pub struct ForecastSkillAssessment<'a> {
     pub pinball_denominator: i128,
     pub candidate_central_80_covered_count: u64,
     pub baseline_central_80_covered_count: u64,
+    /// Per-target paired loss differentials in candidate array order.
+    pub paired_loss_deltas: Vec<PairedForecastLossDelta<'a>>,
 }
 
 /// Exact relative improvement for lower-is-better losses.
@@ -98,6 +111,41 @@ fn exact_skill(candidate: u128, baseline: u128) -> Result<ExactLossSkill, Foreca
         improvement_numerator: improvement,
         baseline_loss_denominator: baseline,
     })
+}
+
+fn per_observation_wis_numerator(
+    observation: ForecastCalibrationObservation<'_>,
+) -> Result<u128, ForecastSkillError> {
+    let actual = i128::from(observation.realized_minor_zar_per_mwh);
+    let q10 = i128::from(observation.forecast_q10_minor_zar_per_mwh);
+    let q50 = i128::from(observation.forecast_q50_minor_zar_per_mwh);
+    let q90 = i128::from(observation.forecast_q90_minor_zar_per_mwh);
+    let median_error = (actual - q50)
+        .checked_abs()
+        .ok_or(ForecastSkillError::ArithmeticOverflow)?;
+    let interval_width = u128::try_from(q90 - q10)
+        .map_err(|_| ForecastSkillError::ArithmeticOverflow)?;
+    let outside_distance = if actual < q10 {
+        q10 - actual
+    } else if actual > q90 {
+        actual - q90
+    } else {
+        0
+    };
+    interval_width
+        .checked_add(
+            u128::try_from(outside_distance)
+                .map_err(|_| ForecastSkillError::ArithmeticOverflow)?
+                .checked_mul(10)
+                .ok_or(ForecastSkillError::ArithmeticOverflow)?,
+        )
+        .and_then(|interval_score| {
+            u128::try_from(median_error)
+                .ok()
+                .and_then(|error| error.checked_mul(5))
+                .and_then(|weighted_median| interval_score.checked_add(weighted_median))
+        })
+        .ok_or(ForecastSkillError::ArithmeticOverflow)
 }
 
 /// Compare candidate and baseline quantile forecasts on an exact paired target
@@ -127,6 +175,7 @@ pub fn compare_forecast_skill<'a>(
         return Err(ForecastSkillError::ModelIdentityNotDistinct);
     }
 
+    let mut paired_loss_deltas = Vec::with_capacity(candidate.len());
     for (index, item) in candidate.iter().copied().enumerate() {
         if candidate[..index].iter().any(|previous| {
             previous.series_id == item.series_id
@@ -159,6 +208,36 @@ pub fn compare_forecast_skill<'a>(
         {
             return Err(ForecastSkillError::RealizedOutcomeMismatch);
         }
+
+        let actual = i128::from(item.realized_minor_zar_per_mwh);
+        let candidate_q50 = i128::from(item.forecast_q50_minor_zar_per_mwh);
+        let baseline_q50 = i128::from(other.forecast_q50_minor_zar_per_mwh);
+        let candidate_abs_error = (actual - candidate_q50)
+            .checked_abs()
+            .ok_or(ForecastSkillError::ArithmeticOverflow)?;
+        let baseline_abs_error = (actual - baseline_q50)
+            .checked_abs()
+            .ok_or(ForecastSkillError::ArithmeticOverflow)?;
+
+        let candidate_wis = per_observation_wis_numerator(item)?;
+        let baseline_wis = per_observation_wis_numerator(other)?;
+        let mae_improvement = baseline_abs_error
+            .checked_sub(candidate_abs_error)
+            .ok_or(ForecastSkillError::ArithmeticOverflow)?;
+        let wis_improvement = i128::try_from(baseline_wis)
+            .map_err(|_| ForecastSkillError::ArithmeticOverflow)?
+            .checked_sub(
+                i128::try_from(candidate_wis)
+                    .map_err(|_| ForecastSkillError::ArithmeticOverflow)?,
+            )
+            .ok_or(ForecastSkillError::ArithmeticOverflow)?;
+        paired_loss_deltas.push(PairedForecastLossDelta {
+            series_id: item.series_id,
+            valid_period_start_utc: item.valid_period_start_utc,
+            valid_period_end_utc: item.valid_period_end_utc,
+            median_mae_improvement_minor_zar_per_mwh: mae_improvement,
+            weighted_interval_improvement_numerator: wis_improvement,
+        });
     }
 
     for item in baseline {
@@ -215,6 +294,7 @@ pub fn compare_forecast_skill<'a>(
         pinball_denominator: candidate_metrics.pinball_denominator,
         candidate_central_80_covered_count: candidate_metrics.central_80_covered_count,
         baseline_central_80_covered_count: baseline_metrics.central_80_covered_count,
+        paired_loss_deltas,
     })
 }
 
