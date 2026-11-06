@@ -597,7 +597,7 @@ mod tests {
             corpus_snapshot_sha256: digest('a'),
             search_surface_sha256: digest('b'),
             route_policy_sha256: digest('c'),
-            surface_state: SearchSurfaceStateV1::FrozenObserved,
+            surface_state: SearchSurfaceStateV1::CompleteFrozenInventory,
             start_node_ref: "state:start".to_string(),
             max_route_cost: 8,
             budget_unit: "synthetic_action_credit".to_string(),
