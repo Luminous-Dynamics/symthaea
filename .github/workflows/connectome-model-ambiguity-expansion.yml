@@ -1,0 +1,79 @@
+name: Connectome model ambiguity set expansion
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_MODEL_AMBIGUITY_EXPANSION_V1.md"
+      - "docs/neuroscience/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_BASE.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANDED.example.json"
+      - "docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.schema.json"
+      - "tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_model_ambiguity_expansion_oracle.py"
+      - ".github/workflows/connectome-model-ambiguity-expansion.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_MODEL_AMBIGUITY_EXPANSION_V1.md"
+      - "docs/neuroscience/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_BASE.example.json"
+      - "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANDED.example.json"
+      - "docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.schema.json"
+      - "tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py"
+      - "tools/connectomics-intake-audit/reference/verify_model_ambiguity_expansion_oracle.py"
+      - ".github/workflows/connectome-model-ambiguity-expansion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-append-only-model-expansion:
+    name: Verify robust-risk and certificate monotonicity
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact event commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate both sequential inputs and the challenge binding
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_STATIC_MODEL_SEQUENTIAL_INTERVENTION.schema.json").read_text())
+          binding_schema = json.loads(Path("docs/neuroscience/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.schema.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator.check_schema(binding_schema)
+          for path in (
+              "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_BASE.example.json",
+              "docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANDED.example.json",
+          ):
+              Draft202012Validator(schema).validate(json.loads(Path(path).read_text()))
+          binding = json.loads(Path("docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.example.json").read_text())
+          Draft202012Validator(binding_schema).validate(binding)
+          assert binding["base_model_vertex_ids"] == ["MODEL-A", "MODEL-B"]
+          assert binding["expanded_model_vertex_ids"] == ["MODEL-A", "MODEL-B", "MODEL-C"]
+          print("sequential policy inputs and append-only binding schemas: PASS")
+          PY
+      - name: Recompute exact base/expanded optima and monotonicity
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_model_ambiguity_expansion_oracle.py
+          python3 tools/connectomics-intake-audit/reference/verify_model_ambiguity_expansion_oracle.py \
+            --base-input docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_BASE.example.json \
+            --expanded-input docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANDED.example.json \
+            --binding docs/neuroscience/examples/CONNECTOME_MODEL_AMBIGUITY_EXPANSION.example.json \
+            --sequential-oracle tools/connectomics-intake-audit/reference/verify_static_model_sequential_policy_oracle.py \
+            --report "$RUNNER_TEMP/model-ambiguity-expansion-receipt.json"
+          python3 -m json.tool "$RUNNER_TEMP/model-ambiguity-expansion-receipt.json" > /dev/null
+          sha256sum "$RUNNER_TEMP/model-ambiguity-expansion-receipt.json"
