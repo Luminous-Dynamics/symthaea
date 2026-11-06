@@ -247,12 +247,27 @@ fn native_group_id(target: &CfCWeightGroupId) -> CfCParameterGroupId {
 
 
 /// One frozen functional probe used to construct hidden-unit activation signatures.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CfCFunctionalProbe {
     /// Input vector for one CfC time step.
     pub input: Vec<f32>,
     /// Elapsed time for this step.
     pub dt: f32,
+}
+
+/// Activation signatures bound to one model fingerprint and one ordered probe set.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCActivationSignatureSet {
+    /// Schema version for serialized signature receipts.
+    pub format_version: u32,
+    /// Native model fingerprint from which these signatures were measured.
+    pub model_digest: String,
+    /// Digest of the ordered elapsed-time/input probe sequence.
+    pub probe_digest: String,
+    /// Layer whose hidden units were measured.
+    pub layer_index: usize,
+    /// Signatures indexed by hidden unit then probe index.
+    pub signatures: Vec<Vec<f64>>,
 }
 
 /// Activation signatures for one layer, indexed by hidden unit then probe index.
@@ -263,7 +278,7 @@ pub fn cfc_hidden_unit_activation_signatures(
     network: &CfCNetwork,
     layer_index: usize,
     probes: &[CfCFunctionalProbe],
-) -> Result<Vec<Vec<f64>>, CfCPermutationAlignmentError> {
+) -> Result<CfCActivationSignatureSet, CfCPermutationAlignmentError> {
     if probes.is_empty() {
         return Err(CfCPermutationAlignmentError::EmptyProbeSet);
     }
@@ -273,6 +288,12 @@ pub fn cfc_hidden_unit_activation_signatures(
             layer_count: network.config().num_layers,
         });
     }
+
+    let model_digest = network
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?
+        .model_digest;
+    let probe_digest = cfc_probe_set_digest(layer_index, probes);
 
     let mut evaluation = network.clone();
     evaluation.reset();
@@ -321,12 +342,43 @@ pub fn cfc_hidden_unit_activation_signatures(
         }
     }
 
-    Ok(signatures)
+    Ok(CfCActivationSignatureSet {
+        format_version: 1,
+        model_digest,
+        probe_digest,
+        layer_index,
+        signatures,
+    })
+}
+
+fn cfc_probe_set_digest(layer_index: usize, probes: &[CfCFunctionalProbe]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"symthaea-cfc-functional-probes-v1\\0");
+    hasher.update(&(layer_index as u64).to_le_bytes());
+    hasher.update(&(probes.len() as u64).to_le_bytes());
+    for probe in probes {
+        hasher.update(&(probe.input.len() as u64).to_le_bytes());
+        for value in &probe.input {
+            hasher.update(&value.to_le_bytes());
+        }
+        hasher.update(&probe.dt.to_le_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
 }
 
 /// Result of matching source hidden units to candidate hidden units by probes.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CfCHiddenUnitAlignment {
+    /// Schema version for serialized alignment receipts.
+    pub format_version: u32,
+    /// Source model fingerprint to which the mapping is bound.
+    pub source_model_digest: String,
+    /// Candidate model fingerprint to which the mapping is bound.
+    pub candidate_model_digest: String,
+    /// Ordered functional probe-set digest used for this alignment.
+    pub probe_digest: String,
+    /// Layer whose units were matched.
+    pub layer_index: usize,
     /// For each source unit, the index of its corresponding candidate unit.
     pub source_to_candidate: Vec<usize>,
     /// Mean squared activation-signature error across all matched units/probes.
@@ -364,6 +416,12 @@ pub enum CfCPermutationAlignmentError {
     },
     #[error("no finite complete hidden-unit assignment exists")]
     NoFeasibleAssignment,
+    #[error("source and candidate probe digests differ: {source} vs {candidate}")]
+    ProbeSetMismatch { source: String, candidate: String },
+    #[error("source and candidate layer indices differ: {source} vs {candidate}")]
+    LayerMismatch { source: usize, candidate: usize },
+    #[error("CfC fingerprint failed while binding activation signatures: {0}")]
+    FingerprintFailed(String),
     #[error("at least one functional probe is required")]
     EmptyProbeSet,
     #[error("layer index {layer_index} is outside 0..{layer_count}")]
@@ -399,9 +457,27 @@ pub enum CfCPermutationAlignmentError {
 /// total mean-squared activation-signature distance with a deterministic
 /// Hungarian assignment. The global assignment margin exposes ambiguity.
 pub fn align_cfc_hidden_unit_signatures(
-    source_signatures: &[Vec<f64>],
-    candidate_signatures: &[Vec<f64>],
+    source_signature_set: &CfCActivationSignatureSet,
+    candidate_signature_set: &CfCActivationSignatureSet,
 ) -> Result<CfCHiddenUnitAlignment, CfCPermutationAlignmentError> {
+    if source_signature_set.format_version != 1 || candidate_signature_set.format_version != 1 {
+        return Err(CfCPermutationAlignmentError::NoFeasibleAssignment);
+    }
+    if source_signature_set.probe_digest != candidate_signature_set.probe_digest {
+        return Err(CfCPermutationAlignmentError::ProbeSetMismatch {
+            source: source_signature_set.probe_digest.clone(),
+            candidate: candidate_signature_set.probe_digest.clone(),
+        });
+    }
+    if source_signature_set.layer_index != candidate_signature_set.layer_index {
+        return Err(CfCPermutationAlignmentError::LayerMismatch {
+            source: source_signature_set.layer_index,
+            candidate: candidate_signature_set.layer_index,
+        });
+    }
+    let source_signatures = &source_signature_set.signatures;
+    let candidate_signatures = &candidate_signature_set.signatures;
+
     if source_signatures.is_empty() {
         return Err(CfCPermutationAlignmentError::EmptyHiddenUnitSet);
     }
@@ -467,6 +543,11 @@ pub fn align_cfc_hidden_unit_signatures(
         alternating_cycle_assignment_margin(&costs, &source_to_candidate);
 
     Ok(CfCHiddenUnitAlignment {
+        format_version: 1,
+        source_model_digest: source_signature_set.model_digest.clone(),
+        candidate_model_digest: candidate_signature_set.model_digest.clone(),
+        probe_digest: source_signature_set.probe_digest.clone(),
+        layer_index: source_signature_set.layer_index,
         source_to_candidate,
         mean_squared_activation_error: best_total_cost / unit_count as f64,
         minimum_assignment_margin,
