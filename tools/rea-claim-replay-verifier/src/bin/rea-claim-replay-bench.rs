@@ -51,9 +51,10 @@ fn build_scenario(evidence_count: usize, padding_bytes: usize) -> Scenario {
         value["provider"]["id"] = json!(format!("benchmark-provider-{index}"));
         value["provider"]["name"] = json!(format!("Benchmark Provider {index}"));
         value["analysis_profile"]["provider"] = value["provider"].clone();
-        value["analysis_profile"]["digest"] =
-            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"])
-                .expect("analysis profile digest"));
+        value["analysis_profile"]["digest"] = json!(
+            rea_compat::analysis_profile_digest(&value["analysis_profile"])
+                .expect("analysis profile digest")
+        );
 
         if padding_bytes == 0 {
             value["raw_result"] = Value::Null;
@@ -163,11 +164,7 @@ fn distribution(samples: &[u128]) -> Value {
     })
 }
 
-fn run_scenario(
-    evidence_count: usize,
-    padding_bytes: usize,
-    sample_count: usize,
-) -> Value {
+fn run_scenario(evidence_count: usize, padding_bytes: usize, sample_count: usize) -> Value {
     let scenario = build_scenario(evidence_count, padding_bytes);
     let evidence_refs: Vec<&[u8]> = scenario
         .evidence_bytes
