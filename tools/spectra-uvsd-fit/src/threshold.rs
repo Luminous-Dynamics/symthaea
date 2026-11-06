@@ -285,6 +285,54 @@ mod tests {
     }
 
     #[test]
+    fn classifications_form_a_disjoint_complete_partition_on_deterministic_corpus() {
+        let mut state = 0x5eed_u64;
+        let mut next_unit = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 11) as f64 / ((1_u64 << 53) as f64)
+        };
+
+        for _campaign in 0..256 {
+            let threshold = 2.0 * next_unit() - 1.0;
+            let mut intervals = Vec::with_capacity(32);
+            for action_id in 0..32 {
+                let first = 2.0 * next_unit() - 1.0;
+                let second = 2.0 * next_unit() - 1.0;
+                intervals.push(interval(
+                    action_id,
+                    first.min(second),
+                    first.max(second),
+                ));
+            }
+
+            let result = classify_robust_threshold(&intervals, threshold).unwrap();
+            let partition_size = result.certified_good_action_ids.len()
+                + result.certified_below_threshold_action_ids.len()
+                + result.unresolved_action_ids.len();
+            assert_eq!(partition_size, intervals.len());
+
+            let mut partition_ids = result.certified_good_action_ids.clone();
+            partition_ids.extend(result.certified_below_threshold_action_ids.iter().copied());
+            partition_ids.extend(result.unresolved_action_ids.iter().copied());
+            partition_ids.sort_unstable();
+            partition_ids.dedup();
+            assert_eq!(partition_ids.len(), intervals.len());
+            assert_eq!(partition_ids, (0_u32..32).collect::<Vec<_>>());
+
+            let expected_disposition = if !result.certified_good_action_ids.is_empty() {
+                ThresholdFamilyDisposition::GoodCandidateSetFound
+            } else if result.unresolved_action_ids.is_empty() {
+                ThresholdFamilyDisposition::CertifiedNoGoodCandidate
+            } else {
+                ThresholdFamilyDisposition::NotEstablishedAtBudget
+            };
+            assert_eq!(result.disposition, expected_disposition);
+        }
+    }
+
+    #[test]
     fn rejects_empty_duplicate_non_finite_and_inverted_inputs() {
         assert_eq!(
             classify_robust_threshold(&[], 0.5),
