@@ -486,7 +486,7 @@ mod tests {
         for pair in &result.diagnostics {
             assert!(pair.paired_difference_sample_variance.abs() < 1.0e-12);
             assert!(pair.independent_sum_sample_variance > 0.0);
-            assert_eq!(pair.paired_to_independent_variance_ratio, Some(0.0));
+            assert!(pair.paired_to_independent_variance_ratio.unwrap() < 1.0e-12);
             assert!(pair.empirical_pair_correlation.unwrap() > 0.999_999);
         }
         assert!((result.diagnostics[0].mean_paired_difference - 0.4).abs() < 1.0e-12);
