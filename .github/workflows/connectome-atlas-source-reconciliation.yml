@@ -1,0 +1,53 @@
+name: Connectome atlas source reconciliation contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_ATLAS_SOURCE_RECONCILIATION_V1.md"
+      - "docs/neuroscience/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_connectome_atlas_source_reconciliation.py"
+      - ".github/workflows/connectome-atlas-source-reconciliation.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_ATLAS_SOURCE_RECONCILIATION_V1.md"
+      - "docs/neuroscience/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_connectome_atlas_source_reconciliation.py"
+      - ".github/workflows/connectome-atlas-source-reconciliation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-atlas-source-reconciliation:
+    name: Validate source manifest and reproduction-tier claim ceiling
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 source manifest
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          print("Draft 2020-12 atlas source-reconciliation schema: PASS")
+          PY
+      - name: Run independent reproduction-tier oracle and adversarial controls
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_connectome_atlas_source_reconciliation.py
+          python3 tools/connectomics-intake-audit/reference/verify_connectome_atlas_source_reconciliation.py \
+            --input docs/neuroscience/examples/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.example.json \
+            --self-test

@@ -1,0 +1,776 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_ATLAS_SOURCE_RECONCILIATION.schema.json",
+  "title": "C. elegans signal-propagation atlas source reconciliation audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "audit_id",
+    "claim_scope",
+    "paper",
+    "dandi_release",
+    "osf_release",
+    "code_repositories",
+    "evidence_components",
+    "reproduction_evidence",
+    "independent_audit_leads",
+    "declared_reproduction_tier"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "audit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "metadata_inventory",
+        "source_reconciliation",
+        "paper_source_data_reproduction",
+        "full_raw_reproduction"
+      ]
+    },
+    "paper": {
+      "$ref": "#/$defs/paper"
+    },
+    "dandi_release": {
+      "$ref": "#/$defs/dandi"
+    },
+    "osf_release": {
+      "$ref": "#/$defs/osf"
+    },
+    "code_repositories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/code_repository"
+      }
+    },
+    "evidence_components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/evidence_component"
+      }
+    },
+    "reproduction_evidence": {
+      "$ref": "#/$defs/reproduction_evidence"
+    },
+    "independent_audit_leads": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/audit_lead"
+      }
+    },
+    "declared_reproduction_tier": {
+      "enum": [
+        "FULL_RAW_REPRODUCED",
+        "PAPER_SOURCE_DATA_REPRODUCED",
+        "PARTIAL_RESPONSE_REANALYSIS",
+        "METADATA_ONLY",
+        "NOT_REPRODUCIBLE"
+      ]
+    }
+  },
+  "$defs": {
+    "paper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "doi",
+        "publication_date",
+        "source_data_url"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "doi": {
+          "const": "10.1038/s41586-023-06683-4"
+        },
+        "publication_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "source_data_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "dandi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dandiset_id",
+        "version",
+        "doi",
+        "metadata_url",
+        "asset_manifest_url",
+        "declared_asset_count",
+        "declared_total_size",
+        "subject_count",
+        "data_standard",
+        "license",
+        "open_access",
+        "inventory_state",
+        "inventory_manifest_sha256",
+        "materialized_asset_count"
+      ],
+      "properties": {
+        "dandiset_id": {
+          "const": "001075"
+        },
+        "version": {
+          "const": "0.240930.1859"
+        },
+        "doi": {
+          "const": "10.48324/dandi.001075/0.240930.1859"
+        },
+        "metadata_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "asset_manifest_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "declared_asset_count": {
+          "const": 223
+        },
+        "declared_total_size": {
+          "const": "4.1 TB"
+        },
+        "subject_count": {
+          "const": 113
+        },
+        "data_standard": {
+          "const": "NWB"
+        },
+        "license": {
+          "const": "CC-BY-4.0"
+        },
+        "open_access": {
+          "const": true
+        },
+        "inventory_state": {
+          "enum": [
+            "REMOTE_METADATA_ONLY",
+            "MATERIALIZED_HASHED",
+            "VERIFIED_EXACT"
+          ]
+        },
+        "inventory_manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "materialized_asset_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 223
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "inventory_state": {
+                "const": "REMOTE_METADATA_ONLY"
+              }
+            },
+            "required": [
+              "inventory_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inventory_manifest_sha256": {
+                "type": "null"
+              },
+              "materialized_asset_count": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "inventory_state": {
+                "enum": [
+                  "MATERIALIZED_HASHED",
+                  "VERIFIED_EXACT"
+                ]
+              }
+            },
+            "required": [
+              "inventory_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inventory_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "materialized_asset_count": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "osf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "doi",
+        "project_id",
+        "metadata_url",
+        "inventory_state",
+        "inventory_manifest_sha256",
+        "artifact_records"
+      ],
+      "properties": {
+        "doi": {
+          "const": "10.17605/OSF.IO/E2SYT"
+        },
+        "project_id": {
+          "const": "E2SYT"
+        },
+        "metadata_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "inventory_state": {
+          "enum": [
+            "NOT_YET_ASSESSED",
+            "REMOTE_METADATA_ONLY",
+            "MATERIALIZED_HASHED",
+            "VERIFIED_EXACT"
+          ]
+        },
+        "inventory_manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/osf_artifact"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "inventory_state": {
+                "enum": [
+                  "NOT_YET_ASSESSED",
+                  "REMOTE_METADATA_ONLY"
+                ]
+              }
+            },
+            "required": [
+              "inventory_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inventory_manifest_sha256": {
+                "type": "null"
+              },
+              "artifact_records": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "inventory_state": {
+                "enum": [
+                  "MATERIALIZED_HASHED",
+                  "VERIFIED_EXACT"
+                ]
+              }
+            },
+            "required": [
+              "inventory_state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "inventory_manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "artifact_records": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "osf_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "path",
+        "artifact_kind",
+        "availability",
+        "sha256"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_kind": {
+          "enum": [
+            "WT_EXPORT",
+            "UNC31_EXPORT",
+            "NULL_CONTROL",
+            "SOURCE_DATA_TABLE",
+            "SUPPLEMENTARY",
+            "OTHER"
+          ]
+        },
+        "availability": {
+          "enum": [
+            "REMOTE_ONLY",
+            "MATERIALIZED_HASHED",
+            "NOT_FOUND_AFTER_DECLARED_SEARCH",
+            "NOT_YET_ASSESSED"
+          ]
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "code_repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_id",
+        "url",
+        "revision_status",
+        "commit_sha",
+        "license",
+        "observed_ref"
+      ],
+      "properties": {
+        "repository_id": {
+          "enum": [
+            "pumpprobe",
+            "wormdatamodel",
+            "wormbrain",
+            "leifer-lab-to-nwb",
+            "other",
+            "mistofrutta"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision_status": {
+          "enum": [
+            "UNPINNED",
+            "COMMIT_PINNED"
+          ]
+        },
+        "commit_sha": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "license": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observed_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "revision_status": {
+                "const": "UNPINNED"
+              }
+            },
+            "required": [
+              "revision_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_sha": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "revision_status": {
+                "const": "COMMIT_PINNED"
+              }
+            },
+            "required": [
+              "revision_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "commit_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "evidence_component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_id",
+        "description",
+        "availability",
+        "source_id",
+        "content_sha256"
+      ],
+      "properties": {
+        "component_id": {
+          "enum": [
+            "STIMULATED_RAW_RECORDINGS",
+            "PROCESSED_TRACES",
+            "SEGMENTATION_AND_ROI_LABELS",
+            "STIMULATION_EVENT_TABLES",
+            "NEURON_IDENTITY_MAP",
+            "EVENT_EXCLUSION_FLAGS",
+            "UNSTIMULATED_NULL_CONTROLS",
+            "PAPER_Q_SOURCE_TABLE",
+            "PAPER_QEQ_SOURCE_TABLE",
+            "ANALYSIS_METHOD_AND_PARAMETERS",
+            "OTHER"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "availability": {
+          "enum": [
+            "NOT_YET_ASSESSED",
+            "REMOTE_METADATA_ONLY",
+            "SOURCE_TABLE_AVAILABLE",
+            "MATERIALIZED_AND_HASHED",
+            "NOT_FOUND_AFTER_DECLARED_SEARCH",
+            "NOT_PUBLICLY_ACCESSIBLE"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "const": "MATERIALIZED_AND_HASHED"
+              }
+            },
+            "required": [
+              "availability"
+            ]
+          },
+          "then": {
+            "properties": {
+              "content_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "enum": [
+                  "NOT_YET_ASSESSED",
+                  "REMOTE_METADATA_ONLY",
+                  "NOT_FOUND_AFTER_DECLARED_SEARCH",
+                  "NOT_PUBLICLY_ACCESSIBLE"
+                ]
+              }
+            },
+            "required": [
+              "availability"
+            ]
+          },
+          "then": {
+            "properties": {
+              "content_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reproduction_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_exclusion_lineage_complete",
+        "neuron_identity_lineage_complete",
+        "paper_source_tables_verified",
+        "paper_source_tables_sha256",
+        "analysis_code_commit_sha",
+        "q_method_reproduced",
+        "qeq_method_reproduced",
+        "qeq_epsilon_sigma"
+      ],
+      "properties": {
+        "event_exclusion_lineage_complete": {
+          "type": "boolean"
+        },
+        "neuron_identity_lineage_complete": {
+          "type": "boolean"
+        },
+        "paper_source_tables_verified": {
+          "type": "boolean"
+        },
+        "paper_source_tables_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "analysis_code_commit_sha": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "q_method_reproduced": {
+          "type": "boolean"
+        },
+        "qeq_method_reproduced": {
+          "type": "boolean"
+        },
+        "qeq_epsilon_sigma": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "paper_source_tables_verified": {
+                "const": true
+              }
+            },
+            "required": [
+              "paper_source_tables_verified"
+            ]
+          },
+          "then": {
+            "properties": {
+              "paper_source_tables_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "paper_source_tables_verified": {
+                "const": false
+              }
+            },
+            "required": [
+              "paper_source_tables_verified"
+            ]
+          },
+          "then": {
+            "properties": {
+              "paper_source_tables_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "audit_lead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lead_id",
+        "source_url",
+        "claim",
+        "status",
+        "verification_receipt_sha256"
+      ],
+      "properties": {
+        "lead_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "UNVERIFIED_LEAD",
+            "VERIFIED",
+            "DISPUTED"
+          ]
+        },
+        "verification_receipt_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "UNVERIFIED_LEAD"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verification_receipt_sha256": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "VERIFIED",
+                  "DISPUTED"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verification_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
