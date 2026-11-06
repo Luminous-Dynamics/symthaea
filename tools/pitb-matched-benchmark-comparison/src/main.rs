@@ -1001,11 +1001,31 @@ fn run_self_tests() -> Result<(), String> {
 fn parse_args(args: &[String]) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     if args.len() != 5 || args[1] != "--compare" {
         return Err(format!(
-            "usage: {} --compare <cohort.json> <run-results.jsonl> <report.json> OR --self-test",
+            "usage: {} --compare <cohort.json> <run-results.jsonl> <report.json> OR --self-test OR --self-test-fixtures <cohort.json> <run-results.jsonl>",
             args.first().map(String::as_str).unwrap_or("pitb-matched-benchmark-comparison")
         ));
     }
     Ok((PathBuf::from(&args[2]), PathBuf::from(&args[3]), PathBuf::from(&args[4])))
+}
+
+fn write_synthetic_fixtures(cohort_path: &PathBuf, results_path: &PathBuf) -> Result<(), String> {
+    let cohort = synthetic_cohort();
+    let rows = synthetic_rows(&cohort);
+    let cohort_bytes = serde_json::to_vec_pretty(&cohort)
+        .map_err(|e| format!("serialize synthetic cohort: {e}"))?;
+    fs::write(cohort_path, cohort_bytes)
+        .map_err(|e| format!("write synthetic cohort: {e}"))?;
+    let mut jsonl = Vec::new();
+    for row in &rows {
+        jsonl.extend(
+            serde_json::to_vec(row)
+                .map_err(|e| format!("serialize synthetic run row: {e}"))?,
+        );
+        jsonl.push(b'\n');
+    }
+    fs::write(results_path, jsonl)
+        .map_err(|e| format!("write synthetic run JSONL: {e}"))?;
+    Ok(())
 }
 
 fn execute() -> Result<(), String> {
@@ -1013,6 +1033,12 @@ fn execute() -> Result<(), String> {
     if args.len() == 2 && args[1] == "--self-test" {
         run_self_tests()?;
         println!("PITB_MATCHED_BENCHMARK_COMPARISON_SELF_TEST_PASS");
+        return Ok(());
+    }
+    if args.len() == 4 && args[1] == "--self-test-fixtures" {
+        run_self_tests()?;
+        write_synthetic_fixtures(&PathBuf::from(&args[2]), &PathBuf::from(&args[3]))?;
+        println!("PITB_MATCHED_BENCHMARK_COMPARISON_FIXTURES_OK");
         return Ok(());
     }
     let (cohort_path, results_path, report_path) = parse_args(&args)?;
