@@ -31,27 +31,9 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
-/// A finite SI energy value expressed in joules.
-///
-/// This unit-bearing wrapper keeps physical energy distinct from dimensionless
-/// model costs, information quantities and raw operation counts.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct PhysicalEnergyJoules(f64);
-
-impl PhysicalEnergyJoules {
-    /// Construct a finite energy value in joules.
-    pub fn new(value_j: f64) -> Option<Self> {
-        value_j.is_finite().then_some(Self(value_j))
-    }
-
-    /// Return the numeric value in joules.
-    pub const fn get(self) -> f64 {
-        self.0
-    }
-}
-
 #[path = "landauer_erasure.rs"]
 mod landauer_erasure;
+pub use landauer_erasure::PhysicalEnergyJoules;
 
 /// Thermodynamic state
 #[derive(Debug, Clone)]
@@ -175,7 +157,6 @@ impl ThermoEncoder {
         temperature_k: f64,
     ) -> Option<PhysicalEnergyJoules> {
         landauer_erasure::erasure_heat_floor_j(bits_erased, temperature_k, K_BOLTZMANN)
-            .and_then(PhysicalEnergyJoules::new)
     }
 
     /// Legacy one-bit Landauer reference: k_B * T * ln(2).
