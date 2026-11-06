@@ -8,7 +8,7 @@
 //!
 //! ## Capabilities
 //!
-//! - **Propositional logic**: equivalence-preserving CNF conversion, DPLL SAT solver
+//! - **Propositional logic**: equivalence-preserving CNF, linear-size Tseitin encoding, DPLL SAT solver
 //! - **Truth table**: evaluation, tautology/contradiction detection
 //! - **Natural deduction**: Modus Ponens, Modus Tollens, hypothetical syllogism
 //! - **First-order logic**: unification (Robinson's algorithm), resolution prover
@@ -44,6 +44,260 @@ pub enum Proposition {
     True,
     /// Falsity constant
     False,
+}
+
+/// Linear-size CNF encoding of a propositional formula.
+///
+/// The clauses are equisatisfiable with the source formula. Each auxiliary
+/// variable is constrained to equal its corresponding subformula, so every
+/// satisfying assignment to the original variables has exactly one
+/// satisfying extension to the auxiliary variables. This unique-extension
+/// property is useful for exact model counting as well as decision solving.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TseitinEncoding {
+    /// CNF clauses. No clauses means TRUE; one empty clause means FALSE.
+    pub clauses: Vec<Vec<(String, bool)>>,
+    /// Original proposition variables, sorted deterministically.
+    pub original_variables: Vec<String>,
+    /// Fresh auxiliary variables introduced by the encoding.
+    pub auxiliary_variables: Vec<String>,
+}
+
+impl TseitinEncoding {
+    /// Check a complete assignment against the generated CNF.
+    ///
+    /// Missing variables are interpreted as false, matching
+    /// Proposition::evaluate.
+    pub fn is_satisfied_by(&self, assignment: &HashMap<String, bool>) -> bool {
+        self.clauses.iter().all(|clause| {
+            clause.iter().any(|(variable, polarity)| {
+                assignment.get(variable).copied().unwrap_or(false) == *polarity
+            })
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TseitinNode {
+    Constant(bool),
+    Literal(String, bool),
+}
+
+impl TseitinNode {
+    fn negate(self) -> Self {
+        match self {
+            Self::Constant(value) => Self::Constant(!value),
+            Self::Literal(variable, polarity) => Self::Literal(variable, !polarity),
+        }
+    }
+
+    fn as_literal(&self) -> Option<(String, bool)> {
+        match self {
+            Self::Literal(variable, polarity) => Some((variable.clone(), *polarity)),
+            Self::Constant(_) => None,
+        }
+    }
+
+    fn is_complement_of(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::Literal(left_name, left_polarity), Self::Literal(right_name, right_polarity))
+                if left_name == right_name && left_polarity != right_polarity
+        )
+    }
+}
+
+/// Bottom-up Tseitin encoder. Each nontrivial compound subformula receives
+/// one fresh variable and a set of clauses defining it in both directions.
+struct TseitinEncoder {
+    clauses: Vec<Vec<(String, bool)>>,
+    auxiliary_variables: Vec<String>,
+    used_variables: HashSet<String>,
+    next_auxiliary: usize,
+}
+
+impl TseitinEncoder {
+    fn new(original_variables: HashSet<String>) -> Self {
+        Self {
+            clauses: Vec::new(),
+            auxiliary_variables: Vec::new(),
+            used_variables: original_variables,
+            next_auxiliary: 0,
+        }
+    }
+
+    fn fresh_auxiliary(&mut self) -> String {
+        loop {
+            let index = self.next_auxiliary;
+            self.next_auxiliary = self
+                .next_auxiliary
+                .checked_add(1)
+                .expect("Tseitin auxiliary-variable index overflow");
+            let candidate = format!("__symthaea_tseitin_{index}");
+            if self.used_variables.insert(candidate.clone()) {
+                self.auxiliary_variables.push(candidate.clone());
+                return candidate;
+            }
+        }
+    }
+
+    fn negate_literal(literal: &(String, bool)) -> (String, bool) {
+        (literal.0.clone(), !literal.1)
+    }
+
+    fn encode(&mut self, proposition: &Proposition) -> TseitinNode {
+        match proposition {
+            Proposition::Atom(name) => TseitinNode::Literal(name.clone(), true),
+            Proposition::Not(inner) => self.encode(inner).negate(),
+            Proposition::And(left, right) => {
+                let left = self.encode(left);
+                let right = self.encode(right);
+                self.make_and(left, right)
+            }
+            Proposition::Or(left, right) => {
+                let left = self.encode(left);
+                let right = self.encode(right);
+                self.make_or(left, right)
+            }
+            Proposition::Implies(left, right) => {
+                let left = self.encode(left).negate();
+                let right = self.encode(right);
+                self.make_or(left, right)
+            }
+            Proposition::Iff(left, right) => {
+                let left = self.encode(left);
+                let right = self.encode(right);
+                self.make_iff(left, right)
+            }
+            Proposition::True => TseitinNode::Constant(true),
+            Proposition::False => TseitinNode::Constant(false),
+        }
+    }
+
+    fn make_and(&mut self, left: TseitinNode, right: TseitinNode) -> TseitinNode {
+        match (&left, &right) {
+            (TseitinNode::Constant(false), _) | (_, TseitinNode::Constant(false)) => {
+                return TseitinNode::Constant(false);
+            }
+            (TseitinNode::Constant(true), _) => return right.clone(),
+            (_, TseitinNode::Constant(true)) => return left.clone(),
+            _ => {}
+        }
+        if left == right {
+            return left;
+        }
+        if left.is_complement_of(&right) {
+            return TseitinNode::Constant(false);
+        }
+
+        let left = left.as_literal().expect("nonconstant Tseitin node");
+        let right = right.as_literal().expect("nonconstant Tseitin node");
+        let auxiliary = self.fresh_auxiliary();
+        let positive_auxiliary = (auxiliary.clone(), true);
+        let negative_auxiliary = (auxiliary.clone(), false);
+
+        // z <-> (a AND b):
+        // (!z OR a) AND (!z OR b) AND (z OR !a OR !b).
+        self.clauses
+            .push(vec![negative_auxiliary.clone(), left.clone()]);
+        self.clauses
+            .push(vec![negative_auxiliary, right.clone()]);
+        self.clauses.push(vec![
+            positive_auxiliary,
+            Self::negate_literal(&left),
+            Self::negate_literal(&right),
+        ]);
+        TseitinNode::Literal(auxiliary, true)
+    }
+
+    fn make_or(&mut self, left: TseitinNode, right: TseitinNode) -> TseitinNode {
+        match (&left, &right) {
+            (TseitinNode::Constant(true), _) | (_, TseitinNode::Constant(true)) => {
+                return TseitinNode::Constant(true);
+            }
+            (TseitinNode::Constant(false), _) => return right.clone(),
+            (_, TseitinNode::Constant(false)) => return left.clone(),
+            _ => {}
+        }
+        if left == right {
+            return left;
+        }
+        if left.is_complement_of(&right) {
+            return TseitinNode::Constant(true);
+        }
+
+        let left = left.as_literal().expect("nonconstant Tseitin node");
+        let right = right.as_literal().expect("nonconstant Tseitin node");
+        let auxiliary = self.fresh_auxiliary();
+        let positive_auxiliary = (auxiliary.clone(), true);
+        let negative_auxiliary = (auxiliary.clone(), false);
+
+        // z <-> (a OR b):
+        // (z OR !a) AND (z OR !b) AND (!z OR a OR b).
+        self.clauses.push(vec![
+            positive_auxiliary.clone(),
+            Self::negate_literal(&left),
+        ]);
+        self.clauses
+            .push(vec![positive_auxiliary, Self::negate_literal(&right)]);
+        self.clauses
+            .push(vec![negative_auxiliary, left, right]);
+        TseitinNode::Literal(auxiliary, true)
+    }
+
+    fn make_iff(&mut self, left: TseitinNode, right: TseitinNode) -> TseitinNode {
+        match (&left, &right) {
+            (TseitinNode::Constant(left_value), TseitinNode::Constant(right_value)) => {
+                return TseitinNode::Constant(left_value == right_value);
+            }
+            (TseitinNode::Constant(true), _) | (_, TseitinNode::Constant(true)) => {
+                return match &left {
+                    TseitinNode::Constant(true) => right.clone(),
+                    _ => left.clone(),
+                };
+            }
+            (TseitinNode::Constant(false), _) => return right.clone().negate(),
+            (_, TseitinNode::Constant(false)) => return left.clone().negate(),
+            _ => {}
+        }
+        if left == right {
+            return TseitinNode::Constant(true);
+        }
+        if left.is_complement_of(&right) {
+            return TseitinNode::Constant(false);
+        }
+
+        let left = left.as_literal().expect("nonconstant Tseitin node");
+        let right = right.as_literal().expect("nonconstant Tseitin node");
+        let auxiliary = self.fresh_auxiliary();
+        let positive_auxiliary = (auxiliary.clone(), true);
+        let negative_auxiliary = (auxiliary.clone(), false);
+
+        // z <-> (a IFF b):
+        // (!a OR !b OR z) AND (a OR b OR z)
+        // AND (!a OR b OR !z) AND (a OR !b OR !z).
+        self.clauses.push(vec![
+            Self::negate_literal(&left),
+            Self::negate_literal(&right),
+            positive_auxiliary.clone(),
+        ]);
+        self.clauses.push(vec![
+            left.clone(),
+            right.clone(),
+            positive_auxiliary,
+        ]);
+        self.clauses.push(vec![
+            Self::negate_literal(&left),
+            right,
+            negative_auxiliary.clone(),
+        ]);
+        self.clauses.push(vec![
+            left,
+            Self::negate_literal(&right),
+            negative_auxiliary,
+        ]);
+        TseitinNode::Literal(auxiliary, true)
+    }
 }
 
 impl Proposition {
@@ -336,6 +590,38 @@ impl LogicEngine {
                 fwd.and(bwd)
             }
             _ => prop.clone(),
+        }
+    }
+
+    /// Convert a propositional formula to a linear-size Tseitin CNF.
+    ///
+    /// Unlike to_cnf, this does not distribute OR over AND and therefore
+    /// grows linearly with formula size. The returned CNF is equisatisfiable
+    /// with the source formula. Every auxiliary variable is constrained by
+    /// a biconditional definition, giving each assignment to the original
+    /// variables exactly one extension to the auxiliaries.
+    ///
+    /// The root is asserted: zero clauses represents TRUE and one empty
+    /// clause represents FALSE. Original and auxiliary variables are listed
+    /// separately so callers can project models back to the source formula.
+    pub fn to_tseitin_cnf(prop: &Proposition) -> TseitinEncoding {
+        let mut original_variables: Vec<String> = prop.variables().into_iter().collect();
+        original_variables.sort();
+
+        let mut encoder = TseitinEncoder::new(original_variables.iter().cloned().collect());
+        let root = encoder.encode(prop);
+        match root {
+            TseitinNode::Constant(true) => {}
+            TseitinNode::Constant(false) => encoder.clauses.push(Vec::new()),
+            TseitinNode::Literal(variable, polarity) => {
+                encoder.clauses.push(vec![(variable, polarity)]);
+            }
+        }
+
+        TseitinEncoding {
+            clauses: Self::normalize_cnf(encoder.clauses),
+            original_variables,
+            auxiliary_variables: encoder.auxiliary_variables,
         }
     }
 
@@ -1966,6 +2252,167 @@ mod tests {
         assert_eq!(
             LogicEngine::to_cnf(&p_and_tautology),
             vec![vec![("p".to_string(), true)]]
+        );
+    }
+
+    fn assert_tseitin_unique_extension(formula: &Proposition, variables: &[&str]) {
+        let encoding = LogicEngine::to_tseitin_cnf(formula);
+        let mut expected_variables: Vec<String> =
+            formula.variables().into_iter().collect();
+        expected_variables.sort();
+        assert_eq!(encoding.original_variables, expected_variables);
+
+        let auxiliary_count = encoding.auxiliary_variables.len();
+        assert!(
+            auxiliary_count < usize::BITS as usize,
+            "test formula unexpectedly produced too many auxiliary variables"
+        );
+
+        for original_mask in 0usize..(1usize << variables.len()) {
+            let original_assignment: HashMap<String, bool> = variables
+                .iter()
+                .enumerate()
+                .map(|(index, name)| ((*name).to_string(), (original_mask & (1 << index)) != 0))
+                .collect();
+            let expected = formula.evaluate(&original_assignment);
+            let mut satisfying_extensions = 0usize;
+
+            for auxiliary_mask in 0usize..(1usize << auxiliary_count) {
+                let mut assignment = original_assignment.clone();
+                for (index, name) in encoding.auxiliary_variables.iter().enumerate() {
+                    assignment.insert(name.clone(), (auxiliary_mask & (1 << index)) != 0);
+                }
+                if encoding.is_satisfied_by(&assignment) {
+                    satisfying_extensions += 1;
+                }
+            }
+
+            assert_eq!(
+                satisfying_extensions,
+                if expected { 1 } else { 0 },
+                "Tseitin encoding must have exactly one auxiliary extension iff {formula} is true; got {satisfying_extensions} for {original_assignment:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_tseitin_constants_and_simple_gates() {
+        assert_tseitin_unique_extension(&Proposition::True, &[]);
+        assert_tseitin_unique_extension(&Proposition::False, &[]);
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        assert_tseitin_unique_extension(&p.clone().and(q.clone()), &["p", "q"]);
+        assert_tseitin_unique_extension(&p.clone().or(q.clone()), &["p", "q"]);
+        assert_tseitin_unique_extension(&p.clone().implies(q.clone()), &["p", "q"]);
+        assert_tseitin_unique_extension(&p.clone().iff(q.clone()), &["p", "q"]);
+        assert_tseitin_unique_extension(&p.clone().not(), &["p"]);
+    }
+
+    #[test]
+    fn test_tseitin_generated_small_formulas_have_unique_extensions() {
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let base = vec![
+            Proposition::True,
+            Proposition::False,
+            p.clone(),
+            p.clone().not(),
+            q.clone(),
+            q.clone().not(),
+            r.clone(),
+            r.clone().not(),
+        ];
+
+        for left in &base {
+            for right in &base {
+                assert_tseitin_unique_extension(
+                    &left.clone().and(right.clone()),
+                    &["p", "q", "r"],
+                );
+                assert_tseitin_unique_extension(
+                    &left.clone().or(right.clone()),
+                    &["p", "q", "r"],
+                );
+                assert_tseitin_unique_extension(
+                    &left.clone().implies(right.clone()),
+                    &["p", "q", "r"],
+                );
+                assert_tseitin_unique_extension(
+                    &left.clone().iff(right.clone()),
+                    &["p", "q", "r"],
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_tseitin_nested_formulas_have_unique_extensions() {
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let formulas = [
+            p.clone().and(q.clone()).or(r.clone()),
+            p.clone().or(q.clone().and(r.clone())),
+            p.clone().implies(q.clone().iff(r.clone())),
+            p.clone().iff(q.clone().or(r.clone()).not()),
+            p.clone().and(q.clone()).iff(r.clone().implies(p.clone())),
+            p.clone().or(q.clone()).and(r.clone().or(p.clone().not())),
+        ];
+
+        for formula in formulas {
+            assert_tseitin_unique_extension(&formula, &["p", "q", "r"]);
+        }
+    }
+
+    #[test]
+    fn test_tseitin_clause_and_auxiliary_counts_are_linear_in_formula_size() {
+        fn gate_count(formula: &Proposition) -> usize {
+            match formula {
+                Proposition::Atom(_) | Proposition::True | Proposition::False => 0,
+                Proposition::Not(inner) => gate_count(inner),
+                Proposition::And(left, right)
+                | Proposition::Or(left, right)
+                | Proposition::Implies(left, right)
+                | Proposition::Iff(left, right) => {
+                    1 + gate_count(left) + gate_count(right)
+                }
+            }
+        }
+
+        let p = Proposition::atom("p");
+        let q = Proposition::atom("q");
+        let r = Proposition::atom("r");
+        let formula = p
+            .clone()
+            .and(q.clone().or(r.clone()))
+            .iff(p.clone().implies(q.clone().and(r.clone())));
+        let gates = gate_count(&formula);
+        let encoding = LogicEngine::to_tseitin_cnf(&formula);
+
+        // AND/OR/IMPLIES require at most 3 clauses per gate, IFF at most 4,
+        // plus one root assertion. Simplifications can only reduce this.
+        assert!(encoding.auxiliary_variables.len() <= gates);
+        assert!(encoding.clauses.len() <= 4 * gates + 1);
+    }
+
+    #[test]
+    fn test_tseitin_auxiliary_names_do_not_collide_with_user_variables() {
+        let reserved = Proposition::atom("__symthaea_tseitin_0");
+        let other = Proposition::atom("other");
+        let formula = reserved.and(other);
+        let encoding = LogicEngine::to_tseitin_cnf(&formula);
+
+        assert!(encoding
+            .auxiliary_variables
+            .iter()
+            .all(|name| !encoding.original_variables.contains(name)));
+        assert!(encoding
+            .auxiliary_variables
+            .contains(&"__symthaea_tseitin_1".to_string()));
+        assert_tseitin_unique_extension(
+            &formula,
+            &["__symthaea_tseitin_0", "other"],
         );
     }
 
