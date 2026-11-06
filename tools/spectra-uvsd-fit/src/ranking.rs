@@ -1077,4 +1077,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn independent_projection_index_matches_full_oracle_across_deterministic_overrides() {
+        let (receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.85),
+                (1, 20, 0.30),
+                (2, 10, 0.55),
+                (2, 20, 0.70),
+            ],
+            300,
+        );
+        let mut state = 0x51ec_7a11_u64;
+        let mut next_unit = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 11) as f64 / ((1_u64 << 53) as f64)
+        };
+
+        for robust_utility in [
+            RobustUtility::Maximin,
+            RobustUtility::LowerTailCvar { tail_mass: 0.37 },
+            RobustUtility::LowerTailCvar { tail_mass: 0.63 },
+        ] {
+            let index =
+                IndependentCounterfactualProjectionIndex::new(&receipt, robust_utility).unwrap();
+            for _ in 0..128 {
+                let action_id = if next_unit() < 0.5 { 1 } else { 2 };
+                let scenario_id = if next_unit() < 0.5 { 10 } else { 20 };
+                let first = next_unit();
+                let second = next_unit();
+                let lower = first.min(second);
+                let upper = first.max(second);
+                let indexed = index
+                    .regret_upper_bound_with_override(action_id, scenario_id, lower, upper)
+                    .unwrap();
+                let full = counterfactual_regret_upper_bound(
+                    &receipt,
+                    robust_utility,
+                    &[(action_id, scenario_id, lower, upper)],
+                )
+                .unwrap();
+                assert_eq!(
+                    indexed, full,
+                    "action={action_id} scenario={scenario_id} lower={lower} upper={upper} utility={robust_utility:?}"
+                );
+            }
+        }
+    }
+
 }
