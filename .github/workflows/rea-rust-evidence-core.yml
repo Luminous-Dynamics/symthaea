@@ -11,6 +11,7 @@ on:
       - "src/rea_compat/**"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-claim-replay-verifier/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   push:
     branches: [main]
@@ -22,6 +23,7 @@ on:
       - "src/rea_compat/**"
       - "scripts/rea/**"
       - "crates/domains/symthaea-rea-compat/**"
+      - "tools/rea-claim-replay-verifier/**"
       - ".github/workflows/rea-rust-evidence-core.yml"
   workflow_dispatch:
 
@@ -106,3 +108,25 @@ jobs:
 
       - name: Rust Evidence identity and upstream differential tests
         run: cargo test --manifest-path tools/rea-evidence-compat-harness/Cargo.toml --locked
+
+      - name: Generate isolated claim replay verifier lockfile
+        run: |
+          cargo metadata \
+            --manifest-path tools/rea-claim-replay-verifier/Cargo.toml \
+            --format-version 1 \
+            > "$RUNNER_TEMP/rea-claim-replay-metadata.json"
+
+      - name: Archive claim replay verifier lockfile
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-claim-replay-verifier-lockfile
+          path: tools/rea-claim-replay-verifier/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Rust format check for independent claim replay verifier
+        run: cargo fmt --manifest-path tools/rea-claim-replay-verifier/Cargo.toml -- --check
+
+      - name: Independent claim result replay conformance
+        run: cargo test --manifest-path tools/rea-claim-replay-verifier/Cargo.toml --locked
