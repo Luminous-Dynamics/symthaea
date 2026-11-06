@@ -165,6 +165,28 @@ The RK4 stages now evaluate the Fourier basis at their own stage times. The iter
 
 This correction makes the model a better-defined continuous-time system. It does not make the frozen-coefficient update an exact solution of the nonlinear ODE; numerical fidelity still needs to be measured against RK4 and a higher-accuracy reference.
 
+### 3.4 Existing resonator audit and repair
+
+The repository already had `crates/core/symthaea-core/src/hdc/resonator.rs`; the HLB programme should extend it rather than fork a second unrelated resonator.
+
+The audit found:
+- `solve_system()` returned `converged=true` for every variable even when the iteration loop exhausted its limit;
+- unconstrained unknowns could be left at random initial estimates yet be counted as converged;
+- multi-system results could inherit stale single-system energy history;
+- the solver used process-global randomness for initialization and exploration, preventing exact replay;
+- the continuous-valued Hadamard update used elementwise multiplication as an approximate correlation signal. The source's own tests already acknowledged that this is not an exact inverse for general real-valued vectors.
+
+**Branch changes:**
+- validate dimensions, finite values, positive finite weights, unique/non-empty unknown names, declared symbol/variable references, and the requirement that each unknown has a solving constraint;
+- report the actual number of iterations and the actual system-wide convergence state; iteration-limit exhaustion remains `converged=false`;
+- compute and retain weighted multi-constraint residual energy on every sweep;
+- add `ResonatorOutcome::{CorrectConvergence, SpuriousConvergence, NonConvergence}`, classified against known ground truth separately from the solver's fixed-point flag;
+- remove the artificial confidence floor and report no symbol confidence when no codebook exists;
+- add a configurable seed and a local deterministic PRNG for initialization and exploration noise, making identical call sequences replayable;
+- normalize and validate codebook vectors at insertion.
+
+**Important algebra boundary:** this repairs reporting and run integrity; it does not turn the existing continuous-Hadamard correlation heuristic into an exact inverse. For exact HRR role inversion, use the separate unitary HRR backend. The next integration task is to benchmark the existing resonator algorithm with matched bipolar/MAP and HRR variants, not to relabel its current float path as exact.
+
 ### 3.4 SWI branch implementation increments
 
 The research branch now contains the following HDC/CfC work:
@@ -175,6 +197,7 @@ The research branch now contains the following HDC/CfC work:
 - The tau derivative is zero at the effective tau clamp boundaries.
 - The phoneme trainer applies local target updates before evolving the frame. It is not described as temporal BPTT.
 - HDC-LTC now exposes typed parameter group IDs, profile statistics, bounded read-only windows, and dimension/finite/norm-validated replacement.
+- The existing `resonator.rs` no longer misreports iteration-limit exhaustion as convergence; it exposes correct/spurious/non-convergence classification against ground truth, validates constraints, tracks system residuals and uses replayable RNG seeds. Its float-Hadamard unbinding remains a heuristic.
 - The `structured_mixer.rs` prototype provides identity, cyclic permutation and normalized Walsh–Hadamard transforms with exact inverse methods.
 - The `hrr.rs` prototype implements O(D log D) circular convolution/correlation using a radix-2 FFT and unitary HRR roles, with exact unbinding for unitary roles.
 - `HdcHrrCodebook` now performs nearest-codeword cleanup with both minimum-similarity and best-versus-runner-up margin thresholds; ambiguous retrieval is represented as abstention.
@@ -417,7 +440,7 @@ The comparison needs to be task-specific. HDC is not a universal classifier winn
 | HDC classification | TorchHD baselines: OnlineHD, AdaptHD, SparseHD, QuantHD, NeuralHD, CompHD, LeHDC, SemiHD; plus SVM, LDA, Ridge, GLVQ and RVFL | Accuracy/F1, few-shot curves, calibration, latency, memory, and robustness on the seven-dataset HDC benchmark and the 121-UCI benchmark |
 | Continuous-time dynamics | LTC, CfC, Neural CDE, ODE-RNN, adaptive RK methods; NIALIM / DFA-CfN / PRDFA-CfN (2026) | Matched one-step and rollout error, irregular-sampling robustness, accuracy/runtime Pareto curves, and a declared error bound |
 | Structured recurrent coupling | Dense RNN, GRU/LSTM, low-rank RNN, NEF/FORCE-style teacher-trained recurrent systems, OMP-minimal dynamics fits | Same-task accuracy at matched parameter count, FLOPs and training data; report whether structured mixing helps |
-| Associative retrieval | HRR/FHRR, bipolar MAP/BSC, modern Hopfield memory, resonator networks | Exact/top-k retrieval, capacity, false recall, confidence calibration, correct convergence, spurious convergence, non-convergence, and updates to correct convergence |
+| Associative retrieval | HRR/FHRR, bipolar MAP/BSC, modern Hopfield memory, Symthaea's existing continuous-Hadamard resonator, and confidence-aware HRR cleanup | Exact/top-k retrieval, capacity, false recall, confidence calibration, correct convergence, spurious convergence, non-convergence, and updates to correct convergence |
 | On-device / edge efficiency | TorchHD / optimized SIMD HDC and domain-specific HDC ASIC/FPGA systems | Latency, peak memory, bytes moved, energy per correct retrieval/prediction, and numerical error on identical hardware |
 
 The 2026 resonator comparison is especially important for HLB-HDC. It evaluates sign, softmax, ReLU and polynomial cleanup; it separates correct convergence from spurious convergence and non-convergence; and it finds that cleanup nonlinearities change both factorization capacity and failure mode. On matched-dimensionality FHRR experiments, the relative ranking also changes by representation. HLS should reproduce this protocol before claiming a better associative memory. For dense bipolar F=3, D=1,000 factorization, that study reports roughly 4.2 / 13.8 mean recurrent updates for sign cleanup at search spaces near 4.9e3 / 6.4e4, but those iteration counts are conditional on correct convergence; they are meaningless without the terminal-outcome proportions.
