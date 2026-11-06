@@ -538,8 +538,8 @@ mod tests {
             outcome("low", 5_000, 80, 100),
             outcome("high", 5_000, 50, 70),
         ];
-        let result = evaluate_decision_regret(inputs(&declared, &decisions, &outcomes, 5_000))
-            .unwrap();
+        let result =
+            evaluate_decision_regret(inputs(&declared, &decisions, &outcomes, 5_000)).unwrap();
         assert_eq!(result.non_anticipativity.shared_information_set_count, 1);
         assert!(result.non_anticipativity.all_shared_decisions_identical);
     }
