@@ -66,10 +66,7 @@ fn bool_at(root: &Value, path: &[&str]) -> Option<bool> {
 }
 
 fn integer_at(root: &Value, path: &[&str]) -> Option<u64> {
-    let value = at(root, path)?;
-    value
-        .as_u64()
-        .or_else(|| value.as_str().and_then(|raw| raw.parse::<u64>().ok()))
+    at(root, path)?.as_u64()
 }
 
 fn non_empty(value: Option<&str>) -> bool {
@@ -722,6 +719,9 @@ mod tests {
         let mut next_digest = 1_u64;
         fill_placeholders(&mut value, "", &mut next_digest);
         value["document_status"] = Value::String("PREREGISTERED".to_owned());
+        value["seed_and_replication_plan"]["confirmatory_seed_count"] =
+            Value::Number(10_u64.into());
+        value["rounds"]["planned_outer_loop_steps"] = Value::Number(4_u64.into());
 
         let shared_budget = value["budget"]["shared_envelope_digest"].clone();
         value["budget"]["arm_budget_bindings"]["evolved_outer_loop"]["envelope_digest"] =
@@ -745,7 +745,7 @@ mod tests {
     #[test]
     fn rejects_template_with_unresolved_placeholders() {
         let template: Value =
-            serde_json::from_str(include_str!(TEMPLATE_PATH)).expect("template JSON parses");
+            serde_json::from_str(include_str!("../../../docs/research/templates/SYM_RSI_R4_IGNITION_PREREGISTRATION_V0_2026-11-06.json")).expect("template JSON parses");
         let report = validate_preregistration(&template);
         assert!(!report.ready_for_independent_review);
         assert!(report.issues.iter().any(|issue| issue.starts_with("DOCUMENT_NOT_FROZEN")));
@@ -759,6 +759,42 @@ mod tests {
             Value::String("starting_state.other_candidate".to_owned());
         let report = validate_preregistration(&value);
         assert!(report.issues.iter().any(|issue| issue.starts_with("START_REFERENCE_MISMATCH")));
+    }
+
+    #[test]
+    fn rejects_identical_outer_loop_researcher_artifacts() {
+        let mut value = valid_specimen();
+        let evolved = value["starting_state"]["outer_loop_arms"]["evolved_researcher"].clone();
+        value["starting_state"]["outer_loop_arms"]["reference_researcher"] = evolved;
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("IDENTICAL_OUTER_RESEARCHERS")));
+    }
+
+    #[test]
+    fn rejects_missing_fresh_transfer_custodian() {
+        let mut value = valid_specimen();
+        value["splits"]["fresh_family_transfer"]["custodian_independent_of_candidate"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("REQUIRED_STRING_MISSING")));
+    }
+
+    #[test]
+    fn rejects_missing_task_family_manifest() {
+        let mut value = valid_specimen();
+        value["task_population"]["task_family_manifest_digest"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("INVALID_SHA256")));
     }
 
     #[test]
