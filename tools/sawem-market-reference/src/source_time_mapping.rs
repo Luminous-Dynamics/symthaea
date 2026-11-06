@@ -172,12 +172,8 @@ pub fn map_source_timestamp<'a>(
     let days = days_from_civil(record.local_timestamp)?;
     let local_seconds = days
         .checked_mul(86_400)
-        .and_then(|seconds| {
-            seconds.checked_add(i64::from(record.local_timestamp.hour) * 3_600)
-        })
-        .and_then(|seconds| {
-            seconds.checked_add(i64::from(record.local_timestamp.minute) * 60)
-        })
+        .and_then(|seconds| seconds.checked_add(i64::from(record.local_timestamp.hour) * 3_600))
+        .and_then(|seconds| seconds.checked_add(i64::from(record.local_timestamp.minute) * 60))
         .and_then(|seconds| seconds.checked_add(i64::from(record.local_timestamp.second)))
         .ok_or(SourceTimeError::ArithmeticOverflow)?;
     let offset_seconds = i64::from(clock.utc_offset_minutes)
@@ -304,7 +300,11 @@ mod tests {
         }
     }
 
-    fn record(id: &'static str, clock_id: &'static str, local_timestamp: CivilDateTime) -> SourceTimestampRecord<'static> {
+    fn record(
+        id: &'static str,
+        clock_id: &'static str,
+        local_timestamp: CivilDateTime,
+    ) -> SourceTimestampRecord<'static> {
         SourceTimestampRecord {
             record_id: id,
             source_ref: id,
@@ -317,7 +317,11 @@ mod tests {
     #[test]
     fn maps_source_declared_positive_offset_to_utc_across_date_boundary() {
         let mapped = map_source_timestamp(
-            record("schedule/row-1", "schedule-utc-plus-1", civil(2024, 1, 1, 0, 30, 0)),
+            record(
+                "schedule/row-1",
+                "schedule-utc-plus-1",
+                civil(2024, 1, 1, 0, 30, 0),
+            ),
             clock("schedule-utc-plus-1", "UTC+1", 60),
         )
         .unwrap();
