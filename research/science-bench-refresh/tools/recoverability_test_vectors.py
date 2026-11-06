@@ -91,7 +91,11 @@ def shortest_route(
                 and used_post
                 and not used_navigation
             )
-            or (mode == "navigation" and used_navigation)
+            or (
+                mode == "navigation"
+                and used_initial
+                and used_navigation
+            )
         )
         if node == target and qualifies:
             route: list[str] = []
@@ -118,14 +122,17 @@ def shortest_route(
                 used_post
                 or (used_reform and operation == "post_reformulation_retrieval"),
                 used_navigation
-                or operation
-                in {
-                    "open_document",
-                    "follow_link",
-                    "open_table_of_contents",
-                    "pagination",
-                    "in_document_find",
-                },
+                or (
+                    used_initial
+                    and operation
+                    in {
+                        "open_document",
+                        "follow_link",
+                        "open_table_of_contents",
+                        "pagination",
+                        "in_document_find",
+                    }
+                ),
             )
             if next_state not in best or next_cost < best[next_state]:
                 best[next_state] = next_cost
@@ -306,6 +313,48 @@ def main() -> int:
     if classify(reordered, reordered_unit)["recoverability"] != "UnreachableWithinBudget":
         raise SystemExit("post-before-rewrite retrieval incorrectly qualified as reformulation")
 
+    # Structural navigation before the first-pass miss cannot count as recovery.
+    navigation_early = copy.deepcopy(base_fields)
+    navigation_early["edges"] = [
+        edge for edge in navigation_early["edges"]
+        if edge["edge_ref"] not in {"route:open-document", "route:paginate", "route:find"}
+    ]
+    navigation_early["nodes"].append({"node_ref": "document:opened-too-early"})
+    navigation_early["nodes"].append({"node_ref": "page:opened-too-early"})
+    navigation_early["edges"].extend([
+        {
+            "edge_ref": "route:open-before-first-pass",
+            "from_node_ref": "state:start",
+            "to_node_ref": "document:opened-too-early",
+            "operation": "open_document",
+            "cost": 1,
+        },
+        {
+            "edge_ref": "route:paginate-before-first-pass",
+            "from_node_ref": "document:opened-too-early",
+            "to_node_ref": "page:opened-too-early",
+            "operation": "pagination",
+            "cost": 1,
+        },
+        {
+            "edge_ref": "route:initial-after-navigation",
+            "from_node_ref": "page:opened-too-early",
+            "to_node_ref": "evidence:navigation",
+            "operation": "initial_retrieval",
+            "cost": 1,
+        },
+    ])
+    navigation_early_manifest = save_manifest(
+        navigation_early, out_dir / "navigation-before-first-pass-manifest.json"
+    )
+    navigation_early_row = next(
+        classify(navigation_early_manifest, unit)
+        for unit in navigation_early_manifest["evidence_units"]
+        if unit["evidence_unit_id"] == "unit:navigation"
+    )
+    if navigation_early_row["recoverability"] != "UnreachableWithinBudget":
+        raise SystemExit("navigation before first-pass miss incorrectly qualified as recovery")
+
     # Reducing route budget cannot improve any recoverability class.
     lower_budget = copy.deepcopy(base_fields)
     lower_budget["max_route_cost"] = 2
@@ -357,6 +406,7 @@ def main() -> int:
             "partial_surface_preserves_positive_and_blocks_negative": True,
             "unknown_surface_all_not_evaluable": True,
             "post_reformulation_retrieval_requires_prior_rewrite": True,
+            "navigation_requires_first_pass_miss": True,
             "lower_budget_never_improves": True,
             "added_direct_route_improves_unreachable_unit": True,
             "model_free_reference_classifier": True,
