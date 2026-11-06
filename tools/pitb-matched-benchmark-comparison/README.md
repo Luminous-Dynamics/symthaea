@@ -29,7 +29,8 @@ The cohort manifest freezes:
 - one budget-policy digest and hard per-task caps for attempts, wall time and cost;
 - which independent assurance gates are mandatory;
 - exact arm identities (model/version, scaffold digest and implementation digest);
-- deterministic cluster-bootstrap seed and replicate count.
+- deterministic cluster-bootstrap seed and replicate count;
+- deterministic cluster sign-flip Monte Carlo replicate count (used only when exact enumeration is not practical).
 
 Each JSONL run row binds the same task ID, repository revision, Lean version, source file, target statement digest, environment digest and budget policy across every arm. The analyzer requires exactly one result for every task/arm pair. It rejects:
 - different task sets, snapshots, splits, environments, repository commits, Lean versions or budget policies;
@@ -58,6 +59,8 @@ Pairwise comparisons are exact-task paired: each arm receives the same tasks. Th
 Use at least 10,000 bootstrap replicates for a public result (the contract permits 1,000 for fast development and caps at 100,000). Report the task-weighted point estimate and the cluster interval together. A positive point estimate whose interval crosses zero is not a demonstrated improvement.
 
 The engine is deterministic for the same cohort, rows and seed. The bootstrap is an uncertainty estimate for the chosen benchmark cohort; it does not magically make the cohort project-disjoint or representative of all future repositories.
+
+Pairwise inference also includes a paired **repository-cluster sign-flip test**. For up to 20 clusters, all sign assignments are enumerated exactly; larger cohorts use the declared deterministic Monte Carlo replicate count. When three or more arms create a family of pairwise tests, the report applies Holm's step-down family-wise error correction to the complete unordered comparison family. The test depends on cluster-level exchangeability/symmetry under the null; report the number of independent repositories and do not interpret a task-level sample size as the number of independent units. Exact sign-flip p-values with very few repositories are coarse by construction, which is why project-disjoint evaluation and additional independent projects remain necessary.
 
 ## Metrics
 
