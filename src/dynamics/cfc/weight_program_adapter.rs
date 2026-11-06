@@ -17,8 +17,8 @@ use symthaea_core::weight_space_program::{
 use thiserror::Error;
 
 use super::network::{
-    CfCNetwork, CfCNetworkFingerprint, CfCParameterGroupId, CfCParameterGroupReplacement,
-    CfCParameterManifest, CfCParameterRole, CfCWeightLoadError,
+    CfCNetwork, CfCParameterGroupId, CfCParameterGroupReplacement, CfCParameterManifest,
+    CfCWeightLoadError,
 };
 use super::types::MIN_TAU;
 
@@ -191,19 +191,19 @@ fn native_replacements(
     candidate: &ValidatedWeightCandidate,
 ) -> Result<Vec<CfCParameterGroupReplacement>, CfCWeightProgramAdapterError> {
     if snapshot.groups.len() != candidate.groups.len() {
-        return Err(CfCWeightProgramAdapterError::NonCFCTarget);
+        return Err(CfCWeightProgramAdapterError::NonCfCTarget);
     }
 
     let mut replacements = Vec::new();
     for (before, after) in snapshot.groups.iter().zip(candidate.groups.iter()) {
         if before.target != after.target || before.shape != after.shape {
-            return Err(CfCWeightProgramAdapterError::NonCFCTarget);
+            return Err(CfCWeightProgramAdapterError::NonCfCTarget);
         }
         if before.values == after.values {
             continue;
         }
         let WeightProgramTarget::CfC(target) = &after.target else {
-            return Err(CfCWeightProgramAdapterError::NonCFCTarget);
+            return Err(CfCWeightProgramAdapterError::NonCfCTarget);
         };
         replacements.push(CfCParameterGroupReplacement {
             id: native_group_id(target),
