@@ -67,6 +67,15 @@ jobs:
           cache: npm
           cache-dependency-path: rea-upstream/package-lock.json
 
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+          rustup default 1.99.1
+          test "$(rustc --version)" = "rustc 1.99.1 (58cf8f9 2026-10-15)"
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
       - name: Verify upstream source pin
         working-directory: rea-upstream
         run: test "$(git rev-parse HEAD)" = "$REA_REFERENCE_SHA"
