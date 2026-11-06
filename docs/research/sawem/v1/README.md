@@ -208,6 +208,20 @@ It reports exact probability-weighted expected policy cash, perfect-information 
 
 The perfect-information result is intentionally labelled a **non-implementable mathematical upper bound**. EVPI measures the maximum value of learning the future under the declared scenario/constraint assumptions; it is not forecast error, not the regret of a best implementable policy, and not an achievable revenue forecast. Real policy evaluation still requires out-of-sample scenario trees, calibrated probabilities and matched vendor baselines. Benchmark case: `DECISION-REGRET-EVPI-001`.
 
+### Executable simple forecast baselines and cohort representativeness
+
+The forecast benchmark now contains executable baseline builders, not just a candidate-vs-baseline scoring interface.
+
+`forecast_baselines.rs` constructs:
+- **Persistence with empirical increments:** q10/q50/q90 price-change quantiles from contiguous historical Trading Period increments.
+- **Seasonal-bucket climatology:** q10/q50/q90 price quantiles from training-only observations assigned to the requested calendar/market bucket.
+
+Both methods require an immutable baseline model identity and training-manifest digest. Historical records are eligible only when the delivery interval has ended and the source was available by the explicit training cutoff, which cannot be later than the decision timestamp. Insufficient history is indeterminate; it never becomes a zero forecast. Every selected training record is retained in the baseline receipt.
+
+`forecast_cohort.rs` audits the population and selection process used for a forecast-calibration study. It requires a complete asset census, exactly one reason-coded disposition per asset, a pre-registered plan and selection rule, and selection timestamps before evaluation. An outcome-dependent exclusion can only support a sensitivity-only claim with a selection-bias warning. A merchant-only cohort remains a merchant-only result, not generalization to all BESS assets.
+
+The two modules were previously present as source files but were not declared by the Rust crate root or included in the conformance validator. They are now compiled, test-mapped and registered as `FORECAST-BASELINES-001` and `FORECAST-COHORT-REPRESENTATIVENESS-001`. Their tests are synthetic contract tests; real SAWEM price baselines and a rights-cleared asset-population census remain unexecuted.
+
 ### Probabilistic forecast calibration with exact scoring
 
 The new `forecast_metrics.rs` module evaluates a single immutable model build against realized prices that became available by a later evaluation timestamp. It consumes q10/q50/q90 forecasts in minor ZAR/MWh, the frozen decision time, forecast issue/available-at times, target Trading Period, realized observation/available-at times, and exact model/source digests.
