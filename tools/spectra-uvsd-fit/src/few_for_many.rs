@@ -517,6 +517,20 @@ mod tests {
             Err(FewForManyPortfolioError::InvalidEpsilon)
         );
         assert_eq!(
+            bound_few_for_many_portfolio_degradation(&points(), &contract(2, 0.1), &[]),
+            Err(FewForManyPortfolioError::EmptyPortfolio)
+        );
+        assert_eq!(
+            bound_few_for_many_portfolio_degradation(&points(), &contract(2, 0.1), &[1, 1]),
+            Err(FewForManyPortfolioError::DuplicatePortfolioAction)
+        );
+        let mut bad_coefficient = contract(2, 0.1);
+        bad_coefficient.objectives[0].coefficient = f64::NAN;
+        assert_eq!(
+            bound_few_for_many_portfolio_degradation(&points(), &bad_coefficient, &[1]),
+            Err(FewForManyPortfolioError::InvalidObjectiveCoefficient)
+        );
+        assert_eq!(
             enumerate_bounded_portfolios(&[1, 1], 1, 10),
             Err(FewForManyPortfolioError::DuplicateEnumerationAction)
         );
