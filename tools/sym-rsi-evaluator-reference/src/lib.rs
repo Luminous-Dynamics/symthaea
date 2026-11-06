@@ -14,14 +14,14 @@ const EXPECTED_FIXTURE_COUNT: usize = 20;
 const EXPECTED_NEGATIVE_COUNT: usize = 16;
 const EXPECTED_POSITIVE_COUNT: usize = 4;
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum FixtureClass {
     AdversarialNegativeControl,
     PositiveControl,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExpectedDisposition {
     RejectSealedPortfolio,
@@ -50,7 +50,7 @@ impl fmt::Display for ExpectedDisposition {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Fixture {
     pub fixture_id: String,
@@ -67,7 +67,7 @@ pub struct Fixture {
     pub note: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScoringPolicy {
     pub hard_gate_rule: String,
@@ -77,7 +77,7 @@ pub struct ScoringPolicy {
     pub external_authority: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct FixturePack {
     pub schema_version: String,
@@ -155,8 +155,11 @@ const NEGATIVE_CONTROLS: [(&str, &str, ExpectedDisposition); EXPECTED_NEGATIVE_C
     ("cross_arm_privilege_drift", "treatment integrity", ExpectedDisposition::RejectMatchedComparison),
 ];
 
-const POSITIVE_IDS: [&str; EXPECTED_POSITIVE_COUNT] = [
-    "ERB-P01", "ERB-P02", "ERB-P03", "ERB-P04",
+const POSITIVE_CONTROLS: [(&str, ExpectedDisposition); EXPECTED_POSITIVE_COUNT] = [
+    ("ERB-P01", ExpectedDisposition::EligibleForIndependentReview),
+    ("ERB-P02", ExpectedDisposition::AbstainTargetDisagreement),
+    ("ERB-P03", ExpectedDisposition::EligibleForCostQualityComparison),
+    ("ERB-P04", ExpectedDisposition::AbstainInvalidMeasurement),
 ];
 
 fn non_empty(value: Option<&str>) -> bool {
@@ -249,7 +252,7 @@ pub fn validate_fixture_pack(pack: &FixturePack) -> ValidationReport {
         match fixture.fixture_class {
             FixtureClass::AdversarialNegativeControl => {
                 observed_negative += 1;
-                if fixture.hard_gate != true {
+                if !fixture.hard_gate {
                     report.issue("NEGATIVE_NOT_HARD_GATE", &fixture.fixture_id);
                 }
                 let Some(control_id) = fixture.control_id.as_deref() else {
@@ -304,8 +307,19 @@ pub fn validate_fixture_pack(pack: &FixturePack) -> ValidationReport {
                 if fixture.control_id.is_some() {
                     report.issue("POSITIVE_HAS_NEGATIVE_CONTROL_ID", &fixture.fixture_id);
                 }
-                if !POSITIVE_IDS.contains(&fixture.fixture_id.as_str()) {
-                    report.issue("UNKNOWN_POSITIVE_FIXTURE_ID", &fixture.fixture_id);
+                match POSITIVE_CONTROLS.iter().find(|(id, _)| *id == fixture.fixture_id) {
+                    Some((_, expected_disposition)) => {
+                        if fixture.expected_disposition != *expected_disposition {
+                            report.issue(
+                                "POSITIVE_DISPOSITION_MISMATCH",
+                                format!(
+                                    "{}: expected {expected_disposition}, got {}",
+                                    fixture.fixture_id, fixture.expected_disposition
+                                ),
+                            );
+                        }
+                    }
+                    None => report.issue("UNKNOWN_POSITIVE_FIXTURE_ID", &fixture.fixture_id),
                 }
                 if fixture.threat_category.is_some() {
                     report.issue("POSITIVE_HAS_THREAT_CATEGORY", &fixture.fixture_id);
@@ -337,7 +351,7 @@ pub fn validate_fixture_pack(pack: &FixturePack) -> ValidationReport {
             report.issue("REQUIRED_CONTROL_MISSING", expected_id);
         }
     }
-    for expected_id in POSITIVE_IDS {
+    for (expected_id, _) in POSITIVE_CONTROLS {
         if !fixture_ids.contains(expected_id) {
             report.issue("REQUIRED_POSITIVE_MISSING", expected_id);
         }
@@ -425,6 +439,15 @@ mod tests {
             Value::String("ELIGIBLE_FOR_INDEPENDENT_REVIEW".to_owned());
         let report = validate_fixture_pack(&from_value(value));
         assert!(report.issues.iter().any(|issue| issue.starts_with("EXPECTED_DISPOSITION_MISMATCH:")));
+    }
+
+    #[test]
+    fn rejects_wrong_positive_disposition() {
+        let mut value = as_value(&valid_pack());
+        value["fixtures"][16]["expected_disposition"] =
+            Value::String("REJECT_SEALED_PORTFOLIO".to_owned());
+        let report = validate_fixture_pack(&from_value(value));
+        assert!(report.issues.iter().any(|issue| issue.starts_with("POSITIVE_DISPOSITION_MISMATCH:")));
     }
 
     #[test]
