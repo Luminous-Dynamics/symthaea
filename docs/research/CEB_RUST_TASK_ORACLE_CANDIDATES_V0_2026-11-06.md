@@ -535,17 +535,18 @@ No new CEB lane, primary metric, score, receipt, task schema, task registry, tru
 
 | Item | Status |
 |---|---|
-| Six candidate specifications authored | Design-only in this document |
-| Exact mapping to #10617 fault-family labels | Pending canonical plan review |
-| Actual source fixture workspaces | Not created |
+| Six candidate specifications authored | Design-only |
+| Exact mapping to #10617 fault-family labels | Confirmed one-to-one against the canonical six family IDs; no sampling slots assigned |
+| Public Rust source fixtures | One 10-file, four-crate API-migration workspace; source-only, not compiled or executed |
 | Reference patches | Not created |
 | Independent grader implementations | Not created |
-| Positive/negative oracle cases | Designed at specification level; not implemented or executed |
+| Oracle case blueprints | 37 machine-readable cases across 37 requirements; no executable oracle or test suite |
+| Baseline/reference/empty-patch controls | Three design-only fixture-validity controls for the event-reproduction candidate |
 | Source/license provenance and contamination cards | Not supplied |
-| Pinned environment and resource budgets | Not supplied |
+| Pinned environment and resource budgets | Not supplied; no Cargo.lock |
 | Task registry entries / admitted tasks | Zero claimed by this dossier |
 | Candidate execution | Not performed; blocked by #10064 |
 | Independent regrade qualification | Not performed; blocked by #10369 |
 | Performance or SOTA comparison | None |
 
-**Honest claim:** this dossier makes six Rust candidate domains reviewable and exposes their specification/oracle obligations. It does not yet provide executable fixtures, qualified oracles, admitted tasks, candidate results, a sealed holdout, or evidence of superiority.
+**Honest claim:** the six candidate domains now have canonical family mappings and machine-readable requirement/oracle traceability, and one has a concrete public source-only workspace. The workspace has not been compiled, tested or executed. No candidate has a qualified oracle, task admission, benchmark result or sealed holdout, and no superiority claim is supported.
