@@ -86,6 +86,7 @@ pub struct WeightModelSnapshot {
     pub architecture_digest: String,
     pub manifest_digest: String,
     pub model_digest: String,
+    pub target_specification_digest: String,
     pub groups: Vec<ParameterGroupSnapshot>,
 }
 
@@ -237,6 +238,7 @@ impl WeightProgram {
         validate_digest(&snapshot.architecture_digest)?;
         validate_digest(&snapshot.manifest_digest)?;
         validate_digest(&snapshot.model_digest)?;
+        validate_digest(&snapshot.target_specification_digest)?;
 
         if self.architecture_digest != snapshot.architecture_digest {
             return Err(WeightProgramError::StaleDigest("architecture"));
@@ -246,6 +248,9 @@ impl WeightProgram {
         }
         if self.base_model_digest != snapshot.model_digest {
             return Err(WeightProgramError::StaleDigest("base model"));
+        }
+        if self.target_specification_digest != snapshot.target_specification_digest {
+            return Err(WeightProgramError::StaleDigest("target specification"));
         }
         if self.fault_hypothesis_ids.is_empty() || self.evidence_receipt_ids.is_empty() {
             return Err(WeightProgramError::MissingProvenance);
@@ -609,6 +614,7 @@ mod tests {
             architecture_digest: digest('a'),
             manifest_digest: digest('b'),
             model_digest: digest('c'),
+            target_specification_digest: digest('d'),
             groups: vec![
                 ParameterGroupSnapshot {
                     target: WeightProgramTarget::CfC(
