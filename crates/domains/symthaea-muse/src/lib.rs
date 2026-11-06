@@ -112,6 +112,8 @@ pub mod fluid_render;
 pub mod form;
 #[cfg(feature = "studio")]
 pub mod genealogy;
+#[cfg(feature = "studio")]
+pub mod rmi_artifact_evidence;
 #[cfg(feature = "theory")]
 pub mod intervention;
 #[cfg(feature = "muse-live")]
