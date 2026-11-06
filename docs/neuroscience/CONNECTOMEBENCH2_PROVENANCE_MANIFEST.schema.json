@@ -134,7 +134,8 @@
         "em_rows",
         "geometry_rows",
         "sample_type_counts",
-        "source_ids"
+        "source_ids",
+        "sample_type_count_reconciliation"
       ],
       "properties": {
         "revision_id": {
@@ -205,6 +206,37 @@
           "items": {
             "type": "string",
             "minLength": 1
+          }
+        },
+        "sample_type_count_reconciliation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reported_sum",
+            "delta_vs_row_count",
+            "status"
+          ],
+          "properties": {
+            "reported_sum": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "delta_vs_row_count": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "status": {
+              "enum": [
+                "RECONCILED",
+                "SOURCE_REPORTED_COUNTS_DO_NOT_RECONCILE",
+                "NOT_REPORTED"
+              ]
+            }
           }
         }
       }
