@@ -1,7 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/rank-contract",
-    "crates/topk-core",
-    "crates/workload",
-]
