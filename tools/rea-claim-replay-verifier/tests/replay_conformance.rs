@@ -678,3 +678,30 @@ fn cli_rejects_too_many_evidence_paths_before_opening_files() {
     assert!(stderr.contains("Evidence paths"));
 }
 
+#[test]
+fn replay_projects_only_claim_authorized_fields_after_full_evidence_verification() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut value = original.value;
+    value["raw_result"] = json!({
+        "opaque_payload": "x".repeat(1024 * 1024),
+        "unrelated_annotations": [{"note": "not a claim premise"}]
+    });
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, &[evidence]);
+
+    let replay = replay_claim_evaluation(
+        &claim_bytes,
+        &[&evidence_bytes],
+        &result_bytes,
+    )
+    .unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        oracle_disposition("basic-provider-report-support")
+    );
+}
+
