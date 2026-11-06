@@ -235,6 +235,8 @@ def self_test(data: dict[str, Any]) -> None:
     require(duplicate_pair is not None, 'self-test fixture must include two candidate identities in one biological equivalence class')
     first_index, second_index = duplicate_pair
     altered['hypothesis_universe'][second_index]['query_decision'] = not altered['hypothesis_universe'][first_index]['query_decision']
+    altered['hypothesis_universe'][second_index]['invalidates_policy'] = True
+    altered['hypothesis_universe'][second_index]['impact_weight'] = max(1.0, altered['hypothesis_universe'][first_index]['impact_weight'])
     try:
         evaluate_without_expectations(altered)
     except ValueError as exc:
