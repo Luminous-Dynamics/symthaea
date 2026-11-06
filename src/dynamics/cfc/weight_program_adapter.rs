@@ -716,6 +716,20 @@ mod tests {
         std::iter::repeat_n(byte, 64).collect()
     }
 
+    fn signature_set(
+        signatures: Vec<Vec<f64>>,
+        model: char,
+        probe: char,
+    ) -> CfCActivationSignatureSet {
+        CfCActivationSignatureSet {
+            format_version: 1,
+            model_digest: digest(model),
+            probe_digest: digest(probe),
+            layer_index: 0,
+            signatures,
+        }
+    }
+
     #[test]
     fn alternating_cycle_margin_matches_small_exact_assignment_fixture() {
         let costs = vec![
@@ -743,10 +757,15 @@ mod tests {
             .iter()
             .map(|source_unit| source[*source_unit].clone())
             .collect::<Vec<_>>();
+        let source = signature_set(source, 'a', 'p');
+        let candidate = signature_set(candidate, 'b', 'p');
         let alignment =
             align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
         assert_eq!(alignment.source_to_candidate, vec![1, 2, 0]);
+        assert_eq!(alignment.source_model_digest, digest('a'));
+        assert_eq!(alignment.candidate_model_digest, digest('b'));
+        assert_eq!(alignment.probe_digest, digest('p'));
         assert!(alignment.mean_squared_activation_error < 1e-15);
         assert!(alignment.minimum_assignment_margin > 0.0);
     }
@@ -755,6 +774,8 @@ mod tests {
     fn activation_signature_alignment_exposes_ambiguous_units() {
         let source = vec![vec![0.0, 1.0], vec![0.0, 1.0], vec![2.0, 3.0]];
         let candidate = vec![vec![2.0, 3.0], vec![0.0, 1.0], vec![0.0, 1.0]];
+        let source = signature_set(source, 'a', 'p');
+        let candidate = signature_set(candidate, 'b', 'p');
         let alignment =
             align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
@@ -763,21 +784,50 @@ mod tests {
     }
 
     #[test]
+    fn activation_alignment_rejects_different_probe_sets_and_layers() {
+        let source = signature_set(vec![vec![0.0, 1.0]], 'a', 'p');
+        let different_probes = signature_set(vec![vec![0.0, 1.0]], 'b', 'q');
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&source, &different_probes),
+            Err(CfCPermutationAlignmentError::ProbeSetMismatch { .. })
+        ));
+
+        let mut different_layer = signature_set(vec![vec![0.0, 1.0]], 'b', 'p');
+        different_layer.layer_index = 1;
+        assert!(matches!(
+            align_cfc_hidden_unit_signatures(&source, &different_layer),
+            Err(CfCPermutationAlignmentError::LayerMismatch { .. })
+        ));
+    }
+
+    #[test]
     fn activation_signature_alignment_rejects_malformed_inputs() {
         assert!(matches!(
-            align_cfc_hidden_unit_signatures(&[], &[]),
+            align_cfc_hidden_unit_signatures(
+                &signature_set(Vec::new(), 'a', 'p'),
+                &signature_set(Vec::new(), 'b', 'p')
+            ),
             Err(CfCPermutationAlignmentError::EmptyHiddenUnitSet)
         ));
         assert!(matches!(
-            align_cfc_hidden_unit_signatures(&[vec![0.0]], &[vec![0.0, 1.0]]),
+            align_cfc_hidden_unit_signatures(
+                &signature_set(vec![vec![0.0]], 'a', 'p'),
+                &signature_set(vec![vec![0.0, 1.0]], 'b', 'p')
+            ),
             Err(CfCPermutationAlignmentError::SignatureLengthMismatch { .. })
         ));
         assert!(matches!(
-            align_cfc_hidden_unit_signatures(&[vec![f64::NAN]], &[vec![0.0]]),
+            align_cfc_hidden_unit_signatures(
+                &signature_set(vec![vec![f64::NAN]], 'a', 'p'),
+                &signature_set(vec![vec![0.0]], 'b', 'p')
+            ),
             Err(CfCPermutationAlignmentError::NonFiniteSignature { .. })
         ));
         assert!(matches!(
-            align_cfc_hidden_unit_signatures(&[vec![0.0], vec![1.0]], &[vec![0.0]]),
+            align_cfc_hidden_unit_signatures(
+                &signature_set(vec![vec![0.0], vec![1.0]], 'a', 'p'),
+                &signature_set(vec![vec![0.0]], 'b', 'p')
+            ),
             Err(CfCPermutationAlignmentError::HiddenUnitCountMismatch { .. })
         ));
     }
