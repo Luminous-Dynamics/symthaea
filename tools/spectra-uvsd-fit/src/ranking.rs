@@ -998,5 +998,83 @@ mod tests {
             certify_epsilon_optimal_action(&receipt, RobustUtility::Maximin, 0.2),
             Err(RobustSelectionError::MetricCountMismatch)
         );
+    } 
+    #[test]
+    fn independent_projection_index_matches_full_recomputation_for_maximin_and_fractional_cvar() {
+        let (receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.90),
+                (1, 20, 0.25),
+                (2, 10, 0.55),
+                (2, 20, 0.65),
+            ],
+            400,
+        );
+        let overrides = [
+            (1_u32, 10_u16, 0.10_f64, 0.35_f64),
+            (1, 20, 0.30, 0.70),
+            (2, 10, 0.45, 0.60),
+            (2, 20, 0.50, 0.95),
+        ];
+
+        for robust_utility in [
+            RobustUtility::Maximin,
+            RobustUtility::LowerTailCvar { tail_mass: 0.43 },
+        ] {
+            let index =
+                IndependentCounterfactualProjectionIndex::new(&receipt, robust_utility).unwrap();
+            for (action_id, scenario_id, lower, upper) in overrides {
+                let indexed = index
+                    .regret_upper_bound_with_override(action_id, scenario_id, lower, upper)
+                    .unwrap();
+                let full = counterfactual_regret_upper_bound(
+                    &receipt,
+                    robust_utility,
+                    &[(action_id, scenario_id, lower, upper)],
+                )
+                .unwrap();
+                assert_eq!(
+                    indexed, full,
+                    "action={action_id} scenario={scenario_id} utility={robust_utility:?}"
+                );
+            }
+        }
     }
+
+    #[test]
+    fn independent_projection_index_preserves_ties_and_rejects_out_of_range_overrides() {
+        let (receipt, _) = bounded_receipt(
+            &[
+                (1, 10, 0.50),
+                (1, 20, 0.50),
+                (2, 10, 0.50),
+                (2, 20, 0.50),
+            ],
+            200,
+        );
+        let index =
+            IndependentCounterfactualProjectionIndex::new(&receipt, RobustUtility::Maximin)
+                .unwrap();
+        for action_id in [1_u32, 2_u32] {
+            let indexed = index
+                .regret_upper_bound_with_override(action_id, 10, 0.25, 0.75)
+                .unwrap();
+            let full = counterfactual_regret_upper_bound(
+                &receipt,
+                RobustUtility::Maximin,
+                &[(action_id, 10, 0.25, 0.75)],
+            )
+            .unwrap();
+            assert_eq!(indexed, full);
+        }
+        assert_eq!(
+            index.regret_upper_bound_with_override(1, 10, -0.1, 0.5),
+            Err(RobustSelectionError::InvalidUtilityInterval)
+        );
+        assert_eq!(
+            index.regret_upper_bound_with_override(1, 99, 0.2, 0.5),
+            Err(RobustSelectionError::MissingMetricRecord)
+        );
+    }
+
 }
