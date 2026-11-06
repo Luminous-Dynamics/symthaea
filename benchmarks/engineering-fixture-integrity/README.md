@@ -81,5 +81,13 @@ The manifest-binding layer uses only the Python standard library; optional
 CAD/mesh dependencies are imported only when the geometry audit runs.
 
 A dedicated [Engineering Fixture Integrity workflow](../../.github/workflows/engineering-fixture-integrity.yml)
-runs the exact 18-test suite and Python byte-compilation independently of the
+runs the exact 20-test suite and Python byte-compilation independently of the
 repository-wide Rust workspace metadata checks.
+
+
+The package path resolver rejects symlinks in every path component (including
+internal aliases), not only symlinks that escape the package root. It also
+compares resolved artifact paths so the manifest, CAD source/edit artifacts,
+assembly and six part definitions cannot alias one another. Two additional
+controls cover an internal symlink and an attempt to reuse the manifest as a
+CAD artifact.
