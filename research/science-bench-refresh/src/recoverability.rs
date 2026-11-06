@@ -179,7 +179,7 @@ pub struct RecoverabilityRecordV1 {
     pub route_edge_refs: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RecoverabilityAuditReportV1 {
     pub schema: &'static str,
     pub manifest_id: String,
@@ -197,7 +197,7 @@ pub struct RecoverabilityAuditReportV1 {
     pub nonclaims: Vec<&'static str>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct SearchState {
     node_ref: String,
     used_initial_retrieval: bool,
