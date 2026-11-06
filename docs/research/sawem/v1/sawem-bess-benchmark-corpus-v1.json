@@ -1463,7 +1463,7 @@
       "case_id": "MARKET-PRICE-IMPACT-001",
       "track": "market_replay_and_policy_comparison",
       "title": "Matched price-taking versus self-impact-adjusted policy revenue",
-      "scenario": "For each implementable battery policy, consume identical source-bound exogenous reference price records and policy-specific market-clearing prices produced by the same immutable market-impact model build. Compute exact price-taking revenue, impact-adjusted revenue and self-impact adjustment from signed grid energy. Compare candidate and comparator only on the same scenario, horizon, interval census, reference-price path and market-impact build. Do not infer price impact from battery size or use a price-taking perfect-foresight bound as realizable revenue.",
+      "scenario": "For each implementable battery policy, consume identical source-bound exogenous reference price records and policy-specific market-clearing prices produced by the same immutable market-impact model build. Compute exact price-taking revenue, impact-adjusted revenue and self-impact adjustment from signed grid energy. Compare candidate and comparator only on the same scenario, horizon, interval census, reference-price path and market-impact build. Do not infer price impact from battery size or use a price-taking perfect-foresight bound as realizable revenue. The reference-price source availability timestamp is part of the matched information vintage; identical values with different known-at times are not a matched comparison.",
       "owner": "Symthaea",
       "expected_disposition": "mixed_by_subcase",
       "implementation_state": "kernel_unit_tested",
@@ -1473,7 +1473,8 @@
         "paired_policy_comparison_requires_the_same_reference_price_path",
         "charging_at_negative_prices_uses_consistent_signed_cashflow",
         "overlapping_gap_future_known_and_duplicate_interval_data_fail_closed",
-        "same_policy_and_mismatched_simulator_builds_are_rejected"
+        "same_policy_and_mismatched_simulator_builds_are_rejected",
+        "matched_reference_price_path_requires_same_availability_vintage"
       ],
       "required_evidence": [
         "frozen no-self-impact reference price series and content digest",
@@ -1483,7 +1484,8 @@
         "signed grid-point energy by matching Trading Period",
         "common scenario, interval census and evaluation timestamp",
         "price data available-at timestamps and market model run receipt",
-        "evidence of market-participation and price-maker assumptions"
+        "evidence of market-participation and price-maker assumptions",
+        "reference price source availability timestamp for every Trading Period"
       ],
       "stress_tags": [
         "price-impact",
