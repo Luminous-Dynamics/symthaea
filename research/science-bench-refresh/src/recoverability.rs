@@ -195,7 +195,7 @@ pub struct RecoverabilityAuditReportV1 {
     pub benchmark_relative_only: bool,
     pub external_anchor_required: bool,
     pub evidence_unit_count: usize,
-    pub distinct_source_family_count: usize,
+    pub distinct_declared_source_family_ref_count: usize,
     pub class_counts: BTreeMap<String, usize>,
     pub records: Vec<RecoverabilityRecordV1>,
     pub nonclaims: Vec<&'static str>,
@@ -591,7 +591,7 @@ pub fn verify_recoverability_manifest(
         benchmark_relative_only: true,
         external_anchor_required: true,
         evidence_unit_count: fields.evidence_units.len(),
-        distinct_source_family_count: families.len(),
+        distinct_declared_source_family_ref_count: families.len(),
         class_counts,
         records,
         nonclaims: vec![
@@ -601,6 +601,7 @@ pub fn verify_recoverability_manifest(
             "pinned artifact identity does not establish source authenticity or factual truth",
             "the manifest commitment requires independent pre-run anchoring",
             "this evaluator does not prove the absence of unlogged tools or network channels",
+            "source-family references are opaque declarations; their count is not independent provenance verification",
         ],
     })
 }
@@ -751,7 +752,7 @@ mod tests {
         let result = report(base_fields());
         assert!(result.valid);
         assert_eq!(result.evidence_unit_count, 5);
-        assert_eq!(result.distinct_source_family_count, 4);
+        assert_eq!(result.distinct_declared_source_family_ref_count, 4);
         let actual: BTreeMap<_, _> = result
             .records
             .iter()
@@ -910,7 +911,7 @@ mod tests {
         });
         let result = report(fields);
         assert_eq!(result.evidence_unit_count, 6);
-        assert_eq!(result.distinct_source_family_count, 4);
+        assert_eq!(result.distinct_declared_source_family_ref_count, 4);
     }
 
     #[test]
