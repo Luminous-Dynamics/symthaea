@@ -1959,7 +1959,10 @@ pub fn render_synthetic_midi_v1(
             }
             Dimension::Rhythm => {
                 let rotation = value.rem_euclid(8) as u32;
-                let pattern = 0b1001_0101_u8.rotate_left(rotation);
+                // A full-period pattern gives each of the eight rotations a
+                // distinct symbolic rhythm; a shorter-period pattern aliased
+                // different feature values to identical MIDI events.
+                let pattern = 0b1000_1101_u8.rotate_left(rotation);
                 for step in 0..8 {
                     if (pattern >> step) & 1 == 1 {
                         add_note(events, channel, 60, 80, step * 240, 120);
@@ -3053,7 +3056,7 @@ mod tests {
             },
             Feature {
                 dimension: Dimension::Texture,
-                value: 3,
+                value: 4,
             },
             b"midi-fixture",
         )
