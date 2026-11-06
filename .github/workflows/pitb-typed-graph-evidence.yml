@@ -312,6 +312,12 @@ jobs:
               "task_denominator": 3,
               "strategy_a_attempted_tasks": 3,
               "strategy_b_attempted_tasks": 3,
+              "strategy_a_implementation_sha256": runs[0]["strategy"]["implementation_sha256"],
+              "strategy_a_execution_stack_sha256": runs[0]["strategy"]["execution_stack_sha256"],
+              "strategy_b_implementation_sha256": runs[4]["strategy"]["implementation_sha256"],
+              "strategy_b_execution_stack_sha256": runs[4]["strategy"]["execution_stack_sha256"],
+              "budget_policy_sha256": runs[0]["budget_policy_sha256"],
+              "evaluation_condition_sha256": runs[0]["evaluation_condition_sha256"],
               "strategy_a_unique_verified_tasks": 2,
               "strategy_b_unique_verified_tasks": 2,
               "both_solved_tasks": 1,
@@ -331,6 +337,16 @@ jobs:
                   raise SystemExit(f"clustered comparison {key}: expected {value!r}, got {comparison[key]!r}")
           if abs(comparison["paired_risk_difference_b_minus_a"]) > 1e-12:
               raise SystemExit("balanced synthetic strategy pair must have zero risk difference")
+          if comparison["strategy_a_implementation_sha256"] == comparison["strategy_b_implementation_sha256"]:
+              raise SystemExit("different strategies must retain distinct implementation identities")
+          if comparison["strategy_a_execution_stack_sha256"] == comparison["strategy_b_execution_stack_sha256"]:
+              raise SystemExit("different strategies must retain distinct execution-stack identities")
+          if comparison["budget_policy_sha256"] != runs[4]["budget_policy_sha256"]:
+              raise SystemExit("pairwise comparison accepted different budget policies")
+          if comparison["evaluation_condition_sha256"] != runs[4]["evaluation_condition_sha256"]:
+              raise SystemExit("pairwise comparison accepted different evaluation conditions")
+          if len(comparison["budget_policy_sha256"]) != 64 or len(comparison["evaluation_condition_sha256"]) != 64:
+              raise SystemExit("execution conditions are not content-addressed")
           print("PITB_SORRYDB_REPORT_AND_CLUSTERED_COMPARISON_SCHEMA_PASS")
           PY
 
