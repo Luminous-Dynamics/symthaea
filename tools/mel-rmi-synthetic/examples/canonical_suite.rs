@@ -1,3 +1,4 @@
+//! Emit a rectangular RMI trial table plus separate artifact and summary reports.
 use mel_rmi_synthetic::{
     ActionMechanism, AgentAction, AgentPolicy, ArtifactFormatV1, ArtifactPayloadSetV1,
     ArtifactPayloadV1, ArtifactSetEvidenceV1, Condition, Dimension, Feature, FixedResponsePolicy,
@@ -573,7 +574,7 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         } else {
             rejected += 1;
         }
-        println!(
+        eprintln!(
             "negotiation,{name},{},{},{},{},{},{},{},{}",
             assessment.available_option_count,
             assessment.proposed_option_count,
@@ -615,7 +616,7 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         &wide_authority,
         &NegotiationChoiceV1::Branch(wide_options),
     )?;
-    println!(
+    eprintln!(
         "negotiation,branch_explosion_clarify,{},{},{},{},{},{},{},{}",
         clarification.available_option_count,
         clarification.proposed_option_count,
@@ -626,7 +627,7 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         clarification.action_well_formed,
         clarification.qualified,
     );
-    println!(
+    eprintln!(
         "negotiation,branch_explosion_rejected,{},{},{},{},{},{},{},{}",
         excessive_branch.available_option_count,
         excessive_branch.proposed_option_count,
@@ -648,8 +649,8 @@ fn run_negotiation_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         rejected += 1;
     }
 
-    println!("negotiation_qualified,{qualified}");
-    println!("negotiation_rejected,{rejected}");
+    eprintln!("negotiation_qualified,{qualified}");
+    eprintln!("negotiation_rejected,{rejected}");
     Ok((qualified, rejected))
 }
 
@@ -705,7 +706,7 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         &NegotiationChoiceV1::Branch(vec![5, 7, 9]),
     )?
     .qualified;
-    println!("authority_scope,valid_event,{valid}");
+    eprintln!("authority_scope,valid_event,{valid}");
     let mut qualified = usize::from(valid);
     let mut rejected = 0usize;
 
@@ -799,8 +800,8 @@ fn run_authority_scope_conformance() -> Result<(usize, usize), Box<dyn Error>> {
         qualified += 1;
     }
 
-    println!("authority_scope_qualified,{qualified}");
-    println!("authority_scope_rejected,{rejected}");
+    eprintln!("authority_scope_qualified,{qualified}");
+    eprintln!("authority_scope_rejected,{rejected}");
     Ok((qualified, rejected))
 }
 
@@ -938,8 +939,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     artifact_report.flush()?;
     trial_event_report.flush()?;
-    println!("artifact_verified,{artifact_bindings_verified}");
-    println!("artifact_digest_rows,{artifact_report_rows}");
-    println!("trial_event_rows,{trial_event_rows}");
+    eprintln!("artifact_verified,{artifact_bindings_verified}");
+    eprintln!("artifact_digest_rows,{artifact_report_rows}");
+    eprintln!("trial_event_rows,{trial_event_rows}");
     Ok(())
 }
