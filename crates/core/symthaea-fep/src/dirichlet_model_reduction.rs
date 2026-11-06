@@ -426,14 +426,13 @@ fn dirichlet_log_evidence_ratio(
         let full = &full_prior.columns[column];
         let reduced = &reduced_prior.columns[column];
         let reduced_support = &reduced_prior.active_support[column];
-        let mut reduced_posterior = Vec::with_capacity(posterior.len());
         let mut reduced_prior_active = Vec::new();
         let mut reduced_posterior_active = Vec::new();
 
         for outcome in 0..posterior.len() {
             let posterior_increment = posterior[outcome] - full[outcome];
             if !reduced_support[outcome] {
-                if posterior_increment < -1e-9 {
+                if posterior_increment < 0.0 {
                     return Err(DirichletBayesianModelReductionError::PosteriorBelowPrior {
                         model_id: model_id.to_owned(),
                         column,
@@ -441,7 +440,7 @@ fn dirichlet_log_evidence_ratio(
                         increment: posterior_increment,
                     });
                 }
-                if posterior_increment > 1e-9 {
+                if posterior_increment > 0.0 {
                     // The data contain an outcome forbidden by this reduced model.
                     // Its marginal likelihood is exactly zero.
                     return Ok(f64::NEG_INFINITY);
@@ -462,7 +461,6 @@ fn dirichlet_log_evidence_ratio(
             }
             reduced_prior_active.push(reduced[outcome]);
             reduced_posterior_active.push(value);
-            reduced_posterior.push(value);
         }
 
         if reduced_prior_active.is_empty() {
@@ -644,6 +642,21 @@ mod tests {
             active_support: columns
                 .iter()
                 .map(|column| vec![true; column.len()])
+                .collect(),
+        }
+    }
+
+    fn tensor_with_support(
+        columns: &[&[f64]],
+        active_support: &[&[bool]],
+        parameterization: char,
+    ) -> DirichletConcentrationTensor {
+        DirichletConcentrationTensor {
+            parameterization_digest: digest(parameterization),
+            columns: columns.iter().map(|column| column.to_vec()).collect(),
+            active_support: active_support
+                .iter()
+                .map(|support| support.to_vec())
                 .collect(),
         }
     }
@@ -841,6 +854,87 @@ mod tests {
         assert!(matches!(
             result,
             Err(DirichletBayesianModelReductionError::NonPositiveReducedPosteriorConcentration { .. })
+        ));
+    }
+
+    #[test]
+    fn explicit_support_restriction_has_finite_evidence_when_excluded_outcome_is_unobserved() {
+        let full_prior = tensor(&[&[1.0, 1.0]], 'a');
+        let posterior = tensor(&[&[4.0, 1.0]], 'a');
+        let reduced_prior = tensor_with_support(
+            &[&[2.0, 0.0]],
+            &[&[true, false]],
+            'a',
+        );
+        let result = reduce_dirichlet_models(
+            &posterior,
+            &full_prior,
+            &[ReducedDirichletModelHypothesis {
+                model_id: "one-outcome-support".into(),
+                prior_probability: 1.0,
+                parameter_prior: reduced_prior,
+            }],
+        )
+        .expect("proper support-restricted model");
+        // Full Beta(1,1) assigns evidence 1/4 to three successes and no failures.
+        // The reduced model fixes P(success)=1, so its evidence is 1 and BF=4.
+        assert!(
+            (result.models[0].log_evidence_ratio - 4.0_f64.ln()).abs() < 1e-11
+        );
+    }
+
+    #[test]
+    fn observing_an_excluded_outcome_gives_the_reduced_model_zero_evidence() {
+        let full_prior = tensor(&[&[1.0, 1.0]], 'a');
+        let posterior = tensor(&[&[4.0, 2.0]], 'a');
+        let reduced_prior = tensor_with_support(
+            &[&[2.0, 0.0]],
+            &[&[true, false]],
+            'a',
+        );
+        let result = reduce_dirichlet_models(
+            &posterior,
+            &full_prior,
+            &[
+                ReducedDirichletModelHypothesis {
+                    model_id: "full".into(),
+                    prior_probability: 0.5,
+                    parameter_prior: full_prior.clone(),
+                },
+                ReducedDirichletModelHypothesis {
+                    model_id: "forbids-observed-outcome".into(),
+                    prior_probability: 0.5,
+                    parameter_prior: reduced_prior,
+                },
+            ],
+        )
+        .expect("full model retains positive evidence");
+        assert_eq!(result.models[1].log_evidence_ratio, f64::NEG_INFINITY);
+        assert_eq!(result.models[1].posterior_probability, 0.0);
+        assert_eq!(result.models[0].posterior_probability, 1.0);
+    }
+
+    #[test]
+    fn empty_reduced_support_is_rejected() {
+        let full_prior = tensor(&[&[1.0, 1.0]], 'a');
+        let posterior = tensor(&[&[1.0, 1.0]], 'a');
+        let empty = tensor_with_support(
+            &[&[0.0, 0.0]],
+            &[&[false, false]],
+            'a',
+        );
+        let result = reduce_dirichlet_models(
+            &posterior,
+            &full_prior,
+            &[ReducedDirichletModelHypothesis {
+                model_id: "empty-support".into(),
+                prior_probability: 1.0,
+                parameter_prior: empty,
+            }],
+        );
+        assert!(matches!(
+            result,
+            Err(DirichletBayesianModelReductionError::EmptyReducedSupport { .. })
         ));
     }
 
