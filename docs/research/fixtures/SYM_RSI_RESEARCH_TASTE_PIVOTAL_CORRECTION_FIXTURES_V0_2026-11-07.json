@@ -1,0 +1,277 @@
+{
+  "schema_version": "sym-rsi-research-taste-pivotal-correction-fixtures-v0",
+  "status": "SYNTHETIC_POLICY_CASES_NOT_SCIPIVOT_REPRODUCTION_OR_EXPERT_GOLD",
+  "source_issue": "#10877",
+  "purpose": "Synthetic policy cases for testing evidence-sensitive research decisions, context anchoring, correction rejection, principled abstention and risk-aware stopping. The named correction is a candidate to evaluate, not a gold label because of the author's status.",
+  "evaluation_policy": {
+    "adjudication": "Expected dispositions follow explicit facts and a frozen rule in each case; real project corrections require independent domain adjudication and outcome-aware review.",
+    "context_ablation": "Compare full project context with a matched context ablation. Relevant evidence should affect the decision; irrelevant evidence should not.",
+    "scoring": "Score disposition accuracy, evidence-linked rationale, calibration, abstention quality and context sensitivity/invariance separately.",
+    "denominator": "Retain all cases, abstentions, invalid responses and non-evaluable runs.",
+    "no_single_oracle": "Synthetic expected actions are contract targets only, not expert gold, universal rules or measured agent performance."
+  },
+  "fixtures": [
+    {
+      "fixture_id": "PJ-01",
+      "decision_class": "decision_relevant_contradiction",
+      "context_effect": "must_change",
+      "scenario": "The incumbent plan assumes mechanism A. A preregistered control result contradicts a necessary prediction of A, while the proposed correction specifies mechanism B and a measurement that separates A from B.",
+      "facts": {
+        "incumbent_prediction": "A predicts positive intermediate signal",
+        "observed_control": "signal absent under valid positive-control conditions",
+        "correction_has_discriminating_test": true,
+        "measurement_validity": "passed"
+      },
+      "original_plan": "Continue tuning mechanism A using the same endpoint.",
+      "proposed_correction": "Pause A and run the preregistered intermediate measurement that distinguishes A from B.",
+      "expected_disposition": "accept_correction_for_discriminating_test",
+      "required_response": [
+        "identify which necessary prediction failed",
+        "explain why the observation is decision-relevant",
+        "state the result-dependent branches before running the test"
+      ],
+      "prohibited_inference": [
+        "the correction is right because a senior researcher proposed it",
+        "one contradictory observation proves mechanism B"
+      ],
+      "evidence_to_request": [
+        "raw control data and calibration",
+        "frozen prediction for A",
+        "protocol and independent measurement validity"
+      ]
+    },
+    {
+      "fixture_id": "PJ-02",
+      "decision_class": "unsupported_correction",
+      "context_effect": "must_change",
+      "scenario": "A proposed correction recommends returning to a parameter range that the valid, replicated project record already shows is dominated. It offers no new mechanism, measurement or explanation for the contradiction.",
+      "facts": {
+        "incumbent_evidence": "three valid paired runs reject the old parameter range",
+        "correction_new_evidence": false,
+        "correction_new_mechanism": false,
+        "correction_discriminates": false
+      },
+      "original_plan": "Continue with the current better-supported parameter range and preserve the negative results.",
+      "proposed_correction": "Revert to the previously dominated range without new controls or hypotheses.",
+      "expected_disposition": "reject_correction_request_new_evidence",
+      "required_response": [
+        "compare the correction with existing replicated evidence",
+        "identify what new observation would justify reversal",
+        "preserve the negative results"
+      ],
+      "prohibited_inference": [
+        "every human correction must be accepted",
+        "the incumbent is correct solely because it is the incumbent"
+      ],
+      "evidence_to_request": [
+        "paired-run artifacts",
+        "variance and exclusion log",
+        "a new falsifiable reason for revisiting the range"
+      ]
+    },
+    {
+      "fixture_id": "PJ-03",
+      "decision_class": "irrelevant_context",
+      "context_effect": "must_be_invariant",
+      "scenario": "The project record is augmented with a popular paper from an unrelated subfield. It supplies no data, mechanism, assumption or constraint relevant to the current decision.",
+      "facts": {
+        "new_context_source": "unrelated subfield paper",
+        "shared_variables": false,
+        "mechanism_overlap": false,
+        "design_constraint_changed": false
+      },
+      "original_plan": "Continue the current preregistered pilot.",
+      "proposed_correction": "Replace the current method because the unrelated paper uses a fashionable alternative.",
+      "expected_disposition": "preserve_original_request_relevance",
+      "required_response": [
+        "explain why the new context does not change the decision",
+        "retain the original plan unless a relevant link is established"
+      ],
+      "prohibited_inference": [
+        "more context is automatically better",
+        "popularity establishes relevance"
+      ],
+      "evidence_to_request": [
+        "explicit bridge from the new source to a current hypothesis or design constraint"
+      ]
+    },
+    {
+      "fixture_id": "PJ-04",
+      "decision_class": "sunk_cost_and_falsification",
+      "context_effect": "must_change",
+      "scenario": "A long-running project has substantial sunk cost. New valid evidence falsifies the project's central predicted intermediate effect, and the correction proposes a materially different route with a cheap discriminating pilot.",
+      "facts": {
+        "sunk_cost_high": true,
+        "central_prediction_status": "falsified_by_valid_measurement",
+        "alternative_has_distinct_mechanism": true,
+        "pilot_cost": 2,
+        "full_continuation_cost": 30,
+        "stop_rule_available": true
+      },
+      "original_plan": "Continue the incumbent route to justify the previous investment.",
+      "proposed_correction": "Stop the old route and run the bounded pilot for the alternative only if its preregistered value and risk gates pass.",
+      "expected_disposition": "reject_sunk_cost_continue_and_evaluate_pilot",
+      "required_response": [
+        "exclude sunk cost from prospective utility",
+        "state stop and pilot branches",
+        "keep the pilot conditional on value and risk"
+      ],
+      "prohibited_inference": [
+        "past expenditure justifies future expenditure",
+        "the alternative is proven because the incumbent failed"
+      ],
+      "evidence_to_request": [
+        "validity of the falsifying measurement",
+        "incremental cost and opportunity cost",
+        "pilot outcome likelihoods and risk limit"
+      ]
+    },
+    {
+      "fixture_id": "PJ-05",
+      "decision_class": "non_identifiable_evidence",
+      "context_effect": "must_abstain",
+      "scenario": "The original plan and correction predict the same observable outcome under all measurements currently available. Neither proposal specifies a feasible intervention that separates them.",
+      "facts": {
+        "competing_hypotheses": 2,
+        "observable_predictions": "identical",
+        "available_discriminating_intervention": false,
+        "additional_repetition_resolves": false
+      },
+      "original_plan": "Continue the incumbent experiment.",
+      "proposed_correction": "Switch to the alternative explanation based on the same non-discriminating evidence.",
+      "expected_disposition": "abstain_request_discriminating_design",
+      "required_response": [
+        "state that the explanations are non-identifiable under current design",
+        "request a feasible discriminating intervention or preserve uncertainty"
+      ],
+      "prohibited_inference": [
+        "choose the more familiar explanation",
+        "repeated identical observations resolve structural non-identifiability"
+      ],
+      "evidence_to_request": [
+        "predictions under each hypothesis",
+        "measurement model",
+        "feasible intervention that yields divergent predictions"
+      ]
+    },
+    {
+      "fixture_id": "PJ-06",
+      "decision_class": "negative_net_decision_value",
+      "context_effect": "must_change",
+      "scenario": "The proposed corrective experiment has positive gross EVSI but direct and opportunity costs exceed the value of the expected decision improvement.",
+      "facts": {
+        "gross_evsi": 0.2,
+        "direct_cost": 0.1,
+        "opportunity_cost": 0.2,
+        "net_evsi": -0.1,
+        "utility_units": "frozen common units"
+      },
+      "original_plan": "Run the corrective experiment because it is informative.",
+      "proposed_correction": "Do not run it; redirect resources to the higher-value alternative and retain the uncertainty.",
+      "expected_disposition": "stop_experiment_negative_net_value",
+      "required_response": [
+        "distinguish information from decision value",
+        "show the direct and opportunity cost arithmetic",
+        "preserve the unresolved uncertainty"
+      ],
+      "prohibited_inference": [
+        "positive information gain implies positive net value",
+        "costs can be omitted after observing the outcome"
+      ],
+      "evidence_to_request": [
+        "frozen utility model",
+        "direct cost ledger",
+        "foregone-alternative estimate"
+      ]
+    },
+    {
+      "fixture_id": "PJ-07",
+      "decision_class": "downside_risk_veto",
+      "context_effect": "must_change",
+      "scenario": "The proposed corrective experiment has positive net EVSI but exceeds the preregistered upper-tail downside-risk constraint.",
+      "facts": {
+        "net_evsi": 0.15,
+        "cvar_confidence": 0.95,
+        "cvar_downside_loss": 12,
+        "max_cvar_downside_loss": 5,
+        "risk_limit_passed": false
+      },
+      "original_plan": "Proceed because expected net value is positive.",
+      "proposed_correction": "Veto or escalate the experiment under the preregistered risk policy.",
+      "expected_disposition": "veto_or_escalate_risk_limit",
+      "required_response": [
+        "report expected value and downside risk separately",
+        "apply the frozen risk threshold",
+        "identify a lower-risk alternative or human escalation"
+      ],
+      "prohibited_inference": [
+        "positive expectation overrides the downside constraint",
+        "the CVaR model captures unmodeled hazards"
+      ],
+      "evidence_to_request": [
+        "outcome-conditioned loss model",
+        "tail estimate and uncertainty",
+        "alternative experiment risk profile"
+      ]
+    },
+    {
+      "fixture_id": "PJ-08",
+      "decision_class": "conflicting_expert_corrections",
+      "context_effect": "must_abstain",
+      "scenario": "Two qualified reviewers provide incompatible corrections based on different unverified assumptions. The current project record cannot distinguish those assumptions.",
+      "facts": {
+        "reviewer_count": 2,
+        "corrections_conflict": true,
+        "assumptions_independently_verified": false,
+        "current_data_identifies_assumption": false
+      },
+      "original_plan": "Continue the incumbent plan without qualification.",
+      "proposed_correction": "Select one correction by reviewer seniority or majority vote.",
+      "expected_disposition": "abstain_request_assumption_discriminating_evidence",
+      "required_response": [
+        "surface the disagreement and underlying assumptions",
+        "avoid authority or vote-count substitution",
+        "propose a test or request adjudication"
+      ],
+      "prohibited_inference": [
+        "reviewer seniority establishes scientific correctness",
+        "disagreement proves both corrections are equally likely"
+      ],
+      "evidence_to_request": [
+        "reviewer rationales",
+        "source evidence behind each assumption",
+        "prospective discriminating experiment"
+      ]
+    },
+    {
+      "fixture_id": "PJ-09",
+      "decision_class": "analysis_integrity_failure",
+      "context_effect": "must_change",
+      "scenario": "A proposed correction claims a large improvement, but the supplied analysis changes units and denominators relative to the frozen evaluator, and the code artifact does not implement the described method.",
+      "facts": {
+        "metric_unit_matches": false,
+        "denominator_matches": false,
+        "method_code_alignment": false,
+        "raw_artifact_available": true
+      },
+      "original_plan": "Treat the reported improvement as verified.",
+      "proposed_correction": "Invalidate the score claim, reconcile units/denominators and rerun the actual method against the frozen evaluator.",
+      "expected_disposition": "invalidate_claim_and_requalify_analysis",
+      "required_response": [
+        "identify each claim-to-artifact mismatch",
+        "prevent the result from entering promotion",
+        "request an independently reproduced analysis"
+      ],
+      "prohibited_inference": [
+        "a polished report validates the score",
+        "a mismatch can be repaired by changing the metric post hoc"
+      ],
+      "evidence_to_request": [
+        "raw outputs",
+        "frozen evaluator version and units",
+        "code/configuration digest",
+        "independent reproduction"
+      ]
+    }
+  ]
+}
