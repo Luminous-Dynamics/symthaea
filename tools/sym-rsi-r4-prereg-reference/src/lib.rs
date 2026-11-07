@@ -335,6 +335,10 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
         "evidence_revalidation_precision_recall",
         "duplicated_experiment_rate",
         "fresh_family_confirmed_yield",
+        "false_cross_scope_sharing_rate",
+        "false_scope_fragmentation_rate",
+        "negative_transfer_by_task_family",
+        "clustered_rollout_utility",
     ];
     let observed_metrics: BTreeSet<String> = at(root, &["research_state_continuity", "metrics"])
         .and_then(Value::as_array)
@@ -343,6 +347,78 @@ fn check_research_state_continuity(report: &mut ValidationReport, root: &Value) 
     for metric in required_metrics {
         if !observed_metrics.contains(metric) {
             report.issue("STATE_METRIC_MISSING", metric);
+        }
+    }
+    let route_scope = at(root, &["research_state_continuity", "scope_routing"]);
+    if route_scope.is_none() {
+        report.issue("STATE_SCOPE_ROUTING_MISSING", "research_state_continuity.scope_routing");
+    }
+    for field in [
+        "scope_descriptor_schema_digest",
+        "router_policy_digest",
+        "route_decision_log_digest",
+        "cluster_scope_manifest_digest",
+    ] {
+        require_sha256(
+            report,
+            root,
+            &["research_state_continuity", "scope_routing", field],
+        );
+    }
+    require_string(
+        report,
+        root,
+        &["research_state_continuity", "scope_routing", "router_access_audit_ref"],
+    );
+    require_string(
+        report,
+        root,
+        &["research_state_continuity", "scope_routing", "sharing_policy"],
+    );
+    for field in [
+        "router_cannot_read_cluster_contents",
+        "router_cannot_access_sealed_labels",
+        "route_fixed_per_task_instance",
+        "cross_cluster_transfer_requires_receipt",
+    ] {
+        require_bool(
+            report,
+            root,
+            &["research_state_continuity", "scope_routing", field],
+            true,
+        );
+    }
+    let required_scope_ablations = [
+        "full_verified_state",
+        "fixed_mechanism_scope_routed_clusters",
+        "adaptive_mechanism_scope_routed_clusters",
+        "shuffled_scope_routing",
+        "oracle_scope_assignment",
+    ];
+    let observed_scope_ablations: BTreeSet<String> =
+        at(root, &["research_state_continuity", "scope_routing", "required_ablation_arms"])
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+            .unwrap_or_default();
+    for arm in required_scope_ablations {
+        if !observed_scope_ablations.contains(arm) {
+            report.issue("STATE_SCOPE_ABLATION_MISSING", arm);
+        }
+    }
+    let required_scope_failures = [
+        "cross_scope_evidence_leakage",
+        "stale_evidence_currentness_inheritance",
+        "unreceipted_cross_cluster_transfer",
+        "hidden_task_label_routing",
+    ];
+    let observed_scope_failures: BTreeSet<String> =
+        at(root, &["research_state_continuity", "scope_routing", "prohibited_failure_modes"])
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+            .unwrap_or_default();
+    for failure in required_scope_failures {
+        if !observed_scope_failures.contains(failure) {
+            report.issue("STATE_SCOPE_FAILURE_MODE_MISSING", failure);
         }
     }
 }
@@ -841,6 +917,44 @@ mod tests {
             Value::String("starting_state.other_candidate".to_owned());
         let report = validate_preregistration(&value);
         assert!(report.issues.iter().any(|issue| issue.starts_with("START_REFERENCE_MISMATCH")));
+    }
+
+    #[test]
+    fn rejects_scope_router_access_to_cluster_contents() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["scope_routing"]["router_cannot_read_cluster_contents"] =
+            Value::Bool(false);
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("BOOLEAN_GUARDRAIL_MISMATCH")));
+    }
+
+    #[test]
+    fn rejects_missing_scope_routing_ablation() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["scope_routing"]["required_ablation_arms"]
+            .as_array_mut()
+            .expect("scope ablation array")
+            .retain(|item| item != "shuffled_scope_routing");
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.starts_with("STATE_SCOPE_ABLATION_MISSING")));
+    }
+
+    #[test]
+    fn rejects_missing_scope_router_audit() {
+        let mut value = valid_specimen();
+        value["research_state_continuity"]["scope_routing"]["router_access_audit_ref"] =
+            Value::String(String::new());
+        let report = validate_preregistration(&value);
+        assert!(report
+            .issues
+            .iter()
+            .any(|issue| issue.contains("router_access_audit_ref")));
     }
 
     #[test]
