@@ -687,7 +687,7 @@ mod tests {
         .unwrap();
         let mut engine = FunctionalSingingEngine::new(24_000);
         let stem = engine.render(&performance).unwrap();
-        assert_eq!(stem.backend, "functional-tract-hdc-cfc");
+        assert_eq!(stem.backend, "functional-tract-kl24-baseline-v1");
         assert!(stem.samples.iter().any(|sample| sample.abs() > 1e-6));
         assert!(stem.samples.iter().all(|sample| sample.is_finite()));
     }
