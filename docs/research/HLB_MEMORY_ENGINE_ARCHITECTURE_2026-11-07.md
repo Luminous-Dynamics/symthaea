@@ -618,3 +618,12 @@ The current HdcLtcUnifiedNetwork has a separate NetworkStateSnapshot intentional
 
 
 A machine-readable source-derived field matrix is available at `docs/research/fixtures/hme_dyn_checkpoint_field_matrix_v0.json`. It distinguishes the actual NetworkStateSnapshot contents from the full neuron/network fields required by LearnerCheckpoint and ReplayCheckpoint. It is a field inventory, not a stable wire schema or executed persistence test.
+
+
+## 21. HDC-LTC bridge projection co-design
+
+New child: [#10981 — HLB-PROJ-CO-DESIGN-001](https://github.com/Luminous-Dynamics/symthaea/issues/10981).
+
+HdcLtcBridge retains dense input/output projection matrices. For 256-wide input/output at 256K dimensions, they represent 512 MiB of logical f32 payload. The output projection's training update is an outer product, hence a rank-one algebraic delta per training step. The new experiment compares current dense matrices, seeded regeneration, structured fast transforms, exact rank-one factor logs and explicitly bounded factor consolidation.
+
+The analytical fixture `docs/research/fixtures/hme_bridge_projection_footprint_v0.json` includes dense footprint, MAC counts and exact factor storage at several D/rank values. It does not report RSS or measured performance.
