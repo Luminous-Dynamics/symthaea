@@ -218,3 +218,32 @@ The branch now includes [hme_query_sampling_and_completion_v0.json](fixtures/hme
 - misses final-coordinate and shifted-phase sparse patterns.
 
 The fixture also contains typed completion cases for ExactComplete, ApproximateComplete, Incomplete after budget exhaustion and UnavailableOrInvalid. These are deterministic contract fixtures, not a benchmark run. The sampling study is owned by #10974; query completion semantics by #10973.
+
+
+## 9. Additional HME research: bounded queries, sampling and certified compression
+
+Three new work packages extend the cross-benchmark programme:
+- [#10973 — HME query budgets](https://github.com/Luminous-Dynamics/symthaea/issues/10973): measure exact-completion probability, approximate quality and incomplete-result behavior under deterministic byte/candidate/coordinate budgets and optional deadlines. A timeout cannot be reported as exact success.
+- [#10974 — phase-balanced approximate similarity](https://github.com/Luminous-Dynamics/symthaea/issues/10974): compare fixed-origin stride with stratified, phase-rotated and adaptive sampling. The fixture includes cases where stride 4 changes full cosine 1.0 to 0.0 and full cosine 0.0 to 1.0.
+- [#10978 — certified compressed exact retrieval](https://github.com/Luminous-Dynamics/symthaea/issues/10978): use compact codes plus verified residual bounds to avoid reading original ContinuousHV payloads for candidates that cannot enter top-k, while exact-scoring every survivor from original payload.
+
+Machine-readable fixtures now on the HME branch:
+- [hme_query_sampling_and_completion_v0.json](fixtures/hme_query_sampling_and_completion_v0.json)
+- [hme_progressive_exact_bounds_v0.json](fixtures/hme_progressive_exact_bounds_v0.json)
+
+The progressive-bound fixture exhaustively enumerated 19,200 small continuous real-arithmetic prefix cases and 768 four-bit binary cases. It found no mathematical under-bound within the declared enumeration tolerance. It also contains a binary64 numerical counterexample: the ordinary floating evaluation of the ContinuousHV Cauchy–Schwarz expression returned 0.4999999999999999 although the full cosine was 0.5, enough to falsely prune at a threshold of 0.49999999999999994. This is why HME requires outward-rounded intervals, not ordinary floating values treated as proofs. These are small synthetic sanity checks, not production proofs or benchmarks.
+
+## 10. Practical competitive positioning
+
+Do not make HME compete as a universal replacement for a modern vector database:
+- On standard 384–3,072D embedding workloads, VIBE and VectorDBBench are the correct algorithm/database reference points; use matched datasets, metrics, filters, recall and hardware.
+- On on-disk vector I/O, MLPerf Storage is the appropriate storage-path reference.
+- On long-term agent memory, LongMemEval, LongMemEval-V2, LoCoMo, TimlMemBench and the Agent Memory Leaderboard are separate downstream tests.
+- On 16K–256K HDC capacity and dynamics, #7772/#7749/#6560/#6561 are the native qualification layer.
+
+A fair head-to-head requires more than equal vector counts. A 16,384D continuous-f32 payload is 64 KiB; a 256K payload is 1 MiB; a 1,536D float32 embedding is 6 KiB. Therefore report both:
+1. **Equal-representation task comparisons** (same underlying corpus and task, each representation scored under its own exact oracle).
+2. **Equal-total-memory / equal-cost comparisons** (include all payloads, codes, indexes, metadata, provenance, journaling, snapshots, cold storage and query CPU).
+3. **Equal-quality Pareto comparisons** (same downstream success / recall floor, then compare bytes, latency and energy with declared measurement boundaries).
+
+If HME uses substantially more bytes per memory than a conventional embedding store, it must demonstrate a task-utility, interference, provenance or state-continuity improvement that justifies the extra footprint. The benchmark must be allowed to show that a conventional embedding or database path wins for a workload; HME should be selected only where its representation-aware semantics are valuable.
