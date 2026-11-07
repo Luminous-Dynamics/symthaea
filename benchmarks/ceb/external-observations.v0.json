@@ -310,6 +310,50 @@
       "supports": [
         "CEB-REVIEW"
       ]
+    },
+    {
+      "source_id": "swe-serve-results",
+      "source_url": "https://research.nvidia.com/benchmarks/swe-serve",
+      "title": "NVIDIA SWE-Serve live results and methodology",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-09-22",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "swe-serve-paper",
+      "source_url": "https://arxiv.org/abs/2609.26777",
+      "title": "SWE-Serve production inference engineering benchmark paper",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-09-22",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "swe-cycle-paper",
+      "source_url": "https://arxiv.org/abs/2605.13139",
+      "title": "SWE-Cycle complete issue resolution cycle benchmark",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-05-13",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "e2e-swe-paper",
+      "source_url": "https://arxiv.org/abs/2609.38335",
+      "title": "E2E-SWE whole-repository generation benchmark",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-09-29",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
     }
   ],
   "comparators": [
@@ -940,6 +984,95 @@
         "71.8% of 13,609 flagged merged PRs had at least one flag still open.",
         "The open flag includes false positives and accepted risk; this is not a defect escape rate or a rate of unremediated true bugs.",
         "Do not mix this PR-level denominator with the suggestion-level denominator of 180,739."
+      ]
+    },
+    {
+      "comparator_id": "swe-serve-production-inference",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Serve",
+      "benchmark_version": "live results accessed 2026-11-07; paper submitted 2026-09-22",
+      "split": "53 production SGLang inference engineering tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 53,
+        "unit": "tasks"
+      },
+      "source_id": "swe-serve-results",
+      "supporting_source_ids": [
+        "swe-serve-paper"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "41 tasks run on one H100 and 12 on CPU; the hardware mix is part of the benchmark contract.",
+        "11 models / 31 effort configurations; fixed mini-SWE-agent harness; three complete runs per configuration.",
+        "Highest displayed mean Pass@1 is 75% for Claude Opus 5 max and GPT-5.6 Sol max; cost/time trade-offs differ significantly.",
+        "The benchmark verifier checks functionality and selected regressions; it explicitly does not claim to assess merge readiness or general code quality.",
+        "This is production inference engineering on SGLang, not a matched CEB repair task population."
+      ]
+    },
+    {
+      "comparator_id": "swe-serve-live-boundary-ablation",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Serve",
+      "benchmark_version": "paper/live-serving ablation accessed 2026-11-07",
+      "split": "19 tasks with E2E serving coverage; full verifier versus E2E checks excluded",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 19,
+        "unit": "E2E_covered_tasks"
+      },
+      "source_id": "swe-serve-paper",
+      "supporting_source_ids": [
+        "swe-serve-results"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Same patches on the 19 E2E-covered tasks: 69.4% pass when E2E checks are excluded versus 45.9% with the full verifier.",
+        "Pooled verifier-scope ablation, not a model-specific leaderboard row.",
+        "This is a verification-boundary effect for the selected serving tasks, not a universal expected E2E penalty."
+      ]
+    },
+    {
+      "comparator_id": "swe-cycle-fullcycle",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Cycle",
+      "benchmark_version": "2026-05-13 paper",
+      "split": "489-instance FullCycle evaluation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 489,
+        "unit": "FullCycle_instances"
+      },
+      "source_id": "swe-cycle-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "489 tasks paired between isolated phase evaluation and FullCycle from a bare repository.",
+        "FullCycle integrates environment reconstruction, implementation and verification-test generation; no human scaffolding is provided.",
+        "No model exceeds 14% strict FullCycle solve in the reported table; GLM-5.1 is highest at 13.50%.",
+        "SWE-Judge combines static and dynamic evaluation; FullCycle judge-human alignment is 96.9% on 489 annotated instances.",
+        "Model list, harness, judge and task population differ from CEB; not a direct CEB pass-rate comparator."
+      ]
+    },
+    {
+      "comparator_id": "e2e-swe-whole-repository",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "E2E-SWE",
+      "benchmark_version": "2026-10-02 paper version",
+      "split": "186 whole-repository generation tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 186,
+        "unit": "whole_repository_tasks"
+      },
+      "source_id": "e2e-swe-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "13 models; four independent runs; fresh empty workspace, installation script and fresh-container hidden tests.",
+        "Claude Opus 5 xhigh reaches 67.7% Pass@1, the highest table result; Fable 5 high reports 65.3%; GPT-5.6 Sol max 61.2%.",
+        "This is greenfield whole-repository generation from implementation-independent specifications, not maintenance of an existing repository or PR review.",
+        "The authors perform static specification/test alignment and rollout-guided task auditing; 59.4% of a separate 138-task SWE-Bench Verified audit is not a result on E2E-SWE."
       ]
     }
   ],
@@ -3844,6 +3977,342 @@
       "notes": [
         "Open flags include false positives and accepted risk; not a true-defect escape rate."
       ]
+    },
+    {
+      "observation_id": "swe-serve-opus5-pass1",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-claude-opus5-max",
+        "model": "Claude Opus 5",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of SWE-Serve tasks resolved on one attempt under the complete verifier.",
+        "value": 75,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75% ± 4%",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±4 percentage points",
+          "margin": 4,
+          "confidence_level": "95% confidence interval",
+          "method": "Source states ± is 95% CI across three complete runs",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": [
+        "SWE-Serve-specific result; not CEB Pass@1."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-gpt56sol-pass1",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of SWE-Serve tasks resolved on one attempt under the complete verifier.",
+        "value": 75,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75% ± 6%",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±6 percentage points",
+          "margin": 6,
+          "confidence_level": "95% confidence interval",
+          "method": "Source states ± is 95% CI across three complete runs",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": [
+        "SWE-Serve-specific result; not CEB Pass@1."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-opus5-cost",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-claude-opus5-max",
+        "model": "Claude Opus 5",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_cost_per_task",
+        "label": "Mean cost per task",
+        "definition": "Mean reported model/API cost per SWE-Serve task; excludes local GPU operating cost where not recorded.",
+        "value": 17,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_task",
+        "direction": "minimize",
+        "raw_display": "$17",
+        "uncertainty": null
+      },
+      "notes": [
+        "Paper/page pricing assumptions; not a live provider quote."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-gpt56sol-cost",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_cost_per_task",
+        "label": "Mean cost per task",
+        "definition": "Mean reported model/API cost per SWE-Serve task; excludes local GPU operating cost where not recorded.",
+        "value": 12,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_task",
+        "direction": "minimize",
+        "raw_display": "$12",
+        "uncertainty": null
+      },
+      "notes": [
+        "Paper/page pricing assumptions; not a live provider quote."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-opus5-time",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-claude-opus5-max",
+        "model": "Claude Opus 5",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_wall_time",
+        "label": "Mean wall time per task",
+        "definition": "Mean end-to-end wall-clock time per SWE-Serve task.",
+        "value": 57.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_task",
+        "direction": "minimize",
+        "raw_display": "57.5 minutes",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-serve-gpt56sol-time",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_wall_time",
+        "label": "Mean wall time per task",
+        "definition": "Mean end-to-end wall-clock time per SWE-Serve task.",
+        "value": 29.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_task",
+        "direction": "minimize",
+        "raw_display": "29.5 minutes",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-serve-no-e2e-pass-rate",
+      "comparator_id": "swe-serve-live-boundary-ablation",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-pooled-configurations",
+        "model": "11 evaluated models; pooled patch set",
+        "harness": "mini-SWE-agent",
+        "configuration": "19 E2E-covered tasks; verifier with live-serving checks excluded"
+      },
+      "metric": {
+        "metric_id": "pass_rate_without_live_e2e",
+        "label": "Pass rate without E2E serving checks",
+        "definition": "Share of pooled patches passing when the live E2E serving checks are excluded from the verifier.",
+        "value": 69.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "69.4%",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-serve-full-verifier-pass-rate",
+      "comparator_id": "swe-serve-live-boundary-ablation",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-pooled-configurations",
+        "model": "11 evaluated models; pooled patch set",
+        "harness": "mini-SWE-agent",
+        "configuration": "19 E2E-covered tasks; complete verifier including live-serving checks"
+      },
+      "metric": {
+        "metric_id": "pass_rate_with_full_verifier",
+        "label": "Pass rate with full E2E verifier",
+        "definition": "Share of pooled patches passing the complete verifier including live E2E serving checks.",
+        "value": 45.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "45.9%",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-cycle-fullcycle-gglm51-solve",
+      "comparator_id": "swe-cycle-fullcycle",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-cycle-glm51-fullcycle",
+        "model": "GLM-5.1",
+        "harness": "SWE-Cycle / SWE-Judge",
+        "configuration": "FullCycle; bare repository; all three phases"
+      },
+      "metric": {
+        "metric_id": "strict_fullcycle_solve_rate",
+        "label": "Strict FullCycle solve rate",
+        "definition": "Fraction of FullCycle instances with a perfect score across environment reconstruction, implementation and test generation.",
+        "value": 13.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "13.50%",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-cycle-fullcycle-judge-human-alignment",
+      "comparator_id": "swe-cycle-fullcycle",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-cycle-judge-fullcycle-human-audit",
+        "model": "SWE-Judge",
+        "harness": "static review plus dynamic execution; human annotation audit",
+        "configuration": "FullCycle; one submission per issue; N=489"
+      },
+      "metric": {
+        "metric_id": "judge_human_alignment",
+        "label": "SWE-Judge / human alignment",
+        "definition": "Fraction of FullCycle judgments aligned with independent human annotations.",
+        "value": 96.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "96.9%",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "e2e-swe-opus5-pass1",
+      "comparator_id": "e2e-swe-whole-repository",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "e2e-swe-claude-opus5-xhigh",
+        "model": "Claude Opus 5",
+        "harness": "E2E-SWE",
+        "configuration": "xhigh; empty workspace; four independent runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of whole-repository generation tasks fully resolved in one attempt; averaged over four independent runs.",
+        "value": 67.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "67.7%",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "e2e-swe-fable5-pass1",
+      "comparator_id": "e2e-swe-whole-repository",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "e2e-swe-claude-fable5-high",
+        "model": "Claude Fable 5",
+        "harness": "E2E-SWE",
+        "configuration": "high; empty workspace; four independent runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of whole-repository generation tasks fully resolved in one attempt; averaged over four independent runs.",
+        "value": 65.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "65.3%",
+        "uncertainty": null
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "e2e-swe-gpt56sol-pass1",
+      "comparator_id": "e2e-swe-whole-repository",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "e2e-swe-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "E2E-SWE",
+        "configuration": "max; empty workspace; four independent runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of whole-repository generation tasks fully resolved in one attempt; averaged over four independent runs.",
+        "value": 61.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "61.2%",
+        "uncertainty": null
+      },
+      "notes": []
     }
   ]
 }
