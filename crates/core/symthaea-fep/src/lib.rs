@@ -149,6 +149,7 @@ pub mod hierarchical_information_gain;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
+pub mod three_ball_partial_observation;
 pub mod three_ball_rule_space;
 pub mod types;
 
