@@ -78,6 +78,174 @@ where
     histogram
 }
 
+/// Build a merge-sort range tree over unique u coordinates.
+///
+/// Each segment-tree node stores the sorted v coordinates of all events whose
+/// u rank lies in that node's interval. A closed axis-aligned rectangle query
+/// is answered in O(log^2 N) using O(N log N) storage.
+fn build_sorted_range_tree(
+    node: usize,
+    left: usize,
+    right: usize,
+    leaves: &[Vec<f64>],
+    tree: &mut [Vec<f64>],
+) {
+    if right - left == 1 {
+        tree[node] = leaves[left].clone();
+        return;
+    }
+    let middle = left + (right - left) / 2;
+    build_sorted_range_tree(node * 2, left, middle, leaves, tree);
+    build_sorted_range_tree(node * 2 + 1, middle, right, leaves, tree);
+
+    let left_values = &tree[node * 2];
+    let right_values = &tree[node * 2 + 1];
+    let mut merged = Vec::with_capacity(left_values.len() + right_values.len());
+    let (mut i, mut j) = (0, 0);
+    while i < left_values.len() && j < right_values.len() {
+        if left_values[i] <= right_values[j] {
+            merged.push(left_values[i]);
+            i += 1;
+        } else {
+            merged.push(right_values[j]);
+            j += 1;
+        }
+    }
+    merged.extend_from_slice(&left_values[i..]);
+    merged.extend_from_slice(&right_values[j..]);
+    tree[node] = merged;
+}
+
+fn count_sorted_range_tree_rectangle(
+    node: usize,
+    left: usize,
+    right: usize,
+    query_left: usize,
+    query_right: usize,
+    v_low: f64,
+    v_high: f64,
+    tree: &[Vec<f64>],
+) -> usize {
+    if query_right <= left || right <= query_left {
+        return 0;
+    }
+    if query_left <= left && right <= query_right {
+        let values = &tree[node];
+        let first = values.partition_point(|value| *value < v_low);
+        let last = values.partition_point(|value| *value <= v_high);
+        return last - first;
+    }
+
+    let middle = left + (right - left) / 2;
+    count_sorted_range_tree_rectangle(
+        node * 2,
+        left,
+        middle,
+        query_left,
+        query_right,
+        v_low,
+        v_high,
+        tree,
+    ) + count_sorted_range_tree_rectangle(
+        node * 2 + 1,
+        middle,
+        right,
+        query_left,
+        query_right,
+        v_low,
+        v_high,
+        tree,
+    )
+}
+
+/// Exact 1+1D open-interval histogram using offline 2D rectangle counting.
+///
+/// The closed coordinate rectangle between causally related endpoints is
+/// queried in O(log^2 N), then all events sharing either endpoint coordinate
+/// are excluded because identical-coordinate events are incomparable.
+/// Every unordered related endpoint pair is visited once. Complexity is
+/// O(N^2 log^2 N) time and O(N log N) memory.
+fn interval_size_histogram_1p1(events: &[Event2D]) -> Vec<u64> {
+    use std::collections::HashMap;
+
+    let event_count = events.len();
+    let mut histogram = vec![0_u64; event_count.saturating_sub(1)];
+    if event_count < 2 {
+        return histogram;
+    }
+
+    let mut ordered: Vec<(f64, f64)> =
+        events.iter().map(|event| (event.u, event.v)).collect();
+    ordered.sort_by(|left, right| {
+        left.0
+            .total_cmp(&right.0)
+            .then_with(|| left.1.total_cmp(&right.1))
+    });
+
+    let mut u_coordinates = Vec::new();
+    let mut leaves: Vec<Vec<f64>> = Vec::new();
+    for (u, v) in ordered {
+        if u_coordinates.last().is_none_or(|previous| *previous != u) {
+            u_coordinates.push(u);
+            leaves.push(Vec::new());
+        }
+        leaves.last_mut().expect("a u-coordinate leaf exists").push(v);
+    }
+
+    let unique_u_count = u_coordinates.len();
+    let mut range_tree = vec![Vec::new(); unique_u_count * 4 + 4];
+    build_sorted_range_tree(1, 0, unique_u_count, &leaves, &mut range_tree);
+
+    let mut coordinate_multiplicity: HashMap<(u64, u64), usize> =
+        HashMap::with_capacity(event_count);
+    for event in events {
+        *coordinate_multiplicity
+            .entry((event.u.to_bits(), event.v.to_bits()))
+            .or_insert(0) += 1;
+    }
+
+    for first_index in 0..event_count {
+        for second_index in (first_index + 1)..event_count {
+            let first = events[first_index];
+            let second = events[second_index];
+            let (past, future) = if first.causally_precedes(second) {
+                (first, second)
+            } else if second.causally_precedes(first) {
+                (second, first)
+            } else {
+                continue;
+            };
+
+            let query_left = u_coordinates.partition_point(|u| *u < past.u);
+            let query_right = u_coordinates.partition_point(|u| *u <= future.u);
+            let closed_rectangle_count = count_sorted_range_tree_rectangle(
+                1,
+                0,
+                unique_u_count,
+                query_left,
+                query_right,
+                past.v,
+                future.v,
+                &range_tree,
+            );
+            let endpoint_duplicates = coordinate_multiplicity
+                .get(&(past.u.to_bits(), past.v.to_bits()))
+                .copied()
+                .unwrap_or(0)
+                + coordinate_multiplicity
+                    .get(&(future.u.to_bits(), future.v.to_bits()))
+                    .copied()
+                    .unwrap_or(0);
+            let interior_count = closed_rectangle_count
+                .checked_sub(endpoint_duplicates)
+                .expect("both endpoint-coordinate groups lie in the closed interval");
+            histogram[interior_count] += 1;
+        }
+    }
+
+    histogram
+}
+
 /// One sprinkled event in 1+1D Minkowski spacetime, represented in null
 /// coordinates u = t + x and v = t - x.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -347,9 +515,7 @@ impl CausalSet2D {
     /// strictly between the endpoints. The histogram is invariant under
     /// order-preserving relabelling and Lorentz boosts of the embedding.
     pub fn interval_size_histogram(&self) -> Vec<u64> {
-        interval_size_histogram_by(self.events.len(), |first, second| {
-            self.events[first].causally_precedes(self.events[second])
-        })
+        interval_size_histogram_1p1(&self.events)
     }
 
     /// Dimensionless two-dimensional Benincasa-Dowker action bracket.
