@@ -911,6 +911,21 @@ mod tests {
         let one_cycle = PhaseSample::from_unwrapped_radians(std::f64::consts::TAU).unwrap();
         assert_eq!(one_cycle.cycle_index(), 1);
         assert_eq!(one_cycle.fractional_phase().microturns(), 0);
+        // Phase intentionally wraps away winding; PhaseSample retains it.
+        assert_eq!(
+            Phase::from_unwrapped_radians(std::f64::consts::TAU)
+                .unwrap()
+                .microturns(),
+            0
+        );
+        assert_eq!(
+            Phase::from_unwrapped_radians(f64::NAN),
+            Err(PhaseError::NonFinitePhase)
+        );
+        assert_eq!(
+            Phase::from_unwrapped_radians(1.0e300),
+            Err(PhaseError::PhaseOutOfRange)
+        );
 
         let before = PhaseSample::from_unwrapped_radians(0.99 * std::f64::consts::TAU).unwrap();
         let after = PhaseSample::from_unwrapped_radians(1.01 * std::f64::consts::TAU).unwrap();
