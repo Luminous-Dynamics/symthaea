@@ -704,7 +704,11 @@ pub fn minimum_campaign_cycle_slip_separation(
     models: &[ModelSignature],
 ) -> Result<u64, PhaseError> {
     let by_probe = minimum_pairwise_cycle_slip_separation(models)?;
-    by_probe.values().copied().min().ok_or(PhaseError::EmptyProbeGrid)
+    by_probe
+        .values()
+        .copied()
+        .min()
+        .ok_or(PhaseError::EmptyProbeGrid)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
