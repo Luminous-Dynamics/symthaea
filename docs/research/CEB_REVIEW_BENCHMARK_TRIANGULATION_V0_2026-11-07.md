@@ -143,6 +143,21 @@ Orujlu et al.'s **Partially Observed Structural Causal Models** (UAI 2026, PMLR 
 
 **CEB implication:** this is the theoretical basis for the new [Causal-Identifiability Protocol V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md). A code reviewer should preserve material evidence-compatible models, identify a query on which they disagree, and request the minimum safe observation that distinguishes them. If no admissible discriminating evidence exists, the correct output is a bounded or non-identifiable claim—not an invented consensus graph.
 
+### 2.12A Causal claim types — source possibility is not incident attribution
+
+The current literature spans different causal targets. CEB should label the target claim before comparing methods:
+
+| Claim type | What the method can establish under its contract | Key limitation |
+|---|---|---|
+| Source structural possibility | A source path can reach a state under stated conditions | Does not show that the build selects it or a run executes it |
+| Build-world selection | Which feature/target-conditioned implementation is in an exact artifact | Does not show that the path was exercised |
+| Execution realization | A qualified trace/slice records a path in a particular run | Does not establish that the path was the actual cause |
+| Actual-cause attribution | A realized factor is a cause under a declared context-specific causal model/semantics | Depends on model, actual context and counterfactual criterion |
+| Interventional-effect identifiability | All admissible evidence-compatible models agree on the effect of a specified intervention | Does not establish that a historical incident occurred |
+| Incident attribution | Source/artifact/event identity and causal evidence bind the mechanism to a named incident | Does not automatically generalize beyond that incident's scope |
+
+This distinction matters for the three nearby research strands: SoftReX's actual-causality/responsibility ranking is an execution-/mutation-grounded localization target; CausalRepair's dynamic slice is an executed dependency context for a failing test; POSCMs' identifiability theory asks when interventional claims are uniquely determined across compatible partially observed models. They are complementary, not interchangeable. Do not rank their metrics together or claim that a source-only reviewer has established an incident cause merely because it produced a plausible topology.
+
 ### 2.12 AACR-Bench — holistic repository context
 
 AACR-Bench reports **200 real PRs from 50 active projects across 10 languages**, with full repository context and an AI-assisted, expert-verified annotation pipeline. The authors report a 285% increase in annotated defect coverage relative to their prior comparison baseline; that is a dataset-coverage claim, not evidence that a model improved by 285%. It is especially relevant to multi-file reasoning, caller discovery, cross-file tracking and the impact of context granularity/retrieval. The benchmark does not itself establish causal intervention prediction or residual-path correctness. [Paper](https://arxiv.org/abs/2601.19494) · [benchmark repository](https://github.com/alibaba/aacr-bench).
@@ -268,7 +283,7 @@ These are prospective aspirations, not achievements. Do not pick thresholds afte
 
 Move from **“Did the model point at the bug?”** to **“Can the reviewer discover, explain, evidence, challenge and communicate the defect accurately at the right cost?”** This is a more meaningful engineering standard than optimizing comment count, lexical overlap, pass rate or a single composite leaderboard score.
 
-A further step is to ask **“Which causal conclusions are identifiable from the evidence actually available?”** Require a compatible-model set, claim-specific identifiability disposition and minimum discriminating evidence request. This prevents a coherent but underdetermined graph from being rewarded as a proven cause. The three development levels are I0 unstructured diagnosis, I1 causal topology, and I2 topology plus identifiability. I2 is exploratory and does not change the registered Phase A/B/C hypotheses.
+A further step is to ask **“Which causal conclusions are identifiable from the evidence actually available?”** Require a compatible-model set, claim-specific identifiability disposition and minimum discriminating evidence request. This prevents a coherent but underdetermined graph from being rewarded as a proven cause. The three development levels are I0 unstructured diagnosis, I1 causal topology, and I2 topology plus identifiability. I2 is exploratory and does not change the registered Phase A/B/C hypotheses. Also record the claim kind: source structural possibility, build-world selection, execution realization, actual-cause attribution, interventional-effect identifiability, or incident attribution. These distinctions prevent one evidence type from silently proving a stronger claim.
 
 ### Causal topology as the next research extension
 
