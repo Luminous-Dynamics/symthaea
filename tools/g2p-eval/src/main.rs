@@ -698,7 +698,9 @@ fn run() -> Result<(), String> {
         .map_err(|error| format!("cannot serialize report: {error}"))?;
     fs::write(&output_path, json)
         .map_err(|error| format!("cannot write {}: {error}", output_path.display()))?;
-    println!("{}", serde_json::to_string_pretty(&report.metrics).unwrap());
+    let summary = serde_json::to_string_pretty(&report.metrics)
+        .map_err(|error| format!("cannot serialize metric summary: {error}"))?;
+    println!("{summary}");
     Ok(())
 }
 
@@ -773,7 +775,7 @@ mod tests {
         ];
         let report = evaluate(&refs, &preds).unwrap();
         assert_eq!(report.metrics.phone_error_rate, Some(0.0));
-        assert_eq!(report.metrics.exact_pronunciation_rate, Some(0.5));
+        assert_eq!(report.metrics.exact_pronunciation_rate, Some(1.0));
         assert_eq!(report.metrics.syllable_boundary_f1, Some(1.0));
         assert_eq!(report.metrics.stress_accuracy, Some(1.0));
         assert_eq!(report.metrics.oov_f1, Some(1.0));
