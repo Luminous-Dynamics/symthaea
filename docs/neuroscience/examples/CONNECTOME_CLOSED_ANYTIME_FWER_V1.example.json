@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "family_id": "phase-response-closed-family-v1",
+  "claim_scope": "synthetic_known_truth",
+  "requested_guarantee": "FWER",
+  "registered_before_confirmatory_outcomes": true,
+  "confirmation_lockbox_opened_before_freeze": false,
+  "family_commitment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "global_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "confirmation_split_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "alpha": "1/5",
+  "claims": [
+    {
+      "claim_id": "H1-local-reset",
+      "null_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "global_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "confirmation_split_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "e_process_values": [
+        "1",
+        "5",
+        "20"
+      ]
+    },
+    {
+      "claim_id": "H2-off-diagonal-transfer",
+      "null_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "global_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "confirmation_split_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "e_process_values": [
+        "1",
+        "4",
+        "15"
+      ]
+    },
+    {
+      "claim_id": "H3-contact-modulation",
+      "null_spec_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "global_filtration_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "confirmation_split_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "e_process_values": [
+        "1",
+        "3/2",
+        "2"
+      ]
+    }
+  ],
+  "oracle_expectations": {
+    "intersection_count": 7,
+    "threshold": "5",
+    "intersections": [
+      {
+        "claim_ids": [
+          "H1-local-reset"
+        ],
+        "stage_two_value": "20"
+      },
+      {
+        "claim_ids": [
+          "H2-off-diagonal-transfer"
+        ],
+        "stage_two_value": "15"
+      },
+      {
+        "claim_ids": [
+          "H3-contact-modulation"
+        ],
+        "stage_two_value": "2"
+      },
+      {
+        "claim_ids": [
+          "H1-local-reset",
+          "H2-off-diagonal-transfer"
+        ],
+        "stage_two_value": "35/2"
+      },
+      {
+        "claim_ids": [
+          "H1-local-reset",
+          "H3-contact-modulation"
+        ],
+        "stage_two_value": "11"
+      },
+      {
+        "claim_ids": [
+          "H2-off-diagonal-transfer",
+          "H3-contact-modulation"
+        ],
+        "stage_two_value": "17/2"
+      },
+      {
+        "claim_ids": [
+          "H1-local-reset",
+          "H2-off-diagonal-transfer",
+          "H3-contact-modulation"
+        ],
+        "stage_two_value": "37/3"
+      }
+    ],
+    "elementary_decisions": [
+      {
+        "claim_id": "H1-local-reset",
+        "first_rejection_stage": 2
+      },
+      {
+        "claim_id": "H2-off-diagonal-transfer",
+        "first_rejection_stage": 2
+      },
+      {
+        "claim_id": "H3-contact-modulation",
+        "first_rejection_stage": null
+      }
+    ],
+    "family_fwer_bound": "1/5"
+  }
+}
