@@ -604,3 +604,16 @@ Benchmark not only the numeric posterior but also semantic integrity:
 - replayable input/result digests and abstention.
 
 This extends standard PGM numerical benchmarks into evidence-qualified decision benchmarks, without claiming that a correct posterior proves true source data or an adequate causal/physical model.
+
+
+### Additional industrial probabilistic-programming comparators — 2026-11-07
+
+- **PyMC 6.4.0** (released 2026-11-01): probabilistic programming with NUTS/MCMC, nutpie, Numba/JAX backends, automatic marginalization of discrete latent variables via pymc-extras, Pathfinder and DADVI. Compare on continuous/hierarchical parameter inference, mixed discrete-continuous models, posterior calibration and effective sample throughput. Track ESS/sec, MCSE, R-hat, divergences, energy diagnostics, posterior predictive scores, wall time and memory. Do not compare raw posterior probabilities from different parameterizations or priors.
+  - https://pypi.org/project/pymc/6.4.0/
+  - https://www.pymc.io/blog/pymc_v6_ecosystem_updates.html
+
+- **Stan 2.40.0** (released 2026-09-16): mature probabilistic programming and HMC ecosystem. Compare where continuous parameter posterior inference is the actual task, with matched priors, transforms, precision, warmup and convergence gates. Include CmdStan 2.40; record exact binary/version and compiler flags.
+  - https://github.com/stan-dev/stan/releases
+  - https://blog.mc-stan.org/2026/
+
+These are not replacements for finite exact variable elimination. Their role is to challenge continuous-parameter and hierarchical uncertainty workflows where Markov-chain or variational inference is appropriate. Our exact finite rational engine can serve as a tiny discrete latent-variable oracle; for a fair comparison, integrate over the same discrete states and hold continuous parameters/data fixed or compare posterior summaries after matched marginalization.
