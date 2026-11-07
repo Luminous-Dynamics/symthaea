@@ -396,6 +396,18 @@ between competing hypotheses, not simply to the most complex simulation.
     O(N²) brute-force oracle through at least N=2,048; then target N=10^5 and
     N=10^6 for throughput and peak-memory measurements. Performance targets
     are not claims until measured on a named machine, exact commit and seed.
+11. Open-interval cardinality histogram: compare bitset counts against a
+    cubic brute-force oracle on all small posets; verify invariance under
+    Lorentz boosts in D=2,3,4 and test empty/chain/antichain/duplicate-coordinate
+    controls.
+12. BDG action readiness: once the dimension-specific coefficients and
+    boundary conventions are independently fixed, compare every interval
+    abundance and total action against an independent implementation, then
+    test ensemble means and variance against continuum-curvature references.
+13. Complexity comparison: separate classical algorithms from quantum
+    counting results. A 2026 PR Research paper gives a ~O(N²) quantum algorithm
+    for BDG action evaluation; compare the correct oracle/query/hardware model
+    rather than treating that quantum complexity as a classical Rust target.
 
 ### Time crystals
 
