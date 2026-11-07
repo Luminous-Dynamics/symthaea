@@ -131,6 +131,14 @@ pub enum QuantifiedStrategyError {
     DuplicateStrategyFunction {
         variable: usize,
     },
+    StrategyFunctionCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    StrategyFunctionsNotCanonical {
+        previous: usize,
+        current: usize,
+    },
     MissingStrategyFunction {
         variable: usize,
     },
@@ -667,8 +675,25 @@ pub fn verify_winning_strategy(
         }
     }
 
+    if strategy.functions.len() != expected_controlled.len() {
+        return Err(QuantifiedStrategyError::StrategyFunctionCountMismatch {
+            expected: expected_controlled.len(),
+            actual: strategy.functions.len(),
+        });
+    }
+
     let mut functions = BTreeMap::new();
+    let mut previous_variable = None;
     for function in &strategy.functions {
+        if let Some(previous) = previous_variable {
+            if function.variable <= previous {
+                return Err(QuantifiedStrategyError::StrategyFunctionsNotCanonical {
+                    previous,
+                    current: function.variable,
+                });
+            }
+        }
+        previous_variable = Some(function.variable);
         let variable = function.variable;
         let actual_quantifier = prefix
             .blocks()
@@ -1206,6 +1231,123 @@ mod tests {
                 owner: StrategyOwner::Existential
             }
         );
+    }
+
+    #[test]
+    fn independent_checker_rejects_oversized_strategy_function_list() {
+        let problem = equality_problem();
+        let prefix = make_prefix(
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
+            2,
+        );
+        let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
+        result.strategy.functions.push(result.strategy.functions[0].clone());
+        assert_eq!(
+            verify_winning_strategy(&problem, &prefix, &result.strategy, budget()).unwrap_err(),
+            QuantifiedStrategyError::StrategyFunctionCountMismatch {
+                expected: 1,
+                actual: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn independent_checker_rejects_noncanonical_function_order() {
+        let problem = CnfProblem {
+            variables: vec!["x".into(), "y".into()],
+            clauses: vec![],
+        };
+        let prefix = make_prefix(
+            vec![
+                block(Quantifier::Exists, &[1, 0]),
+            ],
+            2,
+        );
+        let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
+        result.strategy.functions.reverse();
+        assert!(matches!(
+            verify_winning_strategy(&problem, &prefix, &result.strategy, budget()),
+            Err(QuantifiedStrategyError::StrategyFunctionsNotCanonical { .. })
+        ));
+    }
+
+    #[test]
+    fn generated_three_variable_qbf_prefixes_match_independent_game_oracle() {
+        let mut state = 0xbb67_ae85_84ca_a73bu64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(2_862_933_555_777_941_757)
+                .wrapping_add(3_037_000_493);
+            state
+        };
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+            Literal::positive(2),
+            Literal::negative(2),
+        ];
+        let orders = [
+            [0usize, 1usize, 2usize],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+
+        for formula_index in 0..64 {
+            let clause_count = (next() % 5) as usize;
+            let mut clauses = Vec::with_capacity(clause_count);
+            for _ in 0..clause_count {
+                let literal_count = (next() % 5) as usize;
+                let mut clause = Vec::with_capacity(literal_count);
+                for _ in 0..literal_count {
+                    clause.push(literals[(next() % literals.len() as u64) as usize]);
+                }
+                clauses.push(clause);
+            }
+            let problem = CnfProblem {
+                variables: vec!["x".into(), "y".into(), "z".into()],
+                clauses,
+            };
+
+            for order in orders {
+                for quantifier_mask in 0..8usize {
+                    let blocks: Vec<_> = order
+                        .iter()
+                        .enumerate()
+                        .map(|(position, &variable)| {
+                            block(
+                                if ((quantifier_mask >> position) & 1) == 0 {
+                                    Quantifier::ForAll
+                                } else {
+                                    Quantifier::Exists
+                                },
+                                &[variable],
+                            )
+                        })
+                        .collect();
+                    let prefix = make_prefix(blocks, 3);
+                    let expected = independent_qbf_oracle(&problem, &prefix);
+                    let result =
+                        evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
+                    assert_eq!(
+                        result.value,
+                        expected,
+                        "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
+                    );
+                    let checked =
+                        verify_winning_strategy(&problem, &prefix, &result.strategy, budget())
+                            .unwrap();
+                    assert_eq!(checked.opponent_assignments_checked, result.verification.opponent_assignments_checked);
+                }
+            }
+        }
     }
 
     #[test]
