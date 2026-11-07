@@ -8,6 +8,7 @@
 //! all representable; none is silently converted into a feasible aircraft claim.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 /// Versioned wire contract for an aircraft design study.
@@ -18,6 +19,44 @@ pub const AIRCRAFT_EVALUATION_PROPOSAL_SCHEMA_VERSION: &str =
 /// Versioned wire contract for a returned evaluation record.
 pub const AIRCRAFT_EVALUATION_RECEIPT_SCHEMA_VERSION: &str =
     "aircraft-evaluation-receipt/0.1.0";
+
+/// Canonically serialize a value as UTF-8 JSON with recursively sorted object
+/// keys, compact separators and preserved array order, then compute SHA-256.
+/// This binds the serialized payload deterministically; it does not authenticate
+/// artifact sources or establish physical truth.
+pub fn canonical_sha256<T: Serialize>(value: &T) -> Result<String, String> {
+    let value = serde_json::to_value(value)
+        .map_err(|error| format!("cannot serialize canonical payload: {error}"))?;
+    let canonical = canonicalize_json(value);
+    let bytes = serde_json::to_vec(&canonical)
+        .map_err(|error| format!("cannot encode canonical JSON: {error}"))?;
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(64);
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(&mut encoded, "{byte:02x}")
+            .map_err(|error| format!("cannot encode SHA-256 digest: {error}"))?;
+    }
+    Ok(encoded)
+}
+
+fn canonicalize_json(value: serde_json::Value) -> serde_json::Value {
+    match value {
+        serde_json::Value::Array(items) => {
+            serde_json::Value::Array(items.into_iter().map(canonicalize_json).collect())
+        }
+        serde_json::Value::Object(object) => {
+            let mut entries = object.into_iter().collect::<Vec<_>>();
+            entries.sort_by(|left, right| left.0.cmp(&right.0));
+            let mut sorted = serde_json::Map::new();
+            for (key, value) in entries {
+                sorted.insert(key, canonicalize_json(value));
+            }
+            serde_json::Value::Object(sorted)
+        }
+        scalar => scalar,
+    }
+}
 
 /// Immutable reference to a separately owned artifact.
 ///
@@ -82,6 +121,12 @@ pub struct AircraftStudyManifest {
 }
 
 impl AircraftStudyManifest {
+    /// Canonical identity of the frozen manifest and every referenced digest.
+    pub fn canonical_sha256(&self) -> Result<String, String> {
+        self.validate()?;
+        canonical_sha256(self)
+    }
+
     pub fn validate(&self) -> Result<(), String> {
         if self.schema_version != AIRCRAFT_STUDY_SCHEMA_VERSION {
             return Err("unsupported aircraft study schema version".to_owned());
@@ -148,6 +193,8 @@ impl AircraftStudyManifest {
     ) -> Result<ProposalReview, String> {
         self.validate()?;
         proposal.validate_shape()?;
+        let study_sha256 = self.canonical_sha256()?;
+        let proposal_sha256 = proposal.canonical_sha256()?;
 
         if !self.mission.matches_sha256(&proposal.mission_sha256) {
             return Err("proposal mission digest does not match frozen study".to_owned());
@@ -188,6 +235,8 @@ impl AircraftStudyManifest {
 
         Ok(ProposalReview {
             proposal_id: proposal.proposal_id.clone(),
+            study_sha256,
+            proposal_sha256,
             disposition,
             execution_started: false,
             remaining_budget_units: remaining,
@@ -215,6 +264,9 @@ impl AircraftStudyManifest {
             return Err("receipt references a proposal that was not eligible for review".to_owned());
         }
         receipt.validate_shape()?;
+        let study_sha256 = proposal_review.study_sha256.clone();
+        let proposal_sha256 = proposal_review.proposal_sha256.clone();
+        let receipt_sha256 = receipt.canonical_sha256()?;
         if receipt.proposal_id != proposal.proposal_id {
             return Err("receipt proposal identity mismatch".to_owned());
         }
@@ -263,6 +315,9 @@ impl AircraftStudyManifest {
 
         Ok(ReceiptReview {
             receipt_id: receipt.receipt_id.clone(),
+            study_sha256,
+            proposal_sha256,
+            receipt_sha256,
             disposition,
             actual_cost_units: receipt.cost_units_consumed,
             budget_overrun_units: receipt.cost_units_consumed.saturating_sub(actual_remaining),
@@ -292,6 +347,12 @@ pub struct AircraftEvaluationProposal {
 }
 
 impl AircraftEvaluationProposal {
+    /// Canonical identity of the exact proposal payload.
+    pub fn canonical_sha256(&self) -> Result<String, String> {
+        self.validate_shape()?;
+        canonical_sha256(self)
+    }
+
     fn validate_shape(&self) -> Result<(), String> {
         if self.schema_version != AIRCRAFT_EVALUATION_PROPOSAL_SCHEMA_VERSION {
             return Err("unsupported aircraft evaluation proposal schema version".to_owned());
@@ -327,6 +388,8 @@ pub enum ProposalDisposition {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProposalReview {
     pub proposal_id: String,
+    pub study_sha256: String,
+    pub proposal_sha256: String,
     pub disposition: ProposalDisposition,
     pub execution_started: bool,
     pub remaining_budget_units: u64,
@@ -375,6 +438,12 @@ pub struct AircraftEvaluationReceipt {
 }
 
 impl AircraftEvaluationReceipt {
+    /// Canonical identity of the exact returned receipt payload.
+    pub fn canonical_sha256(&self) -> Result<String, String> {
+        self.validate_shape()?;
+        canonical_sha256(self)
+    }
+
     fn validate_shape(&self) -> Result<(), String> {
         if self.schema_version != AIRCRAFT_EVALUATION_RECEIPT_SCHEMA_VERSION {
             return Err("unsupported aircraft evaluation receipt schema version".to_owned());
@@ -412,6 +481,9 @@ pub enum ReceiptDisposition {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptReview {
     pub receipt_id: String,
+    pub study_sha256: String,
+    pub proposal_sha256: String,
+    pub receipt_sha256: String,
     pub disposition: ReceiptDisposition,
     pub actual_cost_units: u64,
     pub budget_overrun_units: u64,
