@@ -1,0 +1,76 @@
+name: G2P reference evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/g2p-eval/**"
+      - ".github/workflows/g2p-reference-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-scorer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "G2P_EVAL_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check isolated evaluator
+        run: rustfmt +1.96.0 --edition 2024 --check tools/g2p-eval/src/main.rs
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/g2p-eval/Cargo.toml
+
+      - name: Run evaluator contract tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/g2p-eval/Cargo.toml
+
+      - name: Score synthetic positive and negative fixtures
+        run: |
+          cargo +1.96.0 run --locked --manifest-path tools/g2p-eval/Cargo.toml -- \
+            --references tools/g2p-eval/fixtures/references.jsonl \
+            --predictions tools/g2p-eval/fixtures/candidate.jsonl \
+            --output g2p-reference-report.json
+
+      - name: Verify exact synthetic-control expectations
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          with open("g2p-reference-report.json", encoding="utf-8") as f:
+              report = json.load(f)
+          metrics = report["metrics"]
+          assert metrics["phone_error_rate"] == 0.0, metrics
+          assert metrics["exact_pronunciation_rate"] == 1.0, metrics
+          assert metrics["oov_f1"] == 1.0, metrics
+          assert metrics["syllable_boundary_f1"] == 1.0, metrics
+          assert metrics["stress_accuracy"] == 1.0, metrics
+          PY
+
+      - name: Upload synthetic scorer receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2p-reference-eval-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            g2p-reference-report.json
+            tools/g2p-eval/Cargo.lock
+          if-no-files-found: error
