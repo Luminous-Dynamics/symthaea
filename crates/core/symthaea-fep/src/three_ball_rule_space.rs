@@ -1756,5 +1756,4 @@ mod tests {
             score.expected_free_energy_nats.is_finite() && score.model_information_gain_nats >= 0.0
         }));
     }
-
 }
