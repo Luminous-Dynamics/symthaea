@@ -11,8 +11,8 @@
   ],
   "candidate": [
     -1,
-    0.8,
-    0.2,
+    0.75,
+    0.25,
     -0.5
   ],
   "blocks": [
@@ -35,8 +35,8 @@
         2
       ],
       "q_norm": 1,
-      "x_norm": 0.8,
-      "exact_dot": 0.8,
+      "x_norm": 0.75,
+      "exact_dot": 0.75,
       "exact_bound_slack_reduction": 0,
       "payload_bytes": 4
     },
@@ -47,8 +47,8 @@
         3
       ],
       "q_norm": 1,
-      "x_norm": 0.2,
-      "exact_dot": 0.2,
+      "x_norm": 0.25,
+      "exact_dot": 0.25,
       "exact_bound_slack_reduction": 0,
       "payload_bytes": 4
     },
@@ -83,8 +83,10 @@
         0.5,
         -0.5
       ],
-      "blocks_read_before_strict_prune": 4,
-      "safe_to_prune": true
+      "blocks_read_before_termination": 4,
+      "terminated_before_full_payload": false,
+      "termination_kind": "fully_scored_then_not_in_top_k",
+      "exact_result_agrees": true
     },
     {
       "order_id": "exact_slack_oracle_order",
@@ -98,8 +100,10 @@
         0.5,
         -0.5
       ],
-      "blocks_read_before_strict_prune": 2,
-      "safe_to_prune": true,
+      "blocks_read_before_termination": 2,
+      "terminated_before_full_payload": true,
+      "termination_kind": "strict_bound_prune",
+      "exact_result_agrees": true,
       "note": "This is a hindsight oracle order computed from exact block dots. It demonstrates the potential value of a predictor but is not itself a deployable ordering policy."
     },
     {
@@ -115,8 +119,10 @@
         0.5,
         -0.5
       ],
-      "blocks_read_before_strict_prune": 3,
-      "safe_to_prune": true
+      "blocks_read_before_termination": 3,
+      "terminated_before_full_payload": true,
+      "termination_kind": "strict_bound_prune",
+      "exact_result_agrees": true
     }
   ],
   "mathematical_identity": {
