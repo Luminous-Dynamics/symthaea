@@ -3,7 +3,6 @@ name: Strict vocal phoneme contract
 on:
   pull_request:
     paths:
-      - "src/voice/functional_singing.rs"
       - "src/voice/mod.rs"
       - "src/voice/singing_engine.rs"
       - "Cargo.toml"
@@ -54,10 +53,13 @@ jobs:
           components: rustfmt
 
       - name: Format-check only the changed Rust files
-        run: rustfmt +1.96.0 --edition 2024 --check src/voice/functional_singing.rs src/voice/mod.rs src/voice/singing_engine.rs
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs
 
       - name: Compile the feature-gated vocal renderer with frozen dependencies
         run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
+
+      - name: Test VocalPerformance construction and fail-closed validation
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::singing_engine::tests -- --test-threads=1
 
       - name: Confirm the frozen lockfile remained unchanged
         run: git diff --exit-code -- Cargo.lock
