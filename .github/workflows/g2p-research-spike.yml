@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "tools/g2p-spike/**"
+      - "crates/domains/symthaea-muse/src/singing_bridge.rs"
       - ".github/workflows/g2p-research-spike.yml"
   workflow_dispatch:
 
@@ -33,6 +34,17 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
 
+      - name: Install pinned Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test reference scorer and syntax-check G2P tools
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/g2p-spike/score_reference.py tools/g2p-spike/test_score_reference.py
+          python3 -m unittest discover -s tools/g2p-spike -p 'test_*.py' -v
+
       - name: Compile and test isolated G2P spike
         run: cargo +1.96.0 test --manifest-path tools/g2p-spike/Cargo.toml
 
@@ -49,4 +61,8 @@ jobs:
           path: |
             piper-plus-g2p-spike.tsv
             piper-plus-g2p-spike.revision
+            tools/g2p-spike/references.template.csv
+            tools/g2p-spike/score_reference.py
+            tools/g2p-spike/README.md
+            tools/g2p-spike/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
