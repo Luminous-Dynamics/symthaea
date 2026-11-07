@@ -558,7 +558,8 @@ mod tests {
     ) -> DirichletActionPrediction {
         // Column order is choice (outer), gaze, right, centre, left (inner).
         let choice_index = choice.map(|value| value as usize).unwrap_or(3);
-        let gaze_index = gaze.map(|value| value as usize).unwrap_or(3);
+        // Gaze state order in the SPM tensor is start, left, centre, right.
+        let gaze_index = gaze.map(|value| 1 + value as usize).unwrap_or(0);
         let [left, centre, right] = ball_colours.map(|value| value as usize);
         let column_index =
             choice_index * 4 * 27 + gaze_index * 27 + right * 9 + centre * 3 + left * 1;
