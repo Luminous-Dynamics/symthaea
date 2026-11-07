@@ -7,7 +7,6 @@
 //! that the verifier's semantic classifications are correct.
 
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 const SCHEMA_VERSION: &str = "ar5b-direction-board-campaign-v0";
@@ -436,9 +435,8 @@ pub fn validate_campaign(campaign: &Campaign) -> Vec<String> {
 }
 
 fn build_states(campaign: &Campaign, global_prior: f64) -> Vec<CandidateState> {
-    let mut states = Vec::with_capacity(
-        campaign.directions.len() + usize::from(campaign.new_direction_option.enabled),
-    );
+    let extra_candidate = if campaign.new_direction_option.enabled { 1 } else { 0 };
+    let mut states = Vec::with_capacity(campaign.directions.len() + extra_candidate);
     for direction in &campaign.directions {
         let (total_count, valid_count, raw_rate, _) = summarize_history(&direction.history);
         let shrink_weight =
@@ -652,6 +650,26 @@ mod tests {
 
     fn from_value(value: Value) -> Campaign {
         serde_json::from_value(value).expect("mutated campaign deserializes")
+    }
+
+    fn direction(id: &str, digest_char: char) -> Direction {
+        let digest = digest_char.to_string().repeat(64);
+        Direction {
+            direction_id: id.to_owned(),
+            canonical_fingerprint: digest.clone(),
+            target_capability_digest: digest.clone(),
+            solution_object_digest: digest.clone(),
+            construction_principle_digest: digest.clone(),
+            scope_assumptions_digest: digest,
+            verifier_assignment_ref: format!("verifier://synthetic/{id}"),
+            protected_floor_audit_ref: format!("audit://synthetic/{id}"),
+            status: DirectionStatus::Qualified,
+            protected_capability_floor_passed: true,
+            local_best_score: 0.5,
+            estimated_cost_per_evaluation: 10.0,
+            max_share_bps: 10_000,
+            history: Vec::new(),
+        }
     }
 
     #[test]
