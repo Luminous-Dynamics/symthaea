@@ -78,6 +78,7 @@ pub mod communication_adapter;
 pub mod crystal_reservoir;
 pub mod discovery;
 pub mod dtw_align;
+pub mod encoder_space;
 pub mod eval;
 pub mod hdc;
 pub mod hierarchical_scorer;
