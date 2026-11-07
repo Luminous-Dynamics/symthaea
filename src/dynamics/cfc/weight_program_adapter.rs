@@ -1287,8 +1287,8 @@ pub fn build_cfc_network_hidden_unit_canonicalization_program(
 
     let mut evidence_hasher = blake3::Hasher::new();
     evidence_hasher.update(b"symthaea-cfc-network-hidden-unit-alignment-v1\\0");
-    evidence_hasher.update(alignment_source_digest(alignments[0]).as_bytes());
-    evidence_hasher.update(alignment_candidate_digest(alignments[0]).as_bytes());
+    evidence_hasher.update(alignments[0].source_model_digest.as_bytes());
+    evidence_hasher.update(alignments[0].candidate_model_digest.as_bytes());
     evidence_hasher.update(snapshot.architecture_digest.as_bytes());
     evidence_hasher.update(snapshot.manifest_digest.as_bytes());
     for alignment in &alignments {
