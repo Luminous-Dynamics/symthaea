@@ -49,14 +49,16 @@ def split_piper_words(raw: str | list[str]) -> list[list[str]]:
     current: list[str] = []
     for token in tokens:
         if token.isspace():
-            if current:
-                words.append(current)
-                current = []
+            # Preserve an empty lexical slot when a backend emits no phones
+            # for a word between explicit separators. Dropping that slot would
+            # shift every later reference word and corrupt the comparison.
+            words.append(current)
+            current = []
         elif token in PUNCTUATION or token in STRESS_MARKERS:
             continue
         else:
             current.append(token)
-    if current:
+    if current or not words:
         words.append(current)
     return words
 
@@ -113,7 +115,7 @@ def score_system(
     heteronym_exact = 0
     heteronym_total = 0
     oov_total = 0
-    oov_false_positives = 0
+    oov_nonempty_guesses = 0
 
     for reference in references:
         case_id = reference["case_id"]
@@ -126,7 +128,7 @@ def score_system(
         if status == "out_of_vocabulary":
             oov_total += 1
             if observed:
-                oov_false_positives += 1
+                oov_nonempty_guesses += 1
             continue
         if status != "reviewed":
             continue
@@ -150,7 +152,7 @@ def score_system(
             heteronym_total += 1
             heteronym_exact += int(exact)
 
-        if word_index >= len(words):
+        if word_index >= len(words) or not observed:
             missing_words += 1
 
     if evaluated_words == 0 and oov_total == 0:
@@ -167,8 +169,8 @@ def score_system(
         "heteronym_words": heteronym_total,
         "heteronym_exact_accuracy": heteronym_exact / heteronym_total if heteronym_total else None,
         "oov_words": oov_total,
-        "oov_false_positive_rate": oov_false_positives / oov_total if oov_total else None,
-        "oov_false_positives": oov_false_positives,
+        "oov_nonempty_guess_rate": oov_nonempty_guesses / oov_total if oov_total else None,
+        "oov_nonempty_guess_count": oov_nonempty_guesses,
     }
 
 
@@ -203,21 +205,65 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
         raise ValueError(f"reference CSV must contain columns: {sorted(required)}")
 
     adjudicated = []
+    reference_slots: dict[str, set[int]] = {}
     for row in reference_rows:
         status = row["reference_status"].strip()
         if status == "pending" or not status:
             continue
+        case_id = row["case_id"].strip()
+        try:
+            word_index = int(row["word_index"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{case_id}: word_index must be a non-negative integer") from exc
+        if not case_id or word_index < 0:
+            raise ValueError("reference case IDs must be non-empty and word_index non-negative")
         if status == "reviewed" and not row["reviewer_evidence"].strip():
             raise ValueError(
-                f"{row['case_id']} word {row['word_index']}: reviewed row requires reviewer evidence"
+                f"{case_id} word {word_index}: reviewed row requires reviewer evidence"
             )
-        if status == "out_of_vocabulary" and not row["reviewer_evidence"].strip():
+        if status == "out_of_vocabulary":
+            if not row["reviewer_evidence"].strip():
+                raise ValueError(
+                    f"{case_id} word {word_index}: OOV row requires reviewer evidence"
+                )
+            if row["accepted_ipa_variants"].strip():
+                raise ValueError(
+                    f"{case_id} word {word_index}: OOV row must not contain accepted IPA variants"
+                )
+        if status == "reviewed" and not row["accepted_ipa_variants"].strip():
             raise ValueError(
-                f"{row['case_id']} word {row['word_index']}: OOV row requires reviewer evidence"
+                f"{case_id} word {word_index}: reviewed row requires accepted IPA variants"
             )
         if status not in {"reviewed", "out_of_vocabulary"}:
             raise ValueError(f"unknown reference_status {status!r}")
+        reference_slots.setdefault(case_id, set())
+        if word_index in reference_slots[case_id]:
+            raise ValueError(f"{case_id}: duplicate adjudicated word_index {word_index}")
+        reference_slots[case_id].add(word_index)
         adjudicated.append(row)
+
+    if not adjudicated:
+        raise ValueError("no adjudicated reference rows found; pending rows are not scored")
+    for case_id, indices in reference_slots.items():
+        expected = set(range(len(indices)))
+        if indices != expected:
+            raise ValueError(
+                f"{case_id}: adjudicated word indices must form a contiguous zero-based range"
+            )
+    if set(candidate_rows) != set(reference_slots):
+        missing = sorted(set(reference_slots) - set(candidate_rows))
+        extra = sorted(set(candidate_rows) - set(reference_slots))
+        raise ValueError(f"candidate/reference case mismatch; missing={missing}, extra={extra}")
+    for case_id, indices in reference_slots.items():
+        expected_word_count = len(indices)
+        for system_name in ("piper", "muse"):
+            actual_word_count = len(candidate_rows[case_id][system_name])
+            if actual_word_count != expected_word_count:
+                raise ValueError(
+                    f"{case_id}: {system_name} emitted {actual_word_count} word slots, "
+                    f"but the adjudicated reference has {expected_word_count}; "
+                    "explicit separators must preserve empty OOV/missing-word slots"
+                )
 
     return {
         "schema": "g2p-reference-report/v1",
@@ -233,7 +279,7 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
             "stress_markers": "excluded from PER; score stress separately in a future annotation release",
             "multiple_reference_variants": "minimum edit distance among explicitly accepted variants",
             "pending_rows": "excluded",
-            "oov": "non-empty returned phone sequence counted as a false positive; this does not imply the G2P engine exposes calibrated confidence",
+            "oov": "non-empty returned phone sequence on a reviewed OOV reference is reported as a non-empty-guess rate; this does not imply the G2P engine exposes an OOV classifier",
         },
     }
 
