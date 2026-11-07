@@ -14,7 +14,9 @@ For sender leg j, recipient leg i, perturbation phase phi, perturbation class u,
 
 Each phase sample stores an integer cycle index and a signed fractional phase in microturns, with 1,000,000 units per cycle and canonical fractional range [-500,000, 500,000). This avoids floating point in phase wrapping and preserves whole-cycle advances/delays that modulo-only phase would alias to zero. It is a quantized phase representation; source phase-estimator uncertainty must be carried by any biological adapter.
 
-The output keeps two separate vectors: wrapped fractional phase displacement and integer cycle slips. They are never collapsed into one scalar.
+The output keeps two separate vectors: wrapped fractional phase displacement and integer cycle slips. They are never collapsed into one scalar. Cycle slips are computed as the residual between the unwrapped phase difference and the wrapped fractional difference, divided by one full cycle. This prevents a small phase advance across the fractional branch boundary from being mislabeled as a full-cycle slip.
+
+Model separation is reported per probe and across a joint campaign portfolio. The joint metric concatenates the registered probe responses before pairwise distance, so a probe that is uninformative by itself can complement another probe.
 
 A measured row has paired six-leg control and perturbed phases. The output vector preserves canonical axis order:
 1. left foreleg
