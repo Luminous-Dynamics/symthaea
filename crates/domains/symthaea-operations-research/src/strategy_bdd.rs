@@ -45,6 +45,7 @@ pub struct StrategyBddBudget {
     pub max_table_entries: u128,
     pub max_bdd_nodes: usize,
     pub max_support_checks: u128,
+    pub max_interaction_checks: u128,
     pub max_variable_order_evaluations: usize,
     pub max_sifting_passes: usize,
 }
@@ -56,6 +57,7 @@ impl Default for StrategyBddBudget {
             max_table_entries: 1 << 20,
             max_bdd_nodes: 1 << 20,
             max_support_checks: 1 << 22,
+            max_interaction_checks: 1 << 26,
             max_variable_order_evaluations: 1 << 12,
             max_sifting_passes: 2,
         }
@@ -122,6 +124,10 @@ pub enum StrategyBddError {
         limit: usize,
     },
     SupportCheckBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    InteractionGraphCheckBudgetExceeded {
         required: u128,
         limit: u128,
     },
@@ -196,6 +202,28 @@ pub struct StrategyBddSiftingReport {
     pub bdd: ReducedOrderedBdd,
 }
 
+/// Deterministic sources of a ROBDD variable-order starting point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StrategyBddOrderSeed {
+    Natural,
+    Reverse,
+    InteractionMinFill,
+    InteractionMinFillReverse,
+}
+
+/// A bounded multi-start sifting result. The interaction graph is a heuristic
+/// only; the semantic dependency list remains unchanged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyBddMultiStartReport {
+    pub seed_orders: Vec<(StrategyBddOrderSeed, Vec<usize>)>,
+    pub selected_seed: StrategyBddOrderSeed,
+    pub selected_initial_node_count: usize,
+    pub optimized_node_count: usize,
+    pub interaction_pair_checks: u128,
+    pub order_evaluations: usize,
+    pub bdd: ReducedOrderedBdd,
+}
+
 /// Evidence for exact semantic-support reduction of one strategy function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StrategySupportReductionReport {
@@ -229,6 +257,7 @@ pub struct StrategyBddExactOrderSearchReport {
 pub enum StrategyBddOptimizationMethod {
     ExactOrderSearch,
     Sifting,
+    MultiStartSifting,
 }
 
 /// One compiled strategy function, retaining the reduced truth-table
@@ -753,9 +782,20 @@ pub fn sift_strategy_function_robdd(
     function: &BooleanStrategyFunction,
     budget: StrategyBddBudget,
 ) -> Result<StrategyBddSiftingReport, StrategyBddError> {
+    let initial_order: Vec<usize> = (0..function.dependencies.len()).collect();
+    sift_strategy_function_robdd_from_order(function, &initial_order, budget)
+}
+
+/// Sift from an explicit permutation of the legal semantic support.
+pub fn sift_strategy_function_robdd_from_order(
+    function: &BooleanStrategyFunction,
+    initial_order: &[usize],
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddSiftingReport, StrategyBddError> {
     validate_truth_table(function, budget)?;
     let dependency_count = function.dependencies.len();
-    let mut order: Vec<usize> = (0..dependency_count).collect();
+    validate_variable_order(dependency_count, initial_order)?;
+    let mut order = initial_order.to_vec();
     let mut bdd = compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
     let initial_variable_order = order.clone();
     let initial_node_count = bdd.nodes.len();
@@ -831,6 +871,237 @@ pub fn sift_strategy_function_robdd(
         optimized_node_count: bdd.nodes.len(),
         order_evaluations: evaluations,
         bdd,
+    })
+}
+
+fn strategy_table_values(
+    function: &BooleanStrategyFunction,
+) -> Result<Vec<bool>, StrategyBddError> {
+    let entries = checked_power_of_two(function.dependencies.len())?;
+    let mut values = vec![false; entries as usize];
+    for mask in 0..entries {
+        let key: Vec<bool> = (0..function.dependencies.len())
+            .map(|index| ((mask >> index) & 1) != 0)
+            .collect();
+        let Some(&value) = function.table.get(&key) else {
+            return Err(StrategyBddError::MissingTruthTableRow { key });
+        };
+        values[mask as usize] = value;
+    }
+    Ok(values)
+}
+
+/// Expand a context assignment to all dependency positions except i and j.
+/// This bit-spreading helper is O(1), avoiding an O(n) key allocation per
+/// interaction test.
+fn expand_context_mask(mask: usize, first: usize, second: usize) -> usize {
+    let low_mask = if first == 0 { 0 } else { (1usize << first) - 1 };
+    let low = mask & low_mask;
+    let after_first = mask >> first;
+    let middle_width = second - first - 1;
+    let middle_mask = if middle_width == 0 {
+        0
+    } else {
+        (1usize << middle_width) - 1
+    };
+    let middle = after_first & middle_mask;
+    let high = after_first >> middle_width;
+    low | (middle << (first + 1)) | (high << (second + 1))
+}
+
+/// Build the pairwise Boolean-interaction graph of a truth table.
+///
+/// An edge (i,j) exists exactly when the mixed Boolean derivative
+/// f00 XOR f01 XOR f10 XOR f11 is nonzero for at least one assignment to all
+/// other inputs. The graph is an ordering heuristic only; it does not replace
+/// semantic support or prove that higher-order interactions are absent.
+pub fn strategy_interaction_graph(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<(Vec<BTreeSet<usize>>, u128), StrategyBddError> {
+    let entries = validate_truth_table(function, budget)?;
+    let dependency_count = function.dependencies.len();
+    let values = strategy_table_values(function)?;
+    let contexts_per_pair = checked_power_of_two(dependency_count.saturating_sub(2))?;
+    let mut checks = 0u128;
+    let mut graph = vec![BTreeSet::new(); dependency_count];
+
+    for first in 0..dependency_count {
+        for second in first + 1..dependency_count {
+            let mut interacts = false;
+            for context in 0..contexts_per_pair {
+                checks = checks
+                    .checked_add(1)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                if checks > budget.max_interaction_checks {
+                    return Err(StrategyBddError::InteractionGraphCheckBudgetExceeded {
+                        required: checks,
+                        limit: budget.max_interaction_checks,
+                    });
+                }
+                let base = expand_context_mask(context as usize, first, second);
+                let f00 = values[base];
+                let f01 = values[base | (1usize << second)];
+                let f10 = values[base | (1usize << first)];
+                let f11 = values[base | (1usize << first) | (1usize << second)];
+                if f00 ^ f01 ^ f10 ^ f11 {
+                    interacts = true;
+                    break;
+                }
+            }
+            if interacts {
+                graph[first].insert(second);
+                graph[second].insert(first);
+            }
+        }
+    }
+
+    // The table entry budget already ensures values.len() equals 2^n.
+    let _ = entries;
+    Ok((graph, checks))
+}
+
+/// Deterministic min-fill order for an interaction graph. Ties are broken by
+/// active degree, then by the semantic dependency index.
+pub fn interaction_graph_min_fill_order(
+    graph: &[BTreeSet<usize>],
+) -> Vec<usize> {
+    let variable_count = graph.len();
+    let mut active = vec![true; variable_count];
+    let mut adjacency = graph.to_vec();
+    let mut order = Vec::with_capacity(variable_count);
+
+    for _ in 0..variable_count {
+        let mut best: Option<(usize, usize, usize)> = None;
+        for variable in 0..variable_count {
+            if !active[variable] {
+                continue;
+            }
+            let neighbors: Vec<usize> = adjacency[variable]
+                .iter()
+                .copied()
+                .filter(|&neighbor| active[neighbor])
+                .collect();
+            let mut fill_edges = 0usize;
+            for left in 0..neighbors.len() {
+                for right in left + 1..neighbors.len() {
+                    if !adjacency[neighbors[left]].contains(&neighbors[right]) {
+                        fill_edges = fill_edges.saturating_add(1);
+                    }
+                }
+            }
+            let candidate = (fill_edges, neighbors.len(), variable);
+            if best.is_none_or(|current| candidate < current) {
+                best = Some(candidate);
+            }
+        }
+
+        let Some((_, _, selected)) = best else {
+            break;
+        };
+        let neighbors: Vec<usize> = adjacency[selected]
+            .iter()
+            .copied()
+            .filter(|&neighbor| active[neighbor])
+            .collect();
+        for left in 0..neighbors.len() {
+            for right in left + 1..neighbors.len() {
+                adjacency[neighbors[left]].insert(neighbors[right]);
+                adjacency[neighbors[right]].insert(neighbors[left]);
+            }
+        }
+        active[selected] = false;
+        order.push(selected);
+    }
+    order
+}
+
+/// Run bounded sifting from natural, reverse and interaction-graph min-fill
+/// starting orders. Each run receives only the remaining global order budget.
+pub fn multi_start_sift_strategy_function_robdd(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddMultiStartReport, StrategyBddError> {
+    validate_truth_table(function, budget)?;
+    let dependency_count = function.dependencies.len();
+    let (interaction_graph, interaction_pair_checks) =
+        strategy_interaction_graph(function, budget)?;
+    let min_fill = interaction_graph_min_fill_order(&interaction_graph);
+    let mut candidates = vec![
+        (
+            StrategyBddOrderSeed::Natural,
+            (0..dependency_count).collect::<Vec<_>>(),
+        ),
+        (
+            StrategyBddOrderSeed::Reverse,
+            (0..dependency_count).rev().collect::<Vec<_>>(),
+        ),
+        (
+            StrategyBddOrderSeed::InteractionMinFill,
+            min_fill.clone(),
+        ),
+        (
+            StrategyBddOrderSeed::InteractionMinFillReverse,
+            min_fill.into_iter().rev().collect::<Vec<_>>(),
+        ),
+    ];
+
+    let mut unique_orders: Vec<(StrategyBddOrderSeed, Vec<usize>)> = Vec::new();
+    for (seed, order) in candidates.drain(..) {
+        if !unique_orders.iter().any(|(_, previous)| *previous == order) {
+            unique_orders.push((seed, order));
+        }
+    }
+
+    let mut remaining_budget = budget.max_variable_order_evaluations;
+    let mut order_evaluations = 0usize;
+    let mut best: Option<(StrategyBddOrderSeed, usize, StrategyBddSiftingReport)> = None;
+
+    for (seed, order) in &unique_orders {
+        if remaining_budget == 0 {
+            return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+                required: order_evaluations.saturating_add(1),
+                limit: budget.max_variable_order_evaluations,
+            });
+        }
+        let seed_budget = StrategyBddBudget {
+            max_variable_order_evaluations: remaining_budget,
+            ..budget
+        };
+        let report =
+            sift_strategy_function_robdd_from_order(function, order, seed_budget)?;
+        order_evaluations = order_evaluations
+            .checked_add(report.order_evaluations)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        remaining_budget = budget
+            .max_variable_order_evaluations
+            .checked_sub(order_evaluations)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+
+        let replace = best.as_ref().is_none_or(|(best_seed, _, best_report)| {
+            report.optimized_node_count < best_report.optimized_node_count
+                || (report.optimized_node_count == best_report.optimized_node_count
+                    && (report.optimized_variable_order < best_report.optimized_variable_order
+                        || (report.optimized_variable_order == best_report.optimized_variable_order
+                            && *seed < best_seed)))
+        });
+        if replace {
+            best = Some((*seed, report.initial_node_count, report));
+        }
+    }
+
+    let Some((selected_seed, selected_initial_node_count, selected_report)) = best else {
+        return Err(StrategyBddError::ResourceAccountingOverflow);
+    };
+
+    Ok(StrategyBddMultiStartReport {
+        seed_orders: unique_orders,
+        selected_seed,
+        selected_initial_node_count,
+        optimized_node_count: selected_report.optimized_node_count,
+        interaction_pair_checks,
+        order_evaluations,
+        bdd: selected_report.bdd,
     })
 }
 
@@ -966,8 +1237,9 @@ pub fn compile_winning_strategy_functions(
             order_evaluations = report.orders_evaluated;
             report.bdd
         } else {
-            let report = sift_strategy_function_robdd(&support.function, budget)?;
-            optimization_method = StrategyBddOptimizationMethod::Sifting;
+            let report =
+                multi_start_sift_strategy_function_robdd(&support.function, budget)?;
+            optimization_method = StrategyBddOptimizationMethod::MultiStartSifting;
             order_evaluations = report.order_evaluations;
             report.bdd
         };
@@ -1116,6 +1388,7 @@ mod tests {
             max_table_entries: 1 << 8,
             max_bdd_nodes: 1 << 8,
             max_support_checks: 1 << 12,
+            max_interaction_checks: 1 << 12,
             max_variable_order_evaluations: 128,
             max_sifting_passes: 2,
         }
@@ -1466,13 +1739,13 @@ mod tests {
             functions: vec![source],
         };
         let constrained = StrategyBddBudget {
-            max_variable_order_evaluations: 128,
+            max_variable_order_evaluations: 512,
             ..budget()
         };
         let compiled = compile_winning_strategy_functions(&strategy, constrained).unwrap();
         assert_eq!(
             compiled.functions[0].optimization_method,
-            StrategyBddOptimizationMethod::Sifting
+            StrategyBddOptimizationMethod::MultiStartSifting
         );
         assert_eq!(compiled.functions[0].reduced_function.dependencies.len(), 6);
         assert!(compiled.total_bdd_nodes > 0);
@@ -1497,6 +1770,56 @@ mod tests {
             compile_winning_strategy_functions(&strategy, budget()),
             Err(StrategyBddError::StrategyFunctionsNotCanonical { .. })
         ));
+    }
+
+    #[test]
+    fn interaction_graph_detects_mixed_boolean_interaction() {
+        let source = function(&[0, 1, 2], &[false, false, false, true, false, true, false, true]);
+        let (graph, checks) = strategy_interaction_graph(&source, budget()).unwrap();
+        assert!(graph[0].contains(&1));
+        assert!(!graph[0].contains(&2));
+        assert!(!graph[1].contains(&2));
+        assert!(checks > 0);
+    }
+
+    #[test]
+    fn interaction_graph_seed_order_is_deterministic() {
+        let source = function(&[0, 1, 2, 3], &[false; 16]);
+        let (graph, _) = strategy_interaction_graph(&source, budget()).unwrap();
+        assert_eq!(interaction_graph_min_fill_order(&graph), vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn interaction_graph_budget_is_fail_closed() {
+        let source = function(&[0, 1, 2], &[false, false, false, true, false, true, false, true]);
+        let tight = StrategyBddBudget {
+            max_interaction_checks: 0,
+            ..budget()
+        };
+        assert!(matches!(
+            strategy_interaction_graph(&source, tight),
+            Err(StrategyBddError::InteractionGraphCheckBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn multi_start_sifting_preserves_function_and_respects_global_budget() {
+        let source = function(
+            &[11, 12, 10],
+            &[false, true, false, true, false, false, true, true],
+        );
+        let report = multi_start_sift_strategy_function_robdd(&source, budget()).unwrap();
+        assert!(report.order_evaluations <= budget().max_variable_order_evaluations);
+        assert!(!report.seed_orders.is_empty());
+        assert!(report.optimized_node_count <= report.selected_initial_node_count);
+        let compiled = compile_strategy_function_to_robdd_with_order(
+            &source,
+            &report.bdd.variable_order,
+            budget(),
+        )
+        .unwrap();
+        assert_eq!(compiled, report.bdd);
+        verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
     }
 
     #[test]
