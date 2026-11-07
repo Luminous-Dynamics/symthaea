@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Open-world ansatz structural-discovery contract fixtures v0",
+  "description": "Public synthetic contract cases. Not an Unsatz reproduction, blind benchmark, expert gold or agent result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_issue",
+    "purpose",
+    "evaluation_contract",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "open-world-ansatz-structural-discovery-fixtures-v0"
+    },
+    "status": {
+      "const": "SYNTHETIC_CONTRACT_FIXTURES_NOT_UNSATZ_REPRODUCTION_OR_AGENT_RESULTS"
+    },
+    "source_issue": {
+      "const": "#11042"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "structural_score_unit",
+        "coefficient_score_separate",
+        "non_identifiable_policy",
+        "hidden_truth_boundary",
+        "cost_boundary",
+        "task_claim_boundary"
+      ],
+      "properties": {
+        "structural_score_unit": {
+          "const": "identified_structural_equivalence_class"
+        },
+        "coefficient_score_separate": {
+          "const": true
+        },
+        "non_identifiable_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hidden_truth_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_claim_boundary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
+    }
+  },
+  "$defs": {
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "tier",
+        "world_id",
+        "paired_control_group",
+        "world_seed_id",
+        "discovery_split_id",
+        "calibration_split_id",
+        "confirmation_split_id",
+        "structure_input",
+        "measurement_channel",
+        "identifiability",
+        "hidden_state_present",
+        "intervention_access",
+        "long_horizon_holdout",
+        "transfer_relation",
+        "experiment_budget",
+        "measurement_budget",
+        "agent_visible_fields",
+        "expected_disposition",
+        "required_evidence",
+        "prohibited_inference"
+      ],
+      "properties": {
+        "fixture_id": {
+          "type": "string",
+          "pattern": "^ANS-A[0-5]-0[1-9]$"
+        },
+        "tier": {
+          "enum": [
+            "A0",
+            "A1",
+            "A2",
+            "A3",
+            "A4",
+            "A5"
+          ]
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paired_control_group": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "world_seed_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discovery_split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confirmation_split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structure_input": {
+          "enum": [
+            "supplied",
+            "withheld"
+          ]
+        },
+        "measurement_channel": {
+          "enum": [
+            "ideal",
+            "distorted",
+            "uninformative"
+          ]
+        },
+        "identifiability": {
+          "enum": [
+            "identifiable",
+            "equivalence_class",
+            "not_identifiable"
+          ]
+        },
+        "hidden_state_present": {
+          "type": "boolean"
+        },
+        "intervention_access": {
+          "type": "boolean"
+        },
+        "long_horizon_holdout": {
+          "type": "boolean"
+        },
+        "transfer_relation": {
+          "enum": [
+            "none",
+            "related",
+            "unrelated"
+          ]
+        },
+        "experiment_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "measurement_budget": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "agent_visible_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "task_objective",
+              "units",
+              "measurement_metadata",
+              "partial_measurement_metadata",
+              "observations_after_acquisition",
+              "legal_experiments",
+              "remaining_budget",
+              "supplied_model_structure",
+              "source_world_model_artifact"
+            ]
+          }
+        },
+        "expected_disposition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "prohibited_inference": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}
