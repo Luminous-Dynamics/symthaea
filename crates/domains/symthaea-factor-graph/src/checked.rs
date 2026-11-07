@@ -171,6 +171,7 @@ pub fn run_sum_product(
                         let old_message = messages.get(&key).expect("validated message initialization");
                         let damped = damp_message(&new_message, old_message, config.damping)?;
                         max_delta = max_delta.max(probability_delta(&damped, old_message));
+                        max_log_delta = max_log_delta.max(log_message_delta(&damped, old_message));
                         pending.push((key, damped));
                     }
                 }
@@ -199,6 +200,7 @@ pub fn run_sum_product(
                         let old_message = messages.get(&key).expect("validated message initialization");
                         let damped = damp_message(&new_message, old_message, config.damping)?;
                         max_delta = max_delta.max(probability_delta(&damped, old_message));
+                        max_log_delta = max_log_delta.max(log_message_delta(&damped, old_message));
                         messages.insert(key, damped);
                     }
                 }
