@@ -49,6 +49,8 @@ For each feasible action a, report:
 
 Do not scalarize Q, S, representativeness and cost by default. Return the Pareto frontier. A later operational policy may use lexicographic hard gates, but all thresholds and orderings must be preregistered.
 
+V1's executable synthetic oracle computes Q, minimum pairwise TV, model-mutual-information diagnostic and the Q/TV/cost Pareto frontier. It does not yet estimate population representativeness, calibrate a sequential false-alarm process, or establish challenge-family recall. Those require source-bound independent-unit data and later integrated tranches; their absence cannot be interpreted as a pass.
+
 ## 4. Finite query-risk and discrimination semantics
 
 For binary query q(w), world prior p(w), and 0–1 loss, the expected posterior query loss under a model is:
