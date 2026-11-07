@@ -53,6 +53,19 @@ The benchmark carries opaque canonical statement/version, relation, temporal-res
 3. A representation is eligible only after its replica-visibility observation.
 4. A different replica has no visibility observation; result must remain Unknown.
 5. A derived bridge fact inherits two source families; revocation of one parent makes the derived payload ineligible under the fixture's explicit rights policy.
+6. An amended clause is present and visible but is not the version selected by the requested valid-time resolution.
+7. The pre-amendment clause remains the correct result even when the amended version is already indexed and visible.
+8. The amended clause is temporally selected but not yet materialized by the query's known-at cutoff.
+
+## Industry adapter baselines
+
+QVF-R is provider-neutral. Product comparisons should record observable capabilities and opaque internals separately rather than assuming a provider lacks an unexposed feature.
+
+- **Azure AI Search:** hybrid BM25/vector retrieval with reciprocal-rank fusion and a separate semantic-reranker score. Its vector filter modes have different recall/cost behavior: prefilter can maximize filtered recall; postfilter and strict postfilter can miss eligible records under selective filters or small k. Benchmark each filter mode and record eligible-candidate false-negative rates rather than treating filter success as equivalent across modes. See [hybrid ranking](https://learn.microsoft.com/azure/search/hybrid-search-ranking), [filter modes](https://learn.microsoft.com/en-us/azure/search/vector-search-filters), and [hybrid search](https://learn.microsoft.com/en-us/azure/search/hybrid-search-overview).
+- **Amazon Bedrock Knowledge Bases:** managed retrieval provides hybrid search, metadata filtering, reranking and agentic multi-query retrieval with trace events. Document-level ACL filtering is supported for listed connectors, with documented exceptions. QVF-R should test which exact request/trace/ACL/index-availability evidence is actually exposed to an adapter; do not infer historical replica visibility from a successful Retrieve response. See [Knowledge Bases](https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html), [managed retrieval](https://docs.aws.amazon.com/bedrock/latest/userguide/kb-test-retrieve.html), and [AgenticRetrieveStream](https://docs.aws.amazon.com/bedrock/latest/userguide/kb-how-retrieval.html).
+- **Google Vertex AI RAG Engine with Vector Search 2.0:** the documented managed RAG collection does not automatically have an index; unindexed retrieval uses brute-force KNN. The documented RAG collection schema has no sparse-vector field (so hybrid search is unavailable for that corpus path), and its v1 index replica defaults are two. Metadata filtering is resolved to file IDs. QVF-R should compare collection, index and serving configuration separately, and treat provider-internal historical visibility as Unknown unless exposed. See [RAG Engine Vector Search](https://docs.cloud.google.com/gemini-enterprise-agent-platform/build/rag-engine/use-rag-managed-vertex-ai-vector-search).
+
+These are documentation-backed product configurations, not claims about private vendor internals or a complete product-wide capability inventory.
 
 ## Required next validator checks
 
