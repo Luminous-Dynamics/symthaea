@@ -49,3 +49,11 @@ The string-valued subject, operation and environment fields remain exact source 
 ## Claim ceiling
 
 The formal envelope is evidence that a provider-observation meta-claim was mapped consistently under a named v0 contract. It does not prove that the provider told the truth, that its parser is correct, that the archive/member bytes were completely observed, that the source is authentic, that the signer is trusted, that sources are independent, or that the underlying artifact is safe.
+
+## JCS numeric precision boundary
+
+The embedded REA evaluation includes the required `numeric_precision_warnings` array. It identifies out-of-range integer tokens in the asserted value and referenced Evidence records using an RFC 6901 JSON Pointer, exact decimal integer string and Evidence ID where applicable. The formal parser rejects envelopes whose embedded evaluation omits this field or any warning member.
+
+The formal projection also adds an explicit claim-ceiling statement when warnings are present. It does not reject or rewrite those inputs: REA v1 continues to use ECMAScript binary64 semantics for RFC 8785 canonicalization to preserve existing Evidence identity compatibility. A positive formal polarity therefore remains support for the provider-reported-observation meta-claim only; it does not establish exact preservation of an unsafe integer. Exact large integers should be exchanged as decimal strings with domain-specific interpretation.
+
+The warning is already included in the producer's derivation digest. The formal adapter preserves the full evaluation and checks the warning partition; it does not independently replay that derivation. Consumers requiring that check must separately require ReplayMatch from the independent replay verifier.
