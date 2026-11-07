@@ -449,6 +449,30 @@ impl SplitMix64 {
 mod tests {
     use super::*;
 
+    fn brute_interval_size_histogram(causet: &CausalSetNd) -> Vec<u64> {
+        let n = causet.events.len();
+        let mut histogram = vec![0_u64; n.saturating_sub(1)];
+        for first in 0..n {
+            for second in (first + 1)..n {
+                let (past, future) = if causet.events[first].causally_precedes(&causet.events[second]) {
+                    (first, second)
+                } else if causet.events[second].causally_precedes(&causet.events[first]) {
+                    (second, first)
+                } else {
+                    continue;
+                };
+                let interior = (0..n)
+                    .filter(|&event| {
+                        causet.events[past].causally_precedes(&causet.events[event])
+                            && causet.events[event].causally_precedes(&causet.events[future])
+                    })
+                    .count();
+                histogram[interior] += 1;
+            }
+        }
+        histogram
+    }
+
     #[test]
     fn interval_volumes_match_closed_form_references() {
         assert!((CausalSetNd::minkowski_interval_volume(2, 1.0).unwrap() - 0.5).abs() < 1e-12);
@@ -519,6 +543,29 @@ mod tests {
 
             let boosted = causet.lorentz_boosted(0.7, 0).unwrap();
             assert_eq!(boosted.interval_size_histogram(), expected);
+        }
+    }
+
+    #[test]
+    fn interval_histograms_match_brute_force_on_quantized_orders() {
+        for dimension in 2..=4 {
+            for seed in 0..12_u64 {
+                let mut rng = super::SplitMix64::new(seed + 0xD1A0);
+                let events = (0..36)
+                    .map(|id| {
+                        let coordinates = (0..dimension)
+                            .map(|_| (rng.unit_f64() * 6.0).floor())
+                            .collect();
+                        EventNd { id, coordinates }
+                    })
+                    .collect();
+                let causet = CausalSetNd::new(dimension, events).unwrap();
+                assert_eq!(
+                    causet.interval_size_histogram(),
+                    brute_interval_size_histogram(&causet),
+                    "D={dimension}, seed={seed}"
+                );
+            }
         }
     }
 
