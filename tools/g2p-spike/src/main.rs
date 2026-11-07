@@ -66,8 +66,18 @@ mod tests {
             .expect("known words should produce an output");
         assert!(!tokens.is_empty(), "known words must not return no phones");
         assert!(
-            tokens.iter().all(|token| !token.trim().is_empty()),
-            "phoneme token list must not contain empty entries: {tokens:?}"
+            tokens.iter().all(|token| !token.is_empty()),
+            "phoneme token stream must not contain empty entries: {tokens:?}"
+        );
+        assert!(
+            tokens
+                .iter()
+                .any(|token| !token.trim().is_empty() && !matches!(token.as_str(), "ˈ" | "ˌ" | "ː")),
+            "known words must contain at least one IPA phone: {tokens:?}"
+        );
+        assert!(
+            tokens.iter().any(|token| token == " "),
+            "word boundaries must remain explicit in the IPA stream: {tokens:?}"
         );
     }
 
