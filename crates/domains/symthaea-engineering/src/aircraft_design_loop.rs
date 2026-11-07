@@ -622,6 +622,46 @@ mod tests {
     }
 
     #[test]
+    fn canonical_sha256_sorts_object_keys_and_preserves_array_order() {
+        let left: serde_json::Value = serde_json::from_str(
+            r#"{"z":9,"a":{"y":2,"x":1},"items":[3,2,1]}"#,
+        )
+        .expect("valid JSON");
+        let same: serde_json::Value = serde_json::from_str(
+            r#"{"items":[3,2,1],"a":{"x":1,"y":2},"z":9}"#,
+        )
+        .expect("valid JSON");
+        let reordered_array: serde_json::Value = serde_json::from_str(
+            r#"{"items":[1,2,3],"a":{"x":1,"y":2},"z":9}"#,
+        )
+        .expect("valid JSON");
+
+        assert_eq!(
+            canonical_sha256(&left).expect("canonical digest"),
+            canonical_sha256(&same).expect("canonical digest")
+        );
+        assert_ne!(
+            canonical_sha256(&left).expect("canonical digest"),
+            canonical_sha256(&reordered_array).expect("canonical digest")
+        );
+    }
+
+    #[test]
+    fn study_and_proposal_review_returns_exact_canonical_identities() {
+        let study = manifest();
+        let request = proposal();
+        let review = study.review_proposal(&request).expect("valid proposal");
+        assert_eq!(
+            review.study_sha256,
+            study.canonical_sha256().expect("study digest")
+        );
+        assert_eq!(
+            review.proposal_sha256,
+            request.canonical_sha256().expect("proposal digest")
+        );
+    }
+
+    #[test]
     fn dry_run_admits_only_frozen_candidate_case_backend_model_and_cost() {
         let study = manifest();
         let review = study.review_proposal(&proposal()).expect("valid proposal");
@@ -678,12 +718,23 @@ mod tests {
     #[test]
     fn completed_in_domain_receipt_is_recorded_but_never_grants_flight_approval() {
         let study = manifest();
+        let request = proposal();
+        let returned = receipt(RunOutcome::Completed, ApplicabilityDisposition::WithinDeclaredDomain);
         let review = study
-            .review_receipt(
-                &proposal(),
-                &receipt(RunOutcome::Completed, ApplicabilityDisposition::WithinDeclaredDomain),
-            )
+            .review_receipt(&request, &returned)
             .expect("valid receipt");
+        assert_eq!(
+            review.study_sha256,
+            study.canonical_sha256().expect("study digest")
+        );
+        assert_eq!(
+            review.proposal_sha256,
+            request.canonical_sha256().expect("proposal digest")
+        );
+        assert_eq!(
+            review.receipt_sha256,
+            returned.canonical_sha256().expect("receipt digest")
+        );
         assert_eq!(review.disposition, ReceiptDisposition::RecordedWithinDeclaredScope);
         assert!(review.decision_eligible_within_declared_scope);
         assert!(!review.flight_approval);
