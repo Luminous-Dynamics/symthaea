@@ -110,6 +110,7 @@ def validate_documents(
         "https://arxiv.org/abs/2610.33509",
         "https://arxiv.org/abs/2611.02566",
         "https://arxiv.org/abs/2610.13668",
+        "https://arxiv.org/abs/2510.08996",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
         "https://swesweep.com/paper",
