@@ -160,8 +160,7 @@ def validate_documents(
         errors.append("engineering scorecard is missing the sequential evidence-acquisition paradigm shift")
     if "3.13 From uptake to verified engineering impact" not in scorecard:
         errors.append("engineering scorecard is missing the adoption-versus-correctness paradigm shift")
-    if "3.14 From historical fix commits to qualified counterfactual controls"
-        "3.15 From fixed benchmark prompts to matched information framings" not in scorecard:
+    if "3.14 From historical fix commits to qualified counterfactual controls" not in scorecard:
         errors.append("engineering scorecard is missing the counterfactual-control qualification paradigm shift")
     if "3.15 From fixed benchmark prompts to matched information framings" not in scorecard:
         errors.append("engineering scorecard is missing the cross-framing paradigm shift")
