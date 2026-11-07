@@ -25,6 +25,116 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
+
+/// Canonical transcript encoding failure.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CanonicalModelTranscriptError {
+    LengthOutOfRange { field: &'static str, value: usize },
+    NegativeProbabilityPotential { factor_index: usize },
+}
+
+impl fmt::Display for CanonicalModelTranscriptError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LengthOutOfRange { field, value } => {
+                write!(f, "{field} length/value {value} does not fit canonical u64 encoding")
+            }
+            Self::NegativeProbabilityPotential { factor_index } => {
+                write!(f, "probability model factor {factor_index} contains a negative potential")
+            }
+        }
+    }
+}
+
+impl Error for CanonicalModelTranscriptError {}
+
+/// Encode a rational probability factor graph into a deterministic byte transcript.
+///
+/// The transcript is suitable as the input to SHA-256 or another explicitly
+/// versioned digest function. This function deliberately does not claim to
+/// produce a cryptographic digest: the caller must hash the returned bytes and
+/// bind the resulting digest to these exact bytes in any certificate.
+///
+/// Canonicalization rules:
+/// - Variable identities are their stable ordinal indices; cardinalities are
+///   encoded in ordinal order.
+/// - Factors are sorted lexicographically by scope, then by their canonical
+///   rational table values. Duplicate factors remain duplicated.
+/// - The order of variables inside a factor scope is preserved because it
+///   defines table-coordinate meaning.
+/// - Table values are reduced CheckedRational numerator/positive denominator
+///   pairs encoded as signed i128 big-endian bytes.
+/// - The transcript is explicitly versioned and declares probability-potential
+///   semantics and the table-order convention.
+pub fn canonical_model_transcript(
+    graph: &ExactFactorGraph<CheckedRational>,
+) -> Result<Vec<u8>, CanonicalModelTranscriptError> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"SYMPTHAEA-PGM-RATIONAL-MODEL-V1\0");
+    bytes.extend_from_slice(b"semantics=nonnegative-probability-potentials\0");
+    bytes.extend_from_slice(b"scope-order=first-variable-most-significant\0");
+
+    append_len(&mut bytes, "variable count", graph.variable_count())?;
+    for &cardinality in graph.cardinalities() {
+        append_len(&mut bytes, "variable cardinality", cardinality)?;
+    }
+
+    let mut factors = graph.factors().iter().collect::<Vec<_>>();
+    for (factor_index, factor) in factors.iter().enumerate() {
+        if factor.values.iter().any(CheckedRational::is_negative) {
+            return Err(CanonicalModelTranscriptError::NegativeProbabilityPotential {
+                factor_index,
+            });
+        }
+    }
+    factors.sort_by(|left, right| {
+        let scope_order = left.scope.cmp(&right.scope);
+        if scope_order != std::cmp::Ordering::Equal {
+            return scope_order;
+        }
+        for (left_value, right_value) in left.values.iter().zip(&right.values) {
+            let value_order = (
+                left_value.numerator(),
+                left_value.denominator(),
+            ).cmp(&(
+                right_value.numerator(),
+                right_value.denominator(),
+            ));
+            if value_order != std::cmp::Ordering::Equal {
+                return value_order;
+            }
+        }
+        left.values.len().cmp(&right.values.len())
+    });
+
+    append_len(&mut bytes, "factor count", factors.len())?;
+    for factor in factors {
+        append_len(&mut bytes, "factor scope length", factor.scope.len())?;
+        for &variable in &factor.scope {
+            append_len(&mut bytes, "factor variable index", variable)?;
+        }
+        append_len(&mut bytes, "factor table length", factor.values.len())?;
+        for value in &factor.values {
+            bytes.extend_from_slice(&value.numerator().to_be_bytes());
+            bytes.extend_from_slice(&value.denominator().to_be_bytes());
+        }
+    }
+
+    Ok(bytes)
+}
+
+fn append_len(
+    output: &mut Vec<u8>,
+    field: &'static str,
+    value: usize,
+) -> Result<(), CanonicalModelTranscriptError> {
+    let encoded = u64::try_from(value).map_err(|_| {
+        CanonicalModelTranscriptError::LengthOutOfRange { field, value }
+    })?;
+    output.extend_from_slice(&encoded.to_be_bytes());
+    Ok(())
+}
+
 /// One model in the caller-declared finite family.
 ///
 /// The digest must be computed from the canonical model transcript. Factor
@@ -780,6 +890,57 @@ mod tests {
         let bounds = result.bounds.unwrap();
         assert_eq!(bounds.lower, CheckedRational::one());
         assert_eq!(bounds.upper, CheckedRational::one());
+    }
+
+
+    #[test]
+    fn canonical_model_transcript_is_factor_insertion_order_invariant() {
+        let mut forward = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        forward.add_factor(vec![0], vec![q(1, 3), q(2, 3)]).unwrap();
+        forward.add_factor(vec![1], vec![q(1, 4), q(3, 4)]).unwrap();
+        forward.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
+
+        let mut reverse = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        reverse.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
+        reverse.add_factor(vec![1], vec![q(1, 4), q(3, 4)]).unwrap();
+        reverse.add_factor(vec![0], vec![q(1, 3), q(2, 3)]).unwrap();
+
+        assert_eq!(
+            canonical_model_transcript(&forward).unwrap(),
+            canonical_model_transcript(&reverse).unwrap()
+        );
+    }
+
+    #[test]
+    fn canonical_model_transcript_changes_when_exact_factor_changes() {
+        let mut left = graph([q(3, 1), q(1, 1)]);
+        let right = graph([q(2, 1), q(1, 1)]);
+        assert_ne!(
+            canonical_model_transcript(&left).unwrap(),
+            canonical_model_transcript(&right).unwrap()
+        );
+        left.add_factor(vec![0], vec![q(1, 1), q(0, 1)]).unwrap();
+        assert_ne!(
+            canonical_model_transcript(&left).unwrap(),
+            canonical_model_transcript(&right).unwrap()
+        );
+    }
+
+    #[test]
+    fn canonical_model_transcript_rejects_negative_probability_potentials() {
+        let model = graph([q(1, 1), q(-1, 1)]);
+        assert!(matches!(
+            canonical_model_transcript(&model),
+            Err(CanonicalModelTranscriptError::NegativeProbabilityPotential { factor_index: 0 })
+        ));
     }
 
 }
