@@ -42,56 +42,133 @@
   ],
   "claim_ceiling": "framework_function_and_stakeholder_crosswalk_only",
   "non_equivalences": [
-    ["network_reachability", "engineering_authority"],
-    ["controller_acknowledgement", "physical_effect"],
-    ["historian_value", "trusted_process_truth"],
-    ["cyber_containment", "process_safe_containment"],
-    ["simulated_response", "field_qualified_response"],
-    ["asset_unavailable", "hazard_removed"],
-    ["model_confidence", "permission_to_act"]
+    [
+      "network_reachability",
+      "engineering_authority"
+    ],
+    [
+      "controller_acknowledgement",
+      "physical_effect"
+    ],
+    [
+      "historian_value",
+      "trusted_process_truth"
+    ],
+    [
+      "cyber_containment",
+      "process_safe_containment"
+    ],
+    [
+      "simulated_response",
+      "field_qualified_response"
+    ],
+    [
+      "asset_unavailable",
+      "hazard_removed"
+    ],
+    [
+      "model_confidence",
+      "permission_to_act"
+    ]
   ],
   "functions": [
     {
       "id": "GOVERN",
       "nist_csf_2_function": "Govern",
       "ot_concern": "risk_ownership_and_safety_decision_rights",
-      "luminous_owners": ["Mycelix", "Symthaea"],
-      "evidence_required": ["named_owner", "risk_profile", "process_safety_authority", "approved_operating_envelope", "policy_revision"]
+      "luminous_owners": [
+        "Mycelix",
+        "Symthaea"
+      ],
+      "evidence_required": [
+        "named_owner",
+        "risk_profile",
+        "process_safety_authority",
+        "approved_operating_envelope",
+        "policy_revision"
+      ]
     },
     {
       "id": "IDENTIFY",
       "nist_csf_2_function": "Identify",
       "ot_concern": "asset_and_process_context",
-      "luminous_owners": ["Sol-Atlas", "Symthaea"],
-      "evidence_required": ["device_identity", "firmware_or_logic_revision", "physical_role", "dependency_graph", "source_freshness", "inventory_coverage"]
+      "luminous_owners": [
+        "Sol-Atlas",
+        "Symthaea"
+      ],
+      "evidence_required": [
+        "device_identity",
+        "firmware_or_logic_revision",
+        "physical_role",
+        "dependency_graph",
+        "source_freshness",
+        "inventory_coverage"
+      ]
     },
     {
       "id": "PROTECT",
       "nist_csf_2_function": "Protect",
       "ot_concern": "access_segmentation_and_change_protection",
-      "luminous_owners": ["Mycelix", "Symthaea"],
-      "evidence_required": ["zone_conduit_boundary", "remote_access_scope", "change_record", "authenticated_source", "approved_maintenance_window"]
+      "luminous_owners": [
+        "Mycelix",
+        "Symthaea"
+      ],
+      "evidence_required": [
+        "zone_conduit_boundary",
+        "remote_access_scope",
+        "change_record",
+        "authenticated_source",
+        "approved_maintenance_window"
+      ]
     },
     {
       "id": "DETECT",
       "nist_csf_2_function": "Detect",
       "ot_concern": "monitoring_and_cyber_physical_reconciliation",
-      "luminous_owners": ["Symthaea", "Sol-Atlas"],
-      "evidence_required": ["raw_observation_lineage", "sensor_health", "source_dependencies", "clock_quality", "independent_process_evidence"]
+      "luminous_owners": [
+        "Symthaea",
+        "Sol-Atlas"
+      ],
+      "evidence_required": [
+        "raw_observation_lineage",
+        "sensor_health",
+        "source_dependencies",
+        "clock_quality",
+        "independent_process_evidence"
+      ]
     },
     {
       "id": "RESPOND",
       "nist_csf_2_function": "Respond",
       "ot_concern": "process_safe_containment_and_incident_handling",
-      "luminous_owners": ["Symthaea", "Mycelix"],
-      "evidence_required": ["process_state", "hazard_constraints", "operator_approval", "reversible_options", "denial_or_abstention"]
+      "luminous_owners": [
+        "Symthaea",
+        "Mycelix"
+      ],
+      "evidence_required": [
+        "process_state",
+        "hazard_constraints",
+        "operator_approval",
+        "reversible_options",
+        "denial_or_abstention"
+      ]
     },
     {
       "id": "RECOVER",
       "nist_csf_2_function": "Recover",
       "ot_concern": "restore_and_requalify_safe_service",
-      "luminous_owners": ["Symtropy", "Mycelix", "Sol-Atlas"],
-      "evidence_required": ["restored_configuration", "independent_process_measurements", "safety_system_availability", "stable_service_window", "operator_acceptance"]
+      "luminous_owners": [
+        "Symtropy",
+        "Mycelix",
+        "Sol-Atlas"
+      ],
+      "evidence_required": [
+        "restored_configuration",
+        "independent_process_measurements",
+        "safety_system_availability",
+        "stable_service_window",
+        "operator_acceptance"
+      ]
     }
   ],
   "industry_baselines": [
@@ -117,7 +194,7 @@
     "time_to_independently_verified_stable_recovery"
   ],
   "proposed_gates": {
-    "crosswalk_row_coverage": 1.0,
+    "crosswalk_row_coverage": 1,
     "controller_ack_promoted_to_physical_truth": 0,
     "recommendation_promoted_to_device_authority": 0,
     "synthetic_process_safety_constraint_violations": 0,
@@ -131,5 +208,67 @@
     "freight_rail",
     "maritime",
     "industrial_iot_and_cloud_convergence"
-  ]
+  ],
+  "industry_vendor_baselines": [
+    {
+      "id": "CLAROTY",
+      "product": "Claroty Platform",
+      "capabilities": [
+        "CPS asset inventory",
+        "exposure management",
+        "network protection",
+        "secure access",
+        "threat detection"
+      ],
+      "source": "https://claroty.com/platform"
+    },
+    {
+      "id": "NOZOMI",
+      "product": "Nozomi Networks Platform / Guardian",
+      "capabilities": [
+        "OT/IoT asset discovery",
+        "passive network monitoring",
+        "vulnerability assessment",
+        "anomaly detection",
+        "OT threat intelligence"
+      ],
+      "source": "https://www.nozominetworks.com/platform"
+    },
+    {
+      "id": "DRAGOS",
+      "product": "Dragos Platform / OT Watch",
+      "capabilities": [
+        "OT asset visibility",
+        "exposure management",
+        "network monitoring",
+        "OT threat intelligence",
+        "managed threat hunting and analyst triage"
+      ],
+      "source": "https://www.dragos.com/cybersecurity-platform/exposure-management/"
+    }
+  ],
+  "build_buy_bridge": {
+    "buy_or_bridge": [
+      "qualified_passive_OT_sensors",
+      "protocol_decoders",
+      "asset_inventory",
+      "vendor_threat_intelligence"
+    ],
+    "build": [
+      "evidence_lineage_and_source_dependency",
+      "cyber_physical_state_separation",
+      "process_safety_precedence",
+      "authority_non_laundering",
+      "uncertainty_and_abstention",
+      "cross_domain_service_impact",
+      "independently_verified_recovery"
+    ],
+    "do_not_rebuild": [
+      "plant_protocol_stacks",
+      "vendor_device_libraries",
+      "safety_PLCS",
+      "historians",
+      "OT_command_control_plane"
+    ]
+  }
 }
