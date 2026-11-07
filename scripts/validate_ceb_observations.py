@@ -168,6 +168,60 @@ def semantic_errors(payload: dict) -> list[str]:
     if aacr and not any("not model performance" in note for note in aacr["notes"]):
         errors.append("AACR-Bench 285% annotation coverage must not be represented as model performance")
 
+    # Guard the current actual-causality / repair / partial-identifiability comparators.
+    required_method_comparators = {
+        "cbfl-softrex-defects4j": ("CEB-DEBUG", "cbfl-softrex-paper", 827),
+        "causalrepair-defects4j": ("CEB-DEBUG", "causalrepair-paper", 829),
+        "causalrepair-defects4j-trans": ("CEB-DEBUG", "causalrepair-paper", 483),
+        "poscm-uai2026": ("CEB-DEBUG", "poscm-uai2026-paper", 2),
+    }
+    for comparator_id, expected in required_method_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing current causal method comparator {comparator_id}")
+            continue
+        lane, source_id, denominator = expected
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: method comparator lane/source binding changed")
+        if comparator["sample_denominator"]["status"] != "reported" or comparator["sample_denominator"]["value"] != denominator:
+            errors.append(f"{comparator_id}: method comparator denominator changed")
+
+    required_method_observations = {
+        "cbfl-softrex-top1": ("cbfl-softrex-defects4j", "top_1_localizations", 103),
+        "cbfl-blmu-top1": ("cbfl-softrex-defects4j", "top_1_localizations", 89),
+        "cbfl-softrex-top10": ("cbfl-softrex-defects4j", "top_10_localizations", 301),
+        "cbfl-blmu-top10": ("cbfl-softrex-defects4j", "top_10_localizations", 270),
+        "cbfl-softrex-mrr": ("cbfl-softrex-defects4j", "mean_reciprocal_rank", 0.349),
+        "cbfl-blmu-mrr": ("cbfl-softrex-defects4j", "mean_reciprocal_rank", 0.301),
+        "causalrepair-d4j-correct-fixes": ("causalrepair-defects4j", "correct_patches", 313),
+        "reinfix-d4j-correct-fixes": ("causalrepair-defects4j", "correct_patches", 236),
+        "causalrepair-d4j-trans-correct-fixes": ("causalrepair-defects4j-trans", "correct_patches", 289),
+        "poscm-uai26-simulators": ("poscm-uai2026", "external_simulator_count", 2),
+    }
+    for observation_id, expected in required_method_observations.items():
+        observation = next((row for row in observations if row["observation_id"] == observation_id), None)
+        if observation is None:
+            errors.append(f"missing required causal-method observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            observation["comparator_id"] != comparator_id
+            or observation["metric"]["metric_id"] != metric_id
+            or observation["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: comparator/metric/value binding changed")
+
+    # Preserve the method/task boundary: execution and repair results do not
+    # become source-only review precision or Recall@5.
+    if "causalrepair-defects4j" in comparators:
+        caveats = " ".join(comparators["causalrepair-defects4j"]["caveats"]).lower()
+        if "not ceb" not in caveats and "not a source-only" not in caveats:
+            errors.append("CausalRepair comparator must retain repair-vs-review scope caveat")
+    if "cbfl-softrex-defects4j" in comparators:
+        caveats = " ".join(comparators["cbfl-softrex-defects4j"]["caveats"]).lower()
+        if "not ceb defect recall@5" not in caveats:
+            errors.append("SoftReX comparator must retain Top-N-vs-CEB Recall@5 scope caveat")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -349,6 +403,27 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
         if row["observation_id"] != "sdr-ca-public-dataset-count"
     ]
     must_reject(mutant, "causal runtime comparator observation removed")
+
+    mutant = copy.deepcopy(payload)
+    mutant["comparators"] = [
+        row for row in mutant["comparators"] if row["comparator_id"] != "cbfl-softrex-defects4j"
+    ]
+    must_reject(mutant, "actual-causality comparator removed")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "cbfl-softrex-top1")
+    row["metric"]["value"] = 89
+    must_reject(mutant, "SoftReX Top-1 conflated with BLMu")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "causalrepair-d4j-trans-correct-fixes")
+    row["comparator_id"] = "causalrepair-defects4j"
+    must_reject(mutant, "Defects4J-Trans task population collapsed into original Defects4J")
+
+    mutant = copy.deepcopy(payload)
+    row = next(row for row in mutant["observations"] if row["observation_id"] == "poscm-uai26-simulators")
+    row["metric"]["value"] = 95
+    must_reject(mutant, "POSCM simulator count misrepresented as a performance score")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
