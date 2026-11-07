@@ -6,6 +6,7 @@ pub mod design;
 pub mod matrix;
 pub mod permutation_polynomial;
 pub mod profile;
+pub mod finite_model_family;
 pub mod rational_probability;
 pub mod semiring;
 
