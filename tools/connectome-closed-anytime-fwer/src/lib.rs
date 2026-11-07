@@ -12,8 +12,8 @@
 
 use connectome_asof_filtration::{
     AdmissionMode, AdmissionStatus, AdjusterReceipt, AvailabilityState, DecisionAuditStatus,
-    EvidenceEvent, EvidenceSplit, FiltrationAdmission, GlobalLedger, LedgerEntry, LedgerPayload,
-    audit_admission, audit_ledger,
+    DecisionKind, DecisionReceipt, EvidenceEvent, EvidenceSplit, FamilyFreeze, FiltrationAdmission,
+    GlobalLedger, LedgerEntry, LedgerPayload, audit_admission, audit_ledger,
 };
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -954,6 +954,90 @@ mod tests {
             .filtration_admission
             .observed_event_ids
             .push("T7".into());
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
+    fn rejects_global_ledger_with_lookahead_decision() {
+        let mut family = fixture();
+        family.global_ledger.entries.push(LedgerEntry {
+            sequence: 3,
+            entry_commitment_sha256: digest('7'),
+            payload: LedgerPayload::Decision(DecisionReceipt {
+                decision_id: "D-lookahead".into(),
+                campaign_id: family.campaign_id.clone(),
+                kind: DecisionKind::Discovery,
+                policy_version_sha256: digest('1'),
+                input_prefix_sha256: digest('2'),
+                driver_receipt_sha256: digest('3'),
+                history_prefix_sha256: digest('4'),
+                action_sha256: digest('5'),
+                feasibility_receipt_sha256: digest('6'),
+                available_event_ids: vec!["S1".into(), "T7".into()],
+                consumed_event_ids: vec!["FUTURE-EVENT".into()],
+                confirmatory_family_id: None,
+            }),
+        });
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
+    fn rejects_confirmation_event_from_another_frozen_family() {
+        let mut family = fixture();
+        family.global_ledger.entries.push(LedgerEntry {
+            sequence: 3,
+            entry_commitment_sha256: digest('7'),
+            payload: LedgerPayload::FamilyFreeze(FamilyFreeze {
+                family_id: "different-family".into(),
+                family_commitment_sha256: digest('8'),
+                confirmation_lockbox_closed: true,
+            }),
+        });
+        family.global_ledger.entries.push(LedgerEntry {
+            sequence: 4,
+            entry_commitment_sha256: digest('6'),
+            payload: LedgerPayload::Evidence(EvidenceEvent {
+                event_id: "C-other-family".into(),
+                evidence_family_id: "confirmatory-observation".into(),
+                source_stream: "behaviour-confirmation".into(),
+                source_artifact_sha256: digest('5'),
+                revision: 0,
+                supersedes_event_id: None,
+                event_time_ms: Some(200),
+                acquired_at_ms: Some(201),
+                annotated_at_ms: Some(202),
+                qc_at_ms: Some(203),
+                availability_state: AvailabilityState::Approved,
+                split: EvidenceSplit::Confirmation,
+                confirmatory_family_id: Some("different-family".into()),
+            }),
+        });
+        family.global_ledger.entries.push(LedgerEntry {
+            sequence: 5,
+            entry_commitment_sha256: digest('4'),
+            payload: LedgerPayload::Evidence(EvidenceEvent {
+                event_id: "T8".into(),
+                evidence_family_id: "later-exploration".into(),
+                source_stream: "behaviour-exploration".into(),
+                source_artifact_sha256: digest('3'),
+                revision: 0,
+                supersedes_event_id: None,
+                event_time_ms: Some(210),
+                acquired_at_ms: Some(211),
+                annotated_at_ms: Some(212),
+                qc_at_ms: Some(213),
+                availability_state: AvailabilityState::Approved,
+                split: EvidenceSplit::Exploration,
+                confirmatory_family_id: None,
+            }),
+        });
+        family.claims[0]
+            .filtration_admission
+            .observed_event_ids
+            .push("C-other-family".into());
+        family.claims[0]
+            .filtration_admission
+            .process_output_sequence = 5;
         assert!(audit_closed_family(&family).is_err());
     }
 
