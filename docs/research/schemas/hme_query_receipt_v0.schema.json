@@ -9,6 +9,7 @@
     "schema_version",
     "query",
     "generation",
+    "eligibility",
     "requested",
     "status",
     "stop_reason",
@@ -296,6 +297,137 @@
     },
     "receipt_sha256": {
       "$ref": "#/$defs/sha256"
+    },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "policy_sha256",
+        "authorization_generation",
+        "source_ledger_generation",
+        "valid_at",
+        "known_at",
+        "principal_scope_sha256",
+        "hme_manifest_sha256",
+        "physical_count",
+        "eligible_count",
+        "excluded_count",
+        "primary_exclusion_counts",
+        "exclusion_set_sha256",
+        "payload_reads_for_excluded_count",
+        "snapshot_consistent"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "authorization_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_ledger_generation": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "known_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "principal_scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "hme_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "physical_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "eligible_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excluded_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "primary_exclusion_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outside_valid_time",
+            "not_known_at_known_time",
+            "retracted_or_superseded",
+            "quarantined",
+            "out_of_scope",
+            "unauthorized_or_revoked",
+            "forgotten_from_active_index",
+            "privacy_erased_or_unavailable",
+            "retention_expired",
+            "invalid_metadata"
+          ],
+          "properties": {
+            "outside_valid_time": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "not_known_at_known_time": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "retracted_or_superseded": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "quarantined": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "out_of_scope": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unauthorized_or_revoked": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "forgotten_from_active_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "privacy_erased_or_unavailable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "retention_expired": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "invalid_metadata": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "exclusion_set_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "payload_reads_for_excluded_count": {
+          "const": 0
+        },
+        "snapshot_consistent": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "$defs": {
@@ -449,6 +581,35 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "ExactComplete",
+              "ApproximateComplete"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "eligibility": {
+            "properties": {
+              "snapshot_consistent": {
+                "const": true
+              },
+              "payload_reads_for_excluded_count": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "x-semantic-invariants": [
@@ -458,6 +619,14 @@
     "Incomplete best-so-far results are provisional and must never be promoted to completed top-k.",
     "UnavailableOrInvalid must not return memory payloads or silently fall back to an unqualified query path.",
     "Counts must be reconciled against the pinned manifest and active eligibility filters by an independent verifier.",
-    "A receipt digest binds fields; it does not prove that a pruning bound or residual certificate is mathematically valid."
+    "A receipt digest binds fields; it does not prove that a pruning bound or residual certificate is mathematically valid.",
+    "eligibility.physical_count == eligibility.eligible_count + eligibility.excluded_count.",
+    "The sum of mutually exclusive primary_exclusion_counts equals eligibility.excluded_count.",
+    "eligibility.eligible_count == candidate_accounting.eligible_count.",
+    "eligibility.hme_manifest_sha256 equals generation.manifest_sha256.",
+    "ExactComplete and ApproximateComplete require a consistent pinned eligibility snapshot; stale or unavailable policy generations fail closed.",
+    "payload_reads_for_excluded_count must be zero; filtering by scope, valid/known time, revocation, tombstone and retention happens before payload access.",
+    "Excluded item identities/reasons are not exposed to principals lacking permission to inspect them; exclusion_set_sha256 is not a proof of policy correctness.",
+    "Query exclusion, logical forgetting, physical purge and cryptographic erasure are distinct lifecycle states."
   ]
 }
