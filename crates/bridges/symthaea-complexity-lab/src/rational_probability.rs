@@ -257,9 +257,9 @@ mod tests {
         assert_eq!(q(1, 2).checked_div(CheckedRational::zero()), Err(RationalError::ZeroDenominator));
 
         // Generic VE surfaces coefficient overflow as a domain error.
-        let error = CheckedRational::from_integer(i128::MAX)
-            .checked_add(&CheckedRational::one())
-            .unwrap_err();
+        let lhs = CheckedRational::from_integer(i128::MAX);
+        let rhs = CheckedRational::one();
+        let error = ExactSemiring::checked_add(&lhs, &rhs).unwrap_err();
         assert!(matches!(error, SemiringError::Domain(_)));
     }
 }
