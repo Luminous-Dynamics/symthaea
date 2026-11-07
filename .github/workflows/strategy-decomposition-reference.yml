@@ -1,0 +1,44 @@
+name: Strategy Decomposition Reference
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-operations-research/**"
+      - ".github/workflows/strategy-decomposition-reference.yml"
+  push:
+    branches:
+      - research/sat-csp-algorithm-discovery-2026-11
+    paths:
+      - "crates/domains/symthaea-operations-research/**"
+      - ".github/workflows/strategy-decomposition-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: strategy-decomposition-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finite-decomposition:
+    name: Bounded finite decomposition checker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting of the reference modules
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/decomposition.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-operations-research/src/quantified_scope.rs
+
+      - name: Compile the pure-std crate test harness
+        run: rustc --edition 2024 --test crates/domains/symthaea-operations-research/src/lib.rs -o /tmp/symthaea-operations-research-tests
+
+      - name: Run finite semantic and negative-control tests
+        run: /tmp/symthaea-operations-research-tests --nocapture

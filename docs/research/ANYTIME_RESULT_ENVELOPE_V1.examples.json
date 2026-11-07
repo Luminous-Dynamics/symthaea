@@ -1,0 +1,266 @@
+{
+  "schema_version": "symthaea.anytime-result.examples/v1",
+  "notes": [
+    "All digests are syntactically valid fixture placeholders, not real artifacts or evidence.",
+    "These examples illustrate the envelope shape. A separate semantic verifier must check objective/bound direction, request consistency, and incumbent-sequence monotonicity."
+  ],
+  "valid_examples": [
+    {
+      "name": "feasible incumbent retained after deadline; optimality unproven",
+      "result": {
+        "schema_version": "symthaea.anytime-result/v1",
+        "task": {
+          "kind": "allocation",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "source_data_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "contract_version": "allocation/v1",
+          "objective": {
+            "sense": "minimize",
+            "domain": "integer",
+            "encoding": "canonical-decimal-integer",
+            "unit": "credits",
+            "tie_policy": "canonical_witness"
+          }
+        },
+        "disposition": "feasible_unproven",
+        "search": {
+          "completeness": "incomplete",
+          "stopping_reason": "deadline",
+          "exhaustive_for_contract": false,
+          "completion_evidence": null,
+          "generated_nodes": 12000,
+          "explored_nodes": 8400,
+          "pruned_nodes": 2500,
+          "unresolved_nodes": 1100
+        },
+        "incumbents": [
+          {
+            "observed_at_ms": 8300,
+            "witness_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+            "witness_complete": true,
+            "validator": {
+              "id": "independent-allocation-auditor",
+              "version": "1.0",
+              "binary_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+              "independent": true,
+              "verdict": "accepted",
+              "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+              "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+            },
+            "objective_value": "1250",
+            "units": "credits",
+            "reconstruction_digest": "9999999999999999999999999999999999999999999999999999999999999999"
+          }
+        ],
+        "bounds": [
+          {
+            "direction": "lower",
+            "value": "1000",
+            "objective_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "assumptions_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "certificate_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "checker": {
+              "id": "bound-certificate-checker",
+              "version": "1.0",
+              "binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "independent": true
+            },
+            "verdict": "accepted",
+            "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "optimality": {
+          "status": "not_proven",
+          "certificate_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "checker_id": "bound-certificate-checker",
+          "checker_version": "1.0",
+          "checker_binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "verdict": "unavailable",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "checker_independent": true
+        },
+        "infeasibility": null,
+        "resources": {
+          "wall_time_ms": 10000,
+          "cpu_time_ms": 9800,
+          "peak_memory_bytes": 524288000,
+          "energy_microjoules": null
+        },
+        "provenance": {
+          "solver_id": "reference-optimizer",
+          "solver_version": "0.1",
+          "source_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "configuration_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "run_seed": 1,
+          "randomization": "deterministic"
+        }
+      }
+    },
+    {
+      "name": "exhaustive search with independently checked optimum",
+      "result": {
+        "schema_version": "symthaea.anytime-result/v1",
+        "task": {
+          "kind": "allocation",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "source_data_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+          "contract_version": "allocation/v1",
+          "objective": {
+            "sense": "minimize",
+            "domain": "integer",
+            "encoding": "canonical-decimal-integer",
+            "unit": "credits",
+            "tie_policy": "canonical_witness"
+          }
+        },
+        "disposition": "exact_complete",
+        "search": {
+          "completeness": "exhaustive",
+          "stopping_reason": "completed",
+          "exhaustive_for_contract": true,
+          "completion_evidence": {
+            "kind": "search_tree",
+            "artifact_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "checker_id": "search-tree-checker",
+            "checker_version": "1.0",
+            "checker_binary_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "verdict": "accepted",
+            "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+            "checker_independent": true
+          },
+          "generated_nodes": 200,
+          "explored_nodes": 180,
+          "pruned_nodes": 20,
+          "unresolved_nodes": 0
+        },
+        "incumbents": [
+          {
+            "observed_at_ms": 500,
+            "witness_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+            "witness_complete": true,
+            "validator": {
+              "id": "independent-allocation-auditor",
+              "version": "1.0",
+              "binary_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+              "independent": true,
+              "verdict": "accepted",
+              "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+              "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+            },
+            "objective_value": "42",
+            "units": "credits",
+            "reconstruction_digest": null
+          }
+        ],
+        "bounds": [
+          {
+            "direction": "lower",
+            "value": "42",
+            "objective_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "assumptions_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "certificate_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "checker": {
+              "id": "bound-certificate-checker",
+              "version": "1.0",
+              "binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "independent": true
+            },
+            "verdict": "accepted",
+            "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
+        ],
+        "optimality": {
+          "status": "proven_optimal",
+          "certificate_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "checker_id": "bound-certificate-checker",
+          "checker_version": "1.0",
+          "checker_binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "verdict": "accepted",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "checker_independent": true
+        },
+        "infeasibility": null,
+        "resources": {
+          "wall_time_ms": 10000,
+          "cpu_time_ms": 9800,
+          "peak_memory_bytes": 524288000,
+          "energy_microjoules": null
+        },
+        "provenance": {
+          "solver_id": "reference-optimizer",
+          "solver_version": "0.1",
+          "source_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "configuration_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "run_seed": 1,
+          "randomization": "deterministic"
+        }
+      }
+    },
+    {
+      "name": "infeasibility proven by independent certificate despite incomplete search",
+      "result": {
+        "schema_version": "symthaea.anytime-result/v1",
+        "task": {
+          "kind": "scheduling",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "source_data_digest": null,
+          "contract_version": "schedule/v1",
+          "objective": null
+        },
+        "disposition": "proven_infeasible",
+        "search": {
+          "completeness": "incomplete",
+          "stopping_reason": "solver_timeout",
+          "exhaustive_for_contract": false,
+          "completion_evidence": null,
+          "generated_nodes": 30,
+          "explored_nodes": 30,
+          "pruned_nodes": 0,
+          "unresolved_nodes": null
+        },
+        "incumbents": [],
+        "bounds": [],
+        "optimality": null,
+        "infeasibility": {
+          "certificate_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "checker_id": "independent-infeasibility-checker",
+          "checker_version": "1.0",
+          "checker_binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+          "verdict": "accepted",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "checker_independent": true
+        },
+        "resources": {
+          "wall_time_ms": 10000,
+          "cpu_time_ms": 9800,
+          "peak_memory_bytes": 524288000,
+          "energy_microjoules": null
+        },
+        "provenance": {
+          "solver_id": "reference-optimizer",
+          "solver_version": "0.1",
+          "source_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "configuration_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "run_seed": 1,
+          "randomization": "deterministic"
+        }
+      }
+    }
+  ],
+  "negative_controls": [
+    "Set validator.independent=false: reject.",
+    "Set witness_complete=false: reject.",
+    "Mark a deadline-limited run proven_infeasible without an accepted infeasibility proof: reject.",
+    "Mark exact_complete without accepted completion and optimality evidence: reject.",
+    "For minimization, append a later admitted incumbent with a larger objective value: reject in the semantic verifier even though each record independently matches the JSON Schema."
+  ]
+}
