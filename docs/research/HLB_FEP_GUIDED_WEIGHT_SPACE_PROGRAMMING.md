@@ -180,11 +180,21 @@ where \\(B\\) is the multivariate beta function. The implementation accumulates 
 
 Tests include the exact Beta-Binomial evidence ratio for a Beta(1,1) full prior and Beta(2,1) reduced prior (reduced/full evidence ratio \\(4/3\\)), explicit support-restricted evidence when excluded outcomes are unobserved, zero evidence when an excluded outcome is observed, additivity across independent likelihood columns, model-prior odds, ordered-parameterization binding, and negative controls for malformed support and incompatible reduced posteriors.
 
+**Two distinct Dirichlet semantics are now implemented and named:**
+
+1. `reduce_dirichlet_models` is the strict-support variant described above. An outcome excluded by a reduced model has exactly zero probability; observing it gives that model \\(-\\infty\\) log evidence.
+2. `reduce_dirichlet_models_spm_compatible` reproduces the pinned SPM `spm_MDP_log_evidence` convention. It adds \\(p=1/32\\) to every coordinate of the posterior, full prior, and reduced prior, forms \\(s=q+r-p+p_0\\) after smoothing (equivalently \\(q'+r'-p'\\)), and computes the negative of SPM's free-energy expression. Previously zero coordinates are therefore smoothed, not treated as impossible. The matching model-average prior is the **globally normalized** weighted sum of reduced priors, not a per-column arithmetic mean. `evaluate_dirichlet_model_information_gain_spm_compatible` uses this same BMR semantics both before and after each hypothetical observation.
+
+The distinction is anchored to the pinned sources: [`spm_MDP_BMR.m`](https://github.com/spm/spm/blob/28d1f103b021f729266cb7ea07baaf4d0285b22a/toolbox/DEM/spm_MDP_BMR.m) globally normalizes the sum of reduced priors; [`spm_MDP_log_evidence.m`](https://github.com/spm/spm/blob/28d1f103b021f729266cb7ea07baaf4d0285b22a/toolbox/DEM/spm_MDP_log_evidence.m) adds 1/32 to all three tensors; and [`spm_betaln.m`](https://github.com/spm/spm/blob/28d1f103b021f729266cb7ea07baaf4d0285b22a/spm_betaln.m) applies the multivariate beta function down the first (outcome) dimension independently for each remaining tensor column. These are not cosmetic implementation choices; they change reduced-model evidence and posterior odds.
+
+The three-ball exact-source path now carries both the older strict-support prior and `spm_model_average_prior`, which matches `DEM_reasoning.m`'s global normalization. It uses the SPM-compatible BMR/EIG functions through the separate `*_spm_compatible` prediction and action-scoring entry points. The strict-support variant remains useful as an explicit counterfactual, but it is not the source reproduction mode.
+
+
 This is the appropriate categorical BMR substrate for the [2026 three-ball active structure-learning paper](https://doi.org/10.1038/s41467-026-77209-5), whose likelihood parameters are represented by Dirichlet counts. A source-pinned reconstruction of the public 81-rule generator and a one-step model-EIG scorer now exist; the exact paper's reported 79-unique-rule count remains unreconciled with the audited public generator's 75 exact likelihood classes. The branch now tests prospective feedback model-EIG and post-outcome class posteriors under the 81-label and 75-class representations for several choices at a known ball state. This is a feedback-modality quotient-invariance fixture, not the complete three-ball task: the full POMDP, visual+feedback action-conditioned state posterior, exact archived rule-family reconciliation, full expected-free-energy policy evaluator, and production `ActiveInferenceAgent::select_action` integration are not yet implemented.
 
 ### 2.3.3 One-step prospective model EIG from Dirichlet BMR
 
-The categorical BMR module now also exposes `evaluate_dirichlet_model_information_gain`. It implements the model-structure component of the paper's one-step expected information gain:
+The categorical BMR module now exposes both `evaluate_dirichlet_model_information_gain` (strict-support semantics) and `evaluate_dirichlet_model_information_gain_spm_compatible` (pinned SPM semantics). The latter is the relevant source-reproduction path for three-ball. Each evaluator implements the model-structure component of the paper's one-step expected information gain:
 
 ```text
 IG_model(action)
@@ -209,7 +219,8 @@ It rejects missing, duplicate, or unknown model IDs; invalid per-model probabili
 The evaluator adds the hypothetical sufficient-statistic increment to the current full posterior, runs BMR to obtain the posterior over reduced models for that outcome, and averages posterior model entropy under the reconstructed posterior-predictive mixture. It does **not** multiply the outcome probability by another Bayes-factor mixture term; that would double-count evidence and would not match the model-EIG expression in the paper.
 
 The evaluator enforces:
-- The full Dirichlet prior is the model-prior-weighted arithmetic average of the reduced-model priors, as in the paper's Bayesian model average.
+- In strict-support mode, the full Dirichlet prior is the per-column model-prior-weighted arithmetic average of the reduced-model priors.
+- In SPM-compatible mode, the full Dirichlet prior must be the globally normalized weighted sum of all reduced-prior tensor entries, matching `spm_MDP_BMR` and `DEM_reasoning`; it is not a per-column mean.
 - Each model-specific action-outcome predictive distribution is finite, non-negative, keyed to the current model set, and sums to one.
 - The caller-supplied aggregate outcome distribution matches the mixture weighted by the **current posterior model probabilities**.
 - Every hypothetical posterior-count increment matches the exact likelihood tensor dimensions and is finite/non-negative.
@@ -440,7 +451,7 @@ Two tracks remain separate:
 
 Primary outcomes: ground-truth rule posterior probability, rule-identification accuracy, trials to 16-nat model log-odds, model-choice Brier score, decision regret, and observation cost. Diagnostics: state/parameter/model-structure information gain, realized model-entropy reduction, Dirichlet BMR log evidence, posterior winner/runner-up odds, false commitment, and calibration under prior misspecification.
 
-The categorical likelihood BMR baseline must use the Dirichlet primitive in `crates/core/symthaea-fep/src/dirichlet_model_reduction.rs`, not the diagonal-Gaussian BMR primitive.
+The categorical likelihood BMR baseline must use `reduce_dirichlet_models_spm_compatible` and `evaluate_dirichlet_model_information_gain_spm_compatible` for source-faithful three-ball reproduction. The strict-support functions are separate ablation baselines, not substitutes for the SPM evidence convention.
 
 **Source-pinned model-space audit:** the implementation cites [the paper-pinned SPM demo revision](https://github.com/spm/spm/blob/28d1f103b021f729266cb7ea07baaf4d0285b22a/toolbox/DEM/DEM_reasoning.m), [the public rule generator revision](https://github.com/spm/spm/blob/5852cadb300a81fd3f30e7056ee329bca20f0efe/toolbox/DEM/spm_MDP_rules.m), and [the combination-order implementation](https://github.com/spm/spm/blob/main/spm_combinations.m). The audited SPM source lineage confirms 81 labelled hypotheses and rule 65's context/criterion mapping. Its complete likelihood tensors collapse to 75 equivalence classes under exact tensor equality. The paper's 79 count may reflect a different generator snapshot or a different notion of semantic equivalence; the current evidence does not resolve which. The exact-reproduction hard gate therefore remains closed pending a pinned-source reconciliation. Compare random legal observation, reward/pragmatic-greedy without model information, state-only and parameter-only information policies, hierarchical model EIG with Dirichlet BMR, and an analysis-only oracle. Keep preferences, observation cost, legal actions, model priors, and horizon identical across ablations.
 
