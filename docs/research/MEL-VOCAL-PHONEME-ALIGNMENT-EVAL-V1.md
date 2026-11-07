@@ -35,6 +35,24 @@ The paper and repository make this a strong candidate for controlled reproductio
 - https://github.com/Soul-AILab/SoulX-Singer-Eval
 - https://arxiv.org/abs/2602.07803
 
+### Singing-specific phoneme alignment: ISMIR 2026
+
+Kim and Lee's *Vocal Music under Phoneme-Conditional Analysis* (ISMIR 2026) provides a particularly useful alignment reference. Its released benchmark reports a validation set of 47 sung NUS-48E recordings with 25,157 manually reviewed phone boundaries. The selected blended aligner reports 22.8 ms median onset error, 74.6% of onsets within 50 ms, and 90.5% within 100 ms. The paper's comparison also reports that Montreal Forced Aligner produced a usable alignment for only 8 of 47 sung recordings in that experiment, despite being close on read speech. This is strong evidence that speech forced alignment cannot be assumed to transfer to expressive singing.
+
+The aligner pipeline compares an MMS CTC pass with an IPA-native model plus spectral-flux snapping, then blends the results. The benchmark is useful because it retains manually checked phone boundaries and tests actual singing. It is not a universal leaderboard: the sample is small, its phone sequence is supplied/curated, and its domain and annotation conventions need to be reproduced before direct comparison.
+
+Source and code: https://github.com/gillosae/phoneme-conditional-singing-analysis
+
+**Evaluator change in this iteration:** MEL-VOCAL-001 now reports median absolute phone-onset error and the fraction of exact phone-identity pairs within 50 ms and 100 ms. These figures are conditional on exact symbol, word, syllable and vowel/consonant identity matches; they are not a joint score that hides transcription mistakes. To reproduce the ISMIR metric fairly, first run a fixed-reference-phone alignment track on the same manually annotated corpus, then report the joint recognition-plus-alignment result separately.
+
+**Proposed stretch target, not an observed result:** on a speaker/song-disjoint singing alignment set using the same annotation convention, aim for median onset error <=20 ms, >=80% within 50 ms, and >=95% within 100 ms, while preserving high recall (do not achieve low timing error by rejecting difficult phones). Report results separately for vowels, stops, fricatives, word boundaries, melisma, vibrato, breathy singing, glissando and falsetto.
+
+### Phoneme-conditioned musical identity: beyond generic voice similarity
+
+The same ISMIR 2026 work asks whether language-specific vocal identity remains measurable in singing when melody, singer and genre are held constant. It matches marker phones to non-marker controls within the same song, then tests articulatory effects (formants, spectral tilt, H1-H2, HNR), melodic deviation (F0), rhythmic adaptation (duration), melisma, and timbral properties. On a 5,024-track set gated from 9,331 aligned tracks, it reports 85.5% balanced accuracy in nine-way language classification under artist-grouped folds.
+
+This suggests a research direction for Muse: do not only ask whether the voice sounds like the same singer. Also measure whether its language-specific articulatory and prosodic identity survives when singing on different notes, in different registers, and across styles. Use within-singer / within-song matched controls where possible so the language effect is not confounded with singer, melody, or production. This is a separate language-characterization study, not a pronunciation-accuracy score.
+
 ### Music-aware singing quality assessment: MusicJudge
 
 Samsung Research's MusicJudge (Interspeech 2026) is especially relevant because it combines lyric correctness with pitch/rhythm fidelity at meaningful music-block boundaries. Its published evaluation reports ranking agreement with expert judges on SwaraLyrics (Spearman 0.683; Kendall tau 0.499). This demonstrates why lyric-only WER, score-only pitch error, and audio-only MOS should not be collapsed into one universal quality measure.
