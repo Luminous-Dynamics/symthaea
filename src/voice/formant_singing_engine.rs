@@ -116,9 +116,11 @@ impl FormantSingingEngine {
                     .iter()
                     .rev()
                     .find(|phone| phone.is_vowel)
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "syllable {syllable_index} has melisma notes but no vowel nucleus"
-                    ))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "syllable {syllable_index} has melisma notes but no vowel nucleus"
+                        )
+                    })?;
                 for (melisma_index, note) in expected.melisma_notes.iter().enumerate() {
                     let observed_melisma = &aligned[cursor];
                     if observed_melisma.phonemes.len() != 1
