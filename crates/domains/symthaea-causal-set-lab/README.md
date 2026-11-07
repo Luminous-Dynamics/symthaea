@@ -1,7 +1,7 @@
 # symthaea-causal-set-lab
 
 A deliberately small, std-only research crate for causal-set kinematics and
-finite-sample validation.
+finite-sample validation in 1+1D, 2+1D and 3+1D flat Minkowski spacetime.
 
 ## First milestone
 
@@ -16,7 +16,12 @@ finite-sample validation.
 - Small-set brute-force cross-checks for the optimized pair and chain algorithms.
 - Passive Lorentz-boost invariance tests for order-theoretic observables,
   including deterministic maximum-chain tie-breaking.
-- Deterministic seed and bounded-input validation.
+- Dimension-generic fixed-cardinality sprinkling into 2+1D and 3+1D
+  Alexandrov intervals, with analytic interval volumes, Minkowski causal
+  relations, Myrheim–Meyer dimension estimation and boost tests.
+- The 1+1D pair counter and chain reconstruction are O(N log N); the generic
+  higher-dimensional reference observables are O(N²).
+- Deterministic seeds and bounded-input validation.
 
 The implementation uses (u=t+x), (v=t-x). A 1+1D Alexandrov
 interval of endpoint proper-time separation (T) is the square
@@ -44,3 +49,27 @@ cargo run -p symthaea-causal-set-lab --example minkowski_1p1
 No benchmark result should be promoted to a scientific claim unless the
 exact commit, seed, event count, bounds, generator, estimator version and
 output are recorded.
+
+
+## Higher-dimensional flat-spacetime benchmark
+
+The `causal_set_nd` module samples uniformly per spacetime volume in a
+flat Alexandrov interval. For endpoint proper-time separation (T=1), the
+analytic spacetime volumes and dense-sprinkling Myrheim ordering fractions are:
+
+| Spacetime | Volume | Expected ordering fraction |
+|---|---:|---:|
+| 1+1D | 0.5 | 0.5 |
+| 2+1D | `PI / 12` | 8/35 ≈ 0.228571 |
+| 3+1D | `PI / 24` | 0.1 |
+
+Run:
+
+```bash
+cargo run -p symthaea-causal-set-lab --example minkowski_nd
+```
+
+This example reports ordering fractions, dimension estimates and longest-chain
+lengths for fixed-seed samples in all three dimensions. It is a kinematics
+benchmark only: no curved-spacetime reconstruction, causal-set action,
+d'Alembertian, quantum measure or continuum dynamics is implemented.
