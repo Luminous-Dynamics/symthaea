@@ -79,8 +79,6 @@ pub mod formant_singing_engine;
 #[cfg(feature = "singing")]
 pub mod diffsinger;
 #[cfg(feature = "singing")]
-pub mod formant_singing_engine;
-#[cfg(feature = "singing")]
 pub mod kokoro_singing;
 #[cfg(feature = "singing")]
 pub mod singing_engine;
