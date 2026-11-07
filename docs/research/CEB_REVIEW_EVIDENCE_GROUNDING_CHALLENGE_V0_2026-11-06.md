@@ -429,6 +429,54 @@ Do not multiply KDDR by Usefulness Rate or combine them into a single opaque sco
 
 **Invalid behaviors:** Assume the fix worked; infer that the target persists because evidence is missing; invent a runtime observation; force a binary answer when the source state is incomplete.
 
+### ERG-S27 — Correct finding rejected for scope or timing
+
+**Evidence pack:** A finding is independently adjudicated factually correct and actionable under the frozen scope. The maintainer explicitly rejects or defers it because the change is outside the current PR, a different owner must act, a planned migration supersedes it, or the timing is wrong. No evidence contradicts the diagnosis.
+
+**Expected review behavior:** Preserve the correct truth/actionability label. Record the developer's reason as a distinct uptake event (rejected, deferred or redirected). Do not relabel the finding false because it was not implemented.
+
+**Invalid behaviors:** Count every rejection as a false positive; treat deferral as permanent disagreement; infer the developer's preference from silence.
+
+### ERG-S28 — False finding accepted and implemented
+
+**Evidence pack:** A review reports a concrete defect that independent blinded adjudicators reject on the exact source revision. The maintainer accepts the suggestion and changes the code, but the change is unnecessary and introduces a regression or removes valid behavior.
+
+**Expected review behavior:** Keep the finding false/unsupported regardless of adoption. Independently adjudicate the resulting code change and its regressions. Count this as uptake of a false finding, not successful defect detection or remediation.
+
+**Invalid behaviors:** Turn a false finding into gold because code changed; equate merged/accepted with correct; ignore the regression because the suggestion was implemented.
+
+### ERG-S29 — The target was fixed independently before the comment
+
+**Evidence pack:** A valid finding is delivered, but the exact event timeline shows that the maintainer's branch or another contributor already fixed the same target mechanism before the comment was visible. The later thread is marked resolved and the code includes the repair.
+
+**Expected review behavior:** Preserve finding truth; classify the uptake as already fixed / independently reproduced, not caused by the comment. Bind the repair to its pre-existing commit and exact revision.
+
+**Invalid behaviors:** Claim the agent caused the repair; count every resolved thread as an implementation; discard the finding as false because its target is no longer present at a later revision.
+
+### ERG-S30 — A follow-up diff is temporally related but attribution is ambiguous
+
+**Evidence pack:** A review comment is followed by a commit that changes the same file and nearby lines. The commit also implements a separate feature request and refactors the relevant function. The author provides no attribution and the diff alone cannot isolate which change responds to the comment.
+
+**Expected review behavior:** Record temporal association and the observed diff, but leave comment-to-change attribution unresolved unless an explicit, independently supported link or controlled comparison exists. Preserve the original truth/actionability label.
+
+**Invalid behaviors:** Assume the later diff was caused by the comment; infer rejection when no line changed; use LLM semantic similarity as causal proof.
+
+### ERG-S31 — Accepted repair removes the target but introduces a regression
+
+**Evidence pack:** The maintainer accepts a correct target diagnosis and implements a repair. Independent review establishes that the target mechanism is removed, but the patch also breaks a protected invariant or introduces a new regression in a neighboring path.
+
+**Expected review behavior:** Score target remediation and downstream regression separately. Do not label the end-to-end outcome successful merely because the original target disappeared. Preserve the new defect as a separately adjudicated finding.
+
+**Invalid behaviors:** Count an accepted merge as a net quality improvement; erase target success because of an unrelated issue; infer whole-patch safety from target-specific absence.
+
+### ERG-S32 — No response is not rejection, and critical findings are never randomized away
+
+**Evidence pack:** The platform exposes no reliable view/reaction/response event for a low-priority comment before the observation window ends. In the same study, another finding is independently adjudicated as a critical security issue covered by the team's mandatory immediate-escalation policy.
+
+**Expected review behavior:** Keep the low-priority uptake status as no observable response / censored, not rejected. Surface the critical security finding immediately in every experiment arm; it is ineligible for randomized delay, hiding or suppression.
+
+**Invalid behaviors:** Infer rejection or user preference from silence; remove no-response cases from the denominator; randomize the timing or visibility of the critical finding; treat an absent telemetry event as proof it was not read.
+
 ## 13. Claim boundary
 
-This document contributes twenty-six synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
+This document contributes thirty-two synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
