@@ -1,0 +1,13 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
+[package]
+name = "rea-claim-replay-fuzz-support"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "rea_claim_replay_fuzz"
+path = "src/lib.rs"
