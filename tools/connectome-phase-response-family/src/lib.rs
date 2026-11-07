@@ -6,6 +6,9 @@
 //! e-process receipts are authentic or valid; those guarantees must be
 //! independently established in the shared global filtration.
 
+use connectome_asof_filtration::{
+    AdmissionStatus, FiltrationAdmission, GlobalLedger, audit_admission, audit_ledger,
+};
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -225,9 +228,14 @@ pub struct ClaimEvidence {
     pub null_envelope_sha256: String,
     pub component_e_process_receipt_sha256: String,
     pub component_validity_receipt_sha256: String,
+    /// Exact digest for the raw input process bound by the as-of receipt.
+    pub component_input_process_sha256: String,
+    /// SHA-256 of the canonical, stage-ordered rational e-process path below.
+    pub e_process_path_sha256: String,
     pub global_filtration_sha256: String,
     pub confirmation_split_sha256: String,
-    pub component_status: String,
+    /// Typed receipt consumed by the same as-of auditor used for ledger replay.
+    pub filtration_admission: FiltrationAdmission,
     pub weight: Rational,
     /// E-process values E_0,...,E_T. Values may fall; the verifier computes
     /// their running supremum and never treats that supremum as an e-value.
@@ -245,6 +253,8 @@ pub struct FamilyManifest {
     pub alpha: Rational,
     pub global_filtration_sha256: String,
     pub confirmation_split_sha256: String,
+    /// Shared append-only ledger replayed by the as-of filtration auditor.
+    pub global_ledger: GlobalLedger,
     pub claims: Vec<ClaimEvidence>,
 }
 
@@ -279,7 +289,100 @@ fn valid_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+// Small dependency-free SHA-256 implementation. The canonical path encoding
+// is versioned and exact, so the as-of admission output is bound to the actual
+// sequence of reduced rational values consumed by the statistical engine.
+fn sha256_hex(input: &[u8]) -> String {
+    const K: [u32; 64] = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+        0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+        0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+        0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+        0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+        0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+        0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+        0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+    ];
+    let mut state = [
+        0x6a09e667u32, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    ];
+    let mut message = input.to_vec();
+    let bit_len = (message.len() as u64).wrapping_mul(8);
+    message.push(0x80);
+    while message.len() % 64 != 56 {
+        message.push(0);
+    }
+    message.extend_from_slice(&bit_len.to_be_bytes());
+
+    for block in message.chunks_exact(64) {
+        let mut words = [0u32; 64];
+        for (index, chunk) in block.chunks_exact(4).take(16).enumerate() {
+            words[index] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        }
+        for index in 16..64 {
+            let s0 = words[index - 15].rotate_right(7)
+                ^ words[index - 15].rotate_right(18)
+                ^ (words[index - 15] >> 3);
+            let s1 = words[index - 2].rotate_right(17)
+                ^ words[index - 2].rotate_right(19)
+                ^ (words[index - 2] >> 10);
+            words[index] = words[index - 16]
+                .wrapping_add(s0)
+                .wrapping_add(words[index - 7])
+                .wrapping_add(s1);
+        }
+
+        let [mut a, mut b, mut cc, mut d, mut e, mut f, mut g, mut h] = state;
+        for index in 0..64 {
+            let big1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
+            let choose = (e & f) ^ ((!e) & g);
+            let temp1 = h
+                .wrapping_add(big1)
+                .wrapping_add(choose)
+                .wrapping_add(K[index])
+                .wrapping_add(words[index]);
+            let big0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
+            let majority = (a & b) ^ (a & cc) ^ (b & cc);
+            let temp2 = big0.wrapping_add(majority);
+            h = g;
+            g = f;
+            f = e;
+            e = d.wrapping_add(temp1);
+            d = cc;
+            cc = b;
+            b = a;
+            a = temp1.wrapping_add(temp2);
+        }
+        for (slot, value) in state.iter_mut().zip([a, b, cc, d, e, f, g, h]) {
+            *slot = slot.wrapping_add(value);
+        }
+    }
+    state.iter().map(|word| format!("{word:08x}")).collect()
+}
+
+pub fn canonical_e_process_path_sha256(values: &[Rational]) -> String {
+    let mut encoded = b"symthaea-eprocess-path-v1\n".to_vec();
+    for value in values {
+        encoded.extend_from_slice(value.to_string().as_bytes());
+        encoded.push(b'\n');
+    }
+    sha256_hex(&encoded)
+}
+
 pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyError> {
+    let ledger_audit = audit_ledger(&manifest.global_ledger)
+        .map_err(|error| FamilyError(format!("global as-of ledger rejected: {error}")))?;
+    if ledger_audit.campaign_id != manifest.campaign_id
+        || ledger_audit.global_filtration_sha256 != manifest.global_filtration_sha256
+    {
+        return Err(FamilyError(
+            "as-of ledger campaign or global filtration does not match family".into(),
+        ));
+    }
     if manifest.family_id.is_empty() || manifest.campaign_id.is_empty() {
         return Err(FamilyError(
             "family_id and campaign_id must be non-empty".into(),
@@ -347,6 +450,14 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
                 "component validity receipt",
                 claim.component_validity_receipt_sha256.as_str(),
             ),
+            (
+                "component input process",
+                claim.component_input_process_sha256.as_str(),
+            ),
+            (
+                "canonical e-process path",
+                claim.e_process_path_sha256.as_str(),
+            ),
             ("claim filtration", claim.global_filtration_sha256.as_str()),
             (
                 "claim confirmation split",
@@ -370,10 +481,38 @@ pub fn audit_family(manifest: &FamilyManifest) -> Result<FamilyAudit, FamilyErro
                 "claim is bound to a different confirmation split".into(),
             ));
         }
-        if claim.component_status != "VALIDATED_GLOBAL_FILTRATION_EPROCESS" {
-            return Err(FamilyError(
-                "claim lacks a validated global-filtration e-process receipt".into(),
-            ));
+        let admission = &claim.filtration_admission;
+        let admission_audit = audit_admission(&manifest.global_ledger, admission);
+        if !matches!(
+            admission_audit.status,
+            AdmissionStatus::AdmittedDirectGlobal | AdmissionStatus::AdmittedAfterLift
+        ) {
+            return Err(FamilyError(format!(
+                "{} is not admitted to the family filtration: {:?}",
+                claim.claim_id, admission_audit.status
+            )));
+        }
+        if admission.campaign_id != manifest.campaign_id
+            || admission.process_id != claim.claim_id
+            || admission.null_spec_sha256 != claim.null_envelope_sha256
+            || admission.input_process_sha256 != claim.component_input_process_sha256
+            || admission.output_process_sha256 != claim.e_process_path_sha256
+            || admission.target_filtration_sha256 != manifest.global_filtration_sha256
+            || admission.proof_receipt_sha256.as_deref()
+                != Some(claim.component_validity_receipt_sha256.as_str())
+        {
+            return Err(FamilyError(format!(
+                "{} filtration admission is not bound to this exact claim/null/process/path/proof",
+                claim.claim_id
+            )));
+        }
+        if canonical_e_process_path_sha256(&claim.e_process_values)
+            != claim.e_process_path_sha256
+        {
+            return Err(FamilyError(format!(
+                "{} e-process path digest does not match its exact rational path",
+                claim.claim_id
+            )));
         }
         if claim.weight.is_zero() {
             return Err(FamilyError(
