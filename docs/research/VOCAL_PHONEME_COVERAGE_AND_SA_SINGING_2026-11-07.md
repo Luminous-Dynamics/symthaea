@@ -122,6 +122,7 @@ The same held-out lyric/score set should be sent to every score-conditioned back
 - No fallback substitution: zero unknown-phone-to-schwa or unknown-language-to-ID-zero mappings.
 - Composite phone preservation: exact ordered phone expansion and conserved source duration.
 - Melisma: one sustained vowel across note changes; no repeated consonant token; consonant-only melisma rejected.
+- Score timeline: note/rest gap preservation, syllable and melisma overlap rejection, and explicit silence-token coverage.
 - Provenance: exact source revision, score/performance digest, rendered WAV digest and explicit language/backend metadata attached to each run. Voicebank/model-weight tree digest remains a separate required receipt.
 
 ### Singing performance
