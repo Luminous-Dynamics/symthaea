@@ -28,7 +28,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::dirichlet_model_reduction::{
-    DirichletConcentrationTensor, ReducedDirichletModelHypothesis,
+    evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
+    DirichletActionPrediction, DirichletBayesianModelReductionError,
+    DirichletConcentrationTensor, DirichletModelInformationGain,
+    DirichletModelInformationGainError, DirichletPredictedOutcome,
+    ReducedDirichletModelHypothesis,
 };
 
 pub const THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT: usize = 81;
@@ -374,6 +378,392 @@ fn arithmetic_mean_prior(rules: &[ThreeBallRule]) -> DirichletConcentrationTenso
         columns,
         active_support,
     }
+}
+
+
+/// Log preferences over feedback in the order no-feedback, correct, incorrect.
+pub const THREE_BALL_FEEDBACK_LOG_PREFERENCES_NATS: [f64; 3] = [0.0, 2.0, -6.0];
+
+/// A legal feedback action in the known-state unit task.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallFeedbackActionSpec {
+    pub action_id: String,
+    pub choice: Option<ThreeBallColour>,
+    /// Non-negative action cost in nats, kept separate from outcome preferences.
+    pub action_cost_nats: f64,
+}
+
+/// Explicit weights for the scoped known-state one-step decision objective.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallFeedbackDecisionConfig {
+    /// Relative log preferences in [no-feedback, correct, incorrect] order.
+    pub log_preferences_nats: [f64; THREE_BALL_FEEDBACK_OUTCOME_COUNT],
+    /// Weight on prospective information about model identity.
+    pub epistemic_weight: f64,
+}
+
+impl Default for ThreeBallFeedbackDecisionConfig {
+    fn default() -> Self {
+        Self {
+            log_preferences_nats: THREE_BALL_FEEDBACK_LOG_PREFERENCES_NATS,
+            epistemic_weight: 1.0,
+        }
+    }
+}
+
+/// Auditable decomposition of one known-state feedback action score.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallFeedbackActionScore {
+    pub action_id: String,
+    pub choice: Option<ThreeBallColour>,
+    /// KL[Q(feedback | action) || C(feedback)] in nats.
+    pub pragmatic_risk_nats: f64,
+    pub model_information_gain_nats: f64,
+    pub epistemic_value_nats: f64,
+    pub action_cost_nats: f64,
+    /// Lower is better: pragmatic risk - epistemic value + action cost.
+    pub expected_free_energy_nats: f64,
+    pub predictive_feedback: Vec<(ThreeBallFeedback, f64)>,
+    pub model_information_gain: DirichletModelInformationGain,
+}
+
+/// Result of evaluating a finite set of legal known-state feedback actions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallFeedbackDecision {
+    pub selected_action_index: usize,
+    pub selected_action_id: String,
+    pub action_scores: Vec<ThreeBallFeedbackActionScore>,
+}
+
+/// Errors from the known-state, feedback-only action evaluator.
+#[derive(Debug, Clone, PartialEq, thiserror::Error)]
+pub enum ThreeBallFeedbackDecisionError {
+    #[error(transparent)]
+    BayesianModelReduction(#[from] DirichletBayesianModelReductionError),
+    #[error(transparent)]
+    ModelInformationGain(#[from] DirichletModelInformationGainError),
+    #[error("the action set must not be empty")]
+    EmptyActionSet,
+    #[error("action {index} has an empty action ID")]
+    EmptyActionId { index: usize },
+    #[error("duplicate action ID: {0}")]
+    DuplicateActionId(String),
+    #[error("action {action_id} has invalid cost {cost}")]
+    InvalidActionCost { action_id: String, cost: f64 },
+    #[error("feedback decision configuration contains a non-finite preference")]
+    NonFinitePreference,
+    #[error("epistemic weight must be finite and non-negative, got {0}")]
+    InvalidEpistemicWeight(f64),
+    #[error("likelihood tensor column index {column_index} is outside 0..{column_count}")]
+    InvalidLikelihoodColumn {
+        column_index: usize,
+        column_count: usize,
+    },
+    #[error("model {model_id} has invalid posterior predictive concentration at outcome {outcome_index}")]
+    InvalidPosteriorPredictiveConcentration {
+        model_id: String,
+        outcome_index: usize,
+    },
+    #[error("model {model_id} has no positive posterior predictive concentration in the selected column")]
+    EmptyPosteriorPredictiveColumn { model_id: String },
+    #[error("posterior predictive distribution for model {model_id} sums to {sum}, expected 1")]
+    ModelPosteriorPredictiveMassNotNormalized { model_id: String, sum: f64 },
+    #[error("action {action_id} produced unknown feedback outcome ID {outcome_id}")]
+    UnknownFeedbackOutcome { action_id: String, outcome_id: String },
+    #[error("pragmatic KL risk is numerically invalid: {0}")]
+    InvalidPragmaticRisk(f64),
+}
+
+/// Build a model-bound action prediction for a known ball-colour state.
+///
+/// Per-model categorical predictions use the model-specific Dirichlet posterior
+/// implied by the full posterior and the reduced prior:
+///
+///   a_m = a_full_posterior + a_m_prior - a_full_prior.
+///
+/// Models with zero current posterior probability have no evidence-supported
+/// posterior; their normalized prior predictive is retained as a harmless
+/// placeholder because their mixture weight is exactly zero. This function is
+/// a known-state feedback probe, not a gaze/vision POMDP transition model.
+pub fn build_three_ball_feedback_action_prediction(
+    space: &ThreeBallRuleSpace,
+    full_posterior: &DirichletConcentrationTensor,
+    models: &[ReducedDirichletModelHypothesis],
+    ball_colours: [ThreeBallColour; 3],
+    gaze: Option<ThreeBallLocation>,
+    choice: Option<ThreeBallColour>,
+    action_id: impl Into<String>,
+) -> Result<DirichletActionPrediction, ThreeBallFeedbackDecisionError> {
+    let action_id = action_id.into();
+    let full_prior = &space.full_model_average_prior;
+    let current_belief = reduce_dirichlet_models(full_posterior, full_prior, models)?;
+    let model_probabilities = current_belief
+        .models
+        .iter()
+        .map(|model| (model.model_id.clone(), model.posterior_probability))
+        .collect::<BTreeMap<_, _>>();
+
+    let choice_index = choice.map(|value| value as usize).unwrap_or(3);
+    let gaze_index = gaze.map(|value| 1 + value as usize).unwrap_or(0);
+    let [left, centre, right] = ball_colours.map(|value| value as usize);
+    let column_index =
+        choice_index * 4 * 27 + gaze_index * 27 + right * 9 + centre * 3 + left;
+    if column_index >= full_prior.columns.len()
+        || column_index >= full_posterior.columns.len()
+    {
+        return Err(ThreeBallFeedbackDecisionError::InvalidLikelihoodColumn {
+            column_index,
+            column_count: full_prior.columns.len().min(full_posterior.columns.len()),
+        });
+    }
+
+    let mut per_model_predictions = Vec::with_capacity(models.len());
+    for model in models {
+        let posterior_model_probability = model_probabilities
+            .get(&model.model_id)
+            .copied()
+            .unwrap_or(0.0);
+        let mut concentrations = Vec::with_capacity(THREE_BALL_FEEDBACK_OUTCOME_COUNT);
+        for outcome_index in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
+            let active = model.parameter_prior.active_support[column_index][outcome_index];
+            let value = if posterior_model_probability > 0.0 {
+                full_posterior.columns[column_index][outcome_index]
+                    + model.parameter_prior.columns[column_index][outcome_index]
+                    - full_prior.columns[column_index][outcome_index]
+            } else {
+                model.parameter_prior.columns[column_index][outcome_index]
+            };
+            if active && (!value.is_finite() || value <= 0.0) {
+                return Err(
+                    ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
+                        model_id: model.model_id.clone(),
+                        outcome_index,
+                    },
+                );
+            }
+            if !active && value != 0.0 {
+                return Err(
+                    ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
+                        model_id: model.model_id.clone(),
+                        outcome_index,
+                    },
+                );
+            }
+            concentrations.push(if active { value } else { 0.0 });
+        }
+        let total = concentrations.iter().sum::<f64>();
+        if !total.is_finite() || total <= 0.0 {
+            return Err(ThreeBallFeedbackDecisionError::EmptyPosteriorPredictiveColumn {
+                model_id: model.model_id.clone(),
+            });
+        }
+        let probabilities = concentrations
+            .iter()
+            .map(|value| value / total)
+            .collect::<Vec<_>>();
+        let probability_mass = probabilities.iter().sum::<f64>();
+        if !probability_mass.is_finite() || (probability_mass - 1.0).abs() > 1e-10 {
+            return Err(
+                ThreeBallFeedbackDecisionError::ModelPosteriorPredictiveMassNotNormalized {
+                    model_id: model.model_id.clone(),
+                    sum: probability_mass,
+                },
+            );
+        }
+        per_model_predictions.push((model.model_id.clone(), probabilities));
+    }
+
+    let mut mixture = [0.0_f64; THREE_BALL_FEEDBACK_OUTCOME_COUNT];
+    for (model_id, probabilities) in &per_model_predictions {
+        let model_probability = model_probabilities.get(model_id).copied().unwrap_or(0.0);
+        for outcome_index in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
+            mixture[outcome_index] += model_probability * probabilities[outcome_index];
+        }
+    }
+
+    let mut outcomes = Vec::new();
+    for outcome_index in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
+        let mixture_probability = mixture[outcome_index];
+        if mixture_probability <= 0.0 {
+            continue;
+        }
+        let mut posterior_count_increment =
+            vec![vec![0.0; THREE_BALL_FEEDBACK_OUTCOME_COUNT]; THREE_BALL_HIDDEN_STATE_COLUMN_COUNT];
+        posterior_count_increment[column_index][outcome_index] = 1.0;
+        let feedback_id = match outcome_index {
+            0 => "no_feedback",
+            1 => "correct",
+            2 => "incorrect",
+            _ => unreachable!("exactly three feedback outcomes"),
+        };
+        outcomes.push(DirichletPredictedOutcome {
+            outcome_id: feedback_id.to_owned(),
+            full_model_predictive_probability: mixture_probability,
+            model_predictive_probabilities: per_model_predictions
+                .iter()
+                .map(|(model_id, probabilities)| {
+                    (model_id.clone(), probabilities[outcome_index])
+                })
+                .collect(),
+            posterior_count_increment,
+        });
+    }
+
+    Ok(DirichletActionPrediction {
+        action_id,
+        outcomes,
+    })
+}
+
+/// Score legal known-state feedback actions using a scoped one-step FEP objective.
+///
+/// This uses:
+///
+///   G(a) = KL[Q(feedback | a) || C(feedback)]
+///          - epistemic_weight * I(model; feedback | a)
+///          + action_cost.
+///
+/// The state is assumed known and gaze is fixed, so this is a feedback-only
+/// one-step objective. It deliberately omits hidden-state information gain,
+/// visual observation ambiguity, multi-step planning, and safety constraints;
+/// it is not the full three-ball POMDP or the production ActiveInferenceAgent.
+pub fn score_three_ball_known_state_feedback_actions(
+    space: &ThreeBallRuleSpace,
+    full_posterior: &DirichletConcentrationTensor,
+    models: &[ReducedDirichletModelHypothesis],
+    ball_colours: [ThreeBallColour; 3],
+    gaze: Option<ThreeBallLocation>,
+    actions: &[ThreeBallFeedbackActionSpec],
+    config: ThreeBallFeedbackDecisionConfig,
+) -> Result<ThreeBallFeedbackDecision, ThreeBallFeedbackDecisionError> {
+    if actions.is_empty() {
+        return Err(ThreeBallFeedbackDecisionError::EmptyActionSet);
+    }
+    if !config.epistemic_weight.is_finite() || config.epistemic_weight < 0.0 {
+        return Err(ThreeBallFeedbackDecisionError::InvalidEpistemicWeight(
+            config.epistemic_weight,
+        ));
+    }
+    if config.log_preferences_nats.iter().any(|value| !value.is_finite()) {
+        return Err(ThreeBallFeedbackDecisionError::NonFinitePreference);
+    }
+
+    let max_log_preference = config
+        .log_preferences_nats
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let log_normalizer = max_log_preference
+        + config
+            .log_preferences_nats
+            .iter()
+            .map(|value| (value - max_log_preference).exp())
+            .sum::<f64>()
+            .ln();
+    let normalized_log_preferences = config
+        .log_preferences_nats
+        .map(|value| value - log_normalizer);
+
+    let mut seen_action_ids = std::collections::BTreeSet::new();
+    let mut action_scores = Vec::with_capacity(actions.len());
+    for (action_index, action) in actions.iter().enumerate() {
+        if action.action_id.trim().is_empty() {
+            return Err(ThreeBallFeedbackDecisionError::EmptyActionId {
+                index: action_index,
+            });
+        }
+        if !seen_action_ids.insert(action.action_id.clone()) {
+            return Err(ThreeBallFeedbackDecisionError::DuplicateActionId(
+                action.action_id.clone(),
+            ));
+        }
+        if !action.action_cost_nats.is_finite() || action.action_cost_nats < 0.0 {
+            return Err(ThreeBallFeedbackDecisionError::InvalidActionCost {
+                action_id: action.action_id.clone(),
+                cost: action.action_cost_nats,
+            });
+        }
+
+        let prediction = build_three_ball_feedback_action_prediction(
+            space,
+            full_posterior,
+            models,
+            ball_colours,
+            gaze,
+            action.choice,
+            action.action_id.clone(),
+        )?;
+        let information_gain = evaluate_dirichlet_model_information_gain(
+            full_posterior,
+            &space.full_model_average_prior,
+            models,
+            &prediction,
+        )?;
+
+        let mut predictive_feedback = Vec::with_capacity(information_gain.outcomes.len());
+        let mut pragmatic_risk_nats = 0.0;
+        for outcome in &information_gain.outcomes {
+            let (feedback, outcome_index) = match outcome.outcome_id.as_str() {
+                "no_feedback" => (ThreeBallFeedback::NoFeedback, 0),
+                "correct" => (ThreeBallFeedback::Correct, 1),
+                "incorrect" => (ThreeBallFeedback::Incorrect, 2),
+                other => {
+                    return Err(ThreeBallFeedbackDecisionError::UnknownFeedbackOutcome {
+                        action_id: action.action_id.clone(),
+                        outcome_id: other.to_owned(),
+                    });
+                }
+            };
+            let probability = outcome.predictive_probability;
+            if probability > 0.0 {
+                pragmatic_risk_nats += probability
+                    * (probability.ln() - normalized_log_preferences[outcome_index]);
+            }
+            predictive_feedback.push((feedback, probability));
+        }
+        if !pragmatic_risk_nats.is_finite() || pragmatic_risk_nats < -1e-10 {
+            return Err(ThreeBallFeedbackDecisionError::InvalidPragmaticRisk(
+                pragmatic_risk_nats,
+            ));
+        }
+        let pragmatic_risk_nats = pragmatic_risk_nats.max(0.0);
+        let epistemic_value_nats =
+            config.epistemic_weight * information_gain.model_information_gain_nats;
+        let expected_free_energy_nats =
+            pragmatic_risk_nats - epistemic_value_nats + action.action_cost_nats;
+        if !expected_free_energy_nats.is_finite() {
+            return Err(ThreeBallFeedbackDecisionError::InvalidPragmaticRisk(
+                expected_free_energy_nats,
+            ));
+        }
+
+        action_scores.push(ThreeBallFeedbackActionScore {
+            action_id: action.action_id.clone(),
+            choice: action.choice,
+            pragmatic_risk_nats,
+            model_information_gain_nats: information_gain.model_information_gain_nats,
+            epistemic_value_nats,
+            action_cost_nats: action.action_cost_nats,
+            expected_free_energy_nats,
+            predictive_feedback,
+            model_information_gain: information_gain,
+        });
+    }
+
+    let selected_action_index = (0..action_scores.len())
+        .min_by(|left, right| {
+            action_scores[*left]
+                .expected_free_energy_nats
+                .total_cmp(&action_scores[*right].expected_free_energy_nats)
+                .then_with(|| left.cmp(right))
+        })
+        .ok_or(ThreeBallFeedbackDecisionError::EmptyActionSet)?;
+
+    Ok(ThreeBallFeedbackDecision {
+        selected_action_index,
+        selected_action_id: action_scores[selected_action_index].action_id.clone(),
+        action_scores,
+    })
 }
 
 #[cfg(test)]
