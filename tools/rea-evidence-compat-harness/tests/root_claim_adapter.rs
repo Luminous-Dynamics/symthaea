@@ -1,3 +1,4 @@
+#[allow(dead_code)] // This isolated adapter imports the complete root facade for cross-module compilation.
 #[path = "../../../src/rea_compat.rs"]
 mod rea_compat;
 
