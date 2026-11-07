@@ -7,8 +7,8 @@ use rea_compat::formal::{
     validate_formal_provider_observation,
 };
 use rea_compat::{
-    ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, compute_evidence_id,
-    analysis_profile_digest, evaluate_claim, verify_evidence_json,
+    ClaimDisposition, ClaimPredicate, ClaimRequest, ClaimScope, analysis_profile_digest,
+    compute_evidence_id, evaluate_claim, verify_evidence_json,
 };
 use serde_json::{Value, json};
 
@@ -69,12 +69,21 @@ fn supported_provider_observation_exports_only_formal_meta_claim() {
         formal.semantic_polarity,
         FormalSemanticPolarity::PositiveSupport
     );
-    assert_eq!(formal.rea_disposition, ClaimDisposition::SupportedWithinScope);
-    assert_eq!(formal.binding.claim_request_sha256, result.claim_request_sha256);
+    assert_eq!(
+        formal.rea_disposition,
+        ClaimDisposition::SupportedWithinScope
+    );
+    assert_eq!(
+        formal.binding.claim_request_sha256,
+        result.claim_request_sha256
+    );
     assert_eq!(formal.binding.derivation_sha256, result.derivation_sha256);
     assert_eq!(formal.binding.requested_evidence_ids, claim.evidence_ids);
     assert_eq!(formal.binding.evaluator_rule_generation, 0);
-    assert_eq!(formal.binding.predicate, ClaimPredicate::ProviderReportedObservation);
+    assert_eq!(
+        formal.binding.predicate,
+        ClaimPredicate::ProviderReportedObservation
+    );
     validate_formal_provider_observation(&formal).unwrap();
 }
 
@@ -92,7 +101,12 @@ fn refuted_provider_observation_exports_meta_claim_counterevidence_not_artifact_
         FormalSemanticPolarity::SemanticCounterevidence
     );
     assert_eq!(formal.rea_disposition, ClaimDisposition::RefutedWithinScope);
-    assert!(formal.claim_ceiling.iter().any(|item| item.contains("meta-claim")));
+    assert!(
+        formal
+            .claim_ceiling
+            .iter()
+            .any(|item| item.contains("meta-claim"))
+    );
 }
 
 #[test]
@@ -110,12 +124,20 @@ fn contradictory_provider_observations_export_no_semantic_conclusion() {
         FormalSemanticPolarity::NoSemanticConclusion
     );
     assert_eq!(formal.rea_evaluation.evidence_assessments.len(), 2);
-    assert!(formal.rea_evaluation.evidence_assessments.iter().any(|item| {
-        item.kind == rea_compat::EvidenceAssessmentKind::Supports
-    }));
-    assert!(formal.rea_evaluation.evidence_assessments.iter().any(|item| {
-        item.kind == rea_compat::EvidenceAssessmentKind::Contradicts
-    }));
+    assert!(
+        formal
+            .rea_evaluation
+            .evidence_assessments
+            .iter()
+            .any(|item| { item.kind == rea_compat::EvidenceAssessmentKind::Supports })
+    );
+    assert!(
+        formal
+            .rea_evaluation
+            .evidence_assessments
+            .iter()
+            .any(|item| { item.kind == rea_compat::EvidenceAssessmentKind::Contradicts })
+    );
     assert!(!second_bytes.is_empty());
 }
 
@@ -131,7 +153,10 @@ fn missing_premise_exports_underdetermined_without_positive_or_negative_polarity
         formal.semantic_polarity,
         FormalSemanticPolarity::NoSemanticConclusion
     );
-    assert_eq!(formal.rea_evaluation.missing_evidence_ids, claim.evidence_ids);
+    assert_eq!(
+        formal.rea_evaluation.missing_evidence_ids,
+        claim.evidence_ids
+    );
 }
 
 #[test]
@@ -170,7 +195,9 @@ fn reference_partition_rejects_duplicate_assessment_and_unrequested_ids() {
     let claim = provider_claim(evidence.evidence_id.clone());
     let result = evaluate_claim(&claim, &[evidence]).unwrap();
     let mut altered = result;
-    altered.evidence_assessments.push(altered.evidence_assessments[0].clone());
+    altered
+        .evidence_assessments
+        .push(altered.evidence_assessments[0].clone());
 
     let error = export_formal_provider_observation(&altered).unwrap_err();
     assert_eq!(error.kind, FormalMappingErrorKind::InvalidReferences);
@@ -259,4 +286,3 @@ fn formal_rule_generation_is_a_versioned_wire_value_and_schema_contract() {
         json!(0)
     );
 }
-
