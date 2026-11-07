@@ -1,6 +1,6 @@
 # Symthaea RSI: frontier comparison, evaluator research and benchmark targets
 
-**Version:** v0 · **Date:** 2026-11-06  
+**Version:** v0.2 · **Updated:** 2026-11-07  
 **Owner:** #10756 (evaluator research)  
 **Related:** #10497 (R4 ignition), #10691 (algorithmic RSI benchmark), #10717 (causal lineage), #10749 (preregistration semantics)
 
@@ -16,7 +16,7 @@ The programme needs three coupled but separately measured loops:
 
 An improvement in one loop is not evidence that the other two improved. This distinction is the central scientific and product advantage Symthaea can pursue.
 
-## 1. Frontier comparison as of 2026-11-06
+## 1. Frontier comparison as of 2026-11-07
 
 | System / benchmark | Demonstrated result in the public source | What it proves | What it does not yet prove for Symthaea R4 |
 |---|---|---|---|
@@ -351,39 +351,39 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 ## Sources
 
 1. AIDE², *Recursive self-improvement of AI research agents*: https://arxiv.org/abs/2609.26457
-12. IdeaTaste (2026-11-02): https://arxiv.org/abs/2611.03424
-13. TasteVal (2026-10-05): https://arxiv.org/abs/2610.06824
-14. EurekaBench (2026-09-30): https://arxiv.org/abs/2609.30152
-15. TASTE (Anthropic, 2026-08-28): https://alignment.anthropic.com/2026/taste/
-16. REUSE (2026-09-29): https://arxiv.org/abs/2609.33180
-17. SelfImprove-Bench (2026-11-02): https://arxiv.org/abs/2611.02797
-18. MASS (2026-10-08): https://arxiv.org/abs/2610.12176
-19. Symthaea research-taste lane (#10877): https://github.com/Luminous-Dynamics/symthaea/issues/10877
 2. Coral Discovery, *The Division of Cognitive Labor in Autonomous Research* (2026-10-23): https://arxiv.org/abs/2610.33281
 3. RSI-Env, *An Open-Ended Environment for Recursive Self-Improvement of Agents* (2026-11-01): https://arxiv.org/abs/2611.01736
-4. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
-5. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
-6. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
-7. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
-8. RSIBench-Data: https://arxiv.org/abs/2607.25886
-9. EvalResearchBench: https://arxiv.org/abs/2610.04184
-10. RSI evidence census: https://arxiv.org/abs/2610.27610
-11. METR research productivity assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
-12. RSIGym project and methodology: https://rsi-index.ai/ and https://github.com/evolvent-ai/RSIGym
-13. RSI-Forge: https://arxiv.org/abs/2610.09426
-14. Harness²: https://arxiv.org/abs/2610.14224
-15. Co-Harness: https://arxiv.org/abs/2607.22688
-16. ResearchEnvBench (IJCAI 2026): https://doi.org/10.24963/ijcai.2026/48 ; https://arxiv.org/abs/2603.06739
-17. Coral Autoresearch coordination study (September 2026): https://coral-labs.ai/autoresearch/
-18. Harness-RSI survey, revised author reading version (2026-11-04; not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
-19. AREX: https://arxiv.org/abs/2607.21461
-20. Harness-Zero: https://arxiv.org/abs/2609.24974
-21. Routed Continual Learning: https://arxiv.org/abs/2610.38796
-22. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
-23. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
-24. RRSI: https://arxiv.org/abs/2609.24972
-25. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
-26. Into the Unknown: https://arxiv.org/abs/2610.19159
-27. Paper2Agent: https://www.nature.com/articles/s41586-026-11044-y
-28. SciAgentArena: https://sciagentarena.github.io/
-29. Recursive Self-Improvement in AI survey (2026-07-08): https://arxiv.org/abs/2607.07663
+4. RSIGym project and methodology: https://rsi-index.ai/ and https://github.com/evolvent-ai/RSIGym
+5. RSI-Forge: https://arxiv.org/abs/2610.09426
+6. Harness²: https://arxiv.org/abs/2610.14224
+7. Co-Harness: https://arxiv.org/abs/2607.22688
+8. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
+9. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
+10. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+11. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+12. RSIBench-Data: https://arxiv.org/abs/2607.25886
+13. EvalResearchBench: https://arxiv.org/abs/2610.04184
+14. IdeaTaste (2026-11-02): https://arxiv.org/abs/2611.03424
+15. TasteVal (2026-10-05): https://arxiv.org/abs/2610.06824
+16. EurekaBench (2026-09-30): https://arxiv.org/abs/2609.30152
+17. TASTE (Anthropic, 2026-08-28): https://alignment.anthropic.com/2026/taste/
+18. REUSE (2026-09-29): https://arxiv.org/abs/2609.33180
+19. SelfImprove-Bench (2026-11-02): https://arxiv.org/abs/2611.02797
+20. MASS (2026-10-08): https://arxiv.org/abs/2610.12176
+21. RSI evidence census: https://arxiv.org/abs/2610.27610
+22. METR research productivity assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
+23. ResearchEnvBench (IJCAI 2026): https://doi.org/10.24963/ijcai.2026/48 ; https://arxiv.org/abs/2603.06739
+24. Coral Autoresearch coordination study (September 2026): https://coral-labs.ai/autoresearch/
+25. Harness-RSI survey, revised author reading version (2026-11-04; not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
+26. AREX: https://arxiv.org/abs/2607.21461
+27. Harness-Zero: https://arxiv.org/abs/2609.24974
+28. Routed Continual Learning: https://arxiv.org/abs/2610.38796
+29. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
+30. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
+31. RRSI: https://arxiv.org/abs/2609.24972
+32. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
+33. Into the Unknown: https://arxiv.org/abs/2610.19159
+34. Paper2Agent: https://www.nature.com/articles/s41586-026-11044-y
+35. SciAgentArena: https://sciagentarena.github.io/
+36. Recursive Self-Improvement in AI survey (2026-07-08): https://arxiv.org/abs/2607.07663
+37. Symthaea research-taste benchmark (#10877): https://github.com/Luminous-Dynamics/symthaea/issues/10877
