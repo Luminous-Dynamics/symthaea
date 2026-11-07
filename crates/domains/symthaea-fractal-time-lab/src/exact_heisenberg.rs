@@ -565,6 +565,14 @@ mod tests {
             errors.push(error);
         }
         assert!(errors.windows(2).all(|pair| pair[1] < pair[0]), "{errors:?}");
+        let refinement_ratios: Vec<f64> = errors
+            .windows(2)
+            .map(|pair| pair[0] / pair[1])
+            .collect();
+        assert!(
+            refinement_ratios.iter().all(|ratio| (3.5..=4.5).contains(ratio)),
+            "second-order refinement ratios={refinement_ratios:?}"
+        );
     }
 
     #[test]
@@ -587,6 +595,37 @@ mod tests {
                 assert!(endpoints.insert(edge.first));
                 assert!(endpoints.insert(edge.second));
             }
+        }
+    }
+
+    #[test]
+    fn global_spin_inversion_maps_all_up_magnetization_to_all_down() {
+        let mut all_up = KickedHeisenbergFloquet::new_square_lattice(
+            2,
+            2,
+            [0.27, 0.13, 0.41],
+            [0.19, 0.31, 0.35],
+            vec![0.0; 4],
+            PI + 0.09,
+            8,
+        )
+        .unwrap();
+        let mut all_down = KickedHeisenbergFloquet::new_square_lattice(
+            2,
+            2,
+            [0.27, 0.13, 0.41],
+            [0.19, 0.31, 0.35],
+            vec![0.0; 4],
+            PI + 0.09,
+            8,
+        )
+        .unwrap();
+        all_down.set_initial_basis((1 << 4) - 1).unwrap();
+
+        let up_signal = all_up.stroboscopic_magnetization(24);
+        let down_signal = all_down.stroboscopic_magnetization(24);
+        for (up, down) in up_signal.iter().zip(down_signal.iter()) {
+            assert!((up + down).abs() < 1e-10);
         }
     }
 
