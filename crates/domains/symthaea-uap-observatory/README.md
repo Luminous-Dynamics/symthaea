@@ -113,10 +113,36 @@ The output reports:
 - separate missed-target and false-target penalty contributions;
 - number of matched targets.
 
-This is a metric oracle, not a multi-target tracker. It does not implement
-trajectory-level GOSPA/T-GOSPA, identity-switch or fragmentation penalties,
-data association, track filtering, or classification. Those need separate
-algorithms and evaluation code.
+This is a frame-level metric oracle, not a multi-target tracker. It does not
+implement track filtering, data association or classification. Track-set
+temporal evaluation is implemented separately in the trajectory_metrics
+module as OSPA(2); it uses one fixed track assignment across the evaluation
+window and therefore detects identity swaps that frame-level GOSPA misses.
+OSPA(2) does not add a distinct switch-cost term. The 2026 T-GOSPA family is
+a separate metric with an explicit track-switch penalty.
+
+## Track-set temporal metric: OSPA(2) (new reference)
+
+The trajectory_metrics module implements fixed-window OSPA(2):
+
+- Each truth/estimate track pair is scored using a weighted temporal L_q
+  aggregation of cutoff spatial error. A frame where both are absent costs
+  zero; a frame where exactly one exists costs the cutoff.
+- The resulting pairwise track distances are assigned globally across the
+  whole truth and estimate track sets. The assignment does not change frame
+  by frame, so track identity switches cannot receive a perfect score merely
+  because the unordered point sets match at every frame.
+- Unmatched track sets receive the OSPA(2) cardinality penalty. Uniform time
+  weights are the default; callers can provide nonnegative custom weights.
+
+The implementation caps the smaller assignment side at 20 tracks, validates
+window lengths and finite positions, and reports localization and cardinality
+contributions separately. It is an evaluation metric, not a tracker. It does
+not implement the explicit switch-cost term in T-GOSPA.
+
+Run the metric tests with:
+
+    cargo test --locked -p symthaea-uap-observatory --lib trajectory_metrics
 
 ### UAP track benchmark contract
 
