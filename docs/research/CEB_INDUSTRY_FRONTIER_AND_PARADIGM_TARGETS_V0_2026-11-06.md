@@ -172,6 +172,24 @@ These must not be collapsed. The paper's verified-split results show a striking 
 
 **How it complements CRBugBench:** CRBugBench supplies broader review-task scale (1,000 open-source tasks/98 repositories plus 800 proprietary tasks) and top-five defect detection. CR-Bench supplies a smaller, defect-centric PR-context subset with paired known-defect and comment-usefulness outcomes, but is Python-only and judge/reference-label dependent. They are complementary contextual comparators, not the same dataset, denominator or leaderboard.
 
+### 2.21 ReviewBench: known gold plus open-ended discovery
+
+GitHub announced ReviewBench on October 5, 2026. Its dataset has 219 PRs from 187 public repositories across 19 languages, with workload distribution informed by 103.9M GitHub PRs. It uses multi-source finding discovery (human reviews, author follow-up commits, deterministic tools and frontier models), semantic deduplication, and a common validation rubric. Grounded precision/recall/F1 score against known gold; augmented precision/recall/F1 separately adjudicate unmatched findings. Grounded recall is the headline leaderboard comparison because augmented recall's denominator expands based on the findings discovered by each agent. Senior engineers re-labeled the gold true/false positives with 96.6% agreement with the benchmark. GitHub also reports offline ReviewBench changes predicting the direction of production experiments; one multi-model review experiment improved addressed rate by 8.0%, recall by 13.6%, and reduced cost per review by 8.0%, while comment volume rose 61% and critical comments rose 262% online. These are GitHub-reported internal product results, not an independent external replication. [GitHub methodology and launch](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/) · [live ReviewBench leaderboard](https://review-bench.ai/).
+
+The high-severity grounded-F1 board viewed November 7 lists OhMyBug at **83.0 F1 / 92.0 precision / 75.6 recall** (run dated October 25), intent-review-agent at 82.2 / 92.0 / 74.4 (October 20), Copilot Max at 75.7 / 96.8 / 62.2 (October 16), and Laude RevEngine / Claude Opus 5.5 at 73.3 / 92.8 / 60.6 (October 14). Grounded scores count findings people reviewed. This is a high-severity slice, not an all-review or CEB score. [ReviewBench leaderboard](https://review-bench.ai/).
+
+**CEB implication:** take multi-source gold discovery, semantic deduplication, versioned evaluator/matcher, expert audit and separate grounded-vs-augmented reporting. Never let candidate-generated findings become gold automatically. Preserve a strict fixed-gold comparison and a separate, human-adjudicated discovery channel.
+
+### 2.22 SecPRBench: causal vulnerability diagnosis, not location overlap
+
+Yang et al.'s October 24, 2026 preprint presents **SecPRBench**, with 265 vulnerability-introducing changes from nine widely deployed systems projects, including Firefox, V8 and OpenSSL, across C, C++ and Rust. It builds pre-introduction, introducing and repaired source snapshots and validates target labels with PoC replay and human adjudication. 217 cases pass mechanical checks; 48 require human adjudication. [SecPRBench paper](https://arxiv.org/abs/2610.33509).
+
+Across eight direct-review model+harness configurations, target recall ranges from **32.5% to 78.1%**. Grok 4.6 is highest at 78.1%, but the top four agents are statistically tied; Claude Opus 5.5 reports 74.0% at an estimated $0.44 / 1.4 min per scan, versus Grok 4.6's $3.20 / 12.6 min. These are paper-specific cost estimates, not live provider prices. Crucially, **68% of pooled direct-review misses** still land in a root-cause file but describe a neighboring or incorrect mechanism. Recall decreases as the vulnerability mechanism spans more root-cause files. The judge therefore checks the causal trigger, unsafe operation and violated security condition, then verifies that the mechanism is still present in the reviewed revision. [Sections 4–5, Table 2 and limitations](https://arxiv.org/abs/2610.33509).
+
+**Limitations:** targets are publicly disclosed vulnerabilities in nine systems projects, up to 30 files / 2,000 changed lines. The benchmark measures known-target diagnosis, not normal-PR vulnerability prevalence. Fixed companions are target-specific controls, not report precision or whole-PR safety. The Opus 5.5 judge is also an evaluated model; Sonnet 5 drafted most references. One run per task and unmatched budgets limit comparisons. Costs exclude dataset construction and judging; public training-data contamination is possible. [SecPRBench limitations](https://arxiv.org/abs/2610.33509).
+
+**CEB implication:** require mechanism-level diagnosis rather than location overlap. Include same-file/wrong-mechanism, neighboring-cause, fixed-companion and multi-file causal-chain controls. Report the evidence authority and exact source revision. Reuse CEB-REVIEW and causal diagnosis; do not add another metric lane.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -183,6 +201,8 @@ These must not be collapsed. The paper's verified-split results show a striking 
 | SWE Atlas | Comprehension, test writing, refactoring beyond issue resolution | Whether generated understanding and tests stay valid after subsequent changes |
 | CRBugBench | Human-verified pre-merge bug detection in 1,000 public tasks / 98 repositories plus 800 proprietary tasks | Human-agent complementarity, disconfirm-first review, clean-PR false-positive controls and independent finding-to-defect adjudication |
 | CR-Bench-v2 / CR-Bench-Verified | Defect-centric PR review with one labeled defect per instance; KDDR and comment Usefulness Rate | Keep known-defect detection separate from usefulness; audit reference-comment/taxonomy generation, judge lineage, one-defect denominator and Python/11-repository scope |
+| ReviewBench | Multi-source gold, grounded and augmented precision/recall/F1; 219 PRs / 187 repositories / 19 languages | Separate known-gold comparison from independently adjudicated new findings; version matcher/judge and expert audit |
+| SecPRBench | Security-root-cause diagnosis on 265 vulnerability-introducing changes across nine systems projects; 32.5–78.1% target recall | Test causal mechanism, cross-file paths and exact revision rather than location overlap; report precision limitations and per-run cost |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
 | Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
@@ -262,6 +282,12 @@ One-shot issue repair, multi-hour projects and multi-release maintenance are dif
 ### Shift 11 — From autonomy to bounded, evidence-grounded proactivity
 
 Autonomy asks whether an agent can act without step-by-step direction. Proactivity asks whether it can notice something useful before being asked, ground that insight in current evidence, choose the right time and channel, adapt to feedback, and remain silent when the expected value is low. The scarce resource is human attention, not agent message throughput. Evaluate reactive, scheduled and situation-aware policies under matched event streams and total cost; include no-op events, deferred/muted notifications, false alarms, missed urgent signals and authority-boundary controls. Reuse #10727 and the existing continuity, collaboration and escalation contracts; do not create a new CEB metric lane, notification scheduler or user-memory system.
+
+### Shift 12 — From locating suspicious code to falsifiable causal diagnosis
+
+A correct file or line is not a correct diagnosis. SecPRBench reports that most analyzed misses can locate a root-cause file while asserting the wrong mechanism. CR-Bench-v2 further separates target-defect detection from usefulness, while ReviewBench distinguishes fixed-gold findings from independently adjudicated novel discoveries.
+
+A review finding should state a concise, verifiable causal account: triggering precondition, relevant path/state transition, unsafe operation, violated requirement/invariant, exact source revision and evidence authority. The reviewer should try to falsify its own diagnosis with a neighboring mechanism, changed precondition or repaired companion. A location-only hit does not count as a mechanism hit; an independently valid non-target finding is not automatically noise. Measure these as adjudication attributes under existing CEB-REVIEW and causal-diagnosis contracts, not as new metric lanes. Reuse #10367/#10723, #9431 and #10680/#10681 for causality, human complementarity, judge-dependence and verifier qualification.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
@@ -385,6 +411,8 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 
 - Microsoft Research, [CRBugBench: (When) Should a Software Factory be Lights-off?](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/), October 2026; [arXiv:2610.13668](https://arxiv.org/abs/2610.13668).
 - PREreview, [review of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026 (reviewer summary of human/agent complementarity and a proposed, not tested, skeptical second-reviewer arm).
+- GitHub, [ReviewBench: An open benchmark for AI code review](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/), October 5, 2026; [live leaderboard](https://review-bench.ai/) viewed November 7, 2026.
+- Yang et al., [Can Agentic Code Review Catch Vulnerabilities Before They Are Merged? (SecPRBench)](https://arxiv.org/abs/2610.33509), October 24, 2026.
 - Dong et al., [Towards AI as a Collaborative Partner: A Taxonomy of AI Agent Behavior in Software Engineering](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/), AIware '26 (to appear).
 
 - Scale AI, [SWE-Bench Pro V2 release/methodology](https://labs.scale.com/blog/swe-bench-pro-v2), September 22, 2026; [live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), viewed November 6, 2026.
