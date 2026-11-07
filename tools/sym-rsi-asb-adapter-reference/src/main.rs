@@ -42,6 +42,38 @@ fn validate_api_fixtures() -> Result<serde_json::Value, String> {
         .advances_stage(&campaign)
         .map_err(|error| format!("completed job contract: {error}"))?;
 
+    let pinned_cards = [
+        (
+            "nuclease-active-learning",
+            include_str!("../fixtures/asb_lab_v1/nuclease_campaign_card.json"),
+        ),
+        (
+            "propylene-active-learning",
+            include_str!("../fixtures/asb_lab_v1/propylene_campaign_card.json"),
+        ),
+    ];
+    let mut pinned_campaign_reports = Vec::new();
+    for (expected_id, contents) in pinned_cards {
+        let pinned = CampaignCardV1::parse(contents)
+            .map_err(|error| format!("{expected_id} pinned campaign card: {error}"))?;
+        pinned.validate().map_err(|error| format!("{expected_id} pinned campaign contract: {error}"))?;
+        let expected_budget = match expected_id {
+            "nuclease-active-learning" => 384,
+            "propylene-active-learning" => 60,
+            _ => unreachable!("fixed pinned campaign fixture"),
+        };
+        if !pinned.campaign_id.ends_with(expected_id) || pinned.budget.total != expected_budget {
+            return Err(format!("{expected_id}: pinned campaign identity/budget mismatch"));
+        }
+        pinned_campaign_reports.push(serde_json::json!({
+            "campaign": expected_id,
+            "campaign_id": pinned.campaign_id,
+            "total_budget": pinned.budget.total,
+            "stages": pinned.stages.len(),
+            "shared_pool": pinned.is_shared_pool_catalog()
+        }));
+    }
+
     Ok(serde_json::json!({
         "valid": true,
         "campaign_id": campaign.campaign_id,
@@ -49,6 +81,7 @@ fn validate_api_fixtures() -> Result<serde_json::Value, String> {
         "catalog_designs": catalog_ids.len(),
         "selected_batch_size": selected.len(),
         "completed_job_advances_stage": advances_stage,
+        "pinned_upstream_campaign_cards": pinned_campaign_reports,
         "claim_limit": "Fixture contract conformance only; no HTTP request, oracle access, campaign run or benchmark result."
     }))
 }
