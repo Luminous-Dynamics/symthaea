@@ -1078,7 +1078,7 @@ pub fn multi_start_sift_strategy_function_robdd(
                     && (report.optimized_variable_order < best_report.optimized_variable_order
                         || (report.optimized_variable_order
                             == best_report.optimized_variable_order
-                            && *seed < best_seed)))
+                            && *seed < *best_seed)))
         });
         if replace {
             best = Some((*seed, report.initial_node_count, report));
