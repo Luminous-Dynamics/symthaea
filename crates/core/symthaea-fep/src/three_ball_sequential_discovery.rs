@@ -20,7 +20,7 @@
 //! Parameter-learning and source-faithful Dirichlet BMR remain separate paths.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::three_ball_partial_observation::{
     ThreeBallJointBelief, ThreeBallPartialObservationConfig, ThreeBallPartialObservationError,
