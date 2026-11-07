@@ -100,6 +100,8 @@ A finding that localizes correctly but gives the wrong mechanism is a **diagnosi
 
 Keep these labels at the finding/defect adjudication layer; they do not expand CEB's primary metric registry.
 
+**Annotation instrument:** use the copyable [CEB Review Finding Adjudication Card V0](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md) for each candidate finding. It records the five-link causal explanation, exact source revision, evidence authority/freshness, target versus non-target status, adjudicator uncertainty and judge/matcher audit. It is an annotation aid, not a parallel task or receipt schema.
+
 ## 5. Proposed experimental design
 
 Use the same frozen PR/task, same revision, same requirements, equal total budget, same tool permissions, and fixed output budget where feasible:
