@@ -1,6 +1,3 @@
-pub mod operator_trace;
-pub use operator_trace::{parse_and_validate_operator_trace, OperatorTrace, OperatorTraceReport};
-
 //! Offline HCE epoch-contract validation and asynchronous worker-trace analysis.
 //!
 //! This crate does not run agents, schedule work, evaluate hidden data, sign
@@ -11,6 +8,9 @@ pub use operator_trace::{parse_and_validate_operator_trace, OperatorTrace, Opera
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+
+pub mod operator_trace;
+pub use operator_trace::{parse_and_validate_operator_trace, OperatorTrace, OperatorTraceReport};
 
 const HCE_SCHEMA: &str = "sym-rsi-hce-epoch-v0";
 const HCE_FIXTURE_STATUS: &str = "SYNTHETIC_HCE_FIXTURE_NOT_PREREGISTERED";
