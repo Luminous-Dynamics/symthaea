@@ -16,119 +16,408 @@
     "profile_sha256"
   ],
   "properties": {
-    "schema": { "const": "luminous.rea.numeric-intent-profile.v0" },
-    "profile_id": { "type": "string", "minLength": 1 },
-    "profile_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-    "source_schema_id": { "type": "string", "minLength": 1 },
-    "source_schema_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-    "unmatched_numeric_policy": { "const": "opaque_untyped_no_inference" },
+    "schema": {
+      "const": "luminous.rea.numeric-intent-profile.v0"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "profile_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "source_schema_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_schema_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "unmatched_numeric_policy": {
+      "const": "opaque_untyped_no_inference"
+    },
     "rules": {
       "type": "array",
       "minItems": 1,
       "items": {
         "oneOf": [
-          { "$ref": "#/$defs/binary64Rule" },
-          { "$ref": "#/$defs/safeIntegerRule" },
-          { "$ref": "#/$defs/exactIntegerStringRule" },
-          { "$ref": "#/$defs/fixedDecimalStringRule" },
-          { "$ref": "#/$defs/opaqueNumericRule" }
+          {
+            "$ref": "#/$defs/binary64Rule"
+          },
+          {
+            "$ref": "#/$defs/safeIntegerRule"
+          },
+          {
+            "$ref": "#/$defs/exactIntegerStringRule"
+          },
+          {
+            "$ref": "#/$defs/fixedDecimalStringRule"
+          },
+          {
+            "$ref": "#/$defs/opaqueNumericRule"
+          }
         ]
       }
     },
-    "profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    "profile_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
   },
   "$defs": {
     "unitReference": {
-      "type": ["object", "null"],
+      "type": [
+        "object",
+        "null"
+      ],
       "additionalProperties": false,
-      "required": ["profile_id", "profile_version", "profile_sha256", "quantity_kind"],
+      "required": [
+        "profile_id",
+        "profile_version",
+        "profile_sha256",
+        "quantity_kind"
+      ],
       "properties": {
-        "profile_id": { "type": "string", "minLength": 1 },
-        "profile_version": { "type": "string", "minLength": 1 },
-        "profile_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-        "quantity_kind": { "type": "string", "minLength": 1 }
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "quantity_kind": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "binary64Rule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "intent", "unit_ref", "negative_zero_policy", "exponent_form_policy", "overflow_policy", "underflow_policy", "maximum_significant_digits", "precision_policy", "comparison"],
+      "required": [
+        "path",
+        "intent",
+        "unit_ref",
+        "negative_zero_policy",
+        "exponent_form_policy",
+        "overflow_policy",
+        "underflow_policy",
+        "maximum_significant_digits",
+        "precision_policy",
+        "comparison"
+      ],
       "properties": {
-        "path": { "type": "string" },
-        "intent": { "const": "binary64" },
-        "unit_ref": { "$ref": "#/$defs/unitReference" },
-        "negative_zero_policy": { "enum": ["reject", "canonicalize_to_positive_zero", "retain_source_lexeme_only"] },
-        "exponent_form_policy": { "enum": ["allow", "reject"] },
-        "overflow_policy": { "const": "reject" },
-        "underflow_policy": { "enum": ["reject", "allow_subnormal_only", "allow_round_to_zero"] },
-        "maximum_significant_digits": { "type": "integer", "minimum": 1, "maximum": 1000 },
-        "precision_policy": { "enum": ["allow_ecmascript_binary64_rounding", "require_exact_binary64_value"] },
+        "path": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "intent": {
+          "const": "binary64"
+        },
+        "unit_ref": {
+          "$ref": "#/$defs/unitReference"
+        },
+        "negative_zero_policy": {
+          "enum": [
+            "reject",
+            "canonicalize_to_positive_zero",
+            "retain_source_lexeme_only"
+          ]
+        },
+        "exponent_form_policy": {
+          "enum": [
+            "allow",
+            "reject"
+          ]
+        },
+        "overflow_policy": {
+          "const": "reject"
+        },
+        "underflow_policy": {
+          "enum": [
+            "reject",
+            "allow_subnormal_only",
+            "allow_round_to_zero"
+          ]
+        },
+        "maximum_significant_digits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "precision_policy": {
+          "enum": [
+            "allow_ecmascript_binary64_rounding",
+            "require_exact_binary64_value"
+          ]
+        },
         "comparison": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["mode"],
+          "required": [
+            "mode"
+          ],
           "properties": {
-            "mode": { "enum": ["exact_binary64", "absolute_tolerance", "relative_tolerance", "absolute_and_relative_tolerance"] },
-            "absolute_tolerance_decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$" },
-            "relative_tolerance_decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$" }
-          }
+            "mode": {
+              "enum": [
+                "exact_binary64",
+                "absolute_tolerance",
+                "relative_tolerance",
+                "absolute_and_relative_tolerance"
+              ]
+            },
+            "absolute_tolerance_decimal": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+            },
+            "relative_tolerance_decimal": {
+              "type": "string",
+              "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "absolute_tolerance"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "required": [
+                  "absolute_tolerance_decimal"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "relative_tolerance"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "required": [
+                  "relative_tolerance_decimal"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "mode": {
+                    "const": "absolute_and_relative_tolerance"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              },
+              "then": {
+                "required": [
+                  "absolute_tolerance_decimal",
+                  "relative_tolerance_decimal"
+                ]
+              }
+            }
+          ]
         }
       }
     },
     "safeIntegerRule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "intent", "unit_ref", "signedness", "minimum_decimal", "maximum_decimal", "token_form"],
+      "required": [
+        "path",
+        "intent",
+        "unit_ref",
+        "signedness",
+        "minimum_decimal",
+        "maximum_decimal",
+        "token_form"
+      ],
       "properties": {
-        "path": { "type": "string" },
-        "intent": { "const": "safe_integer" },
-        "unit_ref": { "$ref": "#/$defs/unitReference" },
-        "signedness": { "enum": ["signed", "unsigned"] },
-        "minimum_decimal": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)$" },
-        "maximum_decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-        "token_form": { "const": "integer_token_only" }
+        "path": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "intent": {
+          "const": "safe_integer"
+        },
+        "unit_ref": {
+          "$ref": "#/$defs/unitReference"
+        },
+        "signedness": {
+          "enum": [
+            "signed",
+            "unsigned"
+          ]
+        },
+        "minimum_decimal": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)$"
+        },
+        "maximum_decimal": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "token_form": {
+          "const": "integer_token_only"
+        }
       }
     },
     "exactIntegerStringRule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "intent", "unit_ref", "signedness", "minimum_decimal", "maximum_decimal", "grammar", "width_bits"],
+      "required": [
+        "path",
+        "intent",
+        "unit_ref",
+        "signedness",
+        "minimum_decimal",
+        "maximum_decimal",
+        "grammar",
+        "width_bits"
+      ],
       "properties": {
-        "path": { "type": "string" },
-        "intent": { "const": "exact_integer_string" },
-        "unit_ref": { "$ref": "#/$defs/unitReference" },
-        "signedness": { "enum": ["signed", "unsigned"] },
-        "minimum_decimal": { "type": "string", "pattern": "^-?(0|[1-9][0-9]*)$" },
-        "maximum_decimal": { "type": "string", "pattern": "^(0|[1-9][0-9]*)$" },
-        "grammar": { "const": "canonical_decimal_integer" },
-        "width_bits": { "type": ["integer", "null"], "minimum": 1, "maximum": 4096 }
+        "path": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "intent": {
+          "const": "exact_integer_string"
+        },
+        "unit_ref": {
+          "$ref": "#/$defs/unitReference"
+        },
+        "signedness": {
+          "enum": [
+            "signed",
+            "unsigned"
+          ]
+        },
+        "minimum_decimal": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)$"
+        },
+        "maximum_decimal": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "grammar": {
+          "const": "canonical_decimal_integer"
+        },
+        "width_bits": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 4096
+        }
       }
     },
     "fixedDecimalStringRule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "intent", "unit_ref", "maximum_precision", "scale", "trailing_zero_policy", "rounding_mode", "grammar"],
+      "required": [
+        "path",
+        "intent",
+        "unit_ref",
+        "maximum_precision",
+        "scale",
+        "trailing_zero_policy",
+        "rounding_mode",
+        "grammar"
+      ],
       "properties": {
-        "path": { "type": "string" },
-        "intent": { "const": "fixed_decimal_string" },
-        "unit_ref": { "$ref": "#/$defs/unitReference" },
-        "maximum_precision": { "type": "integer", "minimum": 1, "maximum": 1000 },
-        "scale": { "type": "integer", "minimum": 0, "maximum": 1000 },
-        "trailing_zero_policy": { "enum": ["preserve", "require_exact_scale", "allow_extra_zeroes"] },
-        "rounding_mode": { "enum": ["reject", "half_even", "half_up", "toward_zero", "floor", "ceiling"] },
-        "grammar": { "const": "canonical_base10_decimal_string" }
+        "path": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "intent": {
+          "const": "fixed_decimal_string"
+        },
+        "unit_ref": {
+          "$ref": "#/$defs/unitReference"
+        },
+        "maximum_precision": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "trailing_zero_policy": {
+          "enum": [
+            "preserve",
+            "require_exact_scale",
+            "allow_extra_zeroes"
+          ]
+        },
+        "rounding_mode": {
+          "enum": [
+            "reject",
+            "half_even",
+            "half_up",
+            "toward_zero",
+            "floor",
+            "ceiling"
+          ]
+        },
+        "grammar": {
+          "const": "canonical_base10_decimal_string"
+        }
       }
     },
     "opaqueNumericRule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "intent", "accepted_json_type", "arithmetic_authority", "equivalence_authority"],
+      "required": [
+        "path",
+        "intent",
+        "accepted_json_type",
+        "arithmetic_authority",
+        "equivalence_authority"
+      ],
       "properties": {
-        "path": { "type": "string" },
-        "intent": { "const": "opaque_numeric" },
-        "accepted_json_type": { "enum": ["number", "string"] },
-        "arithmetic_authority": { "const": "none" },
-        "equivalence_authority": { "const": "none" }
+        "path": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "intent": {
+          "const": "opaque_numeric"
+        },
+        "accepted_json_type": {
+          "enum": [
+            "number",
+            "string"
+          ]
+        },
+        "arithmetic_authority": {
+          "const": "none"
+        },
+        "equivalence_authority": {
+          "const": "none"
+        }
       }
     }
   }
