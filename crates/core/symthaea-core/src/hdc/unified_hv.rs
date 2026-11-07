@@ -512,6 +512,89 @@ impl ContinuousHV {
         }
     }
 
+    /// Full-resolution scalar cosine similarity, independent of cognitive stride.
+    ///
+    /// This method always visits every coordinate and uses the same scalar
+    /// eight-coordinate accumulation grouping as the non-SIMD similarity path
+    /// when the global cognitive stride is 1. It does not read STRIDE and does
+    /// not dispatch on the simd feature, making it the reference score path
+    /// for exact retrieval and differential SIMD qualification.
+    ///
+    /// The canonical reduction order is part of this method's contract:
+    /// contiguous groups of eight are reduced in coordinate order, followed
+    /// by the remaining tail coordinates in order. A different reduction
+    /// order may differ in f32 rounding and must not be presumed bitwise equal.
+    ///
+    /// As with the legacy scalar path, vectors whose combined norm is below
+    /// 1e-10 return 0.0. Callers that require an admitted exact-retrieval
+    /// profile must validate dimensions and finite/in-range payload values
+    /// before calling this method; this method deliberately does not sanitize
+    /// NaN or infinity.
+    ///
+    /// # Panics
+    /// Panics if dimensions do not match.
+    #[inline]
+    pub fn similarity_full_resolution(&self, other: &Self) -> f32 {
+        assert_eq!(
+            self.values.len(),
+            other.values.len(),
+            "Dimension mismatch in similarity_full_resolution(): {} vs {}",
+            self.values.len(),
+            other.values.len()
+        );
+
+        let mut dot = 0.0f32;
+        let mut norm_a_sq = 0.0f32;
+        let mut norm_b_sq = 0.0f32;
+
+        let mut self_chunks = self.values.chunks_exact(8);
+        let mut other_chunks = other.values.chunks_exact(8);
+
+        for (a, b) in self_chunks.by_ref().zip(other_chunks.by_ref()) {
+            dot += a[0] * b[0]
+                + a[1] * b[1]
+                + a[2] * b[2]
+                + a[3] * b[3]
+                + a[4] * b[4]
+                + a[5] * b[5]
+                + a[6] * b[6]
+                + a[7] * b[7];
+            norm_a_sq += a[0] * a[0]
+                + a[1] * a[1]
+                + a[2] * a[2]
+                + a[3] * a[3]
+                + a[4] * a[4]
+                + a[5] * a[5]
+                + a[6] * a[6]
+                + a[7] * a[7];
+            norm_b_sq += b[0] * b[0]
+                + b[1] * b[1]
+                + b[2] * b[2]
+                + b[3] * b[3]
+                + b[4] * b[4]
+                + b[5] * b[5]
+                + b[6] * b[6]
+                + b[7] * b[7];
+        }
+
+        for (&a, &b) in self_chunks
+            .remainder()
+            .iter()
+            .zip(other_chunks.remainder().iter())
+        {
+            dot += a * b;
+            norm_a_sq += a * a;
+            norm_b_sq += b * b;
+        }
+
+        let denom = (norm_a_sq * norm_b_sq).sqrt();
+        if denom < 1e-10 {
+            return 0.0;
+        }
+
+        (dot / denom).clamp(-1.0, 1.0)
+    }
+
     /// Raw dot product (inner product) of two hypervectors.
     ///
     /// Unlike `similarity()`, this is NOT normalized by vector norms.
@@ -1129,6 +1212,43 @@ impl HV {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_full_resolution_similarity_reads_all_coordinates() {
+        // The only non-zero component is outside the default stride-4 sample.
+        let query = ContinuousHV::from_values(vec![0.0, 0.0, 0.0, 1.0]);
+        let candidate = ContinuousHV::from_values(vec![0.0, 0.0, 0.0, 1.0]);
+
+        assert_eq!(query.similarity_full_resolution(&candidate), 1.0);
+    }
+
+    #[test]
+    fn test_full_resolution_similarity_handles_non_multiple_of_eight() {
+        let mut values = vec![0.0; 9];
+        values[8] = 1.0;
+        let query = ContinuousHV::from_values(values);
+        let candidate = query.clone();
+
+        assert_eq!(query.similarity_full_resolution(&candidate), 1.0);
+    }
+
+    #[test]
+    fn test_full_resolution_similarity_zero_vector_contract() {
+        let zero = ContinuousHV::zero(9);
+        let nonzero = ContinuousHV::from_values(vec![1.0; 9]);
+
+        assert_eq!(zero.similarity_full_resolution(&nonzero), 0.0);
+        assert_eq!(nonzero.similarity_full_resolution(&zero), 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Dimension mismatch in similarity_full_resolution()")]
+    fn test_full_resolution_similarity_rejects_dimension_mismatch() {
+        let a = ContinuousHV::zero(8);
+        let b = ContinuousHV::zero(9);
+
+        let _ = a.similarity_full_resolution(&b);
+    }
 
     #[test]
     fn test_continuous_random_orthogonality() {
