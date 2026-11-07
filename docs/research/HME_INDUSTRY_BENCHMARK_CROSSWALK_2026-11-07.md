@@ -306,3 +306,14 @@ The projection crosswalk now includes Salahudeen, Maalouf and Elfadel, “Determ
 The publisher abstract reports a deterministic Hadamard-submatrix encoder, tested on six regression datasets across associative, iterative-gradient and FLASH-style closed-form ridge learners; it reports up to 9× reduction in selected hyperspace dimension and up to 19× wall-clock speedup versus its default HDR baselines. The paper explicitly reports mixed but competitive predictive performance, dataset/learner dependence, strongest results with closed-form learning, and power-of-two / non-universal compression constraints. Its data is available on request. These are the paper's reported results, not Symthaea results or a reproduction.
 
 This is a direct prior-art baseline for #10981. HME/Symthaea must compare its current dense bridge projection and proposed structured/low-rank profiles against a Hadamard-submatrix arm, then test actual HDC-LTC temporal behavior separately from static regression.
+
+
+## 15. Direct projection prior art and HDC-LTC structured transform candidate
+
+The projection comparison must include the September 2026 paper by Salahudeen, Maalouf and Elfadel, “Deterministic orthogonal projections for hyperdimensional regression: A Hadamard submatrix approach,” *Intelligent Systems with Applications* 31, DOI 10.1016/j.iswa.2026.200707. Its publisher abstract reports six regression datasets, associative / iterative-gradient / FLASH-style closed-form learners, up to 9× smaller selected hyperspace and up to 19× speedup versus its default HDR baselines. It also reports mixed task-dependent predictive performance, strongest benefits with a closed-form solver, and structural limitations. Dataset availability is on request. These are paper-reported results, not Symthaea measurements or a reproduction.
+
+[#10981](https://github.com/Luminous-Dynamics/symthaea/issues/10981) now includes two specific bridge fast-transform candidates:
+- Input 256→D: zero-pad, seeded sign/permutation, normalized fast Walsh–Hadamard transform (FWHT).
+- Output D→256: independently seeded sign/permutation, FWHT and selected-coordinate readout, or a Hadamard-submatrix alternative; compare with an exact rank-one learned adapter.
+
+The model is O(D log D) transform work versus the current dense O(256D) projection arithmetic, but operation counts are not latency claims. These transforms alter the projection profile; compare both static regression controls and actual HDC-LTC temporal/online-learning behavior. The paper's regression gains cannot be generalized to liquid dynamics without those experiments.
