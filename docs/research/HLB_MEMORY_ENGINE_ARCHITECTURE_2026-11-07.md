@@ -630,3 +630,14 @@ The analytical fixture `docs/research/fixtures/hme_bridge_projection_footprint_v
 
 
 The field matrix fixture now also inventories all 12 HdcLtcBridge fields. HdcLtcBridge does not derive Serialize/Deserialize and contains trained output-projection state plus adaptive-dimension counters and seed lineage. The complete learner checkpoint must wrap this bridge-level state around the inner-network checkpoint; scratch buffers are reconstructed empty.
+
+
+## 22. Structured bridge projections: explicit Hadamard/FWHT comparison
+
+Direct prior art: Salahudeen, Maalouf and Elfadel, “Deterministic orthogonal projections for hyperdimensional regression: A Hadamard submatrix approach,” *Intelligent Systems with Applications* 31 (September 2026), DOI 10.1016/j.iswa.2026.200707. The publisher abstract reports up to 9× lower selected hyperspace dimensions and up to 19× wall-clock speedup on six regression datasets, while also describing mixed, task-dependent predictive performance, strongest results with a closed-form solver and no universal compression. This is published prior art, not a Symthaea result. See #10981 for the reproduction and task-transfer controls.
+
+A concrete fast-transform hypothesis for HdcLtcBridge is:
+- Input expansion 256→D: pad into D, apply a versioned sign/permutation, then normalized FWHT. This creates a compact orthogonal expansion without retaining a dense D×256 matrix; the transform remains a changed representation profile.
+- Output reduction D→256: independently seeded sign/permutation + FWHT, then select 256 coordinates (or compare a Hadamard-submatrix readout). A structured fixed base can be paired with the exact rank-one trainable adapter tracked in #10981.
+
+The FWHT arithmetic model is O(D log D), compared with the dense O(256D) projection. The transform is not assumed equivalent to the existing random dense map, and static regression improvement does not imply HDC-LTC trajectory fidelity. Include random/structured/adversarial inputs, irregular dt, sequence prediction, online learning, and high→low→high transitions. The transform seed, sign/permutation generation, normalization, selected coordinate indices and implementation version are part of the representation/checkpoint identity.
