@@ -1275,7 +1275,7 @@ mod tests {
             },
             Note {
                 frequency: 246.94,
-                start_time: 0.75,
+                start_time: 1.12,
                 duration: 0.5,
                 velocity: 0.7,
             },
@@ -1326,6 +1326,21 @@ mod tests {
         assert_eq!(second[1].tension, 0.4);
         assert_eq!(second[2].tension, 0.05);
         performance.validate().unwrap();
+    }
+
+    #[test]
+    fn phrase_breath_policy_is_distinct_from_score_rest_policy() {
+        let policy = SingingRenderPolicy::phrase_expression_comparison();
+        assert!(
+            policy
+                .required_controls
+                .contains(&SingingControl::PhraseBreathTiming)
+        );
+        assert!(
+            !SingingRenderPolicy::score_conditioned_comparison()
+                .required_controls
+                .contains(&SingingControl::PhraseBreathTiming)
+        );
     }
 
     #[test]
