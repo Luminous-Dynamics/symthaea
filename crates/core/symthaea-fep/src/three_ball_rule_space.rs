@@ -37,11 +37,15 @@ pub const THREE_BALL_PLANTED_RULE_ONE_BASED_INDEX: usize = 65;
 pub const THREE_BALL_HIDDEN_STATE_COLUMN_COUNT: usize = 432;
 pub const THREE_BALL_FEEDBACK_OUTCOME_COUNT: usize = 3;
 
-/// SHA-256 of the ordered feedback-likelihood tensor parameterization:
-/// outcomes [no-feedback, correct, incorrect], state factors
-/// [left, centre, right, gaze, choice], with left varying fastest.
+/// Canonical, byte-exact descriptor hashed for the ordered likelihood tensor.
+pub const THREE_BALL_PARAMETERIZATION_DESCRIPTOR: &str =
+    "symthaea-three-ball-feedback-v1|outcomes=no-feedback,correct,incorrect|factors=left,centre,right,gaze,choice|left-fastest";
+
+/// SHA-256 of the canonical descriptor above.
+///
+/// The digest was independently computed over the descriptor's UTF-8 bytes.
 pub const THREE_BALL_PARAMETERIZATION_DIGEST: &str =
-    "29cd312ceb72d317c95a873f9a5b24caeb2d9aabaf8f1aa354d36bad3129724e";
+    "69d3c6e3c7ea7609efc79f6ba58a69fc0979733d59589f61cbbeafc68156a332";
 
 pub const SPM_DEM_REASONING_COMMIT: &str =
     "28d1f103b021f729266cb7ea07baaf4d0285b22a";
@@ -413,11 +417,49 @@ mod tests {
     }
 
     #[test]
+    fn parameterization_digest_is_bound_to_a_canonical_descriptor() {
+        assert_eq!(
+            THREE_BALL_PARAMETERIZATION_DESCRIPTOR,
+            "symthaea-three-ball-feedback-v1|outcomes=no-feedback,correct,incorrect|factors=left,centre,right,gaze,choice|left-fastest"
+        );
+        assert_eq!(THREE_BALL_PARAMETERIZATION_DIGEST.len(), 64);
+        assert!(
+            THREE_BALL_PARAMETERIZATION_DIGEST
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        );
+    }
+
+    #[test]
+    fn likelihood_tensor_uses_spm_column_order_and_outcome_order() {
+        let space = build_three_ball_rule_space();
+        let rule = space.planted_rule();
+        let columns = &rule.parameter_prior.columns;
+
+        // SPM column zero is left=red, centre=red, right=red,
+        // gaze=left, choice=red. Centre red selects left red: correct.
+        assert_eq!(columns[0], vec![0.0, 1.0, 0.0]);
+
+        // Column 3 changes right to green while left and centre stay red:
+        // rule 65 still selects left red: correct.
+        assert_eq!(columns[3], vec![0.0, 1.0, 0.0]);
+
+        // First no-choice block: feedback is no-feedback for every scene.
+        assert_eq!(columns[3 * 3 * 3 * 4 * 3], vec![1.0, 0.0, 0.0]);
+
+        // State left=red, centre=green, right=blue, gaze=left, choice=red.
+        // Rule 65 selects centre green, so choosing red is incorrect.
+        let centre_green_state = 1 + 3 + 9 + 27;
+        assert_eq!(columns[centre_green_state], vec![0.0, 0.0, 1.0]);
+    }
+
+    #[test]
     fn model_average_prior_is_the_arithmetic_mean_of_all_81_reduced_priors() {
         let space = build_three_ball_rule_space();
         assert_eq!(space.full_model_average_prior.columns.len(), 432);
         assert_eq!(space.full_model_average_prior.active_support.len(), 432);
         for column in 0..432 {
+            let mut column_mass = 0.0;
             for outcome in 0..3 {
                 let expected = space
                     .rules
@@ -426,11 +468,15 @@ mod tests {
                         rule.parameter_prior.columns[column][outcome] * rule.prior_probability
                     })
                     .sum::<f64>();
-                assert!(
-                    (space.full_model_average_prior.columns[column][outcome] - expected).abs()
-                        < 1e-12
+                let actual = space.full_model_average_prior.columns[column][outcome];
+                assert!((actual - expected).abs() < 1e-12);
+                assert_eq!(
+                    space.full_model_average_prior.active_support[column][outcome],
+                    actual > 0.0
                 );
+                column_mass += actual;
             }
+            assert!((column_mass - 1.0).abs() < 1e-12);
         }
     }
 
