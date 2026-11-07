@@ -1,0 +1,13 @@
+[package]
+name = "connectome-asof-filtration"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "As-of event replay and filtration admission audit for connectomics evidence"
+
+[lib]
+path = "src/lib.rs"
+
+# Standalone validation crate: intentionally outside the root workspace.
+[workspace]
