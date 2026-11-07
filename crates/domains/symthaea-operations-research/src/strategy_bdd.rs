@@ -1032,7 +1032,10 @@ pub fn strategy_interaction_graph(
 
 /// Deterministic min-fill order for an interaction graph. Ties are broken by
 /// active degree, then by the semantic dependency index.
-pub fn interaction_graph_min_fill_order(graph: &[BTreeSet<usize>]) -> Vec<usize> {
+pub fn interaction_graph_min_fill_order(
+    graph: &[BTreeSet<usize>],
+) -> Result<Vec<usize>, StrategyBddError> {
+    validate_interaction_graph(graph)?;
     let variable_count = graph.len();
     let mut active = vec![true; variable_count];
     let mut adjacency = graph.to_vec();
@@ -1080,7 +1083,7 @@ pub fn interaction_graph_min_fill_order(graph: &[BTreeSet<usize>]) -> Vec<usize>
         active[selected] = false;
         order.push(selected);
     }
-    order
+    Ok(order)
 }
 
 /// Validate a simple, undirected interaction graph whose vertex IDs are
@@ -1235,7 +1238,7 @@ pub fn multi_start_sift_strategy_function_robdd(
     let dependency_count = function.dependencies.len();
     let (interaction_graph, interaction_pair_checks) =
         strategy_interaction_graph(function, budget)?;
-    let min_fill = interaction_graph_min_fill_order(&interaction_graph);
+    let min_fill = interaction_graph_min_fill_order(&interaction_graph)?;
     let frontier_report =
         refine_interaction_order_by_frontier(&interaction_graph, &min_fill, budget)?;
     let min_fill_profile = interaction_graph_frontier_profile(&interaction_graph, &min_fill)?;
@@ -2207,7 +2210,10 @@ mod tests {
     fn interaction_graph_seed_order_is_deterministic() {
         let source = function(&[0, 1, 2, 3], &[false; 16]);
         let (graph, _) = strategy_interaction_graph(&source, budget()).unwrap();
-        assert_eq!(interaction_graph_min_fill_order(&graph), vec![0, 1, 2, 3]);
+        assert_eq!(
+            interaction_graph_min_fill_order(&graph).unwrap(),
+            vec![0, 1, 2, 3]
+        );
     }
 
     #[test]
@@ -2247,6 +2253,40 @@ mod tests {
     }
 
     #[test]
+    fn min_fill_rejects_out_of_range_graph_neighbor() {
+        let graph = vec![BTreeSet::from([1])];
+        assert_eq!(
+            interaction_graph_min_fill_order(&graph).unwrap_err(),
+            StrategyBddError::InteractionGraphNodeOutOfRange {
+                vertex: 0,
+                neighbor: 1,
+                vertex_count: 1
+            }
+        );
+    }
+
+    #[test]
+    fn min_fill_rejects_self_edges() {
+        let graph = vec![BTreeSet::from([0])];
+        assert_eq!(
+            interaction_graph_min_fill_order(&graph).unwrap_err(),
+            StrategyBddError::InteractionGraphSelfEdge { vertex: 0 }
+        );
+    }
+
+    #[test]
+    fn min_fill_rejects_asymmetric_edges() {
+        let graph = vec![BTreeSet::from([1]), BTreeSet::new()];
+        assert_eq!(
+            interaction_graph_min_fill_order(&graph).unwrap_err(),
+            StrategyBddError::InteractionGraphAsymmetricEdge {
+                vertex: 0,
+                neighbor: 1
+            }
+        );
+    }
+
+    #[test]
     fn frontier_refinement_reduces_vertex_separation_without_worsening_maximum() {
         let graph = vec![
             BTreeSet::from([3]),
@@ -2255,7 +2295,7 @@ mod tests {
             BTreeSet::from([0, 1, 2]),
             BTreeSet::new(),
         ];
-        let min_fill = interaction_graph_min_fill_order(&graph);
+        let min_fill = interaction_graph_min_fill_order(&graph).unwrap();
         assert_eq!(min_fill, vec![4, 0, 1, 2, 3]);
         let report = refine_interaction_order_by_frontier(&graph, &min_fill, budget()).unwrap();
         assert_eq!(report.initial_frontier_profile, vec![0, 1, 2, 3]);
