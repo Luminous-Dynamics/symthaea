@@ -55,16 +55,19 @@ impl fmt::Display for ObservabilityError {
                 )
             }
             Self::ParameterScaleCount { expected, actual } => {
-                write!(
-                    f,
-                    "received {actual} parameter scales; expected {expected}"
-                )
+                write!(f, "received {actual} parameter scales; expected {expected}")
             }
             Self::InvalidParameterScale { column } => {
-                write!(f, "parameter scale at column {column} is not finite and positive")
+                write!(
+                    f,
+                    "parameter scale at column {column} is not finite and positive"
+                )
             }
             Self::InvalidRelativeTolerance => {
-                write!(f, "relative tolerance must be finite and between zero and one")
+                write!(
+                    f,
+                    "relative tolerance must be finite and between zero and one"
+                )
             }
             Self::RaggedJacobian {
                 row,
@@ -75,7 +78,10 @@ impl fmt::Display for ObservabilityError {
                 "Jacobian row {row} has {actual} columns; expected {expected}"
             ),
             Self::NonFiniteJacobian { row, column } => {
-                write!(f, "Jacobian entry at row {row}, column {column} is not finite")
+                write!(
+                    f,
+                    "Jacobian entry at row {row}, column {column} is not finite"
+                )
             }
             Self::NumericalOverflow => {
                 write!(f, "Jacobian scaling or information accumulation overflowed")
@@ -173,10 +179,7 @@ pub fn analyze_jacobian(
             actual: parameter_scales.len(),
         });
     }
-    if !relative_tolerance.is_finite()
-        || relative_tolerance <= 0.0
-        || relative_tolerance >= 1.0
-    {
+    if !relative_tolerance.is_finite() || relative_tolerance <= 0.0 || relative_tolerance >= 1.0 {
         return Err(ObservabilityError::InvalidRelativeTolerance);
     }
 
@@ -360,9 +363,7 @@ fn symmetric_jacobi_eigen(
         }
     }
 
-    let eigenvalues = (0..dimension)
-        .map(|index| matrix[index][index])
-        .collect();
+    let eigenvalues = (0..dimension).map(|index| matrix[index][index]).collect();
     Ok((eigenvalues, eigenvectors))
 }
 
@@ -373,7 +374,11 @@ mod tests {
     #[test]
     fn identity_jacobian_is_full_rank_with_unit_condition() {
         let report = analyze_jacobian(
-            &[vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![0.0, 0.0, 1.0]],
+            &[
+                vec![1.0, 0.0, 0.0],
+                vec![0.0, 1.0, 0.0],
+                vec![0.0, 0.0, 1.0],
+            ],
             &[1.0, 1.0, 1.0],
             1.0e-10,
         )
@@ -391,7 +396,11 @@ mod tests {
     #[test]
     fn missing_parameter_column_is_reported_as_a_null_direction() {
         let report = analyze_jacobian(
-            &[vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0], vec![1.0, 1.0, 0.0]],
+            &[
+                vec![1.0, 0.0, 0.0],
+                vec![0.0, 1.0, 0.0],
+                vec![1.0, 1.0, 0.0],
+            ],
             &[1.0, 1.0, 1.0],
             1.0e-8,
         )
@@ -418,12 +427,8 @@ mod tests {
 
     #[test]
     fn near_dependent_columns_are_rank_deficient_at_declared_tolerance() {
-        let report = analyze_jacobian(
-            &[vec![1.0, 1.0], vec![0.0, 1.0e-5]],
-            &[1.0, 1.0],
-            1.0e-4,
-        )
-        .unwrap();
+        let report =
+            analyze_jacobian(&[vec![1.0, 1.0], vec![0.0, 1.0e-5]], &[1.0, 1.0], 1.0e-4).unwrap();
 
         assert_eq!(report.numerical_rank, 1);
         assert_eq!(report.nullity, 1);
@@ -455,8 +460,7 @@ mod tests {
     #[test]
     fn zero_information_jacobian_has_zero_rank() {
         let report =
-            analyze_jacobian(&[vec![0.0, 0.0], vec![0.0, 0.0]], &[1.0, 1.0], 1.0e-8)
-                .unwrap();
+            analyze_jacobian(&[vec![0.0, 0.0], vec![0.0, 0.0]], &[1.0, 1.0], 1.0e-8).unwrap();
 
         assert_eq!(report.numerical_rank, 0);
         assert_eq!(report.nullity, 2);
