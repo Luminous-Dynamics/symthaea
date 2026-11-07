@@ -728,10 +728,14 @@ pub mod triangulation;
 pub use triangulation::{
     Quaternion as SensorToEcefQuaternion,
     RayObservation,
+    SensorPlacementCandidate,
+    SensorPlacementScore,
     TriangulatedPosition,
     TriangulationConfig,
     TriangulationError,
     Vector3 as EcefVector3,
+    bearing_fisher_information,
+    rank_sensor_placements,
     triangulate_bearings,
     triangulate_bearings_with_config,
 };
