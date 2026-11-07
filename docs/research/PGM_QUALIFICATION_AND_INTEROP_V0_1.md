@@ -456,3 +456,6 @@ The first executable shared-engine priority remains exact finite reference infer
 6. decision-regret and subgroup calibration under sealed mechanism-family shifts.
 
 This sequence avoids tuning an approximate policy against an unqualified inference kernel.
+
+
+The companion draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10907 adds bounded exhaustive posterior marginals and a log-partition reference, with a direct tree sum-product differential test. It is stacked on #10900. Both reference paths use f64 arithmetic and explicit state-space bounds; neither is a scalable inference algorithm.
