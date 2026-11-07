@@ -24,12 +24,37 @@
 //!       │                              │                            │ → cpal output
 //! ```
 
+use crate::output_clock::{
+    OutputClockAnchorSchemaV1, OutputClockAnchorSourceV1, OutputClockAnchorV1,
+    OutputClockStreamDescriptorV1,
+};
 use crate::streaming::StreamingSynth;
 use crate::{MuseConfig, MusicalState};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::traits::{Consumer, Observer, Producer, Split};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+static NEXT_STREAM_INSTANCE_ID: AtomicU64 = AtomicU64::new(1);
+const MAX_DEVICE_CHANNELS: usize = 8;
+
+/// Convert one stereo synth frame to one negotiated output-channel sample.
+///
+/// Mono is an arithmetic stereo downmix; stereo preserves L/R; additional
+/// device channels are explicitly zero-filled. This is pure and allocation-free.
+fn stereo_sample_for_device_channel(
+    stereo: [f32; 2],
+    channel_index: usize,
+    channel_count: usize,
+) -> f32 {
+    match channel_count {
+        0 => 0.0,
+        1 => (stereo[0] + stereo[1]) * 0.5,
+        _ if channel_index == 0 => stereo[0],
+        _ if channel_index == 1 => stereo[1],
+        _ => 0.0,
+    }
+}
 
 /// Errors from the live audio system.
 #[derive(Debug)]
@@ -38,6 +63,9 @@ pub enum LiveError {
     NoSupportedConfig,
     DeviceError(String),
     StreamError(String),
+    StreamInstanceIdExhausted,
+    InvalidClockStreamDescriptor,
+    UnsupportedChannelCount(usize),
 }
 
 impl std::fmt::Display for LiveError {
@@ -47,6 +75,11 @@ impl std::fmt::Display for LiveError {
             Self::NoSupportedConfig => write!(f, "no supported audio output config"),
             Self::DeviceError(e) => write!(f, "audio device error: {e}"),
             Self::StreamError(e) => write!(f, "audio stream error: {e}"),
+            Self::StreamInstanceIdExhausted => write!(f, "CPAL stream instance ID space exhausted"),
+            Self::InvalidClockStreamDescriptor => write!(f, "invalid CPAL output clock stream descriptor"),
+            Self::UnsupportedChannelCount(count) => {
+                write!(f, "unsupported CPAL output channel count: {count}")
+            }
         }
     }
 }
@@ -69,6 +102,15 @@ pub struct LiveMuseOutput {
     running: Arc<AtomicBool>,
     /// Negotiated sample rate.
     sample_rate: u32,
+    /// Non-real-time consumer for callback clock anchors.
+    clock_anchor_consumer: Mutex<ringbuf::HeapCons<OutputClockAnchorV1>>,
+    /// Number of callbacks whose anchor could not be retained (timestamp
+    /// invalid, frame counter invalid, or anchor queue full).
+    clock_anchor_dropped_callbacks: Arc<AtomicU64>,
+    /// Stable identity for this CPAL stream instance's clock domain.
+    stream_instance_id: u64,
+    /// Stream-level clock and device configuration identity shared by anchors.
+    clock_stream_descriptor: OutputClockStreamDescriptorV1,
 }
 
 impl LiveMuseOutput {
@@ -78,6 +120,10 @@ impl LiveMuseOutput {
         let device = host
             .default_output_device()
             .ok_or(LiveError::NoOutputDevice)?;
+        let device_id = device
+            .id()
+            .map_err(|error| LiveError::DeviceError(error.to_string()))?
+            .to_string();
 
         // Negotiate output config — prefer f32 stereo
         let supported = device
@@ -107,12 +153,39 @@ impl LiveMuseOutput {
         };
 
         let sample_rate = stream_config.sample_rate;
-        let channels = stream_config.channels as usize;
+        let channel_count = stream_config.channels;
+        let channels = channel_count as usize;
+        if channels == 0 || channels > MAX_DEVICE_CHANNELS {
+            return Err(LiveError::UnsupportedChannelCount(channels));
+        }
+
+        let stream_instance_id = NEXT_STREAM_INSTANCE_ID
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| LiveError::StreamInstanceIdExhausted)?;
+        let clock_stream_descriptor =
+            OutputClockStreamDescriptorV1::from_cpal_device_id(
+                stream_instance_id,
+                &device_id,
+                sample_rate,
+                channel_count,
+            )
+            .ok_or(LiveError::InvalidClockStreamDescriptor)?;
 
         // Ring buffer: 4096 stereo frames (~93ms at 44100Hz)
-        let ring_capacity = 4096 * channels;
+        let ring_capacity = 4096_usize
+            .checked_mul(channels)
+            .ok_or(LiveError::UnsupportedChannelCount(channels))?;
         let ring = ringbuf::HeapRb::<f32>::new(ring_capacity);
         let (mut prod, mut cons) = ring.split();
+
+        // Separate SPSC channel for timestamped output-clock evidence. The
+        // CPAL callback owns the producer; callers drain the consumer outside
+        // the real-time thread.
+        let anchor_ring = ringbuf::HeapRb::<OutputClockAnchorV1>::new(1024);
+        let (mut anchor_prod, anchor_cons) = anchor_ring.split();
+        let clock_anchor_dropped_callbacks = Arc::new(AtomicU64::new(0));
 
         // State update channel
         let (state_tx, state_rx) = std::sync::mpsc::channel::<MusicalState>();
@@ -141,7 +214,8 @@ impl LiveMuseOutput {
 
                     // Interleave stereo pairs into ring buffer
                     for pair in &chunk {
-                        // Back-pressure: if ring is full, spin-wait briefly
+                        // Back-pressure: reserve space for one complete device
+                        // frame so callback sample alignment cannot drift.
                         let mut attempts = 0;
                         while prod.vacant_len() < channels {
                             std::thread::sleep(std::time::Duration::from_micros(100));
@@ -150,9 +224,15 @@ impl LiveMuseOutput {
                                 return;
                             }
                         }
-                        let _ = prod.try_push(pair[0]);
-                        if channels > 1 {
-                            let _ = prod.try_push(pair[1]);
+                        for channel_index in 0..channels {
+                            let sample = stereo_sample_for_device_channel(
+                                *pair,
+                                channel_index,
+                                channels,
+                            );
+                            if prod.try_push(sample).is_err() {
+                                return;
+                            }
                         }
                     }
                 }
@@ -160,17 +240,107 @@ impl LiveMuseOutput {
             .map_err(|e| LiveError::StreamError(e.to_string()))?;
 
         // cpal callback: pulls from ring buffer
+        let mut stream_origin: Option<cpal::StreamInstant> = None;
+        let mut output_frame_cursor = 0_u64;
+        let mut anchor_index = 0_u64;
+        let mut frame_sequence_valid = true;
         let running_audio = running.clone();
+        let anchor_drop_counter = clock_anchor_dropped_callbacks.clone();
         let stream = device
             .build_output_stream(
                 &stream_config,
-                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                move |data: &mut [f32], info: &cpal::OutputCallbackInfo| {
                     if !running_audio.load(Ordering::Relaxed) {
                         data.fill(0.0);
                         return;
                     }
+
                     for sample in data.iter_mut() {
                         *sample = cons.try_pop().unwrap_or(0.0);
+                    }
+
+                    // Capture the CPAL stream clock without cross-stream
+                    // assumptions. The first callback is this stream's local
+                    // origin. All callback/playback times are stored relative
+                    // to that origin and bound to the first sample frame in
+                    // this callback's output buffer.
+                    let timestamp = info.timestamp();
+                    let frame_count = data.len() / channels;
+                    let frame_shape_valid = data.len() % channels == 0;
+                    let frame_count_u32 = u32::try_from(frame_count).ok();
+                    let mut anchor_dropped =
+                        !frame_shape_valid || frame_count == 0 || frame_count_u32.is_none();
+
+                    if !frame_shape_valid || frame_count == 0 || frame_count_u32.is_none() {
+                        // A malformed callback buffer makes the cumulative
+                        // frame clock ambiguous. Do not resume this segment
+                        // silently with a guessed frame offset.
+                        frame_sequence_valid = false;
+                    }
+
+                    if let (Some(frame_count), true, true) =
+                        (frame_count_u32, frame_shape_valid, frame_sequence_valid) {
+                        let callback_instant = timestamp.callback;
+                        let playback_instant = timestamp.playback;
+                        let origin = stream_origin.get_or_insert(callback_instant);
+
+                        let callback_ns = callback_instant
+                            .duration_since(origin)
+                            .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
+                        let playback_ns = playback_instant
+                            .duration_since(origin)
+                            .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
+                        let callback_to_playback_ns = playback_instant
+                            .duration_since(&callback_instant)
+                            .and_then(|duration| u64::try_from(duration.as_nanos()).ok());
+
+                        let next_frame = output_frame_cursor.checked_add(frame_count as u64);
+                        let next_anchor = anchor_index.checked_add(1);
+
+                        match (
+                            callback_ns,
+                            playback_ns,
+                            callback_to_playback_ns,
+                            next_frame,
+                            next_anchor,
+                        ) {
+                            (Some(callback_ns), Some(playback_ns), Some(delay_ns), Some(frame_end), Some(anchor_end)) => {
+                                let anchor = OutputClockAnchorV1 {
+                                    schema_version: OutputClockAnchorSchemaV1::V1,
+                                    source: OutputClockAnchorSourceV1::CpalOutputStreamTimestampV1,
+                                    stream_instance_id,
+                                    anchor_index,
+                                    first_output_frame_index: output_frame_cursor,
+                                    frame_count,
+                                    sample_rate_hz: sample_rate,
+                                    channel_count,
+                                    callback_stream_time_ns: callback_ns,
+                                    playback_stream_time_ns: playback_ns,
+                                    callback_to_playback_ns: delay_ns,
+                                    timestamp_uncertainty_ns: None,
+                                };
+                                if anchor_prod.try_push(anchor).is_err() {
+                                    anchor_dropped = true;
+                                }
+                                output_frame_cursor = frame_end;
+                                anchor_index = anchor_end;
+                            }
+                            _ => {
+                                anchor_dropped = true;
+                                if let Some(frame_end) = next_frame {
+                                    output_frame_cursor = frame_end;
+                                }
+                                if let Some(anchor_end) = next_anchor {
+                                    anchor_index = anchor_end;
+                                }
+                            }
+                        }
+                    }
+
+                    // One relaxed counter update per callback, never one per
+                    // sample. Anchor loss is explicit and does not block audio.
+                    if anchor_dropped {
+                        anchor_drop_counter.fetch_add(1, Ordering::Relaxed);
                     }
                 },
                 move |err| {
@@ -190,6 +360,10 @@ impl LiveMuseOutput {
             _synth_thread: Some(synth_thread),
             running,
             sample_rate,
+            clock_anchor_consumer: Mutex::new(anchor_cons),
+            clock_anchor_dropped_callbacks,
+            stream_instance_id,
+            clock_stream_descriptor,
         })
     }
 
@@ -199,6 +373,47 @@ impl LiveMuseOutput {
     /// synthesis ticks, only the latest is used.
     pub fn update_state(&self, state: &MusicalState) {
         let _ = self.state_tx.send(state.clone());
+    }
+
+
+    /// Drain up to max_items native CPAL output-clock anchors.
+    ///
+    /// This method allocates and takes a mutex, so it must be called from a
+    /// non-real-time thread. The audio callback only performs a bounded,
+    /// lock-free SPSC push.
+    pub fn drain_output_clock_anchors(&self, max_items: usize) -> Vec<OutputClockAnchorV1> {
+        let mut consumer = self
+            .clock_anchor_consumer
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        let mut anchors = Vec::with_capacity(max_items.min(1024));
+        while anchors.len() < max_items {
+            match consumer.try_pop() {
+                Some(anchor) => anchors.push(anchor),
+                None => break,
+            }
+        }
+        anchors
+    }
+
+    /// Stream-level device/config identity shared by the anchors returned
+    /// from drain_output_clock_anchors. The hardware device ID is represented
+    /// by a SHA-256 fingerprint rather than a raw host identifier.
+    pub fn clock_stream_descriptor(&self) -> &OutputClockStreamDescriptorV1 {
+        &self.clock_stream_descriptor
+    }
+
+    /// Number of callbacks whose timestamp/frame anchor could not be retained.
+    ///
+    /// This includes missing/inconsistent timestamp values and a full
+    /// anchor ring. It is not an audio underrun count.
+    pub fn clock_anchor_dropped_callbacks(&self) -> u64 {
+        self.clock_anchor_dropped_callbacks.load(Ordering::Relaxed)
+    }
+
+    /// Stable identity for this CPAL stream instance's clock domain.
+    pub fn stream_instance_id(&self) -> u64 {
+        self.stream_instance_id
     }
 
     /// Negotiated output sample rate.
@@ -217,3 +432,33 @@ impl Drop for LiveMuseOutput {
         self.running.store(false, Ordering::Relaxed);
     }
 }
+
+#[cfg(test)]
+mod channel_mapping_tests {
+    use super::*;
+
+    #[test]
+    fn mono_output_is_explicit_stereo_downmix() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, 0.2], 0, 1), 0.5);
+    }
+
+    #[test]
+    fn stereo_output_preserves_left_and_right_channels() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 0, 2), 0.8);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 1, 2), -0.4);
+    }
+
+    #[test]
+    fn multichannel_output_zeros_unrepresented_channels() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 0, 6), 0.8);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 1, 6), -0.4);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 2, 6), 0.0);
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 5, 6), 0.0);
+    }
+
+    #[test]
+    fn zero_channel_mapping_is_silent_and_does_not_panic() {
+        assert_eq!(stereo_sample_for_device_channel([0.8, -0.4], 0, 0), 0.0);
+    }
+}
+

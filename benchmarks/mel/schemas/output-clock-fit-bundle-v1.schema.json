@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/output-clock-fit-bundle-v1.schema.json",
+  "title": "Melothaea output clock fit bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "stream_descriptor",
+    "anchor_set_sha256",
+    "fit"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-output-clock-fit-bundle-v1"
+    },
+    "stream_descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stream_instance_id",
+        "device_identity_sha256",
+        "sample_rate_hz",
+        "channel_count",
+        "sample_format",
+        "configuration_digest_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-output-clock-stream-descriptor-v1"
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "device_identity_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 768000
+        },
+        "channel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "sample_format": {
+          "const": "f32"
+        },
+        "configuration_digest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "anchor_set_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "fit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stream_instance_id",
+        "sample_rate_hz",
+        "channel_count",
+        "frames_per_ns",
+        "reference_frame_position",
+        "reference_playback_stream_time_ns",
+        "valid_from_playback_stream_time_ns",
+        "valid_until_playback_stream_time_ns",
+        "maximum_extrapolation_ns",
+        "minimum_required_anchor_count",
+        "fit_policy_sha256",
+        "anchor_count",
+        "missing_anchor_records_before_or_between_observations",
+        "maximum_abs_drift_ppm",
+        "maximum_allowed_abs_residual_frames",
+        "estimated_drift_ppm",
+        "median_abs_residual_frames",
+        "p95_abs_residual_frames",
+        "maximum_abs_residual_frames",
+        "accuracy_status",
+        "reported_uncertainty_frames"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-output-clock-fit-v1"
+        },
+        "stream_instance_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_rate_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 768000
+        },
+        "channel_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8
+        },
+        "frames_per_ns": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reference_frame_position": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reference_playback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_from_playback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_until_playback_stream_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_extrapolation_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_required_anchor_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "fit_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "anchor_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "missing_anchor_records_before_or_between_observations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maximum_abs_drift_ppm": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_allowed_abs_residual_frames": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_drift_ppm": {
+          "type": "number"
+        },
+        "median_abs_residual_frames": {
+          "type": "number",
+          "minimum": 0
+        },
+        "p95_abs_residual_frames": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_abs_residual_frames": {
+          "type": "number",
+          "minimum": 0
+        },
+        "accuracy_status": {
+          "const": "point_estimate_only"
+        },
+        "reported_uncertainty_frames": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
