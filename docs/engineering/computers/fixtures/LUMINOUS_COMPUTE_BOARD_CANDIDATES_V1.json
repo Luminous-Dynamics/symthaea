@@ -216,6 +216,61 @@
         "do not use UCIe as a motherboard or carrier connector",
         "do not freeze a generic carrier before selecting an exact module pinout"
       ]
+    },
+    {
+      "candidate_id": "ULX3S_ECP5_OPEN_FLOW",
+      "product": "Radiona / EMARD ULX3S, ECP5-85F variant (exact board revision and SDRAM SKU to be frozen)",
+      "class": "open_hardware_fpga_development_board",
+      "recommended_role": "portable RTL/logic proof and early physical HDC primitive prototype under an open FPGA toolchain",
+      "selection_status": "recommended_parallel_portability_lane_not_a_K26_replacement",
+      "vendor_sources": [
+        "https://github.com/emard/ulx3s",
+        "https://ulx3s.github.io/",
+        "https://github.com/YosysHQ/nextpnr",
+        "https://github.com/YosysHQ/prjtrellis"
+      ],
+      "published_capabilities": {
+        "fpga": {
+          "value": "Lattice ECP5 LFE5U-85F-6BG381C (85K LUT class)",
+          "evidence_class": "upstream_hardware_project"
+        },
+        "external_memory": {
+          "value": "16-bit SDR SDRAM; common 32 MB configuration",
+          "evidence_class": "upstream_hardware_project"
+        },
+        "boot_storage": {
+          "value": "QSPI flash and microSD",
+          "evidence_class": "upstream_hardware_project"
+        },
+        "io": {
+          "value": "56 GPIO, USB/JTAG and expansion I/O",
+          "evidence_class": "upstream_hardware_project"
+        },
+        "reference_clock": {
+          "value": "25 MHz onboard oscillator",
+          "evidence_class": "upstream_hardware_project"
+        },
+        "open_toolchain": {
+          "value": "Yosys synth_ecp5 -> nextpnr-ecp5 -> Project Trellis/ecppack -> openFPGALoader",
+          "evidence_class": "open_tool_project_documentation"
+        },
+        "board_design_files": {
+          "value": "KiCad source and documentation available upstream",
+          "evidence_class": "upstream_hardware_project"
+        }
+      },
+      "caveats": [
+        "Exact board revision, FPGA speed grade, package, SDRAM vendor/density and constraint file must be frozen.",
+        "Project Trellis/nextpnr ECP5 support is evolving and some features remain incomplete/experimental; verify the exact EBR/BRAM, PLL, SERDES and SDRAM requirements rather than assuming complete support.",
+        "The open-flow lane is a portability/prototype path, not production signoff or an industrial safety qualification.",
+        "Do not compare throughput/energy to K26 without normalizing the exact host, external memory and workload boundary.",
+        "Open-hardware board design does not establish local manufacturing or parts sourcing."
+      ],
+      "negative_controls": [
+        "do not claim the open toolchain supports every hard macro or high-speed primitive",
+        "do not claim the ULX3S board is a K26-equivalent SoC",
+        "do not treat SDRAM capacity as on-chip block RAM"
+      ]
     }
   ],
   "interface_and_standard_boundaries": {
@@ -321,5 +376,35 @@
       "warning": "Do not transfer the commercial K26C SOM's 16 GB eMMC specification to the KV260 evaluation-kit SOM."
     },
     "execution_gate": "Qualify on an identified evaluation platform and exact SOM/board revision before custom carrier schematic freeze."
+  },
+  "toolchain_licensing": {
+    "amd_vivado_2026_1": {
+      "basic_tier": {
+        "cost": "free",
+        "license_period": "annual",
+        "renewal_required": true,
+        "kria_devices_supported": true,
+        "evidence_class": "AMD published licensing documentation"
+      },
+      "core_tier": {
+        "license_period": "annual",
+        "kit_voucher": "AMD states Kria SOM kits receive a CORE-tier voucher beginning with 2026.1; development-kit voucher terms state one year",
+        "renewal_required_after_voucher": true,
+        "feature_note": "CORE provides broader simulation/debug features than BASIC; exact IP/flow feature tier must be checked"
+      },
+      "sources": [
+        "https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/licensing-faq.html",
+        "https://docs.amd.com/r/en-US/ug973-vivado-release-notes-install-license/Device-Availability-by-Subscription-Tier",
+        "https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vivado/vivado-licensing-options.html"
+      ]
+    },
+    "kv260_starter_kit": {
+      "manufacturer_us_msrp_usd": 249,
+      "source": "https://www.amd.com/en/products/system-on-modules/kria/k26.html",
+      "caveats": [
+        "MSRP is not South African retail pricing or evidence of local stock.",
+        "KV260 evaluation SOM storage/boot differs from the commercial K26C SOM as recorded above."
+      ]
+    }
   }
 }
