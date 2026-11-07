@@ -223,6 +223,23 @@ This workstream complements but does not replace:
 
 The decision preference, statistical estimand, confidence method, scenario aggregation and resource objective are different layers. Compose them only with explicit typed contracts and independently validated adapters.
 
+### Industry platform comparison is a separate qualification axis
+
+OATS is an algorithmic fixed-confidence comparator; it is not an end-to-end experimentation-platform comparator. Industrial platforms already include experiment-integrity and causal-analysis capabilities that do not follow from a bandit identification theorem:
+
+- Microsoft ExP documents sample-ratio mismatch and data-quality diagnostics (including data loss and join quality), guardrail monitoring and severe-regression shutdown.
+- Uber XP combines fixed-horizon and sequential testing, causal methods and universal holdouts for long-term effects.
+- Netflix describes a unified causal-analysis abstraction and workflows that support consistent production and local analysis.
+- Statsig documents sequential testing, CUPED / variance reduction, stratification, guardrail metrics and multiple-comparison settings.
+
+The live repository already assigns this platform-level comparison to [#10601](https://github.com/Luminous-Dynamics/symthaea/issues/10601): it includes assignment/exposure reconciliation, telemetry integrity, SRM, contamination/interference, guardrail pause/rollback, long-term holdouts and custody/replay. [#10103](https://github.com/Luminous-Dynamics/symthaea/issues/10103) owns the generic experiment kernel and assignment/custody mechanics; [#9215](https://github.com/Luminous-Dynamics/symthaea/issues/9215) owns the experiment-protocol DSL. Reuse those owners; do not duplicate a platform inside OATS.
+
+Therefore SPECTRA needs two different demonstrations:
+1. **Algorithmic result:** matched δ-correct identification with lower sample/resource cost than the best applicable statistical baselines.
+2. **Platform result:** lower fully charged cost to a defensible, applicable, integrity-checked decision while meeting industrial data-quality, causal and guardrail requirements.
+
+A result on (1) alone does not establish (2). The differentiator should be evidence-qualified decision assurance across the full chain, not just a smaller stopping time.
+
 A valid OATS answer under its Gaussian benchmark does not establish causal effect, source truth, model adequacy, target-population validity, operational safety, or authority to deploy. Field experimentation additionally requires assignment/exposure reconciliation, SRM and telemetry checks, contamination and missingness diagnostics, long-term holdouts, and guardrail intervention evidence.
 
 ## 7. Prospective gates (not achieved results)
@@ -250,3 +267,7 @@ This note does not implement OATS, certify the paper's theorem independently, pr
 6. Cao, L., Shi, M. & Shroff, N. (2026). [Provably Efficient Personalized Multi-Objective Bandits with Proactive Conversational Queries](https://proceedings.mlr.press/v337/cao26a.html), UAI 2026.
 7. Wang, S., Sun, H. & Li, K. (2026). [Preference Is More than Comparisons: Rethinking Dueling Bandits with Augmented Human Feedback](https://doi.org/10.1609/aaai.v40i31.39852), AAAI 2026.
 8. Yang, J., Tan, V. Y. F. & Jin, T. (2026). [Best Arm Identification with Minimal Regret](https://www.jmlr.org/beta/papers/v27/24-1612.html), JMLR 27(86).
+9. Microsoft Research. [Patterns of Trustworthy Experimentation During Experiment](https://www.microsoft.com/en-us/research/articles/patterns-of-trustworthy-experimentation-during-experiment/).
+10. Uber Engineering. [XP: A Platform for Experimentation](https://www.uber.com/us/en/blog/xp/).
+11. Netflix. [A Science-Centric Experimentation Platform](https://ieeexplore.ieee.org/document/9276550/).
+12. Statsig. [Experiment options and advanced statistical settings](https://docs.statsig.com/statsig-warehouse-native/features/experiment-options).
