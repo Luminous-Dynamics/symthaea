@@ -968,6 +968,43 @@ mod tests {
     }
 
     #[test]
+    fn correlated_model_state_prior_lets_gaze_disambiguate_model_identity() {
+        let space = build_three_ball_rule_space();
+        let states = enumerate_three_ball_hidden_states();
+        let mut joint = vec![vec![0.0; THREE_BALL_HIDDEN_STATE_COUNT]; 2];
+        let per_state_mass = 0.5 / 9.0;
+        for (state_index, state) in states.iter().enumerate() {
+            match state[0] {
+                ThreeBallColour::Red => joint[0][state_index] = per_state_mass,
+                ThreeBallColour::Blue => joint[1][state_index] = per_state_mass,
+                ThreeBallColour::Green => {}
+            }
+        }
+        let belief = ThreeBallJointBelief {
+            format_version: 1,
+            model_ids: vec!["model-red-context".into(), "model-blue-context".into()],
+            rule_indices: vec![0, 1],
+            hidden_states: states,
+            joint_probabilities: joint,
+        };
+        belief.validate().expect("correlated model/state prior");
+
+        let likelihoods = gaze_likelihoods(&belief, ThreeBallLocation::Left);
+        let information = evaluate_information_gain(&belief, &likelihoods, 3)
+            .expect("model-disambiguating visual observation");
+
+        assert!((information.model_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10);
+        assert!(information.conditional_state_information_gain_nats.abs() < 1e-10);
+        assert!((information.joint_information_gain_nats - std::f64::consts::LN_2).abs() < 1e-10);
+
+        let posterior = belief
+            .condition_on_gaze(ThreeBallLocation::Left, ThreeBallColour::Red)
+            .expect("red visual observation");
+        assert!((posterior.model_marginals()[0] - 1.0).abs() < 1e-12);
+        assert!(posterior.model_marginals()[1] < 1e-12);
+    }
+
+    #[test]
     fn observed_feedback_updates_the_joint_model_state_posterior() {
         let space = build_three_ball_rule_space();
         let belief = ThreeBallJointBelief::uniform_source_prior(&space).expect("prior");
