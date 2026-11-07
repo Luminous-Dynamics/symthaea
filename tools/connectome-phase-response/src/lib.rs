@@ -260,7 +260,7 @@ impl PhaseResponseSurface {
                     )
                 });
                 let cycle_slips_by_leg = std::array::from_fn(|axis| {
-                    perturbed[axis].cycle_index() - control[axis].cycle_index()
+                    cycle_slip_delta(perturbed[axis], control[axis], by_leg[axis])
                 });
                 Ok(PhaseReset {
                     source_leg: key.source_leg,
@@ -277,6 +277,20 @@ impl PhaseResponseSurface {
             matches!(&row.outcome, RowOutcome::Measured { .. }).then_some(*key)
         })
     }
+}
+
+/// Recover the integer full-cycle slip after removing the wrapped
+/// fractional phase displacement. This avoids counting a small phase advance
+/// across the fractional branch boundary as a full-cycle slip.
+fn cycle_slip_delta(perturbed: PhaseSample, control: PhaseSample, wrapped: Phase) -> i64 {
+    let winding_delta = i128::from(perturbed.cycle_index())
+        - i128::from(control.cycle_index());
+    let fractional_delta = i128::from(perturbed.fractional_phase().microturns())
+        - i128::from(control.fractional_phase().microturns());
+    let unwrapped_delta = winding_delta * i128::from(PHASE_SCALE) + fractional_delta;
+    let residual = unwrapped_delta - i128::from(wrapped.microturns());
+    debug_assert_eq!(residual.rem_euclid(i128::from(PHASE_SCALE)), 0);
+    (residual / i128::from(PHASE_SCALE)) as i64
 }
 
 /// Predicted response for one model and one registered probe cell.
@@ -798,6 +812,24 @@ mod tests {
         assert_eq!(response.by_leg[2].microturns(), 100_000);
         assert_eq!(response.cycle_slips_by_leg[2], 1);
         assert_eq!(response.off_diagonal_cycle_slips_l1(), 1);
+    }
+
+    #[test]
+    fn fractional_branch_crossing_is_not_a_full_cycle_slip() {
+        let probe = key(Context::BallContact, 0, 1, 1);
+        let mut control = zero_samples();
+        let mut perturbed = zero_samples();
+        control[0] = PhaseSample::from_unwrapped_microturns(990_000);
+        perturbed[0] = PhaseSample::from_unwrapped_microturns(1_010_000);
+        let surface = PhaseResponseSurface::new(vec![TransferRow {
+            key: probe,
+            outcome: RowOutcome::Measured { control, perturbed },
+        }])
+        .unwrap();
+
+        let response = surface.phase_reset(&probe).unwrap();
+        assert_eq!(response.by_leg[0].microturns(), 20_000);
+        assert_eq!(response.cycle_slips_by_leg[0], 0);
     }
 
     #[test]
