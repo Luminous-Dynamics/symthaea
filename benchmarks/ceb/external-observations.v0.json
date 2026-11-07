@@ -244,6 +244,17 @@
       "supports": [
         "CEB-REVIEW"
       ]
+    },
+    {
+      "source_id": "codereviewbench-kodus",
+      "source_url": "https://www.codereviewbench.com/leaderboard",
+      "title": "CodeReviewBench Kodus leaderboard and per-model scorecards",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-08-21",
+      "supports": [
+        "CEB-REVIEW"
+      ]
     }
   ],
   "comparators": [
@@ -698,6 +709,31 @@
         "KDDR and Usefulness Rate are separate; useful comments are not necessarily target-defect detections.",
         "Table 7 ± values are sample SD across three judges, not sampling confidence intervals; Table 8 reports per-judge bootstrap intervals.",
         "The reference/judge lineage and 60-comment human study are limited; agents in the study did not use tools or execute code."
+      ]
+    },
+    {
+      "comparator_id": "codereviewbench-kodus",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "CodeReviewBench",
+      "benchmark_version": "leaderboard/data snapshot; scorecards generated 2026-09-11",
+      "split": "30 merged PRs / 95 human-authored golden bugs",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 30,
+        "unit": "pull_requests"
+      },
+      "source_id": "codereviewbench-kodus",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Five repositories: cal.com, Discourse, Grafana, Keycloak and Sentry; languages Go, Java, Python, Ruby and TypeScript.",
+        "13 model configurations; Kodus harness, API access path, replay execution and Claude Haiku 4.5 judge.",
+        "DeepSeek V4 Pro is the current top row: F1 43.9, precision 43.6%, recall 44.2%, 42/95 gold bugs found, estimated $0.30/PR and $0.21/bug found.",
+        "The 95% bootstrap interval 32.3–56.3 is for recall, based on 2,000 resamples over 30 PRs; not a CI for F1 or model run-to-run variance.",
+        "The three independent re-scores assess judge noise on the same findings; each model entry had one agent pass, so model run-to-run variance is unmeasured.",
+        "Ground truth is bugs human reviewers had already flagged before merge. Bugs that escaped the original human review are outside the labeled denominator, so the benchmark measures recovery of known human-found bugs rather than exhaustive defect discovery.",
+        "Leaderboard coverage varies by model; inspect each scorecard's evaluated golden denominator before cross-model comparison.",
+        "Maintained by Kodus, which also supplies the harness; treat as vendor-maintained contextual evidence, not independent multi-harness replication."
       ]
     }
   ],
@@ -2761,6 +2797,176 @@
       },
       "notes": [
         "Usefulness is not target-defect detection or identical to CEB actionable precision."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-f1",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "review_f1",
+        "label": "Review F1",
+        "definition": "Harmonic mean of review finding precision and recall against 95 human-authored golden bugs.",
+        "value": 43.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "43.9",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for F1",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "review_f1",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Benchmark-specific F1; not CEB Recall@5."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-precision",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "review_precision",
+        "label": "Review finding precision",
+        "definition": "Fraction of candidate review findings matched to the benchmark's confirmed human-reported bugs.",
+        "value": 43.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "43.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "review_precision",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Precision measured under Kodus output extraction and Claude Haiku 4.5 judgment."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-recall",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "review_recall",
+        "label": "Human-flagged bug recall",
+        "definition": "Fraction of the 95 human-authored golden bugs found by the candidate review configuration.",
+        "value": 44.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "44.2%",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "95% bootstrap interval 32.3–56.3 percentage points",
+          "margin": 12.1,
+          "confidence_level": "95%",
+          "method": "2,000 bootstrap resamples over 30 pull requests; measures PR-sampling variance",
+          "applies_to_metric_id": "review_recall",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "42 of 95 human-authored golden bugs found; bugs not previously reported by human reviewers are absent from the gold denominator."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-cost-pr",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "estimated_cost_per_pr",
+        "label": "Estimated cost per pull request",
+        "definition": "Benchmark-estimated inference and harness cost per reviewed pull request.",
+        "value": 0.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_PR",
+        "direction": "minimize",
+        "raw_display": "$0.300",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "estimated_cost_per_pr",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Not an all-in human, construction, judging or maintenance cost."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-cost-bug",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "estimated_cost_per_bug_found",
+        "label": "Estimated cost per confirmed bug found",
+        "definition": "Benchmark-estimated cost per matched human-authored golden bug found by the candidate.",
+        "value": 0.21,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_bug",
+        "direction": "minimize",
+        "raw_display": "$0.21",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "estimated_cost_per_bug_found",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Derived from the benchmark's per-bug cost convention; compare only inside this harness and dataset."
       ]
     }
   ]
