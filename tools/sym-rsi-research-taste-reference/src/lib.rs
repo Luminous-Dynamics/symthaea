@@ -233,8 +233,16 @@ pub struct EvsiProblem {
     /// Utility[action_index][state_index].
     pub utilities: Vec<Vec<f64>>,
     pub outcomes: Vec<ExperimentOutcome>,
-    /// Same unit as utilities; must include declared opportunity cost.
-    pub experiment_cost: f64,
+    /// Direct resource cost converted into utility units.
+    pub direct_experiment_cost: f64,
+    /// Best foregone alternative use of the committed resources, net of direct cost.
+    pub opportunity_cost: f64,
+    /// Non-negative downside loss for each outcome, in utility units.
+    pub downside_loss_by_outcome: Vec<f64>,
+    /// Confidence level for upper-tail CVaR (for example, 0.95).
+    pub cvar_confidence: f64,
+    /// Maximum admissible CVaR downside loss, in utility units.
+    pub max_cvar_downside_loss: f64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -253,8 +261,15 @@ pub struct EvsiReport {
     pub expected_utility_without_experiment: f64,
     pub expected_utility_with_experiment: f64,
     pub expected_value_of_sample_information: f64,
-    pub experiment_cost: f64,
+    pub direct_experiment_cost: f64,
+    pub opportunity_cost: f64,
     pub net_evsi: f64,
+    pub expected_downside_loss: f64,
+    pub cvar_confidence: f64,
+    pub cvar_downside_loss: f64,
+    pub max_cvar_downside_loss: f64,
+    pub risk_limit_passed: bool,
+    pub decision_eligible: bool,
     pub outcome_decisions: Vec<OutcomeDecision>,
     pub limitations: Vec<String>,
 }
@@ -271,6 +286,7 @@ pub enum EvsiError {
     ProbabilityMassMismatch(&'static str),
     NonFiniteUtility,
     InvalidCost,
+    InvalidRisk(&'static str),
 }
 
 impl std::fmt::Display for EvsiError {
@@ -356,8 +372,29 @@ fn validate_evsi(problem: &EvsiProblem) -> Result<(), EvsiError> {
             return Err(EvsiError::ProbabilityMassMismatch("outcomes_given_state"));
         }
     }
-    if !problem.experiment_cost.is_finite() || problem.experiment_cost < 0.0 {
+    if !problem.direct_experiment_cost.is_finite()
+        || problem.direct_experiment_cost < 0.0
+        || !problem.opportunity_cost.is_finite()
+        || problem.opportunity_cost < 0.0
+    {
         return Err(EvsiError::InvalidCost);
+    }
+    if problem.downside_loss_by_outcome.len() != problem.outcomes.len() {
+        return Err(EvsiError::DimensionMismatch("downside_loss_by_outcome"));
+    }
+    if problem
+        .downside_loss_by_outcome
+        .iter()
+        .any(|loss| !loss.is_finite() || *loss < 0.0)
+    {
+        return Err(EvsiError::InvalidRisk("downside_loss_by_outcome"));
+    }
+    if !problem.cvar_confidence.is_finite()
+        || !(0.0..1.0).contains(&problem.cvar_confidence)
+        || !problem.max_cvar_downside_loss.is_finite()
+        || problem.max_cvar_downside_loss < 0.0
+    {
+        return Err(EvsiError::InvalidRisk("cvar_policy"));
     }
 
     Ok(())
@@ -383,9 +420,43 @@ fn best_action(problem: &EvsiProblem, probabilities: &[f64]) -> (usize, f64) {
 /// Compute finite-state expected value of sample information (EVSI).
 ///
 /// EVSI is the expected improvement in the best downstream decision after
-/// observing an experiment, before subtracting its cost. This is not Shannon
-/// information gain: an informative observation can have zero EVSI if it
-/// cannot improve the optimal decision.
+/// observing an experiment, before subtracting direct or opportunity cost.
+/// Downside risk is reported and gated separately; it is not hidden inside an
+/// arbitrary risk-adjusted utility penalty. This is not Shannon information
+/// gain: an informative observation can have zero EVSI if it cannot improve
+/// the optimal decision.
+fn weighted_upper_tail_cvar(losses: &[f64], probabilities: &[f64], confidence: f64) -> f64 {
+    let total_probability: f64 = probabilities.iter().sum();
+    let tail_mass = 1.0 - confidence;
+    let mut weighted: Vec<(f64, f64)> = losses
+        .iter()
+        .copied()
+        .zip(probabilities.iter().map(|p| p / total_probability))
+        .filter(|(_, probability)| *probability > 0.0)
+        .collect();
+    weighted.sort_by(|left, right| right.0.total_cmp(&left.0));
+
+    let mut remaining = tail_mass;
+    let mut tail_loss = 0.0;
+    for (loss, probability) in weighted {
+        let included = probability.min(remaining);
+        tail_loss += loss * included;
+        remaining -= included;
+        if remaining <= PROBABILITY_TOLERANCE {
+            break;
+        }
+    }
+    tail_loss / tail_mass
+}
+
+/// Compute finite-state expected value of sample information (EVSI).
+///
+/// EVSI is the expected improvement in the best downstream decision after
+/// observing an experiment, before subtracting direct or opportunity cost.
+/// Downside risk is reported and gated separately; it is not hidden inside an
+/// arbitrary risk-adjusted utility penalty. This is not Shannon information
+/// gain: an informative observation can have zero EVSI if it cannot improve
+/// the optimal decision.
 pub fn calculate_evsi(problem: &EvsiProblem) -> Result<EvsiReport, EvsiError> {
     validate_evsi(problem)?;
 
@@ -438,22 +509,51 @@ pub fn calculate_evsi(problem: &EvsiProblem) -> Result<EvsiReport, EvsiError> {
         return Err(EvsiError::ProbabilityMassMismatch("negative_evsi_numerical_or_model_error"));
     }
 
+    let outcome_probabilities: Vec<f64> = outcomes
+        .iter()
+        .map(|outcome| outcome.predictive_probability)
+        .collect();
+    let expected_downside_loss: f64 = problem
+        .downside_loss_by_outcome
+        .iter()
+        .zip(&outcome_probabilities)
+        .map(|(loss, probability)| loss * probability)
+        .sum();
+    let cvar_downside_loss = weighted_upper_tail_cvar(
+        &problem.downside_loss_by_outcome,
+        &outcome_probabilities,
+        problem.cvar_confidence,
+    );
+    let risk_limit_passed =
+        cvar_downside_loss <= problem.max_cvar_downside_loss + PROBABILITY_TOLERANCE;
+    let net_evsi = evsi - problem.direct_experiment_cost - problem.opportunity_cost;
+
     Ok(EvsiReport {
         decision_id: problem.decision_id.clone(),
         best_action_without_experiment: problem.actions[prior_action].clone(),
         expected_utility_without_experiment: prior_value,
         expected_utility_with_experiment: value_with_experiment,
         expected_value_of_sample_information: evsi,
-        experiment_cost: problem.experiment_cost,
-        net_evsi: evsi - problem.experiment_cost,
+        direct_experiment_cost: problem.direct_experiment_cost,
+        opportunity_cost: problem.opportunity_cost,
+        net_evsi,
+        expected_downside_loss,
+        cvar_confidence: problem.cvar_confidence,
+        cvar_downside_loss,
+        max_cvar_downside_loss: problem.max_cvar_downside_loss,
+        risk_limit_passed,
+        decision_eligible: net_evsi > 0.0 && risk_limit_passed,
         outcome_decisions: outcomes,
         limitations: vec![
             "EVSI is conditional on the declared state space, priors, likelihoods, utility and cost model."
                 .to_owned(),
-            "It does not measure entropy reduction, scientific truth, or model calibration."
+            "Direct cost and foregone-alternative opportunity cost are separate, declared utility-unit inputs."
                 .to_owned(),
-            "Utility misspecification and omitted opportunity cost can reverse the decision."
+            "Downside losses and CVaR are conditional on the supplied outcome-loss model and risk threshold."
                 .to_owned(),
+            "A passing risk gate does not capture unmodeled outcomes or establish that the experiment is safe."
+                .to_owned(),
+            "It does not measure entropy reduction, scientific truth, or model calibration.".to_owned(),
             "The result is not causal evidence that the experiment will deliver the modeled outcomes."
                 .to_owned(),
         ],
@@ -490,7 +590,11 @@ mod tests {
                 ExperimentOutcome { outcome_id: "forecast_sun".to_owned(), likelihood_by_state: vec![0.8, 0.2] },
                 ExperimentOutcome { outcome_id: "forecast_rain".to_owned(), likelihood_by_state: vec![0.2, 0.8] },
             ],
-            experiment_cost: 0.1,
+            direct_experiment_cost: 0.1,
+            opportunity_cost: 0.0,
+            downside_loss_by_outcome: vec![0.0, 0.0],
+            cvar_confidence: 0.95,
+            max_cvar_downside_loss: 0.0,
         }
     }
 
@@ -573,10 +677,70 @@ mod tests {
     #[test]
     fn expensive_experiment_has_negative_net_evsi() {
         let mut problem = valid_problem();
-        problem.experiment_cost = 1.0;
+        problem.direct_experiment_cost = 1.0;
         let report = calculate_evsi(&problem).expect("valid finite decision problem");
         assert!(report.expected_value_of_sample_information > 0.0);
         assert!(report.net_evsi < 0.0);
+    }
+
+    #[test]
+    fn keeps_direct_and_opportunity_cost_separate_from_gross_evsi() {
+        let mut problem = valid_problem();
+        problem.direct_experiment_cost = 0.05;
+        problem.opportunity_cost = 0.20;
+        let report = calculate_evsi(&problem).expect("valid finite decision problem");
+        assert!((report.expected_value_of_sample_information - 0.2).abs() < 1e-9);
+        assert!((report.net_evsi + 0.05).abs() < 1e-9);
+        assert!(!report.decision_eligible);
+    }
+
+    #[test]
+    fn positive_net_value_can_fail_the_downside_risk_gate() {
+        let mut problem = valid_problem();
+        problem.direct_experiment_cost = 0.05;
+        problem.downside_loss_by_outcome = vec![0.0, 10.0];
+        problem.max_cvar_downside_loss = 1.0;
+        let report = calculate_evsi(&problem).expect("valid risk model");
+        assert!(report.net_evsi > 0.0);
+        assert!((report.expected_downside_loss - 5.0).abs() < 1e-9);
+        assert!((report.cvar_downside_loss - 10.0).abs() < 1e-9);
+        assert!(!report.risk_limit_passed);
+        assert!(!report.decision_eligible);
+    }
+
+    #[test]
+    fn weighted_cvar_uses_only_the_declared_upper_tail_mass() {
+        let mut problem = valid_problem();
+        problem.outcomes = vec![
+            ExperimentOutcome { outcome_id: "rare_severe".to_owned(), likelihood_by_state: vec![0.02, 0.02] },
+            ExperimentOutcome { outcome_id: "moderate".to_owned(), likelihood_by_state: vec![0.08, 0.08] },
+            ExperimentOutcome { outcome_id: "benign".to_owned(), likelihood_by_state: vec![0.90, 0.90] },
+        ];
+        problem.downside_loss_by_outcome = vec![100.0, 10.0, 0.0];
+        problem.max_cvar_downside_loss = 50.0;
+        let report = calculate_evsi(&problem).expect("valid three-outcome risk model");
+        assert!((report.cvar_downside_loss - 46.0).abs() < 1e-9);
+        assert!(report.risk_limit_passed);
+    }
+
+    #[test]
+    fn rejects_downside_loss_dimension_mismatch() {
+        let mut problem = valid_problem();
+        problem.downside_loss_by_outcome.pop();
+        assert_eq!(
+            calculate_evsi(&problem).expect_err("loss vector must match outcome count"),
+            EvsiError::DimensionMismatch("downside_loss_by_outcome")
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_cvar_policy() {
+        let mut problem = valid_problem();
+        problem.cvar_confidence = 1.0;
+        assert_eq!(
+            calculate_evsi(&problem).expect_err("CVaR confidence must be below one"),
+            EvsiError::InvalidRisk("cvar_policy")
+        );
     }
 
     #[test]
