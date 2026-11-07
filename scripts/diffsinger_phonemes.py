@@ -323,6 +323,11 @@ def flatten_performance_phones(
         # stream without silently moving either note or duplicating a phone.
         overlap_ms = max((previous_end_s - attack_start_s) * 1000.0, 0.0)
         if overlap_ms > 0.0:
+            if advance_ms <= 0.0:
+                raise ValueError(
+                    f"syllable {syllable_index} overlaps the preceding event without "
+                    "a positive consonant_advance_s"
+                )
             if previous_vowel_event is None:
                 raise ValueError(
                     f"syllable {syllable_index} consonant anticipation overlaps the "
@@ -367,7 +372,7 @@ def flatten_performance_phones(
         else:
             previous_vowel_event = None
 
-        previous_vowel_event = _append_weighted_group(
+        core_vowel_event = _append_weighted_group(
             events,
             phonemes,
             mapped_groups,
@@ -375,7 +380,9 @@ def flatten_performance_phones(
             core_budget_ms,
             note_hz,
             f"syllable {syllable_index} nucleus",
-        ) or previous_vowel_event
+        )
+        if core_vowel_event is not None:
+            previous_vowel_event = core_vowel_event
         previous_end_s += core_budget_ms / 1000.0
 
         if has_melisma:
