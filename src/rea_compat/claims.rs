@@ -549,10 +549,7 @@ fn canonical_json_equal(left: &Value, right: &Value) -> Result<bool, ClaimError>
     Ok(left_bytes == right_bytes)
 }
 
-fn claim_ceiling(
-    predicate: ClaimPredicate,
-    has_precision_warnings: bool,
-) -> Vec<String> {
+fn claim_ceiling(predicate: ClaimPredicate, has_precision_warnings: bool) -> Vec<String> {
     let mut ceiling = vec![
         "A supported result is scoped to the exact subject, operation, environment fields and Evidence IDs in this derivation.".to_owned(),
         "This evaluator verifies what a REA Evidence record reports; it does not prove the underlying real-world proposition is true.".to_owned(),
@@ -863,10 +860,7 @@ pub fn evaluate_claim(
         .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
     let claim_request_sha256 = sha256_hex(&claim_bytes);
 
-    let claim_ceiling = claim_ceiling(
-        claim.predicate,
-        !numeric_precision_warnings.is_empty(),
-    );
+    let claim_ceiling = claim_ceiling(claim.predicate, !numeric_precision_warnings.is_empty());
     let body = EvaluationBody {
         schema: CLAIM_EVALUATION_SCHEMA,
         evaluator_version: CLAIM_EVALUATOR_VERSION,
@@ -1040,9 +1034,10 @@ mod tests {
             ]
         );
         assert!(
-            result.claim_ceiling.iter().any(|line| line.contains(
-                "exact integer preservation is not established"
-            ))
+            result
+                .claim_ceiling
+                .iter()
+                .any(|line| line.contains("exact integer preservation is not established"))
         );
     }
 
