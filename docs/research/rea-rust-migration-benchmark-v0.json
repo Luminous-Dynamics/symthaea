@@ -2370,7 +2370,12 @@
         "https://github.com/Luminous-Dynamics/symthaea/pull/10710",
         "https://github.com/Luminous-Dynamics/symthaea/issues/10713",
         "https://github.com/Luminous-Dynamics/symthaea/pull/10368",
-        "https://github.com/Luminous-Dynamics/symthaea/issues/10526"
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10526",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10861",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10798",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10847",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10927",
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10952"
       ],
       "objective": "Qualify whether an investigator's typed conclusion is entailed by exact, scoped, dependency-aware evidence; preserve contradictions, missing evidence, inapplicability and unknown provenance instead of turning them into confidence or majority votes.",
       "principle": "Evidence does not vote; claims must be entailed within declared scope. Receipt validity, cryptographic validity, signer trust, package authorization, completeness, runtime behavior and semantic truth are distinct propositions.",
@@ -2381,7 +2386,15 @@
         "supporting_contradicting_and_prerequisite_evidence_refs",
         "assumptions_and_applicability_conditions",
         "provider_dependency_ancestry_known_declared_inferred_unknown",
-        "uncertainty_limitations_and_falsification_condition"
+        "uncertainty_limitations_and_falsification_condition",
+        "population_definition_and_authority",
+        "declared_query_snapshot_filter_and_version",
+        "enumeration_pages_cursors_sequences_and_gap_closure",
+        "acquisition_coverage_and_snapshot_session_binding",
+        "processing_coverage_with_failed_partial_and_unsupported_items_retained",
+        "issuer_source_participation_and_selective_disclosure",
+        "temporal_retention_and_interval_coverage",
+        "raw_numeric_lexeme_and_precision_coverage_state"
       ],
       "outcome_algebra": [
         "supported_within_scope",
@@ -2453,7 +2466,26 @@
         "member_sha_crc_and_replay_do_not_imply_producer_authenticity_or_signature_trust",
         "attestation_reference_without_trust_policy_does_not_upgrade_member_integrity_claim",
         "receipt_replay_under_wrong_archive_or_wrong_request_is_rejected",
-        "member_payload_sha_size_crc_and_verifier_profile_are_all_bound_in_positive_claim"
+        "member_payload_sha_size_crc_and_verifier_profile_are_all_bound_in_positive_claim",
+        "valid_first_page_only_does_not_establish_declared_population_completeness",
+        "cursor_sequence_skips_page_even_when_terminal_cursor_is_reported",
+        "duplicate_page_or_replayed_cursor_does_not_inflate_unique_population",
+        "total_count_changes_between_pages_without_stable_snapshot_remains_incomplete",
+        "provider_self_asserted_expected_count_does_not_authorize_population_completeness",
+        "hidden_source_filter_prevents_declared_query_from_representing_full_population",
+        "failed_and_unsupported_item_acquisitions_remain_visible_in_processing_denominator",
+        "one_verified_archive_member_does_not_imply_complete_archive_enumeration",
+        "complete_transparency_log_view_does_not_imply_every_issuer_statement_was_registered",
+        "complete_historical_log_view_does_not_select_current_statement_after_supersession",
+        "log_inclusion_without_checkpoint_consistency_or_monitoring_does_not_establish_complete_trusted_view",
+        "missing_sequence_numbers_retention_gaps_or_source_outage_remain_explicit",
+        "independent_population_manifests_with_disagreeing_counts_produce_conflicted_completeness",
+        "complete_source_snapshot_with_incomplete_downstream_parser_does_not_establish_processing_completeness",
+        "zero_observed_items_without_qualified_expected_population_is_observed_subset_not_absence",
+        "provider_self_reported_all_pages_seen_and_all_issued_does_not_self_authorize_completeness",
+        "different_provider_names_over_same_incomplete_upstream_collection_do_not_create_independent_completeness",
+        "unrelated_population_change_does_not_invalidate_claims_outside_its_declared_dependency_closure",
+        "raw_token_audit_unavailable_on_value_constructed_evidence_must_not_claim_complete_lexical_coverage"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2498,9 +2530,21 @@
         "receipt_attestation_trust_laundering_rate",
         "source_snapshot_atomicity_overclaim_rate",
         "member_to_archive_completeness_promotion_rate",
-        "member_integrity_replay_latency_and_peak_rss"
+        "member_integrity_replay_latency_and_peak_rss",
+        "false_completeness_rate_by_population_dimension",
+        "omission_detection_recall_by_page_cursor_sequence_and_issuer_participation_fault",
+        "false_incompleteness_rate",
+        "population_definition_authority_accuracy",
+        "pagination_and_gap_detection_accuracy",
+        "acquisition_and_processing_accounting_completeness",
+        "issuer_participation_uncertainty_accuracy",
+        "completeness_calibration_by_declared_scope",
+        "selective_completeness_invalidation_precision_recall",
+        "resource_cost_by_population_page_count_and_retention_interval",
+        "numeric_precision_warning_recall_by_original_token_availability",
+        "raw_lexeme_coverage_state_accuracy"
       ],
-      "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.; first frozen public seed contains 18 labeled cases; do not generalize the finite conformance result to unseen artifacts or semantic predicates.",
+      "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.; first frozen public seed contains 18 labeled cases; do not generalize the finite conformance result to unseen artifacts or semantic predicates. Additional finite-suite gates: zero false CompleteWithin outcomes on seeded omitted-page, cursor-gap, selective-issuer-publication and incomplete-processing controls; 100% retention/accounting of partial, failed, unsupported and unresolved items; zero completeness uplift from self-assertion or provider-name diversity; and explicit lexical-coverage-state reporting for numeric precision.",
       "protocol": [
         "reuse upstream Evidence, EvidenceBundle and receipt identities; do not mutate pinned REA Evidence ID semantics",
         "freeze claim vocabulary, scope dimensions, dispositions and rule version before evaluation",
@@ -2536,16 +2580,27 @@
         "a sealed memfd makes captured parser input immutable after sealing but does not prove that source acquisition was an atomic point-in-time snapshot during concurrent mutation",
         "one member-integrity proof cannot establish whole-archive traversal/completeness, producer authenticity, signature validity/trust, package authorization, installability, runtime behavior, benignness or MASVS control pass",
         "repacking may preserve payload hash but changes archive digest; bind both archive and member occurrence identities",
-        "receipt proof types must have no unchecked public constructor; JSON Value and self-reported SHA-256 fields are not trusted proof objects"
+        "receipt proof types must have no unchecked public constructor; JSON Value and self-reported SHA-256 fields are not trusted proof objects",
+        "distinguish CompleteWithinDeclaredQuery, CompleteWithinCapturedArtifact and CompleteWithinRegisteredTransparencyView; none implies complete issuer history or the full real-world population",
+        "enumeration, acquisition, processing, issuer participation and temporal coverage are separate required dimensions; do not collapse into one complete boolean",
+        "issuer-signed all-issued declarations and provider-reported all_pages_seen/terminal_cursor fields are observations, not independent proof that no items were withheld",
+        "a transparency log can establish completeness only for its named registered view/checkpoint under an accepted monitoring/consistency policy; SCITT registration does not establish that every issuer statement was submitted",
+        "preserve failed, partial, unsupported, skipped, and unresolved items in denominators; never silently drop them before a completeness claim",
+        "population counts and expected totals must be bound to a qualified authority and stable snapshot, not self-authored by the provider under evaluation",
+        "a complete archive member enumeration is separate from completeness of the broader package repository, device fleet, issuer history or real-world population",
+        "use no-upgrade metamorphic tests: add self-reported completeness fields, provider aliases or more records from the same incomplete source; no stronger completeness disposition may result",
+        "for raw numeric precision, distinguish source-token-audited, parsed-value-only, and lexical-coverage-unavailable; do not promote parsed-value warnings to complete token coverage",
+        "unknown lexical coverage for Value-constructed Evidence remains unknown; exact raw byte hash binding is required for a complete source-token audit"
       ],
       "claim_boundaries": {
         "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
         "archive_identity": "A member digest is not a whole-archive digest; a whole-archive digest is not producer authenticity.",
         "authenticity": "A receipt digest or signature alone does not establish producer identity or trust; a separate attestation and trust policy are required.",
         "signature": "Cryptographic validity, signer identity, trust, package authorization and platform acceptance are separate claims.",
-        "completeness": "One verified member does not establish complete archive/package traversal.",
+        "completeness": "Completeness is scoped to an authorized population definition, stable query/snapshot, enumeration, acquisition, processing and time interval. A complete registered log is not a complete issuer history; a complete declared query is not necessarily the whole real-world population.",
         "independence": "Provider-name diversity or unknown ancestry does not prove independent corroboration.",
-        "semantics": "Byte integrity or package signature does not establish benignness, installability, runtime behavior or control compliance."
+        "semantics": "Byte integrity or package signature does not establish benignness, installability, runtime behavior or control compliance.",
+        "numeric_precision": "RFC 8785/ECMAScript binary64 semantic commitment is distinct from exact source-token preservation. Unsafe integer warnings do not establish that parsed Value inputs received a complete raw-lexeme audit."
       },
       "ownership_boundaries": {
         "generic_rea_claim_evaluation": "This family evaluates whether an exact provider-reported normalized observation is supported by an exact verified REA Evidence record. It is not a generic semantic truth engine.",
@@ -2570,6 +2625,46 @@
         "current_positive_claim_status": "not implemented; member_content_integrity remains fail-closed/unverified",
         "current_replay_subset": "single-disk, non-ZIP64, no-prefix, unique raw-name Stored/Deflate archives on Linux sealed memfd",
         "claim_ceiling": "one exact occurrence's decompressed bytes in the exact captured archive byte sequence; no atomic source snapshot, authenticity, completeness, signature/trust, installability, runtime or MASVS claims"
+      },
+      "population_completeness": {
+        "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10861",
+        "design_owner": "https://github.com/Luminous-Dynamics/symthaea/pull/10798",
+        "dimensions": [
+          "population_definition",
+          "enumeration_coverage",
+          "acquisition_coverage",
+          "processing_coverage",
+          "issuer_source_participation",
+          "temporal_coverage"
+        ],
+        "dispositions": [
+          "complete_within_declared_query",
+          "complete_within_captured_artifact",
+          "complete_within_registered_transparency_view",
+          "issuer_participation_unknown",
+          "observed_subset",
+          "incomplete_or_gapped",
+          "population_definition_unverified",
+          "conflicted_completeness",
+          "unsupported_completeness"
+        ],
+        "explicit_non_implications": [
+          "complete_registered_transparency_view != complete_issuer_history",
+          "complete_declared_query != complete_real_world_population",
+          "one_verified_member != complete_archive",
+          "provider_self_reported_all_pages_seen != independently_verified_enumeration_closure"
+        ]
+      },
+      "numeric_precision": {
+        "producer": "https://github.com/Luminous-Dynamics/symthaea/pull/10927",
+        "raw_lexeme_audit": "https://github.com/Luminous-Dynamics/symthaea/pull/10952",
+        "independent_replay": "https://github.com/Luminous-Dynamics/symthaea/pull/10958",
+        "coverage_states": [
+          "source_token_audited",
+          "parsed_value_only",
+          "lexical_coverage_unavailable"
+        ],
+        "claim_ceiling": "JCS binary64 semantic identity and raw source token preservation are separate. A parsed Value cannot claim complete lexical precision coverage."
       }
     }
   ],
