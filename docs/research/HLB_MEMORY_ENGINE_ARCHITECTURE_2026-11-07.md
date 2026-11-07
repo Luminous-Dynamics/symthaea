@@ -608,3 +608,10 @@ The schema validates structure and status-dependent fields. It does not prove ca
 
 
 A companion [blockwise residual fixture](fixtures/hme_certified_compression_block_bounds_v0.json) illustrates why per-block certificates may be tighter than a single global residual radius. In its 4D synthetic example, the query-weighted block residual dot bound is 2.0 versus 10.1 under the global bound; the corresponding real-arithmetic cosine upper bounds are approximately 0.01048 and 0.05291. This is a geometry sanity check only; it does not validate a production quantizer or floating-point implementation.
+
+
+## 20. HDC-LTC checkpoint completeness
+
+New child: [#10979 — HME-DYN-CHECKPOINT-001](https://github.com/Luminous-Dynamics/symthaea/issues/10979).
+
+The current HdcLtcUnifiedNetwork has a separate NetworkStateSnapshot intentionally limited to dynamic state, layer outputs and evolution clocks; its own documentation says weights and momentum are excluded. This is useful for in-memory evolution restore but cannot, alone, resume a trained learner. HME therefore separates EvolutionSnapshot, LearnerCheckpoint, ReplayCheckpoint and WeightsOnlyArtifact, and requires training-continuation parity after restore.
