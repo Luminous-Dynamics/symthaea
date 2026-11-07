@@ -1,0 +1,240 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "HME-QUERY-CONTRACT-2026-11-07",
+  "status": "synthetic_deterministic_fixture_not_benchmark_result",
+  "dimension": 16,
+  "sampling": {
+    "legacy_stride": 4,
+    "legacy_sample_indices": [
+      0,
+      4,
+      8,
+      12
+    ],
+    "cases": [
+      {
+        "id": "phase_shifted_identical",
+        "description": "Identical semantic vectors occupy only coordinates omitted by fixed-origin stride 4.",
+        "query": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ],
+        "candidate": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0
+        ],
+        "expected_full_cosine": 1,
+        "expected_fixed_origin_stride_cosine": 0
+      },
+      {
+        "id": "masked_disagreement",
+        "description": "The sampled coordinate agrees, but the omitted coordinate reverses the full-space dot product.",
+        "query": [
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "candidate": [
+          1,
+          -1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "expected_full_cosine": 0,
+        "expected_fixed_origin_stride_cosine": 1
+      },
+      {
+        "id": "final_coordinate_spike",
+        "description": "All signal is in the final coordinate, which fixed-origin stride 4 misses.",
+        "query": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "candidate": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "expected_full_cosine": 1,
+        "expected_fixed_origin_stride_cosine": 0
+      },
+      {
+        "id": "phase_rotated_sparse",
+        "description": "Equivalent sparse patterns at a nonzero phase test whether phase-balanced sampling removes fixed-origin aliasing.",
+        "query": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "candidate": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          1,
+          0
+        ],
+        "expected_full_cosine": 1,
+        "expected_fixed_origin_stride_cosine": 0
+      }
+    ]
+  },
+  "query_completion": [
+    {
+      "id": "exact_all_scored",
+      "eligible_count": 4,
+      "fully_scored": 4,
+      "safely_pruned": 0,
+      "approximate_candidates": 0,
+      "budget_exhausted": false,
+      "expected_status": "ExactComplete"
+    },
+    {
+      "id": "exact_with_admissible_prunes",
+      "eligible_count": 4,
+      "fully_scored": 2,
+      "safely_pruned": 2,
+      "approximate_candidates": 0,
+      "budget_exhausted": false,
+      "expected_status": "ExactComplete"
+    },
+    {
+      "id": "partial_scan_budget_exhausted",
+      "eligible_count": 4,
+      "fully_scored": 2,
+      "safely_pruned": 0,
+      "approximate_candidates": 0,
+      "budget_exhausted": true,
+      "expected_status": "Incomplete"
+    },
+    {
+      "id": "approximate_profile_completed",
+      "eligible_count": 4,
+      "fully_scored": 0,
+      "safely_pruned": 0,
+      "approximate_candidates": 3,
+      "budget_exhausted": false,
+      "expected_status": "ApproximateComplete"
+    },
+    {
+      "id": "invalid_pinned_generation",
+      "eligible_count": 4,
+      "fully_scored": 0,
+      "safely_pruned": 0,
+      "approximate_candidates": 0,
+      "budget_exhausted": false,
+      "invalid_generation": true,
+      "expected_status": "UnavailableOrInvalid"
+    }
+  ],
+  "invariants": [
+    "ExactComplete requires every eligible candidate to be fully scored or safely pruned exactly once.",
+    "ApproximateComplete never implies exact result semantics.",
+    "Incomplete results may contain provisional best-so-far items but may not be serialized as complete.",
+    "Fixed-origin stride results must be labelled approximate and never used as the exact oracle.",
+    "The expected cosine values use the small fixture vectors and a direct f64 arithmetic calculation for test-oracle construction; they are not production score measurements."
+  ]
+}
