@@ -70,7 +70,12 @@ pub struct TimingMetrics {
     /// phones do not get to contribute timing accuracy for the wrong sound.
     pub exact_phone_pairs: usize,
     pub onset_mae_ms: Option<f64>,
+    pub onset_median_ms: Option<f64>,
     pub onset_p95_ms: Option<f64>,
+    /// Fraction of exact-phone pairs whose absolute onset error is <= 50 ms.
+    pub onset_within_50ms_fraction: Option<f64>,
+    /// Fraction of exact-phone pairs whose absolute onset error is <= 100 ms.
+    pub onset_within_100ms_fraction: Option<f64>,
     pub offset_mae_ms: Option<f64>,
     pub offset_p95_ms: Option<f64>,
     pub duration_mae_ms: Option<f64>,
@@ -202,7 +207,10 @@ pub fn score_alignment(
         timing: TimingMetrics {
             exact_phone_pairs: counts.exact_matches,
             onset_mae_ms: mean(&onset_errors_ms),
+            onset_median_ms: median(&onset_errors_ms),
             onset_p95_ms: percentile(&onset_errors_ms, 0.95),
+            onset_within_50ms_fraction: fraction_at_or_below(&onset_errors_ms, 50.0),
+            onset_within_100ms_fraction: fraction_at_or_below(&onset_errors_ms, 100.0),
             offset_mae_ms: mean(&offset_errors_ms),
             offset_p95_ms: percentile(&offset_errors_ms, 0.95),
             duration_mae_ms: mean(&duration_errors_ms),
@@ -414,6 +422,35 @@ fn mean(values: &[f64]) -> Option<f64> {
     (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
 }
 
+
+/// Conventional median: arithmetic mean of the two center values for even n.
+/// Empty timing support remains None rather than a synthetic zero.
+fn median(values: &[f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let middle = sorted.len() / 2;
+    if sorted.len() % 2 == 0 {
+        Some((sorted[middle - 1] + sorted[middle]) / 2.0)
+    } else {
+        Some(sorted[middle])
+    }
+}
+
+/// Empirical fraction of errors at or below a declared timing threshold.
+fn fraction_at_or_below(values: &[f64], threshold_ms: f64) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    let within = values
+        .iter()
+        .filter(|value| **value <= threshold_ms)
+        .count();
+    Some(within as f64 / values.len() as f64)
+}
+
 /// Nearest-rank percentile. Empty support is reported as None, never zero.
 fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
     if values.is_empty() {
@@ -476,6 +513,45 @@ mod tests {
         assert_eq!(result.phone_error_rate, 0.0);
         assert_eq!(result.timing.onset_mae_ms, Some(0.0));
         assert_eq!(result.timing.offset_p95_ms, Some(0.0));
+    }
+
+
+    #[test]
+    fn onset_timing_reports_median_and_published_threshold_coverage() {
+        let reference = vec![
+            reference("a", 0, 100, 200, true),
+            reference("b", 1, 300, 400, false),
+            reference("c", 2, 500, 600, false),
+            reference("d", 3, 700, 800, true),
+        ];
+        let predicted = vec![
+            prediction("a", 0, 110, 210, true),  // 10 ms
+            prediction("b", 1, 360, 460, false), // 60 ms
+            prediction("c", 2, 590, 690, false), // 90 ms
+            prediction("d", 3, 850, 950, true),  // 150 ms
+        ];
+        let result = score_alignment(1_000, 2_000, &reference, &predicted, &[]).unwrap();
+        assert_eq!(result.timing.onset_median_ms, Some(75.0));
+        assert_eq!(result.timing.onset_within_50ms_fraction, Some(0.25));
+        assert_eq!(result.timing.onset_within_100ms_fraction, Some(0.75));
+        assert_eq!(result.timing.onset_p95_ms, Some(150.0));
+    }
+
+    #[test]
+    fn median_and_threshold_coverage_use_exact_phone_pairs_only() {
+        let reference = vec![
+            reference("a", 0, 100, 200, true),
+            reference("b", 1, 300, 400, false),
+        ];
+        let predicted = vec![
+            prediction("a", 0, 120, 220, true),
+            prediction("x", 1, 300, 400, false),
+        ];
+        let result = score_alignment(1_000, 1_000, &reference, &predicted, &[]).unwrap();
+        assert_eq!(result.timing.exact_phone_pairs, 1);
+        assert_eq!(result.timing.onset_median_ms, Some(20.0));
+        assert_eq!(result.timing.onset_within_50ms_fraction, Some(1.0));
+        assert_eq!(result.timing.onset_within_100ms_fraction, Some(1.0));
     }
 
     #[test]
@@ -558,6 +634,9 @@ mod tests {
         assert_eq!(result.edits.deletions, 1);
         assert_eq!(result.phone_error_rate, 1.0);
         assert_eq!(result.timing.onset_mae_ms, None);
+        assert_eq!(result.timing.onset_median_ms, None);
+        assert_eq!(result.timing.onset_within_50ms_fraction, None);
+        assert_eq!(result.timing.onset_within_100ms_fraction, None);
         assert_eq!(result.prediction_exact_precision, None);
     }
 
@@ -639,6 +718,9 @@ mod tests {
         let reference = vec![reference("a", 0, 0, 100, true)];
         let result = score_alignment(16_000, 200, &reference, &[], &[]).unwrap();
         assert_eq!(result.timing.onset_p95_ms, None);
+        assert_eq!(result.timing.onset_median_ms, None);
+        assert_eq!(result.timing.onset_within_50ms_fraction, None);
+        assert_eq!(result.timing.onset_within_100ms_fraction, None);
         assert_eq!(result.timing.offset_mae_ms, None);
         assert_eq!(result.melisma.coverage_fraction, None);
     }
