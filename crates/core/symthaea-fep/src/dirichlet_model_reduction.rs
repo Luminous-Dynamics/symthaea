@@ -1661,20 +1661,28 @@ mod tests {
         };
         let models = vec![model_a, model_b];
         let full_prior = model_average_prior(&models);
+        // One observation on coordinate 1 is excluded by model A but is
+        // representable under the full model and model B.
         let posterior = tensor_with_support(
-            &[&[0.5, 0.5]],
+            &[&[0.5, 1.5]],
             &[&[true, true]],
             'a',
         );
-        let strict = reduce_dirichlet_models(&posterior, &full_prior, &models);
-        assert!(matches!(
-            strict,
-            Err(DirichletBayesianModelReductionError::InvalidPosteriorNormalization)
-        ));
+        let strict = reduce_dirichlet_models(&posterior, &full_prior, &models)
+            .expect("strict BMR assigns zero evidence only to the contradicted rule");
+        assert_eq!(
+            strict.models.iter().find(|model| model.model_id == "a").unwrap().log_evidence_ratio,
+            f64::NEG_INFINITY
+        );
 
         let smoothed = reduce_dirichlet_models_spm_compatible(&posterior, &full_prior, &models)
-            .expect("pseudocount mode admits the smoothed coordinates");
-        assert!(smoothed.models.iter().all(|model| model.log_evidence_ratio.is_finite()));
+            .expect("SPM pseudocount retains finite evidence for the reduced rule");
+        assert!(
+            smoothed
+                .models
+                .iter()
+                .all(|model| model.log_evidence_ratio.is_finite())
+        );
     }
 
     #[test]
