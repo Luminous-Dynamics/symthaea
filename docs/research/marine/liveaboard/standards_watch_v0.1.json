@@ -92,6 +92,15 @@
       "source": "https://www.iso.org/standard/85220.html"
     },
     {
+      "id": "ISO 25175:2026",
+      "edition": 1,
+      "publication_date": "2026-06-25",
+      "status": "published",
+      "scope": "Standard marine test methods for air tightness and separation performance (permeation and salt rejection) of RO and NF membrane elements.",
+      "applicability_note": "Use as a membrane-element test reference where the exact licensed method applies. It does not qualify a complete installed yacht watermaker system, electrical energy, flush duty, potable-water safety, product storage/distribution or brine discharge.",
+      "source": "https://www.iso.org/standard/89252.html"
+    },
+    {
       "id": "ISO 2631-1:1997 + Amd 1:2010",
       "edition": 2,
       "amendment": "2010",
