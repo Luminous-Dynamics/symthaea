@@ -70,6 +70,8 @@ Descending-command probe keys must carry an exact source identity: DNg100, DNg97
 
 For a measured row, the crate computes one wrapped phase reset and one cycle-slip count per leg. Non-response, failed assay, missing tracking, out-of-support and unassessed rows remain typed statuses and cannot be silently turned into zero responses.
 
+Every `PhaseResponseSurface` also carries a mandatory `SourceBinding`: dataset ID/revision, phase-estimator digest, leg-axis identity receipt, raw trajectory digest, perturbation receipt/dose mapping, context-definition digest, and animal/session/trial tokens. The Rust constructor rejects empty identity tokens and malformed/non-lowercase SHA-256 strings before storing rows. This validates the declared lineage shape; it does not authenticate signatures, recompute the raw-data digests or verify a transparency-log inclusion proof.
+
 ## Synthetic known-answer tranche
 
 The standalone no-dependency Rust crate under `tools/connectome-phase-response` provides:
