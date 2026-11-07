@@ -4,7 +4,7 @@
 use std::error::Error;
 use symthaea_uap_observatory::{
     EcefVector3, RayObservation, SensorPlacementCandidate, SensorToEcefQuaternion,
-    rank_sensor_placements,
+    TargetHypothesis, rank_sensor_placements, rank_sensor_placements_over_target_region,
 };
 
 fn bearing_from_target(
