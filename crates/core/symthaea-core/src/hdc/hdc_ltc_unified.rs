@@ -760,6 +760,9 @@ impl HdcLtcUnifiedNeuron {
 
         Self {
             state: ContinuousHV::zero(dim),
+            pre_evolution_state: None,
+            pre_evolution_time: 0.0,
+            pre_evolution_dt: 0.0,
             weight_hv: parameters[0].clone(),
             input_mask: parameters[1].clone(),
             tau_modulator: parameters[2].clone(),
