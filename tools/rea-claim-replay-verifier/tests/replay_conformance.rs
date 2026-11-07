@@ -1512,5 +1512,3 @@ fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
             .any(|line| line.as_str().unwrap().contains("does not prove the underlying real-world proposition"))
     );
 }
-
-}
