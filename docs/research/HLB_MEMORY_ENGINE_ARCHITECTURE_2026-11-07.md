@@ -627,3 +627,6 @@ New child: [#10981 — HLB-PROJ-CO-DESIGN-001](https://github.com/Luminous-Dynam
 HdcLtcBridge retains dense input/output projection matrices. For 256-wide input/output at 256K dimensions, they represent 512 MiB of logical f32 payload. The output projection's training update is an outer product, hence a rank-one algebraic delta per training step. The new experiment compares current dense matrices, seeded regeneration, structured fast transforms, exact rank-one factor logs and explicitly bounded factor consolidation.
 
 The analytical fixture `docs/research/fixtures/hme_bridge_projection_footprint_v0.json` includes dense footprint, MAC counts and exact factor storage at several D/rank values. It does not report RSS or measured performance.
+
+
+The field matrix fixture now also inventories all 12 HdcLtcBridge fields. HdcLtcBridge does not derive Serialize/Deserialize and contains trained output-projection state plus adaptive-dimension counters and seed lineage. The complete learner checkpoint must wrap this bridge-level state around the inner-network checkpoint; scratch buffers are reconstructed empty.
