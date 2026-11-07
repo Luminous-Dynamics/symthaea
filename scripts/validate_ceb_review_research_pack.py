@@ -634,7 +634,7 @@ def self_test() -> list[str]:
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
         *(
             f"| ERG-S{i:02d} | target vs alternative | E1 smallest action | source_declared | stop or ask |"
-            for i in range(1, 27)
+            for i in range(1, 33)
         ),
         "E3/E4 remain design-only until #10064 qualification; #10369",
     ))
