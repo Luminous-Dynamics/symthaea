@@ -3,7 +3,7 @@
 **Status:** Public design and benchmark-triangulation material. No repository task is admitted, no candidate is run, and no CEB performance result is claimed.  
 **Owners:** Existing CEB-RESOLUTION / CEB-TEST / CEB-SECURE / CEB-RUST / CEB-CAUSE / CEB-CONTINUITY work; [#10385](https://github.com/Luminous-Dynamics/symthaea/issues/10385), [#10366](https://github.com/Luminous-Dynamics/symthaea/issues/10366), [#10370](https://github.com/Luminous-Dynamics/symthaea/issues/10370), [#10630](https://github.com/Luminous-Dynamics/symthaea/issues/10630).  
 **Gates:** #10064 for candidate-controlled execution isolation; #10369 for signer trust and independent pristine regrade.  
-**Metric boundary:** Keep the 14-lane / 56-primary-metric matrix. This protocol introduces no new lane, receipt schema, aggregate score, test-count score or execution privilege.
+**Metric boundary:** Keep the 14-lane / 56-primary-metric matrix. This protocol introduces no new lane, receipt schema, aggregate score, test-count score or execution privilege. No new receipt or run-attestation format is introduced.
 
 ## 1. Research question
 
