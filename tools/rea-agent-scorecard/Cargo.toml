@@ -1,0 +1,23 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
+[package]
+name = "rea-agent-scorecard"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "rea-agent-scorecard"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["preserve_order"] }
+rea-claim-replay-verifier = { path = "../rea-claim-replay-verifier" }
+symthaea-rea-compat = { path = "../../crates/domains/symthaea-rea-compat" }
