@@ -103,6 +103,8 @@ def validate_documents(
         "https://arxiv.org/abs/2610.13668",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
+        "https://www.codereviewbench.com/leaderboard",
+        "https://www.codereviewbenchmark.com/",
     ):
         if url not in triangulation:
             errors.append(f"triangulation document is missing source URL {url}")
@@ -175,6 +177,10 @@ def validate_documents(
         errors.append("ReviewBench augmented-recall denominator caveat is missing")
     if "CodeReviewBench human-flagged bug recall" not in triangulation:
         errors.append("triangulation must distinguish CodeReviewBench human-flagged-bug recall")
+    if "Martian production review adoption" not in triangulation:
+        errors.append("triangulation must distinguish Martian production adoption")
+    if "acceptance is not proof of correctness" not in triangulation.lower():
+        errors.append("triangulation must not equate production uptake with factual correctness")
     if "Martian production review adoption" not in triangulation:
         errors.append("triangulation must distinguish Martian production adoption from correctness")
     if "adoption is not proof of correctness" not in triangulation.lower():
@@ -362,17 +368,17 @@ def self_test() -> list[str]:
         "#10064 #10369",
     ))
 
-    calibration_pack = "\\n".join((
+    calibration_pack = "\n".join((
         "public synthetic development/calibration material; not an admitted task set",
         *(
-            f"## {idx + 2}. Case CAL-{case:02d}\\nNormative contract\\nCandidate finding to assess\\n"
-            + "\\n".join(f"#### Variant X{variant}\\nsource excerpt" for variant in range(1, 7))
-            + "\\nReviewer worksheet"
+            f"## {idx + 2}. Case CAL-{case:02d}\nNormative contract\nCandidate finding to assess\n"
+            + "\n".join(f"#### Variant X{variant}\nsource excerpt" for variant in range(1, 7))
+            + "\nReviewer worksheet"
             for idx, case in enumerate(range(1, 4))
         ),
         "permanently ineligible as a sealed CEB holdout; No code was compiled or executed",
     ))
-    calibration_key = "\\n".join((
+    calibration_key = "\n".join((
         "public development answer key; not hidden ground truth",
         *(
             f"| CAL-{case:02d} | X{variant} | {state} — state |"
