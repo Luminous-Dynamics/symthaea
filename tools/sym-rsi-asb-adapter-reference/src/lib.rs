@@ -305,7 +305,7 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
         validate_campaign(campaign, &mut issues);
     }
     for required in ["nuclease-active-learning", "propylene-active-learning"] {
-        if !campaign_ids.contains(required) {
+        if !campaign_ids.iter().any(|campaign_id| *campaign_id == required) {
             issues.push(format!("required campaign missing: {required}"));
         }
     }
