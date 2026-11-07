@@ -9,7 +9,7 @@
 //! It is a bounded circuit-compilation experiment, not a scalable QBF solver.
 
 use super::quantified_strategy::BooleanStrategyFunction;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A terminal or indexed decision node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
