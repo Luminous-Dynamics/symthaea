@@ -84,6 +84,8 @@ A profile binds:
 
 profile_sha256 is computed over RFC 8785 canonical bytes of the profile object with the profile_sha256 field omitted. This is an integrity commitment, not a signature, trust anchor or proof that the profile is authoritative. The caller must separately establish why this profile is the correct one for the subject/operation.
 
+JSON Schema validates the closed profile shape. A semantic profile validator must additionally enforce: each exact JSON Pointer appears once; minimum ≤ maximum using exact decimal-string comparison; safe-integer bounds remain inside ±(2^53−1); unsigned rules have no negative range; width/range consistency; binary64 tolerance fields match the selected comparison mode; fixed-decimal precision/scale consistency; and every non-null unit reference resolves to the exact registered profile ID/version/digest. These checks must not use f64 for exact integer/decimal bounds.
+
 A future validator result should distinguish at least:
 - valid: present value conforms to the selected rule and all required source/profile bindings are established;
 - invalid: a present value violates a declared grammar, type, range, scale, unit or policy;
