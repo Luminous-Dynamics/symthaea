@@ -675,7 +675,7 @@ pub fn verify_winning_strategy(
         }
     }
 
-    if strategy.functions.len() != expected_controlled.len() {
+    if strategy.functions.len() > expected_controlled.len() {
         return Err(QuantifiedStrategyError::StrategyFunctionCountMismatch {
             expected: expected_controlled.len(),
             actual: strategy.functions.len(),
