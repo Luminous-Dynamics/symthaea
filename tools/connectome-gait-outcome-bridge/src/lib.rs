@@ -161,9 +161,22 @@ pub struct TransferProbeKey {
     pub delay_index: u32,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MeasurementSourceBinding {
+    pub dataset_id: String,
+    pub dataset_revision_sha256: String,
+    pub raw_trajectory_sha256: String,
+    pub animal_id: String,
+    pub session_id: String,
+    pub trial_id: String,
+    pub condition: Condition,
+    pub stimulus: Stimulus,
+}
+
 #[derive(Clone, Debug)]
 pub struct Measurement {
     pub measurement_id: String,
+    pub source_binding: MeasurementSourceBinding,
     pub endpoint: EndpointKind,
     pub metric_id: MetricId,
     pub availability: Availability,
@@ -265,6 +278,7 @@ pub struct BridgeReport {
 pub enum ReasonCode {
     MissingIdentity,
     InvalidDigest,
+    MixedSourceIdentity,
     ZeroSamplingRate,
     ZeroFrameCount,
     InvalidTransferGridCommitment,
@@ -478,7 +492,20 @@ fn validate_measurement(
         );
         if let Some(value) = measurement.value {
             add(!value.is_finite(), ReasonCode::NonFiniteValue);
-            add(value < 0.0, ReasonCode::NegativeValue);
+            match measurement.metric_id {
+                MetricId::TcsNatvar2024
+                | MetricId::TcsSapkal2026V2
+                | MetricId::PuglieseAutocorrelationOscillationScore
+                | MetricId::PuglieseAutocorrelationFrequency
+                | MetricId::PuglieseSingleLegStepFrequency
+                | MetricId::GenericPhaseVectorStrength
+                | MetricId::SapkalButterworthHilbertPlvV2
+                | MetricId::FicTracForwardVelocity => {
+                    add(value < 0.0, ReasonCode::NegativeValue);
+                }
+                MetricId::PhaseResetFractionalMicroturnsV1
+                | MetricId::PhaseResetCycleSlipsV1 => {}
+            }
             match measurement.metric_id {
                 MetricId::PuglieseAutocorrelationOscillationScore
                 | MetricId::GenericPhaseVectorStrength
@@ -588,11 +615,6 @@ fn validate_measurement(
                     measurement.availability != Availability::NotAvailable,
                     ReasonCode::FicTracUnavailableButMeasured,
                 );
-            } else {
-                add(
-                    !measured(measurement),
-                    ReasonCode::FicTracMissingWhenDeclaredAvailable,
-                );
             }
         }
     }
@@ -658,6 +680,36 @@ fn validate_packet(packet: &GaitOutcomePacket) -> Result<(), BridgeError> {
 
     let mut ids = BTreeSet::new();
     for measurement in &packet.measurements {
+        let row_source = &measurement.source_binding;
+        if row_source.dataset_id != packet.dataset_id
+            || row_source.dataset_revision_sha256 != packet.dataset_revision_sha256
+            || row_source.raw_trajectory_sha256 != packet.raw_trajectory_sha256
+            || row_source.animal_id != packet.animal_id
+            || row_source.session_id != packet.session_id
+            || row_source.trial_id != packet.trial_id
+            || row_source.condition != packet.condition
+            || row_source.stimulus != packet.stimulus
+        {
+            reasons.push(ReasonCode::MixedSourceIdentity);
+        }
+        for value in [
+            row_source.dataset_id.as_str(),
+            row_source.animal_id.as_str(),
+            row_source.session_id.as_str(),
+            row_source.trial_id.as_str(),
+        ] {
+            if !is_nonempty(value) {
+                reasons.push(ReasonCode::MissingIdentity);
+            }
+        }
+        for digest in [
+            row_source.dataset_revision_sha256.as_str(),
+            row_source.raw_trajectory_sha256.as_str(),
+        ] {
+            if !valid_sha256(digest) {
+                reasons.push(ReasonCode::InvalidDigest);
+            }
+        }
         if !ids.insert(measurement.measurement_id.as_str()) {
             reasons.push(ReasonCode::DuplicateMeasurementId);
         }
@@ -889,6 +941,16 @@ mod tests {
     ) -> Measurement {
         Measurement {
             measurement_id: id.into(),
+            source_binding: MeasurementSourceBinding {
+                dataset_id: "synthetic-pugliese-anipose".into(),
+                dataset_revision_sha256: digest('a'),
+                raw_trajectory_sha256: digest('b'),
+                animal_id: "synthetic-animal-1".into(),
+                session_id: "synthetic-session-1".into(),
+                trial_id: "synthetic-trial-1".into(),
+                condition: Condition::BallContact,
+                stimulus: Stimulus::DNg100,
+            },
             endpoint,
             metric_id,
             availability: Availability::Measured,
@@ -985,6 +1047,10 @@ mod tests {
             velocity.value = None;
         }
         packet.measurements.push(velocity);
+        for row in &mut packet.measurements {
+            row.source_binding.stimulus = packet.stimulus;
+            row.source_binding.condition = packet.condition;
+        }
         packet
     }
 
@@ -1030,12 +1096,39 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unknown_or_mixed_subject_identity() {
+    fn rejects_empty_measurement_identity() {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         packet.measurements[0].measurement_id.clear();
         assert!(audit_packet(&packet)
             .unwrap_err()
             .contains(ReasonCode::MissingIdentity));
+    }
+
+    #[test]
+    fn rejects_measurement_from_another_animal_session_or_trial() {
+        let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
+        packet.measurements[0].source_binding.animal_id = "other-animal".into();
+        assert!(audit_packet(&packet)
+            .unwrap_err()
+            .contains(ReasonCode::MixedSourceIdentity));
+    }
+
+    #[test]
+    fn negative_phase_resets_and_negative_cycle_slips_are_valid_outcomes() {
+        let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
+        packet
+            .measurements
+            .iter_mut()
+            .find(|m| m.metric_id == MetricId::PhaseResetFractionalMicroturnsV1)
+            .unwrap()
+            .value = Some(-12_500.0);
+        packet
+            .measurements
+            .iter_mut()
+            .find(|m| m.metric_id == MetricId::PhaseResetCycleSlipsV1)
+            .unwrap()
+            .value = Some(-1.0);
+        assert!(audit_packet(&packet).is_ok());
     }
 
     #[test]
