@@ -17,8 +17,9 @@ pub use claims::{
 
 #[allow(unused_imports)] // This adapter intentionally re-exports the complete Evidence API.
 pub use symthaea_rea_compat::{
-    EVIDENCE_ID_PREFIX, EvidenceError, EvidenceErrorKind, MAX_EVIDENCE_JSON_BYTES,
-    VerifiedEvidence, analysis_profile_digest, canonical_jcs_bytes, compute_evidence_id,
+    EVIDENCE_ID_PREFIX, EvidenceError, EvidenceErrorKind, JcsIntegerPrecisionWarning,
+    JCS_MAX_SAFE_INTEGER, MAX_EVIDENCE_JSON_BYTES, VerifiedEvidence, analysis_profile_digest,
+    canonical_jcs_bytes, compute_evidence_id, jcs_integer_precision_warnings,
     semantic_evidence_content, sha256_hex, validate_evidence_schema, verify_evidence_json,
     verify_evidence_value,
 };
