@@ -119,6 +119,15 @@ pub enum DecompositionError {
         variable_count: usize,
     },
     DuplicateProjectionVariable(usize),
+    EmptyProjectionFragments,
+    ProjectionScopeMismatch {
+        expected: Vec<String>,
+        actual: Vec<String>,
+    },
+    ProjectionAssignmentWidthMismatch {
+        expected: usize,
+        actual: usize,
+    },
     ProjectionSupportBudgetExceeded {
         required_at_least: usize,
         limit: usize,
@@ -644,12 +653,99 @@ pub fn verify_projected_support(
     })
 }
 
-/// Combine projected supports by existential union, deduplicating witnesses.
-pub fn existential_support_union(supports: &[BTreeSet<Vec<bool>>]) -> BTreeSet<Vec<bool>> {
-    supports
-        .iter()
-        .flat_map(|support| support.iter().cloned())
-        .collect()
+/// A child result containing support over an explicitly ordered visible scope.
+///
+/// The scope is part of the value: two assignments with the same Boolean
+/// vector but different variable orderings are not interchangeable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectionSupportFragment {
+    pub visible_variables: Vec<String>,
+    pub support: BTreeSet<Vec<bool>>,
+}
+
+/// Result of combining child projected supports under existential union.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectedSupportUnionReport {
+    pub visible_variables: Vec<String>,
+    pub support: BTreeSet<Vec<bool>>,
+    pub projected_count: u128,
+}
+
+/// Combine projected supports by existential union, failing closed on scope
+/// mismatch, malformed assignment widths, or support-budget exhaustion.
+///
+/// This function validates structural scope identity. The strategy/hyperedge
+/// verifier must separately establish that each fragment is bound to the
+/// correct child task and that the decomposition itself is sound.
+pub fn existential_support_union(
+    fragments: &[ProjectionSupportFragment],
+    budget: EnumerationBudget,
+) -> Result<ProjectedSupportUnionReport, DecompositionError> {
+    let first = fragments
+        .first()
+        .ok_or(DecompositionError::EmptyProjectionFragments)?;
+    let visible_variables = &first.visible_variables;
+
+    if visible_variables.len() > budget.max_variables {
+        return Err(DecompositionError::VariableBudgetExceeded {
+            required: visible_variables.len(),
+            limit: budget.max_variables,
+        });
+    }
+    let name_bytes = visible_variables.iter().try_fold(0usize, |total, name| {
+        total
+            .checked_add(name.len())
+            .ok_or(DecompositionError::ResourceAccountingOverflow)
+    })?;
+    if name_bytes > budget.max_total_variable_name_bytes {
+        return Err(DecompositionError::VariableNameBudgetExceeded {
+            required: name_bytes,
+            limit: budget.max_total_variable_name_bytes,
+        });
+    }
+
+    let mut names = HashSet::with_capacity(visible_variables.len());
+    for (index, name) in visible_variables.iter().enumerate() {
+        if name.is_empty() {
+            return Err(DecompositionError::EmptyVariableName { index });
+        }
+        if !names.insert(name.as_str()) {
+            return Err(DecompositionError::DuplicateVariableName(name.clone()));
+        }
+    }
+
+    let mut support = BTreeSet::new();
+    for fragment in fragments {
+        if fragment.visible_variables != *visible_variables {
+            return Err(DecompositionError::ProjectionScopeMismatch {
+                expected: visible_variables.clone(),
+                actual: fragment.visible_variables.clone(),
+            });
+        }
+        for assignment in &fragment.support {
+            if assignment.len() != visible_variables.len() {
+                return Err(DecompositionError::ProjectionAssignmentWidthMismatch {
+                    expected: visible_variables.len(),
+                    actual: assignment.len(),
+                });
+            }
+            if !support.contains(assignment) && support.len() >= budget.max_projection_support {
+                return Err(DecompositionError::ProjectionSupportBudgetExceeded {
+                    required_at_least: support.len().saturating_add(1),
+                    limit: budget.max_projection_support,
+                });
+            }
+            support.insert(assignment.clone());
+        }
+    }
+
+    let projected_count =
+        u128::try_from(support.len()).map_err(|_| DecompositionError::CountOverflow)?;
+    Ok(ProjectedSupportUnionReport {
+        visible_variables: visible_variables.clone(),
+        support,
+        projected_count,
+    })
 }
 
 #[cfg(test)]
@@ -735,9 +831,59 @@ mod tests {
 
     #[test]
     fn existential_union_deduplicates_same_visible_assignment() {
-        let left = BTreeSet::from([vec![true]]);
-        let right = BTreeSet::from([vec![true]]);
-        assert_eq!(existential_support_union(&[left, right]).len(), 1);
+        let left = ProjectionSupportFragment {
+            visible_variables: vec!["v".into()],
+            support: BTreeSet::from([vec![true]]),
+        };
+        let right = ProjectionSupportFragment {
+            visible_variables: vec!["v".into()],
+            support: BTreeSet::from([vec![true]]),
+        };
+        let report = existential_support_union(&[left, right], budget()).unwrap();
+        assert_eq!(report.projected_count, 1);
+        assert_eq!(report.support, BTreeSet::from([vec![true]]));
+    }
+
+    #[test]
+    fn existential_union_rejects_visible_scope_mismatch() {
+        let left = ProjectionSupportFragment {
+            visible_variables: vec!["v".into()],
+            support: BTreeSet::from([vec![true]]),
+        };
+        let right = ProjectionSupportFragment {
+            visible_variables: vec!["h".into()],
+            support: BTreeSet::from([vec![true]]),
+        };
+        assert_eq!(
+            existential_support_union(&[left, right], budget()).unwrap_err(),
+            DecompositionError::ProjectionScopeMismatch {
+                expected: vec!["v".into()],
+                actual: vec!["h".into()],
+            }
+        );
+    }
+
+    #[test]
+    fn existential_union_rejects_assignment_width_mismatch() {
+        let fragment = ProjectionSupportFragment {
+            visible_variables: vec!["v".into()],
+            support: BTreeSet::from([vec![true, false]]),
+        };
+        assert_eq!(
+            existential_support_union(&[fragment], budget()).unwrap_err(),
+            DecompositionError::ProjectionAssignmentWidthMismatch {
+                expected: 1,
+                actual: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn existential_union_rejects_empty_fragment_list() {
+        assert_eq!(
+            existential_support_union(&[], budget()).unwrap_err(),
+            DecompositionError::EmptyProjectionFragments
+        );
     }
 
     #[test]
