@@ -33,13 +33,13 @@ SoulX-Singer is a high-priority open-model candidate to reproduce. Its public co
 The paper and repository make this a strong candidate for controlled reproduction, not evidence that it outperforms Symthaea locally. Its own documentation notes that generated score/lyric preprocessing may need manual alignment review. Sources:
 - https://github.com/Soul-AILab/SoulX-Singer
 - https://github.com/Soul-AILab/SoulX-Singer-Eval
-- https://arxiv.org/abs/2605. know
+- https://arxiv.org/abs/2602.07803
 
 ### Music-aware singing quality assessment: MusicJudge
 
 Samsung Research's MusicJudge (Interspeech 2026) is especially relevant because it combines lyric correctness with pitch/rhythm fidelity at meaningful music-block boundaries. Its published evaluation reports ranking agreement with expert judges on SwaraLyrics (Spearman 0.683; Kendall tau 0.499). This demonstrates why lyric-only WER, score-only pitch error, and audio-only MOS should not be collapsed into one universal quality measure.
 
-Source: https://research.samsung.com/research-papers/Listening-Like-a-Judge-A-Music-Aware-Framework-for-Automatic-Singing-Performance-Evaluation
+Source: https://arxiv.org/abs/2606.26451
 
 ### Singing-quality predictors: SingMOS-Pro
 
@@ -49,7 +49,7 @@ Its language distribution does not automatically qualify an English or African-l
 
 Sources:
 - https://github.com/South-Twilight/SingMOS
-- https://arxiv.org/abs/2506.XXXX
+- https://arxiv.org/abs/2510.01812
 
 ### Whole-song open baseline: ACE-Step 1.5
 
@@ -123,7 +123,7 @@ Use concealed, loudness-matched clips and at least five independent listeners as
 - artifact severity;
 - musical preference.
 
-Include licensed human-sung anchors and strong model baselines. Use MUSHRA-like multi-stimulus methodology where appropriate, with hidden reference and anchor material. Do not use a single weighted composite as a substitute for dimension-level results.
+Include licensed human-sung anchors and strong model baselines. Use ITU-R BS.1534-3 (MUSHRA) or an explicitly justified derivative where appropriate, with hidden reference and anchor material. Report the adaptation because the original recommendation addresses intermediate audio quality, not every singing-specific construct. Do not use a single weighted composite as a substitute for dimension-level results. Source: https://www.itu.int/rec/R-REC-BS.1534
 
 ## Candidate comparison portfolio
 
