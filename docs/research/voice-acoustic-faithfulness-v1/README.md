@@ -103,3 +103,15 @@ Before building a learned model or ingesting any corpus:
 ## Nonclaims
 
 This file is a design manifest only. It contains no audio labels, trained weights, benchmark scores, human annotations, validated emotion model or evidence of SOTA. It does not promote native ASR or Broca capabilities.
+
+## Additional extractor caveat: amplitude normalization
+
+The current `formant_extraction` implementation computes per-frame RMS, then normalizes each utterance so its maximum frame reaches a fixed value (0.85). This preserves within-utterance relative energy shape but removes absolute amplitude differences between utterances. Consequently:
+
+- Do not interpret its normalized energy mean as calibrated loudness or compare it across microphones/utterances as absolute intensity.
+- Preserve raw RMS before normalization as a separate measurement.
+- Treat relative dynamics, microphone gain and calibrated sound-pressure level as separate quantities.
+- Cross-device or cross-recording loudness comparisons require known gain/calibration metadata and a defined microphone/reference procedure; otherwise report uncalibrated amplitude only.
+- Add a metamorphic test: multiply the same waveform by a known gain factor. Normalized energy shape should remain approximately invariant, while raw RMS should scale predictably. The evaluation must not accidentally call this gain invariance an emotion or arousal estimate.
+
+The default autocorrelation F0 range is also bounded to 60–400 Hz; speaker ranges outside that band will be truncated/undefined under current configuration. Evaluate octave errors and pitch-range coverage against a pinned reference before using the feature for human speech. This is an audit target, not evidence that the extractor is inaccurate on all speakers.
