@@ -232,6 +232,12 @@ LoopControlBench publishes an auditable benchmark harness for real merged Python
 
 **CEB implication:** the strongest lesson is that the validator, not the model, decides completion. Use deterministic target tests, test immutability, source-path allowlists, task certification in the scoring environment and explicit outcome denominators. However, a named fail-to-pass test proves one declared behavior only; it does not establish whole-program safety, causal uniqueness or an independent pristine regrade. The benchmark's own security note identifies repository build/test execution as untrusted code and requires container/VM isolation. This reinforces #10064 rather than relaxing it.
 
+### 2.25 Saving SWE-Bench — realistic user framing as an evaluation treatment
+
+Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Approach for Realistic Agent Evaluation*, was submitted October 10, 2025, revised January 23, 2026 (v4), and accepted to CAIN 2026. It converts formal GitHub issue descriptions into realistic user-style queries using observed developer interaction patterns with chat-based coding assistants. The authors report that formal public benchmarks overestimated performance for some evaluated models by **more than 50%**, with approximately **10–16%** differences on their internal benchmark. These are results for the paper's specific models, task sets and mutation process, not a universal discount factor. [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/) · [arXiv:2510.08996](https://arxiv.org/abs/2510.08996).
+
+**CEB implication:** task framing and information content are experimental variables. A model may repair a formal issue but fail to clarify a realistic developer request; a failing test is additional evidence, not just a paraphrase. Use paired source/defect anchors across issue-conditioned repair, realistic user request, diff-only review, repository-only discovery and failing-test-guided repair. Distinguish wording-only changes from additional/missing information, and keep outputs under their existing CEB lanes rather than creating a composite engineering-intelligence score. The shared-anchor [Cross-Framing Anchor Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) specifies the paired design and confounder controls.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -247,6 +253,7 @@ LoopControlBench publishes an auditable benchmark harness for real merged Python
 | SecPRBench | Security-root-cause diagnosis on 265 vulnerability-introducing changes across nine systems projects; 32.5–78.1% target recall | Test causal mechanism, cross-file paths and exact revision rather than location overlap; report precision limitations and per-run cost |
 | SWE-sweep | Open-world multi-bug discovery/repair across 100 repositories and 22 languages; 4,068 bugs | Adjacent repository-maintenance frontier; keep its bug-resolved score separate from review recall/precision |
 | LoopControlBench | Deterministic fail-to-pass completion on 70 certified Python tasks; 46/70 reference | Methodological comparator for deterministic outcome/admission; not a broad industry SOTA or code-review benchmark |
+| Saving SWE-Bench | Benchmark mutation from formal issues to realistic developer-style requests | Methodological reference for paired prompt/information-framing effects; no universal correction factor or direct leaderboard comparison |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
 | Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
@@ -369,6 +376,14 @@ Separate four outcomes:
 Martian's production review timeline shows why uptake data is valuable, while ReviewBench, SecPRBench and Kodus show why it cannot replace independently adjudicated truth. A comment can be accepted for convenience or rejected despite correctness. A code change following a review does not by itself establish causal attribution to that comment.
 
 The CEB experiment should preserve the finding's exact revision, independent disposition and human-response event. Use review timelines, issue resolution and later recurrence as process/outcome evidence; where causal attribution matters, compare matched review windows or use controlled rollout/holdback designs with a clear assignment unit. Do not infer adoption from silence, do not infer correctness from acceptance, and do not rewrite fixed gold because a developer later changed code. Map to existing CEB-REVIEW / CEB-HUMAN / continuity measures rather than adding a new primary metric lane.
+
+### Shift 17 — From one benchmark prompt to paired information conditions
+
+A formal issue, a realistic developer request, a diff, a repository without bug hints and a failing test expose different information. Their raw success rates do not measure a single capability. *Saving SWE-Bench* reports model-specific overestimation when formal issue statements are mutated into realistic user requests; the effect is not a universal adjustment to every SWE benchmark. [Paper](https://arxiv.org/abs/2510.08996).
+
+CEB should pair multiple task framings on the same source/defect anchor. Keep repository state, target contract, oracle and environment fixed wherever possible; explicitly record when the information package changes. Separate discovery from repair, review from resolution, and clarification from abstention. A failing test or location hint is additional evidence, not a different wording. Randomize condition order, isolate contexts, cluster prompt variants under the original anchor, and score each output with the existing CEB-REVIEW / RESOLUTION / REPO / HUMAN metrics. Do not produce a cross-framing composite or treat the paper's >50% result as a universal discount.
+
+Use the [CEB Review Cross-Framing Anchor Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md); it is a design proposal, not an empirical result or new metric lane.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
