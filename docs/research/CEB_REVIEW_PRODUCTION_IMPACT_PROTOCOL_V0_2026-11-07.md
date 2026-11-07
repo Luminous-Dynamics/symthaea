@@ -3,7 +3,7 @@
 **Status:** Research protocol and preregistration template. No production experiment, user-level randomization, human outcome study or CEB benchmark run is claimed.  
 **Owners:** Existing CEB-REVIEW / CEB-HUMAN / CEB-CONTINUITY work; [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723), [#10637](https://github.com/Luminous-Dynamics/symthaea/issues/10637), [#10630](https://github.com/Luminous-Dynamics/symthaea/issues/10630), [#10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419).  
 **Composition:** [CEB Review Benchmark Triangulation V0](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [Finding Adjudication Card V0](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), [Causal-Diagnosis Preregistration V0](CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md), existing CEB-HUMAN and CEB-CONTINUITY contracts.  
-**Metric boundary:** Keep the CEB measurement matrix at 14 lanes / 56 primary metrics. Do not add an uptake score, deployment-impact lane, opaque composite or new receipt schema.
+**Metric boundary:** Keep the CEB measurement matrix at 14 lanes / 56 primary metrics. Do not add an uptake score, deployment-impact lane, opaque composite or new receipt schema. No uptake score is added; preserve the existing three CEB-REVIEW primary measures.
 
 ## 1. Research question: does a correct review improve engineering outcomes?
 
