@@ -331,7 +331,12 @@
         "exact_feedback_tensor_semantic_class_count_75",
         "paper_reported_unique_rule_count_79",
         "semantic_duplicate_groups_3_triplets",
-        "planted_rule_65_context_centre_red_left_green_centre_blue_right"
+        "planted_rule_65_context_centre_red_left_green_centre_blue_right",
+        "source_labelled_rule_count",
+        "semantic_quotient_rule_count",
+        "model_posterior_aggregation_error_nats",
+        "quotient_action_ranking_invariance",
+        "label_redundancy_entropy_nats"
       ],
       "negative_controls": [
         "random_partial_observation_policy",
@@ -674,6 +679,18 @@
     {
       "id": "fixed_weightprogram_template_without_evidence",
       "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
+    },
+    {
+      "id": "three_ball_source_labelled_81_model_space",
+      "scope": "Source-faithful 81 labelled hypotheses with original equal 1/81 prior mass"
+    },
+    {
+      "id": "three_ball_semantic_quotient_75_model_space",
+      "scope": "Explicit 75-class quotient of the pinned public SPM generator; identical likelihood tensors are grouped and prior mass summed; compare outputs/evidence/action selection against labelled family"
+    },
+    {
+      "id": "three_ball_quotient_model_evidence_invariance",
+      "scope": "Paired invariant check that class posterior equals sum of member-label posteriors after every evidence increment"
     }
   ],
   "seeds": {
@@ -803,7 +820,10 @@
       "semantic_reader_calibration",
       "sequential_session_receipt_chain_integrity",
       "verifier_gated_session_advancement",
-      "cumulative_l2_budget_violations"
+      "cumulative_l2_budget_violations",
+      "semantic_quotient_rule_count",
+      "model_posterior_aggregation_error_nats",
+      "prior_predictive_invariance_error"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -888,7 +908,8 @@
     "sequential_session_receipt_chain_integrity",
     "no_batch_advancement_without_native_candidate_and_verifier_receipts",
     "session_rejects_replayed_or_out_of_order_evidence_and_stale_parent_candidate",
-    "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches"
+    "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches",
+    "The source-faithful 81-label rule family is retained. Any semantic quotient is an explicit secondary representation with prior mass aggregated over exact-likelihood-equivalence classes; prior predictive distributions, model evidence, class posteriors, and action rankings must match the labelled family within declared numerical tolerances."
   ],
   "research_references": [
     {
