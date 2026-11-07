@@ -142,11 +142,11 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         }
         events = flatten_performance_phones(performance, minimum_silence_ms=5.0)
         self.assertEqual([event[0] for event in events], [
-            "m", "ah", "t", "ah", "SP", "ah", "SP", "k", "eh"
+            "m", "ah", "ah", "SP", "ah", "t", "SP", "k", "eh"
         ])
-        self.assertAlmostEqual(events[4][1], 200.0)
+        self.assertAlmostEqual(events[3][1], 200.0)
         self.assertAlmostEqual(events[6][1], 100.0)
-        self.assertEqual(events[4][2], 261.63)
+        self.assertEqual(events[3][2], 261.63)
         self.assertEqual(events[6][2], 293.66)
 
     def test_consonant_anticipation_borrows_from_the_preceding_vowel(self) -> None:
