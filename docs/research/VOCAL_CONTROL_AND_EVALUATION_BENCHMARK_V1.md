@@ -149,6 +149,35 @@ Sources:
 - MusicJudge: https://arxiv.org/abs/2606.26451
 - DiffSinger: https://github.com/openvpi/DiffSinger
 
+
+## What the current frontier tells us
+
+### SoulX-Singer: data pipeline is part of the model
+
+SoulX-Singer reports more than 42,000 hours of vocal material across Mandarin, English and Cantonese. Its curation workflow includes vocal separation, dereverberation, language identification, language-specific lyric transcription, explicit correction against reference lyrics, and note-level score transcription. Its zero-shot benchmark includes 50 unseen singers with fine-grained note-level annotations. This is a much larger data and annotation operation than Muse's present small hand-built English G2P and 60-case vocal gate.
+
+**Strategic consequence:** do not try to beat this simply by replacing a vocoder or changing one neural architecture. Create a better data/evidence pipeline: rights-cleared singers, song- and singer-disjoint splits, corrected lyrics, phone-level references, note-level scores, pronunciation alternatives, expression controls, and exact artifact receipts. A smaller but rigorously annotated and consented corpus can establish a credible niche; it cannot automatically establish better raw naturalness.
+
+### MusicJudge: quality is block-structured and multi-modal
+
+MusicJudge (Interspeech 2026) combines lyric content fidelity with pitch and rhythm fidelity at musically meaningful blocks. It uses semantic, lexical and phonetic signals for lyric matching and accounts for melisma and expressive variations. On its 120-performance expert-ranking set, the paper reports Spearman 0.683 and Kendall tau 0.499.
+
+Muse should reproduce this as an independent evaluator baseline, but preserve a separate score-conditioned task. MusicJudge estimates a performance-intrinsic global key from accompaniment, which can be appropriate for evaluating a performance that has been transposed. In a fixed-score track, use the supplied score as the pitch reference and only normalize a transposition when it is explicitly declared in the case manifest. These are different questions and should be reported separately.
+
+### Fine-grained expression is becoming controllable
+
+A 2025 ASRU paper on phoneme-level energy-sequence control reports more than 50% lower MAE for user-specified phoneme-level energy sequences versus its predictor/baseline comparison without compromising its synthesis quality in the reported study. This supports a concrete Muse experiment: add phone-level energy envelopes to the same control-response matrix as vibrato, breathiness, portamento and articulation. A single syllable velocity or global prompt is not an adequate representation of expressive control.
+
+Source: https://doi.org/10.1109/ASRU65441.2025.11434790
+
+### Proposed evaluator target
+
+After reproducing MusicJudge on an equivalent evaluation subset, target at least Spearman 0.70 and Kendall tau 0.52 against independently collected expert rankings, with confidence intervals and singer/song-disjoint evaluation. Treat these as stretch targets, not claims, and compare with lyric-only and music-only ablations. A correlation target is only meaningful if the annotator panel and data split prevent leakage.
+
+Sources:
+- SoulX-Singer paper: https://arxiv.org/abs/2602.07803
+- MusicJudge paper: https://arxiv.org/abs/2606.26451
+
 ## Proposed qualification gates
 
 These values are initial engineering goals. Freeze final thresholds only after the pilot corpus, human references and metric reliability are established.
