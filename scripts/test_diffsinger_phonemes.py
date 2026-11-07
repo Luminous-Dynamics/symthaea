@@ -149,6 +149,26 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         self.assertEqual(events[3][2], 261.63)
         self.assertEqual(events[6][2], 293.66)
 
+    def test_subframe_score_gaps_are_preserved_before_cumulative_frame_quantization(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                {
+                    "phonemes": [{"ipa": "a", "is_vowel": True, "natural_duration_s": 0.2}],
+                    "note": {"start_time": 0.0, "duration": 0.5, "frequency": 220.0},
+                    "melisma_notes": [],
+                },
+                {
+                    "phonemes": [{"ipa": "ɛ", "is_vowel": True, "natural_duration_s": 0.2}],
+                    "note": {"start_time": 0.503, "duration": 0.5, "frequency": 246.94},
+                    "melisma_notes": [],
+                },
+            ],
+        }
+        events = flatten_performance_phones(performance)
+        self.assertEqual([event[0] for event in events], ["ah", "SP", "eh"])
+        self.assertAlmostEqual(events[1][1], 3.0)
+
     def test_consonant_anticipation_borrows_from_the_preceding_vowel(self) -> None:
         performance = {
             "language": "en",
