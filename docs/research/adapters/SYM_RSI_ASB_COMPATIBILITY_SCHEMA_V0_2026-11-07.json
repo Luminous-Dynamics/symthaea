@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea Autonomous Science Bench compatibility manifest v0",
+  "description": "Structural contract for a pinned read-only AS-Bench replay/twin adapter. It does not prove upstream authenticity, adapter conformance, or scientific performance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "status",
+    "generated_utc_date",
+    "compatibility",
+    "upstream",
+    "adapter_scope",
+    "campaigns",
+    "invariants",
+    "ownership"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "sym-rsi-asb-compatibility-manifest-v0"
+    },
+    "status": {
+      "const": "PINNED_UPSTREAM_COMPATIBILITY_TARGET_NOT_YET_RUN"
+    },
+    "generated_utc_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "official_benchmark_claim",
+        "upstream_gate_mutation_permitted",
+        "note"
+      ],
+      "properties": {
+        "mode": {
+          "const": "read_only_upstream_replay_and_twin"
+        },
+        "official_benchmark_claim": {
+          "const": false
+        },
+        "upstream_gate_mutation_permitted": {
+          "const": false
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "url",
+        "commit",
+        "commit_url",
+        "task_schema_version",
+        "lab_api_version",
+        "pinned_files"
+      ],
+      "properties": {
+        "repository": {
+          "const": "Yibo-Wen/as-bench"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "commit_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "task_schema_version": {
+          "type": "string"
+        },
+        "lab_api_version": {
+          "const": 1
+        },
+        "pinned_files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "git_blob_sha",
+              "purpose"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "adapter_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_backend",
+        "second_backend",
+        "excluded_backends",
+        "excluded_claims"
+      ],
+      "properties": {
+        "first_backend": {
+          "const": "replay"
+        },
+        "second_backend": {
+          "const": "twin"
+        },
+        "excluded_backends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded_claims": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "campaigns": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "task_path",
+          "backend",
+          "domain",
+          "source",
+          "source_doi",
+          "data_license",
+          "design_space",
+          "gates",
+          "reference_shipped_split",
+          "observation_semantics"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "backend": {
+            "enum": [
+              "replay",
+              "twin"
+            ]
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_doi": {
+            "type": "string",
+            "pattern": "^10\\."
+          },
+          "preprint_doi": {
+            "type": "string",
+            "pattern": "^10\\."
+          },
+          "dataset_doi": {
+            "type": "string",
+            "pattern": "^10\\."
+          },
+          "data_license": {
+            "type": "string",
+            "minLength": 1
+          },
+          "design_space": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "orderable_designs",
+              "rounds",
+              "batch_size",
+              "total_measurement_budget"
+            ],
+            "properties": {
+              "orderable_designs": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "rounds": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "batch_size": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "total_measurement_budget": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "held_out_designs": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "gates": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "discovery",
+              "learning",
+              "combination"
+            ],
+            "properties": {
+              "discovery": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/gate"
+                }
+              },
+              "learning": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "$ref": "#/$defs/gate"
+                }
+              },
+              "combination": {
+                "const": "all_discovery_and_learning_gates_must_pass"
+              }
+            }
+          },
+          "reference_shipped_split": {
+            "type": "object",
+            "minProperties": 2,
+            "additionalProperties": {
+              "type": [
+                "integer",
+                "number",
+                "string"
+              ]
+            },
+            "required": [
+              "role"
+            ],
+            "properties": {
+              "role": {
+                "const": "upstream_reference_solution_result_not_a_Symthaea_result"
+              }
+            }
+          },
+          "observation_semantics": {
+            "type": "object",
+            "minProperties": 2,
+            "additionalProperties": {
+              "type": [
+                "boolean",
+                "integer",
+                "number",
+                "string"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric",
+        "operator",
+        "threshold"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "enum": [
+            ">=",
+            ">",
+            "<=",
+            "<"
+          ]
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "held_out_designs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}
