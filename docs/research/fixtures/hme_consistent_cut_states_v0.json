@@ -48,6 +48,20 @@
             "partition_id": 1,
             "highest_contiguous_offset": 19
           }
+        ],
+        "event_coverage_watermarks": [
+          {
+            "stream_id": "obs",
+            "partition_id": 0,
+            "covered_through": 42,
+            "declared_no_memory_mutations": []
+          },
+          {
+            "stream_id": "obs",
+            "partition_id": 1,
+            "covered_through": 19,
+            "declared_no_memory_mutations": []
+          }
         ]
       },
       "event_coverage": [
@@ -57,7 +71,8 @@
           "received_through": 42,
           "learner_consumed_through": 42,
           "memory_materialized_through": 42,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 42
         },
         {
           "stream_id": "obs",
@@ -65,7 +80,8 @@
           "received_through": 19,
           "learner_consumed_through": 19,
           "memory_materialized_through": 19,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 19
         }
       ],
       "composite_manifest": {
@@ -121,6 +137,20 @@
             "partition_id": 1,
             "highest_contiguous_offset": 19
           }
+        ],
+        "event_coverage_watermarks": [
+          {
+            "stream_id": "obs",
+            "partition_id": 0,
+            "covered_through": 41,
+            "declared_no_memory_mutations": []
+          },
+          {
+            "stream_id": "obs",
+            "partition_id": 1,
+            "covered_through": 19,
+            "declared_no_memory_mutations": []
+          }
         ]
       },
       "event_coverage": [
@@ -130,7 +160,8 @@
           "received_through": 42,
           "learner_consumed_through": 42,
           "memory_materialized_through": 41,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 41
         },
         {
           "stream_id": "obs",
@@ -138,7 +169,8 @@
           "received_through": 19,
           "learner_consumed_through": 19,
           "memory_materialized_through": 19,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 19
         }
       ],
       "composite_manifest": {
@@ -195,6 +227,20 @@
             "partition_id": 1,
             "highest_contiguous_offset": 19
           }
+        ],
+        "event_coverage_watermarks": [
+          {
+            "stream_id": "obs",
+            "partition_id": 0,
+            "covered_through": 40,
+            "declared_no_memory_mutations": []
+          },
+          {
+            "stream_id": "obs",
+            "partition_id": 1,
+            "covered_through": 19,
+            "declared_no_memory_mutations": []
+          }
         ]
       },
       "event_coverage": [
@@ -207,7 +253,8 @@
           "explicit_no_memory_mutations": [],
           "gaps": [
             41
-          ]
+          ],
+          "memory_coverage_through": 40
         },
         {
           "stream_id": "obs",
@@ -215,7 +262,8 @@
           "received_through": 19,
           "learner_consumed_through": 19,
           "memory_materialized_through": 19,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 19
         }
       ],
       "composite_manifest": {
@@ -272,6 +320,20 @@
             "partition_id": 1,
             "highest_contiguous_offset": 19
           }
+        ],
+        "event_coverage_watermarks": [
+          {
+            "stream_id": "obs",
+            "partition_id": 0,
+            "covered_through": 42,
+            "declared_no_memory_mutations": []
+          },
+          {
+            "stream_id": "obs",
+            "partition_id": 1,
+            "covered_through": 19,
+            "declared_no_memory_mutations": []
+          }
         ]
       },
       "event_coverage": [
@@ -281,7 +343,8 @@
           "received_through": 42,
           "learner_consumed_through": 42,
           "memory_materialized_through": 42,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 42
         },
         {
           "stream_id": "obs",
@@ -289,7 +352,8 @@
           "received_through": 19,
           "learner_consumed_through": 19,
           "memory_materialized_through": 19,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 19
         }
       ],
       "composite_manifest": {
@@ -346,6 +410,22 @@
             "partition_id": 1,
             "highest_contiguous_offset": 19
           }
+        ],
+        "event_coverage_watermarks": [
+          {
+            "stream_id": "obs",
+            "partition_id": 0,
+            "covered_through": 42,
+            "declared_no_memory_mutations": [
+              42
+            ]
+          },
+          {
+            "stream_id": "obs",
+            "partition_id": 1,
+            "covered_through": 19,
+            "declared_no_memory_mutations": []
+          }
         ]
       },
       "event_coverage": [
@@ -357,7 +437,8 @@
           "memory_materialized_through": 41,
           "explicit_no_memory_mutations": [
             42
-          ]
+          ],
+          "memory_coverage_through": 42
         },
         {
           "stream_id": "obs",
@@ -365,7 +446,8 @@
           "received_through": 19,
           "learner_consumed_through": 19,
           "memory_materialized_through": 19,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 19
         }
       ],
       "composite_manifest": {
@@ -375,7 +457,7 @@
       },
       "expected_status": "CompositeCheckpointComplete",
       "expected_recovery": "restore_generation_7",
-      "note": "Event 42 was consumed by learner but explicitly declared not to produce a memory mutation; this requires a typed event disposition, not inference from absence."
+      "note": "Event 42 was consumed by learner but explicitly declared not to produce a memory mutation. The HME materialized-through offset remains 41, while event coverage reaches 42 through the typed no-memory disposition."
     },
     {
       "id": "post_barrier_event",
@@ -422,6 +504,20 @@
             "partition_id": 1,
             "highest_contiguous_offset": 19
           }
+        ],
+        "event_coverage_watermarks": [
+          {
+            "stream_id": "obs",
+            "partition_id": 0,
+            "covered_through": 42,
+            "declared_no_memory_mutations": []
+          },
+          {
+            "stream_id": "obs",
+            "partition_id": 1,
+            "covered_through": 19,
+            "declared_no_memory_mutations": []
+          }
         ]
       },
       "event_coverage": [
@@ -431,7 +527,8 @@
           "received_through": 42,
           "learner_consumed_through": 42,
           "memory_materialized_through": 42,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 42
         },
         {
           "stream_id": "obs",
@@ -439,7 +536,8 @@
           "received_through": 19,
           "learner_consumed_through": 19,
           "memory_materialized_through": 19,
-          "explicit_no_memory_mutations": []
+          "explicit_no_memory_mutations": [],
+          "memory_coverage_through": 19
         },
         {
           "stream_id": "obs",
@@ -467,6 +565,7 @@
     "Post-barrier events belong to a later epoch and must not be inferred into the current checkpoint.",
     "The composite manifest is published only after all referenced artifacts are durable and independently verified.",
     "If a component is unavailable, stale or corrupt, recovery must reject the composite cut or fall back to the previous verified composite generation.",
-    "A digest proves byte identity, not semantic event coverage or correct learner-to-memory causality."
+    "A digest proves byte identity, not semantic event coverage or correct learner-to-memory causality.",
+    "The event-coverage watermark is not the same as the materialized-update watermark: typed no-memory-mutation dispositions may advance coverage without creating a memory segment update."
   ]
 }
