@@ -15,6 +15,7 @@ from pathlib import Path
 
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
 CROSS_FRAMING = "docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md"
+CROSS_FRAMING_CALIBRATION_PACK = "docs/research/CEB_REVIEW_CROSS_FRAMING_CALIBRATION_PACK_V0_2026-11-07.md"
 COUNTERFACTUAL_QUALIFICATION = "docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md"
 GOLD_COMPLETENESS = "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
 SEQUENTIAL_EVIDENCE = "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
@@ -77,6 +78,7 @@ def validate_documents(
     calibration_key: str,
     counterfactual_qualification: str,
     cross_framing: str,
+    cross_framing_calibration_pack: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -344,6 +346,33 @@ def validate_documents(
         if required.lower() not in cross_framing.lower():
             errors.append(f"cross-framing protocol is missing {required}")
 
+    anchor_headings = (
+        "## 3. Single-defect anchor CF-A01",
+        "## 4. Single-defect anchor CF-A02",
+        "## 5. Single-defect anchor CF-A03",
+    )
+    for heading in anchor_headings:
+        if cross_framing_calibration_pack.count(heading) != 1:
+            errors.append(f"cross-framing calibration pack must contain exactly one {heading}")
+    for condition in range(5):
+        if cross_framing_calibration_pack.count(f"### F{condition} —") != 3:
+            errors.append(f"cross-framing calibration pack must contain F{condition} on each of three single-defect anchors")
+    if cross_framing_calibration_pack.count("### F5 — Open-world multi-bug sweep") != 1:
+        errors.append("cross-framing calibration pack must contain exactly one separate F5 multi-bug sweep")
+    if cross_framing_calibration_pack.count("## 6. Multi-defect repository anchor CF-B01") != 1:
+        errors.append("cross-framing calibration pack must contain exactly one multi-defect CF-B01 anchor")
+    for required in (
+        "Cross-framing information matrix",
+        "wording-only mutation",
+        "information-package contrast",
+        "fresh isolated conversation/context",
+        "permanently ineligible as a sealed CEB holdout",
+        "No code was compiled or executed",
+        "not an admitted task set",
+    ):
+        if required.lower() not in cross_framing_calibration_pack.lower():
+            errors.append(f"cross-framing calibration pack is missing {required}")
+
     for required in (
         "six independent control-qualification dimensions",
         "Q1 — Identity and lineage",
@@ -493,8 +522,33 @@ def self_test() -> list[str]:
         "do not create a composite; not a universal correction factor; no task is admitted; #10064 #10369",
     ))
 
-    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str, cf: str) -> list[str]:
-        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q, cf)
+    cross_framing_calibration_pack = "\n".join((
+        "not an admitted task set; public development calibration; permanently ineligible as a sealed CEB holdout",
+        "## 3. Single-defect anchor CF-A01",
+        "### F0 — Formal issue-conditioned repair",
+        "### F1 — Realistic user request",
+        "### F2 — Diff-only review",
+        "### F3 — Repository-only discovery",
+        "### F4 — Failing-test-guided repair",
+        "## 4. Single-defect anchor CF-A02",
+        "### F0 — Formal issue-conditioned repair",
+        "### F1 — Realistic user request",
+        "### F2 — Diff-only review",
+        "### F3 — Repository-only discovery",
+        "### F4 — Failing-test-guided repair",
+        "## 5. Single-defect anchor CF-A03",
+        "### F0 — Formal issue-conditioned repair",
+        "### F1 — Realistic user request",
+        "### F2 — Diff-only review",
+        "### F3 — Repository-only discovery",
+        "### F4 — Failing-test-guided repair",
+        "## 6. Multi-defect repository anchor CF-B01",
+        "### F5 — Open-world multi-bug sweep",
+        "Cross-framing information matrix; wording-only mutation; information-package contrast; fresh isolated conversation/context; No code was compiled or executed",
+    ))
+
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str, cf: str, cfp: str) -> list[str]:
+        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q, cf, cfp)
 
     crosswalk = "\n".join((
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
@@ -507,7 +561,7 @@ def self_test() -> list[str]:
     valid = run(
         triangulation, challenge, adjudication, scorecard,
         preregistration, gold_completeness, sequential_evidence, crosswalk,
-        calibration_pack, calibration_key, counterfactual_qualification, cross_framing
+        calibration_pack, calibration_key, counterfactual_qualification, cross_framing, cross_framing_calibration_pack
     )
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
@@ -542,6 +596,7 @@ def self_test() -> list[str]:
         ("missing SWE-sweep population", "triangulation", triangulation.replace("4,068 bugs across 100 repositories and 22 languages", "population removed")),
         ("missing LoopControlBench scope caveat", "triangulation", triangulation.replace("not 65.7% of software bugs generally", "claim removed")),
         ("missing F5 framing condition", "cross_framing", cross_framing.replace("F5 — Open-world multi-bug sweep", "F5 removed")),
+        ("missing CF-A02 F4", "cross_framing_calibration_pack", cross_framing_calibration_pack.replace("### F4 — Failing-test-guided repair", "### F4 removed", 2)),
     )
     for label, target, mutant in mutations:
         args = {
@@ -557,6 +612,7 @@ def self_test() -> list[str]:
             "calibration_key": calibration_key,
             "counterfactual_qualification": counterfactual_qualification,
             "cross_framing": cross_framing,
+            "cross_framing_calibration_pack": cross_framing_calibration_pack,
         }
         args[target] = mutant
         result = run(
@@ -572,6 +628,7 @@ def self_test() -> list[str]:
             args["calibration_key"],
             args["counterfactual_qualification"],
             args["cross_framing"],
+            args["cross_framing_calibration_pack"],
         )
         if not result:
             return [f"negative self-test was accepted: {label}"]
@@ -599,7 +656,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 29 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 30 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -614,6 +671,7 @@ def main() -> int:
         calibration_key = read_required(args.repo_root, CALIBRATION_KEY)
         counterfactual_qualification = read_required(args.repo_root, COUNTERFACTUAL_QUALIFICATION)
         cross_framing = read_required(args.repo_root, CROSS_FRAMING)
+        cross_framing_calibration_pack = read_required(args.repo_root, CROSS_FRAMING_CALIBRATION_PACK)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -635,7 +693,7 @@ def main() -> int:
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
         "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26 "
         "human_calibration_cases=3 variants=18 answer_key=separate-public "
-        "counterfactual_controls=6 qualification_dimensions=6 cross_framing_conditions=6"
+        "counterfactual_controls=6 qualification_dimensions=6 cross_framing_conditions=6 cross_framing_anchors=4 prompt_variants=16"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
