@@ -17,6 +17,7 @@ on:
       - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
       - "crates/core/symthaea-fep/src/three_ball_partial_observation.rs"
       - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
+      - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/lib.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
@@ -41,6 +42,7 @@ on:
       - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
       - "crates/core/symthaea-fep/src/three_ball_partial_observation.rs"
       - "crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs"
+      - "crates/core/symthaea-fep/Cargo.toml"
       - "crates/core/symthaea-fep/src/lib.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
@@ -161,7 +163,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-fep/Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
