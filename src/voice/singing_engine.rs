@@ -127,6 +127,22 @@ impl VocalPerformance {
     /// than attaching English phones to another language or silently dropping
     /// trailing lyric syllables. Surplus notes are represented as melisma.
     pub fn from_melody(lyrics: &str, melody: &[Note], language: impl Into<String>) -> Result<Self> {
+        let syllable_count = symthaea_muse::singing_bridge::syllable_count(lyrics);
+        Self::from_melody_with_phrase_ends(lyrics, melody, language, &[syllable_count])
+    }
+
+    /// Bind lyrics and notes to explicit phrase-ending syllable indices.
+    ///
+    /// Each value is an exclusive syllable index. Values must be strictly
+    /// increasing and the final value must equal the G2P syllable count.
+    /// This lets a score author provide breath/phrase boundaries without
+    /// asking a renderer to infer them from an audio waveform.
+    pub fn from_melody_with_phrase_ends(
+        lyrics: &str,
+        melody: &[Note],
+        language: impl Into<String>,
+        phrase_ends: &[usize],
+    ) -> Result<Self> {
         let language = language.into();
         if language != "en" {
             bail!(
@@ -146,6 +162,20 @@ impl VocalPerformance {
                 "insufficient melody notes: {lexical_syllables} lyric syllables require at least that many notes, got {}",
                 melody.len()
             );
+        }
+        if phrase_ends.is_empty() || phrase_ends.last().copied() != Some(lexical_syllables) {
+            bail!(
+                "phrase_ends must be non-empty and terminate at the final lyric syllable ({lexical_syllables})"
+            );
+        }
+        let mut previous_phrase_end = 0usize;
+        for (phrase_index, phrase_end) in phrase_ends.iter().copied().enumerate() {
+            if phrase_end <= previous_phrase_end || phrase_end > lexical_syllables {
+                bail!(
+                    "phrase end {phrase_index} must be strictly increasing and within the lyric syllable count"
+                );
+            }
+            previous_phrase_end = phrase_end;
         }
         let sung = symthaea_muse::singing_bridge::sing(lyrics, melody);
         if sung.len() < lexical_syllables {
@@ -188,7 +218,7 @@ impl VocalPerformance {
                     melisma_notes,
                     articulation: VocalArticulation::Legato,
                     consonant_advance_s: 0.018,
-                    phrase_index: 0,
+                    phrase_index: phrase_ends.partition_point(|end| index >= *end),
                     portamento: if sustained { 0.12 } else { 0.06 },
                     vibrato_onset: if sustained { 0.38 } else { 1.0 },
                     vibrato_rate_hz: 5.2 + aligned.note.velocity.clamp(0.0, 1.0) * 0.5,
@@ -235,40 +265,60 @@ impl VocalPerformance {
             }
         }
 
-        let start = syllables.first().map(|s| s.note.start_time).unwrap_or(0.0);
-        let end = syllables
-            .last()
-            .map(VocalSyllable::end_time_s)
-            .unwrap_or(start);
-        let base_energy = syllables.iter().map(|s| s.energy).sum::<f32>() / syllables.len() as f32;
-        let base_breath =
-            syllables.iter().map(|s| s.breathiness).sum::<f32>() / syllables.len() as f32;
-        let phrases = vec![VocalPhrase {
-            syllable_start: 0,
-            syllable_end: syllables.len(),
-            breath_before_s: 0.0,
-            breath_after_s: 0.10,
-            expression_curve: vec![
-                ExpressionPoint {
-                    time_s: start,
-                    energy: base_energy * 0.86,
-                    breathiness: (base_breath + 0.06).min(1.0),
-                    tension: 0.28,
+        let mut phrases = Vec::with_capacity(phrase_ends.len());
+        let mut phrase_start_index = 0usize;
+        for (phrase_index, phrase_end_index) in phrase_ends.iter().copied().enumerate() {
+            let phrase_syllables = &syllables[phrase_start_index..phrase_end_index];
+            let start = phrase_syllables
+                .first()
+                .map(|syllable| syllable.note.start_time)
+                .unwrap_or(0.0);
+            let end = phrase_syllables
+                .last()
+                .map(VocalSyllable::end_time_s)
+                .unwrap_or(start);
+            let base_energy = phrase_syllables
+                .iter()
+                .map(|syllable| syllable.energy)
+                .sum::<f32>()
+                / phrase_syllables.len() as f32;
+            let base_breath = phrase_syllables
+                .iter()
+                .map(|syllable| syllable.breathiness)
+                .sum::<f32>()
+                / phrase_syllables.len() as f32;
+            phrases.push(VocalPhrase {
+                syllable_start: phrase_start_index,
+                syllable_end: phrase_end_index,
+                breath_before_s: if phrase_index == 0 { 0.0 } else { 0.12 },
+                breath_after_s: if phrase_index + 1 == phrase_ends.len() {
+                    0.10
+                } else {
+                    0.12
                 },
-                ExpressionPoint {
-                    time_s: start + (end - start) * 0.68,
-                    energy: (base_energy + 0.12).min(1.0),
-                    breathiness: base_breath,
-                    tension: 0.48,
-                },
-                ExpressionPoint {
-                    time_s: end,
-                    energy: base_energy * 0.82,
-                    breathiness: (base_breath + 0.08).min(1.0),
-                    tension: 0.22,
-                },
-            ],
-        }];
+                expression_curve: vec![
+                    ExpressionPoint {
+                        time_s: start,
+                        energy: base_energy * 0.86,
+                        breathiness: (base_breath + 0.06).min(1.0),
+                        tension: 0.28,
+                    },
+                    ExpressionPoint {
+                        time_s: start + (end - start) * 0.68,
+                        energy: (base_energy + 0.12).min(1.0),
+                        breathiness: base_breath,
+                        tension: 0.48,
+                    },
+                    ExpressionPoint {
+                        time_s: end,
+                        energy: base_energy * 0.82,
+                        breathiness: (base_breath + 0.08).min(1.0),
+                        tension: 0.22,
+                    },
+                ],
+            });
+            phrase_start_index = phrase_end_index;
+        }
 
         let performance = Self {
             version: VOCAL_PERFORMANCE_VERSION,
@@ -886,6 +936,66 @@ mod tests {
         assert_eq!(performance.syllables[0].melisma_notes.len(), 2);
         assert!((performance.duration_s() - 0.7).abs() < 1e-4);
     }
+    #[test]
+    fn from_melody_supports_explicit_multiple_phrase_boundaries() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 246.94,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let performance =
+            VocalPerformance::from_melody_with_phrase_ends("light bright", &notes, "en", &[1, 2])
+                .unwrap();
+        assert_eq!(performance.phrases.len(), 2);
+        assert_eq!(performance.syllables[0].phrase_index, 0);
+        assert_eq!(performance.syllables[1].phrase_index, 1);
+        assert_eq!(performance.phrases[0].syllable_start, 0);
+        assert_eq!(performance.phrases[0].syllable_end, 1);
+        assert_eq!(performance.phrases[1].syllable_start, 1);
+        assert_eq!(performance.phrases[1].syllable_end, 2);
+        assert!(performance.phrases[0].breath_after_s > 0.0);
+        assert!(performance.phrases[1].breath_before_s > 0.0);
+        performance.validate().unwrap();
+    }
+
+    #[test]
+    fn from_melody_rejects_non_partitioning_phrase_boundaries() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 246.94,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        for phrase_ends in [&[][..], &[1][..], &[2, 1][..], &[1, 3][..]] {
+            assert!(
+                VocalPerformance::from_melody_with_phrase_ends(
+                    "light bright",
+                    &notes,
+                    "en",
+                    phrase_ends
+                )
+                .is_err()
+            );
+        }
+    }
+
     #[test]
     fn from_melody_rejects_non_english_g2p_profiles() {
         let note = Note {
