@@ -103,6 +103,9 @@ pub struct ThreeBallSequentialTrialReceipt {
 pub struct ThreeBallSequentialDiscoveryResult {
     pub format_version: u32,
     pub seed: u64,
+    pub source_demo_commit: String,
+    pub source_rule_generator_commit: String,
+    pub parameterization_digest: String,
     pub true_rule_one_based_index: usize,
     pub true_semantic_class_one_based_index: usize,
     pub model_family: ThreeBallModelFamily,
@@ -133,6 +136,8 @@ pub enum ThreeBallSequentialDiscoveryError {
     EmptyTrialBudget,
     #[error("commitment log-odds threshold must be finite and non-negative")]
     InvalidCommitmentThreshold,
+    #[error("discovery or post-commitment preference schedule contains a non-finite value")]
+    InvalidPreferenceSchedule,
     #[error("true rule one-based index {index} is outside 1..={rule_count}")]
     InvalidTrueRuleIndex { index: usize, rule_count: usize },
     #[error("model family has no posterior support for the true semantic rule")]
@@ -165,6 +170,14 @@ pub fn run_three_ball_sequential_discovery(
         || config.commitment_log_odds_threshold_nats < 0.0
     {
         return Err(ThreeBallSequentialDiscoveryError::InvalidCommitmentThreshold);
+    }
+    if config
+        .discovery_feedback_log_preferences_nats
+        .iter()
+        .chain(config.post_commitment_feedback_log_preferences_nats.iter())
+        .any(|value| !value.is_finite())
+    {
+        return Err(ThreeBallSequentialDiscoveryError::InvalidPreferenceSchedule);
     }
     let true_rule_index = true_rule_one_based_index.checked_sub(1).ok_or(
         ThreeBallSequentialDiscoveryError::InvalidTrueRuleIndex {
@@ -289,7 +302,6 @@ pub fn run_three_ball_sequential_discovery(
             trials_to_correct_rule_commitment = Some(trial_index);
         }
 
-        let class_count = model_posterior_after.len() as f64;
         let brier = model_posterior_after
             .iter()
             .map(|(class_index, probability)| {
@@ -345,6 +357,9 @@ pub fn run_three_ball_sequential_discovery(
     Ok(ThreeBallSequentialDiscoveryResult {
         format_version: 1,
         seed,
+        source_demo_commit: space.source_demo_commit.clone(),
+        source_rule_generator_commit: space.source_rule_generator_commit.clone(),
+        parameterization_digest: space.parameterization_digest.clone(),
         true_rule_one_based_index,
         true_semantic_class_one_based_index,
         model_family: config.model_family,
@@ -629,6 +644,19 @@ mod tests {
                 }
             ),
             Err(ThreeBallSequentialDiscoveryError::InvalidCommitmentThreshold)
+        ));
+
+        assert!(matches!(
+            run_three_ball_sequential_discovery(
+                &space,
+                65,
+                1,
+                ThreeBallSequentialDiscoveryConfig {
+                    post_commitment_feedback_log_preferences_nats: [0.0, f64::NAN, -6.0],
+                    ..Default::default()
+                }
+            ),
+            Err(ThreeBallSequentialDiscoveryError::InvalidPreferenceSchedule)
         ));
     }
 }
