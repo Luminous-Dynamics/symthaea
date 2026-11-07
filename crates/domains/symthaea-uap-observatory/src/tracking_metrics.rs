@@ -253,8 +253,7 @@ mod tests {
             if row == truth.len() {
                 let unmatched_estimates = used.iter().filter(|used| !**used).count();
                 let total = cost
-                    + unmatched_estimates as f64
-                        * config.cutoff_m.powf(config.order)
+                    + unmatched_estimates as f64 * config.cutoff_m.powf(config.order)
                         / config.alpha;
                 if total < best.0 || (total == best.0 && matched > best.1) {
                     *best = (total, matched);
