@@ -374,3 +374,83 @@ Use proper scoring rules (log score, Brier, CRPS where appropriate), reliability
 ---
 
 **Decision:** qualify what exists first. Build no new generic PGM package until factor-graph semantics, evidence/dependence contracts, and cross-project interoperability gaps are demonstrated by exact-oracle tests.
+
+
+## 13. 2026 research-frontier update (2026-11-07)
+
+The benchmark matrix should explicitly incorporate the following current comparisons rather than treating EIG or generic BP as the whole frontier.
+
+### Constrained multi-step Bayesian experimental design
+
+Guo et al., *Constrained Bayesian Experimental Design via Online Planning* (ICML 2026, PMLR 306), combine an amortized policy and posterior network with online multi-step lookahead using scenario trees. The benchmark reports information efficiency under dynamic budgets, varying costs and physical constraints.
+
+Required comparator:
+- nominal one-step EIG / EVSI;
+- exact finite-horizon oracle on small cases;
+- fixed-sequence and random eligible policies;
+- amortized policy without online lookahead;
+- scenario-tree online planning;
+- robust / minimax-regret extension only where implemented faithfully.
+
+Measure decision regret, information acquired, experiment cost, budget feasibility, tree expansion/search cost, posterior approximation error and out-of-family performance. Do not treat the paper's reported performance as a portable score without reproducing its tasks and protocol.
+
+Reference: https://proceedings.mlr.press/v306/guo26g.html
+
+### Partially observed dynamical systems and nested particle inference
+
+Perez-Vieites et al., *Online Bayesian Experimental Design for Partially Observed Dynamical Systems* (ICML 2026, PMLR 306), estimate EIG and its gradient while marginalizing latent states using nested particle filters for online state/parameter inference.
+
+Required comparator for stateful Symtropy and Mycelix tasks:
+- exact finite joint-state oracle for tiny cases;
+- particle filter for state estimation plus a clearly defined parameter update;
+- nested particle-filter / SMC²-style online design;
+- one-step EIG and finite-horizon scenario-tree planning;
+- model-misspecification and persistent sensor-state controls.
+
+Measure posterior error, EIG bias/variance, effective sample size, resampling/degeneracy, predictive log score, decision regret, memory, latency and total compute. A particle method does not become calibrated merely because it reports ESS.
+
+Reference: https://proceedings.mlr.press/v306/perez-vieites26a.html
+
+### Two-axis misspecification: model error and inference error
+
+Callahan & Catanach, *On the Misinformation in a Statistical Experiment* (AISTATS 2026, PMLR 300), show that experiment rankings and classical information-based utility properties can fail under data-generating-model and inference-approximation misspecification. Tang, Sloman & Kaski, *Representative, Informative, and De-Amplifying* (AISTATS 2026), develop R-IDeA to address representativeness, information and error amplification.
+
+The benchmark must keep separate:
+1. correct generator + correct inference;
+2. correct generator + approximate/biased inference;
+3. shifted generator + exact inference under the wrong assumed model;
+4. both model and inference error;
+5. all supplied candidate models inadequate.
+
+Primary outcomes are held-out decision loss, confidence calibration and false-decision rate—not EIG alone. This connects to Symtropy SIM-REL-030 (#3189) and counterexample-guided model-family refinement (#3171). Reproduce published objectives faithfully; label local analogues as inspired comparators.
+
+References:
+- https://proceedings.mlr.press/v300/callahan26a.html
+- https://proceedings.mlr.press/v300/tang26d.html
+- https://github.com/Luminous-Dynamics/symtropy/issues/3189
+- https://github.com/Luminous-Dynamics/symtropy/issues/3171
+
+### Industry release pinning
+
+As of this audit:
+- GTSAM 4.3.0 is the stable tagged release announced on 2026-09-18. The release notes describe faster inference, parallel/multifrontal elimination, expanded filtering and hybrid inference, and experimental CUDA optimization. Compare against this pinned release for reproducibility.
+- A 4.3.2 version appears in the ROS package index on 2026-11-06, but that listing follows the repository development branch. Treat it as a development snapshot until an official stable tag/release is established; do not silently call 4.3.2 the stable release.
+- pgmpy v1.1.2 is the latest listed stable release in the GitHub release list, dated 2026-04-30.
+
+References:
+- https://github.com/borglab/gtsam/releases
+- https://index.ros.org/p/gtsam/
+- https://github.com/pgmpy/pgmpy/releases
+
+### Changed programme priority
+
+The first executable shared-engine priority remains exact finite reference inference, not a new particle implementation. The next qualification layer should then be:
+
+1. exact posterior/MAP reference;
+2. tree and bounded-treewidth differential tests;
+3. explicit independent-vs-correlated observation history;
+4. separate generator-shift and inference-approximation error controls;
+5. particle and amortized/scenario-tree baselines on the same tasks and budgets;
+6. decision-regret and subgroup calibration under sealed mechanism-family shifts.
+
+This sequence avoids tuning an approximate policy against an unqualified inference kernel.
