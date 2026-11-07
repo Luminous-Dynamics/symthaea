@@ -666,3 +666,73 @@ The query-aware algorithm-portfolio/compiler follow-up is tracked in https://git
 - Query-aware inference planner and algorithm contracts are tracked by https://github.com/Luminous-Dynamics/symthaea/issues/10943.
 - Checked log-domain BP implementation: https://github.com/Luminous-Dynamics/symthaea/pull/10939.
 - Remaining legacy joint MAP and Bethe defects: https://github.com/Luminous-Dynamics/symthaea/issues/10940 and https://github.com/Luminous-Dynamics/symthaea/issues/10941.
+
+
+## 16. Checked inference implementation and benchmark transition — 2026-11-07
+
+### Current checked implementation draft
+
+The checked-inference draft is now tracked in https://github.com/Luminous-Dynamics/symthaea/pull/10939. It contains:
+
+- Fail-closed log-domain sum-product with graph/config validation, no zero-to-uniform fallback, normalized probability and log variable beliefs, true cavity-derived factor beliefs, and both probability/log factor beliefs.
+- Explicit inference status: exact forest only when undamped and both message residuals are exactly zero in the f64 representation; separate tolerance-only forest, damped forest, loopy and not-converged labels.
+- Exact joint MAP on validated forests using max-product backpointers, deterministic tie-breaking, traceback across disconnected components, and a score recomputed from original factors; loopy graphs are rejected by this exact API.
+- Bethe free-energy evaluation from actual factor beliefs, with log-domain support, result-shape/normalization checks and exact/approximate/nonstationary statuses.
+
+The current branch has 31 authored tests, including 40 seeded mixed-cardinality forest cases for sum-product variable/factor marginals versus direct enumeration and another 40 for forest joint-MAP score versus exhaustive MAP. It also includes the A=B/B!=C tie counterexample, factor belief vs singleton-product negative control, Bethe forest logZ comparison, rescaling invariance, underflow and impossible-support controls.
+
+**Validation boundary:** source and tests are committed to the draft PR, but cargo/rustc/Nix are not available in the current execution environment. The 31 tests are authored, not executed; this is not a compile/test pass or a benchmark result. The recorded PR workflows are skipped, not passed. Exact-head CI remains required.
+
+### Public benchmark set and pinned versions
+
+A separate public benchmark programme is tracked at https://github.com/Luminous-Dynamics/symthaea/issues/10968.
+
+| Workload | Pinned comparison | Matched query / task |
+|---|---|---|
+| Discrete general PGM | UAI 2022 benchmark sets | PR, MAR, MPE, MMAP; 1 CPU, 8GB and published 20s / 20m / 1h categories |
+| Discrete Bayesian networks | pgmpy v1.1.2 (30 Apr 2026) | CPD validation, VE, BP, junction tree, MAP/MPE on matched BN model/evidence |
+| Continuous / hybrid / incremental factors | GTSAM 4.3.0 (stable, 19 Sep 2026) | nonlinear, Lie-group, Gaussian, hybrid discrete/continuous and incremental robotics tasks |
+| Tractable learned graph models | UAI 2025 Probabilistic Graph Circuits | exact query coverage, expressivity, circuit size, permutation invariance and query latency |
+| Continuous / hierarchical posterior | Stan/CmdStan 2.40.0 (16 Sep 2026), PyMC 6.4.0 (1 Nov 2026) | same likelihood/priors/transforms; ESS/sec, MCSE, R-hat, divergences, predictive checks |
+| Online partially observed design | ICML 2026 nested-particle BED; scenario-tree constrained BED | same state-space model, horizon, action set, costs and observations; posterior error, EIG bias/variance, ESS and decision regret |
+| Misspecification-robust acquisition | AISTATS 2026 R-IDeA | representativeness, informativeness and error-de-amplification; paired decision loss under shifts |
+
+References:
+- UAI task definitions: https://uaicompetition.github.io/uci-2022/competition-entry/tasks/
+- UAI benchmark data: https://uaicompetition.github.io/uci-2022/results/benchmarks/
+- pgmpy release: https://github.com/pgmpy/pgmpy/releases/tag/v1.1.2
+- GTSAM stable release: https://gtsam.org/2026/09/23/gtsam-4-3-release.html
+- Probabilistic Graph Circuits: https://proceedings.mlr.press/v286/papez25a.html
+- Stan 2.40: https://github.com/stan-dev/stan/releases/tag/v2.40.0
+- PyMC 6.4.0: https://pypi.org/project/pymc/6.4.0/
+- Nested-particle online BED: https://proceedings.mlr.press/v306/perez-vieites26a.html
+- Constrained scenario-tree BED: https://proceedings.mlr.press/v306/guo26g.html
+- R-IDeA: https://proceedings.mlr.press/v300/tang26d.html
+
+The published UAI resource tiers are a particularly useful target: one CPU / 8GB RAM with 20-second, 20-minute and one-hour categories. They enable clear anytime curves and make memory/time failure visible, unlike a single averaged score.
+
+### What would qualify as “better than SOTA”
+
+Do not seek one universal leader board. Seek workload-specific Pareto improvements under matched semantics:
+
+1. **Correctness:** exact rational / exhaustive / tree inference parity; zero false exact labels; impossible evidence and unsupported queries fail closed.
+2. **Discrete inference efficiency:** lower verified runtime or peak memory than pgmpy/UAI competitors on a preregistered family at identical answers, precision and hardware budget.
+3. **Continuous and incremental efficiency:** compare against GTSAM only on matched continuous/hybrid robotics workloads, not finite discrete inference.
+4. **Probabilistic-programming quality:** improve sampling efficiency or calibration versus Stan/PyMC on identical posterior targets while preserving convergence diagnostics.
+5. **Structured tractability:** compare with probabilistic circuits on repeated-query cost and query coverage; explicitly measure any expressivity/structure restriction.
+6. **Decision quality under uncertainty:** beat nominal EIG/EVSI on paired downstream decision loss under held-out mechanism shifts, dependence and discrepancy, while keeping hard constraints.
+
+A candidate performance gate is at least 2x lower measured time or memory on a preregistered workload slice at matched exactness/error, with paired confidence intervals and full regressions reported. This is a proposed target, not a current result.
+
+### Revised field strategy
+
+The strongest differentiated capability is a typed, evidence-qualified inference compiler:
+- exact rational / exact finite elimination where width and arithmetic bounds permit;
+- exact tree message passing with valid backpointers;
+- loopy BP, particles, variational inference and circuits with explicit approximation diagnostics;
+- GTSAM-class backend for continuous nonlinear / manifold / incremental workloads;
+- shared provenance, dependence, calibration, discrepancy and model-adequacy contracts through Mycelix;
+- dynamic state, sensor persistence, risk and policy horizons through Symtropy;
+- spatial/event scope and evidence geometry through Sol-Atlas.
+
+The goal is not to implement every PGM algorithm. It is to ensure the selected algorithm is semantically appropriate, its guarantees are inspectable, and any approximation can be measured against a suitable reference.
