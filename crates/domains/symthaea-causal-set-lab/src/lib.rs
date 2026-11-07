@@ -589,13 +589,14 @@ mod tests {
         let mut histogram = vec![0_u64; n.saturating_sub(1)];
         for first in 0..n {
             for second in (first + 1)..n {
-                let (past, future) = if causet.events[first].causally_precedes(causet.events[second]) {
-                    (first, second)
-                } else if causet.events[second].causally_precedes(causet.events[first]) {
-                    (second, first)
-                } else {
-                    continue;
-                };
+                let (past, future) =
+                    if causet.events[first].causally_precedes(causet.events[second]) {
+                        (first, second)
+                    } else if causet.events[second].causally_precedes(causet.events[first]) {
+                        (second, first)
+                    } else {
+                        continue;
+                    };
                 let interior = (0..n)
                     .filter(|&event| {
                         causet.events[past].causally_precedes(causet.events[event])
@@ -728,10 +729,26 @@ mod tests {
 
         let antichain = CausalSet2D::new(
             vec![
-                Event2D { id: 0, u: 0.1, v: 0.9 },
-                Event2D { id: 1, u: 0.3, v: 0.7 },
-                Event2D { id: 2, u: 0.5, v: 0.5 },
-                Event2D { id: 3, u: 0.7, v: 0.3 },
+                Event2D {
+                    id: 0,
+                    u: 0.1,
+                    v: 0.9,
+                },
+                Event2D {
+                    id: 1,
+                    u: 0.3,
+                    v: 0.7,
+                },
+                Event2D {
+                    id: 2,
+                    u: 0.5,
+                    v: 0.5,
+                },
+                Event2D {
+                    id: 3,
+                    u: 0.7,
+                    v: 0.3,
+                },
             ],
             1.0,
             1.0,
