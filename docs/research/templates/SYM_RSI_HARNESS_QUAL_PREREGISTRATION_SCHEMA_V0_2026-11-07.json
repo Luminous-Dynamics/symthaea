@@ -80,7 +80,7 @@
           "properties": {
             "selected_snapshot": {
               "enum": [
-                "paper_v2_or_live_site_snapshot",
+                "__REQUIRED_BEFORE_PREREGISTRATION__",
                 "paper_v2",
                 "live_site_snapshot"
               ]
