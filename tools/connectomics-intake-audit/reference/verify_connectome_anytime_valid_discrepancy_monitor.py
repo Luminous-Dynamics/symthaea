@@ -336,7 +336,7 @@ def verify_expected(report: dict[str, Any], expected: dict[str, Any]) -> None:
             "challenger predictive known-answer mismatch")
     require(report["e_factors_by_history"] == expected["e_factors_by_history"],
             "e-factor known-answer mismatch")
-    require(report["crossing_path"] == expected["crossing_path"], "crossing-path mismatch")
+    require(report["crossing_path"] == expected["crossing_paths"], "crossing-path set mismatch")
     require(report["observed"]["observed_e_value"] == expected["observed_e_value"],
             "observed e-value mismatch")
     require(report["false_alarm_probability_by_null"] == expected["false_alarm_probability_by_null"],
