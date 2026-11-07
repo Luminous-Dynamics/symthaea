@@ -472,6 +472,8 @@ mod tests {
 
     const FIXTURES: &str =
         include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_DECISION_FIXTURES_V0_2026-11-07.json");
+    const EVSI_EXAMPLE: &str =
+        include_str!("../../../docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_EXAMPLE_V0_2026-11-07.json");
 
     fn valid_pack() -> DecisionFixturePack {
         serde_json::from_str(FIXTURES).expect("checked-in decision fixtures parse")
@@ -539,6 +541,13 @@ mod tests {
         let pack: DecisionFixturePack = serde_json::from_value(value).expect("mutated pack parses");
         let report = validate_decision_fixtures(&pack);
         assert!(report.issues.iter().any(|issue| issue.starts_with("prohibited_inference:")));
+    }
+
+    #[test]
+    fn checked_in_evsi_example_matches_reference_calculation() {
+        let report = parse_and_calculate_evsi(EVSI_EXAMPLE).expect("checked-in EVSI example parses");
+        assert!((report.expected_value_of_sample_information - 0.2).abs() < 1e-9);
+        assert!((report.net_evsi - 0.1).abs() < 1e-9);
     }
 
     #[test]
