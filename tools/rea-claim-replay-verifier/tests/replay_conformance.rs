@@ -1553,3 +1553,82 @@ fn unknown_temporal_scope_fields_are_rejected_instead_of_ignored() {
         replay_claim_evaluation(&changed_claim, &[fixture_bytes()], &result_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidClaim);
 }
+
+
+#[test]
+fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_completeness() {
+    let mut value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    value["normalized_result"] = json!({
+        "registered_statements": [
+            {"statement_id": "stmt-001", "subject": "artifact-A"}
+        ],
+        "registered_count": 1,
+        "all_registered_statements_retrieved": true,
+        "terminal_pagination_cursor_seen": true,
+        "issuer_signed_all_issued_declaration": true,
+        "issuer_issued_statement_population_independently_audited": false,
+        "excluded_statement_population": "unknown"
+    });
+    value["raw_result"] = json!({
+        "query": "all statements for artifact-A",
+        "filters": [],
+        "pagination": {"terminal": true},
+        "source_note": "issuer claims all statements were submitted"
+    });
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    // The narrow provider-observation predicate may establish exactly what
+    // the issuer/provider reported. Its claim ceiling must not turn the
+    // self-declared coverage fields into proof of the underlying population.
+    let mut report_claim = provider_claim(evidence.evidence_id.clone());
+    report_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (report_claim_bytes, report_result_bytes) =
+        produce(&report_claim, std::slice::from_ref(&evidence));
+    let report_replay = replay_claim_evaluation(
+        &report_claim_bytes,
+        &[&evidence_bytes],
+        &report_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(report_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        report_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+    let report_result: Value = serde_json::from_slice(&report_result_bytes).unwrap();
+    assert!(
+        report_result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str().unwrap().contains("does not prove the underlying real-world proposition"))
+    );
+
+    // A complete view of registered statements plus an issuer-signed
+    // completeness declaration is still not an independently qualified
+    // issuer-participation proof. The stronger completeness predicate stays
+    // unverified until a dedicated rule consumes such a proof.
+    let mut completeness_claim = report_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) =
+        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(result["evidence_assessments"][0]["kind"], json!("not_evaluated"));
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str().unwrap().contains("No predicate-specific verifier"))
+    );
+}
