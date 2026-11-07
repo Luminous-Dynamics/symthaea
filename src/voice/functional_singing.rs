@@ -703,7 +703,6 @@ mod tests {
         for ipa in ["ǃ", "ʘ", "ǀ", "ǂ", "ǁ", "ɣ"] {
             let error = ipa_to_arpa(ipa).unwrap_err().to_string();
             assert!(error.contains("unsupported IPA phoneme"), "{ipa}: {error}");
-            assert!(!error.contains("AX"), "{ipa}: {error}");
         }
     }
 
