@@ -178,7 +178,7 @@ def validate_documents(
         "A naïve capture–recapture estimate",
         "zero-finding PRs",
         "producer-dependence graph",
-        "does not create a new primary metric",
+        "No new primary metric is introduced.",
         "#10064",
         "#10369",
     ):
@@ -259,7 +259,7 @@ def self_test() -> list[str]:
         "A naïve capture–recapture estimate",
         "zero-finding PRs",
         "producer-dependence graph",
-        "does not create a new primary metric",
+        "No new primary metric is introduced.",
         "#10064 #10369",
     ))
     sequential_evidence = "\n".join((
