@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/rea-agent-scorecard/schemas/submission-v0.schema.json",
+  "title": "REA agent submission v0",
+  "description": "Agent-controlled data only. claim_json/result_json/evidence_json are raw JSON strings so the scorer can reparse them with duplicate-key rejection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "suite_id", "submissions"],
+  "properties": {
+    "schema": { "const": "luminous.rea.agent-submission.v0" },
+    "suite_id": { "type": "string", "minLength": 1 },
+    "submissions": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "abstained",
+          "answer",
+          "claim_json",
+          "result_json",
+          "evidence_json"
+        ],
+        "properties": {
+          "task_id": { "type": "string", "minLength": 1 },
+          "abstained": { "type": "boolean" },
+          "answer": {},
+          "claim_json": { "type": ["string", "null"], "maxLength": 1048576 },
+          "result_json": { "type": ["string", "null"], "maxLength": 4194304 },
+          "evidence_json": {
+            "type": "array",
+            "maxItems": 4096,
+            "items": { "type": "string", "maxLength": 33554432 }
+          }
+        }
+      }
+    }
+  }
+}
