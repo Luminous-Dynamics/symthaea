@@ -475,8 +475,8 @@ fn identity_minus_outer(direction: Vector3) -> Matrix3 {
     let mut output = [[0.0; 3]; 3];
     for row in 0..3 {
         for column in 0..3 {
-            output[row][column] =
-                if row == column { 1.0 } else { 0.0 } - values[row] * values[column];
+            let identity_value = if row == column { 1.0 } else { 0.0 };
+            output[row][column] = identity_value - values[row] * values[column];
         }
     }
     output
@@ -715,6 +715,23 @@ mod tests {
         assert!((rotated.x).abs() < 1.0e-12);
         assert!((rotated.y - 1.0).abs() < 1.0e-12);
         assert!(rotated.z.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn noisy_bearings_produce_finite_uncertainty_and_low_normalized_residual() {
+        let target = Vector3::new(50.0, 40.0, 200.0);
+        let observations = vec![
+            bearing_from_target("north", Vector3::new(0.0, 0.0, 0.0), target, 2.0e-4),
+            bearing_from_target("east", Vector3::new(100.0, 0.0, 0.0), target, 2.0e-4),
+            bearing_from_target("south", Vector3::new(0.0, 100.0, 5.0), target, 2.0e-4),
+            bearing_from_target("west", Vector3::new(100.0, 100.0, 10.0), target, 2.0e-4),
+        ];
+        let result = triangulate_bearings(&observations).unwrap();
+        assert!(result.position_ecef_m.is_finite());
+        assert!(result.covariance_ecef_m2.iter().flatten().all(|value| value.is_finite()));
+        assert!(result.residual_chi_square >= 0.0);
+        assert!(result.rms_angular_residual_rad < 1.0e-8);
+        assert!(result.condition_number < 1.0e10);
     }
 
     #[test]
