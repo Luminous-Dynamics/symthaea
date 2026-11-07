@@ -252,6 +252,101 @@ mod tests {
     }
 
     #[test]
+    fn rational_semiring_laws_hold_on_a_deterministic_fraction_corpus() {
+        let values = [q(-2, 3), q(-1, 2), q(0, 1), q(1, 3), q(2, 5)];
+        let add = |left: CheckedRational, right: CheckedRational| {
+            ExactSemiring::checked_add(&left, &right).unwrap()
+        };
+        let mul = |left: CheckedRational, right: CheckedRational| {
+            ExactSemiring::checked_mul(&left, &right).unwrap()
+        };
+
+        for &a in &values {
+            assert_eq!(add(a, CheckedRational::zero()), a);
+            assert_eq!(mul(a, CheckedRational::one()), a);
+            for &b in &values {
+                assert_eq!(add(a, b), add(b, a));
+                assert_eq!(mul(a, b), mul(b, a));
+                for &c in &values {
+                    assert_eq!(add(add(a, b), c), add(a, add(b, c)));
+                    assert_eq!(mul(mul(a, b), c), mul(a, mul(b, c)));
+                    assert_eq!(mul(a, add(b, c)), add(mul(a, b), mul(a, c)));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ve_posterior_matches_independent_enumeration_on_seeded_small_models() {
+        fn next(state: &mut u64) -> i128 {
+            *state ^= *state >> 12;
+            *state ^= *state << 25;
+            *state ^= *state >> 27;
+            ((*state).wrapping_mul(0x2545_F491_4F6C_DD1D) % 7 + 1) as i128
+        }
+
+        let mut seed = 0x50_47_4D_2026u64;
+        for _case in 0..32 {
+            let unary = [
+                [q(next(&mut seed), 7), q(next(&mut seed), 7)],
+                [q(next(&mut seed), 7), q(next(&mut seed), 7)],
+                [q(next(&mut seed), 7), q(next(&mut seed), 7)],
+            ];
+            let pair01 = (0..4).map(|_| q(next(&mut seed), 7)).collect::<Vec<_>>();
+            let pair12 = (0..4).map(|_| q(next(&mut seed), 7)).collect::<Vec<_>>();
+
+            let mut graph = ExactFactorGraph::new(
+                vec![2, 2, 2],
+                CheckedRational::zero(),
+                CheckedRational::one(),
+            )
+            .unwrap();
+            graph.add_factor(vec![0], unary[0].to_vec()).unwrap();
+            graph.add_factor(vec![1], unary[1].to_vec()).unwrap();
+            graph.add_factor(vec![2], unary[2].to_vec()).unwrap();
+            graph.add_factor(vec![0, 1], pair01.clone()).unwrap();
+            graph.add_factor(vec![1, 2], pair12.clone()).unwrap();
+
+            let mut total = CheckedRational::zero();
+            let mut state_masses = vec![
+                vec![CheckedRational::zero(); 2],
+                vec![CheckedRational::zero(); 2],
+                vec![CheckedRational::zero(); 2],
+            ];
+            for assignment_code in 0..8 {
+                let assignment = [
+                    assignment_code & 1,
+                    (assignment_code >> 1) & 1,
+                    (assignment_code >> 2) & 1,
+                ];
+                let pair01_index = assignment[0] * 2 + assignment[1];
+                let pair12_index = assignment[1] * 2 + assignment[2];
+                let mut weight = unary[0][assignment[0]]
+                    .checked_mul(unary[1][assignment[1]]).unwrap()
+                    .checked_mul(unary[2][assignment[2]]).unwrap()
+                    .checked_mul(pair01[pair01_index]).unwrap()
+                    .checked_mul(pair12[pair12_index]).unwrap();
+                total = total.checked_add(weight).unwrap();
+                for variable in 0..3 {
+                    state_masses[variable][assignment[variable]] = state_masses[variable][assignment[variable]]
+                        .checked_add(weight).unwrap();
+                }
+                // Keep the loop's assignment weight immutable across variables.
+                weight = CheckedRational::zero();
+                let _ = weight;
+            }
+
+            let expected = state_masses
+                .into_iter()
+                .map(|states| states.into_iter().map(|mass| mass.checked_div(total).unwrap()).collect::<Vec<_>>())
+                .collect::<Vec<_>>();
+            let posterior = posterior_marginals(&graph, &[0, 1, 2]).unwrap();
+            assert_eq!(posterior.partition_function, total);
+            assert_eq!(posterior.marginals, expected);
+        }
+    }
+
+    #[test]
     fn rational_overflow_and_zero_divisor_are_explicit_errors() {
         assert_eq!(q(i128::MAX, 1).checked_add(CheckedRational::one()), Err(RationalError::Overflow));
         assert_eq!(q(1, 2).checked_div(CheckedRational::zero()), Err(RationalError::ZeroDenominator));
