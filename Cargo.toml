@@ -22,6 +22,9 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Placeholder directory contains only examples/unused.rs and no crate manifest.
+    # Exclude it from the crates/core/* workspace glob until it becomes a real crate.
+    "crates/core/symthaea",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
