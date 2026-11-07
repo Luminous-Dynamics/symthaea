@@ -93,7 +93,10 @@ impl fmt::Display for FloquetError {
                 )
             }
             Self::InitialStateDimension { expected, actual } => {
-                write!(f, "initial state has {actual} amplitudes; expected {expected}")
+                write!(
+                    f,
+                    "initial state has {actual} amplitudes; expected {expected}"
+                )
             }
             Self::NonFiniteAmplitude { index } => {
                 write!(f, "initial state amplitude {index} is not finite")
@@ -335,10 +338,7 @@ impl KickedIsingFloquet {
     ///
     /// Basis index bits use the same little-endian spin ordering as
     /// `set_initial_basis`. A failed update leaves the current state unchanged.
-    pub fn set_initial_state(
-        &mut self,
-        amplitudes: &[Complex<f64>],
-    ) -> Result<(), FloquetError> {
+    pub fn set_initial_state(&mut self, amplitudes: &[Complex<f64>]) -> Result<(), FloquetError> {
         if amplitudes.len() != self.dimension() {
             return Err(FloquetError::InitialStateDimension {
                 expected: self.dimension(),
@@ -350,7 +350,10 @@ impl KickedIsingFloquet {
                 return Err(FloquetError::NonFiniteAmplitude { index });
             }
         }
-        let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        let norm_squared: f64 = amplitudes
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum();
         if !norm_squared.is_finite() || norm_squared <= f64::MIN_POSITIVE {
             return Err(FloquetError::InvalidInitialStateNorm);
         }
@@ -527,13 +530,8 @@ mod tests {
 
     #[test]
     fn arbitrary_complex_initial_state_is_normalized_and_evolves_unitarily() {
-        let mut model = KickedIsingFloquet::new(
-            2,
-            vec![0.31],
-            vec![0.11, -0.23],
-            PI + 0.08,
-        )
-        .unwrap();
+        let mut model =
+            KickedIsingFloquet::new(2, vec![0.31], vec![0.11, -0.23], PI + 0.08).unwrap();
         let amplitudes = [
             Complex::new(1.0, 1.0),
             Complex::new(2.0, -1.0),
