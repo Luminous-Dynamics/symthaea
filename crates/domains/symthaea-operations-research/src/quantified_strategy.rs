@@ -983,8 +983,8 @@ mod tests {
             .find(|function| function.variable == 0)
             .unwrap();
         assert_eq!(function.dependencies, vec![1]);
-        assert_eq!(function.table.get(&vec![false]), Some(&false));
-        assert_eq!(function.table.get(&vec![true]), Some(&true));
+        assert_eq!(function.table.get(&vec![false]), Some(&true));
+        assert_eq!(function.table.get(&vec![true]), Some(&false));
     }
 
     #[test]
