@@ -1228,6 +1228,117 @@ mod tests {
     }
 
     #[test]
+    fn diagnostic_probe_selection_is_deterministic_and_selects_best_margin() {
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-probe-selection-v1");
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 4,
+            num_layers: 1,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 4,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let source = CfCNetwork::from_genesis(config, &genesis, "probe-selection");
+        let candidate = source.clone();
+        let existing = vec![CfCFunctionalProbe {
+            input: vec![0.2, -0.3],
+            dt: 0.05,
+        }];
+        let candidates = vec![
+            CfCFunctionalProbe {
+                input: vec![0.2, 0.7],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.8, 0.1],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9, -0.6],
+                dt: 0.1,
+            },
+        ];
+
+        let selection = select_cfc_disambiguating_probe(
+            &source,
+            &candidate,
+            0,
+            &existing,
+            &candidates,
+        )
+        .expect("select probe");
+        let repeated = select_cfc_disambiguating_probe(
+            &source,
+            &candidate,
+            0,
+            &existing,
+            &candidates,
+        )
+        .expect("repeat probe selection");
+
+        assert_eq!(selection.selected_candidate_index, repeated.selected_candidate_index);
+        assert_eq!(selection.selected_augmented_probe_digest, repeated.selected_augmented_probe_digest);
+        assert_eq!(selection.candidate_scores, repeated.candidate_scores);
+        assert_eq!(selection.candidate_scores.len(), candidates.len());
+        assert!(selection.baseline_assignment_margin.is_some());
+        assert!(selection.selected_assignment_margin >= selection.baseline_assignment_margin.unwrap());
+        assert_eq!(
+            selection.selected_assignment_margin,
+            selection.candidate_scores[selection.selected_candidate_index]
+                .assignment_margin
+                .expect("multi-unit assignment margin")
+        );
+        assert_eq!(selection.selected_probe, candidates[selection.selected_candidate_index]);
+        assert_ne!(source.fingerprint().unwrap().model_digest, ""); 
+    }
+
+    #[test]
+    fn diagnostic_probe_selection_rejects_empty_candidates_and_single_unit_layers() {
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-probe-selection-edge-v1");
+        let config = CfCNetworkConfig {
+            input_dim: 1,
+            hidden_dim: 1,
+            num_layers: 1,
+            output_dim: 1,
+            cell_config: CfCConfig {
+                input_dim: 1,
+                hidden_dim: 1,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let network = CfCNetwork::from_genesis(config, &genesis, "one-unit");
+        let probe = CfCFunctionalProbe {
+            input: vec![0.5],
+            dt: 0.1,
+        };
+        assert!(matches!(
+            select_cfc_disambiguating_probe(&network, &network, 0, &[], &[]),
+            Err(CfCPermutationAlignmentError::EmptyCandidateProbeSet)
+        ));
+        assert!(matches!(
+            select_cfc_disambiguating_probe(&network, &network, 0, &[], &[probe]),
+            Err(CfCPermutationAlignmentError::NoAlternativeAssignment)
+        ));
+    }
+
+    #[test]
     fn activation_signature_alignment_recovers_hidden_unit_permutation() {
         let source = vec![
             vec![0.0, 0.2, 0.8, -0.1],
