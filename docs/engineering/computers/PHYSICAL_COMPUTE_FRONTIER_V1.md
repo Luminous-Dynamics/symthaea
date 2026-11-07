@@ -215,3 +215,35 @@ For every candidate physical memory, define a retention profile rather than a si
 - remapping/retraining cost after aging or device failure.
 
 The useful metric is not “memory seconds” in isolation. It is the Pareto frontier of **correct state delivered over the required horizon per total system joule, with declared reliability and update semantics**.
+
+
+## 9. FAST-ONN measurement audit — demonstrated prototype versus scale-up projection
+
+The initial summary intentionally kept 25 GS/s and the ~1 W / 32×32-channel optical budget separate from the prototype, but the quantitative comparison needs a more explicit split.
+
+**Paper:** Liang et al., “High-clockrate free-space optical in-memory computing,” Light: Science & Applications 15, 115 (2026-02-13). https://www.nature.com/articles/s41377-026-02206-8
+
+### Experimental configuration and reported results
+- VCSEL device: eight arrays, each 5×5 VCSELs.
+- The detailed optical experiment uses 3×3 VCSEL inputs and 3×3 output kernels; the 9-channel balanced photodetector outputs are digitized by a 9-channel FPGA acquisition board at 100 MS/s.
+- Demonstrated VCSEL data rate: 100 MS/s.
+- Demonstrated arithmetic throughput in the described configuration: 45 GOPS.
+- Random signed MVM average computation-error standard deviation: 3.27% across nine channels; the authors describe precision as over 6 bits including sign.
+- The small MNIST task achieved 93.75% optical-system accuracy against 95.75% digital; Fashion-MNIST achieved 80.75% against 84.88%.
+- The paper describes a YOLO convolution feature-extraction benchmark at 100 million frames/s, but this is not equivalent to 100 million complete end-to-end object-detection decisions/s.
+- The paper estimates a CNN input-to-decision path of ~1.4 μs for its small 28×28 example, decomposed into ~1.0 μs optical streaming and ~0.4 μs digital-head work.
+- The authors estimate ~370 fJ/op (~3 TOPS/W) for the demonstrated system, with the stated electrical boundary including VCSEL drivers/bias and DAC drivers, SLM weighting, and readout electronics (photodetector/TIA/ADC path).
+
+### Projected operating point — not demonstrated
+- 32×32 VCSEL input array with 32×32 optical fanout;
+- 25 GS/s VCSEL-rate scenario;
+- ~2 fJ/op / 500 TOPS/W estimate;
+- >50,000 TOPS derived throughput scenario;
+- ~1 W optical budget for the large 32×32 channel configuration.
+
+These are authors' scale-up projections, not prototype measurements. The 100 MS/s/45 GOPS prototype and the 25 GS/s/50,000-TOPS scale-up must never be combined into one achieved result.
+
+### Benchmark consequence
+Report separate measures for optical arithmetic, optical convolution, input-to-decision task, and wall-input system energy. Include VCSEL/driver, DAC, SLM update/control, optical coupling, photodetection/TIA, ADC, FPGA acquisition, host classification and calibration. The paper's ~370 fJ/op estimate is not automatically equivalent to joules per accepted Symthaea task; the projected ~2 fJ/op figure is not an achieved benchmark.
+
+Source audit: full open-access paper, including Results, Discussion, Methods and system-energy description. https://www.nature.com/articles/s41377-026-02206-8
