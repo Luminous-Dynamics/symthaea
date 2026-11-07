@@ -3,10 +3,7 @@
 
 use std::error::Error;
 use std::f64::consts::PI;
-use symthaea_fractal_time_lab::exact_floquet::{
-    KickedIsingFloquet,
-    analyze_subharmonic_response,
-};
+use symthaea_fractal_time_lab::exact_floquet::{KickedIsingFloquet, analyze_subharmonic_response};
 
 fn main() -> Result<(), Box<dyn Error>> {
     const PERIODS: usize = 100;
@@ -44,6 +41,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     println!("The zero-coupling rows are essential negative controls.");
-    println!("A finite-window subharmonic response is not by itself evidence of a thermodynamic DTC phase.");
+    println!(
+        "A finite-window subharmonic response is not by itself evidence of a thermodynamic DTC phase."
+    );
     Ok(())
 }
