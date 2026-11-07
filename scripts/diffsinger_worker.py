@@ -59,7 +59,6 @@ PROTOCOL_VERSION = 1
 PROVIDER_ID = "diffsinger-local"
 
 
-
 def hz_to_tone(hz: float) -> float:
     return 69.0 + 12.0 * math.log2(hz / 440.0)
 
@@ -110,8 +109,8 @@ class DiffSingerModel:
         """Walk a serialized VocalPerformance into (tokens, languages,
         ph_dur, f0) arrays, SP-padded, matching diffsinger_singing.rs's
         (now-removed) design: proportional per-syllable phoneme timing from
-        natural_duration_s, melisma notes held on the syllable's last
-        phoneme."""
+        natural_duration_s, melisma notes held on the syllable's final
+        explicitly marked vowel."""
         arpabet_phonemes = []
         durations_ms = []
         target_hz = []
