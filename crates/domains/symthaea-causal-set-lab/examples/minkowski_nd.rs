@@ -29,6 +29,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             causet.estimate_myrheim_meyer_dimension(8.0).unwrap(),
             causet.longest_chain_length(),
         );
+        println!(
+            "D={dimension},interval_histogram={:?}",
+            causet.interval_size_histogram()
+        );
     }
 
     println!(
