@@ -6,18 +6,26 @@
 //! Real-time audio processing for live transcription:
 //! - Ring buffer for continuous audio
 //! - Frame-by-frame processing
-//! - Incremental HDC projection
-//! - Low-latency phoneme decoding
+//! - Incremental log-mel to locality-preserving HDC projection
+//! - Separate LTC temporal-salience path and prototype-compatible phoneme lookup
 //!
 //! # Architecture
 //!
 //! ```text
-//! Audio In ─► Ring Buffer ─► Frame Extractor ─► LTC Projector ─► Decoder ─► Text Out
-//!                  ▲                                   │
-//!                  └───────── Feedback Loop ───────────┘
+//! Audio In ─► Ring Buffer ─► absolute frame window
+//!                                  │
+//!                       ┌──────────┴──────────┐
+//!                       ▼                     ▼
+//!                  log-mel frontend      low-cost features
+//!                       │                     │
+//!                       ▼                     ▼
+//!                shared HDC encoder        LTC salience
+//!                       │                     │
+//!                       ▼                     ▼
+//!               trained prototypes       turn-boundary cue
 //! ```
 
-use crate::audio::{AudioConfig, AudioFrontend};
+use crate::audio::{AudioConfig, AudioFrontend, AudioProjector};
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
 use crate::phoneme::PhonemeResonator;
@@ -213,9 +221,10 @@ pub struct StreamProcessor {
     ltc: LtcCell,
     /// Previous LTC state (for salience)
     prev_state: Vec<f32>,
-    /// Audio frontend for feature extraction (reserved for mel-spectrogram processing)
-    #[allow(dead_code)]
+    /// Shared mel frontend used by the offline and streaming acoustic encoders.
     frontend: AudioFrontend,
+    /// Previous mel frame for the shared rise/fall delta encoding.
+    prev_mel_features: Option<Vec<f32>>,
     /// Phoneme resonator for decoding
     resonator: PhonemeResonator,
     /// Frame counter
@@ -268,6 +277,7 @@ impl StreamProcessor {
             ltc,
             prev_state: vec![0.0; 64],
             frontend,
+            prev_mel_features: None,
             resonator: PhonemeResonator::new(),
             frame_count: 0,
             samples_per_frame,
@@ -280,7 +290,12 @@ impl StreamProcessor {
         }
     }
 
-    /// Load phoneme prototypes
+    /// Load phoneme prototypes encoded in the direct-mel frame space.
+    ///
+    /// These vectors must be produced by the same `AudioProjector::project_raw`
+    /// / `direct_mel_hv` encoder used by this streaming processor. Context-window
+    /// vectors returned by `AudioProjector::project` are a different space and
+    /// must not be mixed with raw-frame prototypes.
     pub fn load_prototypes(&mut self, prototypes: &[(String, HV16)]) {
         self.resonator.clear();
         for (label, hv) in prototypes {
@@ -310,6 +325,7 @@ impl StreamProcessor {
                 self.pending_dropped_samples.saturating_add(skipped);
             self.ltc.reset();
             self.prev_state = vec![0.0; 64];
+            self.prev_mel_features = None;
             self.recent_frames.clear();
         }
 
@@ -335,18 +351,26 @@ impl StreamProcessor {
             .buffer
             .read_frame(self.next_sample, self.samples_per_frame)?;
 
-        // Extract features (simplified - would use mel spectrogram)
-        let features = self.extract_simple_features(&audio);
-
-        // Process through LTC
+        // Keep LTC dynamics as a separate temporal-change/salience signal.
+        // Prototype-compatible HDC values must come from the same mel feature
+        // and direct_mel_hv encoder used by AudioProjector::project_raw.
+        let temporal_features = self.extract_simple_features(&audio);
         let state = self
             .ltc
-            .forward(&features, self.config.hop_duration)
+            .forward(&temporal_features, self.config.hop_duration)
             .to_vec();
         let salience = self.ltc.compute_salience(&self.prev_state);
 
-        // Convert state to hypervector
-        let hv = Self::state_to_hv(&state);
+        // The input slice is exactly one configured analysis frame, so the
+        // shared frontend must yield exactly one mel-feature vector. This
+        // makes chunking boundaries irrelevant and matches the batch path.
+        let mel_frames = self.frontend.extract_features(&audio);
+        let mel_features = mel_frames.first()?;
+        let hv = AudioProjector::direct_mel_hv(
+            mel_features,
+            self.prev_mel_features.as_deref(),
+        );
+        self.prev_mel_features = Some(mel_features.clone());
 
         // Decode phoneme
         let (phoneme, confidence) = if !self.resonator.is_empty() {
@@ -426,21 +450,6 @@ impl StreamProcessor {
         features
     }
 
-    /// Convert state to hypervector
-    fn state_to_hv(state: &[f32]) -> HV16 {
-        let mut data = Vec::with_capacity(state.len() * 4);
-        for &s in state {
-            data.extend_from_slice(&s.to_le_bytes());
-        }
-
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&data);
-        let mut output = [0u8; 256];
-        hasher.finalize_xof().fill(&mut output);
-
-        HV16::from_bytes(&output)
-    }
-
     /// Get smoothed phoneme output
     pub fn get_smoothed_phoneme(&self) -> Option<String> {
         if self.recent_frames.len() < self.config.min_frames {
@@ -488,6 +497,7 @@ impl StreamProcessor {
         self.buffer.clear();
         self.ltc.reset();
         self.prev_state = vec![0.0; 64];
+        self.prev_mel_features = None;
         self.frame_count = 0;
         self.next_sample = 0;
         self.pending_discontinuity = false;
@@ -763,6 +773,111 @@ mod tests {
         let second = processor.process();
         assert!(!second.is_empty(), "processor must recover after overrun");
         assert!(second.iter().all(|frame| frame.source_start_sample >= first.last().unwrap().source_start_sample));
+    }
+
+    #[test]
+    fn test_streaming_hvs_match_offline_projector_raw() {
+        let sample_rate = 16_000usize;
+        let samples: Vec<f32> = (0..8_000usize)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                0.35 * (std::f32::consts::TAU * 180.0 * t).sin()
+                    + 0.15 * (std::f32::consts::TAU * 720.0 * t).sin()
+                    + 0.05 * (std::f32::consts::TAU * 1_800.0 * t).sin()
+            })
+            .collect();
+
+        let mut offline = AudioProjector::default_config();
+        let expected = offline.project_raw(&samples);
+
+        let mut streaming = StreamProcessor::new(StreamConfig::default());
+        streaming.push_audio(&samples);
+        let actual = streaming.process();
+
+        assert_eq!(actual.len(), expected.len());
+        for (frame, offline_hv) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                frame.hv, *offline_hv,
+                "stream/offline HDC mismatch at frame {}",
+                frame.frame_idx
+            );
+        }
+    }
+
+    #[test]
+    fn test_mel_delta_history_resets_at_overrun_discontinuity() {
+        let config = StreamConfig {
+            buffer_duration: 0.05,
+            frame_duration: 0.025,
+            hop_duration: 0.010,
+            ..StreamConfig::default()
+        };
+        let sample_rate = 16_000usize;
+        let samples: Vec<f32> = (0..3_200usize)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                0.30 * (std::f32::consts::TAU * 200.0 * t).sin()
+                    + 0.10 * (std::f32::consts::TAU * 900.0 * t).sin()
+            })
+            .collect();
+
+        let mut streaming = StreamProcessor::new(config);
+        streaming.push_audio(&samples);
+        let actual = streaming.process();
+        assert!(!actual.is_empty());
+        assert!(actual[0].discontinuity_before);
+        assert_eq!(actual[0].source_start_sample, 2_400);
+
+        // The retained segment begins at sample 2,400. The offline encoder
+        // starts with no previous mel frame, which must match the first live
+        // frame after the gap; it must not use a delta from discarded audio.
+        let mut offline = AudioProjector::default_config();
+        let expected = offline.project_raw(&samples[2_400..]);
+        assert_eq!(actual.len(), expected.len());
+        for (frame, offline_hv) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                frame.hv, *offline_hv,
+                "post-gap delta reset mismatch at absolute sample {}",
+                frame.source_start_sample
+            );
+        }
+    }
+
+    #[test]
+    fn test_streaming_hv_is_invariant_to_input_chunk_boundaries() {
+        let sample_rate = 16_000usize;
+        let samples: Vec<f32> = (0..12_000usize)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                0.30 * (std::f32::consts::TAU * 220.0 * t).sin()
+                    + 0.12 * (std::f32::consts::TAU * 1_100.0 * t).sin()
+            })
+            .collect();
+
+        let mut offline = AudioProjector::default_config();
+        let expected = offline.project_raw(&samples);
+
+        let mut streaming = StreamProcessor::new(StreamConfig::default());
+        let mut actual = Vec::new();
+        let chunk_sizes = [73usize, 211, 49, 503, 160, 997, 37, 1_003];
+        let mut cursor = 0usize;
+        let mut chunk_index = 0usize;
+        while cursor < samples.len() {
+            let end = (cursor + chunk_sizes[chunk_index % chunk_sizes.len()]).min(samples.len());
+            streaming.push_audio(&samples[cursor..end]);
+            actual.extend(streaming.process());
+            cursor = end;
+            chunk_index += 1;
+        }
+
+        assert_eq!(actual.len(), expected.len());
+        for (frame, offline_hv) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                frame.hv, *offline_hv,
+                "chunked stream/offline HDC mismatch at frame {}",
+                frame.frame_idx
+            );
+        }
     }
 
     #[test]

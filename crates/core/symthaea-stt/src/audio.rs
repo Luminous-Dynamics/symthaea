@@ -445,9 +445,12 @@ impl AudioProjector {
         hvs
     }
 
-    /// Project audio without temporal windowing - returns raw frame HVs
+    /// Project audio without temporal windowing - returns raw direct-mel frame HVs.
     ///
-    /// Used for diagnostic purposes to check encoding quality
+    /// This is the prototype-compatible frame space used by aligned phoneme
+    /// training and live streaming. The context-windowed `project()` method
+    /// returns a different representation and must use matching context-trained
+    /// prototypes.
     pub fn project_raw(&mut self, audio: &[f32]) -> Vec<HV16> {
         self.reset();
 
@@ -604,7 +607,7 @@ impl AudioProjector {
     /// Uses THERMOMETER encoding: for each mel bin, include all basis vectors
     /// from level 0 up to the current level. This ensures similar mel values
     /// produce similar HVs (smooth similarity gradient).
-    fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
+    pub(crate) fn direct_mel_hv(mel_features: &[f32], prev_features: Option<&[f32]>) -> HV16 {
         use crate::hdc::BundleAccumulator;
         let mut acc = BundleAccumulator::new();
 
@@ -968,6 +971,22 @@ mod tests {
         for filter in &filters {
             assert_eq!(filter.len(), config.n_fft / 2 + 1);
         }
+    }
+
+    #[test]
+    fn test_direct_mel_hdc_preserves_local_level_similarity() {
+        // With one active bin and no delta channel, adjacent quantization
+        // levels share basis vectors; a distant level should be less similar.
+        let low = AudioProjector::direct_mel_hv(&[-0.5], None);
+        let adjacent = AudioProjector::direct_mel_hv(&[-0.3], None);
+        let distant = AudioProjector::direct_mel_hv(&[0.9], None);
+
+        let adjacent_similarity = low.similarity(&adjacent);
+        let distant_similarity = low.similarity(&distant);
+        assert!(
+            adjacent_similarity > distant_similarity,
+            "adjacent mel levels should retain more Hamming similarity ({adjacent_similarity:.3}) than distant levels ({distant_similarity:.3})"
+        );
     }
 
     #[test]
