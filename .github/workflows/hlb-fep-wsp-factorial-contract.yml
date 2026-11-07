@@ -8,6 +8,7 @@ on:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/Cargo.toml"
+      - "Cargo.lock"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
@@ -28,6 +29,7 @@ on:
       - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
       - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
       - "crates/core/symthaea-core/Cargo.toml"
+      - "Cargo.lock"
       - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
       - "docs/research/hlb-fep-wsp-factorial-v1.json"
       - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
@@ -107,6 +109,26 @@ jobs:
           rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
 
+      - name: Reconcile and capture workspace lockfile
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cp Cargo.lock research-results/Cargo.lock.before
+          # Workspace membership changed on this research branch (source-only
+          # directories are now excluded). Let Cargo produce the canonical
+          # pruned lockfile once, then make all test invocations fail-closed
+          # with --locked.
+          cargo metadata --format-version 1 > /dev/null
+          cp Cargo.lock research-results/Cargo.lock.generated
+          changed_files="$(git diff --name-only)"
+          if [ "$changed_files" != "Cargo.lock" ]; then
+            echo "Unexpected files changed during lockfile reconciliation:"
+            printf '%s\n' "$changed_files"
+            exit 1
+          fi
+          cargo metadata --locked --format-version 1 > /dev/null
+          sha256sum Cargo.lock research-results/Cargo.lock.generated > research-results/Cargo.lock.SHA256SUMS
+
       - name: Test four-factor contract invariants
         run: |
           set -euo pipefail
@@ -127,7 +149,7 @@ jobs:
           set -euo pipefail
           mkdir -p research-results
           cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
-          sha256sum docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
           cat research-results/SHA256SUMS
 
       - name: Upload protocol-validation receipt
