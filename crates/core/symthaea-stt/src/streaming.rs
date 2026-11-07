@@ -290,7 +290,12 @@ impl StreamProcessor {
         }
     }
 
-    /// Load phoneme prototypes
+    /// Load phoneme prototypes encoded in the direct-mel frame space.
+    ///
+    /// These vectors must be produced by the same `AudioProjector::project_raw`
+    /// / `direct_mel_hv` encoder used by this streaming processor. Context-window
+    /// vectors returned by `AudioProjector::project` are a different space and
+    /// must not be mixed with raw-frame prototypes.
     pub fn load_prototypes(&mut self, prototypes: &[(String, HV16)]) {
         self.resonator.clear();
         for (label, hv) in prototypes {
