@@ -59,6 +59,8 @@ pub struct EnumerationBudget {
     pub max_literals: usize,
     pub max_total_assignment_evaluations: u128,
     pub max_projection_support: usize,
+    pub max_projection_fragments: usize,
+    pub max_projection_support_entries: usize,
 }
 
 impl Default for EnumerationBudget {
@@ -70,6 +72,8 @@ impl Default for EnumerationBudget {
             max_literals: 1 << 20,
             max_total_assignment_evaluations: 1 << 20,
             max_projection_support: 1 << 20,
+            max_projection_fragments: 1 << 16,
+            max_projection_support_entries: 1 << 20,
         }
     }
 }
@@ -120,6 +124,8 @@ pub enum DecompositionError {
     },
     DuplicateProjectionVariable(usize),
     EmptyProjectionFragments,
+    ProjectionFragmentBudgetExceeded { required: usize, limit: usize },
+    ProjectionSupportEntryBudgetExceeded { required: usize, limit: usize },
     ProjectionScopeMismatch {
         expected: Vec<String>,
         actual: Vec<String>,
@@ -135,6 +141,8 @@ pub enum DecompositionError {
     EmptyComponent {
         component: usize,
     },
+    ComponentCountExceedsVariableCount { component_count: usize, variable_count: usize },
+    PartitionEntryCountMismatch { expected: usize, actual: usize },
     ComponentVariableOutOfRange {
         component: usize,
         variable: usize,
@@ -430,6 +438,34 @@ pub fn verify_independent_product(
 ) -> Result<IndependentProductReport, DecompositionError> {
     validate_problem(problem, budget)?;
     let variable_count = problem.variables.len();
+    if components.len() > variable_count {
+        return Err(DecompositionError::ComponentCountExceedsVariableCount {
+            component_count: components.len(),
+            variable_count,
+        });
+    }
+    let component_entries = components.iter().try_fold(0usize, |total, component| {
+        let next = total
+            .checked_add(component.len())
+            .ok_or(DecompositionError::ResourceAccountingOverflow)?;
+        if next > variable_count {
+            return Err(DecompositionError::PartitionEntryCountMismatch {
+                expected: variable_count,
+                actual: next,
+            });
+        }
+        Ok(next)
+    })?;
+    let partition_entries = component_entries
+        .checked_add(free_variables.len())
+        .ok_or(DecompositionError::ResourceAccountingOverflow)?;
+    if partition_entries != variable_count {
+        return Err(DecompositionError::PartitionEntryCountMismatch {
+            expected: variable_count,
+            actual: partition_entries,
+        });
+    }
+
     let mut seen = vec![false; variable_count];
     let mut component_owner = vec![None; variable_count];
     let mut free = vec![false; variable_count];
@@ -681,6 +717,26 @@ pub fn existential_support_union(
     fragments: &[ProjectionSupportFragment],
     budget: EnumerationBudget,
 ) -> Result<ProjectedSupportUnionReport, DecompositionError> {
+    if fragments.is_empty() {
+        return Err(DecompositionError::EmptyProjectionFragments);
+    }
+    if fragments.len() > budget.max_projection_fragments {
+        return Err(DecompositionError::ProjectionFragmentBudgetExceeded {
+            required: fragments.len(),
+            limit: budget.max_projection_fragments,
+        });
+    }
+    let total_support_entries = fragments.iter().try_fold(0usize, |total, fragment| {
+        total
+            .checked_add(fragment.support.len())
+            .ok_or(DecompositionError::ResourceAccountingOverflow)
+    })?;
+    if total_support_entries > budget.max_projection_support_entries {
+        return Err(DecompositionError::ProjectionSupportEntryBudgetExceeded {
+            required: total_support_entries,
+            limit: budget.max_projection_support_entries,
+        });
+    }
     let first = fragments
         .first()
         .ok_or(DecompositionError::EmptyProjectionFragments)?;
@@ -760,6 +816,8 @@ mod tests {
             max_literals: 256,
             max_total_assignment_evaluations: 1 << 8,
             max_projection_support: 1 << 8,
+            max_projection_fragments: 64,
+            max_projection_support_entries: 1 << 8,
         }
     }
 
@@ -883,6 +941,85 @@ mod tests {
         assert_eq!(
             existential_support_union(&[], budget()).unwrap_err(),
             DecompositionError::EmptyProjectionFragments
+        );
+    }
+
+    #[test]
+    fn existential_union_bounds_fragment_count() {
+        let fragment = ProjectionSupportFragment {
+            visible_variables: vec!["v".into()],
+            support: BTreeSet::new(),
+        };
+        let tight = EnumerationBudget {
+            max_projection_fragments: 1,
+            ..budget()
+        };
+        assert_eq!(
+            existential_support_union(&[fragment.clone(), fragment], tight).unwrap_err(),
+            DecompositionError::ProjectionFragmentBudgetExceeded {
+                required: 2,
+                limit: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn existential_union_bounds_total_support_entries_even_when_overlapping() {
+        let fragment = ProjectionSupportFragment {
+            visible_variables: vec!["v".into()],
+            support: BTreeSet::from([vec![true]]),
+        };
+        let tight = EnumerationBudget {
+            max_projection_support_entries: 1,
+            ..budget()
+        };
+        assert_eq!(
+            existential_support_union(&[fragment.clone(), fragment], tight).unwrap_err(),
+            DecompositionError::ProjectionSupportEntryBudgetExceeded {
+                required: 2,
+                limit: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn independent_product_rejects_partition_entry_count_before_allocation() {
+        let problem = independent_fixture();
+        let error = verify_independent_product(
+            &problem,
+            &[vec![0, 1, 2, 3]],
+            &[4, 4],
+            budget(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            DecompositionError::PartitionEntryCountMismatch {
+                expected: 5,
+                actual: 6,
+            }
+        );
+    }
+
+    #[test]
+    fn independent_product_rejects_too_many_components_before_iteration() {
+        let problem = CnfProblem {
+            variables: vec!["x".into()],
+            clauses: vec![],
+        };
+        let error = verify_independent_product(
+            &problem,
+            &[vec![0], vec![]],
+            &[],
+            budget(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            DecompositionError::ComponentCountExceedsVariableCount {
+                component_count: 2,
+                variable_count: 1,
+            }
         );
     }
 
