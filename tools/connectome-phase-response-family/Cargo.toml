@@ -1,0 +1,13 @@
+[package]
+name = "connectome-phase-response-family"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Exact weighted anytime-FWER ledger for connectome phase-response claims"
+
+[lib]
+path = "src/lib.rs"
+
+# Standalone validation crate: intentionally outside the root workspace.
+[workspace]
