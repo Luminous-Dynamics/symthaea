@@ -559,6 +559,7 @@ pub enum SingingControl {
     NotePitch,
     NoteDuration,
     AbsoluteOnsetAndRests,
+    ConsonantAnticipation,
     Melisma,
     ContinuousPitchCurve,
     PhraseExpressionCurve,
@@ -573,7 +574,7 @@ pub enum SingingControl {
 }
 
 impl SingingControl {
-    pub const ALL: [Self; 18] = [
+    pub const ALL: [Self; 19] = [
         Self::LyricText,
         Self::Language,
         Self::ExactPhoneSequence,
@@ -581,6 +582,7 @@ impl SingingControl {
         Self::NotePitch,
         Self::NoteDuration,
         Self::AbsoluteOnsetAndRests,
+        Self::ConsonantAnticipation,
         Self::Melisma,
         Self::ContinuousPitchCurve,
         Self::PhraseExpressionCurve,
