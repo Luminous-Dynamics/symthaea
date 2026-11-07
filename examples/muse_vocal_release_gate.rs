@@ -403,9 +403,9 @@ fn validate_rating_inputs(
 
     let complete = listeners.len() >= minimum_listeners
         && clips.iter().all(|clip| {
-            listeners.iter().all(|listener| {
-                by_clip_listener.contains_key(&(clip.clip_id.as_str(), *listener))
-            })
+            listeners
+                .iter()
+                .all(|listener| by_clip_listener.contains_key(&(clip.clip_id.as_str(), *listener)))
         });
 
     Ok(RatingCoverage {
@@ -570,8 +570,10 @@ fn main() -> Result<()> {
             .iter()
             .map(|entry| (entry.clip_id.as_str(), entry.backend.as_str()))
             .collect();
-        let listeners: std::collections::BTreeSet<_> =
-            values.iter().map(|rating| rating.listener_id.clone()).collect();
+        let listeners: std::collections::BTreeSet<_> = values
+            .iter()
+            .map(|rating| rating.listener_id.clone())
+            .collect();
         let complete = coverage.complete;
         let model_values: Vec<_> = values
             .iter()
@@ -687,10 +689,7 @@ mod rating_validation_tests {
         nan_rating.naturalness = f32::NAN;
         assert!(validate_rating_inputs(&[nan_rating], &clips, 1).is_err());
 
-        let duplicate = vec![
-            rating("a", "listener-1"),
-            rating("a", "listener-1"),
-        ];
+        let duplicate = vec![rating("a", "listener-1"), rating("a", "listener-1")];
         assert!(validate_rating_inputs(&duplicate, &clips, 1).is_err());
     }
 
