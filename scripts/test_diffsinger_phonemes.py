@@ -21,6 +21,24 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         self.assertEqual(ipa_to_arpabet("ɹ"), ["r"])
         self.assertEqual(ipa_to_arpabet("tʃ"), ["ch"])
         self.assertEqual(ipa_to_arpabet("aɪ"), ["ay"])
+        self.assertEqual(ipa_to_arpabet("h"), ["hh"])
+        self.assertEqual(ipa_to_arpabet("eɪ"), ["ey"])
+        self.assertEqual(ipa_to_arpabet("ɜː"), ["er"])
+
+    def test_current_muse_english_g2p_inventory_is_fully_mapped(self) -> None:
+        # Symbols emitted by the current speech.rs dictionary and ASCII-letter
+        # fallback. Keep this fixture synchronized with that source inventory;
+        # an added G2P phone must not silently become an AX or a missing token.
+        muse_g2p_inventory = (
+            "aɪ", "ð", "ə", "ɪ", "z", "æ", "m", "f", "iː", "l",
+            "h", "ɛ", "oʊ", "w", "ɜː", "d", "j", "p", "k", "ɒ",
+            "n", "ʃ", "s", "ɡ", "t", "v", "ʌ", "θ", "ŋ", "ɑ",
+            "eɪ", "uː", "ɹ", "b", "g", "i", "u", "a", "ɔ", "ʊ",
+            "ʒ", "g", "ks",
+        )
+        for ipa in muse_g2p_inventory:
+            with self.subTest(ipa=ipa):
+                self.assertTrue(ipa_to_arpabet(ipa), f"missing mapping for {ipa!r}")
 
     def test_composite_phone_preserves_order_and_divides_duration(self) -> None:
         self.assertEqual(ipa_to_arpabet("ks"), ["k", "s"])
