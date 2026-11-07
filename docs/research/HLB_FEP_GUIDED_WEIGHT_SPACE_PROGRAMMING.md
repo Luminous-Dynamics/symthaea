@@ -194,14 +194,24 @@ IG_model(action)
 ```
 
 For each possible outcome, the caller supplies:
-- Its predictive probability under the current full / Bayesian-model-average parent model.
-- The expected sufficient-statistic increment for the Dirichlet likelihood tensor (typically outcome modality outer-product posterior expectations over the parent-state factors).
+- The posterior-predictive probability under each reduced model, keyed by exact model ID.
+- The aggregate full / Bayesian-model-average predictive probability, which is independently reconstructed and checked.
+- The expected sufficient-statistic increment for the Dirichlet likelihood tensor (typically outcome-modality outer-product posterior expectations over the parent-state factors).
 
-The evaluator adds the hypothetical increment to the current full posterior, runs BMR to obtain the posterior over reduced models for that outcome, and averages posterior model entropy under the supplied full-parent predictive distribution. It separately computes the current model posterior from the current full posterior. It does **not** multiply the outcome probability by another Bayes-factor mixture term; that would double-count evidence and would not match the model-EIG expression in the paper.
+The evaluator obtains the **current posterior over model identity** from BMR, then derives:
+
+```text
+Q(o | a, D) = sum_m Q(m | D) P(o | m, a, D)
+```
+
+It rejects missing, duplicate, or unknown model IDs; invalid per-model probabilities; any per-model outcome distribution that does not sum to one; and any supplied aggregate that disagrees with the posterior-weighted mixture. This matters after evidence has changed model odds: using the original model priors instead of the current posterior can produce the wrong action ranking even when every individual probability is normalized.
+
+The evaluator adds the hypothetical sufficient-statistic increment to the current full posterior, runs BMR to obtain the posterior over reduced models for that outcome, and averages posterior model entropy under the reconstructed posterior-predictive mixture. It does **not** multiply the outcome probability by another Bayes-factor mixture term; that would double-count evidence and would not match the model-EIG expression in the paper.
 
 The evaluator enforces:
 - The full Dirichlet prior is the model-prior-weighted arithmetic average of the reduced-model priors, as in the paper's Bayesian model average.
-- Every action's predicted outcome probabilities are finite, positive, and sum to one.
+- Each model-specific action-outcome predictive distribution is finite, non-negative, keyed to the current model set, and sums to one.
+- The caller-supplied aggregate outcome distribution matches the mixture weighted by the **current posterior model probabilities**.
 - Every hypothetical posterior-count increment matches the exact likelihood tensor dimensions and is finite/non-negative.
 - Current and post-outcome model beliefs are derived from the same parameterization and support-bound BMR contract.
 
