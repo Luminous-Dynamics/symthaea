@@ -763,7 +763,7 @@ pub fn compute_evidence_id(value: &Value) -> Result<String, EvidenceError> {
 
 /// Validate the envelope and analysis-profile commitment, then verify Evidence ID.
 /// This does not authenticate the producer or prove the underlying observation.
-pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, EvidenceError> {
+fn verify_evidence_identity(value: &Value) -> Result<(String, String), EvidenceError> {
     validate_evidence_schema(value)?;
     let expected = compute_evidence_id(value)?;
     let actual = field(object(value, "Evidence")?, "evidence_id", "Evidence")?
@@ -779,8 +779,13 @@ pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, Evidence
         .strip_prefix(EVIDENCE_ID_PREFIX)
         .expect("computed Evidence ID has prefix")
         .to_owned();
+    Ok((expected, semantic_sha256))
+}
+
+pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, EvidenceError> {
+    let (evidence_id, semantic_sha256) = verify_evidence_identity(value)?;
     Ok(VerifiedEvidence {
-        evidence_id: expected,
+        evidence_id,
         semantic_sha256,
         raw_file_sha256: None,
         value: value.clone(),
@@ -831,9 +836,13 @@ pub(crate) fn parse_strict_json_bytes(
 
 pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
     let parsed = parse_strict_json_bytes(input, MAX_EVIDENCE_JSON_BYTES)?;
-    let mut verified = verify_evidence_value(&parsed)?;
-    verified.raw_file_sha256 = Some(sha256_hex(input));
-    Ok(verified)
+    let (evidence_id, semantic_sha256) = verify_evidence_identity(&parsed)?;
+    Ok(VerifiedEvidence {
+        evidence_id,
+        semantic_sha256,
+        raw_file_sha256: Some(sha256_hex(input)),
+        value: parsed,
+    })
 }
 
 struct StrictJsonValue(Value);
@@ -1144,6 +1153,47 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn canonical_jcs_matches_rfc8785_appendix_b_finite_number_vectors() {
+        let input = r#"[
+            0, -0, 5e-324, -5e-324,
+            1.7976931348623157e+308, -1.7976931348623157e+308,
+            9007199254740992, -9007199254740992,
+            295147905179352830000,
+            9.999999999999997e+22, 1e+23, 1.0000000000000001e+23,
+            999999999999999700000, 999999999999999900000, 1e+21,
+            9.999999999999997e-7, 0.000001,
+            333333333.3333332, 333333333.33333325,
+            333333333.3333333, 333333333.3333334, 333333333.33333343,
+            -0.0000033333333333333333, 1424953923781206.2
+        ]"#;
+        let value: Value = serde_json::from_str(input).unwrap();
+        let canonical = String::from_utf8(canonical_jcs_bytes(&value).unwrap()).unwrap();
+        assert_eq!(
+            canonical,
+            "[0,0,5e-324,-5e-324,1.7976931348623157e+308,-1.7976931348623157e+308,9007199254740992,-9007199254740992,295147905179352830000,9.999999999999997e+22,1e+23,1.0000000000000001e+23,999999999999999700000,999999999999999900000,1e+21,9.999999999999997e-7,0.000001,333333333.3333332,333333333.33333325,333333333.3333333,333333333.3333334,333333333.33333343,-0.0000033333333333333333,1424953923781206.2]"
+        );
+
+        // Precision warnings are an orthogonal diagnostic. Only exact integer
+        // tokens outside the safe range are listed; floating-point vectors are
+        // still serialized according to RFC 8785 without false-positive warnings.
+        let warnings = jcs_integer_precision_warnings(&value);
+        assert_eq!(
+            warnings,
+            vec![
+                JcsIntegerPrecisionWarning {
+                    json_pointer: "/6".to_owned(),
+                    integer_value: "9007199254740992".to_owned(),
+                },
+                JcsIntegerPrecisionWarning {
+                    json_pointer: "/7".to_owned(),
+                    integer_value: "-9007199254740992".to_owned(),
+                },
+            ]
+        );
+    }
+
     #[test]
     fn preserves_explicit_unknown_relationship_coverage() {
         let mut evidence = golden();
@@ -1206,5 +1256,20 @@ mod tests {
             validate_evidence_schema(&evidence).unwrap_err().kind,
             EvidenceErrorKind::SchemaViolation
         );
+    }
+    #[test]
+    fn byte_and_value_admission_share_identity_and_semantics() {
+        let raw = include_str!("../tests/fixtures/rea-evidence-v1.json").as_bytes();
+        let from_bytes = verify_evidence_json(raw).unwrap();
+        let from_value = verify_evidence_value(&from_bytes.value).unwrap();
+
+        assert_eq!(from_bytes.evidence_id, from_value.evidence_id);
+        assert_eq!(from_bytes.semantic_sha256, from_value.semantic_sha256);
+        assert_eq!(from_bytes.value, from_value.value);
+        assert_eq!(
+            from_bytes.raw_file_sha256.as_deref(),
+            Some(sha256_hex(raw).as_str())
+        );
+        assert!(from_value.raw_file_sha256.is_none());
     }
 }

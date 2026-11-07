@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-claim-evaluation-v0.schema.json",
+  "title": "REA typed claim request v0",
+  "description": "A conservative claim request referencing immutable REA Evidence IDs. V0 can support only a provider-reported normalized observation; all stronger semantic predicates fail closed until their predicate-specific verifier is registered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "claim_id",
+    "predicate",
+    "scope",
+    "asserted_value",
+    "source_predicate_type",
+    "evidence_ids",
+    "assumptions",
+    "falsification_condition"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.rea.claim.v0"
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "predicate": {
+      "enum": [
+        "provider_reported_observation",
+        "member_content_integrity",
+        "archive_content_identity",
+        "whole_archive_completeness",
+        "producer_authenticity",
+        "signature_cryptographic_validity",
+        "signer_identity",
+        "signer_trust",
+        "package_authorization",
+        "platform_acceptance",
+        "provider_corroboration",
+        "causal_finding",
+        "security_control_pass"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_sha256",
+        "operation"
+      ],
+      "properties": {
+        "subject_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "platform_version": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "environment_id": {
+          "type": ["string", "null"],
+          "minLength": 1
+        }
+      }
+    },
+    "asserted_value": {},
+    "source_predicate_type": {
+      "type": ["string", "null"],
+      "minLength": 1
+    },
+    "evidence_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^ev_[0-9a-f]{64}$"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "falsification_condition": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "predicate": {
+            "const": "provider_reported_observation"
+          }
+        },
+        "required": ["predicate"]
+      },
+      "then": {
+        "properties": {
+          "source_predicate_type": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source_predicate_type": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}
