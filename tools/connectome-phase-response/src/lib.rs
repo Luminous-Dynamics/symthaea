@@ -1014,6 +1014,39 @@ mod tests {
     }
 
     #[test]
+    fn cycle_slip_distance_overflow_is_rejected() {
+        let probe = key(Context::BallContact, 0, 0, 1);
+        let left = ModelSignature {
+            model_id: "left-extreme".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 900,
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: zeros(),
+                cycle_slips_by_leg: [i64::MIN, i64::MIN, 0, 0, 0, 0],
+            }],
+        };
+        let right = ModelSignature {
+            model_id: "right-extreme".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 900,
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: zeros(),
+                cycle_slips_by_leg: [i64::MAX, i64::MAX, 0, 0, 0, 0],
+            }],
+        };
+        assert_eq!(
+            minimum_pairwise_cycle_slip_separation(&[left.clone(), right.clone()]),
+            Err(PhaseError::ArithmeticOverflow)
+        );
+        assert_eq!(
+            minimum_joint_campaign_cycle_slip_separation(&[left, right]),
+            Err(PhaseError::ArithmeticOverflow)
+        );
+    }
+
+    #[test]
     fn full_cycle_slip_is_not_aliased_to_zero_phase() {
         let probe = key(Context::BallContact, 0, 1, 1);
         let control = zero_samples();
