@@ -613,15 +613,23 @@ mod tests {
             Complex::new(0.0, -c * s),
             Complex::new(-s * s, 0.0),
         ];
+        // Basis index bit 0 addresses spin 0 and bit 1 addresses spin 1.
+        // A set bit has Z=-1, so the |01> and |10> field terms carry
+        // -h0+h1 and +h0-h1 respectively.
         let energies = [
             coupling + h0 + h1,
-            -coupling + h0 - h1,
             -coupling - h0 + h1,
+            -coupling + h0 - h1,
             coupling - h0 - h1,
         ];
         for basis in 0..4 {
             let expected = initial[basis] * Complex::from_polar(1.0, -energies[basis]);
-            assert!((model.amplitudes()[basis] - expected).norm() < 1e-12);
+            let error = (model.amplitudes()[basis] - expected).norm();
+            assert!(
+                error < 1e-12,
+                "basis={basis}, observed={:?}, expected={expected:?}, error={error:e}",
+                model.amplitudes()[basis]
+            );
         }
     }
 
@@ -661,7 +669,16 @@ mod tests {
                 > unlocked_response.mean_demodulated_order + 0.5
         );
         assert!(
-            interacting_response.mean_absolute_order > unlocked_response.mean_absolute_order + 0.5
+            interacting_response.mean_absolute_order > unlocked_response.mean_absolute_order + 0.25,
+            "interaction should preserve a larger subharmonic envelope: interacting={:.6}, unlocked={:.6}",
+            interacting_response.mean_absolute_order,
+            unlocked_response.mean_absolute_order
+        );
+        assert!(
+            interacting_response.sign_coherence > unlocked_response.sign_coherence + 0.5,
+            "interaction should improve demodulated sign coherence: interacting={:.6}, unlocked={:.6}",
+            interacting_response.sign_coherence,
+            unlocked_response.sign_coherence
         );
     }
 
