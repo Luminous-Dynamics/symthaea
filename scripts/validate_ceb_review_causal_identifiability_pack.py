@@ -76,6 +76,7 @@ def validate(
     for case_id, block in zip(key_ids, key_blocks):
         for required in (
             "Expected disposition:",
+            "Claim kind",
             "Material alternatives",
             "Disagreement witness:",
             "Minimum additional evidence:",
@@ -155,7 +156,7 @@ def validate(
 def self_test() -> list[str]:
     protocol = "\n".join((
         *DISPOSITIONS,
-        "M(E,A)",
+        "mathcal{M}(E,A)",
         "disagreement witness",
         "minimum discriminating evidence",
         "latent_context",
@@ -183,6 +184,7 @@ def self_test() -> list[str]:
         "\n".join((
             f"## {i}. {case_id}",
             "Expected disposition:",
+            "Claim kind",
             "Material alternatives",
             "Disagreement witness:",
             "Minimum additional evidence:",
