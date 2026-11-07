@@ -558,19 +558,22 @@ fn validate_measurement(
             add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
             add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
             add(measurement.sample_count.is_none(), ReasonCode::InvalidSampleCount);
-            if measurement.metric_id == MetricId::SapkalButterworthHilbertPlvV2 {
-                add(
-                    measurement.preprocessing_sha256.is_none(),
-                    ReasonCode::MissingPreprocessingDigest,
-                );
-                add(
-                    measurement.phase_estimator_sha256.is_none(),
-                    ReasonCode::MissingPhaseEstimatorDigest,
-                );
+            add(
+                measurement.preprocessing_sha256.is_none(),
+                ReasonCode::MissingPreprocessingDigest,
+            );
+            add(
+                measurement.phase_estimator_sha256.is_none(),
+                ReasonCode::MissingPhaseEstimatorDigest,
+            );
+            if let Some(pair) = measurement.pair {
+                add(pair.first >= pair.second, ReasonCode::NonCanonicalPair);
             }
         }
         EndpointKind::TripodCoordination => {
             add(measurement.tripod_group.is_none(), ReasonCode::MissingTripodIdentity);
+            add(measurement.aggregation != AggregationLevel::Trial, ReasonCode::MixedAggregationLevelFrame);
+            add(measurement.support_count.is_none(), ReasonCode::InvalidSupportCount);
             add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
             add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
             add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
@@ -596,7 +599,6 @@ fn validate_measurement(
             add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
             add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
             if let Some(key) = measurement.transfer_probe {
-                add(key.sender == Some(key.recipient), ReasonCode::SelfPair);
                 add(key.phase_bin >= PHASE_BINS, ReasonCode::InvalidPhaseBin);
                 add(key.magnitude_bin >= MAGNITUDE_BINS, ReasonCode::InvalidMagnitudeBin);
             }
