@@ -218,6 +218,20 @@ This adds an important production outcome: does a suggestion enter the developer
 
 **CEB implication:** record four dimensions separately: factual/causal correctness, actionability/usefulness, human uptake/disposition, and downstream engineering outcome where observable. Test causal attribution of adoption rather than treating a subsequent diff as proof that the comment caused it. Reuse CEB-REVIEW and CEB-HUMAN; do not create an opaque adoption score or new metric lane.
 
+### 2.23 SWE-sweep — open-world, multi-bug repository discovery
+
+SWE-sweep broadens the task beyond issue-conditioned resolution: the agent receives a repository with no bug descriptions or locations and must discover and repair concurrent defects. The October 1, 2026 paper covers **4,068 bugs across 100 repositories and 22 languages**. The task uses repository states where many known bugs coexist; every repair is checked by a corresponding hidden fail-to-pass test while the original test suite guards against regressions. The paper's main evaluation reports the strongest model resolving **4.7%** of all bugs and finds discovery harder than repair. [Paper](https://swesweep.com/paper).
+
+The live leaderboard viewed November 7, 2026 lists Astra 6 with mini-SWE-agent at **9.5%**, Sol 5.6 xhigh at 4.7% and Claude Opus 5.5 xhigh at 3.6%. This is a later leaderboard snapshot and not the paper's original seven-model table. Keep both the publication result and live submission result attached to their exact model/harness/run. [Live leaderboard](https://swesweep.com/).
+
+**CEB implication:** this is an adjacent open-world repository discovery/repair frontier, not a code-review metric comparator. It motivates a distinct discovery mode where the agent must decide what work exists, manage multiple interacting defects and prioritize attention before repair. Reuse CEB's repository, causality, continuity, safety and repair contracts; do not translate bug-resolved percentage into Recall@5 or claim matched superiority.
+
+### 2.24 LoopControlBench — deterministic task completion and narrow-scope evidence
+
+LoopControlBench publishes an auditable benchmark harness for real merged Python library bug-fix PRs. Its gate verifies that the maintainer's test fails on the buggy parent and passes after the real fix, in the scoring image. Its reference result is **46/70 = 65.7% solved** for GPT-5-mini, with one attempt per task and no escalation or repair loop. The task pool has since grown to 89, but the published reference remains scoped to the original 70. The maintainers explicitly state that this result applies only to their reproducible, maintainer-tested Python task pool and is not 65.7% of software bugs generally. [Repository and method](https://github.com/kltownsend/loopcontrolbench).
+
+**CEB implication:** the strongest lesson is that the validator, not the model, decides completion. Use deterministic target tests, test immutability, source-path allowlists, task certification in the scoring environment and explicit outcome denominators. However, a named fail-to-pass test proves one declared behavior only; it does not establish whole-program safety, causal uniqueness or an independent pristine regrade. The benchmark's own security note identifies repository build/test execution as untrusted code and requires container/VM isolation. This reinforces #10064 rather than relaxing it.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -231,6 +245,8 @@ This adds an important production outcome: does a suggestion enter the developer
 | CR-Bench-v2 / CR-Bench-Verified | Defect-centric PR review with one labeled defect per instance; KDDR and comment Usefulness Rate | Keep known-defect detection separate from usefulness; audit reference-comment/taxonomy generation, judge lineage, one-defect denominator and Python/11-repository scope |
 | ReviewBench | Multi-source gold, grounded and augmented precision/recall/F1; 219 PRs / 187 repositories / 19 languages | Separate known-gold comparison from independently adjudicated new findings; version matcher/judge and expert audit |
 | SecPRBench | Security-root-cause diagnosis on 265 vulnerability-introducing changes across nine systems projects; 32.5–78.1% target recall | Test causal mechanism, cross-file paths and exact revision rather than location overlap; report precision limitations and per-run cost |
+| SWE-sweep | Open-world multi-bug discovery/repair across 100 repositories and 22 languages; 4,068 bugs | Adjacent repository-maintenance frontier; keep its bug-resolved score separate from review recall/precision |
+| LoopControlBench | Deterministic fail-to-pass completion on 70 certified Python tasks; 46/70 reference | Methodological comparator for deterministic outcome/admission; not a broad industry SOTA or code-review benchmark |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
 | HiL-Bench | Progressive blocker discovery and targeted help seeking | Authority-bounded collaboration and evidence-aware escalation across a changing repository |
 | Google collaborative-agent taxonomy | Developer expectations for standards/process, quality/reliability, problem solving and collaboration | Ground content validity of existing CEB-COLLAB episodes; qualitative construct coverage, not a benchmark score |
@@ -330,6 +346,17 @@ Tool use is not inherently intelligence. A reviewer should choose the next obser
 Compare static-first, unconstrained tool selection, transparent evidence-directed heuristics, calibrated sequential value-of-information, and ask/abstain policies under matched all-in budgets. Require an action proposal that states the claim, alternatives, observation, expected discriminating outcomes, applicability, authority, safety, cost and stopping implication. Do not reward number of tools or tests. Reuse the existing selective-escalation, causal-diagnosis and evidence-authority contracts; do not create a tool-use metric lane, execution scheduler or Bayesian confidence claim without calibrated probabilities.
 
 ### Shift 15 — From comment acceptance to verified engineering impact
+
+
+### Shift 16 — From historical bug-fix commits to qualified counterfactual controls
+
+A historical parent/introducing/fix trio is not automatically a causal experiment. Herbold et al.'s fine-grained study reports that 17–32% of all changed lines in sampled bug-fix commits directly fixed the underlying problem; their use-specific estimate of dataset noise without manual untangling ranges from 3–47%. The study itself cautions these estimates depend on the data and labeling method, but it establishes that commit-level bug-fix provenance can be materially tangled. [Herbold et al.](https://link.springer.com/article/10.1007/s10664-021-10083-5).
+
+Schulte et al.'s 2026 study maps relations among bug-introducing process variables but explicitly states that the observational relations do not establish causality and that confounders must be considered. A 2026 rapid review of 27 causal-software-testing studies finds causal representation/discovery underexplored and identifies model misspecification and untested assumptions as cross-layer threats. [Schulte et al.](https://link.springer.com/article/10.1007/s10664-026-10822-6) · [Ma & Eisty](https://arxiv.org/abs/2606.15683).
+
+CEB should qualify each P/I/F/N/M/IRR control for the specific claim. Independently disentangle target-causal changes from tests, docs, contract context, refactors, dependencies, environment changes, unrelated work and disputed hunks. Check residual paths after fixes; define minimality semantically in the causal model, not by line count; and demonstrate that IRR leaves the target mechanism intact. Use six separate support dimensions—lineage, disentanglement, mechanism/reachability, intervention fidelity, environment/applicability and outcome/oracle validity—without averaging them into a confidence score. Source-only controls support structural claims only; runtime causal claims require qualified execution.
+
+The detailed [CEB Review Counterfactual-Control Qualification V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md) defines the procedure. It adds no metric lane, task schema, receipt, authority class or runner.
 
 The next frontier is not maximizing accepted comments. It is understanding the chain from finding truth to practical change without confusing correlation for causation.
 
@@ -473,6 +500,12 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 - Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [human-found gold limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), accessed November 7, 2026.
 - GitHub, [ReviewBench: An open benchmark for AI code review](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/), October 5, 2026; [live leaderboard](https://review-bench.ai/) viewed November 7, 2026.
 - Yang et al., [Can Agentic Code Review Catch Vulnerabilities Before They Are Merged? (SecPRBench)](https://arxiv.org/abs/2610.33509), October 24, 2026.
+- Lieret et al., [SWE-sweep: Can Agents Autonomously Find and Fix Bugs?](https://swesweep.com/paper), October 1, 2026; [live leaderboard](https://swesweep.com/) viewed November 7, 2026.
+- Townsend, [LoopControlBench](https://github.com/kltownsend/loopcontrolbench), live README and reference score viewed November 7, 2026.
+- Herbold et al., [A fine-grained data set and analysis of tangling in bug fixing commits](https://link.springer.com/article/10.1007/s10664-021-10083-5), Empirical Software Engineering, 2022.
+- Schulte et al., [An exploratory study of bug-introducing changes](https://link.springer.com/article/10.1007/s10664-026-10822-6), Empirical Software Engineering, April 9, 2026.
+- Ma & Eisty, [Applications of Causality in Software Testing: A Rapid Review](https://arxiv.org/abs/2606.15683), June 2026.
+
 - Dong et al., [Towards AI as a Collaborative Partner: A Taxonomy of AI Agent Behavior in Software Engineering](https://research.google/pubs/towards-ai-as-a-collaborative-partner-a-taxonomy-of-ai-agent-behavior-in-software-engineering/), AIware '26 (to appear).
 
 - Scale AI, [SWE-Bench Pro V2 release/methodology](https://labs.scale.com/blog/swe-bench-pro-v2), September 22, 2026; [live leaderboard](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full), viewed November 6, 2026.
