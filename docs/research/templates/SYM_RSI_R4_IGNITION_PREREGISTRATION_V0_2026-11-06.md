@@ -104,3 +104,23 @@ The comparison must include:
 Measure provenance-complete record recovery, false-currentness rate, evidence revalidation precision/recall, duplicated-experiment rate and fresh-family confirmed yield. Require a cold-restart restoration test, successor-version migration test and independent recovery audit. Historical results retain their original as-of context; a migrated record must not silently inherit current validity when its source, scope, task, evaluator or policy changes.
 
 Compose existing claim-currentness/evidence-continuity semantics from #10630. This protocol does not create a second evidence ledger or memory service.
+
+## Scope-aware research-state routing
+
+Compose with #10844 and #10630. The R4 experiment must not assume that all research experience belongs in one global context.
+
+The state-continuity comparison now includes nine ablation arms: the original full verified/no-state/untyped/shuffled/accepted-only controls, plus fixed-mechanism scope-routed clusters, adaptive mechanism-plus-scope routing, shuffled-scope routing and an oracle source-family assignment used only as a diagnostic upper bound.
+
+The scope-routing contract binds:
+- immutable scope-descriptor schema and cluster-scope manifest;
+- frozen router policy and route-decision log;
+- independent router-access audit;
+- no raw cluster-content access for the router;
+- no access to sealed labels or future task identifiers;
+- one selected cluster fixed for each task instance;
+- any cross-cluster transfer to a separate receipt-bound operation.
+
+Scope-specific failure modes are non-compensatory: cross-scope evidence leakage, stale-evidence currentness inheritance, unreceipted cross-cluster transfer and hidden task-label routing. Report false sharing, false fragmentation, negative transfer by task family and utility at the complete-rollout level. Do not count task instances in one stateful rollout as independent replicates.
+
+This is a routing qualification, not a new memory store. Reuse the existing memory/evidence and claim-currentness authorities.
+
