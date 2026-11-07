@@ -60,6 +60,22 @@ A storage-only experiment cannot establish that HME improves an agent's answers.
 
 Public vendor pages currently report, for example, Mem0 LongMemEval 94.4% / LoCoMo 92.5% at a top-200 retrieval budget and roughly 6.8–7.0K mean tokens, while Zep reports LongMemEval 90.2% / LoCoMo 94.7% with its own reader/judge, context sizes and latency accounting. These are vendor-published claims, not independent common-harness measurements and not directly rankable against each other or against Symthaea. Their value is to reveal the competitive range and the metrics vendors expose. HME/Broca must reproduce the same benchmark version, exact question set, reader/backbone, judge, prompt, context budget, token accounting and latency boundary before making a comparative claim. Preserve per-category scores; do not optimize only a single aggregate.
 
+
+### Agent Memory Leaderboard: a practical external integration target
+
+The [Agent Memory Leaderboard (AML)](https://agentmemories.ai/) runs separate Textual, Coding Agent and Multimodal Memory tracks. It requires participant-hosted, fixed-version Add/Search APIs; a repository or Docker image alone is not accepted as a substitute for a working endpoint. Search returns memory evidence rather than the final answer, while the platform runs Answer/Eval. It also requires sample/user isolation, source attribution and evaluation-version traceability.
+
+**Status on 2026-11-07:** Cycle 2 material submissions closed October 31 (UTC+8); formal evaluation closed November 4; the official results page states that results are expected mid-November and full evaluations are still being processed. Do not claim a Cycle 2 submission or score for Symthaea. Track the outcome and use [#8475 — submission readiness](https://github.com/Luminous-Dynamics/symthaea/issues/8475) as the existing owner for next-cycle preparation.
+
+For a future Symthaea submission, the Coding Agent Memory track is a natural first applied test: it evaluates retrieving and reusing experience within the same repository under relevant and noisy memory conditions. The Textual and Multimodal tracks should remain separate follow-on work; their results are not interchangeable. Reuse [#8427](https://github.com/Luminous-Dynamics/symthaea/issues/8427) for the underlying frozen-reader / memory-substrate cost-quality comparison.
+
+Operationally, AML changes the success criterion: HME must support an honest, stable Add/Search service with durable Add acknowledgment, tenant/sample isolation, bounded Search, exact version pinning and enough capacity to survive evaluation concurrency. The API adapter belongs in the existing Broca/benchmark integration, not in the HME hot cognitive update loop.
+
+Official references:
+- https://agentmemories.ai/evaluation
+- https://agentmemories.ai/
+- Existing project readiness issue: https://github.com/Luminous-Dynamics/symthaea/issues/8475
+
 ## 2. Paradigm shifts worth testing
 
 ### A. Semantic address space is not the live evolution state
@@ -192,3 +208,13 @@ Report p50/p95/p99; throughput; bytes read and moved; page residency/fault delta
 ## 7. Claim boundary
 
 This document is a research plan and benchmark crosswalk. It reports no new HME implementation, no Rust compilation/test result, no storage-engine bake-off, no physical I/O/energy measurement, no MLPerf compliance and no SOTA result. The purpose is to make future comparisons fair, reproducible and difficult to overclaim.
+
+
+## 8. New deterministic fixtures — sampling alias and query completion
+
+The branch now includes [hme_query_sampling_and_completion_v0.json](fixtures/hme_query_sampling_and_completion_v0.json). It contains small exact cosine controls where fixed-origin stride 4:
+- misses two identical sparse vectors entirely (full cosine 1.0, sampled-path zero-norm fallback 0.0);
+- reports sampled cosine 1.0 when the full cosine is 0.0 because the only disagreement lies in an omitted coordinate;
+- misses final-coordinate and shifted-phase sparse patterns.
+
+The fixture also contains typed completion cases for ExactComplete, ApproximateComplete, Incomplete after budget exhaustion and UnavailableOrInvalid. These are deterministic contract fixtures, not a benchmark run. The sampling study is owned by #10974; query completion semantics by #10973.
