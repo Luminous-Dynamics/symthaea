@@ -1032,7 +1032,9 @@ mod tests {
         assert!(result.position_ecef_m.subtract(target).norm() < 1.0e-4);
         assert_eq!(result.observations, 4);
         assert_eq!(result.degrees_of_freedom, 5);
-        assert!(result.rms_angular_residual_rad < 1.0e-8);
+        // Noisy overdetermined bearings should leave a small, nonzero fit residual.
+        assert!(result.rms_angular_residual_rad > 0.0);
+        assert!(result.rms_angular_residual_rad < 1.0e-4);
         assert!(result.condition_number.is_finite());
         assert!(result.covariance_ecef_m2[0][0] > 0.0);
         assert!(result.covariance_ecef_m2[1][1] > 0.0);
