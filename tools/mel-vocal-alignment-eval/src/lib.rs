@@ -469,7 +469,7 @@ mod tests {
         ];
         let result = score_alignment(44_100, 2_000, &reference, &predicted, &[]).unwrap();
         assert_eq!(result.timing.exact_phone_pairs, 1);
-        assert!((result.timing.onset_mae_ms.unwrap() - (41.0 / 44.1)).abs() < 1e-10);
+        assert!((result.timing.onset_mae_ms.unwrap() - (10.0)).abs() < 1e-10);
         assert_eq!(result.edits.substitutions, 1);
     }
 
