@@ -62,7 +62,7 @@ At minimum, instrument:
 
 Use calibrated meters and independently reviewed water-quality sampling. TDS or conductivity alone is not a potable-water determination.
 
-## 4. Primary outputs
+## 5. Primary and secondary metrics
 
 1. Net accepted product volume after all start-up, flush and off-spec water is diverted.
 2. Specific electrical input in kWh/m³ of accepted product at a named meter boundary.
@@ -73,7 +73,7 @@ Use calibrated meters and independently reviewed water-quality sampling. TDS or 
 
 Secondary outputs: peak power, startup energy, flush/preservation energy, filter/membrane life, consumables, operator labour, MTTR, noise/vibration, mass/volume, spare requirements and installed service access.
 
-## 5. Fair comparison protocol
+## 6. Fair comparison protocol
 
 Freeze the operating conditions before opening results. The minimum first bench matrix should include:
 - feed salinity at declared reference and boundary conditions;
@@ -89,7 +89,7 @@ Freeze the operating conditions before opening results. The minimum first bench 
 
 Measure the full duty cycle. A 2-hour steady-state nameplate test must not hide 10 minutes of flushing, failed starts, maintenance downtime or off-spec output. Do not compare a 25 °C / 33,000 ppm tested system to another with unknown feed conditions as if they were equal.
 
-## 6. Mission integration
+## 7. Mission integration
 
 The watermaker's measured qualified daily output and actual energy enter separate downstream owners:
 - Symtropy Habitat Metabolism owns water stocks, qualities, process flows, residuals and coupled resource state.
@@ -100,7 +100,7 @@ The watermaker's measured qualified daily output and actual energy enter separat
 
 This avoids creating a parallel water-treatment simulator, desalination physics engine, energy calculator or potable-water authority.
 
-## 7. Benchmark acceptance principles
+## 8. Benchmark acceptance principles
 
 - Report median, p95 and worst-condition output and specific energy across independent units / test days.
 - Hold out complete hardware units or independent test days; individual time samples from one test are not independent test samples.
@@ -110,7 +110,7 @@ This avoids creating a parallel water-treatment simulator, desalination physics 
 - Set a performance-improvement percentage only after a matched baseline and uncertainty budget exist.
 - A superior kWh/m³ number cannot compensate for product quality failure, poor availability, shorter membrane life, excessive consumables or unsafe maintenance.
 
-## 8. Claim ceiling
+## 9. Claim ceiling
 
 Manufacturer data establish only what a supplier publishes. The derived kWh/m³ figures in the CSV are arithmetic transformations of those published figures, not measurement. A bench test qualifies only the specific device/configuration, feed envelope, meter boundary and method tested. No watermaker result alone establishes potable-water safety, full vessel autonomy, legal brine disposal, whole-vessel seaworthiness or regulatory approval.
 
