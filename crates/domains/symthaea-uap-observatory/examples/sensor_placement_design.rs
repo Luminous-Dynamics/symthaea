@@ -90,5 +90,42 @@ fn main() -> Result<(), Box<dyn Error>> {
             covariance[2][2],
         );
     }
+
+    // A finite weighted region tests whether the nominally best sensor stays
+    // useful when target position is uncertain. Existing bearings are
+    // re-predicted from each sensor pose at every hypothesis.
+    let target_hypotheses = vec![
+        TargetHypothesis {
+            target_ecef_m: target,
+            weight: 0.5,
+        },
+        TargetHypothesis {
+            target_ecef_m: EcefVector3::new(70.0, 30.0, 180.0),
+            weight: 0.3,
+        },
+        TargetHypothesis {
+            target_ecef_m: EcefVector3::new(35.0, 55.0, 230.0),
+            weight: 0.2,
+        },
+    ];
+    let robust_ranking =
+        rank_sensor_placements_over_target_region(&existing, &target_hypotheses, &candidates)?;
+    println!("epistemic_status=FINITE_SCENARIO_ROBUST_LOCAL_FIM_NOT_CONTINUOUS_REGION_GUARANTEE");
+    println!("target_hypotheses=3");
+    println!(
+        "candidate,expected_logdet,worst_logdet,expected_trace_m2,worst_trace_m2,worst_condition"
+    );
+    for score in robust_ranking {
+        println!(
+            "{},{:.9},{:.9},{:.12e},{:.12e},{:.9}",
+            score.sensor_id,
+            score.expected_log_determinant_information,
+            score.worst_case_log_determinant_information,
+            score.expected_a_optimal_variance_sum_m2,
+            score.worst_case_a_optimal_variance_sum_m2,
+            score.worst_case_condition_number,
+        );
+    }
+
     Ok(())
 }
