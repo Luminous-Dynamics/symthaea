@@ -8,7 +8,7 @@
 The slow resource-service scheduler works in minutes/hours and passes aggregate loads to existing grid-physics scheduling. That is necessary but insufficient. A vessel can have adequate daily kWh and still experience a failed start, inverter current limiting, DC-bus sag, AC frequency/voltage excursion, converter interaction or nuisance protection trip when multiple services start together.
 
 Recent research reinforces this gap:
-- Zhang et al. (IEEE Transactions on Power Electronics, 1 Oct 2026) review simultaneous pulsed loads, negative incremental impedance, voltage instability, harmonic distortion and multi-timescale control conflicts in shipboard DC microgrids. DOI: https://doi.org/10.1109/TPEL.2026.3697148
+- Zhang et al. (IEEE Transactions on Power Electronics, Vol. 41 Issue 10, October 2026; publisher date of publication 26 May 2026) review simultaneous pulsed loads, negative incremental impedance, voltage instability, harmonic distortion and multi-timescale control conflicts in shipboard DC microgrids. DOI: https://doi.org/10.1109/TPEL.2026.3697148
 - Wang et al. (Applied Energy 426, December 2026 issue; online ahead of issue) review ship EMS coupling to degradation, transient buffering, MVDC stability, HIL/PHIL and deployment evidence. DOI: https://doi.org/10.1016/j.apenergy.2026.128503
 - EMSA's battery safety guidance (2023, updated 11 Nov 2025) is non-mandatory and identifies the role of class, standards and flag-state safety requirements. https://www.emsa.europa.eu/publications/item/5061-battery-energy-storage-systems-bess.html
 
