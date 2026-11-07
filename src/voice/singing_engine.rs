@@ -95,6 +95,17 @@ pub struct VocalPerformance {
 /// frontend itself; internal punctuation, digits and non-ASCII graphemes are
 /// not covered by its dictionary/letter fallback and must remain explicit errors.
 fn validate_english_orthography(lyrics: &str) -> Result<()> {
+    for character in lyrics.chars() {
+        if !(character.is_ascii_alphabetic()
+            || character.is_ascii_whitespace()
+            || character.is_ascii_punctuation())
+        {
+            bail!(
+                "current English G2P accepts ASCII letters, whitespace and boundary punctuation only; unsupported character {character:?}"
+            );
+        }
+    }
+
     for token in lyrics.split_whitespace() {
         let core = token.trim_matches(|character: char| !character.is_alphanumeric());
         for grapheme in core.chars() {
@@ -622,7 +633,7 @@ mod tests {
             duration: 0.5,
             velocity: 0.7,
         };
-        for lyrics in ["café", "don't", "2026"] {
+        for lyrics in ["café", "don't", "2026", "light 🎵 bright"] {
             let error = VocalPerformance::from_melody(lyrics, &[note], "en")
                 .unwrap_err()
                 .to_string();
