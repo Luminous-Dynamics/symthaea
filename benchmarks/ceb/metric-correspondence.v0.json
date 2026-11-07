@@ -469,21 +469,30 @@
       "external_observation_ids": [
         "reviewbench-ohmybug-grounded-precision",
         "crbench-gpt52-reflexion-usefulness",
-        "codereviewbench-deepseek-v4-pro-precision"
+        "codereviewbench-deepseek-v4-pro-precision",
+        "kodus-deepseek-v4-pro-precision",
+        "martian-greptile-precision",
+        "martian-cubic-dev-ai-precision",
+        "martian-qodo-code-review-precision"
       ],
-      "rationale": "ReviewBench grounded precision, CR-Bench-v2 usefulness and CodeReviewBench precision each supply contextual review-quality evidence. Their matchers/judges, denominators, output protocols and definitions differ from CEB's blinded actionable finding adjudication.",
+      "rationale": "ReviewBench grounded precision, Kodus CodeReviewBench precision and CR-Bench-v2 Usefulness Rate are informative but differently labeled. Martian's adoption precision is based on LLM analysis of production bot suggestions and developer follow-up, not independent adjudication of factual defect/actionability. All are related-but-distinct contextual references, not exact CEB actionable precision.",
       "blockers": [
         "ReviewBench's high-severity classifier/matcher and scope differ from CEB blinded actionable-precision adjudication",
         "CR-Bench-v2 Usefulness Rate includes valid suggestions and uses a one-known-defect task design; judge calibration differs",
         "Neither external result is a matched CEB finding set",
         "CodeReviewBench uses Kodus extraction and Claude Haiku 4.5, with a small human-reported-bug corpus",
-        "ReviewBench and CR-Bench-v2 use distinct classifiers/rubrics and task definitions"
+        "ReviewBench and CR-Bench-v2 use distinct classifiers/rubrics and task definitions",
+        "Kodus uses a single Claude Haiku 4.5 judge and one model run; its CI is task-sampling-only",
+        "Martian adoption precision reflects developer follow-up and LLM analysis, not independent defect adjudication",
+        "Per-system sample sizes and benchmark denominators are not common across all comparators"
       ],
       "normalization_requirements": [
         "apply one frozen CEB actionable rubric to identical PRs and findings",
         "independently human-adjudicate unmatched discoveries and false positives",
         "retain target-hit status separately from non-target actionable findings",
-        "re-adjudicate all candidate findings with one frozen CEB human rubric on identical PRs and preserve target and non-target actionable labels separately"
+        "re-adjudicate all candidate findings with one frozen CEB human rubric on identical PRs and preserve target and non-target actionable labels separately",
+        "retain production adoption as a separate outcome from factual correctness",
+        "human-audit accepted and rejected production suggestions on matched PRs before using adoption as a validation signal"
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
