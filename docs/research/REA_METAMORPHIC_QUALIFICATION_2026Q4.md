@@ -127,3 +127,24 @@ Reference: https://www.rfc-editor.org/rfc/rfc9943.html
 ## Claim ceiling
 
 These tests qualify representation invariance, exact premise binding and no-upgrade behavior for the supported v0 observation rule. They do not prove that the evidence universe is complete, that a provider is honest, that sources are independent, that an artifact is safe, or that a result generalizes to unseen binaries or platforms.
+
+## Population completeness and selective disclosure: no-upgrade law (2026-11-07)
+
+A set of valid observations can still be an incomplete view of the population it purports to describe. The v0 claim evaluator must not infer whole-archive or issuer-history completeness from self-reported terminal pagination, page counts, “all issued statements submitted” flags, or a complete view of entries already registered in a transparency log.
+
+Keep these claims distinct:
+
+1. **Complete within declared query/snapshot:** every item in an independently identified, versioned query or snapshot was enumerated and reconciled.
+2. **Complete within captured artifact:** every member/byte-range in the exact admitted artifact was enumerated under the qualified reader.
+3. **Complete within registered transparency view:** every entry in the named tree/checkpoint/log scope was enumerated and verified.
+4. **Issuer participation completeness:** an independent obligation or audit establishes that the issuer submitted every relevant statement it created or observed.
+5. **Observed subset / unknown population:** the records establish only the returned subset; the real-world universe or issuer participation remains unqualified.
+
+The no-upgrade property added to the replay conformance suite binds three distinct provider observations: a declared query reports terminal pagination and matching counts; an issuer reports that all statements were submitted but supplies no independent issuer-history audit; and a transparency view reports every registered entry enumerated. The claim predicate is `whole_archive_completeness`. All three Evidence records are independently identity-verified and replayed, but the disposition must remain `unverified` because evaluator v0 has no predicate-specific completeness rule. Provider count, `confidence=observed`, `authority=external-service`, and a terminal cursor do not change that ceiling.
+
+This is not a rejection of the narrower observations. A provider may establish what it reported about a specific query or log view. The forbidden inference is from “complete set of registered/returned records” to “complete set of records the issuer created” or “complete real-world population”. Completeness requires separate proof obligations for population definition, enumeration coverage, acquisition coverage, processing coverage, issuer participation and temporal coverage.
+
+RFC 9943 (SCITT) is directly relevant: a Transparency Service records signed statements that issuers submit, but an issuer may selectively submit or withhold statements. Therefore complete enumeration of a transparency log can establish a complete view of registered statements at a named checkpoint; it cannot by itself establish complete issuer participation or statement accuracy. See [RFC 9943](https://www.rfc-editor.org/rfc/rfc9943.html).
+
+The metamorphic target is **zero completeness uplift** from provider self-assertion, duplicate/syndicated providers, pagination claims, registered-log completeness or record count. Any future completeness predicate must bind an authoritative population definition, stable snapshot/query, page/cursor/sequence coverage, successful acquisition and processing accounting, independent issuer participation where the claim requires it, and a target-time interval. Until that proof contract exists, v0 remains `unverified`.
+
