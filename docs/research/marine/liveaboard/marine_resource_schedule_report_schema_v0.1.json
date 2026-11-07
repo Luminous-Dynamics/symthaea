@@ -176,7 +176,8 @@
               "potable_water",
               "seawater_feed",
               "fuel",
-              "other_material"
+              "other_material",
+              "brine_concentrate"
             ]
           },
           "quantity": {
@@ -221,7 +222,8 @@
         "outputs_delivered",
         "quality_status",
         "disposition_reason",
-        "evidence_ref"
+        "evidence_ref",
+        "residuals_generated"
       ],
       "properties": {
         "service_id": {
@@ -309,7 +311,8 @@
                   "potable_water",
                   "seawater_feed",
                   "fuel",
-                  "other_material"
+                  "other_material",
+                  "brine_concentrate"
                 ]
               },
               "quantity": {
@@ -352,6 +355,54 @@
         "evidence_ref": {
           "type": "string",
           "minLength": 1
+        },
+        "residuals_generated": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "carrier",
+              "quantity",
+              "unit",
+              "disposition",
+              "disposition_ref",
+              "evidence_ref"
+            ],
+            "properties": {
+              "carrier": {
+                "enum": [
+                  "brine_concentrate",
+                  "other_material"
+                ]
+              },
+              "quantity": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "disposition": {
+                "enum": [
+                  "contained_for_shore_disposal",
+                  "retained_onboard",
+                  "treated_onboard",
+                  "discharged_under_approved_permission",
+                  "unknown"
+                ]
+              },
+              "disposition_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     }
