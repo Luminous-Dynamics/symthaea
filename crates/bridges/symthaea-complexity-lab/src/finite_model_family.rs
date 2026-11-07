@@ -137,7 +137,7 @@ pub fn canonical_model_sha256_hex(
     let transcript = canonical_model_transcript(graph)?;
     let digest = Sha256::digest(&transcript);
     let mut encoded = String::with_capacity(64);
-    for byte in digest.iter() {
+    for &byte in digest.iter() {
         encoded.push(HEX[(byte >> 4) as usize] as char);
         encoded.push(HEX[(byte & 0x0f) as usize] as char);
     }
