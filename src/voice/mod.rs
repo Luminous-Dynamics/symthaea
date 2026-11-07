@@ -75,9 +75,9 @@ pub mod singing;
 // dependency order: singing_engine is the shared contract the other three
 // build on.
 #[cfg(feature = "singing")]
-pub mod formant_singing_engine;
-#[cfg(feature = "singing")]
 pub mod diffsinger;
+#[cfg(feature = "singing")]
+pub mod formant_singing_engine;
 #[cfg(feature = "singing")]
 pub mod kokoro_singing;
 #[cfg(feature = "singing")]
