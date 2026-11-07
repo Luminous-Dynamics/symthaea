@@ -1,0 +1,19 @@
+[workspace]
+members = ["."]
+resolver = "2"
+
+[package]
+name = "rea-numeric-lexeme-audit"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "=1.0.150", features = ["raw_value"] }
+sha2 = "=0.10.9"
+
+[[bin]]
+name = "rea-numeric-lexeme-audit"
+path = "src/main.rs"
