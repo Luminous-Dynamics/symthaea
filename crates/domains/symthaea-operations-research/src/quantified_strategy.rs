@@ -197,8 +197,8 @@ struct PartialEvaluation {
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, QuantifiedStrategyError> {
-    let shift = u32::try_from(exponent)
-        .map_err(|_| QuantifiedStrategyError::ResourceAccountingOverflow)?;
+    let shift =
+        u32::try_from(exponent).map_err(|_| QuantifiedStrategyError::ResourceAccountingOverflow)?;
     1u128
         .checked_shl(shift)
         .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)
@@ -210,12 +210,10 @@ fn validate_matrix(
     budget: QuantifiedEvaluationBudget,
 ) -> Result<(), QuantifiedStrategyError> {
     if problem.variables.len() != prefix.variable_count() {
-        return Err(
-            QuantifiedStrategyError::MatrixPrefixVariableCountMismatch {
-                matrix: problem.variables.len(),
-                prefix: prefix.variable_count(),
-            },
-        );
+        return Err(QuantifiedStrategyError::MatrixPrefixVariableCountMismatch {
+            matrix: problem.variables.len(),
+            prefix: prefix.variable_count(),
+        });
     }
     if problem.variables.len() > budget.max_variables {
         return Err(QuantifiedStrategyError::VariableBudgetExceeded {
@@ -288,16 +286,19 @@ fn strategy_table_entry_bound(
         if block.quantifier != target {
             return Ok(total);
         }
-        block.variables.iter().try_fold(total, |subtotal, &variable| {
-            let dependencies = match owner {
-                StrategyOwner::Existential => prefix.existential_dependencies(variable),
-                StrategyOwner::Universal => prefix.universal_dependencies(variable),
-            }
-            .map_err(QuantifiedStrategyError::InvalidStrategyScope)?;
-            subtotal
-                .checked_add(checked_power_of_two(dependencies.len())?)
-                .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)
-        })
+        block
+            .variables
+            .iter()
+            .try_fold(total, |subtotal, &variable| {
+                let dependencies = match owner {
+                    StrategyOwner::Existential => prefix.existential_dependencies(variable),
+                    StrategyOwner::Universal => prefix.universal_dependencies(variable),
+                }
+                .map_err(QuantifiedStrategyError::InvalidStrategyScope)?;
+                subtotal
+                    .checked_add(checked_power_of_two(dependencies.len())?)
+                    .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)
+            })
     })
 }
 
@@ -330,8 +331,7 @@ fn preflight(
 
     // The truth value is not known before search. Bound both possible witness
     // directions before entering the recursive producer.
-    let existential_entries =
-        strategy_table_entry_bound(prefix, StrategyOwner::Existential)?;
+    let existential_entries = strategy_table_entry_bound(prefix, StrategyOwner::Existential)?;
     let universal_entries = strategy_table_entry_bound(prefix, StrategyOwner::Universal)?;
     let required_entries = existential_entries.max(universal_entries);
     if required_entries > budget.max_strategy_table_entries {
@@ -341,10 +341,8 @@ fn preflight(
         });
     }
 
-    let existential_opponents =
-        opponent_assignment_bound(prefix, StrategyOwner::Existential)?;
-    let universal_opponents =
-        opponent_assignment_bound(prefix, StrategyOwner::Universal)?;
+    let existential_opponents = opponent_assignment_bound(prefix, StrategyOwner::Existential)?;
+    let universal_opponents = opponent_assignment_bound(prefix, StrategyOwner::Universal)?;
     let required_opponents = existential_opponents.max(universal_opponents);
     if required_opponents > budget.max_opponent_assignments {
         return Err(QuantifiedStrategyError::OpponentAssignmentBudgetExceeded {
@@ -736,12 +734,10 @@ pub fn verify_winning_strategy(
 
     let opponent_assignments = checked_power_of_two(opponent_variables.len())?;
     if opponent_assignments > budget.max_opponent_assignments {
-        return Err(
-            QuantifiedStrategyError::OpponentAssignmentBudgetExceeded {
-                required: opponent_assignments,
-                limit: budget.max_opponent_assignments,
-            },
-        );
+        return Err(QuantifiedStrategyError::OpponentAssignmentBudgetExceeded {
+            required: opponent_assignments,
+            limit: budget.max_opponent_assignments,
+        });
     }
 
     let mut used_rows: BTreeMap<usize, BTreeSet<Vec<bool>>> = BTreeMap::new();
@@ -815,8 +811,8 @@ pub fn verify_winning_strategy(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::decomposition::Literal;
+    use super::*;
 
     fn budget() -> QuantifiedEvaluationBudget {
         QuantifiedEvaluationBudget {
@@ -837,10 +833,7 @@ mod tests {
         }
     }
 
-    fn make_prefix(
-        blocks: Vec<QuantifierBlock>,
-        variables: usize,
-    ) -> ValidatedQuantifierPrefix {
+    fn make_prefix(blocks: Vec<QuantifierBlock>, variables: usize) -> ValidatedQuantifierPrefix {
         ValidatedQuantifierPrefix::new(variables, blocks, Default::default()).unwrap()
     }
 
@@ -864,10 +857,7 @@ mod tests {
         })
     }
 
-    fn independent_qbf_oracle(
-        problem: &CnfProblem,
-        prefix: &ValidatedQuantifierPrefix,
-    ) -> bool {
+    fn independent_qbf_oracle(problem: &CnfProblem, prefix: &ValidatedQuantifierPrefix) -> bool {
         let order: Vec<(Quantifier, usize)> = prefix
             .blocks()
             .iter()
@@ -906,7 +896,12 @@ mod tests {
             }
         }
 
-        visit(0, &order, problem, &mut vec![false; problem.variables.len()])
+        visit(
+            0,
+            &order,
+            problem,
+            &mut vec![false; problem.variables.len()],
+        )
     }
 
     fn two_variable_formulas() -> Vec<CnfProblem> {
@@ -953,7 +948,12 @@ mod tests {
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         assert!(result.value);
         assert_eq!(result.strategy.owner, StrategyOwner::Existential);
-        let function = result.strategy.functions.iter().find(|function| function.variable == 1).unwrap();
+        let function = result
+            .strategy
+            .functions
+            .iter()
+            .find(|function| function.variable == 1)
+            .unwrap();
         assert_eq!(function.dependencies, vec![0]);
         assert_eq!(function.table.get(&vec![false]), Some(&false));
         assert_eq!(function.table.get(&vec![true]), Some(&true));
@@ -970,7 +970,12 @@ mod tests {
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         assert!(!result.value);
         assert_eq!(result.strategy.owner, StrategyOwner::Universal);
-        let function = result.strategy.functions.iter().find(|function| function.variable == 0).unwrap();
+        let function = result
+            .strategy
+            .functions
+            .iter()
+            .find(|function| function.variable == 0)
+            .unwrap();
         assert_eq!(function.dependencies, vec![1]);
         assert_eq!(function.table.get(&vec![false]), Some(&false));
         assert_eq!(function.table.get(&vec![true]), Some(&true));
@@ -986,8 +991,18 @@ mod tests {
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         assert!(!result.value);
         assert_eq!(result.strategy.owner, StrategyOwner::Universal);
-        let x = result.strategy.functions.iter().find(|f| f.variable == 0).unwrap();
-        let y = result.strategy.functions.iter().find(|f| f.variable == 1).unwrap();
+        let x = result
+            .strategy
+            .functions
+            .iter()
+            .find(|f| f.variable == 0)
+            .unwrap();
+        let y = result
+            .strategy
+            .functions
+            .iter()
+            .find(|f| f.variable == 1)
+            .unwrap();
         assert_eq!(x.table.get(&vec![]), Some(&false));
         assert_eq!(y.table.get(&vec![]), Some(&true));
     }
@@ -1028,7 +1043,12 @@ mod tests {
         );
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         assert!(result.value);
-        let z = result.strategy.functions.iter().find(|f| f.variable == 2).unwrap();
+        let z = result
+            .strategy
+            .functions
+            .iter()
+            .find(|f| f.variable == 2)
+            .unwrap();
         assert_eq!(z.dependencies, vec![0, 1]);
         assert_eq!(z.table.len(), 4);
     }
@@ -1056,7 +1076,10 @@ mod tests {
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         assert!(!result.value);
         assert_eq!(result.strategy.owner, StrategyOwner::Universal);
-        assert_eq!(result.strategy.functions[0].table.get(&vec![]), Some(&false));
+        assert_eq!(
+            result.strategy.functions[0].table.get(&vec![]),
+            Some(&false)
+        );
     }
 
     #[test]
@@ -1067,7 +1090,12 @@ mod tests {
             2,
         );
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
-        let y = result.strategy.functions.iter_mut().find(|function| function.variable == 1).unwrap();
+        let y = result
+            .strategy
+            .functions
+            .iter_mut()
+            .find(|function| function.variable == 1)
+            .unwrap();
         y.table.insert(vec![false], true);
         y.table.insert(vec![true], false);
         assert!(matches!(
