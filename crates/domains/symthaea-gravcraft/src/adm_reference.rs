@@ -34,8 +34,8 @@ use std::error::Error;
 use std::f64::consts::PI;
 use std::fmt;
 use symthaea_metric_geometry_lab::{
-    curvature_tensors, geodesic_rk4_step, Christoffel4, CurvatureTensors4, GeodesicState,
-    Matrix4, MetricError, MetricField, MetricTensor4, Vector4,
+    Christoffel4, CurvatureTensors4, GeodesicState, Matrix4, MetricError, MetricField,
+    MetricTensor4, Vector4, curvature_tensors, geodesic_rk4_step,
 };
 
 /// Static amplifier-defined ADM shift metric in Cartesian coordinates.
@@ -126,11 +126,8 @@ impl AmplifierAdmMetric {
             let radius = displacement[0]
                 .hypot(displacement[1])
                 .hypot(displacement[2]);
-            let profile = alcubierre_shaping(
-                radius,
-                self.config.bubble_radius,
-                self.config.wall_sigma,
-            );
+            let profile =
+                alcubierre_shaping(radius, self.config.bubble_radius, self.config.wall_sigma);
             for axis in 0..3 {
                 total_shift[axis] += amplitude * profile * direction[axis];
             }
@@ -141,7 +138,10 @@ impl AmplifierAdmMetric {
     /// Build the covariant metric from the ADM lapse, spatial metric and shift.
     pub fn metric_components(&self, position_m: [f64; 3]) -> Result<Matrix4, AdmReferenceError> {
         let beta = self.shift_at(position_m)?;
-        let beta_squared = beta.iter().map(|component| component * component).sum::<f64>();
+        let beta_squared = beta
+            .iter()
+            .map(|component| component * component)
+            .sum::<f64>();
         Ok([
             [-1.0 + beta_squared, beta[0], beta[1], beta[2]],
             [beta[0], 1.0, 0.0, 0.0],
@@ -192,7 +192,10 @@ impl fmt::Display for AdmReferenceError {
                 write!(f, "null-direction sample count must be at least six")
             }
             Self::NonNullProjectedDirection => {
-                write!(f, "projected Eulerian direction is not null under the metric")
+                write!(
+                    f,
+                    "projected Eulerian direction is not null under the metric"
+                )
             }
         }
     }
@@ -301,8 +304,8 @@ pub fn implied_source_diagnostics(
     let mut stress_energy = [[0.0_f64; 4]; 4];
     for mu in 0..4 {
         for nu in 0..4 {
-            let einstein = curvature.ricci[mu][nu]
-                - 0.5 * metric.components[mu][nu] * curvature.ricci_scalar;
+            let einstein =
+                curvature.ricci[mu][nu] - 0.5 * metric.components[mu][nu] * curvature.ricci_scalar;
             stress_energy[mu][nu] = einstein / (8.0 * PI);
         }
     }
@@ -357,7 +360,8 @@ pub fn adm_christoffel_symbols(
     coordinates: Vector4,
 ) -> Result<Christoffel4, AdmReferenceError> {
     Ok(symthaea_metric_geometry_lab::christoffel_symbols(
-        field, coordinates,
+        field,
+        coordinates,
     )?)
 }
 
@@ -513,22 +517,20 @@ mod tests {
             .map(|value| value.abs())
             .fold(0.0_f64, f64::max);
         assert!(maximum > 1.0e-8, "metric gradient produced no connection");
-        assert!(gamma
-            .iter()
-            .flatten()
-            .flatten()
-            .all(|value| value.is_finite()));
+        assert!(
+            gamma
+                .iter()
+                .flatten()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]
     fn normalized_timelike_geodesic_preserves_metric_norm() {
         let field = shifted_field();
-        let initial = normalized_timelike_state(
-            &field,
-            [0.0, 15.0, 0.5, 0.25],
-            [1.0e-3, 0.0, 0.0],
-        )
-        .unwrap();
+        let initial =
+            normalized_timelike_state(&field, [0.0, 15.0, 0.5, 0.25], [1.0e-3, 0.0, 0.0]).unwrap();
         let initial_norm = initial.norm_squared(&field).unwrap();
         assert!((initial_norm + 1.0).abs() < 1.0e-12);
 
@@ -546,12 +548,8 @@ mod tests {
     #[test]
     fn zero_shift_geodesic_is_inertial_and_straight() {
         let field = flat_field();
-        let initial = normalized_timelike_state(
-            &field,
-            [0.0, 1.0, 2.0, 3.0],
-            [0.1, -0.05, 0.02],
-        )
-        .unwrap();
+        let initial =
+            normalized_timelike_state(&field, [0.0, 1.0, 2.0, 3.0], [0.1, -0.05, 0.02]).unwrap();
         let trajectory = integrate_adm_geodesic(&field, initial, 0.5, 20).unwrap();
         for (index, state) in trajectory.iter().enumerate() {
             for axis in 0..4 {
@@ -566,8 +564,7 @@ mod tests {
     #[test]
     fn reconstructed_flat_spacetime_has_zero_required_source() {
         let field = flat_field();
-        let diagnostics =
-            implied_source_diagnostics(&field, [0.0, 15.0, 0.0, 0.0], 26).unwrap();
+        let diagnostics = implied_source_diagnostics(&field, [0.0, 15.0, 0.0, 0.0], 26).unwrap();
         assert!(diagnostics.curvature.ricci_scalar.abs() < 1.0e-9);
         assert!(diagnostics.eulerian_energy_density.abs() < 1.0e-9);
         assert!(diagnostics.minimum_sampled_null_energy.abs() < 1.0e-9);
@@ -576,16 +573,17 @@ mod tests {
     #[test]
     fn shifted_metric_source_diagnostics_are_finite_and_report_sample_count() {
         let field = shifted_field();
-        let diagnostics =
-            implied_source_diagnostics(&field, [0.0, 15.0, 0.5, 0.25], 42).unwrap();
+        let diagnostics = implied_source_diagnostics(&field, [0.0, 15.0, 0.5, 0.25], 42).unwrap();
         assert_eq!(diagnostics.sampled_null_directions, 42);
         assert!(diagnostics.eulerian_energy_density.is_finite());
         assert!(diagnostics.minimum_sampled_null_energy.is_finite());
-        assert!(diagnostics
-            .stress_energy
-            .iter()
-            .flatten()
-            .all(|value| value.is_finite()));
+        assert!(
+            diagnostics
+                .stress_energy
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]
