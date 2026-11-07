@@ -11,9 +11,9 @@
 //! authenticate source receipts or prove those upstream processes valid.
 
 use connectome_asof_filtration::{
-    AdmissionMode, AdmissionStatus, AdjusterReceipt, AvailabilityState, EvidenceEvent,
-    EvidenceSplit, FiltrationAdmission, GlobalLedger, LedgerEntry, LedgerPayload, audit_admission,
-    audit_ledger,
+    AdmissionMode, AdmissionStatus, AdjusterReceipt, AvailabilityState, DecisionAuditStatus,
+    EvidenceEvent, EvidenceSplit, FiltrationAdmission, GlobalLedger, LedgerEntry, LedgerPayload,
+    audit_admission, audit_ledger,
 };
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -302,6 +302,43 @@ pub fn canonical_e_process_path_sha256(values: &[Rational]) -> String {
     sha256_hex(&encoded)
 }
 
+fn validate_confirmatory_admission_scope(
+    ledger: &GlobalLedger,
+    observed_event_ids: &[String],
+    family_id: &str,
+    family_commitment_sha256: &str,
+) -> Result<(), ClosedError> {
+    let observed: BTreeSet<&str> = observed_event_ids.iter().map(String::as_str).collect();
+    let mut matching_freeze_seen = false;
+    for entry in &ledger.entries {
+        match &entry.payload {
+            LedgerPayload::FamilyFreeze(freeze) if freeze.family_id == family_id => {
+                if freeze.family_commitment_sha256 != family_commitment_sha256 {
+                    return Err(ClosedError(
+                        "confirmatory family freeze commitment does not match manifest".into(),
+                    ));
+                }
+                matching_freeze_seen = true;
+            }
+            LedgerPayload::Evidence(event)
+                if observed.contains(event.event_id.as_str())
+                    && event.split == EvidenceSplit::Confirmation =>
+            {
+                if !matching_freeze_seen
+                    || event.confirmatory_family_id.as_deref() != Some(family_id)
+                {
+                    return Err(ClosedError(
+                        "claim admission consumes confirmation evidence outside its frozen family"
+                            .into(),
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 /// Audit complete closed testing over all nonempty subsets (at most 8 claims).
 pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedError> {
     let ledger_audit = audit_ledger(&family.global_ledger)
@@ -311,6 +348,15 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
     {
         return Err(ClosedError(
             "as-of ledger campaign or global filtration does not match closed family".into(),
+        ));
+    }
+    if ledger_audit
+        .decisions
+        .iter()
+        .any(|decision| decision.status != DecisionAuditStatus::Accepted)
+    {
+        return Err(ClosedError(
+            "global as-of ledger contains a rejected adaptive decision prefix".into(),
         ));
     }
     if family.family_id.is_empty() || family.campaign_id.is_empty() {
@@ -418,6 +464,12 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
             )));
         }
         let admission = &claim.filtration_admission;
+        validate_confirmatory_admission_scope(
+            &family.global_ledger,
+            &admission.observed_event_ids,
+            &family.family_id,
+            &family.family_commitment_sha256,
+        )?;
         let admission_audit = audit_admission(&family.global_ledger, admission);
         if !matches!(
             admission_audit.status,
