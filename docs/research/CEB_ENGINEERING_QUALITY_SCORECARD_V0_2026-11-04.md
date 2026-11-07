@@ -119,6 +119,29 @@ For each capability, publish:
 
 Do not collapse these into one number. Report Pareto-dominant configurations and the cost of achieving a given quality/risk point.
 
+## 3.10 From code location to causal mechanism diagnosis
+
+The November 2026 review frontier demonstrates that a reviewer can point at the correct file yet describe the wrong defect mechanism. SecPRBench reports that 68% of analyzed misses include a finding in a root-cause file but a rejected explanation of a neighboring mechanism; multi-file causal mechanisms are substantially harder than single-file cases. ReviewBench adds multi-source golden findings and separate grounded versus augmented scoring; CR-Bench-v2 demonstrates that useful comments and known-defect detection can diverge sharply. These are complementary measurements, not interchangeable scores.
+
+**New research requirement:** CEB-REVIEW adjudicates discovery, localization, mechanism, evidence and decision utility separately. A target-defect hit requires the correct causal mechanism, not merely the right file, function, line or vulnerability family. The concise evidence artifact should identify: (1) the triggering precondition/event, (2) the relevant caller/data/control path and state, (3) the unsafe or incorrect operation, (4) the violated requirement/invariant, and (5) the source revision and strongest evidence authority supporting the conclusion. This is a verifiable diagnosis summary, not a request to expose model chain-of-thought.
+
+Add paired controls for same-file/wrong-mechanism, neighboring defects, non-local multi-file causes, stale/repaired companions, valid non-target findings and clean PRs. Preserve unresolved status when the causal chain is not established. A fixed companion is a target-specific negative control, not a proof that the whole patch is safe.
+
+**Do not add a metric lane.** Keep the existing CEB-REVIEW primaries unchanged:
+- `defect_recall_at_5`: a finding is credited only when it identifies the target defect's causal mechanism.
+- `actionable_precision`: independently adjudicated actionable findings; correct location alone does not qualify.
+- `reviewer_burden`: count the full effort needed to understand and disposition findings, including evidence reconstruction and human adjudication.
+
+Supplementary failure labels (discovery miss, localization miss, mechanism misdiagnosis, revision/scope error, authority overclaim, useful non-target finding, unsupported/noisy finding, unresolved adjudication and evaluator mismatch) are annotation aids, not new registered primary metrics.
+
+**Comparator distinctions as of November 7, 2026:**
+- ReviewBench high-severity grounded leaderboard: leading public row OhMyBug 83.0 F1 / 92.0 precision / 75.6 recall; it also separates fixed-gold grounded outcomes from augmented discovery findings. Its corpus has 219 PRs / 187 repositories / 19 languages, and GitHub reports 96.6% expert agreement on its gold true/false-positive labels. These are ReviewBench-specific measures.
+- SecPRBench: 265 real vulnerability-introducing changes across nine C/C++/Rust systems projects; 217 mechanically validated, 48 human-adjudicated; direct-review target recall 32.5–78.1%. The highest raw recall is not necessarily the best cost point: Grok 4.6 reports 78.1% at estimated $3.20 / 12.6 minutes, while Opus 5.5 reports 74.0% at $0.44 / 1.4 minutes. Its fixed companions do not measure general report precision, and the judge is itself an evaluated model.
+- CR-Bench-v2: verified slice 174 Python tasks/11 repositories; best reported known-defect detection is about 33%, with usefulness around 90% for GPT-5.2 Reflexion. This is a single-known-defect-per-instance, review-only comparator.
+- CRBugBench: scale comparator (1,000 public tasks/98 repositories plus 800 proprietary); best reported detection is 71.9% in top five findings; not a precision measure.
+
+Sources and full correspondence are recorded in [CEB Review Benchmark Triangulation V0](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md). For a matched CEB superiority claim, compare the same frozen tasks, language/repository mix, issue/PR snapshots, model+harness, tool permissions, cost budget, grader and metric definition. A 0.85 CEB Recall@5 target is an ambitious CEB-specific sealed-holdout gate, not a conversion from SecPRBench or ReviewBench.
+
 ## 4. Matched industry comparison design
 
 For every CEB slice, compare:
