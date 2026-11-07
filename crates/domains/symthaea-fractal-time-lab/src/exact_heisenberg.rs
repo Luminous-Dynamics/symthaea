@@ -21,8 +21,6 @@
 use crate::exact_floquet::FloquetError;
 use rustfft::num_complex::Complex;
 use std::collections::BTreeSet;
-use std::f64::consts::PI;
-
 /// An anisotropic spin-1/2 XYZ interaction on an undirected edge.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HeisenbergEdge {
