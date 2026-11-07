@@ -49,6 +49,9 @@ jobs:
           assert fixture["rows"][1]["outcome"]["perturbed_phase_samples"][1]["cycle_index"] == 1
           assert fixture["oracle_expectations"]["cycle_slips_by_leg"] == [0, 0, 0, 0, 0, 0]
           assert fixture["oracle_expectations"]["off_diagonal_cycle_slips_l1"] == 0
+          assert fixture["rows"][3]["probe_key"]["descending_neuron_id"] == "DNg100"
+          assert fixture["rows"][4]["probe_key"]["descending_neuron_id"] == "DNg97"
+          assert fixture["rows"][3]["probe_key"] != fixture["rows"][4]["probe_key"]
           print("phase-response schema/fixture: PASS")
           PY
       - name: Format standalone crate
