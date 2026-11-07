@@ -6,7 +6,6 @@
 
 pub mod api_contract;
 pub mod job_lifecycle;
-pub mod api_v1;
 pub use job_lifecycle::{JobContractError, JobStatus, LabJob};
 
 use serde::{Deserialize, Serialize};
