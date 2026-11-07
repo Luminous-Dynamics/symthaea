@@ -126,12 +126,12 @@ class DiffSingerModel:
         if silence_token is None:
             raise ValueError("voicebank phonemes.json has no entry for 'SP'")
         tokens = [silence_token]
-        languages = [0]
+        languages = [language_id]
         for arpabet in arpabet_phonemes:
             namespaced = f"en/{arpabet}"
             if arpabet == "SP":
                 tokens.append(silence_token)
-                languages.append(0)
+                languages.append(language_id)
                 continue
             token = self.phoneme_token(namespaced)
             if token is None:
@@ -139,7 +139,7 @@ class DiffSingerModel:
             tokens.append(token)
             languages.append(language_id)
         tokens.append(silence_token)
-        languages.append(0)
+        languages.append(language_id)
 
         head_ms = FRAME_MS * HEAD_FRAMES
         tail_ms = FRAME_MS * TAIL_FRAMES
