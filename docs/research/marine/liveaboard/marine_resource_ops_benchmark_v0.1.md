@@ -75,7 +75,7 @@ Use constrained/lexicographic decisions, not a free weighted sum:
 
 V0 is shadow/recommendation mode only. It cannot command the watermaker, generator, battery, HVAC, refrigerator, propulsion or protection devices. Physical controllers, certified local interlocks and operator authority remain independent.
 
-## 5. Weather-routing research context and authority boundary
+## 6. Weather-routing research context and authority boundary
 
 Recent weather-routing literature reinforces why route, speed and energy must be co-designed under uncertainty, but that work belongs to the existing MARINE-DESIGN-001 owner:
 
@@ -85,7 +85,7 @@ Recent weather-routing literature reinforces why route, speed and energy must be
 
 These are research results from different vessel classes and scenarios, not transferable performance claims for LOS-18. They justify matched weather/forecast uncertainty and explicit fuel-versus-delay trade-offs. The marine resource scheduler consumes a frozen route/propulsion demand profile; it does not generate the route or change speed in V0. A future joint study can compose the route owner and service scheduler using exact shared case identities, then compare the full Pareto frontier.
 
-## 6. Benchmark policy baselines
+## 7. Benchmark policy baselines
 
 Compare on identical frozen cases and the same information:
 1. Fixed equipment defaults / static timetable.
@@ -97,7 +97,7 @@ Compare on identical frozen cases and the same information:
 
 Do not compare a forecast-informed policy against a baseline deprived of the same forecast. Freeze compute budgets and replanning intervals.
 
-## 7. Metrics
+## 8. Metrics
 
 Report separately:
 - critical service violations (non-compensable hard fail);
@@ -116,7 +116,7 @@ Report separately:
 
 No one score combines these. Publish the full service and energy ledger plus hard-gate disposition.
 
-## 8. Frozen scenario corpus
+## 9. Frozen scenario corpus
 
 The companion JSON defines four synthetic profiles with critical, hotel, thermal-protection and propulsion load series. Their sum is checked against the aggregate load profile passed to the existing grid-physics harness. Each scenario also declares synthetic generator availability/ramp/start/minimum-run/fuel state, shore-power availability, battery temperature/SoH, sea state/wind/air/sea temperature, solar forecast error bound and RO feed salinity/temperature qualification. These are synthetic contract fields, not vendor- or class-qualified equipment parameters.
 
@@ -128,7 +128,7 @@ The four cases are:
 
 These profiles are deliberately synthetic. Their numbers are contract-test inputs, not recommended vessel sizing or measured operating assumptions.
 
-## 9. Negative controls
+## 10. Negative controls
 
 - Missing or stale battery state must not be treated as reserve headroom.
 - Watermaker feed outside qualified limits must block the production request.
@@ -142,7 +142,7 @@ These profiles are deliberately synthetic. Their numbers are contract-test input
 - Reordered service rows must produce equivalent deterministic output.
 - Loss of network, forecast, Symthaea or Mycelix cannot disable local equipment safety controls.
 
-## 10. Acceptance targets — goals, not results
+## 11. Acceptance targets — goals, not results
 
 - Zero hard-constraint violations in the frozen adversarial corpus.
 - 100% service accounting: completed, postponed, failed, blocked, or indeterminate with reason.
@@ -153,6 +153,6 @@ These profiles are deliberately synthetic. Their numbers are contract-test input
 - Report paired results, tails and worst scenario; no universal kWh saving is predeclared.
 - Use held-out scenario families for policy confirmation; do not split time samples from one synthetic trace into train and test.
 
-## 11. Claim ceiling
+## 12. Claim ceiling
 
 A PASS establishes only that the frozen scheduling contract behaves as specified on the synthetic replay corpus. It does not establish physical energy savings, generator fuel reduction, battery-life improvement, potable-water availability, food safety, habitability, seaworthiness or authority to operate equipment.
