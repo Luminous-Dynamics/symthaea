@@ -522,6 +522,46 @@ mod tests {
     }
 
     #[test]
+    fn three_variable_forest_matches_joint_enumeration() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let c = graph.add_variable("C", 2);
+        graph.add_factor(&[a, b], vec![0.4, 0.1, 0.2, 0.3]);
+        graph.add_factor(&[b, c], vec![0.5, 0.5, 0.3, 0.7]);
+
+        let result = run_sum_product(&graph, &BPConfig::default()).unwrap();
+        assert!(result.converged);
+        assert_eq!(result.inference_status, InferenceStatus::ExactForest);
+
+        let f1 = [[0.4, 0.1], [0.2, 0.3]];
+        let f2 = [[0.5, 0.5], [0.3, 0.7]];
+        let mut z = 0.0;
+        let mut exact = [[0.0; 2]; 3];
+        for av in 0..2 {
+            for bv in 0..2 {
+                for cv in 0..2 {
+                    let weight = f1[av][bv] * f2[bv][cv];
+                    z += weight;
+                    exact[0][av] += weight;
+                    exact[1][bv] += weight;
+                    exact[2][cv] += weight;
+                }
+            }
+        }
+        for variable in 0..3 {
+            for state in 0..2 {
+                let expected = exact[variable][state] / z;
+                assert!(
+                    (result.beliefs[variable][state] - expected).abs() < 1.0e-10,
+                    "variable {variable}, state {state}: checked={}, enumeration={expected}",
+                    result.beliefs[variable][state]
+                );
+            }
+        }
+    }
+
+    #[test]
     fn disconnected_and_isolated_variables_are_uniform() {
         let mut graph = FactorGraph::new();
         graph.add_variable("A", 3);
@@ -563,6 +603,17 @@ mod tests {
             run_sum_product(&graph, &BPConfig::default()),
             Err(CheckedBPError::ZeroCardinality { variable: 0 })
         ));
+    }
+
+    #[test]
+    fn all_zero_factor_is_rejected_before_message_passing() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        graph.add_factor(&[a], vec![0.0, 0.0]);
+        assert_eq!(
+            run_sum_product(&graph, &BPConfig::default()),
+            Err(CheckedBPError::AllZeroFactor { factor: 0 })
+        );
     }
 
     #[test]
@@ -635,6 +686,19 @@ mod tests {
         assert!(result.converged);
         assert_eq!(result.graph_structure, GraphStructure::Forest);
         assert_eq!(result.inference_status, InferenceStatus::ApproximateDampedForest);
+    }
+
+    #[test]
+    fn iteration_exhaustion_is_not_labelled_exact() {
+        let graph = two_node_tree();
+        let result = run_sum_product(&graph, &BPConfig {
+            max_iterations: 1,
+            tolerance: 1.0e-30,
+            damping: 1.0,
+            schedule: MessageSchedule::Parallel,
+        }).unwrap();
+        assert!(!result.converged);
+        assert_eq!(result.inference_status, InferenceStatus::NotConverged);
     }
 
     #[test]
