@@ -313,6 +313,20 @@ Tool use is not inherently intelligence. A reviewer should choose the next obser
 
 Compare static-first, unconstrained tool selection, transparent evidence-directed heuristics, calibrated sequential value-of-information, and ask/abstain policies under matched all-in budgets. Require an action proposal that states the claim, alternatives, observation, expected discriminating outcomes, applicability, authority, safety, cost and stopping implication. Do not reward number of tools or tests. Reuse the existing selective-escalation, causal-diagnosis and evidence-authority contracts; do not create a tool-use metric lane, execution scheduler or Bayesian confidence claim without calibrated probabilities.
 
+### Shift 13 — From comment acceptance to verified engineering impact
+
+The next frontier is not maximizing accepted comments. It is understanding the chain from finding truth to practical change without confusing correlation for causation.
+
+Separate four outcomes:
+1. **Correctness:** is the reported issue real on the exact reviewed revision, and is the causal mechanism right?
+2. **Actionability:** is the proposed response useful, scoped and technically sound?
+3. **Uptake:** did the developer accept, reject, defer, discuss or independently reproduce the suggestion?
+4. **Downstream outcome:** did the change prevent recurrence, reduce rework, introduce regressions, or improve the system under later evolution?
+
+Martian's production review timeline shows why uptake data is valuable, while ReviewBench, SecPRBench and Kodus show why it cannot replace independently adjudicated truth. A comment can be accepted for convenience or rejected despite correctness. A code change following a review does not by itself establish causal attribution to that comment.
+
+The CEB experiment should preserve the finding's exact revision, independent disposition and human-response event. Use review timelines, issue resolution and later recurrence as process/outcome evidence; where causal attribution matters, compare matched review windows or use controlled rollout/holdback designs with a clear assignment unit. Do not infer adoption from silence, do not infer correctness from acceptance, and do not rewrite fixed gold because a developer later changed code. Map to existing CEB-REVIEW / CEB-HUMAN / continuity measures rather than adding a new primary metric lane.
+
 ## 5. Recommended CEB scorecard — independent dimensions
 
 Do not publish one opaque weighted number. Maintain hard gates and a Pareto surface across:
