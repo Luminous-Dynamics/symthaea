@@ -176,3 +176,20 @@ Do not equate:
 - **net decision value:** EVSI minus full experimental and opportunity costs, with downside-risk and feasibility constraints.
 
 An experiment can be informative but not decision-relevant when all plausible outcomes leave the action unchanged. Conversely, a narrow measurement can have high decision value if it changes a costly or safety-critical choice. Freeze utility weights before outcomes; no post-hoc reweighting. If value estimates are not defensible or the choice is non-identifiable, the right action is to abstain or seek more evidence, not invent precision.
+
+
+## Executable decision-value contract refinement (2026-11-07)
+
+The standalone EVSI reference keeps the protocol's decision quantities separate:
+
+- **Gross EVSI:** expected improvement in the best downstream action after observing the experiment, before costs.
+- **Direct experiment cost:** measured resource cost converted to the preregistered utility unit.
+- **Opportunity cost:** value of the best foregone alternative use of the committed resources, net of direct cost.
+- **Net EVSI:** gross EVSI minus direct cost and opportunity cost.
+- **Downside risk:** expected downside loss plus upper-tail CVaR from a declared loss for each experiment outcome.
+
+The risk limit is an independent eligibility gate, not an arbitrary penalty silently folded into utility. A candidate is decision-eligible only when net EVSI is positive and the preregistered CVaR limit passes. This does not make the risk model complete: unmodeled outcomes, loss misspecification and uncertainty in priors or likelihoods remain explicit limitations.
+
+The checked-in weather example retains gross EVSI 0.2 utility units, direct cost 0.1, opportunity cost 0.0, net EVSI 0.1 and zero modeled downside. These are illustrative arithmetic values, not measured research performance.
+
+The reference now includes negative controls for (i) positive net EVSI with a failed risk gate, (ii) opportunity cost reversing an otherwise positive decision, and (iii) weighted CVaR whose tail splits an outcome's probability mass. The Rust tests are authored but remain unexecuted until a Rust toolchain is available.
