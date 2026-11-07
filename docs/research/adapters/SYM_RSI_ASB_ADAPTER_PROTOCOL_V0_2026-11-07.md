@@ -81,6 +81,22 @@ Report the following independently:
 
 Do not allow a high discovery score to compensate for failed held-out learning, or vice versa. Do not normalize away worst-family regressions. Do not call replay/twin conformance original science. R4 remains governed by #10497 and needs same-start, inclusive-budget, repeated full-loop evidence plus fresh-family transfer.
 
+## Current offline contract implementation
+
+The standalone crate now has three distinct layers:
+
+1. `manifest`: pinned upstream repository/file identities and the two campaign/gate contracts.
+2. `job_lifecycle`: queued/running/completed/failed semantics; only completed jobs with a full row count can advance a stage.
+3. `api_contract`: strict fixture-driven parsing of campaign cards, status, catalog and job responses; status budget reconciliation; catalog batch size/eligibility/duplicate/previous-measurement checks; and exact identity-set comparison between submitted designs and completed result rows.
+
+The API fixture CLI is:
+
+```bash
+cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- --api-fixtures
+```
+
+It validates only checked-in synthetic contract fixtures. It makes no HTTP calls. The Rust crate has 31 authored tests in total (5 manifest, 9 lifecycle, 17 API contract); they have not been compiled or run in this environment. The companion structural schema is `tools/sym-rsi-asb-adapter-reference/fixtures/lab-api-v1-public-schema.json`.
+
 ## Progression
 
 1. Validate the manifest offline.
