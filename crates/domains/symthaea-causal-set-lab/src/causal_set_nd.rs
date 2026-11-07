@@ -481,13 +481,14 @@ mod tests {
         let mut histogram = vec![0_u64; n.saturating_sub(1)];
         for first in 0..n {
             for second in (first + 1)..n {
-                let (past, future) = if causet.events[first].causally_precedes(&causet.events[second]) {
-                    (first, second)
-                } else if causet.events[second].causally_precedes(&causet.events[first]) {
-                    (second, first)
-                } else {
-                    continue;
-                };
+                let (past, future) =
+                    if causet.events[first].causally_precedes(&causet.events[second]) {
+                        (first, second)
+                    } else if causet.events[second].causally_precedes(&causet.events[first]) {
+                        (second, first)
+                    } else {
+                        continue;
+                    };
                 let interior = (0..n)
                     .filter(|&event| {
                         causet.events[past].causally_precedes(&causet.events[event])
@@ -616,10 +617,7 @@ mod tests {
             .collect();
         let antichain = CausalSetNd::new(4, antichain_events).unwrap();
         assert_eq!(antichain.interval_size_histogram(), vec![0, 0, 0, 0]);
-        assert_eq!(
-            antichain.bdg_action_4d_dimensionless_bracket().unwrap(),
-            5
-        );
+        assert_eq!(antichain.bdg_action_4d_dimensionless_bracket().unwrap(), 5);
     }
 
     #[test]
