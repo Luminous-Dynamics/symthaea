@@ -46,7 +46,11 @@ V0 defines five intent classes. A rule applies to one exact RFC 6901 JSON Pointe
 
 ### 3.1 binary64
 
-A binary64 rule declares that binary floating-point interpretation is intended. It must identify policies for negative zero, exponent-form input, underflow, overflow, maximum significant digits and comparison. If a tolerance is used, the comparison mode and tolerance representation must be declared in the profile; tolerance values themselves should be decimal strings to avoid introducing an unreviewed binary64 conversion.
+A binary64 rule declares that binary floating-point interpretation is intended. It must identify policies for negative zero, exponent-form input, underflow, overflow, maximum significant digits, precision rounding and comparison. A profile must explicitly say whether ordinary ECMAScript binary64 rounding is accepted or whether the input must represent an exactly representable binary64 value.
+
+**Negative zero requires special care:** RFC 8785 canonicalizes both positive and negative zero as the JSON number 0. A JCS digest therefore cannot preserve the IEEE-754 sign bit. V0 may reject a negative-zero source token, accept it as canonical positive zero, or retain the original token only as diagnostic provenance. A profile must not claim that JCS equality preserves signed-zero semantics. A domain where the sign bit is meaningful needs a different, explicitly typed representation outside ordinary JCS numeric comparison.
+
+Underflow to a subnormal value and underflow all the way to zero are different events and need separate policies. An implementation may allow subnormals while still rejecting values rounded to zero. If a tolerance is used, the comparison mode and tolerance representation must be declared in the profile; tolerance values themselves should be decimal strings to avoid introducing an unreviewed binary64 conversion.
 
 JCS equality is meaningful only between values whose numeric intent is compatible. The profile must not silently compare a binary64 field with an exact decimal string or an exact integer field.
 
