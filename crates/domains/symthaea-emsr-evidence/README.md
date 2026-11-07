@@ -42,6 +42,10 @@ Every run receipt requires a SHA-256 digest for the exact ground-truth/adjudicat
 
 The common-mode dependency graph also binds every source profile to one immutable snapshot ID and RFC 3339 `as_of` time. Unknown dependency inventories remain unknown; `no_declared_common_domain` is not a proof of physical independence.
 
+## Open-set RF evaluation profile
+
+`docs/research/emsr-v0.1/emsr-open-set-rf-profile-v0.1.json` freezes the passive open-set RF task boundary, RF-RPL comparator metadata, rights-pending dataset references, event/recording split policy, known/unknown/indeterminate decisions, metrics and ESP32/RF-front-end claim separation. It is a design profile; the comparator has not been reproduced and no dataset payload is imported.
+
 ## Machine-readable contracts
 
 `docs/research/emsr-v0.1/emsr-evidence-contracts-v0.1.schema.json` contains Draft 2020-12 definitions for the dataset catalogue, split manifest, run receipt, source failure-domain profile and pairwise-independence graph. Cross-record group leakage, unique identifiers, exact intended-use matching, exact-byte digest checks and executor/verifier identity separation are additionally enforced by the Rust validator.
