@@ -112,8 +112,12 @@ pub struct ThreeBallRuleSpace {
     pub source_rule_generator_commit: String,
     pub parameterization_digest: String,
     pub rules: Vec<ThreeBallRule>,
-    /// Arithmetic mean of all 81 source model priors, including duplicates.
+    /// Per-column arithmetic mean of source hypotheses, used by the strict
+    /// structural-zero research variant of Dirichlet BMR.
     pub full_model_average_prior: DirichletConcentrationTensor,
+    /// Source-faithful SPM DEM_reasoning prior: the sum of the 81 likelihood
+    /// tensors divided by 81 and then normalized globally by total tensor mass.
+    pub spm_model_average_prior: DirichletConcentrationTensor,
     /// Number of distinct complete feedback likelihood tensors.
     pub semantic_unique_rule_count: usize,
     /// Groups of source indices that have identical feedback likelihood tensors.
@@ -216,6 +220,7 @@ pub fn build_three_ball_rule_space() -> ThreeBallRuleSpace {
 
     let semantic_unique_rule_count = first_seen.len();
     let full_model_average_prior = arithmetic_mean_prior(&rules);
+    let spm_model_average_prior = globally_normalized_model_average_prior(&rules);
 
     ThreeBallRuleSpace {
         format_version: 1,
@@ -224,6 +229,7 @@ pub fn build_three_ball_rule_space() -> ThreeBallRuleSpace {
         parameterization_digest: THREE_BALL_PARAMETERIZATION_DIGEST.to_owned(),
         rules,
         full_model_average_prior,
+        spm_model_average_prior,
         semantic_unique_rule_count,
         semantic_duplicate_groups: duplicate_groups,
         paper_reported_unique_rule_count: THREE_BALL_PAPER_REPORTED_UNIQUE_RULE_COUNT,
@@ -351,6 +357,25 @@ fn build_rule_prior(
         columns,
         active_support,
     }
+}
+
+/// SPM DEM_reasoning computes A0 as the average of all rule likelihood
+/// tensors and then divides the entire tensor by `sum(A0,'all')`. That is a
+/// global normalization across all hidden-state columns, unlike the strict
+/// per-column arithmetic mean retained by `full_model_average_prior`.
+fn globally_normalized_model_average_prior(
+    rules: &[ThreeBallRule],
+) -> DirichletConcentrationTensor {
+    let mut prior = arithmetic_mean_prior(rules);
+    let total_mass = prior.columns.iter().flatten().sum::<f64>();
+    if total_mass.is_finite() && total_mass > 0.0 {
+        for column in &mut prior.columns {
+            for concentration in column {
+                *concentration /= total_mass;
+            }
+        }
+    }
+    prior
 }
 
 fn arithmetic_mean_prior(rules: &[ThreeBallRule]) -> DirichletConcentrationTensor {
@@ -488,6 +513,8 @@ pub enum ThreeBallFeedbackDecisionError {
 /// posterior; their normalized prior predictive is retained as a harmless
 /// placeholder because their mixture weight is exactly zero. This function is
 /// a known-state feedback probe, not a gaze/vision POMDP transition model.
+/// Construct an action-conditioned feedback prediction using strict
+/// structural-zero model semantics.
 pub fn build_three_ball_feedback_action_prediction(
     space: &ThreeBallRuleSpace,
     full_posterior: &DirichletConcentrationTensor,
@@ -497,9 +524,49 @@ pub fn build_three_ball_feedback_action_prediction(
     choice: Option<ThreeBallColour>,
     action_id: impl Into<String>,
 ) -> Result<DirichletActionPrediction, ThreeBallFeedbackDecisionError> {
+    build_three_ball_feedback_action_prediction_with_mode(
+        space, full_posterior, models, ball_colours, gaze, choice, action_id, false,
+    )
+}
+
+/// Construct the same action prediction under the pinned SPM source convention:
+/// globally normalized parent prior, posterior model odds from 1/32-smoothed
+/// Dirichlet BMR, and model-conditional predictive columns from q + r - p.
+pub fn build_three_ball_feedback_action_prediction_spm_compatible(
+    space: &ThreeBallRuleSpace,
+    full_posterior: &DirichletConcentrationTensor,
+    models: &[ReducedDirichletModelHypothesis],
+    ball_colours: [ThreeBallColour; 3],
+    gaze: Option<ThreeBallLocation>,
+    choice: Option<ThreeBallColour>,
+    action_id: impl Into<String>,
+) -> Result<DirichletActionPrediction, ThreeBallFeedbackDecisionError> {
+    build_three_ball_feedback_action_prediction_with_mode(
+        space, full_posterior, models, ball_colours, gaze, choice, action_id, true,
+    )
+}
+
+fn build_three_ball_feedback_action_prediction_with_mode(
+    space: &ThreeBallRuleSpace,
+    full_posterior: &DirichletConcentrationTensor,
+    models: &[ReducedDirichletModelHypothesis],
+    ball_colours: [ThreeBallColour; 3],
+    gaze: Option<ThreeBallLocation>,
+    choice: Option<ThreeBallColour>,
+    action_id: impl Into<String>,
+    spm_compatible: bool,
+) -> Result<DirichletActionPrediction, ThreeBallFeedbackDecisionError> {
     let action_id = action_id.into();
-    let full_prior = &space.full_model_average_prior;
-    let current_belief = reduce_dirichlet_models(full_posterior, full_prior, models)?;
+    let full_prior = if spm_compatible {
+        &space.spm_model_average_prior
+    } else {
+        &space.full_model_average_prior
+    };
+    let current_belief = if spm_compatible {
+        reduce_dirichlet_models_spm_compatible(full_posterior, full_prior, models)?
+    } else {
+        reduce_dirichlet_models(full_posterior, full_prior, models)?
+    };
     let model_probabilities = current_belief
         .models
         .iter()
@@ -538,36 +605,56 @@ pub fn build_three_ball_feedback_action_prediction(
             } else {
                 model.parameter_prior.columns[column_index][outcome_index]
             };
-            if active && (!value.is_finite() || value <= 0.0) {
-                return Err(
-                    ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
-                        model_id: model.model_id.clone(),
-                        outcome_index,
-                    },
-                );
+            if spm_compatible {
+                // SPM's BMR smooths all coordinates for model evidence, then
+                // removes that pseudocount before normalizing posterior means.
+                // Thus data may support an outcome outside a sparse source rule.
+                if !value.is_finite() || value < -1e-9 {
+                    return Err(
+                        ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
+                            model_id: model.model_id.clone(),
+                            outcome_index,
+                        },
+                    );
+                }
+                concentrations.push(value.max(0.0));
+            } else {
+                if active && (!value.is_finite() || value <= 0.0) {
+                    return Err(
+                        ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
+                            model_id: model.model_id.clone(),
+                            outcome_index,
+                        },
+                    );
+                }
+                if !active && value != 0.0 {
+                    return Err(
+                        ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
+                            model_id: model.model_id.clone(),
+                            outcome_index,
+                        },
+                    );
+                }
+                concentrations.push(if active { value } else { 0.0 });
             }
-            if !active && value != 0.0 {
-                return Err(
-                    ThreeBallFeedbackDecisionError::InvalidPosteriorPredictiveConcentration {
-                        model_id: model.model_id.clone(),
-                        outcome_index,
-                    },
-                );
-            }
-            concentrations.push(if active { value } else { 0.0 });
         }
         let total = concentrations.iter().sum::<f64>();
-        if !total.is_finite() || total <= 0.0 {
-            return Err(
-                ThreeBallFeedbackDecisionError::EmptyPosteriorPredictiveColumn {
-                    model_id: model.model_id.clone(),
-                },
-            );
-        }
-        let probabilities = concentrations
-            .iter()
-            .map(|value| value / total)
-            .collect::<Vec<_>>();
+        let probabilities = if spm_compatible && total == 0.0 {
+            vec![1.0 / THREE_BALL_FEEDBACK_OUTCOME_COUNT as f64;
+                THREE_BALL_FEEDBACK_OUTCOME_COUNT]
+        } else {
+            if !total.is_finite() || total <= 0.0 {
+                return Err(
+                    ThreeBallFeedbackDecisionError::EmptyPosteriorPredictiveColumn {
+                        model_id: model.model_id.clone(),
+                    },
+                );
+            }
+            concentrations
+                .iter()
+                .map(|value| value / total)
+                .collect::<Vec<_>>()
+        };
         let probability_mass = probabilities.iter().sum::<f64>();
         if !probability_mass.is_finite() || (probability_mass - 1.0).abs() > 1e-10 {
             return Err(
@@ -643,6 +730,37 @@ pub fn score_three_ball_known_state_feedback_actions(
     actions: &[ThreeBallFeedbackActionSpec],
     config: ThreeBallFeedbackDecisionConfig,
 ) -> Result<ThreeBallFeedbackDecision, ThreeBallFeedbackDecisionError> {
+    score_three_ball_known_state_feedback_actions_with_mode(
+        space, full_posterior, models, ball_colours, gaze, actions, config, false,
+    )
+}
+
+/// Score the same one-step known-state feedback decision using the pinned SPM
+/// BMR semantics. This remains a scoped feedback-only evaluator, not the full POMDP.
+pub fn score_three_ball_known_state_feedback_actions_spm_compatible(
+    space: &ThreeBallRuleSpace,
+    full_posterior: &DirichletConcentrationTensor,
+    models: &[ReducedDirichletModelHypothesis],
+    ball_colours: [ThreeBallColour; 3],
+    gaze: Option<ThreeBallLocation>,
+    actions: &[ThreeBallFeedbackActionSpec],
+    config: ThreeBallFeedbackDecisionConfig,
+) -> Result<ThreeBallFeedbackDecision, ThreeBallFeedbackDecisionError> {
+    score_three_ball_known_state_feedback_actions_with_mode(
+        space, full_posterior, models, ball_colours, gaze, actions, config, true,
+    )
+}
+
+fn score_three_ball_known_state_feedback_actions_with_mode(
+    space: &ThreeBallRuleSpace,
+    full_posterior: &DirichletConcentrationTensor,
+    models: &[ReducedDirichletModelHypothesis],
+    ball_colours: [ThreeBallColour; 3],
+    gaze: Option<ThreeBallLocation>,
+    actions: &[ThreeBallFeedbackActionSpec],
+    config: ThreeBallFeedbackDecisionConfig,
+    spm_compatible: bool,
+) -> Result<ThreeBallFeedbackDecision, ThreeBallFeedbackDecisionError> {
     if actions.is_empty() {
         return Err(ThreeBallFeedbackDecisionError::EmptyActionSet);
     }
@@ -695,21 +813,47 @@ pub fn score_three_ball_known_state_feedback_actions(
             });
         }
 
-        let prediction = build_three_ball_feedback_action_prediction(
-            space,
-            full_posterior,
-            models,
-            ball_colours,
-            gaze,
-            action.choice,
-            action.action_id.clone(),
-        )?;
-        let information_gain = evaluate_dirichlet_model_information_gain(
-            full_posterior,
-            &space.full_model_average_prior,
-            models,
-            &prediction,
-        )?;
+        let prediction = if spm_compatible {
+            build_three_ball_feedback_action_prediction_spm_compatible(
+                space,
+                full_posterior,
+                models,
+                ball_colours,
+                gaze,
+                action.choice,
+                action.action_id.clone(),
+            )?
+        } else {
+            build_three_ball_feedback_action_prediction(
+                space,
+                full_posterior,
+                models,
+                ball_colours,
+                gaze,
+                action.choice,
+                action.action_id.clone(),
+            )?
+        };
+        let selected_full_prior = if spm_compatible {
+            &space.spm_model_average_prior
+        } else {
+            &space.full_model_average_prior
+        };
+        let information_gain = if spm_compatible {
+            evaluate_dirichlet_model_information_gain_spm_compatible(
+                full_posterior,
+                selected_full_prior,
+                models,
+                &prediction,
+            )?
+        } else {
+            evaluate_dirichlet_model_information_gain(
+                full_posterior,
+                selected_full_prior,
+                models,
+                &prediction,
+            )?
+        };
 
         let mut predictive_feedback = Vec::with_capacity(information_gain.outcomes.len());
         let mut pragmatic_risk_nats = 0.0;
