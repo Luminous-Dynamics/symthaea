@@ -148,7 +148,12 @@
         "index_revision_ref",
         "materialized_at",
         "materialization_observation_ref",
-        "inherited_provenance_family_refs"
+        "inherited_provenance_family_refs",
+        "canonical_statement_ref",
+        "canonical_version_ref",
+        "source_span_refs",
+        "parent_statement_version_refs",
+        "statement_relation_refs"
       ],
       "properties": {
         "representation_ref": {
@@ -222,6 +227,37 @@
             "unknown"
           ],
           "default": "unknown"
+        },
+        "canonical_statement_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "canonical_version_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "source_span_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "parent_statement_version_refs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
+        },
+        "statement_relation_refs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
         }
       }
     },
@@ -330,7 +366,9 @@
         "serving_replica_ref",
         "index_ref",
         "index_revision_ref",
-        "authorization_chain_ref"
+        "authorization_chain_ref",
+        "temporal_resolution_ref",
+        "resolved_statement_version_refs"
       ],
       "properties": {
         "query_ref": {
@@ -365,6 +403,18 @@
         },
         "authorization_chain_ref": {
           "$ref": "#/$defs/ref"
+        },
+        "temporal_resolution_ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "resolved_statement_version_refs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/ref"
+          }
         }
       }
     },
@@ -375,7 +425,8 @@
         "query_ref",
         "representation_ref",
         "expected_state",
-        "reason_ref"
+        "reason_ref",
+        "expected_statement_version_ref"
       ],
       "properties": {
         "query_ref": {
@@ -393,7 +444,8 @@
             "RightsDenied",
             "DerivedRepresentationInvalidated",
             "OutsideRequestedValidTime",
-            "SupersededForRequestedAsOfView"
+            "SupersededForRequestedAsOfView",
+            "WrongPropositionVersionForTemporalResolution"
           ]
         },
         "reason_ref": {
@@ -406,6 +458,9 @@
           "items": {
             "$ref": "#/$defs/ref"
           }
+        },
+        "expected_statement_version_ref": {
+          "$ref": "#/$defs/ref"
         }
       }
     }
