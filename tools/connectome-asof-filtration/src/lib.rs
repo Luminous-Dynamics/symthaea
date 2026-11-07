@@ -246,6 +246,9 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                             })?;
                         if *previous_sequence >= entry.sequence
                             || previous.evidence_family_id != event.evidence_family_id
+                            || previous.source_stream != event.source_stream
+                            || previous.split != event.split
+                            || previous.confirmatory_family_id != event.confirmatory_family_id
                             || previous.revision.checked_add(1) != Some(revision)
                         {
                             return Err(AuditError(format!(
@@ -295,6 +298,15 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                 // this decision, in canonical global availability order.
                 if decision.available_event_ids != ordered_evidence_ids {
                     status = DecisionAuditStatus::PrefixMismatch;
+                }
+                match decision.kind {
+                    DecisionKind::Discovery if decision.confirmatory_family_id.is_some() => {
+                        status = DecisionAuditStatus::InvalidReceipt;
+                    }
+                    DecisionKind::Confirmation if decision.confirmatory_family_id.is_none() => {
+                        status = DecisionAuditStatus::LockboxLeakage;
+                    }
+                    _ => {}
                 }
 
                 let mut consumed = BTreeSet::new();
@@ -383,6 +395,9 @@ pub enum AdmissionMode {
 pub struct AdjusterReceipt {
     pub adjuster_id: String,
     pub adjuster_version: String,
+    pub source_process_sha256: String,
+    pub source_filtration_sha256: String,
+    pub target_filtration_sha256: String,
     pub parameter_sha256: String,
     pub theorem_assumptions_sha256: String,
     pub lifted_output_sha256: String,
@@ -509,6 +524,14 @@ pub fn audit_admission(ledger: &GlobalLedger, admission: &FiltrationAdmission) -
                 || admission.assumption_sha256.as_deref().is_none_or(|d| !valid_sha256(d))
                 || adjuster.adjuster_id.is_empty()
                 || adjuster.adjuster_version.is_empty()
+                || adjuster.source_process_sha256 != admission.input_process_sha256
+                || adjuster.source_filtration_sha256 != admission.source_filtration_sha256
+                || adjuster.target_filtration_sha256 != admission.target_filtration_sha256
+                || admission.assumption_sha256.as_deref()
+                    != Some(adjuster.theorem_assumptions_sha256.as_str())
+                || !valid_sha256(&adjuster.source_process_sha256)
+                || !valid_sha256(&adjuster.source_filtration_sha256)
+                || !valid_sha256(&adjuster.target_filtration_sha256)
                 || !valid_sha256(&adjuster.parameter_sha256)
                 || !valid_sha256(&adjuster.theorem_assumptions_sha256)
                 || !valid_sha256(&adjuster.lifted_output_sha256)
@@ -819,6 +842,17 @@ mod tests {
     #[test]
     fn rejects_discovery_consuming_confirmation_lockbox_data() {
         let mut ledger = fixture();
+        ledger.entries.insert(
+            1,
+            entry(
+                2,
+                LedgerPayload::FamilyFreeze(FamilyFreeze {
+                    family_id: "family-1".into(),
+                    family_commitment_sha256: d('7'),
+                    confirmation_lockbox_closed: true,
+                }),
+            ),
+        );
         ledger.entries[2] = entry(3, confirmation_event());
         ledger.entries[3] = entry(
             4,
@@ -830,8 +864,11 @@ mod tests {
                 None,
             ),
         );
+        for (index, item) in ledger.entries.iter_mut().enumerate() {
+            item.sequence = index as u64 + 1;
+        }
         let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.decisions[1].status, DecisionAuditStatus::LockboxLeakage);
+        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::LockboxLeakage);
     }
 
     #[test]
@@ -873,33 +910,24 @@ mod tests {
     #[test]
     fn rejects_confirmation_event_that_predates_family_freeze() {
         let mut ledger = fixture();
-        ledger.entries.insert(
-            1,
+        let structural = ledger.entries[0].clone();
+        let mut prefreeze_event = confirmation_event();
+        if let LedgerPayload::Evidence(ref mut value) = prefreeze_event {
+            value.event_id = "T7-prefreeze".into();
+        }
+        ledger.entries = vec![
+            structural,
+            entry(2, prefreeze_event),
             entry(
-                2,
+                3,
                 LedgerPayload::FamilyFreeze(FamilyFreeze {
                     family_id: "family-1".into(),
                     family_commitment_sha256: d('7'),
                     confirmation_lockbox_closed: true,
                 }),
             ),
-        );
-        ledger.entries[2] = entry(3, confirmation_event());
-        ledger.entries[3] = entry(
-            4,
-            decision(
-                "D2",
-                &["S1", "T7"],
-                &["S1", "T7"],
-                DecisionKind::Confirmation,
-                Some("family-1"),
-            ),
-        );
-        for (idx, e) in ledger.entries.iter_mut().enumerate() {
-            e.sequence = idx as u64 + 1;
-        }
-        let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::LockboxLeakage);
+        ];
+        assert!(audit_ledger(&ledger).is_err());
     }
 
     #[test]
@@ -910,6 +938,17 @@ mod tests {
             &admission(AdmissionMode::DirectGlobalSupermartingale),
         );
         assert_eq!(report.status, AdmissionStatus::AdmittedDirectGlobal);
+    }
+
+    #[test]
+    fn process_output_must_follow_all_observed_evidence() {
+        let ledger = fixture();
+        let mut receipt = admission(AdmissionMode::DirectGlobalSupermartingale);
+        receipt.process_output_sequence = 3; // T7 is first available at sequence 3.
+        assert_eq!(
+            audit_admission(&ledger, &receipt).status,
+            AdmissionStatus::InvalidReceipt
+        );
     }
 
     #[test]
@@ -939,8 +978,11 @@ mod tests {
         lifted.adjuster = Some(AdjusterReceipt {
             adjuster_id: "reviewed-adjuster".into(),
             adjuster_version: "1".into(),
+            source_process_sha256: d('b'),
+            source_filtration_sha256: d('4'),
+            target_filtration_sha256: d('8'),
             parameter_sha256: d('5'),
-            theorem_assumptions_sha256: d('6'),
+            theorem_assumptions_sha256: d('e'),
             lifted_output_sha256: d('c'),
         });
         assert_eq!(
