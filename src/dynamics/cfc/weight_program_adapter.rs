@@ -629,7 +629,6 @@ pub fn align_cfc_hidden_unit_signatures(
                         .zip(candidate.iter())
                         .map(|(left, right)| (left - right).powi(2))
                         .sum::<f64>()
-                        / probe_count as f64
                 })
                 .collect::<Vec<_>>()
         })
@@ -650,7 +649,7 @@ pub fn align_cfc_hidden_unit_signatures(
         probe_digest: source_signature_set.probe_digest.clone(),
         layer_index: source_signature_set.layer_index,
         source_to_candidate,
-        mean_squared_activation_error: best_total_cost / unit_count as f64,
+        mean_squared_activation_error: best_total_cost / (unit_count * probe_count) as f64,
         minimum_assignment_margin,
     })
 }
@@ -1221,6 +1220,40 @@ mod tests {
             ),
             Err(CfCPermutationAlignmentError::InvalidAcceptancePolicy)
         ));
+    }
+
+    #[test]
+    fn assignment_margin_accumulates_evidence_without_changing_mean_fit_error() {
+        let source_once = signature_set(
+            vec![vec![0.0], vec![1.0], vec![3.0]],
+            'a',
+            'c',
+        );
+        let candidate_once = signature_set(
+            vec![vec![3.1], vec![0.1], vec![1.1]],
+            'b',
+            'c',
+        );
+        let once =
+            align_cfc_hidden_unit_signatures(&source_once, &candidate_once).expect("one probe");
+
+        let source_twice = signature_set(
+            vec![vec![0.0, 0.0], vec![1.0, 1.0], vec![3.0, 3.0]],
+            'a',
+            'd',
+        );
+        let candidate_twice = signature_set(
+            vec![vec![3.1, 3.1], vec![0.1, 0.1], vec![1.1, 1.1]],
+            'b',
+            'd',
+        );
+        let twice =
+            align_cfc_hidden_unit_signatures(&source_twice, &candidate_twice).expect("two probes");
+
+        assert!((twice.mean_squared_activation_error - once.mean_squared_activation_error).abs() < 1e-12);
+        let one_margin = once.minimum_assignment_margin.expect("one-probe margin");
+        let two_margin = twice.minimum_assignment_margin.expect("two-probe margin");
+        assert!((two_margin - 2.0 * one_margin).abs() < 1e-10);
     }
 
     #[test]
