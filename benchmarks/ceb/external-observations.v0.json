@@ -257,17 +257,6 @@
       ]
     },
     {
-      "source_id": "kodus-codereviewbench",
-      "source_url": "https://www.codereviewbench.com/leaderboard",
-      "title": "Kodus CodeReviewBench leaderboard and published methodology",
-      "source_type": "benchmark_leaderboard",
-      "accessed_on": "2026-11-07",
-      "published_on": null,
-      "supports": [
-        "CEB-REVIEW"
-      ]
-    },
-    {
       "source_id": "martian-codereviewbenchmark",
       "source_url": "https://www.codereviewbenchmark.com/",
       "title": "Martian production AI code-review benchmark leaderboard and methodology",
@@ -756,28 +745,6 @@
         "Ground truth is bugs human reviewers had already flagged before merge. Bugs that escaped the original human review are outside the labeled denominator, so the benchmark measures recovery of known human-found bugs rather than exhaustive defect discovery.",
         "Leaderboard coverage varies by model; inspect each scorecard's evaluated golden denominator before cross-model comparison.",
         "Maintained by Kodus, which also supplies the harness; treat as vendor-maintained contextual evidence, not independent multi-harness replication."
-      ]
-    },
-    {
-      "comparator_id": "kodus-codereviewbench",
-      "lane_id": "CEB-REVIEW",
-      "benchmark_name": "CodeReviewBench (Kodus)",
-      "benchmark_version": "live leaderboard accessed 2026-11-07",
-      "split": "30-PR fixed replay set",
-      "sample_denominator": {
-        "status": "reported",
-        "value": 30,
-        "unit": "pull_requests"
-      },
-      "source_id": "kodus-codereviewbench",
-      "supporting_source_ids": [],
-      "comparison_class": "contextual_reference",
-      "caveats": [
-        "Five production OSS repositories: cal.com, Discourse, Grafana, Keycloak and Sentry; 95 human-authored golden bugs across Go, Java, Python, Ruby and TypeScript.",
-        "All entries use one Kodus production review harness, frozen-repository replay, vendor-default model configuration and Claude Haiku 4.5 matcher/judge.",
-        "One model run per entry; model run-to-run variance is not measured. Judge repeatability and task-sampling uncertainty are distinct.",
-        "Recall confidence intervals use 2,000 bootstrap resamples over 30 PRs; neighbouring model ranks overlap and are not reliably separable.",
-        "Leaderboard F1/precision/recall are not CEB causal-diagnosis measures; no CEB top-five or reviewer-burden equivalence."
       ]
     },
     {
@@ -3033,142 +3000,6 @@
       },
       "notes": [
         "Derived from the benchmark's per-bug cost convention; compare only inside this harness and dataset."
-      ]
-    },
-    {
-      "observation_id": "kodus-deepseek-v4-pro-f1",
-      "comparator_id": "kodus-codereviewbench",
-      "source_locator": "Kodus CodeReviewBench leaderboard, DeepSeek V4 Pro scorecard; 30 PRs / 95 human-authored golden bugs",
-      "system": {
-        "system_id": "kodus-deepseek-v4-pro",
-        "model": "DeepSeek V4 Pro",
-        "harness": "Kodus production review agent",
-        "configuration": "vendor-default API path; frozen repository replay; one run"
-      },
-      "metric": {
-        "metric_id": "f1",
-        "label": "Review F1",
-        "definition": "Harmonic mean of the reported micro-averaged precision and recall over golden bug findings.",
-        "value": 43.9,
-        "value_status": "reported",
-        "operator": "equal",
-        "unit": "percent",
-        "direction": "maximize",
-        "raw_display": "43.9",
-        "uncertainty": {
-          "status": "not_reported",
-          "raw_notation": "not reported",
-          "margin": null,
-          "confidence_level": "not reported",
-          "method": "not reported by source",
-          "applies_to_metric_id": "f1",
-          "applies_to_task_count": 30
-        }
-      },
-      "notes": [
-        "F1 ranking metric; 95 golden bugs occur across 30 PRs."
-      ]
-    },
-    {
-      "observation_id": "kodus-deepseek-v4-pro-precision",
-      "comparator_id": "kodus-codereviewbench",
-      "source_locator": "Kodus CodeReviewBench leaderboard, DeepSeek V4 Pro scorecard; 30 PRs / 95 human-authored golden bugs",
-      "system": {
-        "system_id": "kodus-deepseek-v4-pro",
-        "model": "DeepSeek V4 Pro",
-        "harness": "Kodus production review agent",
-        "configuration": "vendor-default API path; frozen repository replay; one run"
-      },
-      "metric": {
-        "metric_id": "precision",
-        "label": "Finding precision",
-        "definition": "Fraction of candidate findings matched to the 95 human-authored golden bugs under the published matcher.",
-        "value": 43.6,
-        "value_status": "reported",
-        "operator": "equal",
-        "unit": "percent",
-        "direction": "maximize",
-        "raw_display": "43.6%",
-        "uncertainty": {
-          "status": "not_reported",
-          "raw_notation": "not reported",
-          "margin": null,
-          "confidence_level": "not reported",
-          "method": "not reported by source",
-          "applies_to_metric_id": "precision",
-          "applies_to_task_count": 30
-        }
-      },
-      "notes": [
-        "Micro-averaged across the fixed 30-PR set."
-      ]
-    },
-    {
-      "observation_id": "kodus-deepseek-v4-pro-recall",
-      "comparator_id": "kodus-codereviewbench",
-      "source_locator": "Kodus CodeReviewBench leaderboard, DeepSeek V4 Pro scorecard; 30 PRs / 95 human-authored golden bugs",
-      "system": {
-        "system_id": "kodus-deepseek-v4-pro",
-        "model": "DeepSeek V4 Pro",
-        "harness": "Kodus production review agent",
-        "configuration": "vendor-default API path; frozen repository replay; one run"
-      },
-      "metric": {
-        "metric_id": "recall",
-        "label": "Golden-bug recall",
-        "definition": "Fraction of the human-authored golden bugs identified by the reviewer.",
-        "value": 44.2,
-        "value_status": "reported",
-        "operator": "equal",
-        "unit": "percent",
-        "direction": "maximize",
-        "raw_display": "44.2%",
-        "uncertainty": {
-          "status": "reported",
-          "raw_notation": "95% bootstrap interval 32.3–56.3 recall points",
-          "margin": 12.1,
-          "confidence_level": "95%",
-          "method": "2,000 bootstrap resamples over the 30 PRs; maximum half-width recorded because interval is asymmetric",
-          "applies_to_metric_id": "recall",
-          "applies_to_task_count": 30
-        }
-      },
-      "notes": [
-        "95% bootstrap CI 32.3–56.3 over 2,000 resamples; measures task-sampling uncertainty, not model run-to-run variance."
-      ]
-    },
-    {
-      "observation_id": "kodus-deepseek-v4-pro-cost",
-      "comparator_id": "kodus-codereviewbench",
-      "source_locator": "Kodus CodeReviewBench leaderboard, DeepSeek V4 Pro scorecard; 30 PRs / 95 human-authored golden bugs",
-      "system": {
-        "system_id": "kodus-deepseek-v4-pro",
-        "model": "DeepSeek V4 Pro",
-        "harness": "Kodus production review agent",
-        "configuration": "vendor-default API path; frozen repository replay; one run"
-      },
-      "metric": {
-        "metric_id": "cost_per_pr",
-        "label": "Cost per pull request",
-        "definition": "Published provider/model run cost per PR under this benchmark's Kodus harness.",
-        "value": 0.3,
-        "value_status": "reported",
-        "operator": "equal",
-        "unit": "USD_per_PR",
-        "direction": "minimize",
-        "raw_display": "$0.300",
-        "uncertainty": {
-          "status": "not_reported",
-          "raw_notation": "not reported",
-          "margin": null,
-          "confidence_level": "not reported",
-          "method": "not reported by source",
-          "applies_to_metric_id": "cost_per_pr",
-          "applies_to_task_count": 30
-        }
-      },
-      "notes": [
-        "$0.21 per bug found is also published but not registered here; cost excludes independent human adjudication."
       ]
     },
     {
