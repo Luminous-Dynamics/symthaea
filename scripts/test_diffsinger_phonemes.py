@@ -10,8 +10,10 @@ from diffsinger_phonemes import (
     duration_per_mapped_phone,
     ipa_to_arpabet,
     map_syllable_phones,
+    note_timing,
     require_melisma_vowel,
     resolve_language_id,
+    timeline_gap_ms,
 )
 
 
@@ -79,6 +81,27 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "no mapped vowel"):
             require_melisma_vowel(last_vowel, 3)
+
+    def test_note_timing_requires_finite_positive_fields(self) -> None:
+        note = {"start_time": 0.25, "duration": 0.5, "frequency": 220.0}
+        self.assertEqual(note_timing(note, "note"), (0.25, 0.5, 220.0, 0.75))
+        invalid_notes = (
+            {"start_time": float("nan"), "duration": 0.5, "frequency": 220.0},
+            {"start_time": 0.0, "duration": 0.0, "frequency": 220.0},
+            {"start_time": 0.0, "duration": 0.5, "frequency": float("inf")},
+            {"start_time": -0.1, "duration": 0.5, "frequency": 220.0},
+            {"start_time": 0.0, "duration": 0.5, "frequency": True},
+        )
+        for invalid in invalid_notes:
+            with self.subTest(note=invalid):
+                with self.assertRaises(ValueError):
+                    note_timing(invalid, "fixture")
+
+    def test_timeline_gaps_are_preserved_and_overlaps_rejected(self) -> None:
+        self.assertAlmostEqual(timeline_gap_ms(0.75, 0.5, "note"), 250.0)
+        self.assertEqual(timeline_gap_ms(0.5, 0.5, "note"), 0.0)
+        with self.assertRaisesRegex(ValueError, "overlaps"):
+            timeline_gap_ms(0.49, 0.5, "note")
 
     def test_duration_and_language_contracts_reject_invalid_values(self) -> None:
         for duration, count in ((0.0, 1), (float("nan"), 1), (40.0, 0)):
