@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
+PRODUCTION_IMPACT = "docs/research/CEB_REVIEW_PRODUCTION_IMPACT_PROTOCOL_V0_2026-11-07.md"
 CROSS_FRAMING = "docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md"
 CROSS_FRAMING_CALIBRATION_PACK = "docs/research/CEB_REVIEW_CROSS_FRAMING_CALIBRATION_PACK_V0_2026-11-07.md"
 COUNTERFACTUAL_QUALIFICATION = "docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md"
@@ -79,17 +80,18 @@ def validate_documents(
     counterfactual_qualification: str,
     cross_framing: str,
     cross_framing_calibration_pack: str,
+    production_impact: str,
 ) -> list[str]:
     errors: list[str] = []
 
     ids, blocks = scenario_blocks(challenge)
-    expected_ids = list(range(1, 27))
+    expected_ids = list(range(1, 33))
     if ids != expected_ids:
         errors.append(
-            f"evidence challenge must contain ERG-S01..ERG-S26 exactly once and in order; got {ids}"
+            f"evidence challenge must contain ERG-S01..ERG-S32 exactly once and in order; got {ids}"
         )
-    if len(blocks) != 26:
-        errors.append(f"evidence challenge must contain 26 scenario blocks; got {len(blocks)}")
+    if len(blocks) != 32:
+        errors.append(f"evidence challenge must contain 32 scenario blocks; got {len(blocks)}")
     for scenario_id, block in zip(ids, blocks):
         label = f"ERG-S{scenario_id:02d}"
         if "**Evidence pack:**" not in block:
@@ -254,12 +256,12 @@ def validate_documents(
         int(re.match(r"^\| ERG-S(\d{2}) \|", line).group(1))
         for line in crosswalk_rows
     ]
-    if crosswalk_ids != list(range(1, 27)):
+    if crosswalk_ids != list(range(1, 33)):
         errors.append(
-            f"evidence-action crosswalk must map ERG-S01..ERG-S26 exactly once and in order; got {crosswalk_ids}"
+            f"evidence-action crosswalk must map ERG-S01..ERG-S32 exactly once and in order; got {crosswalk_ids}"
         )
-    if len(crosswalk_rows) != 26:
-        errors.append(f"evidence-action crosswalk must contain 26 rows; got {len(crosswalk_rows)}")
+    if len(crosswalk_rows) != 32:
+        errors.append(f"evidence-action crosswalk must contain 32 rows; got {len(crosswalk_rows)}")
     for scenario_id, row in zip(crosswalk_ids, crosswalk_rows):
         if row.count("|") < 6:
             errors.append(f"ERG-S{scenario_id:02d}: crosswalk row is missing a required column")
@@ -423,6 +425,33 @@ def validate_documents(
     ):
         if required.lower() not in counterfactual_qualification.lower():
             errors.append(f"counterfactual-control protocol is missing {required}")
+
+    for required in (
+        "Four states",
+        "Truth",
+        "Utility",
+        "Uptake",
+        "Outcome",
+        "cluster-randomized presentation experiment",
+        "intention-to-treat",
+        "blinded",
+        "before treatment",
+        "Never hide, delay or downgrade critical",
+        "No uptake score is added",
+        "No new metric",
+        "no causal claim",
+        "#10064",
+        "#10369",
+    ):
+        if required.lower() not in production_impact.lower():
+            errors.append(f"production-impact protocol is missing {required}")
+    for required in (
+        "https://kodus.io/data",
+        "https://www.codereviewbenchmark.com/",
+        "https://review-bench.ai/",
+    ):
+        if required not in production_impact:
+            errors.append(f"production-impact protocol is missing external source {required}")
     return errors
 
 
@@ -450,7 +479,7 @@ def self_test() -> list[str]:
     challenge = "\n\n".join(
         f"### ERG-S{i:02d} — Synthetic\n\n**Evidence pack:** X\n\n"
         "**Expected review behavior:** Y\n\n**Invalid behaviors:** Z"
-        for i in range(1, 27)
+        for i in range(1, 33)
     ) + "\n#10064 #10369"
     adjudication = "\n".join((
         *PRIMARY_METRICS,
@@ -552,6 +581,7 @@ def self_test() -> list[str]:
         "do not create a composite; not a universal correction factor; no task is admitted; #10064 #10369",
         "C1 — Contract preservation; C2 — Target identity; C3 — Information inventory; C4 — Objective/output; C5 — Interaction realism; C6 — Target leakage",
         "W — Wording-only; R — Information-reduced; A — Information-added; O — Objective-changed; X — Invalid / unresolved; two reviewers independently; not convert these labels into a new metric",
+    ,
     ))
 
     cross_framing_calibration_pack = "\n".join((
@@ -581,8 +611,21 @@ def self_test() -> list[str]:
         "F4 is normally A; Do not label F1 as W",
     ))
 
-    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str, cf: str, cfp: str) -> list[str]:
-        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q, cf, cfp)
+    production_impact = "\\n".join((
+        "Truth Utility Uptake Outcome",
+        "cluster-randomized presentation experiment",
+        "intention-to-treat",
+        "blinded before treatment",
+        "Never hide, delay or downgrade critical security findings",
+        "No uptake score is added; No new metric",
+        "no causal claim #10064 #10369",
+        "https://kodus.io/data",
+        "https://www.codereviewbenchmark.com/",
+        "https://review-bench.ai/",
+    ))
+
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str, cf: str, cfp: str, pi: str) -> list[str]:
+        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q, cf, cfp, pi)
 
     crosswalk = "\n".join((
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
@@ -595,7 +638,7 @@ def self_test() -> list[str]:
     valid = run(
         triangulation, challenge, adjudication, scorecard,
         preregistration, gold_completeness, sequential_evidence, crosswalk,
-        calibration_pack, calibration_key, counterfactual_qualification, cross_framing, cross_framing_calibration_pack
+        calibration_pack, calibration_key, counterfactual_qualification, cross_framing, cross_framing_calibration_pack, production_impact
     )
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
@@ -633,6 +676,10 @@ def self_test() -> list[str]:
         ("missing CF-A02 F4", "cross_framing_calibration_pack", cross_framing_calibration_pack.replace("### F4 — Failing-test-guided repair", "### F4 removed", 2)),
         ("missing W disposition", "cross_framing", cross_framing.replace("W — Wording-only", "W removed")),
         ("missing second prompt reviewer", "cross_framing_calibration_pack", cross_framing_calibration_pack.replace("Reviewer 2 C1–C6 dispositions", "Second reviewer removed")),
+        ("collapsed truth and uptake", "production_impact", production_impact.replace("Truth Utility Uptake Outcome", "Review success")),
+        ("missing intention-to-treat", "production_impact", production_impact.replace("intention-to-treat", "per-protocol only")),
+        ("randomized critical findings", "production_impact", production_impact.replace("Never hide, delay or downgrade critical", "May delay critical")),
+        ("uptake becomes metric", "production_impact", production_impact.replace("No uptake score is added", "Uptake primary score")),
     )
     for label, target, mutant in mutations:
         args = {
@@ -649,6 +696,7 @@ def self_test() -> list[str]:
             "counterfactual_qualification": counterfactual_qualification,
             "cross_framing": cross_framing,
             "cross_framing_calibration_pack": cross_framing_calibration_pack,
+            "production_impact": production_impact,
         }
         args[target] = mutant
         result = run(
@@ -692,7 +740,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 32 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 36 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -708,6 +756,7 @@ def main() -> int:
         counterfactual_qualification = read_required(args.repo_root, COUNTERFACTUAL_QUALIFICATION)
         cross_framing = read_required(args.repo_root, CROSS_FRAMING)
         cross_framing_calibration_pack = read_required(args.repo_root, CROSS_FRAMING_CALIBRATION_PACK)
+        production_impact = read_required(args.repo_root, PRODUCTION_IMPACT)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -716,7 +765,7 @@ def main() -> int:
         triangulation, challenge, adjudication, scorecard, preregistration,
         gold_completeness, sequential_evidence, evidence_crosswalk,
         calibration_pack, calibration_key, counterfactual_qualification, cross_framing,
-        cross_framing_calibration_pack
+        cross_framing_calibration_pack, production_impact
     )
     if failures:
         for failure in failures:
@@ -730,7 +779,7 @@ def main() -> int:
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
         "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26 "
         "human_calibration_cases=3 variants=18 answer_key=separate-public "
-        "counterfactual_controls=6 qualification_dimensions=6 cross_framing_conditions=6 cross_framing_anchors=4 prompt_variants=16"
+        "counterfactual_controls=6 qualification_dimensions=6 cross_framing_conditions=6 cross_framing_anchors=4 prompt_variants=16 production_impact_protocol=1"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
