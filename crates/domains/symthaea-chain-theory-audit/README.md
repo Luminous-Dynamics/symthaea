@@ -124,6 +124,59 @@ The next regular CODATA adjustment is scheduled after its 31 December 2026
 closing date, with publication expected in early 2027. Refresh the measurement
 comparison only from the published adjustment and identified primary inputs.
 
+## Separate physical-consistency audit (new)
+
+The combinatorial reproduction and the physical interpretation are different
+claims. The `physical_consistency` module adds exact integer checks for
+small consequences of the Letter's stated representation, informed by the
+independent audit by Cody Mitchell in
+[SproutSeeds/chain-theory-audit](https://github.com/SproutSeeds/chain-theory-audit),
+pinned here to commit
+`95cd02da5955450397a848c25f8287c1a037d9f2` (25 October 2026).
+
+The current checks are deliberately narrow:
+
+1. **Unbroken generator.** Under the listed 5D diagonal assignments,
+   `U/i = diag(1,1,-1,-1,0)`,
+   `6Y = diag(3,3,-2,-2,-2)`, and
+   `C8 = diag(0,0,1,1,-2)`, the exact identity is
+   `U = (1/3)(6Y) - (1/3)C8`. Its weak-isospin coefficient is zero and its
+   colour-generator coefficient is nonzero. Under these assignments it is
+   not the Standard Model electric-charge generator `Q=T3+Y`.
+2. **Pair-state charge.** The independent audit evaluates the two supported
+   terms under its stated linked representation as `+2/3` and `-1/3`.
+   A superposition of these two terms is not an eigenstate of that electric
+   charge generator. This is a consistency tension if the same pair state is
+   identified with a photon state.
+3. **Weak-angle normalization.** Taking the compendium's conditional
+   `cos²(theta_W)=1/2` and `alpha_em=alpha_Y cos²(theta_W)`, the candidate
+   gives different implied `1/alpha_em` values under the usual Y, 2Y, 6Y,
+   and GUT-normalized conventions. The independent audit reports that the
+   photon identification would require a hypercharge scale of `sqrt(2)`,
+   which is not one of those standard normalizations.
+4. **Running-ladder distinction.** The readout dimension 31,104 is not an
+   integer power of 319, the base used in the compendium's stated ladder.
+
+These are conditional arithmetic and representation checks; they do not
+rederive the whole gauge theory, prove that the independent auditor's reading
+is complete, or establish a consensus verdict on Chain Theory. The external
+audit also reports a census of 1,492,992 combinations of alternatives
+explicitly listed in the Letter, with one value within the stated 1-sigma
+CODATA window. That census does not include undocumented choices made during
+the theory's development, so the broader look-elsewhere question remains open.
+
+Run:
+```
+cargo test -p symthaea-chain-theory-audit
+cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit
+```
+
+A passing arithmetic test cannot promote the photon conjecture. The next
+independent gate is to compare the generator, ray-stabilizer and Ward-identity
+calculations against the author's full source definitions and a second
+formalization, then preregister the physical predictions that differ from
+Standard Model QED.
+
 ## Scientific non-claims
 
 This crate does not show that:
