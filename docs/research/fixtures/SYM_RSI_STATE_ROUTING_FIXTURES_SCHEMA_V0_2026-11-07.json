@@ -97,6 +97,13 @@
           "note": {
             "type": "string",
             "minLength": 1
+          },
+          "fixture_class": {
+            "enum": [
+              "adversarial_negative_control",
+              "positive_control",
+              "abstention_control"
+            ]
           }
         },
         "required": [
@@ -106,7 +113,8 @@
           "scenario",
           "disposition",
           "hard_gate",
-          "fields"
+          "fields",
+          "fixture_class"
         ],
         "additionalProperties": false
       }
