@@ -3,7 +3,7 @@
 **Status:** Public research design and preregistration template. No candidate evaluation, task admission, sealed holdout or model-performance result is claimed.  
 **Program owner:** Existing CEB-REVIEW / CEB-HUMAN / causal-diagnosis work; [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723), [#10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419), [#10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367).  
 **Primary CEB contract:** 14 measurement lanes / 56 primary metrics. CEB-REVIEW remains exactly three primary measures: `defect_recall_at_5`, `actionable_precision`, `reviewer_burden`.  
-**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [20-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md).
+**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), and [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md).
 
 ## 1. Research question
 
