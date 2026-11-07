@@ -112,3 +112,35 @@ The first implementation should be a dry-run orchestration/receipt path, not an 
 ## 8. Claim ceiling
 
 A successful synthetic policy benchmark establishes only that the frozen policy behaves as specified on the frozen synthetic oracle and budget. It does not validate aircraft physics, CFD/FEM, flight performance, safety, airworthiness, certification, passenger operations or commercial viability.
+
+## 9. Executable dry-run boundary
+
+Rust module: `crates/domains/symthaea-engineering/src/aircraft_design_loop.rs`
+
+Wire schemas:
+- `crates/domains/symthaea-engineering/schemas/aircraft-design-study.schema.json`
+- `crates/domains/symthaea-engineering/schemas/aircraft-evaluation-proposal.schema.json`
+- `crates/domains/symthaea-engineering/schemas/aircraft-evaluation-receipt.schema.json`
+
+The bounded API currently:
+- validates a study's exact mission, candidate, required operating-case, decision-question, objective, hard-constraint, backend, model-profile and cost-basis references;
+- admits a proposal only when all references belong to the frozen study and the backend/method/model-profile combination is allow-listed;
+- abstains when the proposed cost exceeds remaining budget;
+- records actual failed, aborted, out-of-domain and non-converged outcomes without turning them into decision-eligible evidence;
+- reports a completed, in-domain evaluation as within its declared model scope only—not as a physical validation or feasibility finding.
+
+Every dry-run review has `execution_started = false`. No external process, solver, CAD system, network client or aircraft-control interface is invoked by this module. It cannot grant flight approval.
+
+The module now computes canonical SHA-256 identities for the exact study manifest, proposal and returned receipt payloads. Canonicalization recursively sorts object keys, preserves array order and uses compact UTF-8 JSON; it does not use debug formatting or unspecified map iteration order. The review outputs carry those digests so a human reviewer can bind a decision to the same serialized objects.
+
+These computed digests make the payloads reproducibly identifiable. They do **not** authenticate referenced artifacts or source bytes, prove that a solver executable is trustworthy, establish calibration traceability, or validate physical truth. Artifact acquisition and independent source authentication remain separate responsibilities.
+
+## 10. Immediate follow-on gates
+
+1. Bind a receipt to the exact runner artifact, executable/environment identity, raw inputs, output bundle, applicability result and uncertainty profile.
+2. Add independent fixtures for stale model profiles, case/configuration mismatch, budget overruns, missing run artifacts, non-convergence and false-feasible labels.
+3. Compose with the existing Symtropy run manifest / receipt work. Do not create a second solver execution registry.
+4. Keep human approval as a distinct, externally recorded review event before any engineering action outside the dry-run boundary.
+5. Build the aircraft-specific decision-value adapter on top of #7803 and the robust interval frontier #7787, rather than implementing a second generic experiment selector.
+
+The first Rust implementation is intentionally a study/receipt admission gate, not yet an adaptive experiment selector or a physics tool.

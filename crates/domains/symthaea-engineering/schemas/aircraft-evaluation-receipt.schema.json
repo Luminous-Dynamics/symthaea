@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/aircraft-evaluation-receipt-0.1.0.json",
+  "title": "Aircraft evaluation receipt 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "proposal_id",
+    "request_sha256",
+    "mission_sha256",
+    "candidate_sha256",
+    "operating_case_sha256",
+    "backend_sha256",
+    "model_profile_sha256",
+    "run_record_sha256",
+    "output_sha256",
+    "cost_basis_sha256",
+    "cost_units_consumed",
+    "outcome",
+    "applicability"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aircraft-evaluation-receipt/0.1.0"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "mission_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "operating_case_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "backend_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "run_record_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "output_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "cost_basis_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "cost_units_consumed": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "outcome": {
+      "enum": [
+        "completed",
+        "failed",
+        "aborted",
+        "out_of_domain",
+        "non_converged"
+      ]
+    },
+    "applicability": {
+      "enum": [
+        "within_declared_domain",
+        "outside_declared_domain",
+        "not_established",
+        "incomplete"
+      ]
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    }
+  }
+}

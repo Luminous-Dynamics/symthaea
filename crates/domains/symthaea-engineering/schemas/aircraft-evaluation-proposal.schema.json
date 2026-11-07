@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/aircraft-evaluation-proposal-0.1.0.json",
+  "title": "Aircraft evaluation proposal 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "mission_sha256",
+    "candidate_sha256",
+    "operating_case_sha256",
+    "backend_sha256",
+    "model_profile_sha256",
+    "method",
+    "request_sha256",
+    "decision_question_sha256",
+    "cost_basis_sha256",
+    "cost_units",
+    "rationale"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aircraft-evaluation-proposal/0.1.0"
+    },
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mission_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "operating_case_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "backend_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "model_profile_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "method": {
+      "enum": [
+        "analytical_bound",
+        "low_order_numerical",
+        "external_solver",
+        "physical_measurement"
+      ]
+    },
+    "request_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "decision_question_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "cost_basis_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "cost_units": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    }
+  }
+}
