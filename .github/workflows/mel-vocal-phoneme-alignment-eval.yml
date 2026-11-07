@@ -1,0 +1,41 @@
+name: Mel vocal phoneme alignment evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-vocal-alignment-eval/**"
+      - "docs/research/MEL-VOCAL-PHONEME-ALIGNMENT-EVAL-V1.md"
+      - ".github/workflows/mel-vocal-phoneme-alignment-eval.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-alignment-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_VOCAL_ALIGNMENT_REVISION=$actual" >> "$GITHUB_ENV"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Format the standalone crate
+        run: cargo +1.96.0 fmt --check --manifest-path tools/mel-vocal-alignment-eval/Cargo.toml
+      - name: Generate the standalone lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/mel-vocal-alignment-eval/Cargo.toml
+      - name: Test the exact alignment scorer
+        run: cargo +1.96.0 test --locked --manifest-path tools/mel-vocal-alignment-eval/Cargo.toml
