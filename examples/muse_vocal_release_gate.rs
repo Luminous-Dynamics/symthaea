@@ -175,7 +175,10 @@ fn blind_id(salt: &str, backend: &str, case_id: usize) -> String {
 
 fn source_revision() -> Option<String> {
     std::env::var("GITHUB_SHA").ok().or_else(|| {
-        let output = Command::new("git").args(["rev-parse", "HEAD"]).output().ok()?;
+        let output = Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .ok()?;
         if !output.status.success() {
             return None;
         }
