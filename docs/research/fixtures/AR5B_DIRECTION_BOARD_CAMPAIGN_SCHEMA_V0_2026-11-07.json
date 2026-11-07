@@ -200,7 +200,26 @@
         "max_share_bps",
         "verifier_intake_ref"
       ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "verifier_intake_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "required": [
