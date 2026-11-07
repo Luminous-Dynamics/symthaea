@@ -103,6 +103,7 @@ def validate_documents(
         "https://arxiv.org/abs/2610.13668",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
+        "https://www.codereviewbenchmark.com/",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
     ):
@@ -307,6 +308,7 @@ def self_test() -> list[str]:
         "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane",
         "candidate-specific and appears in both numerator and denominator",
         "CodeReviewBench human-flagged bug recall",
+        "Martian production review adoption; acceptance is not proof of correctness",
         "Gold-Completeness and Open-Set Discovery",
         "Sequential Evidence Acquisition",
         "#10064 #10369",
