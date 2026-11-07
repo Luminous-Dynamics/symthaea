@@ -67,7 +67,7 @@ def validate(
         errors.append(f"answer key must contain CID-S01..S06 in order; got {key_ids}")
 
     for case_id, block in zip(challenge_ids, challenge_blocks):
-        for required in ("Family:", "Claim:", "Evidence packet:", "Reviewer question:"):
+        for required in ("Family:", "Claim:", "Claim kind:", "Evidence packet:", "Reviewer question:"):
             if required not in block:
                 errors.append(f"{case_id}: missing {required}")
         if "Two compatible" not in block and "Two possible" not in block:
@@ -92,6 +92,7 @@ def validate(
         "mathcal{M}(E,A)",
         "disagreement witness",
         "minimum discriminating evidence",
+        "Source structural possibility Build-world selection Execution realization Actual-cause attribution Interventional-effect identifiability Incident attribution",
         "latent_context",
         "selection/censoring ambiguity",
         "repair-entanglement ambiguity",
@@ -102,6 +103,12 @@ def validate(
         "Interventional-effect identifiability",
         "Incident attribution",
         "not a new confirmatory Phase A hypothesis",
+        "Source structural possibility",
+        "Build-world selection",
+        "Execution realization",
+        "Actual-cause attribution",
+        "Interventional-effect identifiability",
+        "Incident attribution",
         "#10064",
         "#10369",
     ):
@@ -165,6 +172,7 @@ def self_test() -> list[str]:
             f"## {case_id}",
             "Family:",
             "Claim:",
+            "Claim kind:",
             "Evidence packet:",
             "Two compatible models",
             "Reviewer question:",
