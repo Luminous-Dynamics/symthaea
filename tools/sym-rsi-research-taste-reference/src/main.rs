@@ -2,12 +2,12 @@ use std::env;
 use std::fs;
 use std::process::ExitCode;
 
-use sym_rsi_research_taste_reference::{parse_and_calculate_evsi, parse_and_validate_fixtures};
+use sym_rsi_research_taste_reference::{parse_and_calculate_evsi, parse_and_validate_fixtures, parse_and_validate_pivotal_corrections};
 
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
     let Some(mode) = args.next() else {
-        eprintln!("usage: sym-rsi-research-taste-reference <fixtures|evsi> <input.json>");
+        eprintln!("usage: sym-rsi-research-taste-reference <fixtures|pivotal|evsi> <input.json>");
         return ExitCode::from(64);
     };
     let Some(path) = args.next() else {
@@ -34,6 +34,16 @@ fn main() -> ExitCode {
                 ExitCode::from(65)
             }
         },
+        "pivotal" => match parse_and_validate_pivotal_corrections(&contents) {
+            Ok(report) => {
+                println!("{}", serde_json::to_string_pretty(&report).expect("serializable report"));
+                if report.valid_fixture_pack { ExitCode::SUCCESS } else { ExitCode::from(2) }
+            }
+            Err(error) => {
+                eprintln!("invalid pivotal-correction fixture JSON: {error}");
+                ExitCode::from(65)
+            }
+        },
         "evsi" => match parse_and_calculate_evsi(&contents) {
             Ok(report) => {
                 println!("{}", serde_json::to_string_pretty(&report).expect("serializable report"));
@@ -45,7 +55,7 @@ fn main() -> ExitCode {
             }
         },
         _ => {
-            eprintln!("unknown mode {mode:?}; expected fixtures or evsi");
+            eprintln!("unknown mode {mode:?}; expected fixtures, pivotal or evsi");
             ExitCode::from(64)
         }
     }
