@@ -424,8 +424,14 @@ fn validate_group(
     let violates = group.values.iter().any(|value| {
         group.constraints.min_value.is_some_and(|min| *value < min)
             || group.constraints.max_value.is_some_and(|max| *value > max)
-    }) || group.constraints.min_l2_norm.is_some_and(|min| norm < min)
-        || group.constraints.max_l2_norm.is_some_and(|max| norm > max);
+    }) || group
+        .constraints
+        .min_l2_norm
+        .is_some_and(|min| norm < f64::from(min))
+        || group
+            .constraints
+            .max_l2_norm
+            .is_some_and(|max| norm > f64::from(max));
     if violates {
         return Err(if validate_baseline {
             WeightProgramError::BaselineConstraintViolation
