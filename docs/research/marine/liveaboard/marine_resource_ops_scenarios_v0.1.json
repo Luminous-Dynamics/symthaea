@@ -1,18 +1,13 @@
 {
   "schema_version": "0.1.0",
   "status": "synthetic_contract_fixtures_not_physical_vessel_data",
-  "time_step_s": 900,
-  "common_case_binding": {
-    "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-  },
-  "cases": [
+  "time_step_s": 3600,
+  "scenarios": [
     {
       "id": "clear_solar_anchor",
       "operating_case_id": "anchor_clear_sky_v1",
       "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "scenario_horizon_h": 24,
+      "horizon_h": 24,
       "initial_state": {
         "battery_usable_kwh": 90,
         "battery_soc": 0.55,
@@ -22,7 +17,7 @@
         "hot_water_thermal_kwh": 1.5
       },
       "forecast": {
-        "solar_kwh": [
+        "solar_kwh_per_hour": [
           0,
           0,
           0,
@@ -76,40 +71,178 @@
         1.2,
         1.2
       ],
-      "services": [
+      "service_requests": [
         {
           "service_id": "watermaker_daily",
+          "revision": "0.1.0",
           "service_class": "water_production",
-          "earliest_start_h": 8,
-          "latest_start_h": 15,
-          "deadline_h": 18,
-          "required_output_l": 80,
-          "power_kw": 1.2,
-          "minimum_run_min": 60,
-          "restart_energy_kwh": 0.08,
-          "prerequisite": "feed_in_qualified_envelope"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "anchor_clear_sky_v1",
+            "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "required_output": {
+            "quantity": 80,
+            "unit": "L",
+            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+          },
+          "window": {
+            "earliest_start_s": 28800,
+            "latest_start_s": 54000,
+            "deadline_s": 64800,
+            "minimum_run_s": 3600
+          },
+          "power_profile": {
+            "power_min_w": 1200,
+            "power_max_w": 1200,
+            "energy_min_wh": 1200,
+            "energy_max_wh": 1200,
+            "profile_ref": "synthetic:power-profile:watermaker_daily"
+          },
+          "prerequisites": [
+            {
+              "state_id": "feed_in_qualified_envelope",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:feed_in_qualified_envelope"
+            },
+            {
+              "state_id": "prefilter_membrane_health_current",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:prefilter_membrane_health_current"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": false,
+            "minimum_off_s": 3600,
+            "restart_energy_wh": 80,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:accepted-water-quality",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         },
         {
           "service_id": "hot_water_recovery",
+          "revision": "0.1.0",
           "service_class": "domestic_thermal",
-          "earliest_start_h": 9,
-          "latest_start_h": 16,
-          "deadline_h": 19,
-          "required_output_kwh_th": 2,
-          "power_kw": 1.8,
-          "minimum_run_min": 30,
-          "prerequisite": "thermal_store_below_target"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "anchor_clear_sky_v1",
+            "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "required_output": {
+            "quantity": 2,
+            "unit": "kWh_th",
+            "quality_acceptance_ref": "synthetic:thermal-service-complete"
+          },
+          "window": {
+            "earliest_start_s": 32400,
+            "latest_start_s": 57600,
+            "deadline_s": 68400,
+            "minimum_run_s": 1800
+          },
+          "power_profile": {
+            "power_min_w": 1800,
+            "power_max_w": 1800,
+            "energy_min_wh": 900,
+            "energy_max_wh": 900,
+            "profile_ref": "synthetic:power-profile:hot_water_recovery"
+          },
+          "prerequisites": [
+            {
+              "state_id": "thermal_store_below_target",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:thermal_store_below_target"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": true,
+            "minimum_off_s": 1800,
+            "restart_energy_wh": 20,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:thermal-service-complete",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         },
         {
           "service_id": "workshop_charge",
+          "revision": "0.1.0",
           "service_class": "flexible_workshop",
-          "earliest_start_h": 9,
-          "latest_start_h": 17,
-          "deadline_h": 20,
-          "required_output_kwh": 2,
-          "power_kw": 1,
-          "minimum_run_min": 30,
-          "prerequisite": "no_maintenance_safety_lockout"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "anchor_clear_sky_v1",
+            "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "required_output": {
+            "quantity": 2,
+            "unit": "kWh_e",
+            "quality_acceptance_ref": "synthetic:charge-complete"
+          },
+          "window": {
+            "earliest_start_s": 32400,
+            "latest_start_s": 61200,
+            "deadline_s": 72000,
+            "minimum_run_s": 1800
+          },
+          "power_profile": {
+            "power_min_w": 1000,
+            "power_max_w": 1000,
+            "energy_min_wh": 2000,
+            "energy_max_wh": 2000,
+            "profile_ref": "synthetic:power-profile:workshop_charge"
+          },
+          "prerequisites": [
+            {
+              "state_id": "no_maintenance_safety_lockout",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:no_maintenance_safety_lockout"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": true,
+            "minimum_off_s": 0,
+            "restart_energy_wh": 0,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:charge-complete",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         }
       ],
       "hard_constraints": [
@@ -124,7 +257,7 @@
       "id": "cloud_underway_propulsion_fixed",
       "operating_case_id": "underway_cloud_event_v1",
       "conditions_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "scenario_horizon_h": 12,
+      "horizon_h": 12,
       "initial_state": {
         "battery_usable_kwh": 90,
         "battery_soc": 0.62,
@@ -133,7 +266,7 @@
         "potable_water_target_l": 200
       },
       "forecast": {
-        "solar_kwh": [
+        "solar_kwh_per_hour": [
           0,
           0,
           0,
@@ -163,28 +296,116 @@
         5,
         5
       ],
-      "services": [
+      "service_requests": [
         {
           "service_id": "watermaker_replenishment",
+          "revision": "0.1.0",
           "service_class": "water_production",
-          "earliest_start_h": 4,
-          "latest_start_h": 10,
-          "deadline_h": 12,
-          "required_output_l": 60,
-          "power_kw": 1.2,
-          "minimum_run_min": 45,
-          "prerequisite": "feed_in_qualified_envelope"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "underway_cloud_event_v1",
+            "conditions_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "required_output": {
+            "quantity": 60,
+            "unit": "L",
+            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+          },
+          "window": {
+            "earliest_start_s": 14400,
+            "latest_start_s": 36000,
+            "deadline_s": 43200,
+            "minimum_run_s": 2700
+          },
+          "power_profile": {
+            "power_min_w": 1200,
+            "power_max_w": 1200,
+            "energy_min_wh": 900,
+            "energy_max_wh": 900,
+            "profile_ref": "synthetic:power-profile:watermaker_replenishment"
+          },
+          "prerequisites": [
+            {
+              "state_id": "feed_in_qualified_envelope",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:feed_in_qualified_envelope"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": false,
+            "minimum_off_s": 3600,
+            "restart_energy_wh": 80,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:accepted-water-quality",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         },
         {
           "service_id": "hot_water_optional",
+          "revision": "0.1.0",
           "service_class": "domestic_thermal",
-          "earliest_start_h": 2,
-          "latest_start_h": 11,
-          "deadline_h": 12,
-          "required_output_kwh_th": 1.5,
-          "power_kw": 1.8,
-          "minimum_run_min": 30,
-          "prerequisite": "comfort_service_window"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "underway_cloud_event_v1",
+            "conditions_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          },
+          "required_output": {
+            "quantity": 1.5,
+            "unit": "kWh_th",
+            "quality_acceptance_ref": "synthetic:thermal-service-complete"
+          },
+          "window": {
+            "earliest_start_s": 7200,
+            "latest_start_s": 39600,
+            "deadline_s": 43200,
+            "minimum_run_s": 1800
+          },
+          "power_profile": {
+            "power_min_w": 1800,
+            "power_max_w": 1800,
+            "energy_min_wh": 900,
+            "energy_max_wh": 900,
+            "profile_ref": "synthetic:power-profile:hot_water_optional"
+          },
+          "prerequisites": [
+            {
+              "state_id": "comfort_service_window",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:comfort_service_window"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": true,
+            "minimum_off_s": 1800,
+            "restart_energy_wh": 20,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:thermal-service-complete",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         }
       ],
       "hard_constraints": [
@@ -198,7 +419,7 @@
       "id": "low_reserve_high_water_demand",
       "operating_case_id": "low_reserve_water_service_v1",
       "conditions_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "scenario_horizon_h": 24,
+      "horizon_h": 24,
       "initial_state": {
         "battery_usable_kwh": 90,
         "battery_soc": 0.28,
@@ -207,7 +428,7 @@
         "potable_water_target_l": 220
       },
       "forecast": {
-        "solar_kwh": [
+        "solar_kwh_per_hour": [
           0,
           0,
           0,
@@ -261,28 +482,116 @@
         1.4,
         1.4
       ],
-      "services": [
+      "service_requests": [
         {
           "service_id": "urgent_water_reserve",
+          "revision": "0.1.0",
           "service_class": "water_production",
-          "earliest_start_h": 7,
-          "latest_start_h": 12,
-          "deadline_h": 16,
-          "required_output_l": 100,
-          "power_kw": 1.2,
-          "minimum_run_min": 75,
-          "prerequisite": "qualified_feed_and_membrane_health"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "low_reserve_water_service_v1",
+            "conditions_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          "required_output": {
+            "quantity": 100,
+            "unit": "L",
+            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+          },
+          "window": {
+            "earliest_start_s": 25200,
+            "latest_start_s": 43200,
+            "deadline_s": 57600,
+            "minimum_run_s": 4500
+          },
+          "power_profile": {
+            "power_min_w": 1200,
+            "power_max_w": 1200,
+            "energy_min_wh": 1500,
+            "energy_max_wh": 1500,
+            "profile_ref": "synthetic:power-profile:urgent_water_reserve"
+          },
+          "prerequisites": [
+            {
+              "state_id": "qualified_feed_and_membrane_health",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:qualified_feed_and_membrane_health"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": false,
+            "minimum_off_s": 3600,
+            "restart_energy_wh": 80,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:accepted-water-quality",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         },
         {
           "service_id": "discretionary_hot_water",
+          "revision": "0.1.0",
           "service_class": "domestic_thermal",
-          "earliest_start_h": 8,
-          "latest_start_h": 22,
-          "deadline_h": 23,
-          "required_output_kwh_th": 2,
-          "power_kw": 1.8,
-          "minimum_run_min": 30,
-          "prerequisite": "comfort_and_reserve_allow"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "low_reserve_water_service_v1",
+            "conditions_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          },
+          "required_output": {
+            "quantity": 2,
+            "unit": "kWh_th",
+            "quality_acceptance_ref": "synthetic:thermal-service-complete"
+          },
+          "window": {
+            "earliest_start_s": 28800,
+            "latest_start_s": 79200,
+            "deadline_s": 82800,
+            "minimum_run_s": 1800
+          },
+          "power_profile": {
+            "power_min_w": 1800,
+            "power_max_w": 1800,
+            "energy_min_wh": 900,
+            "energy_max_wh": 900,
+            "profile_ref": "synthetic:power-profile:discretionary_hot_water"
+          },
+          "prerequisites": [
+            {
+              "state_id": "comfort_and_reserve_allow",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:comfort_and_reserve_allow"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": true,
+            "minimum_off_s": 1800,
+            "restart_energy_wh": 20,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:thermal-service-complete",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         }
       ],
       "hard_constraints": [
@@ -296,7 +605,7 @@
       "id": "watermaker_feed_out_of_domain",
       "operating_case_id": "feed_quality_out_of_domain_v1",
       "conditions_digest": "1212121212121212121212121212121212121212121212121212121212121212",
-      "scenario_horizon_h": 12,
+      "horizon_h": 12,
       "initial_state": {
         "battery_usable_kwh": 90,
         "battery_soc": 0.8,
@@ -305,7 +614,7 @@
         "potable_water_target_l": 220
       },
       "forecast": {
-        "solar_kwh": [
+        "solar_kwh_per_hour": [
           0,
           0,
           0,
@@ -335,17 +644,61 @@
         1,
         1
       ],
-      "services": [
+      "service_requests": [
         {
           "service_id": "watermaker_attempt",
+          "revision": "0.1.0",
           "service_class": "water_production",
-          "earliest_start_h": 2,
-          "latest_start_h": 8,
-          "deadline_h": 10,
-          "required_output_l": 100,
-          "power_kw": 1.2,
-          "minimum_run_min": 60,
-          "prerequisite": "feed_salinity_temperature_intake_all_within_qualified_envelope"
+          "mission_case": {
+            "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "operating_case_id": "feed_quality_out_of_domain_v1",
+            "conditions_digest": "1212121212121212121212121212121212121212121212121212121212121212"
+          },
+          "required_output": {
+            "quantity": 100,
+            "unit": "L",
+            "quality_acceptance_ref": "synthetic:accepted-water-quality"
+          },
+          "window": {
+            "earliest_start_s": 7200,
+            "latest_start_s": 28800,
+            "deadline_s": 36000,
+            "minimum_run_s": 3600
+          },
+          "power_profile": {
+            "power_min_w": 1200,
+            "power_max_w": 1200,
+            "energy_min_wh": 1200,
+            "energy_max_wh": 1200,
+            "profile_ref": "synthetic:power-profile:watermaker_attempt"
+          },
+          "prerequisites": [
+            {
+              "state_id": "feed_salinity_temperature_intake_all_within_qualified_envelope",
+              "operator": "qualified",
+              "threshold": true,
+              "unit": "boolean",
+              "evidence_ref": "synthetic:prerequisite:feed_salinity_temperature_intake_all_within_qualified_envelope"
+            }
+          ],
+          "flexibility": {
+            "deferrable": true,
+            "interruptible": false,
+            "minimum_off_s": 3600,
+            "restart_energy_wh": 80,
+            "hard_block_on_unknown": true
+          },
+          "acceptance": {
+            "completion_rule": "synthetic:accepted-water-quality",
+            "failure_consequence": "service remains unmet; no output/resource credit; report exact reason"
+          },
+          "evidence": {
+            "source_ref": "synthetic:marine-resource-ops-v0.1",
+            "evidence_class": "synthetic",
+            "design_revision": "LOS-18-concept-v0.1"
+          }
         }
       ],
       "hard_constraints": [
