@@ -999,6 +999,7 @@ pub fn evaluate_dirichlet_model_information_gain(
     let current_model_probabilities = current_model_belief
         .models
         .iter()
+        .filter(|model| model.posterior_probability > 0.0)
         .map(|model| (model.model_id.clone(), model.posterior_probability))
         .collect::<BTreeMap<_, _>>();
     let mut model_predictive_mass = current_model_probabilities
@@ -1928,6 +1929,62 @@ mod tests {
                 ..
             }) if outcome_id == "success"
         ));
+    }
+
+    #[test]
+    fn model_eig_requires_predictions_only_for_positive_posterior_models() {
+        let full_prior = tensor(&[&[2.5, 2.5]], 'a');
+        let models = vec![
+            ReducedDirichletModelHypothesis {
+                model_id: "success-favouring".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[4.0, 1.0]], 'a'),
+            },
+            ReducedDirichletModelHypothesis {
+                model_id: "failure-favouring".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[1.0, 4.0]], 'a'),
+            },
+            ReducedDirichletModelHypothesis {
+                model_id: "zero-prior".into(),
+                prior_probability: 0.0,
+                parameter_prior: tensor(&[&[1.0, 4.0]], 'a'),
+            },
+        ];
+        let action = DirichletActionPrediction {
+            action_id: "positive-posterior-support-only".into(),
+            outcomes: vec![
+                predicted_outcome(
+                    "success",
+                    0.5,
+                    &[("success-favouring", 0.8), ("failure-favouring", 0.2)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.5,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.8)],
+                    vec![vec![0.0, 1.0]],
+                ),
+            ],
+        };
+        let result = evaluate_dirichlet_model_information_gain(
+            &full_prior,
+            &full_prior,
+            &models,
+            &action,
+        )
+        .expect("zero-prior hypothesis does not require predictive entries");
+        assert_eq!(result.outcomes[0].posterior_model_probabilities.len(), 3);
+        assert_eq!(
+            result.outcomes[0]
+                .posterior_model_probabilities
+                .iter()
+                .find(|(model_id, _)| model_id == "zero-prior")
+                .unwrap()
+                .1,
+            0.0
+        );
     }
 
     #[test]
