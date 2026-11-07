@@ -191,11 +191,11 @@ impl CandidateState {
 
     fn eligibility(&self, remaining_budget: f64) -> Result<(), String> {
         if self.allocated_cost + self.estimated_cost_per_evaluation
-            > self.max_budget_cost + EPSILON
+            > self.max_budget_cost
         {
             return Err("direction budget-share cap reached".to_owned());
         }
-        if self.estimated_cost_per_evaluation > remaining_budget + EPSILON {
+        if self.estimated_cost_per_evaluation > remaining_budget {
             return Err("remaining campaign budget is below one evaluation cost".to_owned());
         }
         Ok(())
@@ -538,6 +538,13 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
             })
             .collect();
 
+        if scores.iter().any(|score| !finite(score.potential)) {
+            return Err(vec![
+                "DERIVED_SCORE: non-finite allocation score; reduce priors or exploration weight"
+                    .to_owned(),
+            ]);
+        }
+
         let mut selected: Option<(usize, f64)> = None;
         for (index, score) in scores.iter().enumerate() {
             if !score.eligible {
@@ -545,10 +552,11 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
             }
             let replace = match selected {
                 None => true,
-                Some((_, best_potential)) => {
+                Some((best_index, best_potential)) => {
                     score.potential > best_potential
                         || (score.potential == best_potential
-                            && score.candidate_id < states[selected.unwrap().0].candidate_id)
+                            && score.candidate_id.as_str()
+                                < states[best_index].candidate_id.as_str())
                 }
             };
             if replace {
