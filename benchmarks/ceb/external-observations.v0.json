@@ -4627,6 +4627,112 @@
         "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
         "High-severity only. Not a CEB result or a matched comparison."
       ]
+    },
+    {
+      "observation_id": "sdr-ca-public-dataset-count",
+      "comparator_id": "sdr-ca-runtime-root-cause",
+      "source_locator": "SDRCA abstract; datasets named PetShop, RE1 and RE3",
+      "system": {
+        "system_id": "sdr-ca-framework",
+        "model": "SDRCA",
+        "harness": "runtime root-cause analysis framework",
+        "configuration": "causal graphs, in-distribution counterfactual interventions and Shapley-style multi-cause attribution"
+      },
+      "metric": {
+        "metric_id": "evaluation_dataset_count",
+        "label": "Named evaluation datasets",
+        "definition": "Count of distinct public benchmark datasets named in the paper abstract.",
+        "value": 3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "datasets",
+        "direction": "not_applicable",
+        "raw_display": "3 datasets",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "evaluation_dataset_count",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Descriptive evaluation-scope count only; not an accuracy or recall score.",
+        "Exact task denominator and numerical Recall@1/Recall@3 results are not encoded in this observation."
+      ]
+    },
+    {
+      "observation_id": "unival-defects4j-program-versions",
+      "comparator_id": "unival-causal-fault-localization",
+      "source_locator": "UniVal ICSE 2021 paper and published evaluation description; Defects4J corpus",
+      "system": {
+        "system_id": "unival-causal-fault-localization",
+        "model": "UniVal",
+        "harness": "predicate-outcome and variable-value causal statistical fault localization",
+        "configuration": "Defects4J real-fault program-version evaluation"
+      },
+      "metric": {
+        "metric_id": "evaluated_program_versions",
+        "label": "Evaluated program versions",
+        "definition": "Number of Defects4J program versions in the reported evaluation population.",
+        "value": 835,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "program_versions",
+        "direction": "not_applicable",
+        "raw_display": "835 program versions",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "evaluated_program_versions",
+          "applies_to_task_count": 835
+        }
+      },
+      "notes": [
+        "Population descriptor, not a model accuracy result.",
+        "Execution-profile fault localization; not source-only PR review or CEB Recall@5."
+      ]
+    },
+    {
+      "observation_id": "aacr-bench-annotation-coverage-increase",
+      "comparator_id": "aacr-bench-repository-context",
+      "source_locator": "AACR-Bench arXiv:2601.19494 abstract; annotation pipeline result",
+      "system": {
+        "system_id": "aacr-bench-annotation-pipeline",
+        "model": "AI-assisted annotation with expert verification",
+        "harness": "AACR-Bench three-stage comment augmentation/review completion/expert verification",
+        "configuration": "200 selected PRs; full repository context; 50 projects; 10 languages"
+      },
+      "metric": {
+        "metric_id": "annotation_coverage_increase",
+        "label": "Annotation defect-coverage increase",
+        "definition": "Reported increase in annotated issue/defect coverage compared with using original PR review comments alone.",
+        "value": 285,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent_increase",
+        "direction": "not_applicable",
+        "raw_display": "285% increase",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "annotation_coverage_increase",
+          "applies_to_task_count": 200
+        }
+      },
+      "notes": [
+        "This is expansion in dataset annotation coverage, not model performance improvement or recall.",
+        "Paper reports 1,505 final annotated review comments; do not reinterpret this as a 285% model-score gain.",
+        "Annotation construction uses LLM-generated candidates followed by expert verification; preserve provenance and judge dependence caveats."
+      ]
     }
   ]
 }
