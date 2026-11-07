@@ -181,6 +181,22 @@ impl PronunciationPlan {
         }
         Ok(())
     }
+
+    /// A renderer may consume only fully selected pronunciations. Review,
+    /// OOV, and unsupported words must be resolved upstream, not guessed
+    /// during synthesis.
+    pub fn validate_renderable(&self) -> Result<(), String> {
+        self.validate()?;
+        for (word_index, word) in self.words.iter().enumerate() {
+            if word.state != ResolutionState::Selected {
+                return Err(format!(
+                    "word {word_index} is {:?}; rendering requires an explicit selected pronunciation",
+                    word.state
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), String> {
@@ -493,4 +509,46 @@ mod tests {
         };
         assert!(plan.validate().unwrap_err().contains("incomplete provenance"));
     }
+    #[test]
+    fn unresolved_heteronym_is_valid_but_not_renderable() {
+        let plan = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![word(
+                "read",
+                0,
+                ResolutionState::NeedsReview,
+                vec![
+                    candidate("past", "ɛ", CandidateSource::Dictionary),
+                    candidate("present", "iː", CandidateSource::ModelG2p),
+                ],
+            )],
+        };
+        assert!(plan.validate().is_ok());
+        assert!(plan.validate_renderable().unwrap_err().contains("rendering requires"));
+    }
+
+    #[test]
+    fn resolved_pronunciation_is_renderable() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(SelectionReceipt {
+            authority: SelectionAuthority::HumanReviewer,
+            evidence_reference: "review:read-past-001".into(),
+        });
+        let plan = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+        assert!(plan.validate_renderable().is_ok());
+    }
+
 }
