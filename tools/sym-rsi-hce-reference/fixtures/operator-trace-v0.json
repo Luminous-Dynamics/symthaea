@@ -39,7 +39,7 @@
       "tool_call": false,
       "tool_id": null,
       "permission_id": null,
-      "input_sha256": null,
+      "input_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "output_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "resource_cost_units": 0.1
     },
@@ -52,7 +52,7 @@
       "tool_call": true,
       "tool_id": "sandbox-executor",
       "permission_id": "perm-exec-sandbox",
-      "input_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "output_sha256": null,
       "resource_cost_units": 1
     },
