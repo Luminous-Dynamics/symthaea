@@ -31,7 +31,8 @@ use crate::dirichlet_model_reduction::{
     DirichletActionPrediction, DirichletBayesianModelReductionError, DirichletConcentrationTensor,
     DirichletModelInformationGain, DirichletModelInformationGainError, DirichletPredictedOutcome,
     ReducedDirichletModelHypothesis, evaluate_dirichlet_model_information_gain,
-    reduce_dirichlet_models,
+    evaluate_dirichlet_model_information_gain_spm_compatible, reduce_dirichlet_models,
+    reduce_dirichlet_models_spm_compatible,
 };
 
 pub const THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT: usize = 81;
@@ -926,7 +927,8 @@ mod tests {
     use super::*;
     use crate::dirichlet_model_reduction::{
         DirichletActionPrediction, evaluate_dirichlet_model_information_gain,
-        reduce_dirichlet_models,
+        evaluate_dirichlet_model_information_gain_spm_compatible, reduce_dirichlet_models,
+        reduce_dirichlet_models_spm_compatible,
     };
 
     #[test]
@@ -1534,4 +1536,190 @@ mod tests {
             assert!(model.log_evidence_ratio.abs() < 1e-8);
         }
     }
+    #[test]
+    fn spm_full_model_average_prior_matches_global_tensor_normalization() {
+        let space = build_three_ball_rule_space();
+        let prior = &space.spm_model_average_prior;
+        let raw_total = space
+            .rules
+            .iter()
+            .map(|rule| rule.prior_probability
+                * rule.parameter_prior.columns.iter().flatten().sum::<f64>())
+            .sum::<f64>();
+        assert!((prior.columns.iter().flatten().sum::<f64>() - 1.0).abs() < 1e-12);
+        for column in 0..THREE_BALL_HIDDEN_STATE_COLUMN_COUNT {
+            let column_mass = prior.columns[column].iter().sum::<f64>();
+            assert!((column_mass - 1.0 / THREE_BALL_HIDDEN_STATE_COLUMN_COUNT as f64).abs() < 1e-12);
+            for outcome in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
+                let raw = space
+                    .rules
+                    .iter()
+                    .map(|rule| {
+                        rule.prior_probability * rule.parameter_prior.columns[column][outcome]
+                    })
+                    .sum::<f64>();
+                assert!(
+                    (prior.columns[column][outcome] - raw / raw_total).abs() < 1e-12
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn spm_bmr_with_no_evidence_preserves_equal_prior_over_all_labelled_rules() {
+        let space = build_three_ball_rule_space();
+        let models = space.reduced_model_hypotheses();
+        let prior = &space.spm_model_average_prior;
+        let result =
+            reduce_dirichlet_models_spm_compatible(prior, prior, &models)
+                .expect("source-faithful BMR at zero evidence");
+        assert_eq!(result.models.len(), THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT);
+        for model in result.models {
+            assert!((model.posterior_probability - 1.0 / 81.0).abs() < 1e-10);
+            assert!(model.log_evidence_ratio.abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn spm_pseudocount_mode_does_not_treat_a_reduced_model_zero_as_impossible() {
+        let space = build_three_ball_rule_space();
+        let models = space.reduced_model_hypotheses();
+        let prior = &space.spm_model_average_prior;
+        let mut posterior = prior.clone();
+        let first_model = &models[0];
+        let mut selected = None;
+        'search: for column in 0..prior.columns.len() {
+            for outcome in 0..prior.columns[column].len() {
+                if prior.active_support[column][outcome]
+                    && !first_model.parameter_prior.active_support[column][outcome]
+                {
+                    selected = Some((column, outcome));
+                    break 'search;
+                }
+            }
+        }
+        let (column, outcome) = selected.expect("one source rule excludes outcomes supported by others");
+        posterior.columns[column][outcome] += 1.0;
+
+        let strict = reduce_dirichlet_models(&posterior, prior, &models)
+            .expect("strict-support reduction retains other supported hypotheses");
+        let source_compatible =
+            reduce_dirichlet_models_spm_compatible(&posterior, prior, &models)
+                .expect("SPM smoothing keeps each reduced likelihood column integrable");
+        let strict_first = strict.models.iter().find(|model| model.model_id == first_model.model_id)
+            .expect("strict first model");
+        let spm_first = source_compatible.models.iter().find(|model| model.model_id == first_model.model_id)
+            .expect("SPM first model");
+        assert_eq!(strict_first.log_evidence_ratio, f64::NEG_INFINITY);
+        assert!(spm_first.log_evidence_ratio.is_finite());
+    }
+
+    #[test]
+    fn spm_three_ball_action_eig_is_invariant_under_semantic_quotient() {
+        let space = build_three_ball_rule_space();
+        let labelled_models = space.reduced_model_hypotheses();
+        let quotient_models = space.semantic_unique_model_hypotheses();
+        let prior = &space.spm_model_average_prior;
+        let ball_colours = [
+            ThreeBallColour::Red,
+            ThreeBallColour::Green,
+            ThreeBallColour::Blue,
+        ];
+        for choice in [
+            Some(ThreeBallColour::Red),
+            Some(ThreeBallColour::Green),
+            Some(ThreeBallColour::Blue),
+            None,
+        ] {
+            let labelled_action = build_three_ball_feedback_action_prediction_spm_compatible(
+                &space,
+                prior,
+                &labelled_models,
+                ball_colours,
+                Some(ThreeBallLocation::Centre),
+                choice,
+                format!("spm-labelled-{choice:?}"),
+            )
+            .expect("labelled SPM action prediction");
+            let quotient_action = build_three_ball_feedback_action_prediction_spm_compatible(
+                &space,
+                prior,
+                &quotient_models,
+                ball_colours,
+                Some(ThreeBallLocation::Centre),
+                choice,
+                format!("spm-quotient-{choice:?}"),
+            )
+            .expect("quotient SPM action prediction");
+
+            let labelled = evaluate_dirichlet_model_information_gain_spm_compatible(
+                prior,
+                prior,
+                &labelled_models,
+                &labelled_action,
+            )
+            .expect("labelled SPM model EIG");
+            let quotient = evaluate_dirichlet_model_information_gain_spm_compatible(
+                prior,
+                prior,
+                &quotient_models,
+                &quotient_action,
+            )
+            .expect("quotient SPM model EIG");
+
+            assert!(
+                (labelled.model_information_gain_nats - quotient.model_information_gain_nats).abs()
+                    < 1e-10
+            );
+            assert_eq!(labelled.outcomes.len(), quotient.outcomes.len());
+            for (left, right) in labelled.outcomes.iter().zip(quotient.outcomes.iter()) {
+                assert_eq!(left.outcome_id, right.outcome_id);
+                assert!((left.predictive_probability - right.predictive_probability).abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn spm_known_state_feedback_decision_uses_the_source_prior_and_bmr_path() {
+        let space = build_three_ball_rule_space();
+        let models = space.reduced_model_hypotheses();
+        let posterior = space.spm_model_average_prior.clone();
+        let actions = [
+            ThreeBallFeedbackActionSpec {
+                action_id: "green".into(),
+                choice: Some(ThreeBallColour::Green),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "red".into(),
+                choice: Some(ThreeBallColour::Red),
+                action_cost_nats: 0.0,
+            },
+            ThreeBallFeedbackActionSpec {
+                action_id: "blue".into(),
+                choice: Some(ThreeBallColour::Blue),
+                action_cost_nats: 0.0,
+            },
+        ];
+        let decision = score_three_ball_known_state_feedback_actions_spm_compatible(
+            &space,
+            &posterior,
+            &models,
+            [
+                ThreeBallColour::Red,
+                ThreeBallColour::Green,
+                ThreeBallColour::Blue,
+            ],
+            Some(ThreeBallLocation::Centre),
+            &actions,
+            ThreeBallFeedbackDecisionConfig::default(),
+        )
+        .expect("source-compatible one-step feedback decision");
+        assert_eq!(decision.action_scores.len(), 3);
+        assert!(decision.action_scores.iter().all(|score| {
+            score.expected_free_energy_nats.is_finite()
+                && score.model_information_gain_nats >= 0.0
+        }));
+    }
+
 }
