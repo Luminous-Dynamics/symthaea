@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-six-leg-phase-response-transfer-v1",
+  "claim_scope": "synthetic_known_truth",
+  "phase_unit": "microturns_per_cycle_1000000",
+  "leg_axis": [
+    "left_fore",
+    "left_middle",
+    "left_hind",
+    "right_fore",
+    "right_middle",
+    "right_hind"
+  ],
+  "source_binding": {
+    "dataset_id": "synthetic-phase-reset-known-answer",
+    "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "phase_estimator_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "animal_unit_token": "synthetic-animal-0001",
+    "session_id": "synthetic-session-0001"
+  },
+  "rows": [
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "source_leg_id": "left_fore",
+        "phase_bin": 2,
+        "delay_index": 1
+      },
+      "outcome": {
+        "status": "MEASURED",
+        "control_phase_microturns": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "perturbed_phase_microturns": [
+          100000,
+          0,
+          25000,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "probe_key": {
+        "context": "AIR_STEPPING",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "source_leg_id": "left_fore",
+        "phase_bin": 2,
+        "delay_index": 1
+      },
+      "outcome": {
+        "status": "NO_RESPONSE"
+      }
+    }
+  ],
+  "oracle_expectations": {
+    "measured_row_index": 0,
+    "phase_reset_microturns": [
+      100000,
+      0,
+      25000,
+      0,
+      0,
+      0
+    ],
+    "local_reset_microturns": 100000,
+    "off_diagonal_l1_microturns": 25000
+  }
+}
