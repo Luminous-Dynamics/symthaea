@@ -7,11 +7,11 @@
 //! reporting only the few detections it happened to match.
 //!
 //! This module implements the standard finite-set GOSPA objective for a
-//! single frame. It does NOT implement trajectory-GOSPA / T-GOSPA, track
-//! identity-switch penalties, data association, or a target tracker. Those
-//! are separate metrics and algorithmic layers. The assignment solver uses
-//! exact dynamic programming over the smaller of the truth/estimate sets;
-//! that side is capped at 20 elements to bound memory.
+//! single frame. Track-set temporal evaluation is implemented separately in
+//! trajectory_metrics as OSPA(2). This module does not implement T-GOSPA's
+//! explicit track-switch penalty, data association or a target tracker.
+/// The assignment solver uses exact dynamic programming over the smaller of
+//! the truth/estimate sets; that side is capped at 20 elements to bound memory.
 
 #![forbid(unsafe_code)]
 
