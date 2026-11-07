@@ -704,6 +704,67 @@ Use confidence intervals or paired instance-level tests where appropriate. Repor
 - **Sol-Atlas:** apply graph and constraint optimization to transport, port, energy and infrastructure networks.
 - **Luminous platform:** host common contracts, solver registry, benchmark registry, evaluation protocol and evidence lineage.
 
+## Cross-domain verified anytime optimization
+
+A solver should be allowed to return a verified feasible incumbent before it proves optimality, without losing that useful result when a deadline or worker failure occurs. But the result must distinguish **candidate feasibility**, **search completeness**, and **optimality**.
+
+This is now a shared Symthaea contract in [#10884 — evidence-qualified anytime result envelope](https://github.com/Luminous-Dynamics/symthaea/issues/10884), with a versioned schema and known-answer fixtures:
+
+- [`ANYTIME_RESULT_ENVELOPE_V1.schema.json`](ANYTIME_RESULT_ENVELOPE_V1.schema.json)
+- [`ANYTIME_RESULT_ENVELOPE_V1.examples.json`](ANYTIME_RESULT_ENVELOPE_V1.examples.json)
+
+The v1 envelope is intentionally scoped to optimization workloads (allocation, scheduling, routing, energy dispatch and proof-packet selection). SAT's decision statuses remain owned by #10810 and are adapted without status upgrades. The envelope binds every incumbent validator, bound checker, completion certificate, infeasibility certificate and optimality certificate to the same request and contract digests. A digest is an identity binding; the independent checker must still validate the witness/proof.
+
+### Result dimensions
+
+| Claim | Minimum evidence | What it does not imply |
+|---|---|---|
+| Feasible incumbent | Complete witness plus independent validation against the original request | Search completeness or optimality |
+| Search complete | Exhaustive completion for the declared model, with checked completion/search-tree evidence | Source truth or real-world safety |
+| Bound available | Independently checked lower/upper bound with exact objective and assumption binding | A feasible candidate |
+| Proven optimal | Admitted incumbent plus an independently accepted bound/optimality certificate under the same objective and tie policy | Operational authorization |
+| Proven infeasible | Exhaustive checked search or independently accepted infeasibility proof | Infeasibility of a different model revision |
+
+The result dispositions are deliberately explicit: `exact_complete`, `feasible_unproven`, `proven_infeasible`, `bound_only`, `limit_without_candidate`, `unknown`, `input_rejected`, `unsupported`, and `error`. A timeout cannot become infeasibility. A partial witness cannot replace an admitted complete incumbent. Optimality cannot be inferred from a small heuristic gap.
+
+### Benchmark protocol
+
+Compare the full verified decision path, not only the core solver:
+- time to first candidate;
+- time to first independently verified candidate;
+- incumbent quality at fixed budgets;
+- time to first independently checked bound;
+- time to proof of optimality / infeasibility;
+- verified objective-gap trajectory only when incumbent and bound have the same model/objective binding;
+- rate of runs with a valid incumbent before deadline;
+- checker/proof overhead, peak memory, CPU and energy;
+- tail latency, worst-family performance and failure disposition.
+
+This matches how industry systems expose bounded optimization results. OR-Tools CP-SAT distinguishes `FEASIBLE` (solution found without proof of optimality) from `OPTIMAL`, `INFEASIBLE`, and `UNKNOWN`; Gurobi exposes incumbents and best objective bounds under time limits, with a relative MIP gap computed from those endpoints. Its documentation notes that relative gap is not universally monotonic when incumbent/bound signs differ. We therefore track objective endpoints and their certificates separately rather than treating one scalar gap as an always-improving confidence score. [OR-Tools status definitions](https://github.com/google/or-tools/blob/stable/ortools/sat/docs/troubleshooting.md) · [Gurobi gap definition](https://docs.gurobi.com/projects/optimizer/en/current/reference/parameters.html) · [Gurobi benchmarking guidance](https://support.gurobi.com/hc/en-us/articles/37638046123921-What-to-measure-during-benchmarking).
+
+### Reuse existing domain work
+
+This is a shared semantics/adaptation layer, not a new optimizer or receipt system:
+- [Mycelix #9425](https://github.com/Luminous-Dynamics/symthaea/issues/9425): independently checkable optimality/lower-bound certificates for proof-packet selection.
+- [Symtropy #2608](https://github.com/Luminous-Dynamics/symtropy/issues/2608): preserve verified clean incumbents and measure time-to-first-clean.
+- [Sol-Atlas #417](https://github.com/Luminous-Dynamics/sol-atlas-leptos/issues/417): audited energy-dispatch incumbents under bounded search.
+- #10810: SAT decision/proof status.
+- #10805: benchmark receipts and per-run resource accounting.
+
+The first adapter work should map Sol-Atlas's `feasible_unproven`-style candidate semantics, Mycelix's witness/lower-bound proof, and Symtropy's clean incumbent into the common result model while retaining each project's authoritative validator and exact request bytes.
+
+### Qualification boundaries
+
+The JSON Schema checks structure, digest shape, admissible status combinations and mandatory evidence fields. It does not prove objective ordering, that a bound is mathematically valid, or that an incumbent sequence is monotone. A semantic verifier must additionally:
+- check every certificate and witness against the exact request/contract digest;
+- check lower/upper bound direction against minimization/maximization;
+- compare incumbent values using the declared exact objective domain and units;
+- enforce non-worsening incumbents for fixed-objective minimization/maximization sequences;
+- validate tie handling and only prune on a strictly justified bound;
+- reject stale request revisions and incomplete search-frontier claims.
+
+The three sample envelopes and negative controls are fixtures, not production run evidence or performance results.
+
 ## Explicit non-goals and claim discipline
 
 - Do not claim P = NP or P != NP from heuristic results, large solved instances, subexponential algorithms or random-distribution results.
