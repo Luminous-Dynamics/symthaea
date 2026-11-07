@@ -161,5 +161,141 @@
     "optical_samples_per_second_vs_end_to_end_inference_fps",
     "paper_specific_classification_accuracy_vs_exact_retrieval_accuracy",
     "array_core_energy_vs_wall_input_system_energy"
+  ],
+  "timescale_to_substrate_hypotheses": [
+    {
+      "state_horizon": "sub-ns_to_ns_optical_transient",
+      "candidate_substrates": [
+        "integrated_photonic",
+        "electro_optic"
+      ],
+      "role": "fast transient transforms and selected temporal/reservoir computation",
+      "required_measurements": [
+        "optical_loss",
+        "coupling",
+        "laser_and_driver_energy",
+        "phase_stability",
+        "conversion_overhead",
+        "calibration_drift"
+      ]
+    },
+    {
+      "state_horizon": "ns_to_us_exact_local_state",
+      "candidate_substrates": [
+        "SRAM",
+        "FPGA_BRAM_URAM",
+        "register_file"
+      ],
+      "role": "deterministic pipeline buffers, control, exact HDC reducers",
+      "required_measurements": [
+        "capacity_and_ports",
+        "timing_closure",
+        "leakage_and_clock_power",
+        "ECC_and_upset_behavior"
+      ]
+    },
+    {
+      "state_horizon": "us_to_ms_event_window",
+      "candidate_substrates": [
+        "SRAM",
+        "DRAM",
+        "event_driven_compute"
+      ],
+      "role": "sensor fusion, sparse events, burst processing",
+      "required_measurements": [
+        "burst_buffering",
+        "p99_queue_latency",
+        "timestamp_fidelity",
+        "scheduler_and_host_overhead"
+      ]
+    },
+    {
+      "state_horizon": "ms_to_seconds_adaptive_temporal_state",
+      "candidate_substrates": [
+        "photonic_transient_memory",
+        "mixed_signal",
+        "memristive_state",
+        "digital_recurrent_state"
+      ],
+      "role": "CfC-like dynamics, short-term context and adaptive state",
+      "required_measurements": [
+        "retention_curve",
+        "state_decay",
+        "read_disturb",
+        "temperature_drift",
+        "calibration_cost",
+        "update_energy"
+      ]
+    },
+    {
+      "state_horizon": "minutes_to_hours_working_set",
+      "candidate_substrates": [
+        "DDR",
+        "LPDDR",
+        "HBM",
+        "CXL_if_real_compatible_device"
+      ],
+      "role": "large models, codebooks, shared accelerator working memory",
+      "required_measurements": [
+        "bandwidth",
+        "latency",
+        "NUMA",
+        "refresh",
+        "transfer_cost",
+        "capacity",
+        "energy"
+      ]
+    },
+    {
+      "state_horizon": "power_cycle_persistent_configuration_and_journal",
+      "candidate_substrates": [
+        "MRAM",
+        "qualified_embedded_nonvolatile_memory"
+      ],
+      "role": "recovery metadata, configuration and small write-intensive journals",
+      "required_measurements": [
+        "endurance",
+        "retention",
+        "read_write_latency",
+        "density",
+        "part_qualification",
+        "cost"
+      ]
+    },
+    {
+      "state_horizon": "long_lived_exact_records_and_large_corpora",
+      "candidate_substrates": [
+        "NVMe_NAND",
+        "managed_persistent_storage"
+      ],
+      "role": "durable HDC stores, immutable segments, datasets and audit records",
+      "required_measurements": [
+        "flush_durability",
+        "wear",
+        "power_loss_behavior",
+        "recovery",
+        "write_amplification",
+        "provenance"
+      ]
+    }
+  ],
+  "temporal_memory_contract_metrics": [
+    "required_hold_time_and_update_frequency",
+    "probability_of_correct_read_vs_elapsed_time",
+    "error_vs_read_count_and_write_count",
+    "drift_vs_temperature_and_supply",
+    "write_read_refresh_calibration_and_recovery_energy",
+    "latency_distribution_and_concurrent_access_throughput",
+    "read_disturb_or_destructive_read_semantics",
+    "power_loss_and_reset_persistence",
+    "remapping_retraining_and_aging_cost"
+  ],
+  "placement_rules": [
+    "Match physical retention to required state horizon; photonic seconds-scale state is not durable storage.",
+    "Keep exact identity, provenance, cryptographic integrity, deterministic ties and durable commit state digital unless an exact physical guarantee is separately established.",
+    "Use analog/photonic dynamics only where task precision and noise contracts allow it.",
+    "Co-locate hot state with consuming compute and measure data movement before changing memory technology.",
+    "Include refresh, calibration, migration, write/erase and recovery in lifecycle energy.",
+    "Require explicit conversion and verification boundaries when Symthaea spans multiple substrates."
   ]
 }
