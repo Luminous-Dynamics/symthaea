@@ -17,3 +17,7 @@ path = "examples/minkowski_1p1.rs"
 # Deliberately std-only. This crate is a small, independently auditable
 # scientific primitive; it must not pull the cognitive or physics workspace
 # dependency graph into the first causal-set verification milestone.
+
+[[example]]
+name = "minkowski_nd"
+path = "examples/minkowski_nd.rs"
