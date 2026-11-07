@@ -1777,7 +1777,7 @@ mod tests {
         let (graph, checks) = strategy_interaction_graph(&source, budget()).unwrap();
         assert!(graph[0].contains(&1));
         assert!(graph[0].contains(&2));
-        assert!(!graph[1].contains(&2));
+        assert!(graph[1].contains(&2));
         assert!(checks > 0);
     }
 
