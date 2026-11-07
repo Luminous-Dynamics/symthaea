@@ -189,7 +189,7 @@ fn complete_timeline(raw: &[FormantFrame], duration_s: f32) -> Result<Vec<Forman
 
     for frame_index in 0..frame_count {
         let time_s = frame_index as f32 * FRAME_DT_S;
-        while right_index + 1 < raw.len() && raw[right_index + 1].time < time_s {
+        while right_index + 1 < raw.len() && raw[right_index + 1].time <= time_s {
             right_index += 1;
         }
 
@@ -266,13 +266,13 @@ impl SingingVoiceEngine for FormantSingingEngine {
                 ),
                 capability(
                     SingingControl::NoteDuration,
-                    CapabilitySupport::Native,
-                    "phoneme frames are allocated within each score-note duration",
+                    CapabilitySupport::Approximated,
+                    "phoneme frames are allocated within each score-note duration on a 5 ms frame grid",
                 ),
                 capability(
                     SingingControl::AbsoluteOnsetAndRests,
-                    CapabilitySupport::Native,
-                    "absolute note times are placed on a fixed 200 Hz timeline with explicit silent frames",
+                    CapabilitySupport::Approximated,
+                    "absolute note times are quantized to a 5 ms frame grid with explicit silent frames",
                 ),
                 capability(
                     SingingControl::ConsonantAnticipation,
