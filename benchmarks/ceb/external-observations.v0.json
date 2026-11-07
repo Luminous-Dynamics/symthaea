@@ -266,6 +266,39 @@
       "supports": [
         "CEB-REVIEW"
       ]
+    },
+    {
+      "source_id": "swe-sweep-paper",
+      "source_url": "https://swesweep.com/paper",
+      "title": "SWE-sweep paper: open-world multi-bug repository discovery",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-10-01",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "swe-sweep-live",
+      "source_url": "https://swesweep.com/",
+      "title": "SWE-sweep live leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "loopcontrolbench-readme",
+      "source_url": "https://github.com/kltownsend/loopcontrolbench",
+      "title": "LoopControlBench deterministic completion benchmark and task pool",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
     }
   ],
   "comparators": [
@@ -767,6 +800,52 @@
         "The visible all-time PR totals and recent-period sample sizes are different quantities; do not combine them.",
         "Adoption or a resulting code change is not independent proof that a review finding is factually correct or causally valid.",
         "No CEB causal mechanism labels, exact P/I/F/N/M/IRR controls, top-five recall equivalence or human minutes are reported."
+      ]
+    },
+    {
+      "comparator_id": "swe-sweep-open-world",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-sweep",
+      "benchmark_version": "2026-10-01 paper / 2026-11-07 live leaderboard snapshot",
+      "split": "100 repository tasks / 4,068 concurrent bugs",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 4068,
+        "unit": "bugs"
+      },
+      "source_id": "swe-sweep-paper",
+      "supporting_source_ids": [
+        "swe-sweep-live"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Open-world repository-level multi-bug discovery and repair; agents receive no issue descriptions or bug locations.",
+        "October 1 paper's strongest evaluated system reports 4.7%; the live leaderboard viewed 2026-11-07 lists Astra 6 / mini-SWE-agent at 9.5%; these are different snapshots/configurations and must not be spliced.",
+        "The denominator is 4,068 bugs across 100 repositories and 22 languages, not issue-conditioned tasks.",
+        "Each repaired bug is checked by its own hidden fail-to-pass tests, and the original suite checks for regressions; the benchmark's population still derives from upstream issue/PR histories.",
+        "Not equivalent to CEB's issue-specific task resolve_rate; no direct superiority claim is licensed."
+      ]
+    },
+    {
+      "comparator_id": "loopcontrolbench-certified-python",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "LoopControlBench",
+      "benchmark_version": "2026-11-07 README/reference snapshot",
+      "split": "Original certified Python reference pool",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 70,
+        "unit": "certified tasks"
+      },
+      "source_id": "loopcontrolbench-readme",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Reference result is GPT-5-mini 46/70 = 65.7%, one attempt per task, no escalation or repair loop.",
+        "The pool later grew to 89 tasks, but the published 46/70 reference remains on the original 70-task denominator.",
+        "Narrow population: reproducible, maintainer-tested Python library fixes in the pinned Python 3.13 container, not the general software-bug population.",
+        "The deterministic gate checks a named fail-to-pass test; this does not establish whole-repository correctness, causal uniqueness or CEB independent pristine regrade.",
+        "The default runner is sandboxed, but the optional agentic path is not; respect the project's host-execution warning."
       ]
     }
   ],
@@ -3432,6 +3511,108 @@
         "Recent-period sample size is agent-specific and not a paired common denominator.",
         "Dashboard's all-time PR total differs from its recent-period sample size.",
         "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "swe-sweep-sol56-paper-bugs-resolved",
+      "comparator_id": "swe-sweep-open-world",
+      "source_locator": "SWE-sweep paper, October 1 2026, Table 4 main results; Sol 5.6 xhigh / mini-SWE-agent",
+      "system": {
+        "system_id": "swe-sweep-sol56-miniswe",
+        "model": "Sol 5.6 (xhigh)",
+        "harness": "mini-SWE-agent",
+        "configuration": "Paper main evaluation; 100 repositories / 4,068 bugs"
+      },
+      "metric": {
+        "metric_id": "bugs_resolved_rate",
+        "label": "All-bug repository sweep resolution rate",
+        "definition": "Fraction of all benchmark bugs resolved by the submitted repository patch, requiring the bug's hidden tests to pass and the original test suite to remain passing.",
+        "value": 4.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "4.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "bugs_resolved_rate",
+          "applies_to_task_count": 4068
+        }
+      },
+      "notes": [
+        "Paper's strongest evaluated system; not the current live leaderboard's top row."
+      ]
+    },
+    {
+      "observation_id": "swe-sweep-astra6-live-bugs-resolved",
+      "comparator_id": "swe-sweep-open-world",
+      "source_locator": "SWE-sweep live leaderboard, accessed 2026-11-07, Astra 6 / mini-SWE-agent row",
+      "system": {
+        "system_id": "swe-sweep-astra6-miniswe",
+        "model": "Astra 6",
+        "harness": "mini-SWE-agent",
+        "configuration": "Live leaderboard snapshot accessed 2026-11-07"
+      },
+      "metric": {
+        "metric_id": "bugs_resolved_rate",
+        "label": "All-bug repository sweep resolution rate",
+        "definition": "Fraction of all benchmark bugs resolved by the submitted repository patch, requiring the bug's hidden tests to pass and the original test suite to remain passing.",
+        "value": 9.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "9.5%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "bugs_resolved_rate",
+          "applies_to_task_count": 4068
+        }
+      },
+      "notes": [
+        "Live leaderboard snapshot; do not conflate with the October paper evaluation."
+      ]
+    },
+    {
+      "observation_id": "loopcontrol-gpt5mini-certified-task-rate",
+      "comparator_id": "loopcontrolbench-certified-python",
+      "source_locator": "LoopControlBench README, reference number; original certified Python task pool",
+      "system": {
+        "system_id": "loopcontrol-gpt5mini-one-shot",
+        "model": "GPT-5-mini",
+        "harness": "LoopControlBench runner",
+        "configuration": "One attempt per task; no escalation or repair loop; Python 3.13 container"
+      },
+      "metric": {
+        "metric_id": "certified_task_success_rate",
+        "label": "Certified task success rate",
+        "definition": "Fraction of the original 70 certified Python tasks whose named fail-to-pass test passes after the model edit, with original suite checks satisfied.",
+        "value": 65.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "46/70 = 65.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "certified_task_success_rate",
+          "applies_to_task_count": 70
+        }
+      },
+      "notes": [
+        "Pool later grew to 89; published reference remains 46/70. Not 65.7% of bugs generally."
       ]
     }
   ]
