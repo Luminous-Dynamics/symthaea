@@ -13,6 +13,8 @@ on:
       - "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
       - "docs/research/CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md"
       - "docs/research/CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_HUMAN_CALIBRATION_PACK_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_HUMAN_CALIBRATION_KEY_V0_2026-11-07.md"
       - "docs/research/CEB_ENGINEERING_QUALITY_SCORECARD_V0_2026-11-04.md"
       - "scripts/validate_ceb_review_research_pack.py"
       - ".github/workflows/ceb-contract-validation-v0.yml"
