@@ -367,7 +367,13 @@
         "rollback_rate",
         "time_to_detect_regime_shift",
         "calibration_after_feedback",
-        "source_and_assay_batch_receipt_coverage"
+        "source_and_assay_batch_receipt_coverage",
+        "prepared_candidate_digest_validity",
+        "sequential_step_receipt_chain_integrity",
+        "evidence_batch_replay_rejection_rate",
+        "stale_parent_rejection_rate",
+        "verifier_gated_session_advancement",
+        "cumulative_l2_budget_violations"
       ],
       "negative_controls": [
         "no_edit",
@@ -656,6 +662,18 @@
     {
       "id": "function_oracle_semantic_upper_bound",
       "scope": "Oracle with full held-out function access; verifier-only upper bound, never available to proposer"
+    },
+    {
+      "id": "sequential_weightprogram_session_contract",
+      "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
+    },
+    {
+      "id": "per_batch_editor_reprompt_with_same_compute_budget",
+      "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
+    },
+    {
+      "id": "fixed_weightprogram_template_without_evidence",
+      "scope": "Sequential WSP control with exact same base model, task, evidence batches, compute budget, and native candidate verifier; distinct control isolates whether frozen-template session binding adds value"
     }
   ],
   "seeds": {
@@ -782,7 +800,10 @@
       "held_out_future_batch_leakage_rate",
       "weight_reading_accuracy_after_label_permutation",
       "semantic_accuracy_on_unseen_task_families",
-      "semantic_reader_calibration"
+      "semantic_reader_calibration",
+      "sequential_session_receipt_chain_integrity",
+      "verifier_gated_session_advancement",
+      "cumulative_l2_budget_violations"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -863,7 +884,11 @@
     "The multi-layer CfC canonicalizer must use one fresh, fingerprint-bound activation-alignment receipt per layer, validate every layer index exactly once, propagate each layer permutation through the next layer's input columns, and verify full held-out output equivalence on candidate-only materialization. Residual, bidirectional, and backbone topologies remain explicitly unsupported.",
     "Weight-space semantic-reading results must include randomized output labels/action names and task families absent from public training corpora; familiar dataset-name recognition alone is not accepted as function understanding.",
     "At least one intervention must test causal predictions about outputs after a targeted parameter-group or hidden-unit manipulation; unverified verbal interpretations are not scored as correct semantic recovery.",
-    "Report architecture-only, raw-weight-only, probe-assisted, and intervention-assisted semantic-reading baselines separately under matched information, tool, token, and probe budgets."
+    "Report architecture-only, raw-weight-only, probe-assisted, and intervention-assisted semantic-reading baselines separately under matched information, tool, token, and probe budgets.",
+    "sequential_session_receipt_chain_integrity",
+    "no_batch_advancement_without_native_candidate_and_verifier_receipts",
+    "session_rejects_replayed_or_out_of_order_evidence_and_stale_parent_candidate",
+    "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches"
   ],
   "research_references": [
     {
