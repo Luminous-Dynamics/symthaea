@@ -108,6 +108,66 @@ def semantic_errors(payload: dict) -> list[str]:
         missing = sorted(set(sources) - used_sources)
         errors.append("registered sources not used by any comparator: " + ", ".join(missing))
 
+    # Preserve the November 7 causal-method and current ReviewBench refresh.
+    required_comparators = {
+        "reviewbench-high-severity-recheck-2014": ("CEB-REVIEW", "reviewbench-leaderboard", "reported", 219),
+        "sdr-ca-runtime-root-cause": ("CEB-DEBUG", "sdr-ca-paper", "not_reported", None),
+        "unival-causal-fault-localization": ("CEB-DEBUG", "unival-paper", "reported", 835),
+        "aacr-bench-repository-context": ("CEB-REVIEW", "aacr-bench-paper", "reported", 200),
+    }
+    for comparator_id, expected in required_comparators.items():
+        comparator = comparators.get(comparator_id)
+        if comparator is None:
+            errors.append(f"missing current causal-method comparator {comparator_id}")
+            continue
+        lane, source_id, denominator_status, denominator_value = expected
+        if comparator["lane_id"] != lane or comparator["source_id"] != source_id:
+            errors.append(f"{comparator_id}: lane/source binding changed")
+        denominator = comparator["sample_denominator"]
+        if denominator["status"] != denominator_status or denominator["value"] != denominator_value:
+            errors.append(f"{comparator_id}: denominator contract changed")
+
+    required_observations = {
+        "reviewbench-intent-agent-grounded-f1": ("reviewbench-high-severity-recheck-2014", "grounded_f1", 82.2),
+        "reviewbench-intent-agent-grounded-precision": ("reviewbench-high-severity-recheck-2014", "grounded_precision", 92.0),
+        "reviewbench-intent-agent-grounded-recall": ("reviewbench-high-severity-recheck-2014", "grounded_recall", 74.4),
+        "sdr-ca-public-dataset-count": ("sdr-ca-runtime-root-cause", "evaluation_dataset_count", 3),
+        "unival-defects4j-program-versions": ("unival-causal-fault-localization", "evaluated_program_versions", 835),
+        "aacr-bench-annotation-coverage-increase": ("aacr-bench-repository-context", "annotation_coverage_increase", 285),
+    }
+    for observation_id, expected in required_observations.items():
+        observation = next((row for row in observations if row["observation_id"] == observation_id), None)
+        if observation is None:
+            errors.append(f"missing required scoped observation {observation_id}")
+            continue
+        comparator_id, metric_id, value = expected
+        if (
+            observation["comparator_id"] != comparator_id
+            or observation["metric"]["metric_id"] != metric_id
+            or observation["metric"]["value"] != value
+        ):
+            errors.append(f"{observation_id}: metric/comparator/value binding changed")
+
+    current_reviewbench = [
+        row for row in observations
+        if row["comparator_id"] == "reviewbench-high-severity-recheck-2014"
+    ]
+    if len(current_reviewbench) != 3:
+        errors.append("current ReviewBench snapshot must preserve exactly F1, precision and recall rows")
+    if any(
+        "20:14 SAST" not in row["source_locator"]
+        or "2026-10-20" not in row["system"]["configuration"]
+        for row in current_reviewbench
+    ):
+        errors.append("current ReviewBench snapshot lost its observation time or model run date")
+
+    aacr = next(
+        (row for row in observations if row["observation_id"] == "aacr-bench-annotation-coverage-increase"),
+        None
+    )
+    if aacr and not any("not model performance" in note for note in aacr["notes"]):
+        errors.append("AACR-Bench 285% annotation coverage must not be represented as model performance")
+
     # These two splits must remain separate benchmark populations.
     full = comparators.get("swe-pro-v2-full")
     hard = comparators.get("swe-pro-v2-hard")
@@ -275,6 +335,20 @@ def self_test(payload: dict, schema: dict, format_checker: FormatChecker) -> Non
     mutant = copy.deepcopy(payload)
     mutant["comparators"][0]["comparison_class"] = "beats_sota"
     must_reject(mutant, "unsupported direct superiority claim")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "reviewbench-intent-agent-grounded-recall"
+    ]
+    must_reject(mutant, "current ReviewBench snapshot observation removed")
+
+    mutant = copy.deepcopy(payload)
+    mutant["observations"] = [
+        row for row in mutant["observations"]
+        if row["observation_id"] != "sdr-ca-public-dataset-count"
+    ]
+    must_reject(mutant, "causal runtime comparator observation removed")
 
     print("CEB_EXTERNAL_OBSERVATION_SELF_TEST_PASS")
 
