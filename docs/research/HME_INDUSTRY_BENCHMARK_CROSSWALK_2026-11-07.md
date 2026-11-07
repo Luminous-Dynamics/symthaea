@@ -374,3 +374,19 @@ Both fixtures demonstrate contract shapes only; they are not Rust runtime tests 
 The query receipt schema and examples now bind the pinned eligibility snapshot and reconcile physical, eligible and excluded populations. The machine-readable [eligibility filter fixture](fixtures/hme_eligibility_filter_v0.json) expects zero payload reads for excluded candidates, including a stale LSH hint that points at a revoked item.
 
 This composes the existing #9075/#9139/#9177 owners. It explicitly separates query exclusion, active-index forgetting, physical purge and cryptographic erasure.
+
+
+## 15. Quantized-vector decision stability: evaluate margins, not just distortion
+
+A second 2026 paper is directly relevant to #10978 and #11000: Xiao & Cao, [When Does Low-Bit Quantization Preserve the Decisions of Vector Search?](https://arxiv.org/abs/2609.09854) (September 9, 2026).
+
+The paper studies whether quantization preserves the local rank/prune decisions consumed by a vector-search algorithm. It shows why MSE and global rank correlation can fail to predict selected near-neighbor decision flips. Its analysis decomposes flip risk into exact-margin boundary mass and calibrated residual tails, accounts for covariance between residuals sharing a query/candidate, and presents a held-out block certificate for a frozen quantized decision rule.
+
+Implications for HME:
+- Record exact top-k margin distributions and risk by hard-margin quantiles.
+- Measure ranking and pruning decision flips on selected candidate populations, not random pairs only.
+- Measure covariance of paired residuals rather than assuming independence.
+- For held-out finite-sample selective certificates, report coverage and failure bound; these produce an explicitly probabilistic ApproximateComplete profile.
+- Do not mistake an empirical or statistical certificate for the deterministic worst-case residual upper bound required by ExactComplete.
+
+The paper reports 10.1% ranking flips for scalar int4 on its hardest fifth of margins in one inspected configuration, despite strong aggregate fidelity. This is an external paper result, not an HME measurement. <Cite refs={["turn684205view0","turn443733view0"]}/>
