@@ -22,6 +22,7 @@ on:
       - "docs/research/dtc-phase-rigidity-benchmark-v0.1.md"
       - "docs/research/uap-asynchronous-trajectory-observability-v0.1.md"
       - ".github/workflows/causal-temporal-physics.yml"
+      - ".github/workflows/causal-physics-lockfile-reconcile.yml"
   workflow_dispatch:
 
 permissions:
