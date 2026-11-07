@@ -414,6 +414,103 @@ mod tests {
     use crate::exact_floquet::{IsingEdge, KickedIsingFloquet};
     use std::f64::consts::PI;
 
+    fn dense_hamiltonian_action(
+        state: &[Complex<f64>],
+        n_spins: usize,
+        edges: &[HeisenbergEdge],
+        fields: &[f64],
+    ) -> Vec<Complex<f64>> {
+        let mut output = vec![Complex::new(0.0, 0.0); state.len()];
+        for (basis, amplitude) in state.iter().enumerate() {
+            let mut diagonal_energy = 0.0;
+            for spin in 0..n_spins {
+                let z = if basis & (1 << spin) == 0 { 1.0 } else { -1.0 };
+                diagonal_energy += fields[spin] * z;
+            }
+            output[basis] += *amplitude * diagonal_energy;
+
+            for edge in edges {
+                let first_is_one = basis & (1 << edge.first) != 0;
+                let second_is_one = basis & (1 << edge.second) != 0;
+                let z_first = if first_is_one { -1.0 } else { 1.0 };
+                let z_second = if second_is_one { -1.0 } else { 1.0 };
+                diagonal_energy = edge.j_z * z_first * z_second;
+                output[basis] += *amplitude * diagonal_energy;
+
+                let yy_sign = if first_is_one == second_is_one {
+                    -1.0
+                } else {
+                    1.0
+                };
+                let partner = basis ^ (1 << edge.first) ^ (1 << edge.second);
+                output[basis] += state[partner] * (edge.j_x + edge.j_y * yy_sign);
+            }
+        }
+        output
+    }
+
+    fn dense_x_pulse(
+        state: &[Complex<f64>],
+        n_spins: usize,
+        pulse_angle: f64,
+    ) -> Vec<Complex<f64>> {
+        let mut amplitudes = state.to_vec();
+        let cosine = (pulse_angle / 2.0).cos();
+        let minus_i_sine = Complex::new(0.0, -(pulse_angle / 2.0).sin());
+        for spin in 0..n_spins {
+            let mask = 1_usize << spin;
+            let previous = amplitudes.clone();
+            for basis in 0..amplitudes.len() {
+                if basis & mask == 0 {
+                    let partner = basis | mask;
+                    amplitudes[basis] =
+                        previous[basis] * cosine + previous[partner] * minus_i_sine;
+                    amplitudes[partner] =
+                        previous[partner] * cosine + previous[basis] * minus_i_sine;
+                }
+            }
+        }
+        amplitudes
+    }
+
+    fn dense_exact_interaction_exponential(
+        initial: &[Complex<f64>],
+        n_spins: usize,
+        edges: &[HeisenbergEdge],
+        fields: &[f64],
+    ) -> Vec<Complex<f64>> {
+        // Taylor action for exp(-iH) on a small system. The chosen test
+        // Hamiltonian has modest norm; 64 terms make truncation negligible.
+        let mut result = initial.to_vec();
+        let mut term = initial.to_vec();
+        for order in 1..=64 {
+            let acted = dense_hamiltonian_action(&term, n_spins, edges, fields);
+            let coefficient = Complex::new(0.0, -1.0 / order as f64);
+            let mut term_norm_squared = 0.0;
+            for index in 0..term.len() {
+                term[index] = acted[index] * coefficient;
+                result[index] += term[index];
+                term_norm_squared += term[index].norm_sqr();
+            }
+            if term_norm_squared.sqrt() < 1.0e-16 {
+                break;
+            }
+        }
+        result
+    }
+
+    fn dense_floquet_step_reference(
+        n_spins: usize,
+        edges: &[HeisenbergEdge],
+        fields: &[f64],
+        pulse_angle: f64,
+    ) -> Vec<Complex<f64>> {
+        let mut initial = vec![Complex::new(0.0, 0.0); 1_usize << n_spins];
+        initial[0] = Complex::new(1.0, 0.0);
+        let after_pulse = dense_x_pulse(&initial, n_spins, pulse_angle);
+        dense_exact_interaction_exponential(&after_pulse, n_spins, edges, fields)
+    }
+
     #[test]
     fn one_edge_xyz_gate_matches_closed_form() {
         let j_x = 0.31;
@@ -516,7 +613,7 @@ mod tests {
     }
 
     #[test]
-    fn second_order_trotter_converges_with_more_slices() {
+    fn second_order_trotter_converges_against_independent_dense_exponential() {
         let edges = vec![
             HeisenbergEdge {
                 first: 0,
@@ -534,15 +631,9 @@ mod tests {
             },
         ];
         let fields = vec![0.03, -0.04, 0.02];
-        let mut reference = KickedHeisenbergFloquet::new_graph(
-            3,
-            edges.clone(),
-            fields.clone(),
-            0.41,
-            128,
-        )
-        .unwrap();
-        reference.step();
+        let pulse_angle = 0.41;
+        let reference =
+            dense_floquet_step_reference(3, &edges, &fields, pulse_angle);
 
         let mut errors = Vec::new();
         for slices in [1, 2, 4, 8, 16] {
@@ -550,7 +641,7 @@ mod tests {
                 3,
                 edges.clone(),
                 fields.clone(),
-                0.41,
+                pulse_angle,
                 slices,
             )
             .unwrap();
@@ -558,7 +649,7 @@ mod tests {
             let error = candidate
                 .amplitudes()
                 .iter()
-                .zip(reference.amplitudes())
+                .zip(reference.iter())
                 .map(|(left, right)| (*left - *right).norm_sqr())
                 .sum::<f64>()
                 .sqrt();
