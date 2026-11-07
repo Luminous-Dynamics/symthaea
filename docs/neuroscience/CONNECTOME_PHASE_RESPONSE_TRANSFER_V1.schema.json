@@ -167,14 +167,30 @@
         }
       }
     },
-    "phase_vector": {
+    "phase_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycle_index",
+        "fractional_phase_microturns"
+      ],
+      "properties": {
+        "cycle_index": {
+          "type": "integer"
+        },
+        "fractional_phase_microturns": {
+          "type": "integer",
+          "minimum": -500000,
+          "maximum": 499999
+        }
+      }
+    },
+    "phase_sample_vector": {
       "type": "array",
       "minItems": 6,
       "maxItems": 6,
       "items": {
-        "type": "integer",
-        "minimum": -500000,
-        "maximum": 499999
+        "$ref": "#/$defs/phase_sample"
       }
     },
     "measured_outcome": {
@@ -243,17 +259,34 @@
       "additionalProperties": false,
       "required": [
         "measured_row_index",
-        "phase_reset_microturns",
+        "phase_reset_fractional_microturns",
+        "cycle_slips_by_leg",
         "local_reset_microturns",
-        "off_diagonal_l1_microturns"
+        "off_diagonal_l1_microturns",
+        "off_diagonal_cycle_slips_l1"
       ],
       "properties": {
         "measured_row_index": {
           "type": "integer",
           "minimum": 0
         },
-        "phase_reset_microturns": {
-          "$ref": "#/$defs/phase_vector"
+        "phase_reset_fractional_microturns": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "integer",
+            "minimum": -500000,
+            "maximum": 499999
+          }
+        },
+        "cycle_slips_by_leg": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "integer"
+          }
         },
         "local_reset_microturns": {
           "type": "integer",
@@ -261,6 +294,10 @@
           "maximum": 499999
         },
         "off_diagonal_l1_microturns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "off_diagonal_cycle_slips_l1": {
           "type": "integer",
           "minimum": 0
         }
