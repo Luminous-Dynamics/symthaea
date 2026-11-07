@@ -56,7 +56,7 @@ impl Default for StrategyBddBudget {
             max_table_entries: 1 << 20,
             max_bdd_nodes: 1 << 20,
             max_support_checks: 1 << 22,
-            max_variable_order_evaluations: 512,
+            max_variable_order_evaluations: 1 << 12,
             max_sifting_passes: 2,
         }
     }
@@ -323,12 +323,12 @@ pub fn verify_support_reduction_equivalence(
             .dependencies
             .iter()
             .map(|dependency| {
-                let position = original
+                original
                     .dependencies
                     .iter()
                     .position(|candidate| candidate == dependency)
-                    .expect("dependency scope checked above");
-                original_key[position]
+                    .map(|position| original_key[position])
+                    .unwrap_or(false)
             })
             .collect();
         let Some(&original_value) = original.table.get(&original_key) else {
@@ -1250,6 +1250,40 @@ mod tests {
             );
         }
         assert!(maximum_sift_gap <= 1);
+    }
+
+    #[test]
+    fn verifier_enforces_serialized_node_budget_before_graph_walk() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
+        let tight = StrategyBddBudget {
+            max_bdd_nodes: 2,
+            ..budget()
+        };
+        assert_eq!(
+            verify_robdd_matches_strategy_function(&bdd, &source, tight).unwrap_err(),
+            StrategyBddError::NodeBudgetExceeded {
+                required: 3,
+                limit: 2
+            }
+        );
+    }
+
+    #[test]
+    fn evaluator_enforces_explicit_node_budget() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
+        let tight = StrategyBddBudget {
+            max_bdd_nodes: 2,
+            ..budget()
+        };
+        assert!(matches!(
+            evaluate_robdd_with_budget(&bdd, &[false, false], tight),
+            Err(StrategyBddError::NodeBudgetExceeded {
+                required: 3,
+                limit: 2
+            })
+        ));
     }
 
     #[test]
