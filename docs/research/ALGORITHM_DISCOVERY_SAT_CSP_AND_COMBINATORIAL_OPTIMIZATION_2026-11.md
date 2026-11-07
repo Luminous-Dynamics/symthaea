@@ -307,6 +307,45 @@ For our benchmark contracts, distinguish at least:
 
 Do not compare projected counts with full model counts, or approximate counters with exact counters, using a single solved-count metric. Compare counts, proof/precision guarantees, preprocessing, compile time, query time, memory and reuse across repeated queries.
 
+## Proof-complexity-aware model counting: optimize the derivation, not only the answer
+
+A further paradigm shift is to make the *structure of an exact count derivation* part of the algorithm-discovery objective. A numeric #SAT answer alone hides whether the solver found reusable decomposition, whether its cache was effective, and whether its computation admits a compact independently checkable representation.
+
+Two 2026 results give this direction a concrete theoretical foundation:
+
+- **AAAI-26, Proof Systems That Tightly Characterise Model Counting Algorithms:** an adapted form of MICE is polynomially equivalent to annotated Decision-DNNF proof representations for a DPLL-style model-counting algorithm; the resulting proof systems tightly characterize the runtime of that solver class. The paper also formalizes semantic caching and shows that the corresponding proof system is characterized by Decision-DNNF representation size (ignoring annotation size), motivating semantic reuse as a research variable. [Paper](https://doi.org/10.1609/aaai.v40i17.38431) · [Open PDF](https://ojs.aaai.org/index.php/AAAI/article/download/38431/42393).
+- **Journal of Automated Reasoning (July 20, 2026), The Relative Strength of #SAT Proof Systems:** CPOG polynomially simulates both MICE and kcps, while MICE and kcps are exponentially incomparable. This establishes a proof-size simulation hierarchy among those systems, not a claim that CPOG is the fastest practical checker or the smallest certificate for every instance. [Paper](https://doi.org/10.1007/s10817-026-09757-w) · [PubMed record](https://pubmed.ncbi.nlm.nih.gov/42483024/).
+
+This should compose with, not duplicate, the typed tractable-circuit and proof-format adapter work in [ETH-026 #10301](https://github.com/Luminous-Dynamics/symthaea/issues/10301), scope-complete circuit IR in [ETH-027 #10305](https://github.com/Luminous-Dynamics/symthaea/issues/10305), and exact model-counting benchmark in [ETH-004 #10090](https://github.com/Luminous-Dynamics/symthaea/issues/10090).
+
+### New research hypothesis
+
+For exact #SAT, a solver's useful capability is not only how quickly it produces the correct integer. It is how effectively it discovers a compact derivation composed of:
+- decision partitions, using the exact identity `#F = #F[x] + #F[¬x]`;
+- variable-disjoint decompositions, using `#(F₁ ∧ … ∧ Fₖ) = ∏ᵢ #Fᵢ` only when the scopes are disjoint;
+- sound component caching with a canonical residual-formula identity and explicit remaining-variable universe;
+- preprocessing / rewriting steps whose count-preservation and auxiliary-variable multiplicities are separately established;
+- a proof or circuit representation that an independent checker can validate.
+
+Search should jointly optimize branching, decomposition discovery, cache keys and reuse, and proof-target selection. Semantic cache hits require an actual equivalence obligation; a hash match is an identity test, not proof that two residual formulas are equivalent. Every cache key must bind the residual formula semantics and the variables still free, so unconstrained-variable multiplicities are not lost.
+
+### Metrics to add to #SAT experiments
+
+Keep these as a multi-objective vector rather than collapsing them into one score:
+
+| Dimension | Required measurement |
+|---|---|
+| Solver quality | Exact count, solved status, wall/CPU time, peak RSS |
+| Search structure | Decision nodes, decomposition nodes, component count, cache hits/misses, repeated residual states |
+| Certificate quality | Proof-system ID/version, proof bytes, DAG/circuit nodes and edges, annotation bytes |
+| Assurance cost | Independent checker time, peak RSS, rejection of mutated/invalid proofs |
+| End-to-end cost | Preprocessing + solving + proof generation + independent verification |
+| Transfer | Held-out family/generator performance and proof-size/runtime distributions |
+
+Run matched ablations: no cache, syntactic component cache, semantic cache, branch-only, decomposition-first, and proof-target-aware discovery. Compare CPOG, MICE and annotated Decision-DNNF only where their precise contracts match. Keep proof-system simulation theorems, measured certificate sizes, checker runtime and solver runtime as separate evidence.
+
+For initial qualification, use exhaustive small #SAT instances to verify every partition/decomposition/cache identity, then compare the emitted proof/circuit with an independently implemented checker. The proof-size/runtime characterization applies to the paper's stated algorithm class; do not generalize it to every CDCL or modern model-counting implementation without a separate reduction argument.
+
 ## State of practice: competition and benchmark baselines
 
 - [SAT Competition 2026](https://satcompetition.github.io/2026/): Main, Parallel, Experimental and Cloud tracks, including AI-generated/AI-tuned participation. The rules require a model for SAT instances in all tracks and UNSAT proof certificates in the Main Track; source code and a 1–2 page system description are required, including disclosure of AI-authored code and AI-tuned heuristics. Pure portfolios combining solvers developed by different groups are restricted outside the Cloud Track, so an internal portfolio benchmark is not automatically a valid competition submission. Use the published benchmark list, per-instance outcomes, solver sources and result logs.
