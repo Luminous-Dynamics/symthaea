@@ -112,3 +112,31 @@ The first implementation should be a dry-run orchestration/receipt path, not an 
 ## 8. Claim ceiling
 
 A successful synthetic policy benchmark establishes only that the frozen policy behaves as specified on the frozen synthetic oracle and budget. It does not validate aircraft physics, CFD/FEM, flight performance, safety, airworthiness, certification, passenger operations or commercial viability.
+
+## 9. Executable dry-run boundary
+
+Rust module: `crates/domains/symthaea-engineering/src/aircraft_design_loop.rs`
+
+Wire schemas:
+- `crates/domains/symthaea-engineering/schemas/aircraft-design-study.schema.json`
+- `crates/domains/symthaea-engineering/schemas/aircraft-evaluation-proposal.schema.json`
+- `crates/domains/symthaea-engineering/schemas/aircraft-evaluation-receipt.schema.json`
+
+The bounded API currently:
+- validates a study's exact mission, candidate, required operating-case, decision-question, objective, hard-constraint, backend, model-profile and cost-basis references;
+- admits a proposal only when all references belong to the frozen study and the backend/method/model-profile combination is allow-listed;
+- abstains when the proposed cost exceeds remaining budget;
+- records actual failed, aborted, out-of-domain and non-converged outcomes without turning them into decision-eligible evidence;
+- reports a completed, in-domain evaluation as within its declared model scope only—not as a physical validation or feasibility finding.
+
+Every dry-run review has `execution_started = false`. No external process, solver, CAD system, network client or aircraft-control interface is invoked by this module. It cannot grant flight approval. The SHA-256 checks are syntax and reference-equality checks; artifact authentication and source acquisition are separate responsibilities.
+
+## 10. Immediate follow-on gates
+
+1. Add a canonical, independently recomputable digest for the serialized study and proposal payloads; do not use debug formatting or map iteration order.
+2. Bind an evaluation receipt to the exact runner artifact, executable/environment identity, raw inputs, output bundle, applicability result and uncertainty profile.
+3. Add independent fixtures for stale model profiles, case/configuration mismatch, budget overruns, missing run artifacts, non-convergence and false-feasible labels.
+4. Compose with the existing Symtropy run manifest / receipt work. Do not create a second solver execution registry.
+5. Keep human approval as a distinct, externally recorded review event before any engineering action outside the dry-run boundary.
+
+The first Rust implementation is intentionally a study/receipt admission gate, not yet an adaptive experiment selector or a physics tool.
