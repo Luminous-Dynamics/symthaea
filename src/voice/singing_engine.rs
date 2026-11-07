@@ -499,14 +499,215 @@ impl VocalStem {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SingingControl {
+    LyricText,
+    Language,
+    ExactPhoneSequence,
+    SyllableAlignment,
+    NotePitch,
+    NoteDuration,
+    AbsoluteOnsetAndRests,
+    Melisma,
+    ContinuousPitchCurve,
+    PhraseExpressionCurve,
+    Breathiness,
+    Energy,
+    Tension,
+    Vibrato,
+    Portamento,
+    Articulation,
+    VoiceIdentity,
+    LocalEdits,
+}
+
+impl SingingControl {
+    pub const ALL: [Self; 18] = [
+        Self::LyricText,
+        Self::Language,
+        Self::ExactPhoneSequence,
+        Self::SyllableAlignment,
+        Self::NotePitch,
+        Self::NoteDuration,
+        Self::AbsoluteOnsetAndRests,
+        Self::Melisma,
+        Self::ContinuousPitchCurve,
+        Self::PhraseExpressionCurve,
+        Self::Breathiness,
+        Self::Energy,
+        Self::Tension,
+        Self::Vibrato,
+        Self::Portamento,
+        Self::Articulation,
+        Self::VoiceIdentity,
+        Self::LocalEdits,
+    ];
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CapabilitySupport {
+    Native,
+    Approximated,
+    Unsupported,
+    Conditional,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControlCapability {
+    pub control: SingingControl,
+    pub support: CapabilitySupport,
+    /// Must explain the behavior or the condition; never imply a control is
+    /// fulfilled when the backend ignores it.
+    pub rationale: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SingingBackendCapabilities {
+    pub schema: String,
+    pub backend_id: String,
+    pub controls: Vec<ControlCapability>,
+}
+
+impl SingingBackendCapabilities {
+    pub const SCHEMA: &'static str = "singing-backend-capabilities/v1";
+
+    pub fn new(
+        backend_id: impl Into<String>,
+        controls: Vec<ControlCapability>,
+    ) -> Result<Self> {
+        let capabilities = Self {
+            schema: Self::SCHEMA.to_string(),
+            backend_id: backend_id.into(),
+            controls,
+        };
+        capabilities.validate()?;
+        Ok(capabilities)
+    }
+
+    /// A renderer that has not declared its behavior is never assumed capable.
+    pub fn undeclared(backend_id: impl Into<String>) -> Self {
+        Self {
+            schema: Self::SCHEMA.to_string(),
+            backend_id: backend_id.into(),
+            controls: SingingControl::ALL
+                .into_iter()
+                .map(|control| ControlCapability {
+                    control,
+                    support: CapabilitySupport::Unsupported,
+                    rationale: "backend has not declared this control".to_string(),
+                })
+                .collect(),
+        }
+    }
+
+    pub fn support(&self, control: SingingControl) -> CapabilitySupport {
+        self.controls
+            .iter()
+            .find(|entry| entry.control == control)
+            .map(|entry| entry.support)
+            .unwrap_or(CapabilitySupport::Unsupported)
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        if self.schema != Self::SCHEMA || self.backend_id.trim().is_empty() {
+            bail!("invalid singing backend capability schema or backend ID");
+        }
+        if self.controls.len() != SingingControl::ALL.len() {
+            bail!(
+                "backend {} must declare all {} singing controls, got {}",
+                self.backend_id,
+                SingingControl::ALL.len(),
+                self.controls.len()
+            );
+        }
+        let mut seen = std::collections::HashSet::new();
+        for entry in &self.controls {
+            if !seen.insert(entry.control) {
+                bail!(
+                    "backend {} declares {:?} more than once",
+                    self.backend_id,
+                    entry.control
+                );
+            }
+            if entry.rationale.trim().is_empty() {
+                bail!(
+                    "backend {} has an empty rationale for {:?}",
+                    self.backend_id,
+                    entry.control
+                );
+            }
+        }
+        if SingingControl::ALL.iter().any(|control| !seen.contains(control)) {
+            bail!("backend {} has an incomplete singing capability manifest", self.backend_id);
+        }
+        Ok(())
+    }
+}
+
 pub trait SingingVoiceEngine {
     fn id(&self) -> &str;
+
+    /// Backends must override this to make supported and unsupported controls
+    /// explicit. The default is fail-closed and treats every control as
+    /// unsupported rather than assuming parity between implementations.
+    fn capabilities(&self) -> SingingBackendCapabilities {
+        SingingBackendCapabilities::undeclared(self.id())
+    }
+
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn undeclared_backend_controls_are_fail_closed() {
+        let capabilities = SingingBackendCapabilities::undeclared("unverified-backend");
+        capabilities.validate().unwrap();
+        assert_eq!(
+            capabilities.support(SingingControl::ExactPhoneSequence),
+            CapabilitySupport::Unsupported
+        );
+        assert_eq!(capabilities.controls.len(), SingingControl::ALL.len());
+    }
+
+    #[test]
+    fn capability_manifest_rejects_missing_duplicate_or_empty_entries() {
+        let mut controls: Vec<_> = SingingControl::ALL
+            .into_iter()
+            .map(|control| ControlCapability {
+                control,
+                support: CapabilitySupport::Unsupported,
+                rationale: "not supported by fixture".to_string(),
+            })
+            .collect();
+        controls.pop();
+        assert!(SingingBackendCapabilities::new("fixture", controls).is_err());
+
+        let mut controls: Vec<_> = SingingControl::ALL
+            .into_iter()
+            .map(|control| ControlCapability {
+                control,
+                support: CapabilitySupport::Native,
+                rationale: "fixture support".to_string(),
+            })
+            .collect();
+        controls[0].control = controls[1].control;
+        assert!(SingingBackendCapabilities::new("fixture", controls).is_err());
+
+        let controls = SingingControl::ALL
+            .into_iter()
+            .map(|control| ControlCapability {
+                control,
+                support: CapabilitySupport::Native,
+                rationale: String::new(),
+            })
+            .collect();
+        assert!(SingingBackendCapabilities::new("fixture", controls).is_err());
+    }
 
     #[test]
     fn performance_is_serializable_and_validated() {
