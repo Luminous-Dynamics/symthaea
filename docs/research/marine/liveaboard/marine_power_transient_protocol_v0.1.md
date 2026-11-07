@@ -12,6 +12,9 @@ Recent research reinforces this gap:
 - Wang et al. (Applied Energy 426, December 2026 issue; online ahead of issue) review ship EMS coupling to degradation, transient buffering, MVDC stability, HIL/PHIL and deployment evidence. DOI: https://doi.org/10.1016/j.apenergy.2026.128503
 - EMSA's battery safety guidance (2023, updated 11 Nov 2025) is non-mandatory and identifies the role of class, standards and flag-state safety requirements. https://www.emsa.europa.eu/publications/item/5061-battery-energy-storage-systems-bess.html
 
+- Kotsampopoulos, *Testing Ship Electric Propulsion and Shipboard Microgrids: Standards, Techniques and New Trends*, Energies 19(9), published 22 April 2026. Reviews laboratory testing, co-simulation, CHIL, PHIL and holistic multi-component testbeds; supports the staged HIL/PHIL ladder but does not provide LOS-18 equipment limits. https://doi.org/10.3390/en19092016
+- Kondratyev et al., *Field-Validated Probabilistic Digital Twin of a Shipboard Microgrid for Reliability-Oriented Operation*, Energies 19(17), 4074, published 29 August 2026. Reports 360 thirty-minute field records, 12 operation/fault classes, 4 s samples and 1,080 paired evaluations. Useful supervisory-state/diagnostic precedent; its primary telemetry is operator-confidential, and 4 s cadence is not evidence for millisecond converter/protection dynamics. https://doi.org/10.3390/en19174074
+
 Those sources include larger and naval ships. They motivate test questions, not directly transferable LOS-18 limits.
 
 ## 2. What current Luminous physics can and cannot say
