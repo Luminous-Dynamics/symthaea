@@ -299,7 +299,7 @@ impl HceEpoch {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionRegime {
     SynchronousBarrier,
@@ -341,6 +341,7 @@ pub struct WorkerAttempt {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct WorkerTraceReport {
     pub trace_id: String,
+    pub regime: ExecutionRegime,
     pub worker_count: u32,
     pub wall_clock_budget_ms: u64,
     pub total_attempts: usize,
@@ -491,6 +492,7 @@ pub fn analyze_worker_trace(trace: &WorkerTrace) -> Result<WorkerTraceReport, Tr
 
     Ok(WorkerTraceReport {
         trace_id: trace.trace_id.clone(),
+        regime: trace.regime,
         worker_count: trace.worker_count,
         wall_clock_budget_ms: trace.wall_clock_budget_ms,
         total_attempts: trace.attempts.len(),
