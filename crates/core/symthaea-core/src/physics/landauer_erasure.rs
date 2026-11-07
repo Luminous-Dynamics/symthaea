@@ -74,7 +74,9 @@ mod tests {
         assert!((two_bits - 2.0 * one_bit).abs() < 1e-35);
         assert!((warmer / one_bit - 310.0 / 300.0).abs() < 1e-14);
         assert_eq!(
-            erasure_heat_floor_j(0.0, 300.0, K_BOLTZMANN).unwrap().get(),
+            erasure_heat_floor_j(0.0, 300.0, K_BOLTZMANN)
+                .unwrap()
+                .get(),
             0.0
         );
     }
