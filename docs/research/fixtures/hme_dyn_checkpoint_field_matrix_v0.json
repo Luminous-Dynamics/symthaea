@@ -1,0 +1,192 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "HME-DYN-CHECKPOINT-FIELD-MATRIX-2026-11-07",
+  "status": "source_derived_field_inventory_not_runtime_checkpoint",
+  "source": {
+    "file": "crates/core/symthaea/src/hdc/hdc_ltc_unified.rs",
+    "network_type": "HdcLtcUnifiedNetwork",
+    "neuron_type": "HdcLtcUnifiedNeuron",
+    "evolution_snapshot_type": "NetworkStateSnapshot",
+    "note": "The full network type derives Serialize/Deserialize; NetworkStateSnapshot is a transient Debug/Clone/Default buffer."
+  },
+  "neuron_fields": [
+    {
+      "field": "state",
+      "class": "dynamic_evolution_state",
+      "included_in_evolution_snapshot": true,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "weight_hv",
+      "class": "learned_parameter",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "input_mask",
+      "class": "learned_parameter",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "tau_modulator",
+      "class": "learned_parameter",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "gate_weight",
+      "class": "learned_or_configured_parameter",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "gate_bias",
+      "class": "learned_or_configured_parameter",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "config",
+      "class": "dynamics_configuration",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "weight_momentum",
+      "class": "optimizer_state",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "input_momentum",
+      "class": "optimizer_state",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "running_mean",
+      "class": "mutable_running_statistic",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "running_var",
+      "class": "mutable_running_statistic",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "total_time",
+      "class": "evolution_clock",
+      "included_in_evolution_snapshot": true,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "update_count",
+      "class": "evolution_clock",
+      "included_in_evolution_snapshot": true,
+      "required_for_learner_checkpoint": true
+    }
+  ],
+  "network_fields": [
+    {
+      "field": "layers",
+      "class": "neuron_state_and_parameters",
+      "included_in_evolution_snapshot": "indirect_dynamic_fields_only",
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "layer_bindings",
+      "class": "network_parameter",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "config",
+      "class": "network_configuration",
+      "included_in_evolution_snapshot": false,
+      "required_for_learner_checkpoint": true
+    },
+    {
+      "field": "layer_outputs",
+      "class": "dynamic_evolution_state",
+      "included_in_evolution_snapshot": true,
+      "required_for_learner_checkpoint": true
+    }
+  ],
+  "artifact_classes": {
+    "EvolutionSnapshot": {
+      "captured": [
+        "neuron.state",
+        "neuron.total_time",
+        "neuron.update_count",
+        "network.layer_outputs"
+      ],
+      "omitted": [
+        "neuron.weight_hv",
+        "neuron.input_mask",
+        "neuron.tau_modulator",
+        "neuron.gate_weight",
+        "neuron.gate_bias",
+        "neuron.config",
+        "neuron.weight_momentum",
+        "neuron.input_momentum",
+        "neuron.running_mean",
+        "neuron.running_var",
+        "network.layer_bindings",
+        "network.config"
+      ],
+      "resumable_learner": false,
+      "allowed_use": "restore evolution state against the same immutable model/parameter generation"
+    },
+    "LearnerCheckpoint": {
+      "required": [
+        "all neuron fields",
+        "network.layers",
+        "network.layer_bindings",
+        "network.config",
+        "network.layer_outputs",
+        "schema version",
+        "representation/dimension profile",
+        "parameter generation digest",
+        "operator/evolution profile"
+      ],
+      "resumable_learner": true,
+      "allowed_use": "resume dynamics and learning under the declared runtime contract"
+    },
+    "ReplayCheckpoint": {
+      "required": [
+        "LearnerCheckpoint",
+        "ordered input/event sequence",
+        "event/source digests",
+        "replay cursor",
+        "replay profile"
+      ],
+      "resumable_learner": true,
+      "allowed_use": "restore a complete learner and continue/replay from the declared event boundary"
+    },
+    "WeightsOnlyArtifact": {
+      "required": [
+        "learned/configured parameters",
+        "network architecture/config",
+        "parameter digest"
+      ],
+      "resumable_learner": false,
+      "allowed_use": "initialize or transfer a model under an explicit non-resumable load contract"
+    }
+  },
+  "mandatory_negative_controls": [
+    "EvolutionSnapshot must not qualify as LearnerCheckpoint.",
+    "Missing momentum must fail training-continuation parity even if the immediate forward output matches.",
+    "Wrong parameter-generation digest paired with an EvolutionSnapshot must be rejected.",
+    "WeightsOnlyArtifact must not claim optimizer or dynamic-state continuity.",
+    "A field omitted from a serialized checkpoint must be visible in the artifact-class completeness declaration."
+  ],
+  "nonclaims": [
+    "This inventory is derived from source declarations, not a measured checkpoint size.",
+    "It does not prove the full Serialize/Deserialize representation is a stable durable wire format.",
+    "It does not prove the current HME stores any of these artifacts.",
+    "Field mutability classifications require further source/call-site audit before compression or split-segment design."
+  ]
+}
