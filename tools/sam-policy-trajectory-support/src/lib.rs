@@ -456,7 +456,7 @@ mod tests {
 
     #[test]
     fn incomplete_query_canonical_bytes_preserve_completeness_and_partial_steps() {
-        let mut complete = query("policy-v1", "context-v1", path(&["continue"]));
+        let complete = query("policy-v1", "context-v1", path(&["continue"]));
         let mut incomplete = complete.clone();
         incomplete.complete = false;
         assert_ne!(complete.canonical_bytes(), incomplete.canonical_bytes());
