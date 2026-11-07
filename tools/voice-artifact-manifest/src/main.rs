@@ -132,15 +132,31 @@ fn walk(root: &Path, current: &Path, entries: &mut Vec<ArtifactEntry>) -> Result
 }
 
 fn normalized_root(path: &Path) -> Result<PathBuf, String> {
-    let canonical = path
-        .canonicalize()
-        .map_err(|error| fail(format!("artifact root does not exist: {error}")))?;
-    let metadata = fs::symlink_metadata(&canonical)
+    // Inspect the caller-supplied root before canonicalization: canonicalize
+    // follows symlinks, which would otherwise hide a symlink root.
+    let supplied_metadata = fs::symlink_metadata(path)
         .map_err(|error| fail(format!("cannot stat artifact root: {error}")))?;
-    if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
+    if supplied_metadata.file_type().is_symlink() || !supplied_metadata.file_type().is_dir() {
         return Err(fail("artifact root must be a real directory, not a symlink"));
     }
-    Ok(canonical)
+    path.canonicalize()
+        .map_err(|error| fail(format!("artifact root does not exist: {error}")))
+}
+
+fn ensure_manifest_outside_root(root: &Path, manifest_path: &Path) -> Result<(), String> {
+    let root = normalized_root(root)?;
+    let parent = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = parent
+        .canonicalize()
+        .map_err(|error| fail(format!("manifest parent directory is unavailable: {error}")))?;
+    let name = manifest_path
+        .file_name()
+        .ok_or_else(|| fail("manifest path must name a file"))?;
+    let target = parent.join(name);
+    if target.starts_with(&root) {
+        return Err(fail("manifest file must be outside the artifact root"));
+    }
+    Ok(())
 }
 
 fn build_manifest(root: &Path, artifact_kind: &str) -> Result<ArtifactManifest, String> {
@@ -224,6 +240,7 @@ fn run() -> Result<(), String> {
             let root = PathBuf::from(arg(&args, "--root")?);
             let kind = arg(&args, "--kind")?;
             let output = PathBuf::from(arg(&args, "--output")?);
+            ensure_manifest_outside_root(&root, &output)?;
             let manifest = build_manifest(&root, &kind)?;
             let bytes = serde_json::to_vec_pretty(&manifest)
                 .map_err(|error| fail(format!("cannot serialize manifest: {error}")))?;
@@ -242,6 +259,7 @@ fn run() -> Result<(), String> {
             let bytes = fs::read(&path).map_err(|error| {
                 fail(format!("cannot read manifest {}: {error}", path.display()))
             })?;
+            ensure_manifest_outside_root(&root, &path)?;
             let manifest: ArtifactManifest = serde_json::from_slice(&bytes)
                 .map_err(|error| fail(format!("invalid artifact manifest: {error}")))?;
             verify_manifest(&root, &manifest)?;
@@ -346,6 +364,28 @@ mod tests {
         symlink(external.0.join("secret.bin"), tree.0.join("link.bin")).unwrap();
         let error = build_manifest(&tree.0, "model").unwrap_err();
         assert!(error.contains("symlink rejected"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_root_is_rejected_before_canonicalization() {
+        use std::os::unix::fs::symlink;
+        let tree = TestTree::new();
+        tree.write("weights.bin", b"weights");
+        let parent = TestTree::new();
+        let alias = parent.0.join("root-link");
+        symlink(&tree.0, &alias).unwrap();
+        let error = build_manifest(&alias, "model").unwrap_err();
+        assert!(error.contains("real directory"), "{error}");
+    }
+
+    #[test]
+    fn manifest_must_be_stored_outside_artifact_tree() {
+        let tree = TestTree::new();
+        tree.write("weights.bin", b"weights");
+        assert!(
+            ensure_manifest_outside_root(&tree.0, &tree.0.join("manifest.json")).is_err()
+        );
     }
 
     #[test]
