@@ -10,7 +10,7 @@
 //! single frame. Track-set temporal evaluation is implemented separately in
 //! trajectory_metrics as OSPA(2). This module does not implement T-GOSPA's
 //! explicit track-switch penalty, data association or a target tracker.
-/// The assignment solver uses exact dynamic programming over the smaller of
+//! The assignment solver uses exact dynamic programming over the smaller of
 //! the truth/estimate sets; that side is capped at 20 elements to bound memory.
 
 #![forbid(unsafe_code)]
