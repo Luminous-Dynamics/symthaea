@@ -649,3 +649,8 @@ Two separate issues now track the remaining legacy semantic defects:
 - https://github.com/Luminous-Dynamics/symthaea/issues/10941 — true factor beliefs and Bethe free energy. Product of singleton marginals is mean-field, not the BP factor belief.
 
 These are intentionally not folded into the checked sum-product PR.
+
+
+### Checked BP follow-up test expansion
+
+The checked BP PR now authors 13 tests, including stale/corrupted cached-message rejection (the checked path rebuilds messages) and invalid zero-iteration configuration. The latest source commit is tracked on draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10939. Rust compilation remains unverified in this environment.
