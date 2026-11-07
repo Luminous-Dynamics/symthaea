@@ -335,3 +335,20 @@ Official/preprint references:
 - https://arxiv.org/abs/2610.16289
 - https://alma.di.uoa.gr/node/771
 
+
+
+## 12. New SOTA comparator: PQR-Search (2026-11-05)
+
+[Per-Query Recall Guarantees for Approximate Nearest Neighbor Search in Dynamic Vector Databases](https://arxiv.org/abs/2611.07579), by Woong-Kee Loh and Suan Lee (arXiv, November 5, 2026), is a highly relevant new comparator.
+
+The paper introduces PQR-Search, which targets a per-query probabilistic guarantee: P(Recall(q) < τ) ≤ δ for each query under its randomized orthogonal-transformation assumption. It stores one-bit rotated residual codes relative to IVF centroids and uses exact quantiles of residual errors for pruning. Its reported evaluation includes 20 datasets up to 100M vectors and dynamic insert/delete workloads. The abstract reports failure rates at or below δ in the reported audits, and compares against average-recall-tuned HNSW and exhaustive FAISS.
+
+This is a different guarantee from HME's intended ExactComplete:
+- PQR-Search is approximate but aims to bound the probability that an individual query falls below a recall threshold.
+- HME full scan is deterministic exact against a declared oracle.
+- HME progressive/certified pruning seeks deterministic exact top-k if every prune is mathematically admissible.
+- HME ApproximateComplete may select PQR-like profiles only under an explicit, versioned quality guarantee; it must never be promoted to ExactComplete.
+
+Use PQR-Search as a head-to-head external algorithm baseline where representation, distance metric, dataset, k, hardware and dynamic update semantics are compatible. Report its τ, δ, transformation seed assumptions and per-query failure audit separately from HME exactness. Do not call a probabilistic guarantee deterministic, and do not compare abstract paper speedups with local HME timings without a common setup.
+
+Paper: https://arxiv.org/abs/2611.07579
