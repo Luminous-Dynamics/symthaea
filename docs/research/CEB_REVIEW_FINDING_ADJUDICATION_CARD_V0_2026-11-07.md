@@ -2,7 +2,7 @@
 
 **Purpose:** Human annotation aid for existing CEB-REVIEW tasks and the benchmark-triangulation research.  
 **Status:** Public design-only template. It is not a new task schema, receipt, evaluator, label authority or primary metric.  
-**Use with:** [CEB Review Benchmark Triangulation V0](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [Review Evidence-Grounding Challenge V0](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723).
+**Use with:** [CEB Review Benchmark Triangulation V0](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [Review Evidence-Grounding Challenge V0](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [Dual-Annotator Calibration and Reliability Pack V0](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md), and [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723).
 
 ---
 
