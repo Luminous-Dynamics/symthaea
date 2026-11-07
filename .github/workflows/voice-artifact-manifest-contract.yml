@@ -1,0 +1,80 @@
+name: Voice artifact manifest contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/voice-artifact-manifest/**"
+      - ".github/workflows/voice-artifact-manifest-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  artifact-tree-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR revision
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOICE_ARTIFACT_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Apply and verify canonical formatting
+        run: |
+          rustfmt +1.96.0 --edition 2024 tools/voice-artifact-manifest/src/main.rs
+          rustfmt +1.96.0 --edition 2024 --check tools/voice-artifact-manifest/src/main.rs
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/voice-artifact-manifest/Cargo.toml
+
+      - name: Run artifact-tree unit tests
+        run: cargo +1.96.0 test --locked --manifest-path tools/voice-artifact-manifest/Cargo.toml
+
+      - name: Exercise create, verify and byte-tamper negative control
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/tree/voices/en" "$tmp/tree/models"
+          printf 'voice-bytes-v1' > "$tmp/tree/voices/en/voice.bin"
+          printf '{"version":1}\n' > "$tmp/tree/models/config.json"
+          cargo +1.96.0 run --locked --manifest-path tools/voice-artifact-manifest/Cargo.toml -- \
+            create --root "$tmp/tree" --kind kokoro-model-and-voice --output "$tmp/manifest.json"
+          cargo +1.96.0 run --locked --manifest-path tools/voice-artifact-manifest/Cargo.toml -- \
+            verify --root "$tmp/tree" --manifest "$tmp/manifest.json"
+          printf 'voice-bytes-v2' > "$tmp/tree/voices/en/voice.bin"
+          if cargo +1.96.0 run --locked --manifest-path tools/voice-artifact-manifest/Cargo.toml -- \
+            verify --root "$tmp/tree" --manifest "$tmp/manifest.json"; then
+            echo "tampered artifact tree unexpectedly verified" >&2
+            exit 1
+          fi
+
+      - name: Record exact source revision
+        run: printf '%s\n' "$VOICE_ARTIFACT_REVISION" > voice-artifact-manifest.revision
+
+      - name: Upload canonical source and dependency lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: voice-artifact-manifest-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            tools/voice-artifact-manifest/src/main.rs
+            tools/voice-artifact-manifest/Cargo.lock
+            voice-artifact-manifest.revision
+          if-no-files-found: error
