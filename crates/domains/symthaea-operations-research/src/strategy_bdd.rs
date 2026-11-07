@@ -46,6 +46,8 @@ pub struct StrategyBddBudget {
     pub max_bdd_nodes: usize,
     pub max_support_checks: u128,
     pub max_interaction_checks: u128,
+    pub max_frontier_order_evaluations: usize,
+    pub max_frontier_refinement_passes: usize,
     pub max_variable_order_evaluations: usize,
     pub max_sifting_passes: usize,
 }
@@ -58,7 +60,9 @@ impl Default for StrategyBddBudget {
             max_bdd_nodes: 1 << 20,
             max_support_checks: 1 << 22,
             max_interaction_checks: 1 << 26,
-            max_variable_order_evaluations: 1 << 12,
+            max_frontier_order_evaluations: 1 << 12,
+            max_frontier_refinement_passes: 2,
+            max_variable_order_evaluations: 1 << 13,
             max_sifting_passes: 2,
         }
     }
@@ -130,6 +134,18 @@ pub enum StrategyBddError {
     InteractionGraphCheckBudgetExceeded {
         required: u128,
         limit: u128,
+    },
+    FrontierOrderSearchBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    InteractionGraphNodeOutOfRange {
+        vertex: usize,
+        neighbor: usize,
+        vertex_count: usize,
+    },
+    InteractionGraphSelfEdge {
+        vertex: usize,
     },
     StrategyVariableMismatch {
         original: usize,
@@ -209,6 +225,8 @@ pub enum StrategyBddOrderSeed {
     Reverse,
     InteractionMinFill,
     InteractionMinFillReverse,
+    FrontierRefinedMinFill,
+    FrontierRefinedMinFillReverse,
 }
 
 /// A bounded multi-start sifting result. The interaction graph is a heuristic
@@ -220,9 +238,23 @@ pub struct StrategyBddMultiStartReport {
     pub selected_initial_node_count: usize,
     pub optimized_node_count: usize,
     pub interaction_pair_checks: u128,
+    pub frontier_refinement_evaluations: usize,
+    pub min_fill_max_frontier: usize,
+    pub refined_max_frontier: usize,
     pub order_evaluations: usize,
     pub bdd: ReducedOrderedBdd,
 }
+
+/// Evidence from bounded insertion refinement of an interaction-graph order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyBddFrontierRefinementReport {
+    pub initial_order: Vec<usize>,
+    pub refined_order: Vec<usize>,
+    pub initial_frontier_profile: Vec<usize>,
+    pub refined_frontier_profile: Vec<usize>,
+    pub order_evaluations: usize,
+}
+
 
 /// Evidence for exact semantic-support reduction of one strategy function.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1014,7 +1046,154 @@ pub fn interaction_graph_min_fill_order(graph: &[BTreeSet<usize>]) -> Vec<usize>
     order
 }
 
-/// Run bounded sifting from natural, reverse and interaction-graph min-fill
+/// Validate a simple, undirected interaction graph whose vertex IDs are
+/// indices into the strategy function's dependency list.
+fn validate_interaction_graph(
+    graph: &[BTreeSet<usize>],
+) -> Result<(), StrategyBddError> {
+    for (vertex, neighbors) in graph.iter().enumerate() {
+        for &neighbor in neighbors {
+            if neighbor >= graph.len() {
+                return Err(StrategyBddError::InteractionGraphNodeOutOfRange {
+                    vertex,
+                    neighbor,
+                    vertex_count: graph.len(),
+                });
+            }
+            if neighbor == vertex {
+                return Err(StrategyBddError::InteractionGraphSelfEdge { vertex });
+            }
+            if !graph[neighbor].contains(&vertex) {
+                return Err(StrategyBddError::DependencyScopeMismatch {
+                    expected: (0..graph.len()).collect(),
+                    actual: vec![vertex, neighbor],
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Compute the live vertex-separation frontier after every non-final prefix
+/// of an order. A processed vertex is live when it has an edge to an
+/// unprocessed vertex.
+pub fn interaction_graph_frontier_profile(
+    graph: &[BTreeSet<usize>],
+    order: &[usize],
+) -> Result<Vec<usize>, StrategyBddError> {
+    validate_interaction_graph(graph)?;
+    validate_variable_order(graph.len(), order)?;
+    let mut position = vec![usize::MAX; order.len()];
+    for (rank, &vertex) in order.iter().enumerate() {
+        position[vertex] = rank;
+    }
+    let mut profile = Vec::with_capacity(order.len().saturating_sub(1));
+    for cut in 1..order.len() {
+        let mut live = 0usize;
+        for &vertex in &order[..cut] {
+            if graph[vertex]
+                .iter()
+                .any(|&neighbor| position[neighbor] >= cut)
+            {
+                live = live
+                    .checked_add(1)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+            }
+        }
+        profile.push(live);
+    }
+    Ok(profile)
+}
+
+fn frontier_score(
+    graph: &[BTreeSet<usize>],
+    order: &[usize],
+) -> Result<(usize, usize, Vec<usize>), StrategyBddError> {
+    let profile = interaction_graph_frontier_profile(graph, order)?;
+    let maximum = profile.iter().copied().max().unwrap_or(0);
+    let total = profile.iter().try_fold(0usize, |sum, width| {
+        sum.checked_add(*width)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)
+    })?;
+    Ok((maximum, total, profile))
+}
+
+/// Refine a min-fill order by bounded variable insertion. Candidates are
+/// accepted only when the lexicographic frontier score improves:
+/// (maximum frontier, total frontier mass, profile). Therefore the maximum
+/// frontier can never exceed that of the input seed.
+pub fn refine_interaction_order_by_frontier(
+    graph: &[BTreeSet<usize>],
+    initial_order: &[usize],
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddFrontierRefinementReport, StrategyBddError> {
+    validate_interaction_graph(graph)?;
+    validate_variable_order(graph.len(), initial_order)?;
+    let initial_frontier_profile = interaction_graph_frontier_profile(graph, initial_order)?;
+    let mut order = initial_order.to_vec();
+    let mut best_score = frontier_score(graph, &order)?;
+    let mut evaluations = 0usize;
+
+    for _ in 0..budget.max_frontier_refinement_passes {
+        let mut pass_improved = false;
+        for vertex in 0..graph.len() {
+            let Some(current_position) = order.iter().position(|candidate| *candidate == vertex)
+            else {
+                return Err(StrategyBddError::VariableOrderEntryOutOfRange {
+                    position: vertex,
+                    dependency_index: vertex,
+                    dependency_count: graph.len(),
+                });
+            };
+            let mut remainder = order.clone();
+            remainder.remove(current_position);
+            let mut best_order = order.clone();
+
+            for insertion_position in 0..graph.len() {
+                let mut candidate = remainder.clone();
+                candidate.insert(insertion_position, vertex);
+                if candidate == order {
+                    continue;
+                }
+                let required = evaluations
+                    .checked_add(1)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                if required > budget.max_frontier_order_evaluations {
+                    return Err(StrategyBddError::FrontierOrderSearchBudgetExceeded {
+                        required,
+                        limit: budget.max_frontier_order_evaluations,
+                    });
+                }
+                evaluations = required;
+                let candidate_score = frontier_score(graph, &candidate)?;
+                if candidate_score < best_score {
+                    best_score = candidate_score;
+                    best_order = candidate;
+                }
+            }
+
+            if best_order != order {
+                order = best_order;
+                pass_improved = true;
+            }
+        }
+        if !pass_improved {
+            break;
+        }
+    }
+
+    let refined_frontier_profile = interaction_graph_frontier_profile(graph, &order)?;
+    Ok(StrategyBddFrontierRefinementReport {
+        initial_order: initial_order.to_vec(),
+        refined_order: order,
+        initial_frontier_profile,
+        refined_frontier_profile,
+        order_evaluations: evaluations,
+    })
+}
+
+/// Run bounded sifting from natural, reverse, interaction min-fill and
+/// frontier-refined starting orders.
 /// starting orders. Each run receives only the remaining global order budget.
 pub fn multi_start_sift_strategy_function_robdd(
     function: &BooleanStrategyFunction,
@@ -1025,6 +1204,18 @@ pub fn multi_start_sift_strategy_function_robdd(
     let (interaction_graph, interaction_pair_checks) =
         strategy_interaction_graph(function, budget)?;
     let min_fill = interaction_graph_min_fill_order(&interaction_graph);
+    let frontier_report =
+        refine_interaction_order_by_frontier(&interaction_graph, &min_fill, budget)?;
+    let min_fill_profile = interaction_graph_frontier_profile(&interaction_graph, &min_fill)?;
+    let min_fill_max_frontier = min_fill_profile.iter().copied().max().unwrap_or(0);
+    let refined_max_frontier = frontier_report
+        .refined_frontier_profile
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(0);
+    let frontier_refinement_evaluations = frontier_report.order_evaluations;
+    let refined_order = frontier_report.refined_order;
     let mut candidates = vec![
         (
             StrategyBddOrderSeed::Natural,
@@ -1038,6 +1229,14 @@ pub fn multi_start_sift_strategy_function_robdd(
         (
             StrategyBddOrderSeed::InteractionMinFillReverse,
             min_fill.into_iter().rev().collect::<Vec<_>>(),
+        ),
+        (
+            StrategyBddOrderSeed::FrontierRefinedMinFill,
+            refined_order.clone(),
+        ),
+        (
+            StrategyBddOrderSeed::FrontierRefinedMinFillReverse,
+            refined_order.into_iter().rev().collect::<Vec<_>>(),
         ),
     ];
 
@@ -1095,6 +1294,9 @@ pub fn multi_start_sift_strategy_function_robdd(
         selected_initial_node_count,
         optimized_node_count: selected_report.optimized_node_count,
         interaction_pair_checks,
+        frontier_refinement_evaluations,
+        min_fill_max_frontier,
+        refined_max_frontier,
         order_evaluations,
         bdd: selected_report.bdd,
     })
@@ -1383,7 +1585,9 @@ mod tests {
             max_bdd_nodes: 1 << 8,
             max_support_checks: 1 << 12,
             max_interaction_checks: 1 << 12,
-            max_variable_order_evaluations: 128,
+            max_frontier_order_evaluations: 1 << 12,
+            max_frontier_refinement_passes: 2,
+            max_variable_order_evaluations: 1 << 13,
             max_sifting_passes: 2,
         }
     }
@@ -1822,6 +2026,94 @@ mod tests {
         .unwrap();
         assert_eq!(compiled, report.bdd);
         verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
+    }
+
+    #[test]
+    fn frontier_refinement_reduces_vertex_separation_without_worsening_maximum() {
+        let graph = vec![
+            BTreeSet::from([3]),
+            BTreeSet::from([2, 3]),
+            BTreeSet::from([1, 3]),
+            BTreeSet::from([0, 1, 2]),
+            BTreeSet::new(),
+        ];
+        let min_fill = interaction_graph_min_fill_order(&graph);
+        assert_eq!(min_fill, vec![4, 0, 1, 2, 3]);
+        let report = refine_interaction_order_by_frontier(&graph, &min_fill, budget()).unwrap();
+        assert_eq!(report.initial_frontier_profile, vec![0, 1, 2, 3]);
+        assert_eq!(report.refined_frontier_profile, vec![0, 1, 2, 1]);
+        assert!(report.refined_frontier_profile.iter().max()
+            <= report.initial_frontier_profile.iter().max());
+        assert!(report.order_evaluations > 0);
+    }
+
+    #[test]
+    fn frontier_refinement_budget_is_fail_closed() {
+        let graph = vec![
+            BTreeSet::from([3]),
+            BTreeSet::from([2, 3]),
+            BTreeSet::from([1, 3]),
+            BTreeSet::from([0, 1, 2]),
+            BTreeSet::new(),
+        ];
+        let min_fill = interaction_graph_min_fill_order(&graph);
+        let tight = StrategyBddBudget {
+            max_frontier_order_evaluations: 0,
+            ..budget()
+        };
+        assert!(matches!(
+            refine_interaction_order_by_frontier(&graph, &min_fill, tight),
+            Err(StrategyBddError::FrontierOrderSearchBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn frontier_profile_rejects_malformed_interaction_graph() {
+        let graph = vec![BTreeSet::from([1]), BTreeSet::new()];
+        assert!(matches!(
+            interaction_graph_frontier_profile(&graph, &[0, 1]),
+            Err(StrategyBddError::DependencyScopeMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn interaction_graph_matches_independent_mixed_derivative_oracle_for_all_three_variable_functions() {
+        for function_mask in 0..256usize {
+            let values: Vec<bool> = (0..8)
+                .map(|assignment| ((function_mask >> assignment) & 1) != 0)
+                .collect();
+            let source = function(&[0, 1, 2], &values);
+            let (graph, _) = strategy_interaction_graph(&source, budget()).unwrap();
+
+            for first in 0..3 {
+                for second in first + 1..3 {
+                    let mut expected = false;
+                    for context in 0..2 {
+                        let mut keys = [[false; 3]; 4];
+                        keys[0][3 - first - second] = false;
+                        let mut base = [false; 3];
+                        base[3 - first - second] = context != 0;
+                        let mut f00 = base;
+                        let mut f01 = base;
+                        let mut f10 = base;
+                        let mut f11 = base;
+                        f01[second] = true;
+                        f10[first] = true;
+                        f11[first] = true;
+                        f11[second] = true;
+                        let read = |key: [bool; 3]| *source.table.get(key.as_slice()).unwrap();
+                        if read(f00) ^ read(f01) ^ read(f10) ^ read(f11) {
+                            expected = true;
+                        }
+                    }
+                    assert_eq!(
+                        graph[first].contains(&second),
+                        expected,
+                        "function mask {function_mask}, pair ({first}, {second})"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
