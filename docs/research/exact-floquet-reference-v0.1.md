@@ -70,3 +70,32 @@ checked against the following invariants:
 These are independent mathematical reference calculations, not Rust test
 results. Rust compile and test status is pending verification on the pinned
 toolchain.
+
+
+## v0.2 graph extension and finite-window diagnostics
+
+The exact state-vector engine has been generalized from a 1D open chain to
+an arbitrary simple undirected ZZ interaction graph, with duplicate/self
+edges and out-of-range endpoints rejected. A square-lattice constructor
+creates open-boundary 2D grids with independently configurable horizontal
+and vertical couplings.
+
+The module now exposes a finite-window subharmonic response summary:
+mean demodulated order, mean absolute order and sign coherence. Those are
+signal statistics, not a thermodynamic phase certificate. The zero-coupling
+pi-pulse control is mandatory because a perfect pi pulse gives period-two
+magnetization without interactions.
+
+Two executable examples are available:
+- exact_floquet_reference: compare an interacting and a noninteracting 1D chain.
+- exact_floquet_phase_sweep: sweep chain size, coupling and pulse error.
+- exact_floquet_2d_sweep: sweep 2x2, 2x3 and 3x3 square lattices.
+
+Independent Python finite-size reference results are recorded in
+docs/research/dtc-exact-floquet-reference-results-v0.2.md. They show a
+strong interaction-dependent finite-time subharmonic response for ordered
+product initial states, but also strong dependence on initial state and
+coupling. The report does not claim an asymptotic DTC phase.
+
+All Rust compilation and unit-test gates remain open until run on the
+repository-pinned toolchain.
