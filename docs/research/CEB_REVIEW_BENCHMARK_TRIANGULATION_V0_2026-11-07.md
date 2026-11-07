@@ -119,6 +119,30 @@ Causal fault-localization work is a necessary adjacent comparator: CEB should no
 
 **CEB implication:** evaluate source-level mechanism diagnosis separately from runtime root-cause localization. The new [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) tests AND/OR path structure, partial temporal order, interaction conditions and residual paths. Compare with SDRCA/UniVal only on an explicitly matched runtime evidence slice if their data and intervention contracts permit it; never compare their Recall@1/3 directly to CEB Recall@5.
 
+### 2.13 Causality-Based Fault Localization / SoftReX — actual causality under execution
+
+Navaratnarajah et al.'s **Causality-Based Fault Localization** preprint (October 31, 2026; tool: SoftReX) frames fault localization using actual-causality / causal-responsibility semantics rather than only suspiciousness correlations. It models code elements as variables and mutations as interventions, and explicitly discusses overdetermination, pre-emption and masked faults. On Defects4J, its main comparison evaluates 827 bugs across 17 Java projects after excluding 27 OOM/timeout cases. It reports 103 Top-1 and 301 Top-10 localizations, with MRR 0.349, versus BLMu's 89 Top-1, 270 Top-10 and MRR 0.301. Its guided search reports about 2.6× fewer mutants than Major in its matched subset while retaining competitive localization accuracy. [Paper](https://arxiv.org/abs/2611.01292).
+
+**Scope and limitations:** this is execution-grounded fault localization on Java test suites and mutant sets. It does not evaluate source-only PR comments, human-actionability, repository-context ambiguity or reviewer burden. The paper's main experimental result depends on the supplied test suite and mutation semantics; its structural model does not yet integrate runtime data-flow/value state in the same way as a complete dynamic causal model. The Defects4J exclusions, task split, mutant budget and ranking metrics must remain attached to every result.
+
+**CEB implication:** use SoftReX as the closest current actual-causality localization method, and include its problem classes—overdetermination, pre-emption and masking—in the synthetic diagnosis corpus. Do not equate its Top-1/Top-10 localization counts with CEB defect Recall@5. CEB's identifiability work asks the additional question: when does the available evidence distinguish the candidate causal models at all?
+
+### 2.14 CausalRepair — minimal causal context through dual slicing
+
+Wu et al.'s **CausalRepair** (PACMSE / ISSTA 2026) combines test-semantic static slicing with runtime trace-based dynamic slicing to construct a compact causal context for automated repair. The paper reports 313 correct fixes on Defects4J across V1.2 and V2.0, compared with 236 for its second-ranked ReinFix baseline, and 289 on Defects4J-Trans. It reports two experienced Java researchers independently review patch semantics, with a third reviewer resolving disagreements. The authors also evaluate a more realistic fault-localization setting, where CausalRepair fixes 232 bugs with noisy initial localization. [Paper](https://arxiv.org/abs/2608.10613) · [artifact](https://doi.org/10.5281/zenodo.20953899).
+
+**Scope and limitations:** CausalRepair is automated repair, not pre-merge code review. Its strongest context contains actual execution traces and a failure-triggering test. It uses Defects4J Java projects and one principal backbone configuration; its success count is not an all-language or production prevalence estimate. Patch equivalence is independently reviewed, but remains tied to the paper's evaluation contract.
+
+**CEB implication:** compose source topology with a minimal causal-context discipline. Where execution is allowed, a dynamic slice may remove static over-approximation; where execution is unavailable or unauthorized, preserve possible paths and mark which are merely source-possible. A compact context is useful only if it does not delete an alternative sufficient path or hide an unobserved caller.
+
+### 2.15 Partially Observed Structural Causal Models — identifiability under latent context
+
+Orujlu et al.'s **Partially Observed Structural Causal Models** (UAI 2026, PMLR 337) formalizes settings where unobserved upstream context co-determines both the interaction structure and downstream mechanisms. It defines intervention hierarchies over node-level and edge-local mechanisms and gives identifiability results for which interventions can separate structure formation from mechanism behavior. Its experiments demonstrate non-identifiability under latent context and structure–mechanism confounding under latent edges. [Paper](https://proceedings.mlr.press/v337/orujlu26a.html).
+
+**Scope and limitations:** this is a general causal-modeling theory and simulator evaluation, not a code-review benchmark or software RCA leaderboard. Its identifiability results depend on its formal assumptions and intervention family; CEB must not claim to implement POSCMs merely by adding a latent-node annotation.
+
+**CEB implication:** this is the theoretical basis for the new [Causal-Identifiability Protocol V0](CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md). A code reviewer should preserve material evidence-compatible models, identify a query on which they disagree, and request the minimum safe observation that distinguishes them. If no admissible discriminating evidence exists, the correct output is a bounded or non-identifiable claim—not an invented consensus graph.
+
 ### 2.12 AACR-Bench — holistic repository context
 
 AACR-Bench reports **200 real PRs from 50 active projects across 10 languages**, with full repository context and an AI-assisted, expert-verified annotation pipeline. The authors report a 285% increase in annotated defect coverage relative to their prior comparison baseline; that is a dataset-coverage claim, not evidence that a model improved by 285%. It is especially relevant to multi-file reasoning, caller discovery, cross-file tracking and the impact of context granularity/retrieval. The benchmark does not itself establish causal intervention prediction or residual-path correctness. [Paper](https://arxiv.org/abs/2601.19494) · [benchmark repository](https://github.com/alibaba/aacr-bench).
@@ -244,6 +268,8 @@ These are prospective aspirations, not achievements. Do not pick thresholds afte
 
 Move from **“Did the model point at the bug?”** to **“Can the reviewer discover, explain, evidence, challenge and communicate the defect accurately at the right cost?”** This is a more meaningful engineering standard than optimizing comment count, lexical overlap, pass rate or a single composite leaderboard score.
 
+A further step is to ask **“Which causal conclusions are identifiable from the evidence actually available?”** Require a compatible-model set, claim-specific identifiability disposition and minimum discriminating evidence request. This prevents a coherent but underdetermined graph from being rewarded as a proven cause. The three development levels are I0 unstructured diagnosis, I1 causal topology, and I2 topology plus identifiability. I2 is exploratory and does not change the registered Phase A/B/C hypotheses.
+
 ### Causal topology as the next research extension
 
 A five-link chain remains the minimum explanation. For multi-path, stateful and concurrent defects, compare that baseline with a typed graph that represents AND-gated interactions, OR alternative routes, temporal partial orders and residual path reachability after intervention. The graph is a falsifiable mechanism contract, not a decorative dependency map. See [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) and its six public synthetic development cases.
@@ -273,7 +299,7 @@ No new metric lane, task schema, receipt, oracle authority, generic scheduler, j
 6. Audit public dataset reuse/licensing and contamination risk before any import.
 7. Reconcile the prospective target language with the CEB matrix owner before registering any new metric.
 
-No public scenario here is a sealed holdout task. No candidate-controlled code is run. No hidden labels, reference patches, executable graders or SOTA result are created.
+No public scenario here is a sealed holdout task. No candidate-controlled code is run. No hidden labels, reference patches, executable graders or SOTA result are created. The new identifiability protocol and six public synthetic cases are development-only; they do not demonstrate calibrated abstention or causal identification.
 
 ## 10. Sources — current snapshot 2026-11-07
 
