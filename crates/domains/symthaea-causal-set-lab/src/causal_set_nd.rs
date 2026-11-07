@@ -237,6 +237,17 @@ impl CausalSetNd {
         count
     }
 
+    /// Histogram of cardinalities of open order intervals.
+    ///
+    /// Bin k counts causally related endpoint pairs with exactly k events
+    /// strictly between the endpoints. The bitset reference is dimension
+    /// generic and invariant under Lorentz boosts of the embedding.
+    pub fn interval_size_histogram(&self) -> Vec<u64> {
+        super::interval_size_histogram_by(self.events.len(), |first, second| {
+            self.events[first].causally_precedes(&self.events[second])
+        })
+    }
+
     /// Myrheim ordering fraction r = R / choose(N,2).
     pub fn ordering_fraction(&self) -> Option<f64> {
         let n = self.events.len() as f64;
@@ -476,6 +487,10 @@ mod tests {
                 let boosted = causet.lorentz_boosted(rapidity, 0).unwrap();
                 assert_eq!(causet.related_pair_count(), boosted.related_pair_count());
                 assert_eq!(
+                    causet.interval_size_histogram(),
+                    boosted.interval_size_histogram()
+                );
+                assert_eq!(
                     causet.longest_chain_length(),
                     boosted.longest_chain_length()
                 );
@@ -485,6 +500,25 @@ mod tests {
                         < 1e-12
                 );
             }
+        }
+    }
+
+    #[test]
+    fn interval_size_histogram_is_dimension_generic_and_boost_invariant() {
+        for dimension in 2..=4 {
+            let events = (0..4)
+                .map(|id| {
+                    let mut coordinates = vec![id as f64];
+                    coordinates.resize(dimension, 0.0);
+                    EventNd { id, coordinates }
+                })
+                .collect();
+            let causet = CausalSetNd::new(dimension, events).unwrap();
+            let expected = vec![3, 2, 1];
+            assert_eq!(causet.interval_size_histogram(), expected);
+
+            let boosted = causet.lorentz_boosted(0.7, 0).unwrap();
+            assert_eq!(boosted.interval_size_histogram(), expected);
         }
     }
 
