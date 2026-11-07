@@ -858,7 +858,11 @@
       "prior_predictive_invariance_error",
       "quotient_action_ranking_invariance_error",
       "labelled_vs_quotient_feedback_model_eig_delta_nats",
-      "feedback_only_known_state_quotient_fixture_status"
+      "feedback_only_known_state_quotient_fixture_status",
+      "posterior_predictive_mixture_coherence_error",
+      "per_model_predictive_mass_error",
+      "model_predictive_missing_or_duplicate_id_rejection_rate",
+      "posterior_vs_prior_weighting_difference_nats"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -946,7 +950,8 @@
     "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches",
     "The source-faithful 81-label rule family is retained. Any semantic quotient is an explicit secondary representation with prior mass aggregated over exact-likelihood-equivalence classes; prior predictive distributions, model evidence, class posteriors, and action rankings must match the labelled family within declared numerical tolerances.",
     "The causal weight-reading task must distinguish structural weight arithmetic from semantic interpretation: output labels and task names are randomized, label permutations are hidden from the reader, and predictions are scored against actual outputs under sealed parameter-group interventions. Dataset-name guesses alone never count as successful interpretation.",
-    "The feedback-only known-state three-ball quotient fixture is reported separately from full-task reproduction; it must compare prospective Dirichlet model-EIG, predictive outcome masses, post-outcome semantic-class posterior aggregation, and action rankings across 81 labelled versus 75 quotient hypotheses, including a no-choice zero-information control."
+    "The feedback-only known-state three-ball quotient fixture is reported separately from full-task reproduction; it must compare prospective Dirichlet model-EIG, predictive outcome masses, post-outcome semantic-class posterior aggregation, and action rankings across 81 labelled versus 75 quotient hypotheses, including a no-choice zero-information control.",
+    "Prospective Dirichlet model-EIG derives each action-outcome probability as the mixture of per-model posterior-predictive probabilities weighted by the current posterior model belief from BMR; it rejects missing, duplicate, or unknown model IDs, per-model predictive distributions that do not normalize, and caller-supplied aggregate probabilities that disagree with the reconstructed mixture."
   ],
   "research_references": [
     {
