@@ -579,7 +579,8 @@ fn search(
             .partial_matrix_checks
             .checked_add(1)
             .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)?;
-        if let Some(value) = partial_matrix_value(problem, assignment, variable_positions, position) {
+        if let Some(value) = partial_matrix_value(problem, assignment, variable_positions, position)
+        {
             if value {
                 stats.early_true_prunes = stats
                     .early_true_prunes
