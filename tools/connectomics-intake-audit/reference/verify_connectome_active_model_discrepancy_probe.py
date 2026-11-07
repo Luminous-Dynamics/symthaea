@@ -78,6 +78,22 @@ def model_mi_bits(action_id: str, models: list[dict[str, Any]], worlds: list[dic
     return h_y - h_y_given_m
 
 
+def validate_disjoint_partitions(
+    fit_units: list[str], discovery_units: list[str], lockbox_units: list[str]
+) -> tuple[set[str], set[str], set[str]]:
+    fit, discovery, lockbox = set(fit_units), set(discovery_units), set(lockbox_units)
+    require(fit and discovery and lockbox, "empty data split partition")
+    require(not (fit & discovery or fit & lockbox or discovery & lockbox),
+            "model-fit/discovery/confirmation leakage")
+    return fit, discovery, lockbox
+
+
+def best_feasible_action(actions: list[dict[str, Any]], values: dict[str, float]) -> str | None:
+    feasible = [a for a in actions if a["feasibility_status"] == "FEASIBLE"]
+    ranked = sorted(feasible, key=lambda a: (-values[a["action_id"]], a["action_id"]))
+    return ranked[0]["action_id"] if ranked and values[ranked[0]["action_id"]] > 1e-12 else None
+
+
 def pareto_frontier(actions: list[dict[str, Any]], q_value: dict[str, float],
                     d_value: dict[str, float]) -> list[str]:
     feasible = [a for a in actions if a["feasibility_status"] == "FEASIBLE"]
@@ -146,10 +162,11 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(valid_sha(challenge["challenge_evidence_sha256"]), "bad challenge evidence digest")
 
     split = data["split_manifest"]
-    fit, discovery, lockbox = (set(split["model_fit_units"]), set(split["challenger_discovery_units"]),
-                               set(split["confirmation_lockbox_units"]))
-    require(fit and discovery and lockbox, "empty data split partition")
-    require(not (fit & discovery or fit & lockbox or discovery & lockbox), "model-fit/discovery/confirmation leakage")
+    fit, discovery, lockbox = validate_disjoint_partitions(
+        split["model_fit_units"],
+        split["challenger_discovery_units"],
+        split["confirmation_lockbox_units"],
+    )
     require(valid_sha(split["split_sha256"]), "bad split digest")
     require(
         set(challenge["challenger_discovery_unit_ids"]).issubset(discovery),
@@ -208,15 +225,13 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         mi[aid] = model_mi_bits(aid, models, worlds, pred)
 
     feasible = [a for a in actions if a["feasibility_status"] == "FEASIBLE"]
-    def best_by(values: dict[str, float]) -> str | None:
-        ranked = sorted(feasible, key=lambda a: (-values[a["action_id"]], a["action_id"]))
-        return ranked[0]["action_id"] if ranked and values[ranked[0]["action_id"]] > 1e-12 else None
-    query_best = best_by(query_value)
-    discrepancy_best = best_by(discrepancy_value)
+    query_best = best_feasible_action(actions, query_value)
+    discrepancy_best = best_feasible_action(actions, discrepancy_value)
     frontier = pareto_frontier(actions, query_value, discrepancy_value)
     status = "SYNTHETIC_CONTRACT_VALIDATED" if discrepancy_best is not None else "NO_FEASIBLE_DISCREPANCY_PROBE"
 
     expected = data["oracle_expectations"]
+    require(expected["status"] == status, "declared discrepancy-probe status mismatch")
     require(abs(expected["baseline_query_loss"] - prior_loss) <= 1e-12, "baseline query loss mismatch")
     require(expected["query_only_action_id"] == query_best, "query-only action mismatch")
     require(expected["discrepancy_only_action_id"] == discrepancy_best, "discrepancy-only action mismatch")
@@ -256,6 +271,22 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
 def self_test() -> None:
     require(abs(tv({"X": 1.0}, {"X": 0.5, "Y": 0.5}) - 0.5) <= 1e-12, "TV known answer")
     require(abs(tv({"X": 0.5, "Y": 0.5}, {"X": 0.5, "Y": 0.5})) <= 1e-12, "zero TV known answer")
+    require(
+        best_feasible_action(
+            [
+                {"action_id": "allowed", "feasibility_status": "FEASIBLE"},
+                {"action_id": "blocked", "feasibility_status": "DISALLOWED"},
+            ],
+            {"allowed": 0.0, "blocked": 10.0},
+        ) is None,
+        "no-feasible-discrepancy-probe abstention control",
+    )
+    try:
+        validate_disjoint_partitions(["same"], ["same"], ["lockbox"])
+    except ValueError:
+        pass
+    else:
+        raise ValueError("discovery/confirmation leakage negative control failed")
     require(
         abs(
             model_mi_bits(
