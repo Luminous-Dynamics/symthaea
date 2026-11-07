@@ -45,6 +45,14 @@ jobs:
       - name: Check formatting
         run: rustfmt --edition 2024 --check crates/domains/symthaea-emsr-evidence/src/lib.rs
 
+      - name: Validate committed EMSR JSON artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            jq -e . "$file" >/dev/null
+          done < <(find docs/research/emsr-v0.1 -maxdepth 1 -type f -name '*.json' -print | sort)
+
       # Preserve the package's repository-relative include_str! fixture paths,
       # but give Cargo an isolated workspace so unrelated root members do not
       # block this package's own compile/test/lint checks.
