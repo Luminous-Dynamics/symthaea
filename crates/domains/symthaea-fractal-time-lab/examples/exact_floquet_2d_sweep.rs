@@ -3,10 +3,7 @@
 
 use std::error::Error;
 use std::f64::consts::PI;
-use symthaea_fractal_time_lab::exact_floquet::{
-    KickedIsingFloquet,
-    analyze_subharmonic_response,
-};
+use symthaea_fractal_time_lab::exact_floquet::{KickedIsingFloquet, analyze_subharmonic_response};
 
 fn main() -> Result<(), Box<dyn Error>> {
     const PERIODS: usize = 300;
@@ -22,7 +19,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("initial_state=all_up_product");
     println!("longitudinal_fields=zero");
     println!("boundary=open");
-    println!("width,height,J_h,J_v,theta_error,mean_demodulated_order,mean_absolute_order,sign_coherence");
+    println!(
+        "width,height,J_h,J_v,theta_error,mean_demodulated_order,mean_absolute_order,sign_coherence"
+    );
     for (width, height) in lattices {
         for coupling in couplings {
             for epsilon in pulse_errors {
