@@ -448,7 +448,8 @@
             "recipient": "right_fore",
             "phase_bin": 2,
             "magnitude_bin": 1,
-            "delay_index": 3
+            "delay_index": 3,
+            "probe_class": "local_phase_kick"
           },
           "numerator_ticks": null,
           "denominator_ticks": null,
@@ -487,7 +488,8 @@
             "recipient": "right_fore",
             "phase_bin": 2,
             "magnitude_bin": 1,
-            "delay_index": 3
+            "delay_index": 3,
+            "probe_class": "local_phase_kick"
           },
           "numerator_ticks": null,
           "denominator_ticks": null,
@@ -977,7 +979,8 @@
             "recipient": "right_fore",
             "phase_bin": 2,
             "magnitude_bin": 1,
-            "delay_index": 3
+            "delay_index": 3,
+            "probe_class": "local_phase_kick"
           },
           "numerator_ticks": null,
           "denominator_ticks": null,
@@ -1016,7 +1019,8 @@
             "recipient": "right_fore",
             "phase_bin": 2,
             "magnitude_bin": 1,
-            "delay_index": 3
+            "delay_index": 3,
+            "probe_class": "local_phase_kick"
           },
           "numerator_ticks": null,
           "denominator_ticks": null,
