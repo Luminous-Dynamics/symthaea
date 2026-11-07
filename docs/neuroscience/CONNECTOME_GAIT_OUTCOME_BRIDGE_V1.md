@@ -34,7 +34,7 @@ These are not promotion levels. Local rhythmicity cannot certify inter-leg coord
 - Paired inference/scorecard and animal-level aggregation: Symtropy #2145.
 - This crate validates **provenance, metric identity, endpoint compatibility and coverage only**. It does not compute any raw metric or aggregate biological replicates.
 
-Symtropy PR #3354's conventional phase-vector strength is not automatically Sapkal v2's paper-specific phase pipeline. The latter requires separate preprocessing and phase-estimator digests. TCS NatVar 2024 and TCS Sapkal 2026 v2 use distinct denominators and must never be pooled into one median. The Sapkal v2 ratio is not clamped.
+Symtropy PR #3354's conventional phase-vector strength is not automatically Sapkal v2's paper-specific phase pipeline. The latter requires separate preprocessing and phase-estimator digests. A pairwise coverage family is complete only when all 15 pairs share the same metric, method, preprocessing and phase-estimator digests. A phase-reset probe is counted only when its fractional-phase and cycle-slip outputs share the same probe key and exact pipeline identity. TCS NatVar 2024 and TCS Sapkal 2026 v2 use distinct denominators and must never be pooled into one median. The Sapkal v2 ratio is not clamped.
 
 ## 4. Packet boundary
 
@@ -43,6 +43,7 @@ One packet is one immutable dataset revision × raw trajectory × animal × sess
 Every row carries:
 - endpoint, exact metric ID, unit and aggregation level;
 - method and optional preprocessing/phase-estimator digests;
+- exact probe class for intervention rows: local phase kick, load/contact, proprioceptive channel, descending command, or mechanical body/substrate;
 - named leg, pair, tripod group or transfer probe key where relevant;
 - availability state, value, support/sample counts and frame window;
 - repeated dataset/revision/raw digest plus animal/session/trial/condition/stimulus binding.
