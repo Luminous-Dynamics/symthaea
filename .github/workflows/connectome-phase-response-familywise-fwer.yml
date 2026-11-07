@@ -1,0 +1,71 @@
+name: Connectome phase-response familywise FWER contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/connectome-phase-response-family/**"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.md"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.example.json"
+      - ".github/workflows/connectome-phase-response-familywise-fwer.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectome-phase-response-family/**"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.md"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.example.json"
+      - ".github/workflows/connectome-phase-response-familywise-fwer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-phase-response-familywise-fwer:
+    name: Validate exact weighted anytime-FWER claim family
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Validate Draft 2020-12 schema and fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from fractions import Fraction
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["requested_guarantee"] == "FWER"
+          assert sum((Fraction(claim["weight"]) for claim in fixture["claims"]), Fraction(0)) == 1
+          expected = {
+              "C1-local-reset": (Fraction(20), 2),
+              "C2-off-diagonal-transfer": (Fraction(40), 2),
+              "C3-contact-recovery": (Fraction(40), None),
+          }
+          alpha = Fraction(fixture["alpha"])
+          for claim in fixture["claims"]:
+              threshold = 1 / (alpha * Fraction(claim["weight"]))
+              running_max = Fraction(0)
+              first_crossing = None
+              for stage, encoded in enumerate(claim["e_process_values"]):
+                  running_max = max(running_max, Fraction(encoded))
+                  if first_crossing is None and running_max >= threshold and stage > 0:
+                      first_crossing = stage
+              assert (threshold, first_crossing) == expected[claim["claim_id"]]
+          print("phase-response familywise schema/fixture: PASS")
+          PY
+      - name: Format standalone crate
+        run: cargo fmt --manifest-path tools/connectome-phase-response-family/Cargo.toml -- --check
+      - name: Test standalone exact-rational Rust audit
+        run: cargo test --manifest-path tools/connectome-phase-response-family/Cargo.toml --locked
