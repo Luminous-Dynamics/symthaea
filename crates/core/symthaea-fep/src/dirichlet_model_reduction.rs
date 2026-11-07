@@ -103,6 +103,15 @@ pub enum DirichletBayesianModelReductionError {
         distribution: &'static str,
         column: usize,
     },
+    EmptySupport {
+        distribution: &'static str,
+        column: usize,
+    },
+    SupportMismatch {
+        distribution: &'static str,
+        column: usize,
+        outcome: usize,
+    },
     ColumnCountMismatch {
         distribution: &'static str,
         expected: usize,
@@ -175,6 +184,17 @@ impl std::fmt::Display for DirichletBayesianModelReductionError {
             Self::EmptyColumn { distribution, column } => {
                 write!(f, "{distribution} column {column} is empty")
             }
+            Self::EmptySupport { distribution, column } => {
+                write!(f, "{distribution} column {column} has no active outcomes")
+            }
+            Self::SupportMismatch {
+                distribution,
+                column,
+                outcome,
+            } => write!(
+                f,
+                "{distribution} support at column {column}, outcome {outcome} is incompatible with the full model"
+            ),
             Self::ColumnCountMismatch {
                 distribution,
                 expected,
@@ -286,8 +306,9 @@ pub fn reduce_dirichlet_models(
     DirichletBayesianModelReductionError,
 > {
     let column_count = full_posterior.columns.len();
-    validate_tensor(full_posterior, "full posterior", None, false)?;
-    validate_tensor(full_prior, "full prior", Some(full_posterior), false)?;
+    validate_tensor(full_posterior, "full posterior", None, true)?;
+    validate_tensor(full_prior, "full prior", Some(full_posterior), true)?;
+    ensure_support_equal(full_posterior, full_prior, "full prior")?;
     ensure_parameterization_matches(
         &full_posterior.parameterization_digest,
         "full prior",
@@ -324,6 +345,7 @@ pub fn reduce_dirichlet_models(
             Some(full_posterior),
             true,
         )?;
+        ensure_support_is_subset(full_posterior, &model.parameter_prior, "reduced prior")?;
         ensure_parameterization_matches(
             &full_posterior.parameterization_digest,
             "reduced prior",
@@ -426,13 +448,27 @@ fn dirichlet_log_evidence_ratio(
     for column in 0..full_posterior.columns.len() {
         let posterior = &full_posterior.columns[column];
         let full = &full_prior.columns[column];
+        let full_support = &full_prior.active_support[column];
         let reduced = &reduced_prior.columns[column];
         let reduced_support = &reduced_prior.active_support[column];
+        let mut full_prior_active = Vec::new();
+        let mut full_posterior_active = Vec::new();
         let mut reduced_prior_active = Vec::new();
         let mut reduced_posterior_active = Vec::new();
 
         for outcome in 0..posterior.len() {
+            if !full_support[outcome] {
+                // The full model assigns exactly zero probability to this outcome.
+                // Support equality guarantees both prior and posterior concentrations
+                // are zero, and support-subset validation prevents reduced models
+                // from activating it.
+                continue;
+            }
+
             let posterior_increment = posterior[outcome] - full[outcome];
+            full_prior_active.push(full[outcome]);
+            full_posterior_active.push(posterior[outcome]);
+
             if !reduced_support[outcome] {
                 if posterior_increment < 0.0 {
                     return Err(DirichletBayesianModelReductionError::PosteriorBelowPrior {
@@ -471,9 +507,9 @@ fn dirichlet_log_evidence_ratio(
                 column,
             });
         }
-        let contribution = log_multivariate_beta(full)
+        let contribution = log_multivariate_beta(&full_prior_active)
             + log_multivariate_beta(&reduced_posterior_active)
-            - log_multivariate_beta(posterior)
+            - log_multivariate_beta(&full_posterior_active)
             - log_multivariate_beta(&reduced_prior_active);
         if !contribution.is_finite() {
             return Err(DirichletBayesianModelReductionError::NonFiniteLogEvidence {
@@ -567,6 +603,20 @@ fn validate_tensor(
                 });
             }
         }
+        if !support.iter().any(|active| *active) {
+            if allow_support_restriction {
+                return Err(DirichletBayesianModelReductionError::EmptySupport {
+                    distribution,
+                    column: column_index,
+                });
+            }
+            return Err(DirichletBayesianModelReductionError::InvalidSupportMask {
+                distribution,
+                column: column_index,
+                expected: column.len(),
+                actual: 0,
+            });
+        }
         if !allow_support_restriction && support.iter().any(|active| !active) {
             return Err(DirichletBayesianModelReductionError::InvalidSupportMask {
                 distribution,
@@ -574,6 +624,52 @@ fn validate_tensor(
                 expected: column.len(),
                 actual: support.iter().filter(|active| **active).count(),
             });
+        }
+    }
+    Ok(())
+}
+
+/// The full posterior and prior must describe exactly the same categorical
+/// simplex faces; learning changes concentrations, not model support.
+fn ensure_support_equal(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    distribution: &'static str,
+) -> Result<(), DirichletBayesianModelReductionError> {
+    for column in 0..full_prior.active_support.len() {
+        for outcome in 0..full_prior.active_support[column].len() {
+            if full_prior.active_support[column][outcome]
+                != full_posterior.active_support[column][outcome]
+            {
+                return Err(DirichletBayesianModelReductionError::SupportMismatch {
+                    distribution,
+                    column,
+                    outcome,
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Reduced models may remove support, but may not introduce outcomes that
+/// are impossible under the full-model likelihood family.
+fn ensure_support_is_subset(
+    full_model: &DirichletConcentrationTensor,
+    reduced_model: &DirichletConcentrationTensor,
+    distribution: &'static str,
+) -> Result<(), DirichletBayesianModelReductionError> {
+    for column in 0..full_model.active_support.len() {
+        for outcome in 0..full_model.active_support[column].len() {
+            if reduced_model.active_support[column][outcome]
+                && !full_model.active_support[column][outcome]
+            {
+                return Err(DirichletBayesianModelReductionError::SupportMismatch {
+                    distribution,
+                    column,
+                    outcome,
+                });
+            }
         }
     }
     Ok(())
@@ -797,9 +893,11 @@ pub fn evaluate_dirichlet_model_information_gain(
     reduced_models: &[ReducedDirichletModelHypothesis],
     action: &DirichletActionPrediction,
 ) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
-    validate_tensor(full_posterior, "full posterior", None, false)
+    validate_tensor(full_posterior, "full posterior", None, true)
         .map_err(DirichletModelInformationGainError::ModelReduction)?;
-    validate_tensor(full_prior, "full prior", Some(full_posterior), false)
+    validate_tensor(full_prior, "full prior", Some(full_posterior), true)
+        .map_err(DirichletModelInformationGainError::ModelReduction)?;
+    ensure_support_equal(full_posterior, full_prior, "full prior")
         .map_err(DirichletModelInformationGainError::ModelReduction)?;
     ensure_parameterization_matches(
         &full_posterior.parameterization_digest,
