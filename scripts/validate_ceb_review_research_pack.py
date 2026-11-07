@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
+COUNTERFACTUAL_QUALIFICATION = "docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md"
 GOLD_COMPLETENESS = "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
 SEQUENTIAL_EVIDENCE = "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
 EVIDENCE_CROSSWALK = "docs/research/CEB_REVIEW_EVIDENCE_ACTION_CROSSWALK_V0_2026-11-07.md"
@@ -70,6 +71,7 @@ def validate_documents(
     evidence_crosswalk: str,
     calibration_pack: str,
     calibration_key: str,
+    counterfactual_qualification: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -142,6 +144,8 @@ def validate_documents(
         errors.append("engineering scorecard is missing the sequential evidence-acquisition paradigm shift")
     if "3.13 From uptake to verified engineering impact" not in scorecard:
         errors.append("engineering scorecard is missing the adoption-versus-correctness paradigm shift")
+    if "3.14 From historical fix commits to qualified counterfactual controls" not in scorecard:
+        errors.append("engineering scorecard is missing the counterfactual-control qualification paradigm shift")
 
     required_states = (
         "P — Parent / pre-introduction",
@@ -288,6 +292,27 @@ def validate_documents(
         errors.append("calibration answer key must remain labelled public development material")
     if "not hidden ground truth" not in calibration_key.lower():
         errors.append("calibration answer key must not claim hidden/oracle authority")
+
+    for required in (
+        "six independent control-qualification dimensions",
+        "Q1 — Identity and lineage",
+        "Q2 — Change disentanglement",
+        "Q3 — Causal mechanism and reachability",
+        "Q4 — Intervention fidelity",
+        "Q5 — Environment and applicability",
+        "Q6 — Outcome and oracle validity",
+        "historical source-state observations",
+        "minimal in the causal model",
+        "not presumed to be a minimal intervention",
+        "confounders",
+        "equivalent or likely equivalent",
+        "source-only structural claims",
+        "#10064",
+        "#10369",
+        "No new primary metric",
+    ):
+        if required.lower() not in counterfactual_qualification.lower():
+            errors.append(f"counterfactual-control protocol is missing {required}")
     return errors
 
 
@@ -329,7 +354,8 @@ def self_test() -> list[str]:
         "3.10 From code location to causal mechanism diagnosis\n"
         "3.11 From human-found gold to independently audited open-set discovery\n"
         "3.12 From tool use to sequential evidence acquisition\\n"
-        "3.13 From uptake to verified engineering impact"
+        "3.13 From uptake to verified engineering impact\n"
+        "3.14 From historical fix commits to qualified counterfactual controls"
     )
     preregistration = "\n".join((
         "P — Parent / pre-introduction",
@@ -385,9 +411,22 @@ def self_test() -> list[str]:
             for variant, state in enumerate(["P", "I", "F", "N", "M", "IRR"], 1)
         ),
     ))
+    counterfactual_qualification = "\n".join((
+        "six independent control-qualification dimensions",
+        "Q1 — Identity and lineage",
+        "Q2 — Change disentanglement",
+        "Q3 — Causal mechanism and reachability",
+        "Q4 — Intervention fidelity",
+        "Q5 — Environment and applicability",
+        "Q6 — Outcome and oracle validity",
+        "historical source-state observations",
+        "minimal in the causal model; not presumed to be a minimal intervention",
+        "confounders; equivalent or likely equivalent; source-only structural claims",
+        "No new primary metric; #10064 #10369",
+    ))
 
-    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str) -> list[str]:
-        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck)
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str) -> list[str]:
+        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q)
 
     crosswalk = "\n".join((
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
@@ -400,7 +439,7 @@ def self_test() -> list[str]:
     valid = run(
         triangulation, challenge, adjudication, scorecard,
         preregistration, gold_completeness, sequential_evidence, crosswalk,
-        calibration_pack, calibration_key
+        calibration_pack, calibration_key, counterfactual_qualification
     )
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
@@ -431,6 +470,7 @@ def self_test() -> list[str]:
         ("missing calibration variant", "calibration_pack", calibration_pack.replace("#### Variant X6", "#### Variant X7", 1)),
         ("missing calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X3 |", "| CAL-02 | X8 |", 1)),
         ("duplicate calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X1 |", "| CAL-01 | X1 |", 1)),
+        ("missing control disentanglement", "counterfactual_qualification", counterfactual_qualification.replace("Q2 — Change disentanglement", "Q2 removed")),
     )
     for label, target, mutant in mutations:
         args = {
@@ -444,6 +484,7 @@ def self_test() -> list[str]:
             "crosswalk": crosswalk,
             "calibration_pack": calibration_pack,
             "calibration_key": calibration_key,
+            "counterfactual_qualification": counterfactual_qualification,
         }
         args[target] = mutant
         result = run(
@@ -457,6 +498,7 @@ def self_test() -> list[str]:
             args["crosswalk"],
             args["calibration_pack"],
             args["calibration_key"],
+            args["counterfactual_qualification"],
         )
         if not result:
             return [f"negative self-test was accepted: {label}"]
@@ -484,7 +526,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 25 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 26 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -497,6 +539,7 @@ def main() -> int:
         evidence_crosswalk = read_required(args.repo_root, EVIDENCE_CROSSWALK)
         calibration_pack = read_required(args.repo_root, CALIBRATION_PACK)
         calibration_key = read_required(args.repo_root, CALIBRATION_KEY)
+        counterfactual_qualification = read_required(args.repo_root, COUNTERFACTUAL_QUALIFICATION)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -504,7 +547,7 @@ def main() -> int:
     failures = validate_documents(
         triangulation, challenge, adjudication, scorecard, preregistration,
         gold_completeness, sequential_evidence, evidence_crosswalk,
-        calibration_pack, calibration_key
+        calibration_pack, calibration_key, counterfactual_qualification
     )
     if failures:
         for failure in failures:
@@ -517,7 +560,8 @@ def main() -> int:
         f"scenarios={len(ids)} comparators={len(COMPARATORS)} "
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
         "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26 "
-        "human_calibration_cases=3 variants=18 answer_key=separate-public"
+        "human_calibration_cases=3 variants=18 answer_key=separate-public "
+        "counterfactual_controls=6 qualification_dimensions=6"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
