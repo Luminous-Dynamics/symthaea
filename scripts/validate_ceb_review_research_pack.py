@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
+PREREGISTRATION = "docs/research/CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md"
 CHALLENGE = "docs/research/CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md"
 ADJUDICATION = "docs/research/CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md"
 SCORECARD = "docs/research/CEB_ENGINEERING_QUALITY_SCORECARD_V0_2026-11-04.md"
@@ -56,6 +57,7 @@ def validate_documents(
     challenge: str,
     adjudication: str,
     scorecard: str,
+    preregistration: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -121,6 +123,39 @@ def validate_documents(
     if "3.10 From code location to causal mechanism diagnosis" not in scorecard:
         errors.append("engineering scorecard is missing the causal-diagnosis paradigm shift")
 
+    required_states = (
+        "P — Parent / pre-introduction",
+        "I — Introducing",
+        "F — Fixed companion",
+        "N — Neighboring-mechanism control",
+        "M — Minimal causal intervention",
+        "IRR — irrelevant intervention",
+    )
+    for state in required_states:
+        if state not in preregistration:
+            errors.append(f"causal-diagnosis preregistration is missing counterfactual state {state}")
+    for phase in ("Phase A — Source-only diagnosis contract", "Phase B — Evidence acquisition value", "Phase C — Human complementarity"):
+        if phase not in preregistration:
+            errors.append(f"causal-diagnosis preregistration is missing {phase}")
+    for required in (
+        "paired task-level analysis",
+        "repository-cluster bootstrap",
+        "80% power",
+        "family-wise alpha 0.05",
+        "same total inference budget",
+        "does not create another metric lane",
+        "#10064",
+        "#10369",
+        "no task is admitted",
+    ):
+        if required not in preregistration.lower() and required not in preregistration:
+            errors.append(f"causal-diagnosis preregistration is missing required safeguard: {required}")
+    for metric in PRIMARY_METRICS:
+        if metric not in preregistration:
+            errors.append(f"causal-diagnosis preregistration must preserve existing primary metric {metric}")
+    if "candidate-specific and appears in both numerator and denominator" not in triangulation:
+        errors.append("ReviewBench augmented-recall denominator caveat is missing")
+
     return errors
 
 
@@ -152,8 +187,22 @@ def self_test() -> list[str]:
         "#10064 #10369",
     ))
     scorecard = "3.10 From code location to causal mechanism diagnosis"
+    preregistration = "\\n".join((
+        "P — Parent / pre-introduction",
+        "I — Introducing",
+        "F — Fixed companion",
+        "N — Neighboring-mechanism control",
+        "M — Minimal causal intervention",
+        "IRR — irrelevant intervention",
+        "Phase A — Source-only diagnosis contract",
+        "Phase B — Evidence acquisition value",
+        "Phase C — Human complementarity",
+        "paired task-level analysis repository-cluster bootstrap 80% power family-wise alpha 0.05",
+        "same total inference budget does not create another metric lane #10064 #10369 no task is admitted",
+        *PRIMARY_METRICS,
+    ))
 
-    valid = validate_documents(triangulation, challenge, adjudication, scorecard)
+    valid = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration)
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
 
@@ -165,6 +214,9 @@ def self_test() -> list[str]:
         ("missing evidence authority", adjudication.replace("compiler_resolved", "deleted_class")),
         ("missing isolation gate", challenge.replace("#10064", "removed_gate")),
         ("missing primary metric mapping", adjudication.replace("reviewer_burden", "removed_metric")),
+        ("missing counterfactual state", preregistration.replace("M — Minimal causal intervention", "M-state-removed")),
+        ("missing power rule", preregistration.replace("80% power", "unspecified power")),
+        ("missing phase C", preregistration.replace("Phase C — Human complementarity", "phase omitted")),
     )
     for label, mutant in mutations:
         if label == "duplicate scenario identity":
@@ -179,8 +231,10 @@ def self_test() -> list[str]:
             result = validate_documents(triangulation, challenge, mutant, scorecard)
         elif label == "missing isolation gate":
             result = validate_documents(triangulation, mutant, adjudication, scorecard)
+        elif label == "missing counterfactual state" or label == "missing power rule" or label == "missing phase C":
+            result = validate_documents(triangulation, challenge, adjudication, scorecard, mutant)
         else:
-            result = validate_documents(triangulation, challenge, mutant, scorecard)
+            result = validate_documents(triangulation, challenge, mutant, scorecard, preregistration)
         if not result:
             return [f"negative self-test was accepted: {label}"]
 
@@ -207,18 +261,19 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 7 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 10 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
         challenge = read_required(args.repo_root, CHALLENGE)
         adjudication = read_required(args.repo_root, ADJUDICATION)
         scorecard = read_required(args.repo_root, SCORECARD)
+        preregistration = read_required(args.repo_root, PREREGISTRATION)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    failures = validate_documents(triangulation, challenge, adjudication, scorecard)
+    failures = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration)
     if failures:
         for failure in failures:
             print(f"ERROR: {failure}", file=sys.stderr)
@@ -228,7 +283,8 @@ def main() -> int:
     print(
         "CEB_REVIEW_RESEARCH_PACK_PASS: "
         f"scenarios={len(ids)} comparators={len(COMPARATORS)} "
-        f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)}"
+        f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
+        "counterfactual_states=6 experimental_phases=3"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
