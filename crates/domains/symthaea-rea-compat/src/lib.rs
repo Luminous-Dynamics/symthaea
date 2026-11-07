@@ -151,10 +151,7 @@ fn integer_outside_ecmascript_safe_range(integer: &str) -> bool {
 }
 
 fn join_json_pointer(parent: &str, token: &str) -> String {
-    format!(
-        "{parent}/{}",
-        token.replace('~', "~0").replace('/', "~1")
-    )
+    format!("{parent}/{}", token.replace('~', "~0").replace('/', "~1"))
 }
 
 /// Report unsafe integer values still represented exactly as i64/u64 in Value.
