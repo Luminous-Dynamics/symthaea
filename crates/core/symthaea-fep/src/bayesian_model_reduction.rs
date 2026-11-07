@@ -469,8 +469,7 @@ mod tests {
     }
 
     fn log_normal_density(value: f64, mean: f64, variance: f64) -> f64 {
-        -0.5 * ((2.0 * std::f64::consts::PI * variance).ln()
-            + (value - mean).powi(2) / variance)
+        -0.5 * ((2.0 * std::f64::consts::PI * variance).ln() + (value - mean).powi(2) / variance)
     }
 
     /// Independent Simpson integration of E_q[p_reduced(theta) / p_full(theta)].
@@ -550,11 +549,8 @@ mod tests {
         )
         .expect("integrable Gaussian ratio");
         // Fixed reference and an independently evaluated Simpson integral.
-        let quadrature = simpson_log_evidence_ratio(
-            &posterior,
-            &full_prior,
-            &gaussian(&[0.2], &[0.2]),
-        );
+        let quadrature =
+            simpson_log_evidence_ratio(&posterior, &full_prior, &gaussian(&[0.2], &[0.2]));
         assert!((result.models[0].log_evidence_ratio - 0.3500401567802551).abs() < 1e-11);
         assert!((result.models[0].log_evidence_ratio - quadrature).abs() < 1e-9);
     }
