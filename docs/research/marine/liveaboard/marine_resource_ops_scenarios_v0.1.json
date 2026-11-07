@@ -251,7 +251,146 @@
         "watermaker_feed_qualified",
         "potable_water_quality_gate",
         "service_deadlines"
-      ]
+      ],
+      "load_components_kw": {
+        "critical": [
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "hotel": [
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4,
+          0.4
+        ],
+        "thermal_protection": [
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3
+        ],
+        "propulsion": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "environment": {
+        "sea_state": "anchorage_sheltered_synthetic",
+        "wind_speed_m_s": 4,
+        "air_temperature_c": 27,
+        "sea_temperature_c": 24,
+        "solar_relative_forecast_error_bound": 0.25
+      },
+      "generator": {
+        "available": true,
+        "max_power_kw": 8,
+        "min_stable_load_kw": 2.5,
+        "start_delay_min": 5,
+        "minimum_run_min": 60,
+        "fuel_remaining_l": 180,
+        "quiet_hours_local": [
+          22,
+          7
+        ]
+      },
+      "shore_power": {
+        "available": false,
+        "max_import_kw": 0
+      },
+      "battery_state": {
+        "temperature_c": 24,
+        "state_of_health": 0.98
+      },
+      "watermaker_feed": {
+        "salinity_ppm": 35000,
+        "temperature_c": 24,
+        "qualification": "within_synthetic_qualified_envelope",
+        "qualification_ref": "synthetic:ro-envelope-v0.1"
+      }
     },
     {
       "id": "cloud_underway_propulsion_fixed",
@@ -413,7 +552,95 @@
         "critical_loads_never_shed",
         "battery_soc_gte_min",
         "no_speed_or_route_change_by_service_scheduler"
-      ]
+      ],
+      "load_components_kw": {
+        "critical": [
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6
+        ],
+        "hotel": [
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9,
+          0.9
+        ],
+        "thermal_protection": [
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "propulsion": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      },
+      "environment": {
+        "sea_state": "head_sea_case_3_synthetic",
+        "wind_speed_m_s": 11,
+        "air_temperature_c": 25,
+        "sea_temperature_c": 22,
+        "solar_relative_forecast_error_bound": 0.45
+      },
+      "generator": {
+        "available": true,
+        "max_power_kw": 8,
+        "min_stable_load_kw": 2.5,
+        "start_delay_min": 5,
+        "minimum_run_min": 60,
+        "fuel_remaining_l": 240,
+        "quiet_hours_local": null
+      },
+      "shore_power": {
+        "available": false,
+        "max_import_kw": 0
+      },
+      "battery_state": {
+        "temperature_c": 30,
+        "state_of_health": 0.96
+      },
+      "watermaker_feed": {
+        "salinity_ppm": 35000,
+        "temperature_c": 22,
+        "qualification": "within_synthetic_qualified_envelope",
+        "qualification_ref": "synthetic:ro-envelope-v0.1"
+      }
     },
     {
       "id": "low_reserve_high_water_demand",
@@ -599,7 +826,146 @@
         "watermaker_feed_qualified",
         "potable_water_quality_gate",
         "no_silent_unmet_water_service"
-      ]
+      ],
+      "load_components_kw": {
+        "critical": [
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6
+        ],
+        "hotel": [
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5,
+          0.5
+        ],
+        "thermal_protection": [
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3,
+          0.3
+        ],
+        "propulsion": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "environment": {
+        "sea_state": "low_solar_storm_case_synthetic",
+        "wind_speed_m_s": 18,
+        "air_temperature_c": 30,
+        "sea_temperature_c": 27,
+        "solar_relative_forecast_error_bound": 0.6
+      },
+      "generator": {
+        "available": true,
+        "max_power_kw": 7,
+        "min_stable_load_kw": 2.5,
+        "start_delay_min": 8,
+        "minimum_run_min": 90,
+        "fuel_remaining_l": 35,
+        "quiet_hours_local": [
+          22,
+          7
+        ]
+      },
+      "shore_power": {
+        "available": false,
+        "max_import_kw": 0
+      },
+      "battery_state": {
+        "temperature_c": 34,
+        "state_of_health": 0.82
+      },
+      "watermaker_feed": {
+        "salinity_ppm": 39000,
+        "temperature_c": 27,
+        "qualification": "within_synthetic_qualified_envelope",
+        "qualification_ref": "synthetic:ro-envelope-v0.1"
+      }
     },
     {
       "id": "watermaker_feed_out_of_domain",
@@ -705,7 +1071,95 @@
         "watermaker_feed_qualified",
         "no_output_credit_when_feed_out_of_domain",
         "service_must_be_blocked_or_deferred_with_reason"
-      ]
+      ],
+      "load_components_kw": {
+        "critical": [
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6,
+          0.6
+        ],
+        "hotel": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "thermal_protection": [
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2,
+          0.2
+        ],
+        "propulsion": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "environment": {
+        "sea_state": "coastal_swell_case_synthetic",
+        "wind_speed_m_s": 6,
+        "air_temperature_c": 26,
+        "sea_temperature_c": 29,
+        "solar_relative_forecast_error_bound": 0.2
+      },
+      "generator": {
+        "available": false,
+        "max_power_kw": 0,
+        "min_stable_load_kw": 0,
+        "start_delay_min": 0,
+        "minimum_run_min": 0,
+        "fuel_remaining_l": 0,
+        "quiet_hours_local": null
+      },
+      "shore_power": {
+        "available": false,
+        "max_import_kw": 0
+      },
+      "battery_state": {
+        "temperature_c": 24,
+        "state_of_health": 0.99
+      },
+      "watermaker_feed": {
+        "salinity_ppm": 42000,
+        "temperature_c": 29,
+        "qualification": "outside_synthetic_qualified_envelope",
+        "qualification_ref": "synthetic:ro-envelope-v0.1"
+      }
     }
   ]
 }
