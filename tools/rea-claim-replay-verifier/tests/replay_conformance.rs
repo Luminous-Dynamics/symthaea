@@ -1575,3 +1575,425 @@ fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation
     let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &changed).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
 }
+
+#[test]
+fn removing_environment_scope_dimensions_cannot_upgrade_a_specific_observation() {
+    let mut evidence_value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    evidence_value["environment"] = json!({
+        "id": "device-42",
+        "platform": "Android",
+        "architecture": "aarch64",
+        "isolation": "process"
+    });
+    evidence_value["evidence_id"] =
+        json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&evidence_value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let mut exact_scope = provider_claim(evidence.evidence_id.clone());
+    exact_scope.scope.platform = Some("Android".to_owned());
+    exact_scope.scope.environment_id = Some("device-42".to_owned());
+    let (exact_claim_bytes, exact_result_bytes) =
+        produce(&exact_scope, std::slice::from_ref(&evidence));
+    let exact =
+        replay_claim_evaluation(&exact_claim_bytes, &[&evidence_bytes], &exact_result_bytes)
+            .unwrap();
+    assert_eq!(exact.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        exact.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+
+    for (label, platform, environment_id) in [
+        ("platform", None, Some("device-42".to_owned())),
+        ("environment_id", Some("Android".to_owned()), None),
+        ("both", None, None),
+    ] {
+        let mut broadened = exact_scope.clone();
+        broadened.scope.platform = platform;
+        broadened.scope.environment_id = environment_id;
+        let (claim_bytes, result_bytes) = produce(&broadened, std::slice::from_ref(&evidence));
+        let replay =
+            replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+        assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch, "{label}");
+        assert_eq!(
+            replay.expected_disposition,
+            Disposition::Underdetermined,
+            "removing {label} scope unexpectedly retained positive support"
+        );
+
+        let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+        assert!(
+            result["evidence_assessments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["kind"] == json!("scope_unverifiable")),
+            "removing {label} scope did not preserve the missing-scope reason"
+        );
+
+        let stale_positive =
+            replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &exact_result_bytes).unwrap();
+        assert_eq!(
+            stale_positive.outcome,
+            ReplayOutcome::ReplayMismatch,
+            "old positive result replayed after {label} scope was removed"
+        );
+        assert_eq!(
+            stale_positive.expected_disposition,
+            Disposition::Underdetermined
+        );
+    }
+}
+
+#[test]
+fn confidence_and_authority_labels_cannot_promote_precision_warned_unimplemented_predicates() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let confidence_levels = ["observed", "derived", "inferred"];
+    let authority_classes = [
+        "shipped-artifact",
+        "controlled-replay",
+        "historical-reference",
+        "external-service",
+        "analyst-inference",
+    ];
+    let unsupported_predicates = [
+        ClaimPredicate::MemberContentIntegrity,
+        ClaimPredicate::ArchiveContentIdentity,
+        ClaimPredicate::WholeArchiveCompleteness,
+        ClaimPredicate::ProducerAuthenticity,
+        ClaimPredicate::SignatureCryptographicValidity,
+        ClaimPredicate::SignerIdentity,
+        ClaimPredicate::SignerTrust,
+        ClaimPredicate::PackageAuthorization,
+        ClaimPredicate::PlatformAcceptance,
+        ClaimPredicate::ProviderCorroboration,
+        ClaimPredicate::CausalFinding,
+        ClaimPredicate::SecurityControlPass,
+    ];
+
+    for predicate in unsupported_predicates {
+        for confidence in confidence_levels {
+            for authority in authority_classes {
+                let mut value = original.value.clone();
+                value["confidence"] = json!(confidence);
+                value["authority"] = json!(authority);
+                value["normalized_result"]["large_count"] = json!(9_007_199_254_740_993_u64);
+                value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+                let evidence_bytes = serde_json::to_vec(&value).unwrap();
+                let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+                let mut claim = provider_claim(evidence.evidence_id.clone());
+                claim.predicate = predicate;
+                claim.source_predicate_type = None;
+                let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+                let replay =
+                    replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes)
+                        .unwrap();
+
+                assert_eq!(
+                    replay.outcome,
+                    ReplayOutcome::ReplayMatch,
+                    "{predicate:?}/{confidence}/{authority}"
+                );
+                assert_eq!(
+                    replay.expected_disposition,
+                    Disposition::Unverified,
+                    "{predicate:?}/{confidence}/{authority} changed claim authority"
+                );
+                let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+                assert_eq!(
+                    result["evidence_assessments"][0]["kind"],
+                    json!("not_evaluated")
+                );
+                assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+                assert!(
+                    result["numeric_precision_warnings"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|warning| warning["json_pointer"]
+                            == json!("/normalized_result/large_count")),
+                    "precision diagnostics were not retained for {predicate:?}/{confidence}/{authority}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn unknown_temporal_scope_fields_are_rejected_instead_of_ignored() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+
+    let mut claim_value: Value = serde_json::from_slice(&claim_bytes).unwrap();
+    claim_value["scope"]["as_of"] = json!("2026-11-07T08:00:00Z");
+    claim_value["scope"]["freshness_policy"] = json!("max-age-24h");
+    let changed_claim = serde_json::to_vec(&claim_value).unwrap();
+
+    let error =
+        replay_claim_evaluation(&changed_claim, &[fixture_bytes()], &result_bytes).unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidClaim);
+}
+
+#[test]
+fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_completeness() {
+    let mut value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    value["normalized_result"] = json!({
+        "registered_statements": [
+            {"statement_id": "stmt-001", "subject": "artifact-A"}
+        ],
+        "registered_count": 1,
+        "all_registered_statements_retrieved": true,
+        "terminal_pagination_cursor_seen": true,
+        "issuer_signed_all_issued_declaration": true,
+        "issuer_issued_statement_population_independently_audited": false,
+        "excluded_statement_population": "unknown"
+    });
+    value["raw_result"] = json!({
+        "query": "all statements for artifact-A",
+        "filters": [],
+        "pagination": {"terminal": true},
+        "source_note": "issuer claims all statements were submitted"
+    });
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let mut report_claim = provider_claim(evidence.evidence_id.clone());
+    report_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (report_claim_bytes, report_result_bytes) =
+        produce(&report_claim, std::slice::from_ref(&evidence));
+    let report_replay = replay_claim_evaluation(
+        &report_claim_bytes,
+        &[&evidence_bytes],
+        &report_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(report_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        report_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+    let report_result: Value = serde_json::from_slice(&report_result_bytes).unwrap();
+    assert!(
+        report_result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
+    );
+
+    let mut completeness_claim = report_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("No predicate-specific verifier"))
+    );
+}
+
+#[test]
+fn terminal_pagination_and_self_reported_all_pages_do_not_prove_population_completeness() {
+    let mut evidence_value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    evidence_value["normalized_result"] = json!({
+        "query": {
+            "query_id": "snapshot-query-17",
+            "filters": [],
+            "source_snapshot_id": null,
+            "declared_total_pages": 3
+        },
+        "pages": [
+            {"page": 1, "cursor_in": null, "cursor_out": "cursor-1", "items": ["a", "b"]},
+            {"page": 3, "cursor_in": "cursor-2", "cursor_out": "terminal", "items": ["e"]}
+        ],
+        "observed_page_numbers": [1, 3],
+        "terminal_cursor_seen": true,
+        "all_pages_seen": true,
+        "missing_page_numbers": [2],
+        "issuer_participation_independently_audited": false
+    });
+    evidence_value["evidence_id"] =
+        json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&evidence_value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let mut observation_claim = provider_claim(evidence.evidence_id.clone());
+    observation_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (observation_claim_bytes, observation_result_bytes) =
+        produce(&observation_claim, std::slice::from_ref(&evidence));
+    let observation_replay = replay_claim_evaluation(
+        &observation_claim_bytes,
+        &[&evidence_bytes],
+        &observation_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(observation_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        observation_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+
+    let mut completeness_claim = observation_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("No predicate-specific verifier"))
+    );
+}
+
+#[test]
+fn incomplete_downstream_processing_cannot_promote_whole_population_completeness() {
+    let mut value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    value["normalized_result"] = json!({
+        "declared_query": {
+            "query_id": "snapshot-query-23",
+            "source_snapshot_id": "snapshot-23",
+            "expected_items": ["item-a", "item-b", "item-c"]
+        },
+        "enumeration": {
+            "enumerated_item_ids": ["item-a", "item-b", "item-c"],
+            "terminal_cursor_seen": true
+        },
+        "acquisition": {
+            "acquired_item_ids": ["item-a", "item-b", "item-c"],
+            "acquisition_failures": []
+        },
+        "processing": {
+            "processed_item_ids": ["item-a", "item-c"],
+            "failed_item_ids": ["item-b"],
+            "failure_reasons": [{"item_id": "item-b", "reason": "unsupported_format"}],
+            "provider_claims_all_items_processed": true
+        }
+    });
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let mut observation_claim = provider_claim(evidence.evidence_id.clone());
+    observation_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (observation_claim_bytes, observation_result_bytes) =
+        produce(&observation_claim, std::slice::from_ref(&evidence));
+    let observation_replay = replay_claim_evaluation(
+        &observation_claim_bytes,
+        &[&evidence_bytes],
+        &observation_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(observation_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        observation_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+
+    let mut completeness_claim = observation_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
+}
+
+#[test]
+fn unsafe_integer_precision_warnings_survive_recursive_key_permutations() {
+    let mut evidence_value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    evidence_value["normalized_result"]["large_count"] = json!(9_007_199_254_740_993_u64);
+    evidence_value["normalized_result"]["asserted_counter"] = json!(9_007_199_254_740_994_u64);
+    evidence_value["parameters"]["large_offset"] = json!(18_446_744_073_709_551_615_u64);
+    evidence_value["evidence_id"] =
+        json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
+
+    let evidence_bytes = serde_json::to_vec(&evidence_value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+    let mut claim = provider_claim(evidence.evidence_id.clone());
+    claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+
+    let original_replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    assert_eq!(original_replay.outcome, ReplayOutcome::ReplayMatch);
+
+    let reversed_claim =
+        json_with_reversed_object_keys(&serde_json::from_slice::<Value>(&claim_bytes).unwrap());
+    let reversed_evidence = json_with_reversed_object_keys(&evidence_value);
+    let reversed_result =
+        json_with_reversed_object_keys(&serde_json::from_slice::<Value>(&result_bytes).unwrap());
+
+    let replay = replay_claim_evaluation(
+        reversed_claim.as_bytes(),
+        &[reversed_evidence.as_bytes()],
+        reversed_result.as_bytes(),
+    )
+    .unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+    assert_eq!(
+        replay.numeric_precision_warnings,
+        original_replay.numeric_precision_warnings
+    );
+    assert_eq!(
+        replay.recomputed_derivation_sha256,
+        original_replay.recomputed_derivation_sha256
+    );
+}
