@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/domain-types",
+    "crates/record-parser",
+    "crates/storage-adapter",
+    "crates/cli",
+]
