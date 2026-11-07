@@ -666,3 +666,12 @@ Machine-readable fixtures:
 The adaptive-order fixture uses q=[1,1,1,1], x=[-1,-1,1,1], exact cosine 0 and kth threshold 0.1. Processing the negative block first yields a safe real-arithmetic upper bound 0; processing the positive block first yields upper bound 1 and cannot prune. The ordering hint never participates in the proof.
 
 The consistent-cut fixture distinguishes a materialized-update watermark from an event-coverage watermark. A typed explicit no-memory-mutation disposition can advance event coverage without a segment write; missing disposition, partition gaps or parameter-generation mismatch prevent a complete cut. These are synthetic fixtures, not runtime tests or crash-recovery evidence.
+
+
+## 21. Eligibility before payload access
+
+New child: [#11003 — HME-ELIGIBILITY-001](https://github.com/Luminous-Dynamics/symthaea/issues/11003).
+
+HME query execution must apply a pinned, metadata-only eligibility snapshot before payload loading, vector scoring or candidate ordering. It composes #9075 (bitemporal source history), #9139 (forgetting/erasure governance) and #9177 (principal/scope/evidence packet); it does not create a new policy engine.
+
+The query receipt now binds policy/authorization/source-ledger generations, valid_at/known_at, principal-scope digest and HME manifest digest. It distinguishes physical, eligible and excluded populations, and requires zero payload reads for excluded candidates. A new fixture, `docs/research/fixtures/hme_eligibility_filter_v0.json`, includes a stale LSH hit for a revoked memory and distinguishes active-index forgetting from physical purge and cryptographic erasure. This is a synthetic contract/security fixture, not a runtime access-control or erasure test.
