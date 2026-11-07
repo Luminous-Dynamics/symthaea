@@ -352,5 +352,3 @@ fn formal_parser_rejects_omitted_nullable_fields_instead_of_defaulting_them() {
         );
     }
 }
-
-}
