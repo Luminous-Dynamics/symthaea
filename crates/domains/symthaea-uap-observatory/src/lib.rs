@@ -795,11 +795,19 @@ pub use triangulation::{
     triangulate_bearings_with_config,
 };
 
-/// Frame-level multi-target GOSPA metrics; trajectory-level metrics remain future work.
+/// Frame-level multi-target GOSPA metrics.
 pub mod tracking_metrics;
 
 pub use tracking_metrics::{
     GospaBreakdown, GospaConfig, GospaError, MAX_GOSPA_ASSIGNMENT_SIDE, gospa_frame,
+};
+
+/// Fixed-association OSPA(2) track-set evaluation over a discrete time window.
+pub mod trajectory_metrics;
+
+pub use trajectory_metrics::{
+    MAX_OSPA2_ASSIGNMENT_SIDE, Ospa2Breakdown, Ospa2Config, Ospa2Error, TrackSeries,
+    ospa2_track_distance, ospa2_track_sets,
 };
 
 /// Track-set temporal evaluation with a fixed-association OSPA(2) reference.
