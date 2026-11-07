@@ -143,6 +143,8 @@ pub struct ThreeBallGazeActionScore {
     /// feedback-choice score after each possible visual observation.
     pub expected_free_energy_nats: f64,
     pub contingencies: Vec<ThreeBallGazeContingency>,
+    /// Choice selected immediately when `location == None`.
+    pub immediate_choice: Option<ThreeBallColour>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,6 +152,8 @@ pub struct ThreeBallPartialObservationDecision {
     pub selected_action_index: usize,
     pub selected_gaze: Option<ThreeBallLocation>,
     pub selected_contingencies: Vec<ThreeBallGazeContingency>,
+    /// Selected immediately when `selected_gaze == None`.
+    pub selected_immediate_choice: Option<ThreeBallColour>,
     pub action_scores: Vec<ThreeBallGazeActionScore>,
 }
 
@@ -486,6 +490,7 @@ pub fn score_three_ball_gaze_policies(
         action_cost_nats: 0.0,
         expected_free_energy_nats: current_score.expected_free_energy_nats,
         contingencies: Vec::new(),
+        immediate_choice: current_choice,
     }];
 
     for location in [
@@ -539,6 +544,7 @@ pub fn score_three_ball_gaze_policies(
             action_cost_nats: action_cost,
             expected_free_energy_nats: expected_free_energy,
             contingencies,
+            immediate_choice: None,
         });
     }
 
@@ -555,12 +561,12 @@ pub fn score_three_ball_gaze_policies(
     // Preserve the immediate-choice baseline as the None action's contingency;
     // gaze actions return their observation-conditioned choice map.
     let selected_contingencies = selected.contingencies.clone();
-    let _ = current_choice;
 
     Ok(ThreeBallPartialObservationDecision {
         selected_action_index,
         selected_gaze: selected.location,
         selected_contingencies,
+        selected_immediate_choice: selected.immediate_choice,
         action_scores,
     })
 }
@@ -957,6 +963,10 @@ mod tests {
         assert_eq!(
             decision.selected_gaze,
             decision.action_scores[decision.selected_action_index].location
+        );
+        assert_eq!(
+            decision.selected_immediate_choice,
+            decision.action_scores[decision.selected_action_index].immediate_choice
         );
         assert_eq!(decision.action_scores.len(), 4);
         for action in &decision.action_scores {
