@@ -5,6 +5,7 @@ on:
     paths:
       - "src/voice/mod.rs"
       - "src/voice/singing_engine.rs"
+      - "examples/muse_vocal_release_gate.rs"
       - "Cargo.toml"
       - "Cargo.lock"
       - "scripts/diffsinger_worker.py"
@@ -57,13 +58,16 @@ jobs:
           components: rustfmt
 
       - name: Format-check only the changed Rust files
-        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs examples/muse_vocal_release_gate.rs
 
       - name: Compile the feature-gated vocal renderer with frozen dependencies
         run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
 
       - name: Test VocalPerformance construction and fail-closed validation
         run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::singing_engine::tests -- --test-threads=1
+
+      - name: Compile the integrated comparative vocal release gate
+        run: cargo +1.96.0 check --locked -p symthaea --example muse_vocal_release_gate --features "singing,voice-tts"
 
       - name: Confirm the frozen lockfile remained unchanged
         run: git diff --exit-code -- Cargo.lock
