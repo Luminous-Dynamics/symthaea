@@ -407,13 +407,15 @@ The following are safe and useful before #10064 isolation and #10369 trust quali
 6. Audit the external observation registry for source revision, denominator, uncertainty, environment, cost and benchmark version completeness.
 7. Map the current CEB portfolio to ownership boundaries and block overlapping registries, metrics and receipts.
 8. Continue static negative-control design for admission, contamination, lifecycle and claim licensing.
-9. Author and statically review six Rust task/oracle development candidates under [#10701](https://github.com/Luminous-Dynamics/symthaea/issues/10701) / [draft PR #10704](https://github.com/Luminous-Dynamics/symthaea/pull/10704). Reconcile their family mapping with #10617 and keep them unadmitted under #10609 until all source, oracle, custody and execution prerequisites are met.
+9. Author and statically review six Rust task/oracle development candidates under [#10701](https://github.com/Luminous-Dynamics/symthaea/issues/10701) / [integrated draft PR #10746](https://github.com/Luminous-Dynamics/symthaea/pull/10746), stacked on the current 14-lane/56-metric and 41-negative/12-positive integrity portfolio. Preserve #10617 family mapping and zero admission until #10609 and all custody/execution prerequisites qualify.
+10. Run the public synthetic evidence scenarios through the [gold-completeness/open-set discovery protocol](CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md), including blind zero-finding/clean-consensus audits and producer-dependence review.
+11. Run two-author source-only annotation against the [sequential evidence-acquisition policy](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md); compare which minimal observation distinguishes each causal hypothesis, its authority, safety and all-in cost.
 
 Do not execute candidate-controlled build scripts, tests, macros, graders or attack payloads on the current host-opt-in runner. Do not claim independent regrading, sealed holdout, candidate execution or production isolation.
 
 ## 9. Current CEB maturity and limits
 
-The November 5 work added or advanced:
+The November 5–7 work added or advanced:
 - task admission and two-sided oracle qualification (#10609);
 - release lifecycle (#10611);
 - selective escalation (#10613);
@@ -422,6 +424,9 @@ The November 5 work added or advanced:
 - evidence continuity protocol and measurement lane (#10631/#10632);
 - T1–T4 contamination transparency and task/card binding (#10634);
 - collaborative engineering protocol (#10640).
+
+- code-review frontier: ReviewBench, SecPRBench, CR-Bench-v2 and CodeReviewBench now triangulated in the narrative and structured comparator registry; CEB-REVIEW still has only three primary metrics.
+- causal diagnosis: P/I/F/N/M/IRR counterfactual preregistration, 26 synthetic evidence scenarios and sequential evidence-acquisition/gold-completeness protocols.
 
 These remain open draft PRs, not merged releases. Their CEB Contract Validation V0 runs passed at their recorded exact heads, but that is contract validation only; general CI, execution isolation and independently trusted regrading are not implied. The task and contamination registries still contain zero admitted real tasks/cards, and no continuity or collaboration episodes have been executed. P0 #10064 and #10369 remain prerequisites for candidate execution and independent-regrade claims.
 
