@@ -107,6 +107,14 @@ Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Appro
 
 The [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) defines the six framing conditions, source/defect anchors, leakage controls and paired analysis. It is a design proposal, not a task set or performance result.
 
+### 2.10 Kodus State of AI Code Review 2026 — suggestion implementation is not correctness
+
+Kodus separately publishes platform-level analytics from its production code-review pipeline, distinct from its 30-PR CodeReviewBench replay above. The report analyzes **22,743 AI-authored PRs** and **180,739 review suggestions** across its supported GitHub/GitLab/Bitbucket/Azure DevOps pipeline, with a data window beginning September 1, 2025 and a snapshot ending June 8, 2026. It reports **33% implemented/adapted** overall, rising from 25% to 48% by PR-created month across the cited eight-month window; the newest months are right-censored and June is partial. Bugs have a reported 34.5% implementation/adaptation rate; security 31.2%. It also reports that **71.8% of 13,609 flagged merged PRs had at least one open flag**, while 60% of security flags and 64% of critical flags were unaddressed. The report explicitly states the open-flag result includes false positives and accepted risk. [Kodus State of AI Code Review 2026](https://kodus.io/data), methodology and snapshot disclosed in the report.
+
+**Composition and attribution caveats:** the report warns that platform-wide adoption/merge trends are heavily compositional. Its fixed 24-team panel shows that platform-wide PR size and merge-time trends largely disappear when comparing the same teams at both ends. Its “implemented” rule is based on later changes to flagged lines; that does not prove the review comment caused the edit or that the edit corrected the defect. Silent ignores count in the implementation outcome. These are descriptive analyses from Kodus' own commercial review pipeline, not a randomized intervention or independent adjudication of every suggestion.
+
+**CEB implication:** use these data to motivate a separate uptake/outcome protocol, not as correctness evidence. The production-impact experiment must freeze truth/actionability before exposure; distinguish accepted, adapted, rejected, deferred, independently reproduced and no-response; verify repairs and regressions separately; control team composition and censoring; and never treat a later diff as causal proof. See [CEB Review Production-Impact Protocol V0](CEB_REVIEW_PRODUCTION_IMPACT_PROTOCOL_V0_2026-11-07.md). Uptake stays contextual under existing CEB-HUMAN/CEB-CONTINUITY ownership; no new metric lane or acceptance score is created.
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -256,5 +264,6 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Arsentev, [PREreview of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026.
 - Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [method/limitations post](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), data generated 2026-09-11; accessed November 7, 2026.
 - Martian, [Code Review Benchmark production-adoption dashboard](https://www.codereviewbenchmark.com/), accessed November 7, 2026.
+- Kodus, [State of AI Code Review 2026](https://kodus.io/data), production pipeline snapshot through June 8, 2026; accessed November 7, 2026.
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
