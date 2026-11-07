@@ -239,7 +239,7 @@ For every zero-failure result, report the denominator and a confidence bound. Ze
 - **SLSA v1.2:** approved Build and Source tracks. Build provenance binds artifact to build process and inputs; Source provenance addresses revision creation/change management. The current working draft adds Build Environment and Dependency tracks, but these remain draft proposals. REA should consume signed provenance under explicit signer-builder policy; absence from best-effort resolvedDependencies is not a general proof of non-use.
 - **Sigstore/Rekor and Certificate Transparency:** signed identity and transparent registration/inclusion/consistency. They require monitoring/gossip or equivalent defenses for split views and do not establish semantic truth.
 - **SCITT RFC 9943:** transparency and accountability for signed statements. Issuers may make false statements; relying parties assess accuracy and supersession.
-- **TUF 1.0.36:** version, threshold, expiry, rollback and freeze protections for update metadata. It does not prove artifact behavior or semantic safety.
+- **TUF 1.0.37:** version, threshold, expiry, rollback and freeze protections for update metadata. It does not prove artifact behavior or semantic safety.
 - **NIST AI 800-3 and TEVV-Athlon:** statistical uncertainty/generalization and context-specific assessment design.
 - **DORA:** disaggregated throughput and instability measures; useful precedent for avoiding one composite operational score.
 - **SWE-Milestone and SWE-CI:** continuous software evolution and maintenance histories; REA adds the lifecycle of evidence validity and claim invalidation across those changes.
@@ -275,3 +275,48 @@ This design qualifies declared temporal policies and lineage relationships over 
 - [DORA software delivery performance metrics](https://dora.dev/guides/dora-metrics/)
 - [SWE-Milestone paper (ICML 2026)](https://proceedings.mlr.press/v306/deng26d.html)
 - [SWE-CI paper](https://arxiv.org/abs/2603.03823)
+
+## 8. Population completeness and selective disclosure
+
+Temporal applicability and provider lineage still do not establish that the evidence population is complete. A complete, append-only transparency view can be a complete view of what was registered while remaining incomplete as a history of what an issuer created or observed.
+
+RFC 9943 §9.3 explicitly allows issuers to refuse registration or selectively submit only some statements. Its §9.2 also distinguishes statement registration from statement accuracy and permits supersession/correction. Therefore:
+
+- complete transparency-log enumeration means all entries in the named log/tree/checkpoint scope were retrieved and verified;
+- it does not mean every statement made by the issuer was registered;
+- an issuer-signed declaration that it submitted everything is still an issuer assertion unless a separately qualified participation/audit policy establishes that obligation and its fulfillment;
+- provider-reported terminal cursors, page counts, or complete=true fields do not independently establish population completeness.
+
+### Separate completeness dimensions
+
+Keep six questions distinct:
+
+1. Population definition: who is authorized to define the universe, query, filters, interval and version?
+2. Enumeration coverage: were all pages/cursors/sequences/partitions in that declared scope traversed, with terminal closure and no gaps?
+3. Acquisition coverage: was every enumerated item actually acquired from the same snapshot/session?
+4. Processing coverage: was every acquired item processed, or explicitly retained as partial, unsupported, failed or unresolved?
+5. Issuer/source participation: is there independent evidence that the source submitted every item it created or observed?
+6. Temporal coverage: do retention, clock, expiry, supersession and interval gaps leave holes?
+
+These do not collapse into a completeness boolean. CompleteWithinDeclaredQuery is weaker than complete-for-population; CompleteWithinRegisteredTransparencyView is weaker than complete-issuer-history. CompleteWithinCapturedArtifact is a byte/artifact claim and says nothing about the universe of artifacts outside it.
+
+### Composition boundary
+
+Reuse the qualified-expectation authority principle in #453 as a precedent, #10629 for claim-specific completeness obligations, #6283 for sampling-frame/measurement validity, #10410 for common-mode lineage, and #10630 for selective revalidation after population or source changes. Do not copy a telemetry schema into REA or create a new generic coverage graph.
+
+Unknown population definition, omitted pages, untrusted terminal markers, failed acquisitions, unprocessed items, selective issuer submission, or undisclosed source filters must remain explicit. Absence from a partial view cannot be promoted to a negative conclusion.
+
+### Required no-upgrade properties
+
+- A provider's all_pages_seen flag cannot establish enumeration completeness without an independently bound query/snapshot and cursor/sequence closure.
+- A complete transparency-log view cannot establish complete issuer participation absent an independent participation guarantee or audit.
+- Adding more providers that expose the same incomplete upstream collection cannot create independent completeness.
+- A self-reported population total cannot authorize negative inference.
+- Missing, unsupported, failed and partial records remain in the denominator; do not silently drop them.
+- An unrelated population change must not invalidate claims whose declared scope and dependencies are unaffected.
+
+### Benchmark additions
+
+Measure false-completeness rate by dimension, omission-detection recall by omission family, false-incompleteness rate, population-definition authority accuracy, pagination/gap detection, acquisition/processing accounting, issuer-participation uncertainty, selective invalidation precision/recall, and latency/cost by population and page count. Require zero false CompleteWithin outcomes on seeded missing-page, omitted-item, selective-publication and incomplete-processing controls; publish denominators and statistical upper bounds.
+
+Claim ceiling: even a perfectly replayed transparency ledger only establishes its registered view under the chosen log policy. It does not prove the issuer registered every statement it created, nor that a complete declared query equals the real-world population.
