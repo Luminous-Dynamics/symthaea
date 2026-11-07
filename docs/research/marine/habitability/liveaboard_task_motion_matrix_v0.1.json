@@ -39,7 +39,8 @@
     "walking",
     "reaching",
     "lifting_or_carrying",
-    "manual_control"
+    "manual_control",
+    "bending"
   ],
   "exposure_windows_seconds": [
     600,
@@ -277,5 +278,6 @@
     "Emergency egress and safety-critical deck tasks use separate hard approval gates; comfort never substitutes.",
     "A human self-report is an evidence source with protocol/uncertainty, not a calibrated physical measurement.",
     "The ontology is a proposal for benchmark construction, not a comfort or habitability pass."
-  ]
+  ],
+  "exposure_window_semantics": "These are candidate scenario windows for test design (10 min, 1 h, 2 h, 8 h), not published comfort limits or mandatory exposure periods. Select exact durations for each task and validate against the chosen method and human-factors review."
 }
