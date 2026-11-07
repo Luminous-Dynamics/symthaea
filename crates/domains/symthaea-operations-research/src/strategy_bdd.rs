@@ -8,7 +8,13 @@
 //! validates the DAG structure, and exhaustively checks semantic equivalence.
 //! It is a bounded circuit-compilation experiment, not a scalable QBF solver.
 
-use super::quantified_strategy::{BooleanStrategyFunction, StrategyOwner, WinningStrategy};
+use super::decomposition::{CnfProblem, Literal};
+use super::quantified_scope::{Quantifier, QuantifierBlock, ValidatedQuantifierPrefix};
+use super::quantified_strategy::{
+    BooleanStrategyFunction, QbfEvaluationResult, QuantifiedEvaluationBudget,
+    QuantifiedStrategyError, StrategyOwner, StrategyVerificationReport, WinningStrategy,
+    verify_winning_strategy,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A terminal or indexed decision node.
@@ -305,6 +311,11 @@ pub struct CompiledStrategyFunction {
     pub reduced_function: BooleanStrategyFunction,
     pub support_report: StrategySupportReductionReport,
     pub optimization_method: StrategyBddOptimizationMethod,
+    pub order_seed: Option<StrategyBddOrderSeed>,
+    pub interaction_pair_checks: u128,
+    pub frontier_refinement_evaluations: usize,
+    pub min_fill_max_frontier: usize,
+    pub refined_max_frontier: usize,
     pub order_evaluations: usize,
     pub bdd: ReducedOrderedBdd,
 }
@@ -320,6 +331,28 @@ pub struct CompiledWinningStrategy {
     pub reduced_truth_table_entries: u128,
     pub total_bdd_nodes: usize,
     pub total_order_evaluations: usize,
+}
+
+/// Result of verifying the source QBF strategy and then compiling its
+/// functions. The source verification report and representation metrics are
+/// distinct evidence layers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedCompiledQbfStrategy {
+    pub value: bool,
+    pub source_strategy_verification: StrategyVerificationReport,
+    pub representation: CompiledWinningStrategy,
+}
+
+/// Errors at the boundary between original-QBF verification and representation
+/// compilation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerifiedStrategyCompilationError {
+    ResultOwnerMismatch {
+        value: bool,
+        owner: StrategyOwner,
+    },
+    SourceStrategyInvalid(QuantifiedStrategyError),
+    RepresentationInvalid(StrategyBddError),
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, StrategyBddError> {
@@ -1422,21 +1455,42 @@ pub fn compile_winning_strategy_functions(
         previous_variable = Some(source_function.variable);
 
         let support = minimize_strategy_function_support(source_function, budget)?;
-        let optimization_method;
-        let order_evaluations;
-        let bdd = if exact_order_space_fits(
+        let (
+            optimization_method,
+            order_seed,
+            interaction_pair_checks,
+            frontier_refinement_evaluations,
+            min_fill_max_frontier,
+            refined_max_frontier,
+            order_evaluations,
+            bdd,
+        ) = if exact_order_space_fits(
             support.function.dependencies.len(),
             budget.max_variable_order_evaluations,
         ) {
             let report = find_exact_minimum_robdd_order(&support.function, budget)?;
-            optimization_method = StrategyBddOptimizationMethod::ExactOrderSearch;
-            order_evaluations = report.orders_evaluated;
-            report.bdd
+            (
+                StrategyBddOptimizationMethod::ExactOrderSearch,
+                None,
+                0,
+                0,
+                0,
+                0,
+                report.orders_evaluated,
+                report.bdd,
+            )
         } else {
             let report = multi_start_sift_strategy_function_robdd(&support.function, budget)?;
-            optimization_method = StrategyBddOptimizationMethod::MultiStartSifting;
-            order_evaluations = report.order_evaluations;
-            report.bdd
+            (
+                StrategyBddOptimizationMethod::MultiStartSifting,
+                Some(report.selected_seed),
+                report.interaction_pair_checks,
+                report.frontier_refinement_evaluations,
+                report.min_fill_max_frontier,
+                report.refined_max_frontier,
+                report.order_evaluations,
+                report.bdd,
+            )
         };
 
         verify_robdd_matches_strategy_function(&bdd, &support.function, budget)?;
@@ -1466,6 +1520,11 @@ pub fn compile_winning_strategy_functions(
             reduced_function: support.function,
             support_report: support.report,
             optimization_method,
+            order_seed,
+            interaction_pair_checks,
+            frontier_refinement_evaluations,
+            min_fill_max_frontier,
+            refined_max_frontier,
             order_evaluations,
             bdd,
         });
@@ -1480,6 +1539,44 @@ pub fn compile_winning_strategy_functions(
         reduced_truth_table_entries,
         total_bdd_nodes,
         total_order_evaluations,
+    })
+}
+
+/// Verify a candidate QBF result against the original matrix/prefix and only
+/// then compile its winning functions into support-minimized ROBDDs.
+///
+/// Any producer-supplied verification report inside QbfEvaluationResult is
+/// ignored and recomputed here. The compiled BDD is an additional representation
+/// certificate; it never substitutes for source-matrix strategy verification.
+pub fn verify_and_compile_qbf_strategy(
+    problem: &CnfProblem,
+    prefix: &ValidatedQuantifierPrefix,
+    candidate: &QbfEvaluationResult,
+    qbf_budget: QuantifiedEvaluationBudget,
+    bdd_budget: StrategyBddBudget,
+) -> Result<VerifiedCompiledQbfStrategy, VerifiedStrategyCompilationError> {
+    let expected_owner = if candidate.value {
+        StrategyOwner::Existential
+    } else {
+        StrategyOwner::Universal
+    };
+    if candidate.strategy.owner != expected_owner {
+        return Err(VerifiedStrategyCompilationError::ResultOwnerMismatch {
+            value: candidate.value,
+            owner: candidate.strategy.owner,
+        });
+    }
+
+    let source_strategy_verification =
+        verify_winning_strategy(problem, prefix, &candidate.strategy, qbf_budget)
+            .map_err(VerifiedStrategyCompilationError::SourceStrategyInvalid)?;
+    let representation = compile_winning_strategy_functions(&candidate.strategy, bdd_budget)
+        .map_err(VerifiedStrategyCompilationError::RepresentationInvalid)?;
+
+    Ok(VerifiedCompiledQbfStrategy {
+        value: candidate.value,
+        source_strategy_verification,
+        representation,
     })
 }
 
@@ -1949,6 +2046,128 @@ mod tests {
         assert_eq!(compiled.functions[0].reduced_function.dependencies.len(), 6);
         assert!(compiled.total_bdd_nodes > 0);
         assert!(compiled.total_order_evaluations <= 128);
+    }
+
+    fn equality_qbf_problem_and_prefix() -> (CnfProblem, ValidatedQuantifierPrefix) {
+        let problem = CnfProblem {
+            variables: vec!["u".into(), "x".into()],
+            clauses: vec![
+                vec![Literal::negative(0), Literal::positive(1)],
+                vec![Literal::positive(0), Literal::negative(1)],
+            ],
+        };
+        let prefix = ValidatedQuantifierPrefix::new(
+            2,
+            vec![
+                QuantifierBlock {
+                    quantifier: Quantifier::ForAll,
+                    variables: vec![0],
+                },
+                QuantifierBlock {
+                    quantifier: Quantifier::Exists,
+                    variables: vec![1],
+                },
+            ],
+            Default::default(),
+        )
+        .unwrap();
+        (problem, prefix)
+    }
+
+    #[test]
+    fn end_to_end_compiler_rechecks_source_strategy_and_compiles_verified_bdd() {
+        let (problem, prefix) = equality_qbf_problem();
+        let candidate =
+            super::super::quantified_strategy::evaluate_qbf_with_strategy(
+                &problem,
+                &prefix,
+                QuantifiedEvaluationBudget::default(),
+            )
+            .unwrap();
+        let mut untrusted = candidate.clone();
+        // A producer-supplied report is not authoritative and is recomputed.
+        untrusted.verification.opponent_assignments_checked = 0;
+
+        let verified = verify_and_compile_qbf_strategy(
+            &problem,
+            &prefix,
+            &untrusted,
+            QuantifiedEvaluationBudget::default(),
+            budget(),
+        )
+        .unwrap();
+
+        assert!(verified.value);
+        assert_eq!(
+            verified.source_strategy_verification.opponent_assignments_checked,
+            2
+        );
+        assert_eq!(verified.representation.owner, StrategyOwner::Existential);
+        assert_eq!(verified.representation.functions.len(), 1);
+        assert_eq!(verified.representation.total_bdd_nodes, 1);
+        assert_eq!(
+            verified.representation.functions[0].optimization_method,
+            StrategyBddOptimizationMethod::ExactOrderSearch
+        );
+    }
+
+    #[test]
+    fn end_to_end_compiler_rejects_tampered_source_strategy_before_bdd_compile() {
+        let (problem, prefix) = equality_qbf_problem();
+        let mut candidate =
+            super::super::quantified_strategy::evaluate_qbf_with_strategy(
+                &problem,
+                &prefix,
+                QuantifiedEvaluationBudget::default(),
+            )
+            .unwrap();
+        let function = candidate
+            .strategy
+            .functions
+            .iter_mut()
+            .find(|function| function.variable == 1)
+            .unwrap();
+        function.table.insert(vec![false], true);
+        function.table.insert(vec![true], false);
+
+        assert!(matches!(
+            verify_and_compile_qbf_strategy(
+                &problem,
+                &prefix,
+                &candidate,
+                QuantifiedEvaluationBudget::default(),
+                budget()
+            ),
+            Err(VerifiedStrategyCompilationError::SourceStrategyInvalid(
+                QuantifiedStrategyError::Counterexample { .. }
+            ))
+        ));
+    }
+
+    #[test]
+    fn end_to_end_compiler_rejects_truth_value_owner_mismatch() {
+        let (problem, prefix) = equality_qbf_problem();
+        let mut candidate =
+            super::super::quantified_strategy::evaluate_qbf_with_strategy(
+                &problem,
+                &prefix,
+                QuantifiedEvaluationBudget::default(),
+            )
+            .unwrap();
+        candidate.strategy.owner = StrategyOwner::Universal;
+        assert!(matches!(
+            verify_and_compile_qbf_strategy(
+                &problem,
+                &prefix,
+                &candidate,
+                QuantifiedEvaluationBudget::default(),
+                budget()
+            ),
+            Err(VerifiedStrategyCompilationError::ResultOwnerMismatch {
+                value: true,
+                owner: StrategyOwner::Universal
+            })
+        ));
     }
 
     #[test]
