@@ -221,6 +221,8 @@ A strategy-discovery system should optimize not only which algorithm to execute,
 
 Research basis: Fuchs, Bach & Iser, *Active Learning for SAT Solver Benchmarking*, Journal of Automated Reasoning (2025), https://doi.org/10.1007/s10817-025-09729-6. The work treats benchmark selection as dynamic active learning: select informative instances to estimate a new solver's rank while reducing benchmarking cost.
 
+The paper reports approximately **92% PAR-2 ranking prediction accuracy at about 10% of full-benchmark runtime** on the SAT Competition 2022 Anniversary Track. This is a historical published reference, not a demonstrated result on the 2026 Main Track and not a guarantee of transfer to Symthaea's evolving strategy population.
+
 For Symthaea, distinguish three processes:
 
 1. **Development-set active selection:** choose known, non-confirmatory instances that are most likely to change a strategy-selection decision.
@@ -235,6 +237,8 @@ For Symthaea, distinguish three processes:
 - Active-learning benchmark selector.
 - Adversarial generation alone.
 - Combined active selection + adversarial generation + strategy evolution.
+
+First reproduce the published historical reference (approximately 92% ranking accuracy at approximately 10% evaluation time on the 2022 Anniversary Track). Then test a prospective Symthaea stretch target of **greater than 95% rank accuracy at no more than 10% of full development-set evaluation cost** on the 2026 development pool, with family-wise ranking error, calibration and selection regret reported. This is a hypothesis, not an achieved result.
 
 ### Measurements
 
