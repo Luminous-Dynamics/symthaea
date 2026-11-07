@@ -1,0 +1,84 @@
+name: EMSR Evidence Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Cargo.lock'
+      - 'crates/domains/symthaea-emsr-evidence/**'
+      - 'docs/research/EMSR_BENCHMARK_CHARTER_V0_1.md'
+      - 'docs/research/emsr-v0.1/**'
+      - '.github/workflows/emsr-evidence.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Cargo.lock'
+      - 'crates/domains/symthaea-emsr-evidence/**'
+      - 'docs/research/EMSR_BENCHMARK_CHARTER_V0_1.md'
+      - 'docs/research/emsr-v0.1/**'
+      - '.github/workflows/emsr-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: emsr-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evidence-contract:
+    name: EMSR evidence validator
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      # The root workspace currently has unrelated wildcard-member directories
+      # without manifests; see PR #9361. Format this package source directly.
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-emsr-evidence/src/lib.rs
+
+      # Preserve the package's repository-relative include_str! fixture paths,
+      # but give Cargo an isolated workspace so unrelated root members do not
+      # block this package's own compile/test/lint checks.
+      - name: Prepare isolated EMSR package workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/emsr-isolated"
+          pkg="$root/crates/domains/symthaea-emsr-evidence"
+          mkdir -p "$pkg/src" "$root/docs/research/emsr-v0.1"
+          cp crates/domains/symthaea-emsr-evidence/src/lib.rs "$pkg/src/lib.rs"
+          cp docs/research/emsr-v0.1/*.json "$root/docs/research/emsr-v0.1/"
+          cat > "$pkg/Cargo.toml" <<'EOF'
+          [package]
+          name = "symthaea-emsr-evidence"
+          version = "0.1.0"
+          edition = "2024"
+          license = "AGPL-3.0-or-later"
+
+          [dependencies]
+          chrono = { version = "0.4", features = ["serde"] }
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          sha2 = { version = "0.10", features = ["oid"] }
+          EOF
+          echo "EMSR_ISOLATED_MANIFEST=$pkg/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Resolve isolated package lockfile
+        run: |
+          cargo generate-lockfile --manifest-path "$EMSR_ISOLATED_MANIFEST"
+          sha256sum "$(dirname "$EMSR_ISOLATED_MANIFEST")/Cargo.lock"
+
+      - name: Run validator tests
+        run: cargo test --manifest-path "$EMSR_ISOLATED_MANIFEST" --locked
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path "$EMSR_ISOLATED_MANIFEST" --all-targets --locked -- -D warnings
