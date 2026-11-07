@@ -42,6 +42,9 @@ An improvement in one loop is not evidence that the other two improved. This dis
 | **Recursive automated R&D** (2026-10-18 release) | NanoChat validation BPB 0.9372 community reference vs 0.9109 system result over 10 B200 seeds; NanoGPT result around 77.3–77.5 s vs a 79.7 s reference; SOL-ExecBench 0.754 vs 0.699 over 235 B200 kernels. | Strong practical comparator for parallel research threads, search, algorithm/system tuning and artifact retention. | These results do not establish same-start R4 ignition. Hardware, task and evaluator must be matched; the NanoGPT official leaderboard timing was still pending in the public artifact README, and only 10 SOL examples were public. |
 | **AI4AI-Bench** (arXiv:2608.20318) | Paper reports 0.166 mean and 0.250 best normalized score across 10 algorithm-design tasks and 29 configurations. | Useful frozen training-algorithm research work packages and a separation between run tuning and learning-method changes. | A third-party full code audit dated 2026-11-03 reports score-changing defects in 4/10 tasks, hidden data exposure in two tasks, best-of-three selection on final metrics, and no case classified as research progress under that audit's rubric. Treat the published ranking as provisional pending corrected reproduction. |
 | **RSIBench-Data** (arXiv:2607.25886) | Agents improved on their first valid attempt in 58.33% of settings; among runs continuing beyond the best observed score, 78.26% ended below that peak. | Data-strategy iteration can work, but continued search often loses the best result. | Final checkpoint is not a safe proxy for best-so-far; preserving a peak is not proof of repeatable transfer or R4. |
+| **AgentIdeaBench** (arXiv:2609.07611, 2026-09-07) | Matched Static/Active evaluation of 33 models across 40 subfields and five disciplines. In its 28-model primary roster, Active retrieval mean gain +0.34; 19/28 improve; capability interaction r=0.69. Weakest quartile −0.18, strongest +0.76. Feasibility +1.21, clarity +0.63, specificity +0.58, impact +0.23; measured originality −0.14, not significant. | Shows active exploration is capability-conditioned and mainly improves evidence grounding/executability; static-only ideation can hide model differences. | It does not show retrieval universally helps or independently validate scientific discoveries. Use matched budgets, pre-treatment capability tiers and separate originality/realized-value outcomes. |
+| **Autonomous Science Bench 0.1** (arXiv:2610.18449, 2026-10-13) | Six lab-derived design-build-test-learn campaigns across biology, chemistry and materials. Two calibrated gates: discovery quality among measured designs and learning quality of ranking unmeasured designs. Public pilot: nine configurations, three trials/task; GPT-6 Astra/Codex 72.2% ($190 total) and Opus 5.5/Claude Code 66.7% ($173). | Strong practical closed-loop comparator for experiment selection, measurement interpretation, adaptive decisions and prediction of unmeasured designs. | Authors caution small differences are not meaningful at three trials/task. Six tasks are a pilot, not a powered industry SOTA ranking. Preserve both gate outcomes and the replay-oracle → digital-twin → live-lab distinction. |
+| **FIRE-Bench** (ICML 2026, PMLR 306) | Full-cycle rediscovery of established, verifiable ML findings; agents design/run experiments and draw evidence-backed conclusions. Strongest tested agents remain below 50 F1 with high run-to-run variance and recurring design, execution and evidence-reasoning failures. | Verifiable benchmark for full-cycle research and evidence-backed conclusions without relying only on LLM-as-judge paper quality. | Rediscovery of known findings is not original scientific discovery; below-50 F1 is a benchmark-specific result, not a general science score. |
 | **IdeaTaste** (arXiv:2611.03424, 2026-11-02) | Six models, four areas, >90,000 proposals; average populations reach ~26% of human-community level on citation matching and 18% on concrete idea matching. The gap is strongest in proposed approaches and research plans; blinded reviewers rate AI proposals lower on expected success and feasibility. | Direct signal that literature retrieval / direction coverage is not the same as concrete research taste. | Retrospective matching to future human publications measures community alignment, not truth or all valuable novelty. Keep independently validated non-matching discoveries as a separate track; do not optimize citation/idea matching alone. |
 | **TasteVal** (arXiv:2610.06824, 2026-10-05) | Isolates experiment planning from implementation with a fixed Coder; 8 private AI-R&D tasks, 24 human experts, six seeds/model/task, 40 H100-hours/attempt. Opus 5.5 reports 2.30x expert-baseline compute multiplier (95% CI 1.15–4.37). | Strongest direct comparator for prospective experiment selection, result interpretation and compute efficiency. | Private single-H100 tasks limit independent reproduction; does not measure general problem choice, parallel research, model/harness recursion or transfer at frontier scale. Best human attempt per task is not the full human distribution. |
 | **EurekaBench** (arXiv:2609.30152, 2026-09-30) | On 26 scientific problems, Fable 5.1 reports 47.4% predictive accuracy and 42.4% mechanism-derived insight credit, versus human-research reference 48.8% and 69.7%; its own explicitly established insight score is 22.7%. | Shows prediction, mechanism identification and insight attribution must be separate outcomes. | Insight credit that allows follow-up judging/experiments is distinct from the agent's direct evidence; prediction score cannot stand in for causal mechanism discovery. |
@@ -70,6 +73,9 @@ An improvement in one loop is not evidence that the other two improved. This dis
 - **ResearchEnvBench exposes a missing precondition: real environment readiness.** Extend CEB #10419 with runtime capability tiers and false-success measurement. Do not treat importability, a passing container build or GPU visibility as proof that repository entrypoints run. For Rust/Nix/WGPU work, map the same principle to locked toolchain and dependency closure, CPU entrypoints, target/ABI alignment, actual GPU compute and distributed execution only where applicable; retain per-task skipped denominators and hidden runtime probes.
 - **Coral's scheduled-meeting experiment is a separate coordination baseline.** The public September study reports 5.35% fewer GPU cycles on one kernel task with four Opus 4.6 agents and 234 evaluations per configuration. Compare scheduled evidence-sharing, direction-board allocation and their interaction; do not attribute a meeting benefit to the direction board or multiply the effects without a factorial test.
 - **The November 4 Harness-RSI survey sharpens the claim ladder.** Record (a) an editable improvement mechanism, (b) whether it was actually reused in later improvements, and (c) whether that reuse demonstrably improved subsequent optimization. A reusable artifact or retained memory alone is not evidence of the third claim.
+- **AgentIdeaBench adds the active-exploration interaction.** In its matched 28-model primary roster the mean Active–Static gain is +0.34, but 19/28 improve and baseline capability predicts benefit. Active retrieval improves feasibility/clarity/specificity, not measured originality. This motivates #10877's static/active/random-retrieval/no-search factorial with pre-treatment capability tiers.
+- **Autonomous Science Bench supplies a closed-loop campaign diagnostic.** Preserve its two separate gates: quality of experiments actually measured and predictive ranking of unmeasured candidates. Its public 72.2% versus 66.7% leaderboard has only three trials per task, so do not claim a meaningful model gap yet. Use replay → digital twin → live lab and report budget/cost frontiers.
+- **FIRE-Bench is the verifiable rediscovery complement.** Require experiment design, execution and evidence-backed conclusion against documented known findings. It is more defensible than paper-fluency judgment, but rediscovery remains distinct from original science.
 - **IdeaTaste reveals a concrete research-taste bottleneck.** Matching topics, tasks and citations is much easier than generating the particular approach and research plan that later proves useful. Add #10877 as a separate direction/approach/experiment/interpretation lane. Its future-publication matching is a retrospective community reference, not a truth metric; preserve independently validated novel directions separately.
 - **TasteVal sets a prospective experiment-efficiency bar.** Reproduce the Researcher/fixed-Coder separation and expert baseline. Target >2.30x compute multiplier only on a genuinely comparable suite and report a confidence interval; do not claim direct TasteVal reproduction from our own tasks.
 - **EurekaBench requires prediction and mechanism discovery to be separate.** A model can forecast a result without identifying why it occurs; mechanism-derived insight needs its own evidence and attribution.
@@ -351,39 +357,42 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 ## Sources
 
 1. AIDE², *Recursive self-improvement of AI research agents*: https://arxiv.org/abs/2609.26457
-2. Coral Discovery, *The Division of Cognitive Labor in Autonomous Research* (2026-10-23): https://arxiv.org/abs/2610.33281
-3. RSI-Env, *An Open-Ended Environment for Recursive Self-Improvement of Agents* (2026-11-01): https://arxiv.org/abs/2611.01736
-4. RSIGym project and methodology: https://rsi-index.ai/ and https://github.com/evolvent-ai/RSIGym
-5. RSI-Forge: https://arxiv.org/abs/2610.09426
-6. Harness²: https://arxiv.org/abs/2610.14224
-7. Co-Harness: https://arxiv.org/abs/2607.22688
-8. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
-9. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
-10. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
-11. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
-12. RSIBench-Data: https://arxiv.org/abs/2607.25886
-13. EvalResearchBench: https://arxiv.org/abs/2610.04184
-14. IdeaTaste (2026-11-02): https://arxiv.org/abs/2611.03424
-15. TasteVal (2026-10-05): https://arxiv.org/abs/2610.06824
-16. EurekaBench (2026-09-30): https://arxiv.org/abs/2609.30152
-17. TASTE (Anthropic, 2026-08-28): https://alignment.anthropic.com/2026/taste/
-18. REUSE (2026-09-29): https://arxiv.org/abs/2609.33180
-19. SelfImprove-Bench (2026-11-02): https://arxiv.org/abs/2611.02797
-20. MASS (2026-10-08): https://arxiv.org/abs/2610.12176
-21. RSI evidence census: https://arxiv.org/abs/2610.27610
-22. METR research productivity assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
-23. ResearchEnvBench (IJCAI 2026): https://doi.org/10.24963/ijcai.2026/48 ; https://arxiv.org/abs/2603.06739
-24. Coral Autoresearch coordination study (September 2026): https://coral-labs.ai/autoresearch/
-25. Harness-RSI survey, revised author reading version (2026-11-04; not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
-26. AREX: https://arxiv.org/abs/2607.21461
-27. Harness-Zero: https://arxiv.org/abs/2609.24974
-28. Routed Continual Learning: https://arxiv.org/abs/2610.38796
-29. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
-30. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
-31. RRSI: https://arxiv.org/abs/2609.24972
-32. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
-33. Into the Unknown: https://arxiv.org/abs/2610.19159
-34. Paper2Agent: https://www.nature.com/articles/s41586-026-11044-y
-35. SciAgentArena: https://sciagentarena.github.io/
-36. Recursive Self-Improvement in AI survey (2026-07-08): https://arxiv.org/abs/2607.07663
-37. Symthaea research-taste benchmark (#10877): https://github.com/Luminous-Dynamics/symthaea/issues/10877
+2. AgentIdeaBench: https://arxiv.org/abs/2609.07611
+3. Autonomous Science Bench 0.1: https://www.autonomous-science-bench.ai/ ; https://arxiv.org/abs/2610.18449
+4. FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+5. Coral Discovery, *The Division of Cognitive Labor in Autonomous Research* (2026-10-23): https://arxiv.org/abs/2610.33281
+6. RSI-Env, *An Open-Ended Environment for Recursive Self-Improvement of Agents* (2026-11-01): https://arxiv.org/abs/2611.01736
+7. RSIGym project and methodology: https://rsi-index.ai/ and https://github.com/evolvent-ai/RSIGym
+8. RSI-Forge: https://arxiv.org/abs/2610.09426
+9. Harness²: https://arxiv.org/abs/2610.14224
+10. Co-Harness: https://arxiv.org/abs/2607.22688
+11. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
+12. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
+13. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+14. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+15. RSIBench-Data: https://arxiv.org/abs/2607.25886
+16. EvalResearchBench: https://arxiv.org/abs/2610.04184
+17. IdeaTaste (2026-11-02): https://arxiv.org/abs/2611.03424
+18. TasteVal (2026-10-05): https://arxiv.org/abs/2610.06824
+19. EurekaBench (2026-09-30): https://arxiv.org/abs/2609.30152
+20. TASTE (Anthropic, 2026-08-28): https://alignment.anthropic.com/2026/taste/
+21. REUSE (2026-09-29): https://arxiv.org/abs/2609.33180
+22. SelfImprove-Bench (2026-11-02): https://arxiv.org/abs/2611.02797
+23. MASS (2026-10-08): https://arxiv.org/abs/2610.12176
+24. RSI evidence census: https://arxiv.org/abs/2610.27610
+25. METR research productivity assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
+26. ResearchEnvBench (IJCAI 2026): https://doi.org/10.24963/ijcai.2026/48 ; https://arxiv.org/abs/2603.06739
+27. Coral Autoresearch coordination study (September 2026): https://coral-labs.ai/autoresearch/
+28. Harness-RSI survey, revised author reading version (2026-11-04; not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
+29. AREX: https://arxiv.org/abs/2607.21461
+30. Harness-Zero: https://arxiv.org/abs/2609.24974
+31. Routed Continual Learning: https://arxiv.org/abs/2610.38796
+32. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
+33. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
+34. RRSI: https://arxiv.org/abs/2609.24972
+35. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
+36. Into the Unknown: https://arxiv.org/abs/2610.19159
+37. Paper2Agent: https://www.nature.com/articles/s41586-026-11044-y
+38. SciAgentArena: https://sciagentarena.github.io/
+39. Recursive Self-Improvement in AI survey (2026-07-08): https://arxiv.org/abs/2607.07663
+40. Symthaea research-taste benchmark (#10877): https://github.com/Luminous-Dynamics/symthaea/issues/10877
