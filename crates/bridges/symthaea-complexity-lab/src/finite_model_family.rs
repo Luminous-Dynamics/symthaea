@@ -42,6 +42,7 @@ pub enum FiniteFamilyError {
     EmptyFamily,
     InvalidModelDigest { index: usize, digest: String },
     DuplicateModelDigest { digest: String },
+    MissingStateBounds { variable_index: usize, state_index: usize },
     CardinalityManifestMismatch {
         model_digest: String,
         expected: Vec<usize>,
@@ -64,6 +65,10 @@ impl fmt::Display for FiniteFamilyError {
             Self::DuplicateModelDigest { digest } => {
                 write!(f, "finite model family repeats model digest {digest}")
             }
+            Self::MissingStateBounds { variable_index, state_index } => write!(
+                f,
+                "no posterior bound was accumulated for variable {variable_index}, state {state_index}"
+            ),
             Self::CardinalityManifestMismatch {
                 model_digest,
                 expected,
@@ -267,12 +272,15 @@ pub fn evaluate_finite_model_family(
         None
     } else {
         let mut completed = Vec::with_capacity(lower_upper.len());
-        for variable_bounds in lower_upper {
+        for (variable_index, variable_bounds) in lower_upper.into_iter().enumerate() {
             let mut states = Vec::with_capacity(variable_bounds.len());
-            for state_bounds in variable_bounds {
-                // A supported model contributes every variable/state marginal,
-                // so a missing endpoint indicates an internal implementation bug.
-                states.push(state_bounds.expect("supported model must initialize all state bounds"));
+            for (state_index, state_bounds) in variable_bounds.into_iter().enumerate() {
+                // Keep even impossible internal states as a typed failure rather
+                // than allowing a malformed result to panic during assembly.
+                states.push(state_bounds.ok_or(FiniteFamilyError::MissingStateBounds {
+                    variable_index,
+                    state_index,
+                })?);
             }
             completed.push(states);
         }
