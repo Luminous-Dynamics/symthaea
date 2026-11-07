@@ -19,32 +19,32 @@ Do not infer runtime behavior from source fragments. Do not invent probabilities
 
 **Evidence packet:**
 
-\`\`\`rust
+```rust
 fn submit(req: Request, store: &Store) -> Result<()> {
     if auth::check(req.actor, req.tenant, req.resource)? {
         store.mutate(req.resource, req.payload)?;
     }
     Ok(())
 }
-\`\`\`
+```
 
 The packet omits the implementation of auth::check, its backing policy store, and other callers of store.mutate. No runtime trace, policy contract or caller inventory is supplied.
 
 Two compatible completions:
 
-\`\`\`rust
+```rust
 // Completion A
 fn check(actor: UserId, tenant: TenantId, resource: ResourceId) -> Result<bool> {
     policy.current(actor, tenant, resource)
 }
-\`\`\`
+```
 
-\`\`\`rust
+```rust
 // Completion B
 fn check(actor: UserId, _tenant: TenantId, _resource: ResourceId) -> Result<bool> {
     global_user_allowlist.contains(actor)
 }
-\`\`\`
+```
 
 **Reviewer question:** What does the handler prove? Can it prove tenant/resource authorization, or only that a helper gate precedes this particular mutation call?
 
@@ -56,7 +56,7 @@ fn check(actor: UserId, _tenant: TenantId, _resource: ResourceId) -> Result<bool
 
 **Evidence packet:**
 
-\`\`\`rust
+```rust
 #[cfg(feature = "strict-policy")]
 fn missing_policy() -> Decision {
     Decision::Deny
@@ -66,7 +66,7 @@ fn missing_policy() -> Decision {
 fn missing_policy() -> Decision {
     Decision::Allow
 }
-\`\`\`
+```
 
 The source tree includes both implementations. The exact Cargo invocation, resolved feature set, target triple, build profile and artifact identity are not supplied.
 
@@ -82,7 +82,7 @@ Two compatible build worlds: (A) strict-policy is enabled and the fail-closed de
 
 **Evidence packet:**
 
-\`\`\`rust
+```rust
 fn handle(req: Request, cache: &Cache) -> Result<Response> {
     let entry = cache.get(req.key)?;
     match entry {
@@ -90,7 +90,7 @@ fn handle(req: Request, cache: &Cache) -> Result<Response> {
         None => Err(Error::Unavailable),
     }
 }
-\`\`\`
+```
 
 A synthetic monitoring summary says that, in the examined observation window, most requests with Error::Unavailable were also preceded by a cache eviction. The summary does not include tenant workload, queue pressure, cache-capacity changes or per-request interleaving. No controlled intervention or randomized rollout is supplied.
 
@@ -108,7 +108,7 @@ Two compatible models:
 
 **Evidence packet:**
 
-\`\`\`rust
+```rust
 fn process(msg: Message, cfg: Config) -> Result<()> {
     if cfg.legacy_retry && !msg.has_stable_id {
         apply_transfer(msg)?;
@@ -120,7 +120,7 @@ fn process(msg: Message, cfg: Config) -> Result<()> {
 
     Ok(())
 }
-\`\`\`
+```
 
 The frozen contract says that either call to apply_transfer can independently duplicate a transfer when its gate is active. The incident record says only that a duplicate transfer occurred. It does not identify which call executed, whether both executed, or which condition values were active.
 
@@ -140,7 +140,7 @@ Both paths are independently sufficient. A third possibility is that both were a
 
 **Evidence packet:**
 
-\`\`\`rust
+```rust
 fn submit(req: Request, queue: &Queue) -> Result<()> {
     let allowed = authorize(req.actor, req.tenant, req.resource)?;
     queue.enqueue(Job { req, allowed })
@@ -153,7 +153,7 @@ fn worker(job: Job) -> Result<()> {
         Err(Error::Denied)
     }
 }
-\`\`\`
+```
 
 A revocation handler can change current authorization state. The packet supplies no transaction/queue ordering contract, event timestamps, worker trace, synchronization edge or authorization epoch.
 
@@ -171,23 +171,23 @@ Two possible orders:
 
 Before revision:
 
-\`\`\`rust
+```rust
 let key = (msg.logical_id, msg.attempt_id);
 if !seen.contains(key) {
     apply_transfer(msg)?;
     seen.insert(key);
 }
-\`\`\`
+```
 
 After revision:
 
-\`\`\`rust
+```rust
 let key = msg.logical_id;
 if !seen.contains(key) {
     apply_transfer(msg)?;
     seen.insert_with_retention(key, REDELIVERY_HORIZON);
 }
-\`\`\`
+```
 
 The same historical change also modifies queue acknowledgement behavior, the retry horizon and the deduplication-store implementation. The only supplied outcome is that the duplicate was not observed in the subsequent sample. No isolated commits, component ablations, independent replay or workload-matched control is supplied.
 
