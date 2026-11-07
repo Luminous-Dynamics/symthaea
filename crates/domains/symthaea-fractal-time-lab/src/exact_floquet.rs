@@ -46,6 +46,14 @@ pub enum FloquetError {
         basis: usize,
         dimension: usize,
     },
+    InitialStateDimension {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteAmplitude {
+        index: usize,
+    },
+    InvalidInitialStateNorm,
     InvalidEdge {
         edge_index: usize,
         first: usize,
@@ -83,6 +91,15 @@ impl fmt::Display for FloquetError {
                     f,
                     "basis index {basis} is outside state dimension {dimension}"
                 )
+            }
+            Self::InitialStateDimension { expected, actual } => {
+                write!(f, "initial state has {actual} amplitudes; expected {expected}")
+            }
+            Self::NonFiniteAmplitude { index } => {
+                write!(f, "initial state amplitude {index} is not finite")
+            }
+            Self::InvalidInitialStateNorm => {
+                write!(f, "initial state must have a finite, nonzero norm")
             }
             Self::InvalidEdge {
                 edge_index,
@@ -314,6 +331,38 @@ impl KickedIsingFloquet {
         Ok(())
     }
 
+    /// Set an arbitrary finite complex state, normalizing it to unit norm.
+    ///
+    /// Basis index bits use the same little-endian spin ordering as
+    /// `set_initial_basis`. A failed update leaves the current state unchanged.
+    pub fn set_initial_state(
+        &mut self,
+        amplitudes: &[Complex<f64>],
+    ) -> Result<(), FloquetError> {
+        if amplitudes.len() != self.dimension() {
+            return Err(FloquetError::InitialStateDimension {
+                expected: self.dimension(),
+                actual: amplitudes.len(),
+            });
+        }
+        for (index, amplitude) in amplitudes.iter().enumerate() {
+            if !amplitude.re.is_finite() || !amplitude.im.is_finite() {
+                return Err(FloquetError::NonFiniteAmplitude { index });
+            }
+        }
+        let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        if !norm_squared.is_finite() || norm_squared <= f64::MIN_POSITIVE {
+            return Err(FloquetError::InvalidInitialStateNorm);
+        }
+        let inverse_norm = norm_squared.sqrt().recip();
+        let normalized: Vec<Complex<f64>> = amplitudes
+            .iter()
+            .map(|amplitude| *amplitude * inverse_norm)
+            .collect();
+        self.amplitudes = normalized;
+        Ok(())
+    }
+
     /// Apply one Floquet period exactly to the state vector.
     pub fn step(&mut self) {
         self.apply_global_x_rotation();
@@ -475,6 +524,50 @@ pub fn analyze_subharmonic_response(signal: &[f64], start: usize) -> Option<Subh
 mod tests {
     use super::*;
     use std::f64::consts::PI;
+
+    #[test]
+    fn arbitrary_complex_initial_state_is_normalized_and_evolves_unitarily() {
+        let mut model = KickedIsingFloquet::new(
+            2,
+            vec![0.31],
+            vec![0.11, -0.23],
+            PI + 0.08,
+        )
+        .unwrap();
+        let amplitudes = [
+            Complex::new(1.0, 1.0),
+            Complex::new(2.0, -1.0),
+            Complex::new(-0.5, 0.25),
+            Complex::new(0.0, 1.5),
+        ];
+        model.set_initial_state(&amplitudes).unwrap();
+        assert!((model.norm_squared() - 1.0).abs() < 1.0e-12);
+        for _ in 0..24 {
+            model.step();
+            assert!((model.norm_squared() - 1.0).abs() < 1.0e-11);
+        }
+    }
+
+    #[test]
+    fn invalid_arbitrary_initial_state_is_rejected_without_mutation() {
+        let mut model = KickedIsingFloquet::new(2, vec![0.2], vec![0.0; 2], PI).unwrap();
+        let original = model.amplitudes().to_vec();
+        assert!(matches!(
+            model.set_initial_state(&[Complex::new(1.0, 0.0)]),
+            Err(FloquetError::InitialStateDimension { .. })
+        ));
+        assert_eq!(
+            model.set_initial_state(&[Complex::new(0.0, 0.0); 4]),
+            Err(FloquetError::InvalidInitialStateNorm)
+        );
+        let mut non_finite = [Complex::new(0.0, 0.0); 4];
+        non_finite[2] = Complex::new(f64::NAN, 0.0);
+        assert_eq!(
+            model.set_initial_state(&non_finite),
+            Err(FloquetError::NonFiniteAmplitude { index: 2 })
+        );
+        assert_eq!(model.amplitudes(), original.as_slice());
+    }
 
     #[test]
     fn exact_evolution_preserves_norm() {
