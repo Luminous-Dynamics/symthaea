@@ -450,6 +450,110 @@ pub fn minimum_pairwise_cycle_slip_separation(
     Ok(result)
 }
 
+/// Minimum pairwise separation for the complete registered probe portfolio.
+/// Responses from all phase bins, contexts, delays and perturbation classes are
+/// concatenated conceptually before distance is computed. This lets a portfolio
+/// distinguish models when individual probe cells are individually blind.
+pub fn minimum_joint_campaign_phase_separation(
+    models: &[ModelSignature],
+) -> Result<u64, PhaseError> {
+    if models.len() < 2 {
+        return Err(PhaseError::InsufficientModels);
+    }
+    let mut ids = BTreeSet::new();
+    let maps = models
+        .iter()
+        .map(|model| {
+            if !ids.insert(model.model_id.clone()) {
+                return Err(PhaseError::DuplicateModelId(model.model_id.clone()));
+            }
+            model.prediction_map()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let reference_keys: BTreeSet<_> = maps[0].keys().copied().collect();
+    if reference_keys.is_empty() {
+        return Err(PhaseError::EmptyProbeGrid);
+    }
+    for (index, map) in maps.iter().enumerate().skip(1) {
+        let keys: BTreeSet<_> = map.keys().copied().collect();
+        if keys != reference_keys {
+            return Err(PhaseError::ModelProbeGridMismatch {
+                model_id: models[index].model_id.clone(),
+            });
+        }
+    }
+
+    let mut minimum = u64::MAX;
+    for left in 0..maps.len() {
+        for right in (left + 1)..maps.len() {
+            let portfolio_distance = reference_keys
+                .iter()
+                .map(|key| {
+                    response_vector_distance(
+                        &maps[left][key].0,
+                        &maps[right][key].0,
+                    )
+                })
+                .sum::<u64>();
+            minimum = minimum.min(portfolio_distance);
+        }
+    }
+    Ok(minimum)
+}
+
+/// Minimum pairwise cycle-slip separation for the complete registered probe
+/// portfolio. This remains distinct from fractional phase displacement.
+pub fn minimum_joint_campaign_cycle_slip_separation(
+    models: &[ModelSignature],
+) -> Result<u64, PhaseError> {
+    if models.len() < 2 {
+        return Err(PhaseError::InsufficientModels);
+    }
+    let mut ids = BTreeSet::new();
+    let maps = models
+        .iter()
+        .map(|model| {
+            if !ids.insert(model.model_id.clone()) {
+                return Err(PhaseError::DuplicateModelId(model.model_id.clone()));
+            }
+            model.prediction_map()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let reference_keys: BTreeSet<_> = maps[0].keys().copied().collect();
+    if reference_keys.is_empty() {
+        return Err(PhaseError::EmptyProbeGrid);
+    }
+    for (index, map) in maps.iter().enumerate().skip(1) {
+        let keys: BTreeSet<_> = map.keys().copied().collect();
+        if keys != reference_keys {
+            return Err(PhaseError::ModelProbeGridMismatch {
+                model_id: models[index].model_id.clone(),
+            });
+        }
+    }
+
+    let mut minimum = u64::MAX;
+    for left in 0..maps.len() {
+        for right in (left + 1)..maps.len() {
+            let portfolio_distance = reference_keys
+                .iter()
+                .map(|key| {
+                    maps[left][key]
+                        .1
+                        .iter()
+                        .zip(maps[right][key].1.iter())
+                        .map(|(a, b)| a.abs_diff(*b))
+                        .sum::<u64>()
+                })
+                .sum::<u64>();
+            minimum = minimum.min(portfolio_distance);
+        }
+    }
+    Ok(minimum)
+}
+
 /// Minimum separation across all model pairs and supplied probe cells, for
 /// the fractional phase component only.
 pub fn minimum_campaign_separation(models: &[ModelSignature]) -> Result<u64, PhaseError> {
@@ -751,6 +855,42 @@ mod tests {
         let separation = minimum_pairwise_probe_separation(&[model_a, model_b]).unwrap();
         assert_eq!(separation[&phase_zero], 0);
         assert_eq!(separation[&phase_half], 40_000);
+    }
+
+    #[test]
+    fn individually_blind_phase_bins_can_form_a_discriminating_portfolio() {
+        let phase_zero = key(Context::BallContact, 0, 0, 1);
+        let phase_half = key(Context::BallContact, 0, 4, 1);
+        let mut common = zeros();
+        common[0] = Phase::from_microturns(50_000);
+        let mut separated = common;
+        separated[2] = Phase::from_microturns(40_000);
+        let model_a = ModelSignature {
+            model_id: "central".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 900,
+            predictions: vec![
+                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction { key: phase_half, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
+            ],
+        };
+        let model_b = ModelSignature {
+            model_id: "sensory".to_string(),
+            steady_state_frequency_millihz: 11_000,
+            steady_state_plv_milli: 900,
+            predictions: vec![
+                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction { key: phase_half, by_leg: separated, cycle_slips_by_leg: [0; LEG_COUNT] },
+            ],
+        };
+        assert_eq!(
+            minimum_campaign_separation(&[model_a.clone(), model_b.clone()]).unwrap(),
+            0
+        );
+        assert_eq!(
+            minimum_joint_campaign_phase_separation(&[model_a, model_b]).unwrap(),
+            40_000
+        );
     }
 
     #[test]
