@@ -86,25 +86,27 @@ The gate output is the unsafe decision. Ordinary policy evaluation is a separate
 **Canonical topology:**
 
 \`\`\`text
-commit_transfer(operation_id)
+ATOMIC TRANSACTION:
+  commit_transfer(operation_id)
+  + insert dedup key (operation_id, attempt_id)
           |
           v
-ack not durably observed (lost response / worker interruption)
+transaction commits; queue acknowledgement is lost/not observed
           |
           v
 same logical operation redelivered with new attempt_id
           |
           v
-dedup key (operation_id, attempt_id) is distinct
+dedup key (operation_id, new_attempt_id) is distinct
           |
           v
-dedup miss -> second commit -> duplicate effect
+dedup miss -> second transaction commits duplicate effect
 \`\`\`
 
 Necessary conditions in the declared scenario:
-1. side effect commits before acknowledgement is durably established;
-2. the acknowledgement is lost or not observed, causing redelivery;
-3. deduplication identity changes across attempts.
+1. the transaction durably commits both the side effect and the attempt-scoped deduplication record;
+2. the acknowledgement is lost or not observed after that transaction commits, causing redelivery;
+3. the redelivery carries a new attempt ID, so the deduplication identity changes across attempts.
 
 Retry alone is not sufficient if the logical operation ID is durably deduplicated.
 
@@ -117,7 +119,7 @@ Retry alone is not sufficient if the logical operation ID is durably deduplicate
 | M | absent | Using the stable operation ID as the dedup key removes the attempt-specific miss under the declared retention. |
 | IRR | present | Jitter/logging changes do not change the identity or commit/ack sequence. |
 
-**Nearest wrong mechanisms:** “The queue is at-least-once” (not independently a defect); “network loss alone duplicates transfers” (only if idempotency fails); “TTL alone is causal” (the supplied I key already differs on every attempt).
+**Nearest wrong mechanisms:** “The queue is at-least-once” (not independently a defect); “network loss alone duplicates transfers” (only if idempotency fails); “TTL alone is causal” (the supplied I key already differs on every attempt); “a crash before dedup insert duplicates the effect” (excluded here by the declared atomic transaction).
 
 **Residual-path rule:** The key does not establish atomicity outside the described transfer/dedup store. If a reviewer claims end-to-end exactly-once semantics, that is an overclaim.
 
