@@ -135,16 +135,11 @@ impl EnhancedKnowledgeGraph {
         // Check for contradictions before inserting
         let contradictions = self.detect_contradictions(&encoding, current_cycle);
 
-        // Check for corroboration (highly similar existing fact)
-        if let Some(existing_id) = self.find_corroboration(&encoding) {
-            if let Some(fact) = self.facts.get_mut(&existing_id) {
-                fact.corroboration_count += 1;
-                // Boost confidence on corroboration (capped at initial)
-                fact.confidence = (fact.confidence + 0.1).min(1.0);
-                fact.last_accessed_cycle = current_cycle;
-                return (existing_id, contradictions);
-            }
-        }
+        // HDC similarity is a candidate-retrieval signal, not a source-identity
+        // or independent-corroboration proof. Preserve each admitted observation
+        // as its own FactId until provenance-aware claim identity and source-family
+        // rules can justify a merge. Similarity alone must not discard an
+        // observation, increment corroboration, or increase memory confidence.
 
         // Evict if at capacity
         if self.facts.len() >= self.capacity {
@@ -673,17 +668,6 @@ impl EnhancedKnowledgeGraph {
         alerts
     }
 
-    fn find_corroboration(&self, encoding: &FactEncoding) -> Option<FactId> {
-        // A fact with >0.85 similarity is likely the same information
-        for existing in self.facts.values() {
-            let sim = encoding.vector.similarity(&existing.encoding.vector);
-            if sim > 0.85 {
-                return Some(existing.id);
-            }
-        }
-        None
-    }
-
     fn evict_lowest_confidence(&mut self) {
         if let Some((&id, _)) = self.facts.iter().min_by(|(_, a), (_, b)| {
             a.confidence
@@ -779,20 +763,32 @@ mod tests {
     }
 
     #[test]
-    fn test_corroboration() {
+    fn test_similarity_alone_does_not_merge_or_corroborate() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
         let enc1 = make_encoding("oil prices rose", 0.7);
+        let first_vector = enc1.vector.clone();
         let (id1, _) = graph.insert(enc1, 1, None, false);
 
-        // Insert same fact again — should corroborate, not duplicate
-        let enc2 = make_encoding("oil prices rose", 0.8);
+        // Force identical HDC vectors with different source text. This is a
+        // deliberately strong semantic-neighbor control, not proof of source
+        // identity or independent corroboration.
+        let mut enc2 = make_encoding("oil prices increased", 0.8);
+        enc2.vector = first_vector;
         let (id2, _) = graph.insert(enc2, 2, None, false);
 
-        assert_eq!(id1, id2); // Same ID = corroborated
-        assert_eq!(graph.len(), 1); // Still one fact
-        let fact = graph.get_fact(id1).unwrap();
-        assert_eq!(fact.corroboration_count, 1);
+        assert_ne!(id1, id2);
+        assert_eq!(graph.len(), 2);
+        assert_eq!(graph.total_insertions(), 2);
+
+        let first = graph.get_fact(id1).unwrap();
+        let second = graph.get_fact(id2).unwrap();
+        assert_eq!(first.corroboration_count, 0);
+        assert_eq!(second.corroboration_count, 0);
+        assert_eq!(first.confidence, 0.7);
+        assert_eq!(second.confidence, 0.8);
+        assert_eq!(first.encoding.source_text, "oil prices rose");
+        assert_eq!(second.encoding.source_text, "oil prices increased");
     }
 
     #[test]
