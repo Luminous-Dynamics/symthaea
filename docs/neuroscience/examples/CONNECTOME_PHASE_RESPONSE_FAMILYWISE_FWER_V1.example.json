@@ -30,13 +30,33 @@
       "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS",
       "weight": "1/2",
       "e_process_values": [
         "1",
         "5",
         "25"
-      ]
+      ],
+      "component_input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "e_process_path_sha256": "e8f3744af2199f2fe8f77267594f31a05494b08231c8332c4ebff46e9e3fb1ab",
+      "filtration_admission": {
+        "campaign_id": "synthetic-phase-response-campaign",
+        "process_id": "C1-local-reset",
+        "null_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_process_sha256": "e8f3744af2199f2fe8f77267594f31a05494b08231c8332c4ebff46e9e3fb1ab",
+        "source_filtration_id": "connectome-global-v1",
+        "source_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "target_filtration_id": "connectome-global-v1",
+        "target_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "observed_event_ids": [
+          "S1"
+        ],
+        "process_output_sequence": 2,
+        "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+        "proof_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "assumption_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "adjuster": null
+      }
     },
     {
       "claim_id": "C2-off-diagonal-transfer",
@@ -57,13 +77,33 @@
       "component_validity_receipt_sha256": "4545454545454545454545454545454545454545454545454545454545454545",
       "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS",
       "weight": "1/4",
       "e_process_values": [
         "1",
         "10",
         "50"
-      ]
+      ],
+      "component_input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "e_process_path_sha256": "8588965580380bf886abdf9e29dedfa8d014307d8f07055baa79c6e8ec0105f7",
+      "filtration_admission": {
+        "campaign_id": "synthetic-phase-response-campaign",
+        "process_id": "C2-off-diagonal-transfer",
+        "null_spec_sha256": "2323232323232323232323232323232323232323232323232323232323232323",
+        "input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_process_sha256": "8588965580380bf886abdf9e29dedfa8d014307d8f07055baa79c6e8ec0105f7",
+        "source_filtration_id": "connectome-global-v1",
+        "source_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "target_filtration_id": "connectome-global-v1",
+        "target_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "observed_event_ids": [
+          "S1"
+        ],
+        "process_output_sequence": 2,
+        "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+        "proof_receipt_sha256": "4545454545454545454545454545454545454545454545454545454545454545",
+        "assumption_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "adjuster": null
+      }
     },
     {
       "claim_id": "C3-contact-recovery",
@@ -84,13 +124,80 @@
       "component_validity_receipt_sha256": "8989898989898989898989898989898989898989898989898989898989898989",
       "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
       "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS",
       "weight": "1/4",
       "e_process_values": [
         "1",
         "2",
         "12"
-      ]
+      ],
+      "component_input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "e_process_path_sha256": "612f53e68b7d6638a61401ebdccbccf1fee4e0a1e0bbcc7282d28ea7c3817265",
+      "filtration_admission": {
+        "campaign_id": "synthetic-phase-response-campaign",
+        "process_id": "C3-contact-recovery",
+        "null_spec_sha256": "6767676767676767676767676767676767676767676767676767676767676767",
+        "input_process_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "output_process_sha256": "612f53e68b7d6638a61401ebdccbccf1fee4e0a1e0bbcc7282d28ea7c3817265",
+        "source_filtration_id": "connectome-global-v1",
+        "source_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "target_filtration_id": "connectome-global-v1",
+        "target_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "observed_event_ids": [
+          "S1"
+        ],
+        "process_output_sequence": 2,
+        "mode": "DIRECT_GLOBAL_SUPERMARTINGALE",
+        "proof_receipt_sha256": "8989898989898989898989898989898989898989898989898989898989898989",
+        "assumption_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "adjuster": null
+      }
     }
-  ]
+  ],
+  "global_ledger": {
+    "campaign_id": "synthetic-phase-response-campaign",
+    "global_filtration_id": "connectome-global-v1",
+    "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "entries": [
+      {
+        "sequence": 1,
+        "entry_commitment_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "kind": "EVIDENCE",
+        "payload": {
+          "event_id": "S1",
+          "evidence_family_id": "structural-revision-s1",
+          "source_stream": "structural-em",
+          "source_artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "revision": 0,
+          "supersedes_event_id": null,
+          "event_time_ms": 100,
+          "acquired_at_ms": 101,
+          "annotated_at_ms": 102,
+          "qc_at_ms": 103,
+          "availability_state": "APPROVED",
+          "split": "FIT",
+          "confirmatory_family_id": null
+        }
+      },
+      {
+        "sequence": 2,
+        "entry_commitment_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+        "kind": "EVIDENCE",
+        "payload": {
+          "event_id": "T7",
+          "evidence_family_id": "behaviour-trial-7",
+          "source_stream": "behaviour-kinematics",
+          "source_artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "revision": 0,
+          "supersedes_event_id": null,
+          "event_time_ms": 90,
+          "acquired_at_ms": 91,
+          "annotated_at_ms": 110,
+          "qc_at_ms": 111,
+          "availability_state": "APPROVED",
+          "split": "EXPLORATION",
+          "confirmatory_family_id": null
+        }
+      }
+    ]
+  }
 }
