@@ -140,6 +140,12 @@ Sources:
 - https://research.samsung.com/research-papers/Listening-Like-a-Judge-A-Music-Aware-Framework-for-Automatic-Singing-Performance-Evaluation
 - https://arxiv.org/abs/2606.26451
 
+## Phrase-aware performance authoring
+
+The shared `VocalPerformance` model now offers `from_melody_with_phrase_specs` alongside the compatibility `from_melody` and `from_melody_with_phrase_ends` constructors. Each `VocalPhraseSpec` declares an exclusive syllable end, breath-before and breath-after durations, and an independent start/peak/release expression profile for energy, breathiness and tension.
+
+These are authoring controls, not a claim that the renderers synthesize breaths. The 20-control capability schema separates `PhraseBreathTiming` from `AbsoluteOnsetAndRests`: explicit musical rests are represented in note timelines and SP/silent events, whereas breath-before/after metadata is currently unsupported by Kokoro, DiffSinger and FormantSingingEngine. A phrase-expression qualification track should therefore require the former metadata at the plan level and only award rendering credit after acoustic breath-event evidence exists.
+
 ## Paradigm shift: qualify controllability, not just audio preference
 
 The research benchmark should distinguish at least five tasks:
