@@ -333,6 +333,41 @@
         "paper_reported_rule_count_79_vs_source_audit_count_75_discrepancy",
         "constant_criterion_mapping_duplicate_across_context_factor_labels"
       ]
+    },
+    {
+      "id": "sequential_evidence_weight_space_programming",
+      "environment": "Sequential prediction-and-discovery environment with a frozen initial predictor, repeated assay/measurement batches, endpoint-budget constraints, optional task/regime shifts, and a fixed editable WeightProgram interface. The proposer receives only evidence available before each decision; hidden held-out endpoints and future batches remain sealed. Distinguish a fixed edit program authored once and executed repeatedly from an editor re-prompted on every batch.",
+      "primary_outcomes": [
+        "cumulative_ranking_utility",
+        "final_discovery_utility",
+        "held_out_prediction_loss",
+        "cumulative_decision_regret",
+        "endpoint_budget_efficiency"
+      ],
+      "diagnostics": [
+        "per_batch_utility_delta",
+        "sequential_repair_success",
+        "task_retention_after_update",
+        "edit_program_reuse_rate",
+        "llm_editor_call_count",
+        "candidate_evaluations_per_batch",
+        "cumulative_changed_parameter_count",
+        "cumulative_parameter_drift_l2",
+        "rollback_rate",
+        "time_to_detect_regime_shift",
+        "calibration_after_feedback",
+        "source_and_assay_batch_receipt_coverage"
+      ],
+      "negative_controls": [
+        "no_edit",
+        "random_matched_norm_edit_each_batch",
+        "shuffled_assay_feedback",
+        "delayed_assay_feedback",
+        "editor_reprompted_each_batch",
+        "fixed_edit_program_without_measurement_feedback",
+        "stationary_task_without_regime_shift",
+        "held_out_future_batch_leakage_canary"
+      ]
     }
   ],
   "baselines": [
@@ -539,6 +574,26 @@
     {
       "id": "activation_alignment_then_candidate_only_wsp_canonicalization",
       "scope": "Probe-aligned function-preserving coordinate canonicalization via typed WeightProgram and native SWI candidate transaction; initially restricted to a one-layer, non-residual, no-backbone CfC network"
+    },
+    {
+      "id": "weightloop_fixed_editor_sequential",
+      "scope": "WeightLoop-style fixed editor writes a bounded reusable parameter-editing program once; subsequent evidence batches drive candidate selection/execution without another LLM call"
+    },
+    {
+      "id": "per_batch_llm_reproposal_wsp",
+      "scope": "WSP editor is re-prompted/re-invoked after each feedback batch; compare editor-call and candidate-evaluation cost with fixed-program reuse"
+    },
+    {
+      "id": "sequential_gradient_or_online_update",
+      "scope": "Matched gradient, online-learning or closed-form update under identical evidence batches, endpoint budget, and held-out evaluation"
+    },
+    {
+      "id": "fep_probe_selection_plus_fixed_wsp",
+      "scope": "Prospective information-gain policy selects which measurement/assay to acquire; fixed bounded WeightProgram uses the resulting evidence in candidate-only SWI validation"
+    },
+    {
+      "id": "weight_program_feedback_blind",
+      "scope": "The fixed WeightProgram executes with shuffled or withheld measurement feedback, isolating whether gains arise from evidence-conditioned updates"
     }
   ],
   "seeds": {
@@ -615,7 +670,11 @@
       "predictive_outcome_mass_error",
       "probes_to_unambiguous_alignment",
       "held_out_function_equivalence_after_probe_selection",
-      "assignment_margin_at_fixed_probe_budget"
+      "assignment_margin_at_fixed_probe_budget",
+      "cumulative_ranking_utility",
+      "final_discovery_utility",
+      "endpoint_budget_efficiency",
+      "cumulative_decision_regret"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -649,7 +708,10 @@
       "paper_reported_unique_rule_count",
       "model_space_count_discrepancy",
       "symmetry_canonicalization_function_drift",
-      "stale_alignment_canonicalization_acceptance_rate"
+      "stale_alignment_canonicalization_acceptance_rate",
+      "cumulative_parameter_drift_l2",
+      "task_retention_after_update",
+      "held_out_future_batch_leakage_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -666,7 +728,9 @@
       "alignment_runtime_ns",
       "assignment_margin_evidence_per_probe",
       "canonicalization_changed_parameter_count",
-      "canonicalization_candidate_evaluations"
+      "canonicalization_candidate_evaluations",
+      "edit_program_reuse_rate",
+      "llm_editor_call_count"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -720,7 +784,11 @@
     "Probe selection and alignment fitting must use a declared selection-probe pool; final functional-equivalence and acceptance metrics must use a disjoint held-out probe sequence not used for selection, threshold tuning, or assignment fitting.",
     "Accumulated assignment margin is computed from summed squared activation differences across probes, while the reported fit error remains mean-squared activation error; the same mapping repeated across independent probes must increase the margin in proportion to probe count without changing mean fit error.",
     "The three-ball source audit preserves the 81 labelled SPM hypotheses and equal 1/81 prior mass. It independently canonicalizes the exact full feedback likelihood tensors and records the current public-generator result of 75 semantic classes (three triplicate constant mappings) against the paper-reported 79. The exact-reproduction status remains blocked until this discrepancy is reconciled against the paper's archived code/uniqueness criterion; neither model labels nor priors may be silently deduplicated.",
-    "CfC symmetry canonicalization must bind to the current source and candidate native model digests, shared architecture/manifest digests, and accepted alignment receipt; it must only target the registered one-layer, non-residual, no-backbone topology, use the coupled five-group permutation, materialize on a candidate clone, recover the canonical fixture digest, and preserve the candidate's function on disjoint held-out input sequences."
+    "CfC symmetry canonicalization must bind to the current source and candidate native model digests, shared architecture/manifest digests, and accepted alignment receipt; it must only target the registered one-layer, non-residual, no-backbone topology, use the coupled five-group permutation, materialize on a candidate clone, recover the canonical fixture digest, and preserve the candidate's function on disjoint held-out input sequences.",
+    "The sequential WeightProgram benchmark must distinguish one fixed editor-authored program reused across evidence batches from per-batch editor re-prompting; report LLM calls, candidate evaluations, update count, inference cost, and endpoint budget separately.",
+    "Every sequential edit is bound to the exact model, program, target specification, evidence-batch digest, and verifier receipt; candidates are evaluated on predeclared held-out observations and promoted only through a separate explicit acceptance boundary.",
+    "Future measurement batches, hidden endpoints, and held-out assay outcomes are inaccessible to the editor and probe selector; include a leakage canary and report all candidate evaluations, rollbacks, and unsuccessful edits.",
+    "Sequential WSP results are compared with no-edit, random matched-norm, feedback-blind, re-prompted WSP, and matched online/gradient baselines under identical evidence batches and endpoint budgets; online-replay author-reported results are not treated as independent replication."
   ],
   "research_references": [
     {
