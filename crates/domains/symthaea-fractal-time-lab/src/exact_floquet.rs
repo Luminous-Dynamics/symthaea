@@ -1,11 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Exact state-vector reference evolution for a finite kicked-Ising spin chain.
+//! Exact state-vector reference evolution for a finite kicked-Ising graph.
 //!
 //! One Floquet period applies a global x rotation followed by a diagonal
-//! nearest-neighbour Ising/longitudinal-field phase:
+//! Ising/longitudinal-field phase on an explicit graph:
 //!
-//! U_F = exp(-i [sum_i J_i Z_i Z_(i+1) + sum_i h_i Z_i])
+//! U_F = exp(-i [sum_(i,j) J_ij Z_i Z_j + sum_i h_i Z_i])
 //!       exp(-i theta/2 sum_i X_i).
 //!
 //! This is exact finite-dimensional state-vector evolution (up to f64
@@ -19,6 +19,7 @@
 //! memory.
 
 use rustfft::num_complex::Complex;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
@@ -31,6 +32,8 @@ pub enum FloquetError {
     FieldCount { expected: usize, actual: usize },
     NonFiniteParameter { name: &'static str, index: usize },
     InitialBasisOutOfRange { basis: usize, dimension: usize },
+    InvalidEdge { edge_index: usize, first: usize, second: usize, n_spins: usize },
+    DuplicateEdge { first: usize, second: usize },
 }
 
 impl fmt::Display for FloquetError {
@@ -52,24 +55,39 @@ impl fmt::Display for FloquetError {
             Self::InitialBasisOutOfRange { basis, dimension } => {
                 write!(f, "basis index {basis} is outside state dimension {dimension}")
             }
+            Self::InvalidEdge { edge_index, first, second, n_spins } => {
+                write!(f, "edge {edge_index} ({first}, {second}) is invalid for {n_spins} spins")
+            }
+            Self::DuplicateEdge { first, second } => {
+                write!(f, "duplicate Ising edge ({first}, {second})")
+            }
         }
     }
 }
 
 impl Error for FloquetError {}
 
-/// Exact state-vector simulator for a finite open-boundary kicked-Ising chain.
+/// A ZZ interaction edge in the kicked-Ising graph.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct IsingEdge {
+    pub first: usize,
+    pub second: usize,
+    pub coupling: f64,
+}
+
+/// Exact state-vector simulator for a finite kicked-Ising interaction graph.
 #[derive(Clone, Debug)]
 pub struct KickedIsingFloquet {
     n_spins: usize,
-    couplings: Vec<f64>,
+    edges: Vec<IsingEdge>,
     fields: Vec<f64>,
     pulse_angle: f64,
     amplitudes: Vec<Complex<f64>>,
 }
 
 impl KickedIsingFloquet {
-    /// Construct an all-up product state |00...0>.
+    /// Construct an open-boundary nearest-neighbour chain in the all-up
+    /// computational-basis state |00...0>.
     ///
     /// couplings[i] multiplies Z_i Z_(i+1); fields[i] multiplies Z_i.
     /// The maximum size is capped at 20 spins to bound exact-state memory.
@@ -89,6 +107,32 @@ impl KickedIsingFloquet {
                 actual: couplings.len(),
             });
         }
+        let edges = couplings
+            .into_iter()
+            .enumerate()
+            .map(|(index, coupling)| IsingEdge {
+                first: index,
+                second: index + 1,
+                coupling,
+            })
+            .collect();
+        Self::new_graph(n_spins, edges, fields, pulse_angle)
+    }
+
+    /// Construct an exact kicked-Ising simulator on an arbitrary simple graph.
+    ///
+    /// Edge endpoints are zero-based spin indices. Duplicate undirected
+    /// edges, self-edges, out-of-range indices and non-finite couplings are
+    /// rejected. The initial state is all-up |00...0>.
+    pub fn new_graph(
+        n_spins: usize,
+        edges: Vec<IsingEdge>,
+        fields: Vec<f64>,
+        pulse_angle: f64,
+    ) -> Result<Self, FloquetError> {
+        if !(1..=20).contains(&n_spins) {
+            return Err(FloquetError::InvalidSpinCount { n_spins });
+        }
         if fields.len() != n_spins {
             return Err(FloquetError::FieldCount {
                 expected: n_spins,
@@ -101,19 +145,42 @@ impl KickedIsingFloquet {
                 index: 0,
             });
         }
-        for (index, value) in couplings.iter().enumerate() {
-            if !value.is_finite() {
-                return Err(FloquetError::NonFiniteParameter {
-                    name: "couplings",
-                    index,
-                });
-            }
-        }
         for (index, value) in fields.iter().enumerate() {
             if !value.is_finite() {
                 return Err(FloquetError::NonFiniteParameter {
                     name: "fields",
                     index,
+                });
+            }
+        }
+
+        let mut seen_edges = BTreeSet::new();
+        for (edge_index, edge) in edges.iter().enumerate() {
+            if edge.first >= n_spins
+                || edge.second >= n_spins
+                || edge.first == edge.second
+            {
+                return Err(FloquetError::InvalidEdge {
+                    edge_index,
+                    first: edge.first,
+                    second: edge.second,
+                    n_spins,
+                });
+            }
+            if !edge.coupling.is_finite() {
+                return Err(FloquetError::NonFiniteParameter {
+                    name: "edge_coupling",
+                    index: edge_index,
+                });
+            }
+            let canonical = (
+                edge.first.min(edge.second),
+                edge.first.max(edge.second),
+            );
+            if !seen_edges.insert(canonical) {
+                return Err(FloquetError::DuplicateEdge {
+                    first: canonical.0,
+                    second: canonical.1,
                 });
             }
         }
@@ -126,15 +193,62 @@ impl KickedIsingFloquet {
 
         Ok(Self {
             n_spins,
-            couplings,
+            edges,
             fields,
             pulse_angle,
             amplitudes,
         })
     }
 
+    /// Construct an open-boundary rectangular square-lattice Ising model.
+    /// Spin index is y * width + x. Horizontal and vertical couplings may differ.
+    pub fn new_square_lattice(
+        width: usize,
+        height: usize,
+        horizontal_coupling: f64,
+        vertical_coupling: f64,
+        fields: Vec<f64>,
+        pulse_angle: f64,
+    ) -> Result<Self, FloquetError> {
+        let n_spins = width
+            .checked_mul(height)
+            .ok_or(FloquetError::DimensionOverflow)?;
+        if !(1..=20).contains(&n_spins) {
+            return Err(FloquetError::InvalidSpinCount { n_spins });
+        }
+        let mut edges = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                let site = y * width + x;
+                if x + 1 < width {
+                    edges.push(IsingEdge {
+                        first: site,
+                        second: site + 1,
+                        coupling: horizontal_coupling,
+                    });
+                }
+                if y + 1 < height {
+                    edges.push(IsingEdge {
+                        first: site,
+                        second: site + width,
+                        coupling: vertical_coupling,
+                    });
+                }
+            }
+        }
+        Self::new_graph(n_spins, edges, fields, pulse_angle)
+    }
+
     pub fn n_spins(&self) -> usize {
         self.n_spins
+    }
+
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    pub fn edges(&self) -> &[IsingEdge] {
+        &self.edges
     }
 
     pub fn dimension(&self) -> usize {
@@ -229,14 +343,11 @@ impl KickedIsingFloquet {
             for spin in 0..self.n_spins {
                 let z = if (basis & (1 << spin)) == 0 { 1.0 } else { -1.0 };
                 energy += self.fields[spin] * z;
-                if spin + 1 < self.n_spins {
-                    let next_z = if (basis & (1 << (spin + 1))) == 0 {
-                        1.0
-                    } else {
-                        -1.0
-                    };
-                    energy += self.couplings[spin] * z * next_z;
-                }
+            }
+            for edge in &self.edges {
+                let z_first = if (basis & (1 << edge.first)) == 0 { 1.0 } else { -1.0 };
+                let z_second = if (basis & (1 << edge.second)) == 0 { 1.0 } else { -1.0 };
+                energy += edge.coupling * z_first * z_second;
             }
             *amplitude *= Complex::from_polar(1.0, -energy);
         }
@@ -417,6 +528,80 @@ mod tests {
             interacting_response.mean_absolute_order
                 > unlocked_response.mean_absolute_order + 0.5
         );
+    }
+
+    #[test]
+    fn graph_constructor_matches_chain_constructor() {
+        let mut chain = KickedIsingFloquet::new(
+            4,
+            vec![0.3, 0.7, -0.2],
+            vec![0.1, -0.2, 0.05, 0.17],
+            PI + 0.06,
+        )
+        .unwrap();
+        let mut graph = KickedIsingFloquet::new_graph(
+            4,
+            vec![
+                IsingEdge { first: 0, second: 1, coupling: 0.3 },
+                IsingEdge { first: 1, second: 2, coupling: 0.7 },
+                IsingEdge { first: 2, second: 3, coupling: -0.2 },
+            ],
+            vec![0.1, -0.2, 0.05, 0.17],
+            PI + 0.06,
+        )
+        .unwrap();
+
+        chain.step();
+        graph.step();
+        for (left, right) in chain.amplitudes().iter().zip(graph.amplitudes()) {
+            assert!((*left - *right).norm() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn square_lattice_kicked_ising_has_interaction_stabilized_subharmonic_response() {
+        let mut noninteracting = KickedIsingFloquet::new_square_lattice(
+            2, 2, 0.0, 0.0, vec![0.0; 4], PI + 0.1,
+        )
+        .unwrap();
+        let mut interacting = KickedIsingFloquet::new_square_lattice(
+            2, 2, 0.5, 0.5, vec![0.0; 4], PI + 0.1,
+        )
+        .unwrap();
+        assert_eq!(interacting.edge_count(), 4);
+
+        let unlocked_signal = noninteracting.stroboscopic_magnetization(100);
+        let locked_signal = interacting.stroboscopic_magnetization(100);
+        let unlocked = analyze_subharmonic_response(&unlocked_signal, 20).unwrap();
+        let locked = analyze_subharmonic_response(&locked_signal, 20).unwrap();
+
+        assert!(locked.mean_demodulated_order > unlocked.mean_demodulated_order + 0.5);
+        assert!(locked.sign_coherence > unlocked.sign_coherence);
+    }
+
+    #[test]
+    fn graph_constructor_rejects_duplicate_and_invalid_edges() {
+        assert!(matches!(
+            KickedIsingFloquet::new_graph(
+                3,
+                vec![
+                    IsingEdge { first: 0, second: 1, coupling: 0.5 },
+                    IsingEdge { first: 1, second: 0, coupling: 0.5 },
+                ],
+                vec![0.0; 3],
+                PI,
+            ),
+            Err(FloquetError::DuplicateEdge { .. })
+        ));
+        assert!(matches!(
+            KickedIsingFloquet::new_graph(
+                3,
+                vec![IsingEdge { first: 0, second: 3, coupling: 0.5 }],
+                vec![0.0; 3],
+                PI,
+            ),
+            Err(FloquetError::InvalidEdge { .. })
+        ));
     }
 
     #[test]
