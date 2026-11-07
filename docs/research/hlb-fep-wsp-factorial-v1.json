@@ -304,7 +304,7 @@
     },
     {
       "id": "partial_observation_rule_discovery",
-      "environment": "Exact Friston et al. (2026) three-ball active structure-learning reproduction target: partially observed discrete POMDP with five latent factors (three ball-colour factors, each with red/green/blue states; one look-location factor with start/left/centre/right; one choice factor with no-choice/red/blue/green), two outcome modalities (vision: nothing/red/green/blue; feedback: no-feedback/correct/incorrect), action-controlled gaze and choice, random ball colours per trial, and six time points per trial (five moves). Relative log preferences for feedback are [0, 2, -6] nats in the order no-feedback/correct/incorrect. The hidden rule is a context-dependent mapping from centre-ball colour to the criterion location (red→left, green→centre, blue→right); the model family contains 81 possible mappings (79 unique after degeneracy), with rule 65 as the planted generating rule. The generative model is assumed known except for the feedback likelihood tensor. Any change to these factors, outcomes, time horizon, priors, rule family, or model-space construction is a separately labelled adaptation.",
+      "environment": "Exact Friston et al. (2026) three-ball active structure-learning reproduction target: partially observed discrete POMDP with five latent factors (three ball-colour factors, each with red/green/blue states; one look-location factor with start/left/centre/right; one choice factor with no-choice/red/blue/green), two outcome modalities (vision: nothing/red/green/blue; feedback: no-feedback/correct/incorrect), action-controlled gaze and choice, random ball colours per trial, and six time points per trial (five moves). Relative log preferences for feedback are [0, 2, -6] nats in the order no-feedback/correct/incorrect. The hidden rule is a context-dependent mapping from centre-ball colour to the criterion location (red→left, green→centre, blue→right); the model family contains 81 possible mappings (79 unique after degeneracy), with rule 65 as the planted generating rule. The generative model is assumed known except for the feedback likelihood tensor. Any change to these factors, outcomes, time horizon, priors, rule family, or model-space construction is a separately labelled adaptation. Source qualification note: the pinned public SPM implementation reproduces 81 labelled mappings but exact feedback-likelihood tensor equality yields 75 semantic classes, while the paper reports 79 unique rules. This discrepancy remains unresolved; the public-source implementation is a source-pinned reconstruction/audit, not an exact reproduction, until archived source or the paper's uniqueness criterion reconciles it. A separate unit fixture evaluates feedback-only model EIG conditional on a known ball-colour state across 4 choices (including no-choice), and checks the 81-label vs 75-class quotient; it is not the full POMDP or gaze/vision EIG.",
       "primary_outcomes": [
         "rule_identification_accuracy",
         "trials_to_model_selection",
@@ -347,7 +347,10 @@
         "oracle_rule_label_for_analysis_only",
         "public_spm_rule_generator_exact_tensor_semantic_deduplication",
         "paper_reported_rule_count_79_vs_source_audit_count_75_discrepancy",
-        "constant_criterion_mapping_duplicate_across_context_factor_labels"
+        "constant_criterion_mapping_duplicate_across_context_factor_labels",
+        "feedback_only_known_state_quotient_fixture",
+        "source_labelled_81_vs_semantic_75_prospective_model_eig_invariance",
+        "no_choice_feedback_only_zero_information_control"
       ]
     },
     {
@@ -852,7 +855,10 @@
       "cumulative_l2_budget_violations",
       "semantic_quotient_rule_count",
       "model_posterior_aggregation_error_nats",
-      "prior_predictive_invariance_error"
+      "prior_predictive_invariance_error",
+      "quotient_action_ranking_invariance_error",
+      "labelled_vs_quotient_feedback_model_eig_delta_nats",
+      "feedback_only_known_state_quotient_fixture_status"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -939,7 +945,8 @@
     "session_rejects_replayed_or_out_of_order_evidence_and_stale_parent_candidate",
     "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches",
     "The source-faithful 81-label rule family is retained. Any semantic quotient is an explicit secondary representation with prior mass aggregated over exact-likelihood-equivalence classes; prior predictive distributions, model evidence, class posteriors, and action rankings must match the labelled family within declared numerical tolerances.",
-    "The causal weight-reading task must distinguish structural weight arithmetic from semantic interpretation: output labels and task names are randomized, label permutations are hidden from the reader, and predictions are scored against actual outputs under sealed parameter-group interventions. Dataset-name guesses alone never count as successful interpretation."
+    "The causal weight-reading task must distinguish structural weight arithmetic from semantic interpretation: output labels and task names are randomized, label permutations are hidden from the reader, and predictions are scored against actual outputs under sealed parameter-group interventions. Dataset-name guesses alone never count as successful interpretation.",
+    "The feedback-only known-state three-ball quotient fixture is reported separately from full-task reproduction; it must compare prospective Dirichlet model-EIG, predictive outcome masses, post-outcome semantic-class posterior aggregation, and action rankings across 81 labelled versus 75 quotient hypotheses, including a no-choice zero-information control."
   ],
   "research_references": [
     {
