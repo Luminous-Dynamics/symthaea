@@ -44,7 +44,9 @@
               "version": "1.0",
               "binary_digest": "6666666666666666666666666666666666666666666666666666666666666666",
               "independent": true,
-              "verdict": "accepted"
+              "verdict": "accepted",
+              "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+              "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
             },
             "objective_value": "1250",
             "units": "credits",
@@ -64,7 +66,9 @@
               "binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
               "independent": true
             },
-            "verdict": "accepted"
+            "verdict": "accepted",
+            "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
           }
         ],
         "optimality": {
@@ -73,7 +77,10 @@
           "checker_id": "bound-certificate-checker",
           "checker_version": "1.0",
           "checker_binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
-          "verdict": "unavailable"
+          "verdict": "unavailable",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "checker_independent": true
         },
         "infeasibility": null,
         "resources": {
@@ -121,7 +128,10 @@
             "checker_id": "search-tree-checker",
             "checker_version": "1.0",
             "checker_binary_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-            "verdict": "accepted"
+            "verdict": "accepted",
+            "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+            "checker_independent": true
           },
           "generated_nodes": 200,
           "explored_nodes": 180,
@@ -138,7 +148,9 @@
               "version": "1.0",
               "binary_digest": "6666666666666666666666666666666666666666666666666666666666666666",
               "independent": true,
-              "verdict": "accepted"
+              "verdict": "accepted",
+              "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+              "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
             },
             "objective_value": "42",
             "units": "credits",
@@ -158,7 +170,9 @@
               "binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
               "independent": true
             },
-            "verdict": "accepted"
+            "verdict": "accepted",
+            "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+            "request_digest": "4444444444444444444444444444444444444444444444444444444444444444"
           }
         ],
         "optimality": {
@@ -167,7 +181,10 @@
           "checker_id": "bound-certificate-checker",
           "checker_version": "1.0",
           "checker_binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
-          "verdict": "accepted"
+          "verdict": "accepted",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "checker_independent": true
         },
         "infeasibility": null,
         "resources": {
@@ -217,7 +234,10 @@
           "checker_id": "independent-infeasibility-checker",
           "checker_version": "1.0",
           "checker_binary_digest": "7777777777777777777777777777777777777777777777777777777777777777",
-          "verdict": "accepted"
+          "verdict": "accepted",
+          "contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "request_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "checker_independent": true
         },
         "resources": {
           "wall_time_ms": 10000,
