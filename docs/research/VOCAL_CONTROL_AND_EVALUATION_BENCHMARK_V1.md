@@ -114,6 +114,8 @@ When candidates generate their own lyrics, use this as a separate prompt-to-song
 
 For pairwise preference, use a Bradley-Terry or equivalent rater-aware model and report uncertainty. For multi-stimulus quality ratings, use an appropriately adapted MUSHRA-style protocol with hidden reference/anchors. Singing-specific dimensions must be rated separately.
 
+For a whole-song preference track intended to be comparable with Artificial Analysis AA-Music-Vocal v1.1, its current methodology provides a useful normalization reference: blinded same-prompt pairwise voting, a minimum 10-second listen per clip, static-gain normalization toward -16 LUFS with a -1 dBTP ceiling, and no compression, limiting or EQ. Its model Elo is estimated with Bradley-Terry maximum likelihood and reported with 95% uncertainty intervals. Muse should preserve original dry WAVs and hashes, derive listening copies under one fixed normalization procedure, and report the exact procedure; score-conditioned Track A remains a separate evaluation task.
+
 ## Cross-benchmark comparison
 
 | Benchmark/system | Task it measures | How Symthaea should use it |
@@ -125,6 +127,8 @@ For pairwise preference, use a Bradley-Terry or equivalent rater-aware model and
 | DiffSinger | Phoneme/duration/F0-conditioned SVS baseline | Explicit control baseline |
 | Kokoro singing adaptation | Speech-to-singing adapted baseline | Measure degradation from speech-domain transformation |
 | Symthaea physical vocal tract (planned; not currently integrated) | Intended interpretable articulatory and physical acoustic realization | Keep as a research track until issue #10860 is closed and exact-head examples compile |
+
+SoulX-Singer reports training on more than 42,000 hours of vocal data and support for Mandarin, English and Cantonese. That is a very different scale from Muse's current hand-tuned G2P and local worker. We should not imply that a small local prototype can beat that system on raw naturalness by changing architectures alone. The feasible path is to first reproduce it as a reference baseline, then target a better control/evidence/compute frontier with exact score compliance, local edits, provenance and a deployable hybrid design.
 
 Sources:
 - Artificial Analysis leaderboard: https://artificialanalysis.ai/music/leaderboard/vocals
