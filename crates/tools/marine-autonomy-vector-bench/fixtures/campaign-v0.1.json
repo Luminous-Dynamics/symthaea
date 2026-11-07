@@ -441,8 +441,8 @@
             "quantity_unit": "L",
             "rate_unit": "L/day",
             "usable_stock": [
-              0,
-              0
+              300,
+              300
             ],
             "net_depletion_per_day": [
               0,
