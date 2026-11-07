@@ -282,7 +282,7 @@ pub struct SupportGatedSelectorReport {
 /// Hoeffding interval is formed only when the caller declares that continuation
 /// draws are independent across continuation IDs and utilities lie in
 /// [lower, upper]. The contract's justification digest is retained as metadata,
-/// not authenticated by this reference. 
+/// not authenticated by this reference.
 /// An alternative is eligible only when its lower bound strictly exceeds the
 /// baseline upper bound. The union bound covers the baseline and every
 /// supported alternative. Common random numbers may correlate candidates
@@ -293,14 +293,18 @@ pub struct SupportGatedSelectorReport {
 pub fn select_supported_candidate(
     design: &SupportGatedSelectorDesign,
 ) -> Result<SupportGatedSelectorReport, SupportedSelectorError> {
-    validate_design(&design.headroom)
-        .map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
+    validate_design(&design.headroom).map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
     if design.continuation_sampling.disposition
         != ContinuationSamplingDisposition::IidAcrossContinuationIds
     {
         return Err(SupportedSelectorError::SelectionContinuationIndependenceNotEstablished);
     }
-    if design.continuation_sampling.justification_digest.trim().is_empty() {
+    if design
+        .continuation_sampling
+        .justification_digest
+        .trim()
+        .is_empty()
+    {
         return Err(SupportedSelectorError::EmptySamplingJustification);
     }
     if design.utility_lower_bound >= design.utility_upper_bound {
@@ -316,12 +320,8 @@ pub fn select_supported_candidate(
         if record.candidate_id != *candidate_id {
             return Err(SupportedSelectorError::SupportRecordOrderMismatch);
         }
-        if record.independence
-            != SupportAssessmentIndependence::IndependentOfOutcomeSelection
-        {
-            return Err(
-                SupportedSelectorError::SupportAssessmentNotIndependentOfOutcomeSelection,
-            );
+        if record.independence != SupportAssessmentIndependence::IndependentOfOutcomeSelection {
+            return Err(SupportedSelectorError::SupportAssessmentNotIndependentOfOutcomeSelection);
         }
         if record.support_receipt_digest.trim().is_empty() {
             return Err(SupportedSelectorError::EmptySupportReceiptDigest);
@@ -359,10 +359,11 @@ pub fn select_supported_candidate(
         .ok_or(SupportedSelectorError::InvalidHeadroomDesign(
             HeadroomError::MissingBaselineCandidate,
         ))?;
-    let baseline_supported = design.support[baseline_index].disposition
-        == CandidateSupportDisposition::Supported;
+    let baseline_supported =
+        design.support[baseline_index].disposition == CandidateSupportDisposition::Supported;
 
-    let excluded_candidate_ids = design.support
+    let excluded_candidate_ids = design
+        .support
         .iter()
         .filter(|record| record.disposition != CandidateSupportDisposition::Supported)
         .map(|record| record.candidate_id.clone())
@@ -395,12 +396,12 @@ pub fn select_supported_candidate(
         });
     }
 
-    let eligible_alternatives = design.support
+    let eligible_alternatives = design
+        .support
         .iter()
         .enumerate()
         .filter(|(index, record)| {
-            *index != baseline_index
-                && record.disposition == CandidateSupportDisposition::Supported
+            *index != baseline_index && record.disposition == CandidateSupportDisposition::Supported
         })
         .map(|(index, _)| index)
         .collect::<Vec<_>>();
@@ -410,34 +411,32 @@ pub fn select_supported_candidate(
     let utility_range =
         (i128::from(design.utility_upper_bound) - i128::from(design.utility_lower_bound)) as f64;
     let selection_count = design.headroom.selection.continuation_ids.len();
-    let radius = utility_range
-        * ((2.0 * simultaneous_count as f64 / delta).ln()
-            / (2.0 * selection_count as f64))
-            .sqrt();
+    let radius =
+        utility_range * ((2.0 * simultaneous_count as f64 / delta).ln() / (2.0 * selection_count as f64)).sqrt();
 
     let baseline_mean = mean(&design.headroom.selection.candidates[baseline_index].values);
     let baseline_upper_bound = baseline_mean + radius;
-    let baseline_sum = checked_sum(
-        &design.headroom.selection.candidates[baseline_index].values,
-    )
-    .map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
+    let baseline_sum = checked_sum(&design.headroom.selection.candidates[baseline_index].values)
+        .map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
 
     let mut qualifying = Vec::<(usize, i128)>::new();
     for index in eligible_alternatives {
         let values = &design.headroom.selection.candidates[index].values;
         let candidate_sum =
             checked_sum(values).map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
-        let mean_difference =
-            (candidate_sum.checked_sub(baseline_sum)
-                .ok_or(SupportedSelectorError::WorkCountOverflow)?) as f64
-                / selection_count as f64;
+        let mean_difference = (candidate_sum
+            .checked_sub(baseline_sum)
+            .ok_or(SupportedSelectorError::WorkCountOverflow)?) as f64
+            / selection_count as f64;
         if mean_difference > 2.0 * radius {
             qualifying.push((index, candidate_sum));
         }
     }
 
     qualifying.sort_by(|left, right| {
-        right.1.cmp(&left.1)
+        right
+            .1
+            .cmp(&left.1)
             .then_with(|| candidate_ids[left.0].cmp(&candidate_ids[right.0]))
     });
 
@@ -485,7 +484,6 @@ pub fn select_supported_candidate(
         evaluation_rollout_count,
     })
 }
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeadroomReport {
@@ -793,7 +791,6 @@ fn decompose_candidate_continuation(
     }
 }
 
-
 fn pairing_variance_report(
     batch: &ContinuationBatch,
     baseline_index: usize,
@@ -831,18 +828,13 @@ fn pairing_variance_report(
             let (covariance, paired_difference_variance) = match &batch.coupling {
                 CouplingDisposition::SharedInvariant { .. }
                 | CouplingDisposition::SensitivityOnly { .. } => {
-                    let covariance = sample_covariance_i64(
-                        &candidate.values,
-                        &baseline.values,
-                    );
+                    let covariance = sample_covariance_i64(&candidate.values, &baseline.values);
                     let paired = sample_variance_f64(
                         &candidate
                             .values
                             .iter()
                             .zip(&baseline.values)
-                            .map(|(candidate, baseline)| {
-                                *candidate as f64 - *baseline as f64
-                            })
+                            .map(|(candidate, baseline)| *candidate as f64 - *baseline as f64)
                             .collect::<Vec<_>>(),
                     );
                     (Some(covariance), Some(paired))
@@ -850,11 +842,10 @@ fn pairing_variance_report(
                 CouplingDisposition::Uncoupled => (None, None),
             };
 
-            let paired_mean_variance = paired_difference_variance
-                .map(|variance| variance / continuation_count as f64);
+            let paired_mean_variance =
+                paired_difference_variance.map(|variance| variance / continuation_count as f64);
             let ratio = paired_mean_variance.and_then(|paired| {
-                (independent_mean_variance > 0.0)
-                    .then_some(paired / independent_mean_variance)
+                (independent_mean_variance > 0.0).then_some(paired / independent_mean_variance)
             });
             let reduction = ratio.map(|value| 1.0 - value);
 
@@ -905,9 +896,7 @@ fn sample_covariance_i64(left: &[i64], right: &[i64]) -> f64 {
     let right_mean = mean(right);
     left.iter()
         .zip(right)
-        .map(|(left, right)| {
-            (*left as f64 - left_mean) * (*right as f64 - right_mean)
-        })
+        .map(|(left, right)| (*left as f64 - left_mean) * (*right as f64 - right_mean))
         .sum::<f64>()
         / (left.len() - 1) as f64
 }
@@ -1184,7 +1173,10 @@ mod tests {
 
 
 
-    fn support_record(candidate_id: &str, disposition: CandidateSupportDisposition) -> CandidateSupportRecord {
+    fn support_record(
+        candidate_id: &str,
+        disposition: CandidateSupportDisposition,
+    ) -> CandidateSupportRecord {
         CandidateSupportRecord {
             candidate_id: candidate_id.to_owned(),
             disposition,
@@ -1220,8 +1212,10 @@ mod tests {
             candidate_ids: vec!["baseline".to_owned(), "candidate-a".to_owned()],
             baseline_candidate_id: "baseline".to_owned(),
             selection: batch(
-                &["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
-                  "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16"],
+                &[
+                    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+                    "s12", "s13", "s14", "s15", "s16",
+                ],
                 vec![
                     candidate("baseline", &[0; 17]),
                     candidate("candidate-a", &[10; 17]),
@@ -1249,7 +1243,10 @@ mod tests {
         selector.utility_upper_bound = 10;
         let report = select_supported_candidate(&selector).unwrap();
 
-        assert_eq!(report.disposition, SupportedSelectorDisposition::AlternativeSelected);
+        assert_eq!(
+            report.disposition,
+            SupportedSelectorDisposition::AlternativeSelected
+        );
         assert_eq!(report.selected_candidate_id.as_deref(), Some("candidate-a"));
         assert_eq!(report.scope, SelectorScope::CompleteWithinDeclaredScope);
         assert!(report.selected_lower_bound.unwrap() > report.baseline_upper_bound.unwrap());
@@ -1281,7 +1278,10 @@ mod tests {
         );
         let report = select_supported_candidate(&selector).unwrap();
 
-        assert_eq!(report.disposition, SupportedSelectorDisposition::BaselineRetained);
+        assert_eq!(
+            report.disposition,
+            SupportedSelectorDisposition::BaselineRetained
+        );
         assert_eq!(report.selected_candidate_id.as_deref(), Some("baseline"));
         assert!(report.selected_lower_bound.unwrap() <= report.baseline_upper_bound.unwrap());
     }
@@ -1296,8 +1296,10 @@ mod tests {
             ],
             baseline_candidate_id: "baseline".to_owned(),
             selection: batch(
-                &["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
-                  "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16"],
+                &[
+                    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+                    "s12", "s13", "s14", "s15", "s16",
+                ],
                 vec![
                     candidate("baseline", &[0; 17]),
                     candidate("candidate-a", &[10; 17]),
@@ -1329,10 +1331,10 @@ mod tests {
         assert_eq!(report.disposition, SupportedSelectorDisposition::BaselineRetained);
         assert_eq!(report.selected_candidate_id.as_deref(), Some("baseline"));
         assert_eq!(report.eligible_alternative_count, 0);
-        assert_eq!(report.excluded_candidate_ids, vec![
-            "candidate-a".to_owned(),
-            "candidate-b".to_owned(),
-        ]);
+        assert_eq!(
+            report.excluded_candidate_ids,
+            vec!["candidate-a".to_owned(), "candidate-b".to_owned(),]
+        );
     }
 
     #[test]
@@ -1364,8 +1366,10 @@ mod tests {
             candidate_ids: vec!["baseline".to_owned(), "candidate-a".to_owned()],
             baseline_candidate_id: "baseline".to_owned(),
             selection: batch(
-                &["s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7",
-                  "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16"],
+                &[
+                    "s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+                    "s12", "s13", "s14", "s15", "s16",
+                ],
                 vec![
                     candidate("baseline", &[0; 17]),
                     candidate("candidate-a", &[10; 17]),
@@ -1374,7 +1378,10 @@ mod tests {
             ),
             evaluation: batch(
                 &["e0", "e1"],
-                vec![candidate("baseline", &[0, 0]), candidate("candidate-a", &[7, 7])],
+                vec![
+                    candidate("baseline", &[0, 0]),
+                    candidate("candidate-a", &[7, 7]),
+                ],
                 shared(),
             ),
         };
@@ -1413,8 +1420,7 @@ mod tests {
 
         selector.support[1].support_receipt_digest =
             "sam-support-receipt:candidate-a:unknown".to_owned();
-        selector.support[2].independence =
-            SupportAssessmentIndependence::OutcomeDependentOrUnknown;
+        selector.support[2].independence = SupportAssessmentIndependence::OutcomeDependentOrUnknown;
         assert_eq!(
             select_supported_candidate(&selector),
             Err(SupportedSelectorError::SupportAssessmentNotIndependentOfOutcomeSelection)
@@ -1600,10 +1606,18 @@ mod tests {
             PairingVarianceDisposition::NotIdentifiedUncoupled
         );
         let comparison = &report.pairing_variance.comparisons[0].variance;
-        assert!(comparison.independent_difference_of_means_variance.is_some());
+        assert!(
+            comparison
+                .independent_difference_of_means_variance
+                .is_some()
+        );
         assert!(comparison.sample_covariance.is_none());
         assert!(comparison.paired_difference_of_means_variance.is_none());
-        assert!(comparison.common_random_number_variance_reduction_fraction.is_none());
+        assert!(
+            comparison
+                .common_random_number_variance_reduction_fraction
+                .is_none()
+        );
     }
 
     #[test]
@@ -1618,10 +1632,12 @@ mod tests {
             report.pairing_variance.disposition,
             PairingVarianceDisposition::SensitivityOnlyNotPrimary
         );
-        assert!(report.pairing_variance.comparisons[0]
-            .variance
-            .paired_difference_of_means_variance
-            .is_some());
+        assert!(
+            report.pairing_variance.comparisons[0]
+                .variance
+                .paired_difference_of_means_variance
+                .is_some()
+        );
     }
 
     #[test]
