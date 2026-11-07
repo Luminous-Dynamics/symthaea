@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea HCE epoch and worker trace contracts v0",
+  "description": "Structural contracts for synthetic HCE split-policy declarations and already-recorded execution traces. Rust semantic validation adds role, visibility, interval and accounting constraints.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/HceEpoch"
+    },
+    {
+      "$ref": "#/$defs/WorkerTrace"
+    }
+  ],
+  "$defs": {
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "HceEpoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "status",
+        "epoch_id",
+        "task_family_id",
+        "candidate_population_sha256",
+        "evaluator_artifact_sha256",
+        "tool_contract_sha256",
+        "search_budget",
+        "splits",
+        "selection_policy",
+        "overlap_audit"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "sym-rsi-hce-epoch-v0"
+        },
+        "status": {
+          "const": "SYNTHETIC_HCE_FIXTURE_NOT_PREREGISTERED"
+        },
+        "epoch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_population_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "evaluator_artifact_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "tool_contract_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "search_budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_candidates",
+            "max_search_evaluations",
+            "max_wall_clock_hours"
+          ],
+          "properties": {
+            "max_candidates": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_search_evaluations": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_wall_clock_hours": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "splits": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/Split"
+          }
+        },
+        "selection_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "finalize_search_before_selection",
+            "search_cannot_read_selection",
+            "selection_score_not_returned_to_search",
+            "confirmation_after_candidate_freeze",
+            "transfer_after_candidate_freeze"
+          ],
+          "properties": {
+            "finalize_search_before_selection": {
+              "const": true
+            },
+            "search_cannot_read_selection": {
+              "const": true
+            },
+            "selection_score_not_returned_to_search": {
+              "const": true
+            },
+            "confirmation_after_candidate_freeze": {
+              "const": true
+            },
+            "transfer_after_candidate_freeze": {
+              "const": true
+            }
+          }
+        },
+        "overlap_audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "independent_custodian_id",
+            "exact_membership_comparison_completed",
+            "zero_overlap_declared",
+            "audited_split_count",
+            "audit_artifact_sha256"
+          ],
+          "properties": {
+            "independent_custodian_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "exact_membership_comparison_completed": {
+              "const": true
+            },
+            "zero_overlap_declared": {
+              "const": true
+            },
+            "audited_split_count": {
+              "const": 5
+            },
+            "audit_artifact_sha256": {
+              "$ref": "#/$defs/Sha256"
+            }
+          }
+        }
+      }
+    },
+    "Split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_id",
+        "role",
+        "task_family_id",
+        "case_count",
+        "membership_commitment_sha256",
+        "features_visible_to_agent",
+        "labels_visible_to_agent",
+        "score_visible_to_agent",
+        "search_evaluator_access",
+        "final_selection_access",
+        "confirmation_evaluator_access",
+        "transfer_evaluator_access",
+        "fresh_family",
+        "custodian_id"
+      ],
+      "properties": {
+        "split_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "train",
+            "search",
+            "selection",
+            "confirmation",
+            "transfer"
+          ]
+        },
+        "task_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "membership_commitment_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "features_visible_to_agent": {
+          "type": "boolean"
+        },
+        "labels_visible_to_agent": {
+          "type": "boolean"
+        },
+        "score_visible_to_agent": {
+          "type": "boolean"
+        },
+        "search_evaluator_access": {
+          "type": "boolean"
+        },
+        "final_selection_access": {
+          "type": "boolean"
+        },
+        "confirmation_evaluator_access": {
+          "type": "boolean"
+        },
+        "transfer_evaluator_access": {
+          "type": "boolean"
+        },
+        "fresh_family": {
+          "type": "boolean"
+        },
+        "custodian_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "WorkerTrace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trace_id",
+        "regime",
+        "worker_count",
+        "wall_clock_budget_ms",
+        "attempts"
+      ],
+      "properties": {
+        "trace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "regime": {
+          "enum": [
+            "synchronous_barrier",
+            "asynchronous_steady_state"
+          ]
+        },
+        "worker_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "wall_clock_budget_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attempts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/WorkerAttempt"
+          }
+        }
+      }
+    },
+    "WorkerAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "candidate_id",
+        "worker_id",
+        "start_ms",
+        "end_ms",
+        "disposition",
+        "resource_cost_units"
+      ],
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worker_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "start_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "disposition": {
+          "enum": [
+            "valid",
+            "invalid",
+            "failed",
+            "cancelled",
+            "timed_out"
+          ]
+        },
+        "resource_cost_units": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
