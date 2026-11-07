@@ -16,7 +16,12 @@
     "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "phase_estimator_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "animal_unit_token": "synthetic-animal-0001",
-    "session_id": "synthetic-session-0001"
+    "session_id": "synthetic-session-0001",
+    "axis_identity_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "raw_trajectory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "perturbation_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "context_definition_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "trial_unit_token": "synthetic-trial-0001"
   },
   "rows": [
     {
