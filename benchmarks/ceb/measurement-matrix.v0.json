@@ -307,7 +307,10 @@
         "test_template_baseline",
         "same_model_test_generation",
         "mutation_guided_test_generation",
-        "CEB_spec_and_counterexample_guided_generation"
+        "CEB_spec_and_counterexample_guided_generation",
+        "feature_isolated_only_test_oracle_negative_control",
+        "specification_composition_aware_oracle_positive_control",
+        "hidden_requirement_invention_negative_control"
       ],
       "evidence_contract": {
         "required_artifacts": [
@@ -316,7 +319,12 @@
           "mutation_set_digest",
           "mutation_outcomes",
           "flakiness_repeats",
-          "independent_oracle_review"
+          "independent_oracle_review",
+          "specification_obligation_inventory",
+          "feature_interaction_coverage_matrix",
+          "hidden_test_requirement_trace",
+          "valid_alternative_solution_results",
+          "composition_coverage_adjudication"
         ],
         "independent_adjudication": true,
         "unresolved_state_required": true,
@@ -327,7 +335,10 @@
         "reference_pass_and_empty_patch_fail",
         "valid_alternative_solution_positive_controls",
         "repeatability_threshold",
-        "no hidden-test exposure"
+        "no hidden-test exposure",
+        "every specification-required feature interaction is traceable to at least one acceptance case; feature-isolated checks do not substitute when the specification requires composition",
+        "hidden acceptance tests must be derivable from the frozen specification or adjudicated clarifications; unsupported hidden requirements block oracle qualification",
+        "valid semantically equivalent alternatives must pass the same composed behavioral contract without requiring byte-identical reference implementation"
       ],
       "holdout_design": "Mutation-family disjoint and API-boundary disjoint. Include alternative correct implementations and deliberately flaky tests."
     },

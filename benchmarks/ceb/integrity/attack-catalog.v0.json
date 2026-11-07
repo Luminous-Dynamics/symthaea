@@ -21,13 +21,13 @@
   "minimum_initial_corpus": {
     "negative_controls": 20,
     "positive_controls": 5,
-    "authored_negative_controls": 39,
-    "authored_positive_controls": 11
+    "authored_negative_controls": 41,
+    "authored_positive_controls": 12
   },
   "production_qualification_targets": {
     "negative_control_trials": 300,
     "positive_control_trials": 300,
-    "distinct_negative_fault_families": 39,
+    "distinct_negative_fault_families": 41,
     "maximum_false_accepts_for_target": "0/300",
     "maximum_false_rejects_for_target": "0/300",
     "confidence": "One-sided 95% exact binomial bound, with cluster-aware sensitivity analysis. Zero errors in 300 genuinely independent trials gives a simple exact upper bound just below 1%; correlated repeats must not be counted as independent.",
@@ -40,7 +40,8 @@
       "task_quality_and_versioning",
       "comparative_protocol",
       "reference_verifier_and_positive_acceptance",
-      "optimization_and_measurement_hacking"
+      "optimization_and_measurement_hacking",
+      "specification_composition_and_hidden_test_fidelity"
     ],
     "hard_gate": "Any critical false accept blocks qualification. Any unresolved critical control blocks score eligibility until independently adjudicated."
   },
@@ -821,6 +822,49 @@
       "required_evidence": "blind_contract_review_and_cache_lifecycle_test_evidence",
       "severity": "control",
       "execution_profile": "isolated_microvm",
+      "status": "design_only_not_executed"
+    },
+    {
+      "id": "BI-N40",
+      "polarity": "negative",
+      "control_role": "adversarial_invalid_state",
+      "threat_class": "feature_composition_coverage_gap",
+      "target": "specification-to-acceptance composition coverage",
+      "scenario": "The frozen specification explicitly requires two or more features to interact, but the visible acceptance suite checks each feature only in isolation and contains no case for the required composition. The oracle cannot qualify end-to-end compliance until the missing specification-derived interaction is covered.",
+      "expected_verdict": "unresolved",
+      "expected_qualification": "unresolved",
+      "required_evidence": "specification_obligation_inventory_and_interaction_coverage_matrix",
+      "severity": "high",
+      "execution_profile": "independent_review",
+      "status": "design_only_not_executed"
+    },
+    {
+      "id": "BI-N41",
+      "polarity": "negative",
+      "control_role": "adversarial_invalid_state",
+      "threat_class": "hidden_test_requirement_invention",
+      "target": "hidden acceptance test fidelity",
+      "scenario": "A hidden test rejects an implementation for a behavior that is not required by the frozen task specification or any adjudicated clarification. The hidden test adds an undisclosed acceptance obligation and therefore cannot support candidate failure.",
+      "expected_verdict": "unresolved",
+      "expected_qualification": "unresolved",
+      "required_evidence": "hidden_test_to_specification_trace_and_independent_oracle_adjudication",
+      "severity": "critical",
+      "execution_profile": "independent_review",
+      "status": "design_only_not_executed"
+    },
+    {
+      "id": "BI-P12",
+      "polarity": "positive",
+      "control_role": "valid_state_control",
+      "threat_class": "specification_derived_composition_coverage",
+      "target": "specification-to-acceptance composition coverage",
+      "scenario": "Every explicitly required cross-feature interaction is traced from a frozen specification obligation into one or more visible or hidden acceptance cases. Hidden cases add no new requirements, and independently adjudicated semantically valid alternative implementations pass.",
+      "expected_verdict": "qualifying",
+      "expected_qualification": "qualifying",
+      "expected_candidate_outcome": "all_spec_required_compositions_covered_valid_alternatives_pass",
+      "required_evidence": "specification_obligation_inventory_interaction_coverage_matrix_and_blind_alternative_solution_review",
+      "severity": "control",
+      "execution_profile": "independent_review",
       "status": "design_only_not_executed"
     }
   ]

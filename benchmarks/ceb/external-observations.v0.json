@@ -2,12 +2,12 @@
   "schema_version": 0,
   "registry_id": "CEB-EXTERNAL-OBSERVATIONS-V0",
   "status": "design_only_external_reference_snapshot",
-  "snapshot_date": "2026-11-05",
+  "snapshot_date": "2026-11-07",
   "policy": {
     "unit_of_observation": "One row represents one metric from one benchmark split and one named system configuration. Never combine metrics from different configurations into a synthetic system.",
     "comparison_ceiling": "All included external scores are contextual or historical references unless a separately preregistered matched comparison is recorded; no direct CEB superiority claim is supported by this registry.",
     "uncertainty_rule": "Preserve source-reported uncertainty notation. Do not infer a confidence level or interval method unless the source states it.",
-    "denominator_rule": "Every task or pair count belongs to its exact benchmark/split. Missing denominators must be explicitly marked not_reported, not silently imputed.",
+    "denominator_rule": "Every task or pair count belongs to its exact benchmark/split. Missing denominators must be explicitly marked not_reported, not silently imputed. Candidate-dependent augmented-recall denominators are per-agent discovery diagnostics and must not be used as a common cross-agent ranking denominator.",
     "unlabeled_rule": "An unlabeled leaderboard value remains unlabeled; it cannot be mapped to a named metric by guesswork."
   },
   "sources": [
@@ -199,6 +199,160 @@
       "published_on": null,
       "supports": [
         "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "reviewbench-leaderboard",
+      "source_url": "https://review-bench.ai/",
+      "title": "ReviewBench high-severity grounded-F1 leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "reviewbench-methodology",
+      "source_url": "https://review-bench.ai/methodology/",
+      "title": "ReviewBench offline benchmark methodology",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "secprbench-paper",
+      "source_url": "https://arxiv.org/abs/2610.33509",
+      "title": "SecPRBench: vulnerability-introducing pull-request review benchmark",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-10-24",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "cr-bench-v2-paper",
+      "source_url": "https://arxiv.org/abs/2611.02566",
+      "title": "CR-Bench-v2: known-defect detection and comment usefulness",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-11-02",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "codereviewbench-kodus",
+      "source_url": "https://www.codereviewbench.com/leaderboard",
+      "title": "CodeReviewBench Kodus leaderboard and per-model scorecards",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-08-21",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "martian-codereviewbenchmark",
+      "source_url": "https://www.codereviewbenchmark.com/",
+      "title": "Martian production AI code-review benchmark leaderboard and methodology",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "swe-sweep-paper",
+      "source_url": "https://swesweep.com/paper",
+      "title": "SWE-sweep paper: open-world multi-bug repository discovery",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-10-01",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "swe-sweep-live",
+      "source_url": "https://swesweep.com/",
+      "title": "SWE-sweep live leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "loopcontrolbench-readme",
+      "source_url": "https://github.com/kltownsend/loopcontrolbench",
+      "title": "LoopControlBench deterministic completion benchmark and task pool",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "kodus-state-ai-code-review",
+      "source_url": "https://kodus.io/data",
+      "title": "Kodus State of AI Code Review 2026 production-pipeline analytics",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-06-08",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "swe-serve-results",
+      "source_url": "https://research.nvidia.com/benchmarks/swe-serve",
+      "title": "NVIDIA SWE-Serve live results and methodology",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-09-22",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "swe-serve-paper",
+      "source_url": "https://arxiv.org/abs/2609.26777",
+      "title": "SWE-Serve production inference engineering benchmark paper",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-09-22",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "swe-cycle-paper",
+      "source_url": "https://arxiv.org/abs/2605.13139",
+      "title": "SWE-Cycle complete issue resolution cycle benchmark",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-05-13",
+      "supports": [
+        "CEB-RESOLUTION"
+      ]
+    },
+    {
+      "source_id": "e2e-swe-paper",
+      "source_url": "https://arxiv.org/abs/2609.38335",
+      "title": "E2E-SWE whole-repository generation benchmark",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-09-29",
+      "supports": [
+        "CEB-RESOLUTION"
       ]
     }
   ],
@@ -585,6 +739,340 @@
         "The benchmark uses continuous release-history milestone DAGs; it is not a CEB evidence-disposition task set.",
         "The visible leaderboard row does not expose the task denominator, exact aggregation details, uncertainty interval or all run configuration fields.",
         "No metric correspondence here licenses a direct CEB superiority comparison."
+      ]
+    },
+    {
+      "comparator_id": "reviewbench-high-severity",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "ReviewBench",
+      "benchmark_version": "live high-severity leaderboard accessed 2026-11-07",
+      "split": "High-severity grounded-F1 leaderboard",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 219,
+        "unit": "pull_requests"
+      },
+      "source_id": "reviewbench-leaderboard",
+      "supporting_source_ids": [
+        "reviewbench-methodology"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Dataset contains 219 PRs from 187 public repositories across 19 languages; exact high-severity TP denominator is not separately stated on the live leaderboard.",
+        "Leader row OhMyBug run dated 2026-10-25: 83.0 grounded F1 / 92.0 precision / 75.6 recall.",
+        "Grounded scores count findings reviewed by people; these are not all-severity results or CEB Recall@5/actionable-precision scores.",
+        "Augmented recall is candidate-dependent because unmatched true positives increase that candidate's numerator and denominator; use grounded recall for common-gold ranking.",
+        "The methodology uses a Claude Sonnet 5 classifier for labels and unmatched-finding classification; senior-engineer audit scope is separately disclosed."
+      ]
+    },
+    {
+      "comparator_id": "secprbench-direct-review",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "SecPRBench",
+      "benchmark_version": "arXiv paper submitted 2026-10-24",
+      "split": "265 buggy security-introducing changes; direct review",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 265,
+        "unit": "buggy_tasks"
+      },
+      "source_id": "secprbench-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Nine C/C++/Rust systems projects, including Firefox, V8 and OpenSSL.",
+        "217 cases pass mechanical checks and 48 use human adjudication; each has a fixed companion.",
+        "Measures target-mechanism recall across findings, not top-five recall or ordinary-PR vulnerability prevalence.",
+        "68% of analyzed misses locate a root-cause file but explain a neighboring/incorrect mechanism.",
+        "Fixed companions check the target only and do not establish report precision; fixed revisions can include intervening changes.",
+        "The evaluator is Claude Opus 5.5, also an evaluated model; one run per task and unmatched budgets limit comparisons."
+      ]
+    },
+    {
+      "comparator_id": "cr-bench-v2-verified",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "CR-Bench-v2",
+      "benchmark_version": "2026-11-03 revised preprint",
+      "split": "CR-Bench-Verified",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 174,
+        "unit": "verified_PR_instances"
+      },
+      "source_id": "cr-bench-v2-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "174 verified instances derived from a 584-instance corpus; 11 Python repositories, with Django contributing 63 tasks.",
+        "Each instance has one labeled known defect; other true defects are not necessarily counted as KDDR hits.",
+        "KDDR and Usefulness Rate are separate; useful comments are not necessarily target-defect detections.",
+        "Table 7 ± values are sample SD across three judges, not sampling confidence intervals; Table 8 reports per-judge bootstrap intervals.",
+        "The reference/judge lineage and 60-comment human study are limited; agents in the study did not use tools or execute code."
+      ]
+    },
+    {
+      "comparator_id": "codereviewbench-kodus",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "CodeReviewBench",
+      "benchmark_version": "leaderboard/data snapshot; scorecards generated 2026-09-11",
+      "split": "30 merged PRs / 95 human-authored golden bugs",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 30,
+        "unit": "pull_requests"
+      },
+      "source_id": "codereviewbench-kodus",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Five repositories: cal.com, Discourse, Grafana, Keycloak and Sentry; languages Go, Java, Python, Ruby and TypeScript.",
+        "13 model configurations; Kodus harness, API access path, replay execution and Claude Haiku 4.5 judge.",
+        "DeepSeek V4 Pro is the current top row: F1 43.9, precision 43.6%, recall 44.2%, 42/95 gold bugs found, estimated $0.30/PR and $0.21/bug found.",
+        "The 95% bootstrap interval 32.3–56.3 is for recall, based on 2,000 resamples over 30 PRs; not a CI for F1 or model run-to-run variance.",
+        "The three independent re-scores assess judge noise on the same findings; each model entry had one agent pass, so model run-to-run variance is unmeasured.",
+        "Ground truth is bugs human reviewers had already flagged before merge. Bugs that escaped the original human review are outside the labeled denominator, so the benchmark measures recovery of known human-found bugs rather than exhaustive defect discovery.",
+        "Leaderboard coverage varies by model; inspect each scorecard's evaluated golden denominator before cross-model comparison.",
+        "Maintained by Kodus, which also supplies the harness; treat as vendor-maintained contextual evidence, not independent multi-harness replication."
+      ]
+    },
+    {
+      "comparator_id": "martian-production-review",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Martian Code Review Benchmark",
+      "benchmark_version": "live production-adoption dashboard accessed 2026-11-07",
+      "split": "Overall online recent-period leaderboard",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "per-tool PR denominators differ; dashboard reports a pooled 17,768 scored-PR view for the recent period"
+      },
+      "source_id": "martian-codereviewbenchmark",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Analyzes production review-bot activity, developer responses, follow-up code changes and resolved threads; uses LLM-powered analysis of suggestion adoption.",
+        "Dashboard states 17,768 scored PRs in its recent-period view, while individual tool sample sizes vary; not a shared paired denominator.",
+        "The visible all-time PR totals and recent-period sample sizes are different quantities; do not combine them.",
+        "Adoption or a resulting code change is not independent proof that a review finding is factually correct or causally valid.",
+        "No CEB causal mechanism labels, exact P/I/F/N/M/IRR controls, top-five recall equivalence or human minutes are reported."
+      ]
+    },
+    {
+      "comparator_id": "swe-sweep-open-world",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-sweep",
+      "benchmark_version": "2026-10-01 paper / 2026-11-07 live leaderboard snapshot",
+      "split": "100 repository tasks / 4,068 concurrent bugs",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 4068,
+        "unit": "bugs"
+      },
+      "source_id": "swe-sweep-paper",
+      "supporting_source_ids": [
+        "swe-sweep-live"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Open-world repository-level multi-bug discovery and repair; agents receive no issue descriptions or bug locations.",
+        "October 1 paper's strongest evaluated system reports 4.7%; the live leaderboard viewed 2026-11-07 lists Astra 6 / mini-SWE-agent at 9.5%; these are different snapshots/configurations and must not be spliced.",
+        "The denominator is 4,068 bugs across 100 repositories and 22 languages, not issue-conditioned tasks.",
+        "Each repaired bug is checked by its own hidden fail-to-pass tests, and the original suite checks for regressions; the benchmark's population still derives from upstream issue/PR histories.",
+        "Not equivalent to CEB's issue-specific task resolve_rate; no direct superiority claim is licensed."
+      ]
+    },
+    {
+      "comparator_id": "loopcontrolbench-certified-python",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "LoopControlBench",
+      "benchmark_version": "2026-11-07 README/reference snapshot",
+      "split": "Original certified Python reference pool",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 70,
+        "unit": "certified tasks"
+      },
+      "source_id": "loopcontrolbench-readme",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Reference result is GPT-5-mini 46/70 = 65.7%, one attempt per task, no escalation or repair loop.",
+        "The pool later grew to 89 tasks, but the published 46/70 reference remains on the original 70-task denominator.",
+        "Narrow population: reproducible, maintainer-tested Python library fixes in the pinned Python 3.13 container, not the general software-bug population.",
+        "The deterministic gate checks a named fail-to-pass test; this does not establish whole-repository correctness, causal uniqueness or CEB independent pristine regrade.",
+        "The default runner is sandboxed, but the optional agentic path is not; respect the project's host-execution warning."
+      ]
+    },
+    {
+      "comparator_id": "kodus-production-all-suggestions",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "All review suggestions; implementation/adaptation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 180739,
+        "unit": "review_suggestions"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Across 22,743 AI-authored PRs in the report's supported GitHub/GitLab/Bitbucket/Azure DevOps pipeline; data window begins 2025-09-01 and snapshot ends 2026-06-08.",
+        "33% of 180,739 review suggestions were classified implemented/adapted by changes to flagged lines in later diffs.",
+        "A later diff is not proof the specific suggestion caused the change or that the resulting change was correct.",
+        "The rate by PR-created month rises from 25% to 48% over the cited eight-month period; recent months are right-censored and June is partial.",
+        "Descriptive platform analytics, not randomized treatment effects or independent human truth adjudication."
+      ]
+    },
+    {
+      "comparator_id": "kodus-production-bug-suggestions",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "Bug-class suggestions; implementation/adaptation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 100014,
+        "unit": "bug_suggestions"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "34.5% of bug-class suggestions were classified implemented/adapted by later changes to flagged lines.",
+        "This is an uptake/implementation outcome, not defect precision, correctness or verified remediation.",
+        "Later changes can be independently motivated, bundled or unrelated; the source's rule detects changes to flagged lines rather than causal attribution.",
+        "Descriptive data from the Kodus production pipeline, not a randomized treatment effect."
+      ]
+    },
+    {
+      "comparator_id": "kodus-production-security-suggestions",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "Security-class suggestions; implementation/adaptation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 7409,
+        "unit": "security_suggestions"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "31.2% of security-class suggestions were classified implemented/adapted by later changes to flagged lines.",
+        "This is not vulnerability correctness, verified security remediation or incident reduction.",
+        "The report's implementation classifier and open-flag measures include false positives and accepted risk; no claim of causal attribution is made."
+      ]
+    },
+    {
+      "comparator_id": "kodus-flagged-merged-pr-open-flags",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "Kodus State of AI Code Review 2026",
+      "benchmark_version": "production-pipeline snapshot through 2026-06-08",
+      "split": "Flagged merged PRs; at least one flag remains open",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 13609,
+        "unit": "flagged_merged_PRs"
+      },
+      "source_id": "kodus-state-ai-code-review",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "71.8% of 13,609 flagged merged PRs had at least one flag still open.",
+        "The open flag includes false positives and accepted risk; this is not a defect escape rate or a rate of unremediated true bugs.",
+        "Do not mix this PR-level denominator with the suggestion-level denominator of 180,739."
+      ]
+    },
+    {
+      "comparator_id": "swe-serve-production-inference",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Serve",
+      "benchmark_version": "live results accessed 2026-11-07; paper submitted 2026-09-22",
+      "split": "53 production SGLang inference engineering tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 53,
+        "unit": "tasks"
+      },
+      "source_id": "swe-serve-results",
+      "supporting_source_ids": [
+        "swe-serve-paper"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "41 tasks run on one H100 and 12 on CPU; the hardware mix is part of the benchmark contract.",
+        "11 models / 31 effort configurations; fixed mini-SWE-agent harness; three complete runs per configuration.",
+        "Highest displayed mean Pass@1 is 75% for Claude Opus 5 max and GPT-5.6 Sol max; cost/time trade-offs differ significantly.",
+        "The benchmark verifier checks functionality and selected regressions; it explicitly does not claim to assess merge readiness or general code quality.",
+        "This is production inference engineering on SGLang, not a matched CEB repair task population."
+      ]
+    },
+    {
+      "comparator_id": "swe-serve-live-boundary-ablation",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Serve",
+      "benchmark_version": "paper/live-serving ablation accessed 2026-11-07",
+      "split": "19 tasks with E2E serving coverage; full verifier versus E2E checks excluded",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 19,
+        "unit": "E2E_covered_tasks"
+      },
+      "source_id": "swe-serve-paper",
+      "supporting_source_ids": [
+        "swe-serve-results"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Same patches on the 19 E2E-covered tasks: 69.4% pass when E2E checks are excluded versus 45.9% with the full verifier.",
+        "Pooled verifier-scope ablation, not a model-specific leaderboard row.",
+        "This is a verification-boundary effect for the selected serving tasks, not a universal expected E2E penalty."
+      ]
+    },
+    {
+      "comparator_id": "swe-cycle-fullcycle",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "SWE-Cycle",
+      "benchmark_version": "2026-05-13 paper",
+      "split": "489-instance FullCycle evaluation",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 489,
+        "unit": "FullCycle_instances"
+      },
+      "source_id": "swe-cycle-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "489 tasks paired between isolated phase evaluation and FullCycle from a bare repository.",
+        "FullCycle integrates environment reconstruction, implementation and verification-test generation; no human scaffolding is provided.",
+        "No model exceeds 14% strict FullCycle solve in the reported table; GLM-5.1 is highest at 13.50%.",
+        "SWE-Judge combines static and dynamic evaluation; FullCycle judge-human alignment is 96.9% on 489 annotated instances.",
+        "Model list, harness, judge and task population differ from CEB; not a direct CEB pass-rate comparator."
+      ]
+    },
+    {
+      "comparator_id": "e2e-swe-whole-repository",
+      "lane_id": "CEB-RESOLUTION",
+      "benchmark_name": "E2E-SWE",
+      "benchmark_version": "2026-10-02 paper version",
+      "split": "186 whole-repository generation tasks",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 186,
+        "unit": "whole_repository_tasks"
+      },
+      "source_id": "e2e-swe-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "13 models; four independent runs; fresh empty workspace, installation script and fresh-container hidden tests.",
+        "Claude Opus 5 xhigh reaches 67.7% Pass@1, the highest table result; Fable 5 high reports 65.3%; GPT-5.6 Sol max 61.2%.",
+        "This is greenfield whole-repository generation from implementation-independent specifications, not maintenance of an existing repository or PR review.",
+        "The authors perform static specification/test alignment and rollout-guided task auditing; 59.4% of a separate 138-task SWE-Bench Verified audit is not a result on E2E-SWE."
       ]
     }
   ],
@@ -1935,6 +2423,1984 @@
         "Test recall is not a direct measure of CEB evidence invalidation or evidence continuity.",
         "Context only; do not pool with precision or the benchmark's separate aggregate Score."
       ]
+    },
+    {
+      "observation_id": "reviewbench-ohmybug-grounded-f1",
+      "comparator_id": "reviewbench-high-severity",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard, row OhMyBug, dated 2026-10-25",
+      "system": {
+        "system_id": "reviewbench-ohmybug",
+        "model": "not_reported_on_leaderboard",
+        "harness": "OhMyBug review-agent submission",
+        "configuration": "High-severity grounded leaderboard; run date 2026-10-25"
+      },
+      "metric": {
+        "metric_id": "grounded_f1",
+        "label": "Grounded F1",
+        "definition": "Harmonic mean of grounded precision and grounded recall against the fixed human-reviewed gold set.",
+        "value": 83,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "83.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "grounded_f1",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "High-severity slice only; not an all-severity review score."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-ohmybug-grounded-precision",
+      "comparator_id": "reviewbench-high-severity",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard, row OhMyBug, dated 2026-10-25",
+      "system": {
+        "system_id": "reviewbench-ohmybug",
+        "model": "not_reported_on_leaderboard",
+        "harness": "OhMyBug review-agent submission",
+        "configuration": "High-severity grounded leaderboard; run date 2026-10-25"
+      },
+      "metric": {
+        "metric_id": "grounded_precision",
+        "label": "Grounded precision",
+        "definition": "Fraction of candidate findings matched to fixed-gold actionable findings under the ReviewBench matcher.",
+        "value": 92,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "92.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "grounded_precision",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "ReviewBench classifier/rubric differs from CEB blinded actionable precision."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-ohmybug-grounded-recall",
+      "comparator_id": "reviewbench-high-severity",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard, row OhMyBug, dated 2026-10-25",
+      "system": {
+        "system_id": "reviewbench-ohmybug",
+        "model": "not_reported_on_leaderboard",
+        "harness": "OhMyBug review-agent submission",
+        "configuration": "High-severity grounded leaderboard; run date 2026-10-25"
+      },
+      "metric": {
+        "metric_id": "grounded_recall",
+        "label": "Grounded recall",
+        "definition": "Fraction of fixed-gold true-positive findings identified by the candidate.",
+        "value": 75.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "grounded_recall",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Not top-five constrained; not CEB defect_recall_at_5."
+      ]
+    },
+    {
+      "observation_id": "secpr-grok46-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Grok 4.6 / Claude Code",
+      "system": {
+        "system_id": "secpr-grok46",
+        "model": "Grok 4.6",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 78.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "78.1%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-grok46-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Grok 4.6 / Claude Code",
+      "system": {
+        "system_id": "secpr-grok46",
+        "model": "Grok 4.6",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 3.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$3.20",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-grok46-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Grok 4.6 / Claude Code",
+      "system": {
+        "system_id": "secpr-grok46",
+        "model": "Grok 4.6",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 12.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "12.6 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "secpr-gpt6-sol-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GPT-6 sol / Codex CLI",
+      "system": {
+        "system_id": "secpr-gpt6-sol",
+        "model": "GPT-6 sol",
+        "harness": "Codex CLI",
+        "configuration": "xhigh direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 76.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "76.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-gpt6-sol-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GPT-6 sol / Codex CLI",
+      "system": {
+        "system_id": "secpr-gpt6-sol",
+        "model": "GPT-6 sol",
+        "harness": "Codex CLI",
+        "configuration": "xhigh direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 0.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$0.60",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-gpt6-sol-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GPT-6 sol / Codex CLI",
+      "system": {
+        "system_id": "secpr-gpt6-sol",
+        "model": "GPT-6 sol",
+        "harness": "Codex CLI",
+        "configuration": "xhigh direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 3.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "3.3 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "secpr-glm53-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GLM 5.3 / Claude Code",
+      "system": {
+        "system_id": "secpr-glm53",
+        "model": "GLM 5.3",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 74.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "74.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-glm53-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GLM 5.3 / Claude Code",
+      "system": {
+        "system_id": "secpr-glm53",
+        "model": "GLM 5.3",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 4.99,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$4.99",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-glm53-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GLM 5.3 / Claude Code",
+      "system": {
+        "system_id": "secpr-glm53",
+        "model": "GLM 5.3",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 20.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "20.8 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "secpr-opus55-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Claude Opus 5.5 / Claude Code",
+      "system": {
+        "system_id": "secpr-opus55",
+        "model": "Claude Opus 5.5",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 74,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "74.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-opus55-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Claude Opus 5.5 / Claude Code",
+      "system": {
+        "system_id": "secpr-opus55",
+        "model": "Claude Opus 5.5",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 0.44,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$0.44",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-opus55-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Claude Opus 5.5 / Claude Code",
+      "system": {
+        "system_id": "secpr-opus55",
+        "model": "Claude Opus 5.5",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 1.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "1.4 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt52-reflexion-kddr",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt52-reflexion",
+        "model": "GPT-5.2",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "known_defect_detection_rate",
+        "label": "Known-Defect Detection Rate (KDDR)",
+        "definition": "Fraction of instances in which at least one review comment identifies the single labeled known defect.",
+        "value": 33,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "33.0% ± 1.3 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±1.3 sample SD across three judges; not a sampling CI",
+          "margin": 1.3,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "known_defect_detection_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Single known defect per instance; not CEB Recall@5; values are mean across judges."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt52-reflexion-usefulness",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt52-reflexion",
+        "model": "GPT-5.2",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "comment_usefulness_rate",
+        "label": "Comment Usefulness Rate",
+        "definition": "Fraction of review comments classified as Bug Hit or Valid Suggestion rather than Noise.",
+        "value": 89.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "89.8% ± 9.5 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±9.5 sample SD across three judges; not a sampling CI",
+          "margin": 9.5,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "comment_usefulness_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Usefulness is not target-defect detection or identical to CEB actionable precision."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt5mini-reflexion-kddr",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt5mini-reflexion",
+        "model": "GPT-5-mini",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "known_defect_detection_rate",
+        "label": "Known-Defect Detection Rate (KDDR)",
+        "definition": "Fraction of instances in which at least one review comment identifies the single labeled known defect.",
+        "value": 33.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "33.7% ± 4.9 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±4.9 sample SD across three judges; not a sampling CI",
+          "margin": 4.9,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "known_defect_detection_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Single known defect per instance; not CEB Recall@5; values are mean across judges."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt5mini-reflexion-usefulness",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt5mini-reflexion",
+        "model": "GPT-5-mini",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "comment_usefulness_rate",
+        "label": "Comment Usefulness Rate",
+        "definition": "Fraction of review comments classified as Bug Hit or Valid Suggestion rather than Noise.",
+        "value": 72.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "72.6% ± 28.4 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±28.4 sample SD across three judges; not a sampling CI",
+          "margin": 28.4,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "comment_usefulness_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Usefulness is not target-defect detection or identical to CEB actionable precision."
+      ]
+    },
+    {
+      "observation_id": "crbench-gemini-code-assist-kddr",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gemini-code-assist",
+        "model": "Gemini Code Assist",
+        "harness": "commercial review product",
+        "configuration": "benchmark configuration; no matched Reflexion arm"
+      },
+      "metric": {
+        "metric_id": "known_defect_detection_rate",
+        "label": "Known-Defect Detection Rate (KDDR)",
+        "definition": "Fraction of instances in which at least one review comment identifies the single labeled known defect.",
+        "value": 8.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "8.1% ± 0.6 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.6 sample SD across three judges; not a sampling CI",
+          "margin": 0.6,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "known_defect_detection_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Single known defect per instance; not CEB Recall@5; values are mean across judges."
+      ]
+    },
+    {
+      "observation_id": "crbench-gemini-code-assist-usefulness",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gemini-code-assist",
+        "model": "Gemini Code Assist",
+        "harness": "commercial review product",
+        "configuration": "benchmark configuration; no matched Reflexion arm"
+      },
+      "metric": {
+        "metric_id": "comment_usefulness_rate",
+        "label": "Comment Usefulness Rate",
+        "definition": "Fraction of review comments classified as Bug Hit or Valid Suggestion rather than Noise.",
+        "value": 78,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "78.0% ± 20.0 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±20.0 sample SD across three judges; not a sampling CI",
+          "margin": 20,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "comment_usefulness_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Usefulness is not target-defect detection or identical to CEB actionable precision."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-f1",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "review_f1",
+        "label": "Review F1",
+        "definition": "Harmonic mean of review finding precision and recall against 95 human-authored golden bugs.",
+        "value": 43.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "43.9",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported for F1",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "review_f1",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Benchmark-specific F1; not CEB Recall@5."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-precision",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "review_precision",
+        "label": "Review finding precision",
+        "definition": "Fraction of candidate review findings matched to the benchmark's confirmed human-reported bugs.",
+        "value": 43.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "43.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "review_precision",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Precision measured under Kodus output extraction and Claude Haiku 4.5 judgment."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-recall",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "review_recall",
+        "label": "Human-flagged bug recall",
+        "definition": "Fraction of the 95 human-authored golden bugs found by the candidate review configuration.",
+        "value": 44.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "44.2%",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "95% bootstrap interval 32.3–56.3 percentage points",
+          "margin": 12.1,
+          "confidence_level": "95%",
+          "method": "2,000 bootstrap resamples over 30 pull requests; measures PR-sampling variance",
+          "applies_to_metric_id": "review_recall",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "42 of 95 human-authored golden bugs found; bugs not previously reported by human reviewers are absent from the gold denominator."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-cost-pr",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "estimated_cost_per_pr",
+        "label": "Estimated cost per pull request",
+        "definition": "Benchmark-estimated inference and harness cost per reviewed pull request.",
+        "value": 0.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_PR",
+        "direction": "minimize",
+        "raw_display": "$0.300",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "estimated_cost_per_pr",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Not an all-in human, construction, judging or maintenance cost."
+      ]
+    },
+    {
+      "observation_id": "codereviewbench-deepseek-v4-pro-cost-bug",
+      "comparator_id": "codereviewbench-kodus",
+      "source_locator": "CodeReviewBench leaderboard and DeepSeek V4 Pro scorecard; run/data snapshot generated 2026-09-11",
+      "system": {
+        "system_id": "codereviewbench-deepseek-v4-pro",
+        "model": "DeepSeek V4 Pro",
+        "harness": "Kodus",
+        "configuration": "API access; replay; Claude Haiku 4.5 judge; one agent pass"
+      },
+      "metric": {
+        "metric_id": "estimated_cost_per_bug_found",
+        "label": "Estimated cost per confirmed bug found",
+        "definition": "Benchmark-estimated cost per matched human-authored golden bug found by the candidate.",
+        "value": 0.21,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_bug",
+        "direction": "minimize",
+        "raw_display": "$0.21",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "estimated_cost_per_bug_found",
+          "applies_to_task_count": 30
+        }
+      },
+      "notes": [
+        "Derived from the benchmark's per-bug cost convention; compare only inside this harness and dataset."
+      ]
+    },
+    {
+      "observation_id": "martian-greptile-f1",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Greptile row",
+      "system": {
+        "system_id": "martian-greptile",
+        "model": "Greptile",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1600 PRs; dashboard all-time PR counter 128449; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_f1",
+        "label": "Adoption F1",
+        "definition": "Published F1 score for code-review findings judged in the production review-timeline benchmark.",
+        "value": 65.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "65.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_f1",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-greptile-precision",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Greptile row",
+      "system": {
+        "system_id": "martian-greptile",
+        "model": "Greptile",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1600 PRs; dashboard all-time PR counter 128449; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_precision",
+        "label": "Adoption precision",
+        "definition": "Published precision for review suggestions in the production review-timeline benchmark.",
+        "value": 82.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "82.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_precision",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-greptile-recall",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Greptile row",
+      "system": {
+        "system_id": "martian-greptile",
+        "model": "Greptile",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1600 PRs; dashboard all-time PR counter 128449; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_recall",
+        "label": "Adoption recall",
+        "definition": "Published recall for review suggestions in the production review-timeline benchmark.",
+        "value": 53.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "53.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_recall",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-greptile-recent-n",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Greptile row",
+      "system": {
+        "system_id": "martian-greptile",
+        "model": "Greptile",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1600 PRs; dashboard all-time PR counter 128449; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "recent_pr_sample_size",
+        "label": "Recent-period PR sample size",
+        "definition": "Number of pull requests in the dashboard's recent-period sample for this tool.",
+        "value": 1600,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "pull_requests",
+        "direction": "not_applicable",
+        "raw_display": "1600",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "recent_pr_sample_size",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-cubic-dev-ai-f1",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Cubic Dev AI row",
+      "system": {
+        "system_id": "martian-cubic-dev-ai",
+        "model": "Cubic Dev AI",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1525 PRs; dashboard all-time PR counter 54361; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_f1",
+        "label": "Adoption F1",
+        "definition": "Published F1 score for code-review findings judged in the production review-timeline benchmark.",
+        "value": 63.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "63.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_f1",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-cubic-dev-ai-precision",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Cubic Dev AI row",
+      "system": {
+        "system_id": "martian-cubic-dev-ai",
+        "model": "Cubic Dev AI",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1525 PRs; dashboard all-time PR counter 54361; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_precision",
+        "label": "Adoption precision",
+        "definition": "Published precision for review suggestions in the production review-timeline benchmark.",
+        "value": 68.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "68.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_precision",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-cubic-dev-ai-recall",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Cubic Dev AI row",
+      "system": {
+        "system_id": "martian-cubic-dev-ai",
+        "model": "Cubic Dev AI",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1525 PRs; dashboard all-time PR counter 54361; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_recall",
+        "label": "Adoption recall",
+        "definition": "Published recall for review suggestions in the production review-timeline benchmark.",
+        "value": 58.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "58.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_recall",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-cubic-dev-ai-recent-n",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Cubic Dev AI row",
+      "system": {
+        "system_id": "martian-cubic-dev-ai",
+        "model": "Cubic Dev AI",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 1525 PRs; dashboard all-time PR counter 54361; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "recent_pr_sample_size",
+        "label": "Recent-period PR sample size",
+        "definition": "Number of pull requests in the dashboard's recent-period sample for this tool.",
+        "value": 1525,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "pull_requests",
+        "direction": "not_applicable",
+        "raw_display": "1525",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "recent_pr_sample_size",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-qodo-code-review-f1",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Qodo Code Review row",
+      "system": {
+        "system_id": "martian-qodo-code-review",
+        "model": "Qodo Code Review",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 2435 PRs; dashboard all-time PR counter 18734; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_f1",
+        "label": "Adoption F1",
+        "definition": "Published F1 score for code-review findings judged in the production review-timeline benchmark.",
+        "value": 62.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "62.3%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_f1",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-qodo-code-review-precision",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Qodo Code Review row",
+      "system": {
+        "system_id": "martian-qodo-code-review",
+        "model": "Qodo Code Review",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 2435 PRs; dashboard all-time PR counter 18734; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_precision",
+        "label": "Adoption precision",
+        "definition": "Published precision for review suggestions in the production review-timeline benchmark.",
+        "value": 75.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75.3%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_precision",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-qodo-code-review-recall",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Qodo Code Review row",
+      "system": {
+        "system_id": "martian-qodo-code-review",
+        "model": "Qodo Code Review",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 2435 PRs; dashboard all-time PR counter 18734; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "adoption_recall",
+        "label": "Adoption recall",
+        "definition": "Published recall for review suggestions in the production review-timeline benchmark.",
+        "value": 53.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "53.1%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "adoption_recall",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "martian-qodo-code-review-recent-n",
+      "comparator_id": "martian-production-review",
+      "source_locator": "Martian Code Review Benchmark current leaderboard; Qodo Code Review row",
+      "system": {
+        "system_id": "martian-qodo-code-review",
+        "model": "Qodo Code Review",
+        "harness": "production review-bot integration observed by Martian",
+        "configuration": "Recent-period sample 2435 PRs; dashboard all-time PR counter 18734; LLM-derived adoption evaluation"
+      },
+      "metric": {
+        "metric_id": "recent_pr_sample_size",
+        "label": "Recent-period PR sample size",
+        "definition": "Number of pull requests in the dashboard's recent-period sample for this tool.",
+        "value": 2435,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "pull_requests",
+        "direction": "not_applicable",
+        "raw_display": "2435",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "recent_pr_sample_size",
+          "applies_to_task_count": null
+        }
+      },
+      "notes": [
+        "Recent-period sample size is agent-specific and not a paired common denominator.",
+        "Dashboard's all-time PR total differs from its recent-period sample size.",
+        "LLM-derived developer-adoption signal; not independent gold-truth defect adjudication."
+      ]
+    },
+    {
+      "observation_id": "swe-sweep-sol56-paper-bugs-resolved",
+      "comparator_id": "swe-sweep-open-world",
+      "source_locator": "SWE-sweep paper, October 1 2026, Table 4 main results; Sol 5.6 xhigh / mini-SWE-agent",
+      "system": {
+        "system_id": "swe-sweep-sol56-miniswe",
+        "model": "Sol 5.6 (xhigh)",
+        "harness": "mini-SWE-agent",
+        "configuration": "Paper main evaluation; 100 repositories / 4,068 bugs"
+      },
+      "metric": {
+        "metric_id": "bugs_resolved_rate",
+        "label": "All-bug repository sweep resolution rate",
+        "definition": "Fraction of all benchmark bugs resolved by the submitted repository patch, requiring the bug's hidden tests to pass and the original test suite to remain passing.",
+        "value": 4.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "4.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "bugs_resolved_rate",
+          "applies_to_task_count": 4068
+        }
+      },
+      "notes": [
+        "Paper's strongest evaluated system; not the current live leaderboard's top row."
+      ]
+    },
+    {
+      "observation_id": "swe-sweep-astra6-live-bugs-resolved",
+      "comparator_id": "swe-sweep-open-world",
+      "source_locator": "SWE-sweep live leaderboard, accessed 2026-11-07, Astra 6 / mini-SWE-agent row",
+      "system": {
+        "system_id": "swe-sweep-astra6-miniswe",
+        "model": "Astra 6",
+        "harness": "mini-SWE-agent",
+        "configuration": "Live leaderboard snapshot accessed 2026-11-07"
+      },
+      "metric": {
+        "metric_id": "bugs_resolved_rate",
+        "label": "All-bug repository sweep resolution rate",
+        "definition": "Fraction of all benchmark bugs resolved by the submitted repository patch, requiring the bug's hidden tests to pass and the original test suite to remain passing.",
+        "value": 9.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "9.5%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "bugs_resolved_rate",
+          "applies_to_task_count": 4068
+        }
+      },
+      "notes": [
+        "Live leaderboard snapshot; do not conflate with the October paper evaluation."
+      ]
+    },
+    {
+      "observation_id": "loopcontrol-gpt5mini-certified-task-rate",
+      "comparator_id": "loopcontrolbench-certified-python",
+      "source_locator": "LoopControlBench README, reference number; original certified Python task pool",
+      "system": {
+        "system_id": "loopcontrol-gpt5mini-one-shot",
+        "model": "GPT-5-mini",
+        "harness": "LoopControlBench runner",
+        "configuration": "One attempt per task; no escalation or repair loop; Python 3.13 container"
+      },
+      "metric": {
+        "metric_id": "certified_task_success_rate",
+        "label": "Certified task success rate",
+        "definition": "Fraction of the original 70 certified Python tasks whose named fail-to-pass test passes after the model edit, with original suite checks satisfied.",
+        "value": 65.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "46/70 = 65.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "certified_task_success_rate",
+          "applies_to_task_count": 70
+        }
+      },
+      "notes": [
+        "Pool later grew to 89; published reference remains 46/70. Not 65.7% of bugs generally."
+      ]
+    },
+    {
+      "observation_id": "kodus-production-all-implemented-rate",
+      "comparator_id": "kodus-production-all-suggestions",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-all",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "all suggestion classes"
+      },
+      "metric": {
+        "metric_id": "implemented_adapted_rate",
+        "label": "Implemented/adapted suggestion rate",
+        "definition": "Fraction of review suggestions with flagged lines changed in a later diff according to Kodus' implementation/adaptation classifier.",
+        "value": 33,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "33.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "implemented_adapted_rate",
+          "applies_to_task_count": 180739
+        }
+      },
+      "notes": [
+        "Observed uptake only; not correctness or causal attribution."
+      ]
+    },
+    {
+      "observation_id": "kodus-production-bug-implemented-rate",
+      "comparator_id": "kodus-production-bug-suggestions",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-bugs",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "bug-class suggestions"
+      },
+      "metric": {
+        "metric_id": "bug_suggestion_implementation_rate",
+        "label": "Bug-suggestion implementation/adaptation rate",
+        "definition": "Fraction of bug-class review suggestions classified implemented/adapted by later changes to flagged lines.",
+        "value": 34.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "34.5%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "bug_suggestion_implementation_rate",
+          "applies_to_task_count": 100014
+        }
+      },
+      "notes": [
+        "Uptake/implementation, not target-defect precision or verified remediation."
+      ]
+    },
+    {
+      "observation_id": "kodus-production-security-implemented-rate",
+      "comparator_id": "kodus-production-security-suggestions",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-security",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "security-class suggestions"
+      },
+      "metric": {
+        "metric_id": "security_suggestion_implementation_rate",
+        "label": "Security-suggestion implementation/adaptation rate",
+        "definition": "Fraction of security-class review suggestions classified implemented/adapted by later changes to flagged lines.",
+        "value": 31.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "31.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "security_suggestion_implementation_rate",
+          "applies_to_task_count": 7409
+        }
+      },
+      "notes": [
+        "Uptake/implementation, not security correctness or verified vulnerability removal."
+      ]
+    },
+    {
+      "observation_id": "kodus-flagged-merged-pr-open-flag-rate",
+      "comparator_id": "kodus-flagged-merged-pr-open-flags",
+      "source_locator": "Kodus State of AI Code Review 2026 report; production-pipeline descriptive analytics, time window 2025-09-01 through 2026-06-08",
+      "system": {
+        "system_id": "kodus-platform-flagged-merged",
+        "model": "Kodus production code-review pipeline",
+        "harness": "Kodus platform analytics",
+        "configuration": "flagged merged pull requests"
+      },
+      "metric": {
+        "metric_id": "flagged_merged_pr_open_flag_rate",
+        "label": "Flagged merged PRs with at least one open flag",
+        "definition": "Fraction of flagged merged PRs with at least one associated review flag still open at the report snapshot.",
+        "value": 71.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "minimize",
+        "raw_display": "71.8%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "flagged_merged_pr_open_flag_rate",
+          "applies_to_task_count": 13609
+        }
+      },
+      "notes": [
+        "Open flags include false positives and accepted risk; not a true-defect escape rate."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-opus5-pass1",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-claude-opus5-max",
+        "model": "Claude Opus 5",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of SWE-Serve tasks resolved on one attempt under the complete verifier.",
+        "value": 75,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75% ± 4%",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±4 percentage points",
+          "margin": 4,
+          "confidence_level": "95% confidence interval",
+          "method": "Source states ± is 95% CI across three complete runs",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": [
+        "SWE-Serve-specific result; not CEB Pass@1."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-gpt56sol-pass1",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of SWE-Serve tasks resolved on one attempt under the complete verifier.",
+        "value": 75,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75% ± 6%",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±6 percentage points",
+          "margin": 6,
+          "confidence_level": "95% confidence interval",
+          "method": "Source states ± is 95% CI across three complete runs",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": [
+        "SWE-Serve-specific result; not CEB Pass@1."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-opus5-cost",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-claude-opus5-max",
+        "model": "Claude Opus 5",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_cost_per_task",
+        "label": "Mean cost per task",
+        "definition": "Mean reported model/API cost per SWE-Serve task; excludes local GPU operating cost where not recorded.",
+        "value": 17,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_task",
+        "direction": "minimize",
+        "raw_display": "$17",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_cost_per_task",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": [
+        "Paper/page pricing assumptions; not a live provider quote."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-gpt56sol-cost",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_cost_per_task",
+        "label": "Mean cost per task",
+        "definition": "Mean reported model/API cost per SWE-Serve task; excludes local GPU operating cost where not recorded.",
+        "value": 12,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_task",
+        "direction": "minimize",
+        "raw_display": "$12",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_cost_per_task",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": [
+        "Paper/page pricing assumptions; not a live provider quote."
+      ]
+    },
+    {
+      "observation_id": "swe-serve-opus5-time",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-claude-opus5-max",
+        "model": "Claude Opus 5",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_wall_time",
+        "label": "Mean wall time per task",
+        "definition": "Mean end-to-end wall-clock time per SWE-Serve task.",
+        "value": 57.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_task",
+        "direction": "minimize",
+        "raw_display": "57.5 minutes",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_wall_time",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-serve-gpt56sol-time",
+      "comparator_id": "swe-serve-production-inference",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "mini-SWE-agent",
+        "configuration": "max effort; 53 tasks; 3 complete runs"
+      },
+      "metric": {
+        "metric_id": "mean_wall_time",
+        "label": "Mean wall time per task",
+        "definition": "Mean end-to-end wall-clock time per SWE-Serve task.",
+        "value": 29.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_task",
+        "direction": "minimize",
+        "raw_display": "29.5 minutes",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_wall_time",
+          "applies_to_task_count": 53
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-serve-no-e2e-pass-rate",
+      "comparator_id": "swe-serve-live-boundary-ablation",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-pooled-configurations",
+        "model": "11 evaluated models; pooled patch set",
+        "harness": "mini-SWE-agent",
+        "configuration": "19 E2E-covered tasks; verifier with live-serving checks excluded"
+      },
+      "metric": {
+        "metric_id": "pass_rate_without_live_e2e",
+        "label": "Pass rate without E2E serving checks",
+        "definition": "Share of pooled patches passing when the live E2E serving checks are excluded from the verifier.",
+        "value": 69.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "69.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_rate_without_live_e2e",
+          "applies_to_task_count": 19
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-serve-full-verifier-pass-rate",
+      "comparator_id": "swe-serve-live-boundary-ablation",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-serve-pooled-configurations",
+        "model": "11 evaluated models; pooled patch set",
+        "harness": "mini-SWE-agent",
+        "configuration": "19 E2E-covered tasks; complete verifier including live-serving checks"
+      },
+      "metric": {
+        "metric_id": "pass_rate_with_full_verifier",
+        "label": "Pass rate with full E2E verifier",
+        "definition": "Share of pooled patches passing the complete verifier including live E2E serving checks.",
+        "value": 45.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "45.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_rate_with_full_verifier",
+          "applies_to_task_count": 19
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-cycle-fullcycle-gglm51-solve",
+      "comparator_id": "swe-cycle-fullcycle",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-cycle-glm51-fullcycle",
+        "model": "GLM-5.1",
+        "harness": "SWE-Cycle / SWE-Judge",
+        "configuration": "FullCycle; bare repository; all three phases"
+      },
+      "metric": {
+        "metric_id": "strict_fullcycle_solve_rate",
+        "label": "Strict FullCycle solve rate",
+        "definition": "Fraction of FullCycle instances with a perfect score across environment reconstruction, implementation and test generation.",
+        "value": 13.5,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "13.50%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "strict_fullcycle_solve_rate",
+          "applies_to_task_count": 489
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "swe-cycle-fullcycle-judge-human-alignment",
+      "comparator_id": "swe-cycle-fullcycle",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "swe-cycle-judge-fullcycle-human-audit",
+        "model": "SWE-Judge",
+        "harness": "static review plus dynamic execution; human annotation audit",
+        "configuration": "FullCycle; one submission per issue; N=489"
+      },
+      "metric": {
+        "metric_id": "judge_human_alignment",
+        "label": "SWE-Judge / human alignment",
+        "definition": "Fraction of FullCycle judgments aligned with independent human annotations.",
+        "value": 96.9,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "96.9%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "judge_human_alignment",
+          "applies_to_task_count": 489
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "e2e-swe-opus5-pass1",
+      "comparator_id": "e2e-swe-whole-repository",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "e2e-swe-claude-opus5-xhigh",
+        "model": "Claude Opus 5",
+        "harness": "E2E-SWE",
+        "configuration": "xhigh; empty workspace; four independent runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of whole-repository generation tasks fully resolved in one attempt; averaged over four independent runs.",
+        "value": 67.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "67.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 186
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "e2e-swe-fable5-pass1",
+      "comparator_id": "e2e-swe-whole-repository",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "e2e-swe-claude-fable5-high",
+        "model": "Claude Fable 5",
+        "harness": "E2E-SWE",
+        "configuration": "high; empty workspace; four independent runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of whole-repository generation tasks fully resolved in one attempt; averaged over four independent runs.",
+        "value": 65.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "65.3%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 186
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "e2e-swe-gpt56sol-pass1",
+      "comparator_id": "e2e-swe-whole-repository",
+      "source_locator": "Published benchmark results; exact model/task split and source revision recorded in the observation.",
+      "system": {
+        "system_id": "e2e-swe-gpt56-sol-max",
+        "model": "GPT-5.6 Sol",
+        "harness": "E2E-SWE",
+        "configuration": "max; empty workspace; four independent runs"
+      },
+      "metric": {
+        "metric_id": "pass_at_1",
+        "label": "Pass@1",
+        "definition": "Fraction of whole-repository generation tasks fully resolved in one attempt; averaged over four independent runs.",
+        "value": 61.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "61.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "pass_at_1",
+          "applies_to_task_count": 186
+        }
+      },
+      "notes": []
     }
   ]
 }
