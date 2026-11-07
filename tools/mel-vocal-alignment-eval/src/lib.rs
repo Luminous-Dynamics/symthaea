@@ -383,10 +383,7 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
     while i > 0 || j > 0 {
         // Deterministic tie-breaking: diagonal, then deletion, then insertion.
         if i > 0 && j > 0 {
-            let cost = usize::from(!same_phone_identity(
-                &reference[i - 1],
-                &predicted[j - 1],
-            ));
+            let cost = usize::from(!same_phone_identity(&reference[i - 1], &predicted[j - 1]));
             if costs[i][j] == costs[i - 1][j - 1] + cost {
                 if cost == 0 {
                     reversed.push(Edit::Exact {
