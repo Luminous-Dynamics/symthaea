@@ -529,6 +529,18 @@ mod tests {
     }
 
     #[test]
+    fn same_ipa_in_wrong_syllable_is_not_an_exact_match() {
+        let reference = vec![reference("a", 0, 100, 500, true)];
+        let mut predicted = vec![prediction("a", 0, 100, 500, true)];
+        predicted[0].syllable_index = 1;
+
+        let result = score_alignment(16_000, 1_000, &reference, &predicted, &[]).unwrap();
+        assert_eq!(result.edits.exact_matches, 0);
+        assert_eq!(result.edits.substitutions, 1);
+        assert_eq!(result.timing.onset_mae_ms, None);
+    }
+
+    #[test]
     fn same_ipa_with_wrong_vowel_class_is_not_an_exact_match() {
         let reference = vec![reference("m", 0, 100, 500, false)];
         let predicted = vec![prediction("m", 0, 100, 500, true)];
