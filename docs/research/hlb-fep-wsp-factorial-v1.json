@@ -410,7 +410,12 @@
         "accuracy_with_architecture_only_context",
         "functional_probe_budget",
         "intervention_probe_budget",
-        "semantic_accuracy_vs_parameter_count"
+        "semantic_accuracy_vs_parameter_count",
+        "weight_oracle_holdout_accuracy",
+        "semantic_label_permutation_recovery",
+        "causal_intervention_prediction_accuracy_by_group",
+        "abstention_coverage_at_target_risk",
+        "probe_budget_vs_semantic_accuracy"
       ],
       "negative_controls": [
         "architecture_only_prior_baseline",
@@ -419,7 +424,11 @@
         "randomized_class_names_and_action_names",
         "unseen_procedural_task_family",
         "misleading_metadata_decoy",
-        "no_probe_weight_only_interpretation"
+        "no_probe_weight_only_interpretation",
+        "all_label_names_randomized_per_network",
+        "class_index_permutation_not_disclosed",
+        "causal_intervention_holdout_groups",
+        "unseen_procedural_task_semantics"
       ]
     }
   ],
@@ -691,6 +700,26 @@
     {
       "id": "three_ball_quotient_model_evidence_invariance",
       "scope": "Paired invariant check that class posterior equals sum of member-label posteriors after every evidence increment"
+    },
+    {
+      "id": "weight_oracles_small_transformer",
+      "scope": "Ahmed et al. (arXiv:2610.07334) staged weight-reading oracle with external deterministic computation; reproduce only on its declared small-transformer architecture/task and compare compute, training-data and probe budget"
+    },
+    {
+      "id": "ahmed_zero_probe_weight_reader",
+      "scope": "Ahmed (arXiv:2611.08070) no-tool/no-forward-pass weight-only reader; preserve randomized labels and unfamiliar task-family controls"
+    },
+    {
+      "id": "activation_probe_causal_weight_reader",
+      "scope": "Same reader with a fixed, budgeted functional probe set; no hidden labels or metadata"
+    },
+    {
+      "id": "controlled_intervention_weight_reader",
+      "scope": "Same reader with preregistered parameter-group interventions and measured consequences; interventions are exposed by benchmark contract only"
+    },
+    {
+      "id": "label_permutation_semantic_canary",
+      "scope": "Output-label permutation control: the function's indexed output pattern remains but semantic names are permuted; reader must recover the new index-to-name mapping or abstain"
     }
   ],
   "seeds": {
@@ -909,7 +938,8 @@
     "no_batch_advancement_without_native_candidate_and_verifier_receipts",
     "session_rejects_replayed_or_out_of_order_evidence_and_stale_parent_candidate",
     "cumulative_edit_path_and_parameter_change_budgets_are_enforced_across_accepted_batches",
-    "The source-faithful 81-label rule family is retained. Any semantic quotient is an explicit secondary representation with prior mass aggregated over exact-likelihood-equivalence classes; prior predictive distributions, model evidence, class posteriors, and action rankings must match the labelled family within declared numerical tolerances."
+    "The source-faithful 81-label rule family is retained. Any semantic quotient is an explicit secondary representation with prior mass aggregated over exact-likelihood-equivalence classes; prior predictive distributions, model evidence, class posteriors, and action rankings must match the labelled family within declared numerical tolerances.",
+    "The causal weight-reading task must distinguish structural weight arithmetic from semantic interpretation: output labels and task names are randomized, label permutations are hidden from the reader, and predictions are scored against actual outputs under sealed parameter-group interventions. Dataset-name guesses alone never count as successful interpretation."
   ],
   "research_references": [
     {
