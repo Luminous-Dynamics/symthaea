@@ -273,7 +273,7 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
         issues.push("adapter scope must begin with replay/twin and explicitly exclude live claims".to_owned());
     }
 
-    const REQUIRED_PINS: [(&str, &str); 8] = [
+    const REQUIRED_PINS: [(&str, &str); 10] = [
         ("README.md", "f5430803960bdbe8e4c2fb0f2bd3dca25dbe52a9"),
         ("docs/ARCHITECTURE.md", "c056f367ec6f92ab91057465ed21b417e4ce0645"),
         ("runtime/api/openapi.yaml", "db5c272a5ffd13ac79d0ed9682a90ed6ffdd27dc"),
@@ -282,6 +282,8 @@ pub fn validate_manifest(manifest: &Manifest) -> ValidationReport {
         ("tasks/biology/deepmind/nuclease-active-learning/README.md", "2eb8d04d8c8e89efc2bbe4b85a33690fb3ff68e7"),
         ("tasks/chemistry/sargent-lab/propylene-active-learning/task.toml", "31a26d7baf312520d1eabd803fa40912ca43e4b9"),
         ("tasks/chemistry/sargent-lab/propylene-active-learning/README.md", "05513bae497d1c66fa9dd39253bf6bbaa6bb054d"),
+        ("tasks/biology/deepmind/nuclease-active-learning/environment/lab/campaign/campaign.json", "75681198b0ecc70d38130c08fd1b1d8e5a8e10fb"),
+        ("tasks/chemistry/sargent-lab/propylene-active-learning/environment/lab/campaign/campaign.json", "18920080073338f64500db4d0ccd4ffea425e9c1"),
     ];
     for pin in &manifest.upstream.pinned_files {
         if pin.path.trim().is_empty() || pin.purpose.trim().is_empty() || !is_hex_sha(&pin.git_blob_sha) {
@@ -360,7 +362,7 @@ mod tests {
         let report = validate_manifest(&valid_manifest());
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.campaign_count, 2);
-        assert_eq!(report.pinned_file_count, 8);
+        assert_eq!(report.pinned_file_count, 10);
     }
 
     #[test]
