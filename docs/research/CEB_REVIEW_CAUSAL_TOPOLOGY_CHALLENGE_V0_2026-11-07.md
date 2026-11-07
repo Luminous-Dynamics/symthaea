@@ -106,17 +106,22 @@ fn decision(cfg: Config, request: Request) -> Decision {
 
 \`\`\`rust
 fn handle(msg: Delivery) -> Result<()> {
-    commit_transfer(msg.operation_id, msg.amount)?;
-
-    // The key incorrectly includes this delivery's unique attempt.
-    dedup.insert((msg.operation_id, msg.attempt_id), expiry_after(TTL))?;
+    store.transaction(|tx| {
+        // The transaction makes the effect and dedup record durable together.
+        let key = (msg.operation_id, msg.attempt_id);
+        if !tx.contains(key)? {
+            tx.commit_transfer(msg.operation_id, msg.amount)?;
+            tx.insert_dedup(key, expiry_after(TTL))?;
+        }
+        Ok(())
+    })?;
 
     queue.ack(msg.delivery_id)?;
     Ok(())
 }
 \`\`\`
 
-If the effect commits and acknowledgement is lost, the queue redelivers the same logical operation with a new \`attempt_id\`. A deduplication lookup uses the same key shape as the insert.
+The transaction atomically commits the effect and its deduplication record. The declared retry condition is specifically that this transaction commits, but the queue acknowledgement is lost or not observed. The queue then redelivers the same logical operation with a new \`attempt_id\`. A deduplication lookup uses the same key shape as the insert. Crashes before transaction commit are rolled back by the declared transaction and are outside this case.
 
 **State deltas:**
 
