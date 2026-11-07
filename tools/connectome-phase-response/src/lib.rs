@@ -730,7 +730,7 @@ mod tests {
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 900,
             predictions: vec![
-                ProbePrediction { key: phase_zero, by_leg: common },
+                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
                 ProbePrediction { key: phase_half, by_leg: separated, cycle_slips_by_leg: [0; LEG_COUNT] },
             ],
         };
