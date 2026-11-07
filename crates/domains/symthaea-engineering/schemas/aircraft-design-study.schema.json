@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/aircraft-design-study-0.1.0.json",
+  "title": "Aircraft design study manifest 0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "mission",
+    "candidate_configurations",
+    "required_operating_cases",
+    "decision_questions",
+    "objective_profile",
+    "hard_constraint_profile",
+    "allowed_backends",
+    "cost_basis",
+    "total_budget_units",
+    "consumed_budget_units",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aircraft-design-study/0.1.0"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mission": {
+      "$ref": "#/$defs/artifact"
+    },
+    "candidate_configurations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "required_operating_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "decision_questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "objective_profile": {
+      "$ref": "#/$defs/artifact"
+    },
+    "hard_constraint_profile": {
+      "$ref": "#/$defs/artifact"
+    },
+    "allowed_backends": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/backend_admission"
+      }
+    },
+    "cost_basis": {
+      "$ref": "#/$defs/artifact"
+    },
+    "total_budget_units": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "consumed_budget_units": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "backend_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backend",
+        "allowed_methods",
+        "model_profiles"
+      ],
+      "properties": {
+        "backend": {
+          "$ref": "#/$defs/artifact"
+        },
+        "allowed_methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/method"
+          }
+        },
+        "model_profiles": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/artifact"
+          }
+        }
+      }
+    },
+    "method": {
+      "enum": [
+        "analytical_bound",
+        "low_order_numerical",
+        "external_solver",
+        "physical_measurement"
+      ]
+    }
+  }
+}
