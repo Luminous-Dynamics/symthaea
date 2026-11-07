@@ -247,3 +247,35 @@ These are authors' scale-up projections, not prototype measurements. The 100 MS/
 Report separate measures for optical arithmetic, optical convolution, input-to-decision task, and wall-input system energy. Include VCSEL/driver, DAC, SLM update/control, optical coupling, photodetection/TIA, ADC, FPGA acquisition, host classification and calibration. The paper's ~370 fJ/op estimate is not automatically equivalent to joules per accepted Symthaea task; the projected ~2 fJ/op figure is not an achieved benchmark.
 
 Source audit: full open-access paper, including Results, Discussion, Methods and system-energy description. https://www.nature.com/articles/s41377-026-02206-8
+
+
+## 10. Neuromorphic external benchmark update — THOR × NeuroBench 2026
+
+The THOR × NeuroBench Challenge Phase-I results were announced on 2026-10-20. The task is continuous OpenBMI EEG motor-imagery decoding. Its separate tracks are useful because they do not collapse raw task accuracy and resource efficiency into one opaque number.
+
+Sources:
+- Official results: https://neuromorphiccommons.com/news/thor-x-neurobench-challenge-2026-results/
+- Leaderboard and protocol: https://neuromorphiccommons.com/events/thor-neurobench-2026/
+- NeuroBench framework paper: https://www.nature.com/articles/s41467-025-56739-4
+
+### Published competition results
+- Absolute-accuracy winner: EdgeSynapse AI, 73.38%.
+- Efficiency-track winner: PHC Lab, 69.73% accuracy, 60.54K SynOps and 672 B model/state footprint.
+- Synaptic: 68.40% accuracy, 23.65K SynOps and 1.05 KB footprint.
+- NTK: 73.21% accuracy, 378.05K SynOps and 15.21 KB footprint.
+
+The efficiency track uses SynOps and memory footprint, with separate NES and NBS scoring strategies and Pareto reporting. SynOps is a compute-work proxy and must not be described as a direct wall-power measurement. These are OpenBMI EEG-MI challenge-specific results, not general neuromorphic or Symthaea HDC results.
+
+### Luminous benchmark implication
+Add an optional BCI/temporal classification lane using the official OpenBMI data and exact challenge split/evaluation contract where data licensing permits. Preserve:
+- subject-wise/cross-validation split integrity;
+- accuracy and per-subject/per-class metrics;
+- SynOps or the official harness's equivalent operation accounting;
+- model + state footprint;
+- event/sparse-update behavior;
+- latency distribution and adaptation cost.
+
+For any hardware deployment, additionally measure sensor/DAQ, preprocessing, host, memory traffic, accelerator, power conversion and wall-input energy; report joules per accepted decision and p99 latency. Do not equate SynOps with energy or compare EEG accuracy directly with language identification, exact HDC retrieval or other unrelated tasks.
+
+### Benchmark governance
+Reuse NeuroBench's hardware-independent algorithm track and system/deployment track. Luminous-specific physical substrate claims should extend the system boundary, not fork a competing neuromorphic benchmark definition.
