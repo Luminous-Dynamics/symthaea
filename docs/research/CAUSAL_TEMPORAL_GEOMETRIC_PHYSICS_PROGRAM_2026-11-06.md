@@ -127,6 +127,22 @@ reference numbers, not Rust execution evidence. The crate does not solve
 Einstein's equations, ADM constraints, matter evolution or a metric source
 problem.
 
+### Cross-domain scientific evidence contract
+
+A new std-only crate, `symthaea-science-evidence`, is being added as the
+common manifest/receipt layer across these work packages. It binds a full
+source commit, clean-tree declaration, toolchain/platform, coordinate and
+unit conventions, equations/assumptions, configuration, seeds, baselines,
+primary metrics, uncertainty method, input/output BLAKE3 digests, claims,
+non-claims and falsification conditions.
+
+Verification states remain distinct: `NotRun`, `Queued`, `Running`,
+`Passed`, `Failed`, `Skipped`. A passing run requires a clean source
+tree, exact-head checks, log artifact digests, matching runner environment,
+and outputs. This is a local integrity contract, not an authenticated
+signature or proof of physical truth. The included demonstration explicitly
+emits a `NotRun` receipt and cannot qualify as a pass.
+
 ### UAP evidence foundation
 
 A new std-only crate, `symthaea-uap-observatory`, defines the initial
@@ -310,7 +326,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-01 | Causal-set kinematics | 1+1D sprinkling, order, chain, dimension estimator | Minkowski reference + Lorentz invariance |
 | CTGP-02 | Causal-set scaling | Multi-N, multi-seed finite-size study | Error bars, convergence and null controls |
 | CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals (prototype added) | Rust tests + independent volume, distribution and boost checks |
-| CTGP-04 | Chain Theory reproduction | Independent std-only record enumerator and radical-sum audit (prototype added) | Per-record CSV match + Lean 4.35.0/axiom audit |
+| CTGP-04 | Chain Theory reproduction | Independent std-only enumerator emits all 172 rows in author CSV order; six full classification bands tested | Run Rust example and byte-diff full CSV; Lean 4.35.0 build and axiom/read-cap audit |
 | CTGP-05 | Chain Theory stress tests | Alternative choices, uniqueness and sensitivity analysis | All assumptions enumerated; blind alternatives |
 | CTGP-06 | Quantum DTC simulator | Exact complex kicked-Ising graph oracle (1D/2D prototype added); anisotropic Heisenberg remains future work | Independent exact-diagonalization agreement on small systems |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
@@ -319,6 +335,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
 | CTGP-11 | UAP evidence pipeline | Calibration/provenance contract (prototype added), then reconstruction | Blinded known-object challenge before anomaly claims |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
+| CTGP-13 | Scientific evidence plane | Shared exact-head BLAKE3 manifest/receipt contract (prototype added) | Unit tests; reject dirty trees, stale heads, queued/skipped checks and missing log/output digests |
 
 ## Benchmarks
 
@@ -423,23 +440,59 @@ reproducibility, robustness to misspecification and scientific claim quality.
 Symthaea should only claim SOTA on axes where an exact-head, matched-baseline
 benchmark demonstrates it.
 
+## Competitive scorecard and improvement targets
+
+The objective is not to replace mature specialist software before matching
+its reference results. The first competitive advantage should be
+cross-domain reproducibility and explicit claim control; numerical speed or
+physical fidelity only count after matched benchmarks.
+
+| Workstream | Current Symthaea prototype | Strong external comparator | Near-term parity gate | Longer-term differentiator |
+|---|---|---|---|---|
+| Causal sets | 1+1D O(N log N), D=2..4 O(N²) kinematics | Causal-set literature/reference implementations | Multi-seed finite-size, Lorentz boosts, volume and dimension recovery | Higher-D efficient causal relations, curved embeddings and discrete wave operators |
+| Chain Theory | Independent 172-row algebraic enumerator | Author's Python/Lean source and third-party audit | Full CSV byte diff, pinned Lean build and assumption audit | Formalize alternative grammars and falsify/derive the physical bridge |
+| Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
+| GR / GravCraft | Minkowski/Schwarzschild metric, connection, curvature and geodesic kernel | Einstein Toolkit, SpECTRE, analytic GR references | Curvature, invariants, convergence and coordinate checks | Constraint-consistent 3+1 evolution and stress-energy/energy-condition audit |
+| UAP | Typed calibration/provenance contract | NASA-recommended calibrated multi-sensor methodology; sensor-fusion toolchains | Blind known-object calibration, timing, parallax and uncertainty reconstruction | Low false-positive track reconstruction on sealed data |
+| Evidence plane | Exact-head BLAKE3 manifest and receipt prototype | Reproducible-build, SBOM and scientific workflow provenance systems | Tamper/stale-head/skip/dirty-tree negative controls | Reusable proof-carrying experiments across Symthaea, Mycelix and Sol-Atlas |
+
+### Measurable targets
+
+- **Correctness first:** zero mismatches against analytic or independent exact
+  oracles on the declared validation domain.
+- **Calibration:** nominal 95% uncertainty intervals achieve 93–97% empirical
+  coverage on held-out synthetic trials before real sensor claims.
+- **Robustness:** report false-positive and false-negative rates with
+  confidence intervals under missingness, drift, noise and adversarial inputs.
+- **Scaling:** publish runtime, peak memory and error together; no speedup
+  claim without same machine, compiler, input, baseline and output digest.
+- **Replication:** every headline figure can be rebuilt from one manifest,
+  source SHA, frozen inputs, toolchain and raw result artifacts.
+- **Scientific scope:** no extrapolation beyond the tested dimension,
+  Hamiltonian, coordinate chart, sensor calibration domain or claim boundary.
+
 ## Immediate next actions
 
-1. Run Rust formatting and tests for the causal-set, Chain Theory audit,
-   exact Floquet and UAP evidence crates on the pinned toolchain.
-2. Compare all 172 Chain Theory record identities, signs and weights against
-   the author's published CSV; audit the read-cap premise and charge assignment.
-3. Add coordinate-distribution and finite-size tests to the 2+1D / 3+1D
-   causal-set implementation; then profile before optimizing O(N²) observables.
-4. Upgrade time-crystal phase-rigidity and lifetime metrics around the exact
-   1D/2D kicked-Ising graph oracle; add independent exact-diagonalization and
-   external TeNPy/quimb reference comparisons.
-5. Extend the UAP evidence contract with synchronization, frame transforms,
-   covariance propagation, track association and blind known-object tests.
-6. Extend the metric geometry kernel with signature checks, Riemann/Ricci
-   tensors, curvature invariants, coordinate-transform tests and convergence
-   studies before changing GravCraft trajectory code.
-7. Preserve exact-head check evidence; skipped or queued CI is never a pass.
+1. Run `cargo fmt --check` and targeted `cargo test -p ...` for all new
+   crates with the pinned Rust toolchain; the current environment has not run
+   these and no skipped CI check is treated as a pass.
+2. Run the Chain Theory audit example, extract the emitted CSV section with
+   `sed -n '/^record,construction,slot_kinds/,$p'`, and diff all 172 rows
+   against the author's commit-pinned CSV.
+3. Run the causal-set 1+1D and N-dimensional examples; add sampled-coordinate
+   distribution tests and scale the N log N implementation against brute force.
+4. Compare the exact Floquet graph engine with an independent dense matrix
+   Floquet operator for N<=9; then add randomized initial states, disorder,
+   heating and finite-size scaling.
+5. Add coordinate-transform and step-size convergence tests to the metric
+   geometry kernel; only then begin replacing the GravCraft shift shortcut.
+6. Extend UAP sensor records into clock synchronization, frame transforms,
+   covariance propagation, multi-sensor track association and sealed
+   known-object challenges.
+7. Bind each run to the shared science-evidence manifest, exact-head logs,
+   input/output digests and explicit claim boundary.
+8. Preserve independent baselines, negative controls and failed results;
+   no theory, benchmark or physical claim self-certifies.
 
 ## Scientific non-claims
 
