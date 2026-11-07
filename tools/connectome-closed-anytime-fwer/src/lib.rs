@@ -495,11 +495,22 @@ mod tests {
     #[test]
     fn decisions_are_persistent_after_raw_processes_fall() {
         let mut family = fixture();
-        family.claims[0].e_process_values = vec![r(1, 1), r(20, 1), r(2, 1)];
-        family.claims[1].e_process_values = vec![r(1, 1), r(15, 1), r(1, 1)];
+        family.claims[0].e_process_values = vec![r(1, 1), r(6, 1), r(20, 1), r(2, 1)];
+        family.claims[1].e_process_values = vec![r(1, 1), r(3, 1), r(15, 1), r(1, 1)];
+        family.claims[2].e_process_values = vec![r(1, 1), r(3, 2), r(2, 1), r(1, 1)];
         let report = audit_closed_family(&family).unwrap();
-        assert_eq!(report.elementary[0].rejection_path, vec![false, false, true]);
-        assert_eq!(report.elementary[1].rejection_path, vec![false, false, true]);
+        assert_eq!(
+            report.elementary[0].rejection_path,
+            vec![false, false, true, true]
+        );
+        assert_eq!(
+            report.elementary[1].rejection_path,
+            vec![false, false, true, true]
+        );
+        assert_eq!(
+            report.elementary[2].rejection_path,
+            vec![false, false, false, false]
+        );
     }
 
     #[test]
