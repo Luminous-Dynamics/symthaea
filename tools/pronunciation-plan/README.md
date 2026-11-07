@@ -11,15 +11,15 @@ Do not equate "G2P returned a string" with "the word was understood". Preserve m
 - \`out_of_vocabulary\`: no candidate was invented;
 - \`unsupported\`: the selected language/profile cannot handle the token.
 
-The plan uses UTF-8 byte spans into the exact original text. Every non-whitespace source character must be covered by one and only one lexical-token span; one span cannot merge whitespace-separated words. A selected pronunciation is bound to a candidate with a non-empty evidence reference. Raw provider scores are retained as *raw scores*, never described as calibrated probabilities.
+The plan uses UTF-8 byte spans into the exact original text. Every non-whitespace source character must be covered by one and only one lexical-token span; one span cannot merge whitespace-separated words. A selected pronunciation is bound to a candidate with a non-empty evidence reference. In schema v2, the receipt also stores a BLAKE3 digest of the exact candidate record and a second BLAKE3 digest binding that candidate to the schema version, language, full source text, lexical byte span, surface token, and selected candidate ID. A change to the phones, stress, syllable segmentation, provider provenance, source text, language, or token span invalidates the unchanged receipt. These are content-integrity bindings, not digital signatures: the external review/user/community evidence record must still authenticate the authority. Raw provider scores are retained as *raw scores*, never described as calibrated probabilities.
 
 A renderer should receive a frozen, validated pronunciation plan and syllable-to-score alignment. It must not rerun G2P, reselect a heteronym, or silently approximate an unsupported phone during rendering.
 
 ## Contract and test coverage
 
-The library checks schema version, language presence, exact source-text spans, full non-whitespace coverage, duplicate candidate IDs, source provenance, finite raw scores, stress ranges, syllabic nuclei, normalized IPA tokens, explicit selection receipts, and OOV/unsupported state constraints.
+The library checks schema version 2, language presence, exact source-text spans, full non-whitespace coverage, duplicate candidate IDs, source provenance, finite raw scores, stress ranges, syllabic nuclei, normalized IPA tokens, explicit selection receipts, candidate/context digest integrity, and OOV/unsupported state constraints.
 
-Synthetic tests cover contextual heteronyms, user/human selection receipts, OOV without guessed phones, missing source coverage, UTF-8 span errors, unknown candidate selection, stress/length markers mixed into phone tokens, consonant-only syllables, non-finite scores, and missing provenance.
+Synthetic tests cover contextual heteronyms, user/human selection receipts, stale-receipt rejection after candidate-phone mutation, stale-receipt rejection after language-context mutation, OOV without guessed phones, missing source coverage, UTF-8 span errors, unknown candidate selection, stress/length markers mixed into phone tokens, consonant-only syllables, non-finite scores, and missing provenance.
 
 ## Score alignment contract
 
