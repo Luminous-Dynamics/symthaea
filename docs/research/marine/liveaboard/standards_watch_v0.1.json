@@ -137,5 +137,22 @@
     "Do not copy restricted standards text.",
     "Flag, class, SAMSA, route and vessel-use applicability require separate review.",
     "A small-craft length scope does not prove that all relevant conventions or local regulations apply or do not apply."
+  ],
+  "regulatory_frameworks": [
+    {
+      "id": "IMO International Code of Safety for Maritime Autonomous Surface Ships (MASS Code)",
+      "resolution": "MSC.595(111)",
+      "adopted": "2026-05-22",
+      "effective": "2026-07-01",
+      "status": "non_mandatory_code_in_effect",
+      "scope": "Applies to cargo ships covered by SOLAS Chapter I; IMO describes the general international-voyage SOLAS threshold as over 500 gross tonnage. Member States are invited to apply the Code as far as practicable to MASS under 500 GT.",
+      "requirements_note": "Goal-based framework covering design, construction and operation of remotely or autonomously operated cargo ships, including navigation, connectivity, remote operations, fire safety, search and rescue, cybersecurity and modes of operation. The master retains overall responsibility.",
+      "future_roadmap": "IMO plans development of a mandatory MASS Code from 2028, expected adoption by 1 July 2030, and entry into force 1 January 2032. These are future milestones, not current mandatory requirements.",
+      "los_applicability_note": "Do not assume this cargo-ship code directly governs a private recreational LOS-18. Use its functional mode descriptions, risk assessment, cybersecurity and human-responsibility concepts as design research only; confirm applicability with flag/competent authorities for each intended vessel and operation. Enhanced automation does not itself make a vessel a MASS or create operating privileges.",
+      "sources": [
+        "https://www.imo.org/en/mediacentre/pressbriefings/pages/imo-adopts-mass-code.aspx",
+        "https://www.imo.org/en/mediacentre/hottopics/pages/autonomous-shipping.aspx"
+      ]
+    }
   ]
 }
