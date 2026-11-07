@@ -9,7 +9,10 @@ use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use super::singing_engine::{SingingVoiceEngine, VocalPerformance, VocalStem};
+use super::singing_engine::{
+    CapabilitySupport, ControlCapability, SingingBackendCapabilities, SingingControl,
+    SingingVoiceEngine, VocalPerformance, VocalStem,
+};
 
 const PROTOCOL_VERSION: u32 = 1;
 const MAX_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
@@ -87,6 +90,39 @@ impl DiffSingerEngine {
 impl SingingVoiceEngine for DiffSingerEngine {
     fn id(&self) -> &str {
         &self.provider_id
+    }
+
+    fn capabilities(&self) -> SingingBackendCapabilities {
+        use CapabilitySupport::{Approximated, Conditional, Native, Unsupported};
+        let control = |control, support, rationale: &str| ControlCapability {
+            control,
+            support,
+            rationale: rationale.to_string(),
+        };
+        SingingBackendCapabilities::new(
+            self.id(),
+            vec![
+                control(SingingControl::LyricText, Unsupported, "the worker receives phonemes and score events; raw lyric text is not a model input"),
+                control(SingingControl::Language, Conditional, "the current worker accepts English only and requires an explicit voicebank language ID"),
+                control(SingingControl::ExactPhoneSequence, Native, "explicit supported IPA phones map to required voicebank ARPAbet tokens; unknown phones fail"),
+                control(SingingControl::SyllableAlignment, Approximated, "phone duration is apportioned within v2 syllables from natural-duration priors"),
+                control(SingingControl::NotePitch, Native, "per-note frequency is expanded into the DiffSinger F0 frame sequence"),
+                control(SingingControl::NoteDuration, Native, "note durations and phone natural-duration priors define the phoneme frame durations"),
+                control(SingingControl::AbsoluteOnsetAndRests, Native, "absolute timing gaps are represented by explicit SP events; overlapping spans fail"),
+                control(SingingControl::Melisma, Native, "the explicitly marked vowel is extended across melisma notes without re-articulating consonants"),
+                control(SingingControl::ContinuousPitchCurve, Unsupported, "only discrete note F0 is expanded; arbitrary PitchPoint interpolation is not applied"),
+                control(SingingControl::PhraseExpressionCurve, Unsupported, "phrase expression curves are not passed to the worker model"),
+                control(SingingControl::Breathiness, Unsupported, "the current worker asks the variance model to predict breathiness rather than applying VocalSyllable breathiness"),
+                control(SingingControl::Energy, Unsupported, "VocalSyllable energy is not currently mapped to the model's velocity input"),
+                control(SingingControl::Tension, Unsupported, "VocalSyllable/phrase tension is not applied to the variance model input"),
+                control(SingingControl::Vibrato, Unsupported, "the current F0 sequence is constant within each note and does not encode vibrato"),
+                control(SingingControl::Portamento, Unsupported, "continuous pitch transitions between note targets are not generated"),
+                control(SingingControl::Articulation, Approximated, "phone identities and durations imply articulation classes, but the articulation enum is not consumed"),
+                control(SingingControl::VoiceIdentity, Conditional, "the current worker uses the fixed Standard voicebank embeddings; identity depends on the provisioned voicebank"),
+                control(SingingControl::LocalEdits, Unsupported, "the worker renders the full performance and exposes no localized cache/edit operation"),
+            ],
+        )
+        .expect("static DiffSinger capability manifest is complete")
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
