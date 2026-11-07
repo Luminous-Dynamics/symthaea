@@ -352,3 +352,16 @@ This is a different guarantee from HME's intended ExactComplete:
 Use PQR-Search as a head-to-head external algorithm baseline where representation, distance metric, dataset, k, hardware and dynamic update semantics are compatible. Report its τ, δ, transformation seed assumptions and per-query failure audit separately from HME exactness. Do not call a probabilistic guarantee deterministic, and do not compare abstract paper speedups with local HME timings without a common setup.
 
 Paper: https://arxiv.org/abs/2611.07579
+
+
+## 13. Adaptive exact block search and coherent checkpointing
+
+New HME research:
+- [#11000 — query/candidate-informed block order](https://github.com/Luminous-Dynamics/symthaea/issues/11000). This applies representation-aware block bounds to exact HDC progressive scans while explicitly recognizing BlockMaxWAND and variable-block-max WAND as established prior art. Its goal is HDC-specific exactness + data locality, not claiming the general block-pruning concept.
+- [#11001 — consistent-cut cognitive checkpoint](https://github.com/Luminous-Dynamics/symthaea/issues/11001). It binds bridge learner checkpoint, HME manifest/segments and consumed/materialized event watermarks into one coherent, recoverable generation. It composes the existing memory substrate and checkpoint owners.
+
+The branch includes deterministic synthetic fixtures:
+- [hme_adaptive_block_order_v0.json](fixtures/hme_adaptive_block_order_v0.json)
+- [hme_consistent_cut_states_v0.json](fixtures/hme_consistent_cut_states_v0.json)
+
+Both fixtures demonstrate contract shapes only; they are not Rust runtime tests or storage crash-injection results.
