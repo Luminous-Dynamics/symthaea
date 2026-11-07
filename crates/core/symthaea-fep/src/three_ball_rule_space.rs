@@ -679,7 +679,7 @@ mod tests {
                         .iter()
                         .filter(|(model_id, _)| {
                             space.rules.iter().any(|rule| {
-                                rule.model_id == *model_id
+                                rule.model_id.as_str() == model_id.as_str()
                                     && (rule.one_based_index == representative_index
                                         || rule.duplicate_of_one_based_index
                                             == Some(representative_index))
