@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_CLOSED_ANYTIME_FWER_V1.schema.json",
+  "title": "Connectome closed anytime-FWER elementary family V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "family_id",
+    "claim_scope",
+    "requested_guarantee",
+    "registered_before_confirmatory_outcomes",
+    "confirmation_lockbox_opened_before_freeze",
+    "family_commitment_sha256",
+    "global_filtration_sha256",
+    "confirmation_split_sha256",
+    "alpha",
+    "claims",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "requested_guarantee": {
+      "const": "FWER"
+    },
+    "registered_before_confirmatory_outcomes": {
+      "const": true
+    },
+    "confirmation_lockbox_opened_before_freeze": {
+      "const": false
+    },
+    "family_commitment_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "global_filtration_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "confirmation_split_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "alpha": {
+      "$ref": "#/$defs/rational"
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rational": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(/[1-9][0-9]*)?$"
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "null_spec_sha256",
+        "global_filtration_sha256",
+        "confirmation_split_sha256",
+        "e_process_values"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "null_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "global_filtration_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "confirmation_split_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "e_process_values": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/rational"
+          }
+        }
+      }
+    },
+    "intersection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_ids",
+        "stage_two_value"
+      ],
+      "properties": {
+        "claim_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "stage_two_value": {
+          "$ref": "#/$defs/rational"
+        }
+      }
+    },
+    "elementary_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "first_rejection_stage"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "first_rejection_stage": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intersection_count",
+        "threshold",
+        "intersections",
+        "elementary_decisions",
+        "family_fwer_bound"
+      ],
+      "properties": {
+        "intersection_count": {
+          "const": 7
+        },
+        "threshold": {
+          "$ref": "#/$defs/rational"
+        },
+        "intersections": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "$ref": "#/$defs/intersection"
+          }
+        },
+        "elementary_decisions": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/elementary_decision"
+          }
+        },
+        "family_fwer_bound": {
+          "$ref": "#/$defs/rational"
+        }
+      }
+    }
+  }
+}
