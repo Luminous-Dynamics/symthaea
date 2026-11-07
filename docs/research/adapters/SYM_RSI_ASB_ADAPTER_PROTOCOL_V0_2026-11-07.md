@@ -47,7 +47,7 @@ The twin task returns exact published measurements for 96 of 980 source-study de
 | `POST /v1/deliverables` | Submit final model/report | Preserve upstream type, schema, size and required-stage checks |
 | lab-owned `/state/ledger.json` | Campaign execution record | Bind the existing canonical receipt/evidence pipeline to the lab-provided ledger; do not trust agent-container copies |
 
-The lab owns stage order, accepted batch size, eligibility, uniqueness and budget enforcement. Rejected requests must not be treated as consuming a stage. Re-submitting the latest accepted batch is idempotent. A failed asynchronous job is not a completed experiment. The offline Rust reference contract in `tools/sym-rsi-asb-adapter-reference/src/job_lifecycle.rs` rejects pending jobs with result rows, completed jobs without a full result batch, failed jobs with result rows, and repeated design IDs. `api_contract.rs` additionally checks completed result identities against the exact submitted-design set. It advances a stage only for a valid `completed` job with a complete and identity-matching result batch.
+The lab owns stage order, accepted batch size, eligibility, uniqueness and budget enforcement. Rejected requests must not be treated as consuming a stage. Re-submitting the latest accepted batch is idempotent. A failed asynchronous job is not a completed experiment. The offline Rust reference contract in `tools/sym-rsi-asb-adapter-reference/src/job_lifecycle.rs` rejects pending jobs with result rows, completed jobs without a full result batch, failed jobs with result rows, and repeated design IDs. `api_contract.rs` additionally checks completed result identities against the exact submitted-design set. It advances a stage only for a valid `completed` job with a complete and identity-matching result batch. The API contract additionally requires every declared measurement on each row: scalar values must be finite numbers and file measurements must be non-empty file references. A matching row count and identity set without measurement values is not evidence of an experiment.
 
 The verifier is a separate no-network boundary. Its hidden truth and evaluation data must never be exposed to the policy process, Coder, retrieval tools or direction board.
 
@@ -95,7 +95,7 @@ The API fixture CLI is:
 cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- --api-fixtures
 ```
 
-It validates checked-in contract fixtures and the two exact upstream public-card projections. It makes no HTTP calls. The Rust crate has 33 authored tests in total (5 manifest, 9 lifecycle, 19 API contract); they have not been compiled or run in this environment. The companion structural schema is `tools/sym-rsi-asb-adapter-reference/fixtures/lab-api-v1-public-schema.json`.
+It validates checked-in contract fixtures and the two exact upstream public-card projections. It makes no HTTP calls. The Rust crate has 38 authored tests in total (5 manifest, 9 lifecycle, 24 API contract); they have not been compiled or run in this environment. The companion structural schema is `tools/sym-rsi-asb-adapter-reference/fixtures/lab-api-v1-public-schema.json`.
 
 ## Progression
 
