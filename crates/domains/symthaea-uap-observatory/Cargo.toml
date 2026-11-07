@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-uap-observatory"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Calibration-aware, provenance-preserving sensor evidence contracts for anomalous observation analysis"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+# Intentionally std-only. The first milestone defines immutable evidence
+# records and validation rules; it does not infer object identity, propulsion,
+# or non-human origin.
