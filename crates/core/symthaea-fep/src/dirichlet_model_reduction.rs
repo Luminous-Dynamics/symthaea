@@ -313,7 +313,53 @@ impl std::error::Error for DirichletBayesianModelReductionError {}
 /// model. Each reduced model differs only in its prior concentration tensor.
 /// Evidence ratios are relative to the full model and include supplied model
 /// prior probabilities when computing posterior model probabilities.
+/// SPM's pinned Dirichlet BMR uses a 1/32 pseudocount on every tensor
+/// coordinate before evaluating the multivariate-beta evidence ratio.
+///
+/// This path preserves that convention explicitly. The support masks remain
+/// provenance metadata, but inactive zero coordinates are smoothed exactly as
+/// in `spm_MDP_log_evidence`; they are not treated as impossible events.
+/// Model priors must reconstruct the globally normalized model-average prior,
+/// as in `spm_MDP_BMR`.
+pub fn reduce_dirichlet_models_spm_compatible(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+) -> Result<DirichletBayesianModelReductionResult, DirichletBayesianModelReductionError> {
+    reduce_dirichlet_models_with_evidence(
+        full_posterior,
+        full_prior,
+        reduced_models,
+        dirichlet_log_evidence_ratio_spm_compatible,
+    )
+}
+
+/// Existing strict-support BMR treats excluded coordinates as exact zeros and
+/// assigns zero evidence when an observation is outside reduced support.
 pub fn reduce_dirichlet_models(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+) -> Result<DirichletBayesianModelReductionResult, DirichletBayesianModelReductionError> {
+    reduce_dirichlet_models_with_evidence(
+        full_posterior,
+        full_prior,
+        reduced_models,
+        dirichlet_log_evidence_ratio,
+    )
+}
+
+fn reduce_dirichlet_models_with_evidence(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+    evidence_ratio: fn(
+        &DirichletConcentrationTensor,
+        &DirichletConcentrationTensor,
+        &DirichletConcentrationTensor,
+        &str,
+    ) -> Result<f64, DirichletBayesianModelReductionError>,
+) -> Result<DirichletBayesianModelReductionResult, DirichletBayesianModelReductionError> {
     full_posterior: &DirichletConcentrationTensor,
     full_prior: &DirichletConcentrationTensor,
     reduced_models: &[ReducedDirichletModelHypothesis],
@@ -380,7 +426,7 @@ pub fn reduce_dirichlet_models(
     let mut log_weights = Vec::with_capacity(reduced_models.len());
     let mut log_evidence_ratios = Vec::with_capacity(reduced_models.len());
     for model in reduced_models {
-        let log_ratio = dirichlet_log_evidence_ratio(
+        let log_ratio = evidence_ratio(
             full_posterior,
             full_prior,
             &model.parameter_prior,
@@ -528,6 +574,90 @@ fn dirichlet_log_evidence_ratio(
             + log_multivariate_beta(&reduced_posterior_active)
             - log_multivariate_beta(&full_posterior_active)
             - log_multivariate_beta(&reduced_prior_active);
+        if !contribution.is_finite() {
+            return Err(DirichletBayesianModelReductionError::NonFiniteLogEvidence {
+                model_id: model_id.to_owned(),
+                column,
+            });
+        }
+        total += contribution;
+        if !total.is_finite() {
+            return Err(DirichletBayesianModelReductionError::NonFiniteLogEvidence {
+                model_id: model_id.to_owned(),
+                column,
+            });
+        }
+    }
+    Ok(total)
+}
+
+/// Exact SPM `spm_MDP_log_evidence` convention at the pinned implementation:
+/// add 1/32 to q, p, and r at every outcome coordinate, form
+/// s = q + r - p + 1/32, then negate SPM's free-energy expression to obtain
+/// log p(data | reduced) / p(data | full).
+fn dirichlet_log_evidence_ratio_spm_compatible(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_prior: &DirichletConcentrationTensor,
+    model_id: &str,
+) -> Result<f64, DirichletBayesianModelReductionError> {
+    const PSEUDOCOUNT: f64 = 1.0 / 32.0;
+    let mut total = 0.0_f64;
+
+    for column in 0..full_posterior.columns.len() {
+        let posterior = &full_posterior.columns[column];
+        let prior = &full_prior.columns[column];
+        let reduced = &reduced_prior.columns[column];
+        let mut posterior_smoothed = Vec::with_capacity(posterior.len());
+        let mut prior_smoothed = Vec::with_capacity(prior.len());
+        let mut reduced_smoothed = Vec::with_capacity(reduced.len());
+        let mut reduced_posterior_smoothed = Vec::with_capacity(reduced.len());
+
+        for outcome in 0..posterior.len() {
+            let increment = posterior[outcome] - prior[outcome];
+            if !increment.is_finite() || increment < -PROBABILITY_TOLERANCE {
+                return Err(DirichletBayesianModelReductionError::PosteriorBelowPrior {
+                    model_id: model_id.to_owned(),
+                    column,
+                    outcome,
+                    increment,
+                });
+            }
+
+            let q = posterior[outcome] + PSEUDOCOUNT;
+            let p = prior[outcome] + PSEUDOCOUNT;
+            let r = reduced[outcome] + PSEUDOCOUNT;
+            let s = q + r - p;
+            if !q.is_finite()
+                || !p.is_finite()
+                || !r.is_finite()
+                || !s.is_finite()
+                || q <= 0.0
+                || p <= 0.0
+                || r <= 0.0
+                || s <= 0.0
+            {
+                return Err(
+                    DirichletBayesianModelReductionError::NonPositiveReducedPosteriorConcentration {
+                        model_id: model_id.to_owned(),
+                        column,
+                        outcome,
+                        concentration: s,
+                    },
+                );
+            }
+
+            posterior_smoothed.push(q);
+            prior_smoothed.push(p);
+            reduced_smoothed.push(r);
+            reduced_posterior_smoothed.push(s);
+        }
+
+        // Negative of SPM's F = logB(q) + logB(r) - logB(p) - logB(s).
+        let contribution = log_multivariate_beta(&prior_smoothed)
+            + log_multivariate_beta(&reduced_posterior_smoothed)
+            - log_multivariate_beta(&posterior_smoothed)
+            - log_multivariate_beta(&reduced_smoothed);
         if !contribution.is_finite() {
             return Err(DirichletBayesianModelReductionError::NonFiniteLogEvidence {
                 model_id: model_id.to_owned(),
@@ -1294,6 +1424,135 @@ mod tests {
         assert!(result.models[0].log_evidence_ratio.abs() < 1e-12);
         assert!((result.models[0].posterior_probability - 1.0).abs() < 1e-12);
         assert_eq!(result.most_probable_model_id, "full");
+    }
+
+    fn model_average_prior(models: &[ReducedDirichletModelHypothesis]) -> DirichletConcentrationTensor {
+        let mut columns = models[0]
+            .parameter_prior
+            .columns
+            .iter()
+            .map(|column| vec![0.0; column.len()])
+            .collect::<Vec<_>>();
+        let mut active_support = models[0]
+            .parameter_prior
+            .active_support
+            .iter()
+            .map(|support| vec![false; support.len()])
+            .collect::<Vec<_>>();
+        for model in models {
+            for column in 0..columns.len() {
+                for outcome in 0..columns[column].len() {
+                    columns[column][outcome] +=
+                        model.prior_probability * model.parameter_prior.columns[column][outcome];
+                    active_support[column][outcome] |=
+                        model.prior_probability > 0.0
+                            && model.parameter_prior.active_support[column][outcome];
+                }
+            }
+        }
+        let total = columns.iter().flatten().sum::<f64>();
+        for column in &mut columns {
+            for value in column {
+                *value /= total;
+            }
+        }
+        DirichletConcentrationTensor {
+            parameterization_digest: models[0].parameter_prior.parameterization_digest.clone(),
+            columns,
+            active_support,
+        }
+    }
+
+    #[test]
+    fn spm_compatible_bmr_matches_independent_pinned_reference_value() {
+        // Two likelihood columns, with source-like structural zeros. The full
+        // prior is the globally normalized weighted sum of reduced priors.
+        let model_a = ReducedDirichletModelHypothesis {
+            model_id: "a".into(),
+            prior_probability: 0.5,
+            parameter_prior: tensor_with_support(
+                &[&[1.0, 0.0, 0.0], &[0.0, 0.0, 1.0]],
+                &[&[true, false, false], &[false, false, true]],
+                'a',
+            ),
+        };
+        let model_b = ReducedDirichletModelHypothesis {
+            model_id: "b".into(),
+            prior_probability: 0.5,
+            parameter_prior: tensor_with_support(
+                &[&[0.0, 1.0, 0.0], &[0.0, 1.0, 0.0]],
+                &[&[false, true, false], &[false, true, false]],
+                'a',
+            ),
+        };
+        let models = vec![model_a, model_b];
+        let full_prior = model_average_prior(&models);
+        assert!((full_prior.columns.iter().flatten().sum::<f64>() - 1.0).abs() < 1e-12);
+        assert!((full_prior.columns[0][0] - 0.25).abs() < 1e-12);
+        assert!((full_prior.columns[0][1] - 0.25).abs() < 1e-12);
+        assert!((full_prior.columns[1][1] - 0.25).abs() < 1e-12);
+        assert!((full_prior.columns[1][2] - 0.25).abs() < 1e-12);
+
+        let posterior = tensor_with_support(
+            &[&[2.25, 0.25, 0.0], &[0.0, 1.25, 3.25]],
+            &[&[true, true, false], &[false, true, true]],
+            'a',
+        );
+        let result = reduce_dirichlet_models_spm_compatible(
+            &posterior,
+            &full_prior,
+            &models,
+        )
+        .expect("SPM-compatible pseudocount evidence");
+
+        // Independent reference calculated from SPM's published formula:
+        // p=1/32; q'=q+p, p'=p+p, r'=r+p, s'=q'+r'-p'.
+        assert!((result.models[0].log_evidence_ratio - (-0.46687324049317436)).abs() < 1e-11);
+        assert!((result.models[1].log_evidence_ratio - (-5.719463927425713)).abs() < 1e-11);
+        assert!((result.models[0].posterior_probability - 0.99479331).abs() < 1e-8);
+        assert!((result.models[1].posterior_probability - 0.00520669).abs() < 1e-8);
+        assert!(
+            result.models.iter().all(|model| model.log_evidence_ratio.is_finite()),
+            "SPM's 1/32 pseudocount keeps formerly zero outcomes in the smoothed simplex"
+        );
+    }
+
+    #[test]
+    fn strict_face_bmr_and_spm_smoothing_are_explicitly_different() {
+        let model_a = ReducedDirichletModelHypothesis {
+            model_id: "a".into(),
+            prior_probability: 0.5,
+            parameter_prior: tensor_with_support(
+                &[&[1.0, 0.0]],
+                &[&[true, false]],
+                'a',
+            ),
+        };
+        let model_b = ReducedDirichletModelHypothesis {
+            model_id: "b".into(),
+            prior_probability: 0.5,
+            parameter_prior: tensor_with_support(
+                &[&[0.0, 1.0]],
+                &[&[false, true]],
+                'a',
+            ),
+        };
+        let models = vec![model_a, model_b];
+        let full_prior = model_average_prior(&models);
+        let posterior = tensor_with_support(
+            &[&[0.5, 0.5]],
+            &[&[true, true]],
+            'a',
+        );
+        let strict = reduce_dirichlet_models(&posterior, &full_prior, &models);
+        assert!(matches!(
+            strict,
+            Err(DirichletBayesianModelReductionError::SupportMismatch { .. })
+        ));
+
+        let smoothed = reduce_dirichlet_models_spm_compatible(&posterior, &full_prior, &models)
+            .expect("pseudocount mode admits the smoothed coordinates");
+        assert!(smoothed.models.iter().all(|model| model.log_evidence_ratio.is_finite()));
     }
 
     #[test]
