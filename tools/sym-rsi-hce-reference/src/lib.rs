@@ -556,6 +556,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_search_features_exposed_to_agent() {
+        let mut value: Value = serde_json::from_str(HCE_FIXTURE).expect("HCE JSON parses");
+        value["splits"][1]["features_visible_to_agent"] = Value::Bool(true);
+        let bad: HceEpoch = serde_json::from_value(value).expect("mutated HCE parses");
+        assert_eq!(
+            bad.validate().expect_err("search inputs must remain hidden"),
+            HceError::InvalidSplitRolePolicy("search-v0".to_owned())
+        );
+    }
+
+    #[test]
     fn rejects_selection_feedback_to_search() {
         let mut value: Value = serde_json::from_str(HCE_FIXTURE).expect("HCE JSON parses");
         value["selection_policy"]["selection_score_not_returned_to_search"] = Value::Bool(false);
