@@ -10,9 +10,9 @@
 //! caller's live network.
 
 use symthaea_core::weight_space_program::{
-    CfCWeightGroupId, ParameterGroupConstraints, ParameterGroupRole,
-    ParameterGroupSnapshot, WeightModelSnapshot, WeightProgram, WeightProgramError,
-    WeightProgramReceipt, WeightProgramTarget, ValidatedWeightCandidate,
+    CfCWeightGroupId, ParameterGroupConstraints, ParameterGroupRole, ParameterGroupSnapshot,
+    ValidatedWeightCandidate, WeightModelSnapshot, WeightProgram, WeightProgramError,
+    WeightProgramReceipt, WeightProgramTarget,
 };
 use thiserror::Error;
 
@@ -91,10 +91,8 @@ pub fn materialize_cfc_weight_program(
     let replacements = native_replacements(&snapshot, &candidate)?;
 
     let mut candidate_network = network.clone();
-    candidate_network.try_apply_parameter_group_replacements(
-        &snapshot.model_digest,
-        &replacements,
-    )?;
+    candidate_network
+        .try_apply_parameter_group_replacements(&snapshot.model_digest, &replacements)?;
     candidate_network.reset_optimizer_state_after_parameter_edit();
 
     let candidate_fingerprint = candidate_network
@@ -245,7 +243,6 @@ fn native_group_id(target: &CfCWeightGroupId) -> CfCParameterGroupId {
     }
 }
 
-
 /// One frozen functional probe used to construct hidden-unit activation signatures.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CfCFunctionalProbe {
@@ -327,12 +324,13 @@ pub fn cfc_hidden_unit_activation_signatures(
         let input = ndarray::Array1::from_vec(probe.input.clone());
         let _ = evaluation.forward(&input, probe.dt);
         let states = evaluation.state();
-        let layer_state = states.get(layer_index).ok_or(
-            CfCPermutationAlignmentError::InvalidLayerIndex {
-                layer_index,
-                layer_count: states.len(),
-            },
-        )?;
+        let layer_state =
+            states
+                .get(layer_index)
+                .ok_or(CfCPermutationAlignmentError::InvalidLayerIndex {
+                    layer_index,
+                    layer_count: states.len(),
+                })?;
         for (unit_index, value) in layer_state.iter().copied().enumerate() {
             if !value.is_finite() {
                 return Err(CfCPermutationAlignmentError::NonFiniteActivation {
@@ -402,7 +400,6 @@ pub struct CfCHiddenUnitAlignment {
     pub minimum_assignment_margin: Option<f64>,
 }
 
-
 /// Acceptance thresholds required before a caller uses an inferred unit mapping
 /// to transform parameter groups. These are task-calibrated tolerances, not
 /// universal constants.
@@ -438,7 +435,9 @@ pub enum CfCPermutationAlignmentError {
         expected: usize,
         actual: usize,
     },
-    #[error("{side} activation signature {unit_index} contains a non-finite value at probe {probe_index}")]
+    #[error(
+        "{side} activation signature {unit_index} contains a non-finite value at probe {probe_index}"
+    )]
     NonFiniteSignature {
         side: &'static str,
         unit_index: usize,
@@ -472,12 +471,15 @@ pub enum CfCPermutationAlignmentError {
         probe_index: usize,
         value_index: usize,
     },
-    #[error("layer {layer_index}, unit {unit_index}, probe {probe_index} produced a non-finite activation")]
+    #[error(
+        "layer {layer_index}, unit {unit_index}, probe {probe_index} produced a non-finite activation"
+    )]
     NonFiniteActivation {
         layer_index: usize,
         unit_index: usize,
         probe_index: usize,
-    },    #[error("alignment acceptance policy requires finite non-negative thresholds")]
+    },
+    #[error("alignment acceptance policy requires finite non-negative thresholds")]
     InvalidAcceptancePolicy,
     #[error("alignment receipt is malformed: {field}")]
     MalformedAlignmentReceipt { field: &'static str },
@@ -485,7 +487,6 @@ pub enum CfCPermutationAlignmentError {
     ActivationErrorAboveThreshold { measured: f64, maximum: f64 },
     #[error("alignment assignment margin {measured:?} is below required minimum {minimum}")]
     AssignmentAmbiguous { measured: Option<f64>, minimum: f64 },
-
 }
 
 /// Infer a one-to-one hidden-unit correspondence from frozen activation probes.
@@ -594,8 +595,8 @@ pub fn align_cfc_hidden_unit_signatures(
         })
         .collect::<Vec<_>>();
 
-    let (source_to_candidate, best_total_cost) =
-        minimum_cost_assignment(&costs).ok_or(CfCPermutationAlignmentError::NoFeasibleAssignment)?;
+    let (source_to_candidate, best_total_cost) = minimum_cost_assignment(&costs)
+        .ok_or(CfCPermutationAlignmentError::NoFeasibleAssignment)?;
 
     let minimum_assignment_margin =
         alternating_cycle_assignment_margin(&costs, &source_to_candidate);
@@ -673,10 +674,12 @@ pub fn validate_cfc_alignment_for_parameter_transfer(
         });
     }
     if alignment.mean_squared_activation_error > policy.max_mean_squared_activation_error {
-        return Err(CfCPermutationAlignmentError::ActivationErrorAboveThreshold {
-            measured: alignment.mean_squared_activation_error,
-            maximum: policy.max_mean_squared_activation_error,
-        });
+        return Err(
+            CfCPermutationAlignmentError::ActivationErrorAboveThreshold {
+                measured: alignment.mean_squared_activation_error,
+                maximum: policy.max_mean_squared_activation_error,
+            },
+        );
     }
 
     // A one-unit layer has no alternative permutation. Every larger layer
@@ -702,10 +705,7 @@ pub fn validate_cfc_alignment_for_parameter_transfer(
 /// matched pair. Alternative assignments decompose into alternating cycles.
 /// Floyd-Warshall over the row-transition graph computes all shortest cycles in
 /// O(n^3), avoiding n separate O(n^3) Hungarian re-solves.
-fn alternating_cycle_assignment_margin(
-    costs: &[Vec<f64>],
-    assignment: &[usize],
-) -> Option<f64> {
+fn alternating_cycle_assignment_margin(costs: &[Vec<f64>], assignment: &[usize]) -> Option<f64> {
     let n = assignment.len();
     if n <= 1 {
         return None;
@@ -734,8 +734,7 @@ fn alternating_cycle_assignment_margin(
                 if !distance[intermediate][destination].is_finite() {
                     continue;
                 }
-                let through = distance[source][intermediate]
-                    + distance[intermediate][destination];
+                let through = distance[source][intermediate] + distance[intermediate][destination];
                 if through < distance[source][destination] {
                     distance[source][destination] = through;
                 }
@@ -846,9 +845,7 @@ fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Option<(Vec<usize>, f64)> {
         }
         total_cost += edge_cost;
     }
-    total_cost
-        .is_finite()
-        .then_some((assignment, total_cost))
+    total_cost.is_finite().then_some((assignment, total_cost))
 }
 
 #[cfg(test)]
@@ -893,9 +890,8 @@ mod tests {
             enable_online_learning: false,
             ..Default::default()
         };
-        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
-            "symthaea-cfc-probe-digest-test-v1",
-        );
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-cfc-probe-digest-test-v1");
         let network = CfCNetwork::from_genesis(config, &genesis, "probe-digest");
         let probes = vec![
             CfCFunctionalProbe {
@@ -917,9 +913,8 @@ mod tests {
             cfc_hidden_unit_activation_signatures(&network, 0, &probes).expect("repeat receipt");
         let mut reordered_probes = probes.clone();
         reordered_probes.reverse();
-        let reordered =
-            cfc_hidden_unit_activation_signatures(&network, 0, &reordered_probes)
-                .expect("reordered receipt");
+        let reordered = cfc_hidden_unit_activation_signatures(&network, 0, &reordered_probes)
+            .expect("reordered receipt");
 
         assert_eq!(first.probe_digest, repeated.probe_digest);
         assert_ne!(first.probe_digest, reordered.probe_digest);
@@ -997,9 +992,8 @@ mod tests {
                 let brute_best = totals[0];
                 let brute_second = totals[1];
                 let brute_margin = brute_second - brute_best;
-                let measured_margin =
-                    alternating_cycle_assignment_margin(&costs, &assignment)
-                        .expect("complete finite matrix has an alternative assignment");
+                let measured_margin = alternating_cycle_assignment_margin(&costs, &assignment)
+                    .expect("complete finite matrix has an alternative assignment");
 
                 assert!(
                     (best_cost - brute_best).abs() < 1e-9,
@@ -1028,21 +1022,23 @@ mod tests {
             .collect::<Vec<_>>();
         let source = signature_set(source, 'a', 'c');
         let candidate = signature_set(candidate, 'b', 'c');
-        let alignment =
-            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+        let alignment = align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
         assert_eq!(alignment.source_to_candidate, vec![1, 2, 0]);
         assert_eq!(alignment.source_model_digest, digest('a'));
         assert_eq!(alignment.candidate_model_digest, digest('b'));
         assert_eq!(alignment.probe_digest, digest('c'));
         assert!(alignment.mean_squared_activation_error < 1e-15);
-        assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
+        assert!(
+            alignment
+                .minimum_assignment_margin
+                .is_some_and(|margin| margin > 0.0)
+        );
     }
 
     #[test]
     fn activation_signatures_use_hidden_dimension_for_deeper_layers() {
-        let genesis =
-            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-deep-layer-probe-v1");
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("cfc-deep-layer-probe-v1");
         let config = CfCNetworkConfig {
             input_dim: 3,
             hidden_dim: 4,
@@ -1056,14 +1052,15 @@ mod tests {
             input: vec![0.2, -0.3, 0.7],
             dt: 0.05,
         }];
-        let signatures =
-            cfc_hidden_unit_activation_signatures(&network, 1, &probes)
-                .expect("layer one is observed after external input propagation");
+        let signatures = cfc_hidden_unit_activation_signatures(&network, 1, &probes)
+            .expect("layer one is observed after external input propagation");
         assert_eq!(signatures.signatures.len(), 4);
-        assert!(signatures
-            .signatures
-            .iter()
-            .all(|signature| signature.len() == 1));
+        assert!(
+            signatures
+                .signatures
+                .iter()
+                .all(|signature| signature.len() == 1)
+        );
 
         let invalid = vec![CfCFunctionalProbe {
             input: vec![0.2, -0.3, 0.7, 0.1],
@@ -1082,17 +1079,24 @@ mod tests {
     #[test]
     fn alignment_transfer_gate_accepts_well_separated_mapping() {
         let source = signature_set(
-            vec![vec![0.0, 0.2, 0.8], vec![1.0, -0.4, 0.3], vec![-0.5, 0.6, -0.1]],
+            vec![
+                vec![0.0, 0.2, 0.8],
+                vec![1.0, -0.4, 0.3],
+                vec![-0.5, 0.6, -0.1],
+            ],
             'a',
             'c',
         );
         let candidate = signature_set(
-            vec![source.signatures[2].clone(), source.signatures[0].clone(), source.signatures[1].clone()],
+            vec![
+                source.signatures[2].clone(),
+                source.signatures[0].clone(),
+                source.signatures[1].clone(),
+            ],
             'b',
             'c',
         );
-        let alignment =
-            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+        let alignment = align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
         validate_cfc_alignment_for_parameter_transfer(
             &alignment,
             CfCAlignmentAcceptancePolicy {
@@ -1105,15 +1109,10 @@ mod tests {
 
     #[test]
     fn alignment_transfer_gate_rejects_ambiguous_or_malformed_receipts() {
-        let ambiguous_source =
-            signature_set(vec![vec![0.0, 1.0], vec![0.0, 1.0]], 'a', 'c');
-        let ambiguous_candidate =
-            signature_set(vec![vec![0.0, 1.0], vec![0.0, 1.0]], 'b', 'c');
-        let ambiguous = align_cfc_hidden_unit_signatures(
-            &ambiguous_source,
-            &ambiguous_candidate,
-        )
-        .expect("ambiguous alignment is still diagnosable");
+        let ambiguous_source = signature_set(vec![vec![0.0, 1.0], vec![0.0, 1.0]], 'a', 'c');
+        let ambiguous_candidate = signature_set(vec![vec![0.0, 1.0], vec![0.0, 1.0]], 'b', 'c');
+        let ambiguous = align_cfc_hidden_unit_signatures(&ambiguous_source, &ambiguous_candidate)
+            .expect("ambiguous alignment is still diagnosable");
         assert!(matches!(
             validate_cfc_alignment_for_parameter_transfer(
                 &ambiguous,
@@ -1145,8 +1144,7 @@ mod tests {
     fn alignment_transfer_gate_rejects_activation_error_and_invalid_policy() {
         let source = signature_set(vec![vec![0.0, 1.0], vec![1.0, 0.0]], 'a', 'c');
         let candidate = signature_set(vec![vec![0.1, 1.1], vec![1.1, 0.1]], 'b', 'c');
-        let alignment =
-            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+        let alignment = align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
         assert!(matches!(
             validate_cfc_alignment_for_parameter_transfer(
                 &alignment,
@@ -1175,11 +1173,14 @@ mod tests {
         let candidate = vec![vec![2.0, 3.0], vec![0.0, 1.0], vec![0.0, 1.0]];
         let source = signature_set(source, 'a', 'c');
         let candidate = signature_set(candidate, 'b', 'c');
-        let alignment =
-            align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
+        let alignment = align_cfc_hidden_unit_signatures(&source, &candidate).expect("alignment");
 
         assert!(alignment.mean_squared_activation_error < 1e-15);
-        assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin < 1e-15));
+        assert!(
+            alignment
+                .minimum_assignment_margin
+                .is_some_and(|margin| margin < 1e-15)
+        );
     }
 
     #[test]
@@ -1313,12 +1314,10 @@ mod tests {
             enable_online_learning: false,
             ..Default::default()
         };
-        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
-            "symthaea-swi-permutation-equivalence-v1",
-        );
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-swi-permutation-equivalence-v1");
         let original = CfCNetwork::from_genesis(config, &genesis, "permutation-equivalence");
-        let snapshot =
-            cfc_weight_model_snapshot(&original, digest('d')).expect("snapshot");
+        let snapshot = cfc_weight_model_snapshot(&original, digest('d')).expect("snapshot");
         let permutation = [2usize, 0, 3, 1];
         let get = |id: CfCWeightGroupId| {
             snapshot
@@ -1349,11 +1348,15 @@ mod tests {
             max_abs_delta: 100.0,
             operations: vec![
                 WeightProgramOperation::ReplaceGroup {
-                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellInputProjection { cell: 0 }),
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellInputProjection {
+                        cell: 0,
+                    }),
                     values: permute_rows(&input, 4, 2, &permutation),
                 },
                 WeightProgramOperation::ReplaceGroup {
-                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellRecurrentProjection { cell: 0 }),
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellRecurrentProjection {
+                        cell: 0,
+                    }),
                     values: permute_square(&recurrent, 4, &permutation),
                 },
                 WeightProgramOperation::ReplaceGroup {
@@ -1361,7 +1364,9 @@ mod tests {
                     values: permutation.iter().map(|index| bias[*index]).collect(),
                 },
                 WeightProgramOperation::ReplaceGroup {
-                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 }),
+                    target: WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant {
+                        cell: 0,
+                    }),
                     values: permutation.iter().map(|index| tau[*index]).collect(),
                 },
                 WeightProgramOperation::ReplaceGroup {
@@ -1375,8 +1380,7 @@ mod tests {
         let permuted = candidate.network;
 
         assert_ne!(
-            candidate.base_native_model_digest,
-            candidate.candidate_native_model_digest,
+            candidate.base_native_model_digest, candidate.candidate_native_model_digest,
             "the parameter fingerprint must distinguish equivalent parameterizations"
         );
         assert_eq!(candidate.receipt.edited_group_count, 5);
@@ -1417,24 +1421,22 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let source_state_before = original.state();
-        let source_signatures =
-            cfc_hidden_unit_activation_signatures(&original, 0, &probes)
-                .expect("source activation signatures");
-        let candidate_signatures =
-            cfc_hidden_unit_activation_signatures(&permuted, 0, &probes)
-                .expect("candidate activation signatures");
+        let source_signatures = cfc_hidden_unit_activation_signatures(&original, 0, &probes)
+            .expect("source activation signatures");
+        let candidate_signatures = cfc_hidden_unit_activation_signatures(&permuted, 0, &probes)
+            .expect("candidate activation signatures");
         assert_eq!(original.state(), source_state_before);
         assert_eq!(source_signatures.model_digest, snapshot.model_digest);
         assert_eq!(
             candidate_signatures.model_digest,
             candidate.candidate_native_model_digest
         );
-        assert_eq!(source_signatures.probe_digest, candidate_signatures.probe_digest);
-        let alignment = align_cfc_hidden_unit_signatures(
-            &source_signatures,
-            &candidate_signatures,
-        )
-        .expect("activation-based hidden-unit alignment");
+        assert_eq!(
+            source_signatures.probe_digest,
+            candidate_signatures.probe_digest
+        );
+        let alignment = align_cfc_hidden_unit_signatures(&source_signatures, &candidate_signatures)
+            .expect("activation-based hidden-unit alignment");
         assert_eq!(alignment.source_to_candidate, vec![1, 3, 0, 2]);
         assert_eq!(alignment.source_model_digest, snapshot.model_digest);
         assert_eq!(
@@ -1444,7 +1446,11 @@ mod tests {
         assert_eq!(alignment.probe_digest, source_signatures.probe_digest);
         assert_eq!(alignment.layer_index, 0);
         assert!(alignment.mean_squared_activation_error < 1e-10);
-        assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
+        assert!(
+            alignment
+                .minimum_assignment_margin
+                .is_some_and(|margin| margin > 0.0)
+        );
 
         let mut original_eval = original.clone();
         let mut permuted_eval = permuted.clone();
@@ -1490,8 +1496,7 @@ mod tests {
         };
         let network = CfCNetwork::new(config);
         let task_digest = digest('d');
-        let snapshot = cfc_weight_model_snapshot(&network, task_digest.clone())
-            .expect("snapshot");
+        let snapshot = cfc_weight_model_snapshot(&network, task_digest.clone()).expect("snapshot");
 
         let tau_group = snapshot
             .groups
@@ -1522,10 +1527,16 @@ mod tests {
             }],
         };
 
-        let base_digest_before = network.fingerprint().expect("base fingerprint").model_digest;
+        let base_digest_before = network
+            .fingerprint()
+            .expect("base fingerprint")
+            .model_digest;
         let candidate = materialize_cfc_weight_program(&network, digest('d'), &program)
             .expect("isolated candidate");
-        let base_digest_after = network.fingerprint().expect("base fingerprint").model_digest;
+        let base_digest_after = network
+            .fingerprint()
+            .expect("base fingerprint")
+            .model_digest;
 
         assert_eq!(base_digest_before, base_digest_after);
         assert_eq!(candidate.base_native_model_digest, base_digest_before);
@@ -1551,9 +1562,7 @@ mod tests {
         let task_digest = digest('d');
         let healthy_snapshot =
             cfc_weight_model_snapshot(&healthy, task_digest.clone()).expect("healthy snapshot");
-        let tau_target = WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant {
-            cell: 0,
-        });
+        let tau_target = WeightProgramTarget::CfC(CfCWeightGroupId::CellTimeConstant { cell: 0 });
         let healthy_tau = healthy_snapshot
             .groups
             .iter()
@@ -1562,7 +1571,10 @@ mod tests {
             .values
             .clone();
 
-        let faulty_values = healthy_tau.iter().map(|value| value * 3.0).collect::<Vec<_>>();
+        let faulty_values = healthy_tau
+            .iter()
+            .map(|value| value * 3.0)
+            .collect::<Vec<_>>();
         let faulty_base_digest = faulty.fingerprint().expect("faulty base").model_digest;
         faulty
             .try_apply_parameter_group_replacements(
@@ -1576,10 +1588,7 @@ mod tests {
 
         // Seed a nonzero recurrent state and stale optimizer counters so the
         // adapter must reset them on the candidate, without touching the source.
-        let _ = faulty.forward(
-            &ndarray::Array1::from_vec(vec![0.25, -0.75]),
-            0.2,
-        );
+        let _ = faulty.forward(&ndarray::Array1::from_vec(vec![0.25, -0.75]), 0.2);
         let source_state_norm = faulty.cells[0]
             .state()
             .iter()
@@ -1619,11 +1628,13 @@ mod tests {
             }],
         };
 
-        let candidate =
-            materialize_cfc_weight_program(&faulty, task_digest.clone(), &repair)
-                .expect("candidate repair");
+        let candidate = materialize_cfc_weight_program(&faulty, task_digest.clone(), &repair)
+            .expect("candidate repair");
         assert_eq!(
-            faulty.fingerprint().expect("faulty remains unchanged").model_digest,
+            faulty
+                .fingerprint()
+                .expect("faulty remains unchanged")
+                .model_digest,
             faulty_digest_before
         );
         let source_state_after = faulty.cells[0]
@@ -1643,7 +1654,13 @@ mod tests {
             .sum::<f32>()
             .sqrt();
         assert_eq!(candidate_state_norm, 0.0);
-        assert!(candidate.network.adam_states.iter().all(|state| state.t == 0));
+        assert!(
+            candidate
+                .network
+                .adam_states
+                .iter()
+                .all(|state| state.t == 0)
+        );
         assert_eq!(candidate.network.adam_output.t, 0);
 
         let repaired_tau = candidate.network.flattened_tau();
@@ -1686,7 +1703,8 @@ mod tests {
             "the isolated repair should recover the healthy output sequence"
         );
 
-        let healthy_now = cfc_weight_model_snapshot(&healthy, task_digest).expect("healthy current");
+        let healthy_now =
+            cfc_weight_model_snapshot(&healthy, task_digest).expect("healthy current");
         assert_eq!(
             repair.validate_and_materialize(&healthy_now),
             Err(WeightProgramError::StaleDigest("base model"))
