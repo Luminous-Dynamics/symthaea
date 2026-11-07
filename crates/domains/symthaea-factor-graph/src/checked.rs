@@ -836,7 +836,7 @@ pub fn bethe_free_energy(
         match (inference.inference_status, inference.graph_structure) {
             (InferenceStatus::ExactForest, GraphStructure::Forest) => BetheStatus::ExactForest,
             (InferenceStatus::NotConverged, _) => BetheStatus::NonStationary,
-            _ => BetheStatus::ApproximateFixedPoint,
+            _ => BetheStatus::ApproximateConverged,
         }
     };
 
@@ -1410,7 +1410,7 @@ mod tests {
         }
         assert!((inference.factor_beliefs[0][0] - 0.25).abs() > 0.1);
         let bethe = bethe_free_energy(&graph, &inference).unwrap();
-        assert_eq!(bethe.status, BetheStatus::ApproximateFixedPoint);
+        assert_eq!(bethe.status, BetheStatus::ApproximateConverged);
     }
 
     #[test]
