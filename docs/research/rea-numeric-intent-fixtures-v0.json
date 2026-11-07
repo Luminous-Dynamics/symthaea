@@ -1,0 +1,32 @@
+{
+  "schema": "luminous.rea.numeric-intent-fixtures.v0",
+  "status": "design_fixture_matrix",
+  "provenance": {
+    "authored_independently_of_numeric_validator": true,
+    "expected_outcomes_are_not_generated_by_implementation": true
+  },
+  "cases": [
+    {"id":"binary64-jcs-equal-42-and-42-point-zero","intent":"binary64","input":"{\"measurement\":42.0}","path":"/measurement","expected_status":"valid","expected_authority":"binary64_value_only","reason":"Binary64 intent permits JCS comparison; this does not preserve source token spelling."},
+    {"id":"binary64-subnormal-smallest-positive","intent":"binary64","input":"{\"measurement\":5e-324}","path":"/measurement","expected_status":"valid","expected_authority":"binary64_value_only","reason":"A valid finite binary64 subnormal is accepted when the declared policy permits subnormals."},
+    {"id":"binary64-exponent-overflow","intent":"binary64","input":"{\"measurement\":1e400}","path":"/measurement","expected_status":"invalid","expected_authority":"none","reason":"The profile overflow policy is reject; no finite binary64 value is established."},
+    {"id":"binary64-underflow-rejected","intent":"binary64","input":"{\"measurement\":1e-9999}","path":"/measurement","expected_status":"invalid","expected_authority":"none","reason":"The declared underflow policy rejects values that collapse to zero."},
+    {"id":"safe-integer-upper-bound","intent":"safe_integer","input":"{\"counter\":9007199254740991}","path":"/counter","expected_status":"valid","expected_authority":"exact_bounded_integer","reason":"The positive inclusive bound is exactly 2^53-1."},
+    {"id":"safe-integer-first-unsafe","intent":"safe_integer","input":"{\"counter\":9007199254740992}","path":"/counter","expected_status":"invalid","expected_authority":"none","reason":"The integer token is outside the declared safe integer range."},
+    {"id":"safe-integer-rejects-fraction-token","intent":"safe_integer","input":"{\"counter\":42.0}","path":"/counter","expected_status":"invalid","expected_authority":"none","reason":"V0 safe_integer requires integer-token syntax, not merely a mathematically integral binary64 value."},
+    {"id":"safe-integer-rejects-exponent-token","intent":"safe_integer","input":"{\"counter\":4.2e1}","path":"/counter","expected_status":"invalid","expected_authority":"none","reason":"Exponent notation is not an integer token under this exact representation contract."},
+    {"id":"exact-integer-string-above-safe-range","intent":"exact_integer_string","input":"{\"sequence\":\"9007199254740993\"}","path":"/sequence","expected_status":"valid","expected_authority":"exact_integer_string","reason":"The original digit string remains exact and is checked against the declared string grammar/range."},
+    {"id":"exact-integer-string-rejects-leading-zero","intent":"exact_integer_string","input":"{\"sequence\":\"00042\"}","path":"/sequence","expected_status":"invalid","expected_authority":"none","reason":"Canonical decimal integer grammar forbids leading zeroes."},
+    {"id":"exact-integer-string-rejects-plus-sign","intent":"exact_integer_string","input":"{\"sequence\":\"+42\"}","path":"/sequence","expected_status":"invalid","expected_authority":"none","reason":"Canonical decimal integer grammar forbids a leading plus sign."},
+    {"id":"fixed-decimal-string-exact-scale","intent":"fixed_decimal_string","input":"{\"amount\":\"273.15\"}","path":"/amount","expected_status":"valid","expected_authority":"exact_decimal_string","reason":"The source decimal is represented as a string with its declared scale."},
+    {"id":"fixed-decimal-string-scale-mismatch","intent":"fixed_decimal_string","input":"{\"amount\":\"273.150\"}","path":"/amount","expected_status":"invalid","expected_authority":"none","reason":"The selected profile requires exact scale two and does not permit extra trailing zeroes."},
+    {"id":"fixed-decimal-string-does-not-coerce-number","intent":"fixed_decimal_string","input":"{\"amount\":0.1}","path":"/amount","expected_status":"invalid","expected_authority":"none","reason":"A JSON number cannot satisfy a declared exact decimal string field."},
+    {"id":"opaque-numeric-no-arithmetic","intent":"opaque_numeric","input":"{\"vendor_code\":1.25e2}","path":"/vendor_code","expected_status":"opaque","expected_authority":"none","reason":"The source value is retained, but arithmetic and numeric equivalence are not authorized."},
+    {"id":"missing-profile-path","intent":"safe_integer","input":"{\"other\":7}","path":"/counter","expected_status":"unverifiable","expected_authority":"none","reason":"The required profile path is absent; absence is not numeric zero."},
+    {"id":"null-is-not-zero","intent":"safe_integer","input":"{\"counter\":null}","path":"/counter","expected_status":"invalid","expected_authority":"none","reason":"Null is distinct from a valid integer and cannot be coerced to zero."},
+    {"id":"value-only-evidence-lexical-coverage-unavailable","intent":"safe_integer","input":null,"path":"/counter","expected_status":"unverifiable","expected_authority":"none","reason":"A serde_json::Value without exact source bytes cannot establish raw-token integer spelling."},
+    {"id":"duplicate-profile-path","intent":"profile","input":null,"profile_rule_paths":["/counter","/counter"],"expected_status":"invalid_profile","expected_authority":"none","reason":"An exact JSON Pointer may have only one numeric intent rule."},
+    {"id":"unit-mismatch-no-implicit-conversion","intent":"unit_ref","input":null,"path":"/distance","left_unit":"length.metre.v1","right_unit":"length.foot.v1","expected_status":"unverifiable","expected_authority":"none","reason":"Different unit contracts are incomparable without an explicit versioned conversion contract."},
+    {"id":"profile-digest-mismatch","intent":"profile","input":"{\"counter\":7}","path":"/counter","expected_status":"invalid_profile","expected_authority":"none","reason":"A profile whose claimed digest does not match canonical profile bytes cannot authorize a value interpretation."},
+    {"id":"profile-unmatched-path-does-not-infer-intent","intent":"unmatched_numeric","input":"{\"counter\":7,\"mystery\":99}","path":"/mystery","expected_status":"opaque","expected_authority":"none","reason":"Unmatched numeric paths remain opaque and receive no arithmetic/equivalence authority."}
+  ]
+}
