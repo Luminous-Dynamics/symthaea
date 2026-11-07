@@ -1,0 +1,113 @@
+name: REA Numeric Lexeme Fuzz
+
+on:
+  pull_request:
+    paths:
+      - "tools/rea-numeric-lexeme-fuzz/**"
+      - "tools/rea-numeric-lexeme-audit/**"
+      - ".github/workflows/rea-numeric-lexeme-fuzz.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-numeric-lexeme-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  raw-lexeme-fuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact pull request head or dispatched revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned nightly Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: nightly-2026-11-03
+          components: llvm-tools-preview
+
+      - name: Install pinned cargo-fuzz
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
+
+      - name: Generate isolated fuzz lockfile
+        run: cargo +nightly-2026-11-03 generate-lockfile --manifest-path tools/rea-numeric-lexeme-fuzz/fuzz/Cargo.toml
+
+      - name: Generate support crate lockfile
+        run: cargo +nightly-2026-11-03 generate-lockfile --manifest-path tools/rea-numeric-lexeme-fuzz/Cargo.toml
+
+      - name: Audit dependency graph
+        run: cargo +nightly-2026-11-03 tree --manifest-path tools/rea-numeric-lexeme-fuzz/fuzz/Cargo.toml --locked -e normal,dev
+
+      - name: Run deterministic metamorphic support tests
+        run: cargo +nightly-2026-11-03 test --manifest-path tools/rea-numeric-lexeme-fuzz/Cargo.toml --locked
+
+      - name: Record exact fuzz run context
+        run: |
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          checked_out="$(git rev-parse HEAD)"
+          test "$checked_out" = "$expected"
+          if test "$GITHUB_EVENT_NAME" = "pull_request"; then
+            seconds=60
+          else
+            seconds=300
+          fi
+          mkdir -p tools/rea-numeric-lexeme-fuzz/fuzz/artifacts
+          {
+            echo "tested_tree_commit=$checked_out"
+            echo "workflow_event_sha=$GITHUB_SHA"
+            echo "expected_head_sha=$expected"
+            echo "toolchain=nightly-2026-11-03"
+            rustc +nightly-2026-11-03 --version --verbose
+            cargo +nightly-2026-11-03 --version
+            cargo +nightly-2026-11-03 fuzz --version
+            uname -a
+            sha256sum tools/rea-numeric-lexeme-fuzz/Cargo.lock
+            sha256sum tools/rea-numeric-lexeme-fuzz/fuzz/Cargo.lock
+            sha256sum tools/rea-numeric-lexeme-fuzz/fuzz/corpus/raw_numeric_lexemes/*
+            echo "fuzz_seconds=$seconds"
+          } | tee tools/rea-numeric-lexeme-fuzz/fuzz/artifacts/run-context.txt
+          echo "FUZZ_SECONDS=$seconds" >> "$GITHUB_ENV"
+
+      - name: Fuzz raw numeric lexeme audit
+        working-directory: tools/rea-numeric-lexeme-fuzz
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-11-03 fuzz run raw_numeric_lexemes -- \
+            -artifact_prefix=fuzz/artifacts/crash- \
+            -max_total_time="$FUZZ_SECONDS" \
+            -max_len=1048576 \
+            -rss_limit_mb=512 \
+            -timeout=5 \
+            -print_final_stats=1 2>&1 | tee fuzz/artifacts/fuzz-output.txt
+
+      - name: Bind output digest and statistics
+        if: always()
+        run: |
+          output="tools/rea-numeric-lexeme-fuzz/fuzz/artifacts/fuzz-output.txt"
+          if test -f "$output"; then
+            sha256sum "$output" | tee -a tools/rea-numeric-lexeme-fuzz/fuzz/artifacts/run-context.txt
+            grep -E 'Done [0-9]+ runs|stat::number_of_executed_units:|stat::average_exec_per_sec:|stat::peak_rss_mb:' "$output" > tools/rea-numeric-lexeme-fuzz/fuzz/artifacts/fuzz-summary.txt || true
+          fi
+
+      - name: Upload exact lockfiles, seed corpus, context and crashes
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: rea-numeric-lexeme-fuzz-run
+          path: |
+            tools/rea-numeric-lexeme-fuzz/Cargo.lock
+            tools/rea-numeric-lexeme-fuzz/fuzz/Cargo.lock
+            tools/rea-numeric-lexeme-fuzz/fuzz/artifacts/**
+            tools/rea-numeric-lexeme-fuzz/fuzz/corpus/**
+          if-no-files-found: warn
+          retention-days: 14
