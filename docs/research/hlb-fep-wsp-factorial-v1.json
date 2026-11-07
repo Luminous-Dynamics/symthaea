@@ -246,11 +246,14 @@
     },
     {
       "id": "permutation_equivalence_and_repair_transfer",
-      "environment": "Seeded small CfC networks with function-preserving hidden-unit permutations, paired genuinely faulty variants, exact functional probes, and held-out permutations; the equivalence-preserving transform must be executed through the typed WeightProgram and candidate-only SWI adapter, while fault labels are withheld from the proposer",
+      "environment": "Seeded small CfC networks with function-preserving hidden-unit permutations, paired genuinely faulty variants, exact functional probes, and held-out permutations; the equivalence-preserving transform must be executed through the typed WeightProgram and candidate-only SWI adapter, while fault labels are withheld from the proposer; an adaptive functional-probe subtask supplies a frozen selection pool and a disjoint held-out validation pool; the diagnostic selector may choose probes to maximize accumulated assignment margin but must never use held-out probes during selection",
       "primary_outcomes": [
         "function_equivalence_error",
         "equivalent_healthy_false_edit_rate",
-        "cross_permutation_repair_success"
+        "cross_permutation_repair_success",
+        "probes_to_unambiguous_alignment",
+        "held_out_function_equivalence_after_probe_selection",
+        "assignment_margin_at_fixed_probe_budget"
       ],
       "diagnostics": [
         "permutation_alignment_precision",
@@ -263,7 +266,12 @@
         "candidate_only_wsp_materialization",
         "minimum_assignment_margin",
         "activation_signature_alignment_error",
-        "alignment_abstention_rate"
+        "alignment_abstention_rate",
+        "probe_selection_margin_gain",
+        "cumulative_assignment_margin_by_probe_count",
+        "functional_probe_candidate_evaluations",
+        "held_out_activation_signature_error",
+        "probe_selection_to_held_out_margin_transfer"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
@@ -271,7 +279,13 @@
         "healthy_unpermuted_network",
         "faulty_network_with_held_out_permutation",
         "incomplete_hidden_unit_permutation_that_changes_function",
-        "ambiguous_duplicate_activation_signatures"
+        "ambiguous_duplicate_activation_signatures",
+        "duplicate_probe_candidate_pool",
+        "candidate_pool_order_permutation",
+        "all_candidate_probes_non_discriminating",
+        "held_out_probe_distribution_shift",
+        "same_width_architecture_mismatch",
+        "same_architecture_manifest_mismatch"
       ]
     },
     {
@@ -491,6 +505,22 @@
     {
       "id": "no_model_structure_eig",
       "scope": "Ablation removing model-structure expected information gain while keeping state/parameter EIG, preference vector, action costs, and horizon fixed"
+    },
+    {
+      "id": "random_functional_probe_selection",
+      "scope": "Random probe chosen from the same frozen candidate pool and with the same number of model forward passes"
+    },
+    {
+      "id": "deterministic_max_margin_probe_selection",
+      "scope": "Greedy selection maximizing accumulated hidden-unit assignment margin; primary SWI implementation"
+    },
+    {
+      "id": "exhaustive_probe_subset_oracle",
+      "scope": "Small-pool oracle enumerating all allowed probe subsets at a fixed budget; verifier-only upper bound"
+    },
+    {
+      "id": "deep_align_learned_weight_alignment",
+      "scope": "Navon et al. ICML 2024 Deep-Align when exact layer shapes and architecture families are supported; report unsupported cases"
     }
   ],
   "seeds": {
@@ -564,7 +594,10 @@
       "prospective_model_information_gain_nats",
       "expected_posterior_model_entropy_nats",
       "model_average_prior_coherence_error",
-      "predictive_outcome_mass_error"
+      "predictive_outcome_mass_error",
+      "probes_to_unambiguous_alignment",
+      "held_out_function_equivalence_after_probe_selection",
+      "assignment_margin_at_fixed_probe_budget"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -588,7 +621,11 @@
       "ambiguous_alignment_abstention_rate",
       "dirichlet_support_mask_validation_failure_rate",
       "dirichlet_excluded_observed_outcome_zero_evidence_accuracy",
-      "dirichlet_reduced_posterior_nonintegrability_rejection_rate"
+      "dirichlet_reduced_posterior_nonintegrability_rejection_rate",
+      "architecture_mismatch_rejection_rate",
+      "manifest_mismatch_rejection_rate",
+      "probe_set_mismatch_rejection_rate",
+      "held_out_alignment_acceptance_false_positive_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -600,7 +637,10 @@
       "edited_parameter_count",
       "measured_operation_count",
       "functional_probe_budget",
-      "permutation_alignment_operations"
+      "permutation_alignment_operations",
+      "probe_candidate_forward_passes",
+      "alignment_runtime_ns",
+      "assignment_margin_evidence_per_probe"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -649,7 +689,10 @@
     "Three-ball model evidence must use the registered model family and Dirichlet column ordering, and the reported Occam threshold must be expressed as posterior model log-odds in nats; model commitment is evaluated at the declared 16-nat threshold as a replication metric, not as a universal constant.",
     "Dirichlet BMR requires positive concentrations on active coordinates and an explicit active-support mask; inactive coordinates must have exactly zero concentration, and any posterior count in an excluded coordinate makes that reduced model's evidence zero. Empty or malformed support and non-integrable reduced posteriors are rejected.",
     "The one-step Dirichlet model-EIG evaluator must compute current and post-outcome model beliefs from BMR, weight posterior model entropy by the full Bayesian-model-average parent predictive outcome distribution, and must not reweight the predictive distribution by Bayes factors a second time.",
-    "The parent Dirichlet prior used for prospective model EIG must equal the reduced-model-prior arithmetic mean under the registered model probabilities; predictive outcome probabilities must be normalized, and hypothetical sufficient-statistic increments must match the exact parameterization and be finite and non-negative."
+    "The parent Dirichlet prior used for prospective model EIG must equal the reduced-model-prior arithmetic mean under the registered model probabilities; predictive outcome probabilities must be normalized, and hypothetical sufficient-statistic increments must match the exact parameterization and be finite and non-negative.",
+    "Adaptive functional-probe selection must report the full frozen candidate pool, selected probe, per-candidate accumulated assignment margin and mean activation error, source/candidate/architecture/manifest digests, and the final ordered probe-set digest. It must be deterministic and must not mutate either model.",
+    "Probe selection and alignment fitting must use a declared selection-probe pool; final functional-equivalence and acceptance metrics must use a disjoint held-out probe sequence not used for selection, threshold tuning, or assignment fitting.",
+    "Accumulated assignment margin is computed from summed squared activation differences across probes, while the reported fit error remains mean-squared activation error; the same mapping repeated across independent probes must increase the margin in proportion to probe count without changing mean fit error."
   ],
   "research_references": [
     {
