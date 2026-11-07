@@ -104,25 +104,31 @@ Existing locomotor connectomics and CPG studies provide important structural rec
 Baselines at equal observation/perturbation budget:
 1. mean frequency-only;
 2. steady-state PLV/tripod score only;
-3. pairwise phase correlation;
-4. single-leg local oscillator;
+3. pairwise phase correlation and the established phase-oscillator / PRC formulations;
+4. single-leg local oscillator and the Symtropy #3926 six-leg synthetic phase-network generators;
 5. pinned Pugliese rate-model reproduction;
 6. central-coupled phase model;
 7. proprioceptive/contact/load augmented models;
 8. body-mechanical coupling model;
 9. hybrid sensorimotor model;
-10. random and expert-prior probe design;
-11. #9592 Fisher D/A-optimal and EIG design;
-12. #10880 robust model-discrepancy probe selection.
+10. frozen model predictions and noise-aware separation from Symtropy #3454;
+11. source-pinned FlyGym 2.1.1 / NeuroMechFly 2.x embodied trajectories from #3357 / #3881, with separate gait/physics metrics;
+12. scripted phase controller, reflex/PID, native CPG/rule-based/hybrid FlyGym controllers and learned/RL or DRL-CPG controllers at matched body, sensor, action and compute budgets;
+13. random and expert-prior probe design;
+14. #9592 Fisher D/A-optimal and EIG design, with #3478 as the typed EIG/Fisher/EVSI interface;
+15. #10880 robust model-discrepancy probe selection and #10897 anytime-valid monitoring.
+
+The 2026 proprioceptive DRL-CPG hexapod literature reports strong route completion across terrain transitions in its own robot/task setup. Treat it as an adjacent engineering baseline only; do not compare its headline completion percentage directly to Drosophila neural or gait outcomes without matching body, sensor, task, hardware and evaluation budgets.
 
 Primary outcomes:
-- circular phase-reset error by source, recipient, phase, context and delay;
+- circular phase-reset error by source, recipient, phase, perturbation magnitude, context and delay;
+- integer cycle-slip error separately from fractional phase-reset error;
 - local vs off-diagonal response calibration;
 - recovery/re-lock time;
-- held-out source-leg, phase-bin, condition and animal generalization;
-- minimum pairwise response separation over the declared model challenge set;
+- held-out source-leg, phase-bin, magnitude, condition and animal generalization;
+- minimum per-probe and joint-portfolio model-response separation over the declared challenge set;
 - missing/non-response/out-of-support rate and complete denominators;
-- all-in cost, preparation, reviewer and acquisition time.
+- all-in acquisition, preparation, reviewer, inference, simulator and compute cost.
 
 Biological promotion thresholds must be chosen after a source-bound pilot estimates independent-animal variability and phase-estimator uncertainty. Do not set a headline percentage before that pilot.
 
