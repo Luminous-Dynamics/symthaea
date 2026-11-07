@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use std::error::Error;
-use symthaea_causal_set_lab::causal_set_nd::{
-    CausalSetNd, expected_ordering_fraction,
-};
+use symthaea_causal_set_lab::causal_set_nd::{CausalSetNd, expected_ordering_fraction};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let seed = 0xC0FFEE;
@@ -19,12 +17,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("D,volume,related_pairs,observed_r,expected_r,MM_dimension,longest_chain");
 
     for dimension in 2..=4 {
-        let causet = CausalSetNd::sprinkle_fixed_cardinality(
-            seed,
-            event_count,
-            dimension,
-            proper_time,
-        )?;
+        let causet =
+            CausalSetNd::sprinkle_fixed_cardinality(seed, event_count, dimension, proper_time)?;
         let observed = causet.ordering_fraction().expect("N >= 2");
         println!(
             "{dimension},{:.12},{},{:.9},{:.9},{:.6},{}",
@@ -37,7 +31,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
-    println!("The dimension sweep checks finite-sample estimators against flat-spacetime references.");
+    println!(
+        "The dimension sweep checks finite-sample estimators against flat-spacetime references."
+    );
     println!("It does not test curved-spacetime reconstruction or causal-set quantum dynamics.");
     Ok(())
 }
