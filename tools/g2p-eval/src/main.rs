@@ -166,6 +166,11 @@ fn validate_candidate_syllable_info(
             }
         }
     }
+    if stress.is_some() && boundaries.is_none() {
+        return Err(invalid(format!(
+            "{label}: syllable stress requires explicit syllable boundaries"
+        )));
+    }
     if let Some(stress) = stress {
         if stress.iter().any(|value| *value > 2) {
             return Err(invalid(format!(
@@ -182,8 +187,14 @@ fn validate_phone_sequence(
     stress: &[u8],
     label: &str,
 ) -> Result<(), String> {
-    if phones.iter().any(|phone| phone.trim().is_empty()) {
-        return Err(invalid(format!("{label}: phone tokens must be non-empty")));
+    if phones.iter().any(|phone| {
+        phone.trim().is_empty()
+            || phone.chars().any(char::is_whitespace)
+            || matches!(phone.as_str(), "ˈ" | "ˌ" | "ː")
+    }) {
+        return Err(invalid(format!(
+            "{label}: phone tokens must be non-empty normalized IPA units without standalone stress/length markers"
+        )));
     }
     if phones.is_empty() {
         if !boundaries.is_empty() || !stress.is_empty() {
@@ -425,7 +436,14 @@ fn validate_inputs(
                 reference.case_id
             ));
         }
+        let mut variant_ids = BTreeSet::new();
         for variant in &reference.accepted_variants {
+            if variant.variant_id.trim().is_empty() || !variant_ids.insert(variant.variant_id.as_str()) {
+                return Err(format!(
+                    "reference {} has an empty or duplicate variant ID",
+                    reference.case_id
+                ));
+            }
             if variant.phones.is_empty() {
                 return Err(format!(
                     "in-vocabulary reference {} variant {} must contain phones",
@@ -492,13 +510,13 @@ fn validate_inputs(
                     prediction.case_id
                 ));
             }
-            if prediction
-                .phones
-                .iter()
-                .any(|phone| phone.trim().is_empty())
-            {
+            if prediction.phones.iter().any(|phone| {
+                phone.trim().is_empty()
+                    || phone.chars().any(char::is_whitespace)
+                    || matches!(phone.as_str(), "ˈ" | "ˌ" | "ː")
+            }) {
                 return Err(format!(
-                    "prediction {} contains an empty phone token",
+                    "prediction {} contains an invalid normalized IPA phone token",
                     prediction.case_id
                 ));
             }
@@ -601,9 +619,9 @@ fn evaluate(
                 EditCounts {
                     substitutions: 0,
                     deletions: 0,
-                    insertions: candidate.phones.len(),
+                    insertions: 0,
                 },
-                candidate.phones.len(),
+                0,
                 None,
                 None,
                 None,
@@ -613,8 +631,12 @@ fn evaluate(
         let exact = (!reference.expected_oov).then_some(distance == 0 && !candidate.detected_oov);
         let candidate_phone_count = candidate.phones.len();
         let per = (reference_phones > 0).then(|| distance as f64 / reference_phones as f64);
-        total_reference_phones += reference_phones;
-        total_edits += edits.total();
+        // OOV cases are evaluated only by OOV detection. Guessed phones on an
+        // OOV word must not distort conventional in-vocabulary PER.
+        if !reference.expected_oov {
+            total_reference_phones += reference_phones;
+            total_edits += edits.total();
+        }
         if let Some(exact) = exact {
             in_vocabulary_cases += 1;
             if exact {
@@ -919,6 +941,47 @@ mod tests {
         ];
         assert!(validate_inputs(&refs, &duplicate).is_err());
         assert!(validate_inputs(&refs, &[]).is_err());
+    }
+
+    #[test]
+    fn oov_guessed_phones_affect_oov_detection_not_in_vocabulary_per() {
+        let refs = vec![
+            reference(
+                "known",
+                false,
+                vec![variant("known-v1", &["w", "ɜ", "d"], &[3], &[1])],
+            ),
+            reference("oov", true, vec![]),
+        ];
+        let preds = vec![
+            candidate("known", &["w", "ɜ", "d"], &[3], &[1], false),
+            candidate("oov", &["k", "s", "z", "p", "l"], &[5], &[1], false),
+        ];
+        let report = evaluate(&refs, &preds).unwrap();
+        assert_eq!(report.metrics.phone_error_rate, Some(0.0));
+        assert_eq!(report.metrics.exact_pronunciation_rate, Some(1.0));
+        assert_eq!(report.metrics.oov_false_negative, 1);
+        assert_eq!(report.metrics.oov_recall, Some(0.0));
+        assert_eq!(report.cases[1].phone_error_rate, None);
+        assert_eq!(report.cases[1].candidate_phone_count, 5);
+    }
+
+    #[test]
+    fn stress_without_boundaries_and_duplicate_variant_ids_are_rejected() {
+        let refs = vec![reference(
+            "word",
+            false,
+            vec![
+                variant("duplicate", &["w", "ɜ", "d"], &[3], &[1]),
+                variant("duplicate", &["w", "ɜ", "d"], &[3], &[1]),
+            ],
+        )];
+        let preds = vec![candidate("word", &["w", "ɜ", "d"], &[3], &[1], false)];
+        assert!(validate_inputs(&refs, &preds).is_err());
+
+        let mut invalid = candidate("word", &["w", "ɜ", "d"], &[3], &[1], false);
+        invalid.syllable_boundaries = None;
+        assert!(validate_inputs(&refs[..0], &[invalid]).is_err());
     }
 
     #[test]
