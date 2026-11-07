@@ -193,3 +193,36 @@ The risk limit is an independent eligibility gate, not an arbitrary penalty sile
 The checked-in weather example retains gross EVSI 0.2 utility units, direct cost 0.1, opportunity cost 0.0, net EVSI 0.1 and zero modeled downside. These are illustrative arithmetic values, not measured research performance.
 
 The reference now includes negative controls for (i) positive net EVSI with a failed risk gate, (ii) opportunity cost reversing an otherwise positive decision, and (iii) weighted CVaR whose tail splits an outcome's probability mass. The Rust tests are authored but remain unexecuted until a Rust toolchain is available.
+
+
+## Pivotal research judgment and context anchoring (2026-11-07)
+
+SciΠvot (arXiv:2610.21082) provides a new comparison construct adjacent to proposal taste and experimental design. It contains 248 pivotal decisions extracted from six months of project records in 26 projects across six scientific fields. Each case compares an original LLM plan with a senior-researcher correction using only the pre-correction project record. The authors report that, in the medium-effort project-context condition, four of five tested frontier models were below chance on the selected cases; the best reported project-condition accuracy was 63.5%, compared with 73.4% for fresh researchers.
+
+The result motivates a specific hypothesis: **context can help preserve state and still harm judgment when it anchors the agent to its existing plan**. Do not infer that context is generally harmful, or that each human correction is necessarily correct. The selected cases are corrections made by humans, so their selection and label process needs an independent disagreement and outcome audit.
+
+The Symthaea study should separately measure:
+- correction choice under full project context;
+- matched context ablation and compact evidence-delta context;
+- sensitivity to decision-relevant observations;
+- invariance to irrelevant project history;
+- correct rejection of a correction contradicted by valid evidence;
+- calibrated abstention on non-identifiable or expert-disagreement cases;
+- evidence-linked rationale and predicted consequence;
+- subsequent realized outcome, where available.
+
+### Synthetic pivotal-correction pack
+
+Adds a separate nine-case synthetic fixture pack:
+
+`docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_PIVOTAL_CORRECTION_FIXTURES_V0_2026-11-07.json`
+
+Its companion schema and Rust `pivotal` CLI validator are separate from the canonical 16-case research-taste pack. The nine cases include:
+- six cases requiring the decision to change in response to decision-relevant evidence;
+- one case requiring invariance to irrelevant context;
+- two cases requiring abstention because the available evidence is non-identifying or reviewer assumptions conflict;
+- controls for unsupported corrections, sunk-cost anchoring, negative net EVSI, downside-risk veto and analysis-integrity failure.
+
+The validator enforces the canonical disposition and context-effect contract. These are synthetic policy fixtures, **not a SciΠvot reproduction, human expert gold, or measured agent results**. Their purpose is to test that the benchmark itself encodes sensitivity and invariance correctly before asking models to solve it.
+
+Source: https://arxiv.org/abs/2610.21082
