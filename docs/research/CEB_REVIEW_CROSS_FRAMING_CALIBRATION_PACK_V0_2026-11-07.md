@@ -224,11 +224,30 @@ Complete once per variant and retain disagreement:
 - What output is requested (review / repair / discover / ask)?
 - Which existing CEB lane owns the primary outcome?
 - Is the output format comparable to another condition? Why?
+- Reviewer 1 C1–C6 dispositions:
+- Reviewer 2 C1–C6 dispositions:
+- Final framing class: W / R / A / O / X:
+- Contract-preservation rationale:
+- Target-identity rationale:
+- Information ledger (present / absent / added):
+- Objective/output comparison:
+- Realism assessment:
+- Target-leakage assessment:
 - Prompt semantic-equivalence review:
 - Leakage/confounder notes:
 - Missing/invalid condition status:
 - Reviewers and disagreements:
 
-## 9. Claim boundary
+## 9. Prompt-fidelity disposition rules
+
+Before using any variant as a paired condition, apply the six-dimension C1–C6 review and W/R/A/O/X disposition in [Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md).
+
+- Reject X variants from confirmatory pairing or retain them as unresolved.
+- Do not label F1 as W merely because it describes the same feature; if it omits useful facts or changes the request, classify it R or X.
+- F4 is normally A relative to an issue-only condition when a failing test adds evidence.
+- F2/F3/F5 change the task objective and must be labelled O (and A/R as appropriate), not described as wording-only variants.
+- Keep the two independent reviewers' information ledgers and disagreements. Do not convert agreement into an additional CEB metric.
+
+## 10. Claim boundary
 
 This pack contains four public synthetic anchors and sixteen framing templates (F0–F4 for three single-defect anchors, plus one F5 multi-defect sweep condition). It is for author calibration only. It is not a task set, an executable fixture, hidden truth, sealed holdout or benchmark result. The public key offers no cryptographic blinding. No code was compiled or executed, and no candidate or agent was evaluated. The pack is permanently ineligible as a sealed CEB holdout.
