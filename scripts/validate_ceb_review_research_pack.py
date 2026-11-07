@@ -254,6 +254,8 @@ def self_test() -> list[str]:
         "Phase C — Human complementarity",
         "paired task-level analysis repository-cluster bootstrap 80% power family-wise alpha 0.05",
         "same total inference budget no new primary metric lane #10064 #10369 No tasks are admitted by this preregistration",
+        "Gold-Completeness and Open-Set Discovery",
+        "Sequential Evidence Acquisition",
         *PRIMARY_METRICS,
     ))
     gold_completeness = "\n".join((
