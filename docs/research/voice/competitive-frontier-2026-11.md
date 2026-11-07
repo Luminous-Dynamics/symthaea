@@ -56,6 +56,10 @@ Meta's November 10, 2025 release describes ASR coverage for more than 1,600 lang
 
 Meta's release is an important architecture and breadth comparator. Do not assume that every South African language, variety or conversational domain has an independently reproduced result merely because the suite covers 1,600+ languages.
 
+**Inference-path caveat:** the current official repository README also says its reference inference pipeline presently accepts only audio files shorter than 40 seconds for the CTC and LLM model suites, even though an unlimited-audio-length LLM variant is released. Treat architectural context length and currently supported end-to-end inference input length as two separate capabilities. Long-form comparisons must document the exact checkpoint and code path, or use a declared chunking strategy with boundary effects measured.
+
+Source: https://github.com/facebookresearch/omnilingual-asr
+
 Source: https://ai.meta.com/blog/omnilingual-asr-advancing-automatic-speech-recognition/
 Model repository and December 2025 v2 update: https://github.com/facebookresearch/omnilingual-asr
 
