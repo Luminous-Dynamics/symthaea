@@ -7,7 +7,9 @@
 //! independently established in the shared global filtration.
 
 use connectome_asof_filtration::{
-    AdmissionStatus, FiltrationAdmission, GlobalLedger, audit_admission, audit_ledger,
+    AdmissionMode, AdmissionStatus, AdjusterReceipt, AvailabilityState, EvidenceEvent,
+    EvidenceSplit, FiltrationAdmission, GlobalLedger, LedgerEntry, LedgerPayload, audit_admission,
+    audit_ledger,
 };
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
@@ -848,6 +850,90 @@ mod tests {
     fn rejects_non_global_component_status() {
         let mut manifest = fixture();
         manifest.claims[0].component_status = "LOCAL_FILTRATION_ONLY".into();
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn canonical_path_sha256_matches_standard_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn admits_theorem_matched_lifted_process() {
+        let mut manifest = fixture();
+        let claim = &mut manifest.claims[1];
+        let admission = &mut claim.filtration_admission;
+        admission.mode = AdmissionMode::AdjusterLifted;
+        admission.source_filtration_id = "neural-local-stream-v1".into();
+        admission.source_filtration_sha256 = digest('7');
+        admission.adjuster = Some(AdjusterReceipt {
+            adjuster_id: "chore-ramdas-filtration-lift".into(),
+            adjuster_version: "reviewed-v1".into(),
+            source_process_sha256: admission.input_process_sha256.clone(),
+            source_filtration_sha256: admission.source_filtration_sha256.clone(),
+            target_filtration_sha256: admission.target_filtration_sha256.clone(),
+            parameter_sha256: digest('8'),
+            theorem_assumptions_sha256: admission.assumption_sha256.clone().unwrap(),
+            lifted_output_sha256: admission.output_process_sha256.clone(),
+        });
+        let report = audit_family(&manifest).expect("reviewed lift receipt is bound");
+        assert_eq!(report.claims.len(), 3);
+    }
+
+    #[test]
+    fn rejects_local_only_process_even_when_global_digest_label_matches() {
+        let mut manifest = fixture();
+        manifest.claims[0].filtration_admission.mode = AdmissionMode::LocalOnly;
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_incomparable_filtration_process() {
+        let mut manifest = fixture();
+        manifest.claims[0].filtration_admission.mode = AdmissionMode::IncomparableOrUnknown;
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_e_process_path_mutation_without_new_admission() {
+        let mut manifest = fixture();
+        manifest.claims[0].e_process_values[2] = r(26, 1);
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_claim_null_binding() {
+        let mut manifest = fixture();
+        manifest.claims[0].filtration_admission.null_spec_sha256 = digest('9');
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_campaign_process_or_proof_receipt() {
+        for mutation in 0..3 {
+            let mut manifest = fixture();
+            match mutation {
+                0 => manifest.claims[0].filtration_admission.campaign_id = "other".into(),
+                1 => manifest.claims[0].filtration_admission.process_id = "other-process".into(),
+                _ => {
+                    manifest.claims[0].filtration_admission.proof_receipt_sha256 =
+                        Some(digest('9'));
+                }
+            }
+            assert!(audit_family(&manifest).is_err(), "mutation {mutation}");
+        }
+    }
+
+    #[test]
+    fn rejects_process_that_consumes_event_at_its_output_sequence() {
+        let mut manifest = fixture();
+        manifest.claims[0]
+            .filtration_admission
+            .observed_event_ids
+            .push("T7".into());
         assert!(audit_family(&manifest).is_err());
     }
 
