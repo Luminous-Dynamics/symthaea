@@ -246,14 +246,17 @@
     },
     {
       "id": "permutation_equivalence_and_repair_transfer",
-      "environment": "Seeded small CfC networks with function-preserving hidden-unit permutations, paired genuinely faulty variants, exact functional probes, and held-out permutations; the equivalence-preserving transform must be executed through the typed WeightProgram and candidate-only SWI adapter, while fault labels are withheld from the proposer; an adaptive functional-probe subtask supplies a frozen selection pool and a disjoint held-out validation pool; the diagnostic selector may choose probes to maximize accumulated assignment margin but must never use held-out probes during selection",
+      "environment": "Seeded CfC networks with function-preserving hidden-unit permutations at one and multiple layers, paired genuine faults, exact functional probes, and held-out permutations. One-layer/no-backbone and multi-layer/no-residual/no-backbone cases are separate registered strata. Each layer's alignment is measured from a frozen, source-bound functional probe sequence; the transform must propagate adjacent-layer input-column permutations, recurrent row/column permutations, layer-local bias/time-constant permutations, and final output-column permutations through the typed WeightProgram and candidate-only SWI adapter. Fault labels remain withheld from the proposer.",
       "primary_outcomes": [
         "function_equivalence_error",
         "equivalent_healthy_false_edit_rate",
         "cross_permutation_repair_success",
         "probes_to_unambiguous_alignment",
         "held_out_function_equivalence_after_probe_selection",
-        "assignment_margin_at_fixed_probe_budget"
+        "assignment_margin_at_fixed_probe_budget",
+        "multilayer_function_equivalence_error",
+        "multilayer_alignment_transfer_success",
+        "multilayer_heldout_function_retention"
       ],
       "diagnostics": [
         "permutation_alignment_precision",
@@ -274,7 +277,11 @@
         "probe_selection_to_held_out_margin_transfer",
         "symmetry_canonicalization_recovery_success",
         "candidate_function_preservation_after_canonicalization",
-        "stale_alignment_canonicalization_rejection_rate"
+        "stale_alignment_canonicalization_rejection_rate",
+        "layerwise_alignment_receipt_count",
+        "adjacent_layer_permutation_consistency",
+        "multilayer_canonicalization_operation_count",
+        "multilayer_candidate_native_digest"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
@@ -288,7 +295,11 @@
         "all_candidate_probes_non_discriminating",
         "held_out_probe_distribution_shift",
         "same_width_architecture_mismatch",
-        "same_architecture_manifest_mismatch"
+        "same_architecture_manifest_mismatch",
+        "missing_layer_alignment",
+        "duplicate_layer_alignment",
+        "residual_topology_rejected_until_supported",
+        "backbone_topology_rejected_until_supported"
       ]
     },
     {
@@ -674,7 +685,9 @@
       "cumulative_ranking_utility",
       "final_discovery_utility",
       "endpoint_budget_efficiency",
-      "cumulative_decision_regret"
+      "cumulative_decision_regret",
+      "multilayer_function_equivalence_error",
+      "multilayer_heldout_function_retention"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -788,7 +801,8 @@
     "The sequential WeightProgram benchmark must distinguish one fixed editor-authored program reused across evidence batches from per-batch editor re-prompting; report LLM calls, candidate evaluations, update count, inference cost, and endpoint budget separately.",
     "Every sequential edit is bound to the exact model, program, target specification, evidence-batch digest, and verifier receipt; candidates are evaluated on predeclared held-out observations and promoted only through a separate explicit acceptance boundary.",
     "Future measurement batches, hidden endpoints, and held-out assay outcomes are inaccessible to the editor and probe selector; include a leakage canary and report all candidate evaluations, rollbacks, and unsuccessful edits.",
-    "Sequential WSP results are compared with no-edit, random matched-norm, feedback-blind, re-prompted WSP, and matched online/gradient baselines under identical evidence batches and endpoint budgets; online-replay author-reported results are not treated as independent replication."
+    "Sequential WSP results are compared with no-edit, random matched-norm, feedback-blind, re-prompted WSP, and matched online/gradient baselines under identical evidence batches and endpoint budgets; online-replay author-reported results are not treated as independent replication.",
+    "The multi-layer CfC canonicalizer must use one fresh, fingerprint-bound activation-alignment receipt per layer, validate every layer index exactly once, propagate each layer permutation through the next layer's input columns, and verify full held-out output equivalence on candidate-only materialization. Residual, bidirectional, and backbone topologies remain explicitly unsupported."
   ],
   "research_references": [
     {
