@@ -6,10 +6,7 @@ use std::f64::consts::PI;
 use symthaea_fractal_time_lab::exact_floquet::analyze_subharmonic_response;
 use symthaea_fractal_time_lab::exact_heisenberg::KickedHeisenbergFloquet;
 
-fn final_state_distance(
-    left: &KickedHeisenbergFloquet,
-    right: &KickedHeisenbergFloquet,
-) -> f64 {
+fn final_state_distance(left: &KickedHeisenbergFloquet, right: &KickedHeisenbergFloquet) -> f64 {
     left.amplitudes()
         .iter()
         .zip(right.amplitudes())
@@ -39,7 +36,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("analysis_start={ANALYSIS_START}");
     println!("trotter_slices={TROTTER_SLICES}");
     println!("convergence_reference_slices={CONVERGENCE_SLICES}");
-    println!("width,height,case,epsilon,mean_demodulated_order,mean_absolute_order,sign_coherence,norm_error,trotter_final_state_distance");
+    println!(
+        "width,height,case,epsilon,mean_demodulated_order,mean_absolute_order,sign_coherence,norm_error,trotter_final_state_distance"
+    );
 
     for (width, height) in lattices {
         let n_spins = width * height;
@@ -115,10 +114,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("initial_state_control=3x3,epsilon=0.10");
     println!(
         "all_up_order={:.9},single_spin_defect_order={:.9}",
-        up.mean_demodulated_order,
-        defect.mean_demodulated_order
+        up.mean_demodulated_order, defect.mean_demodulated_order
     );
     println!("A finite-window response is not evidence of thermodynamic time-crystalline order.");
-    println!("Trotter distances must be checked under further slice refinement before quantitative claims.");
+    println!(
+        "Trotter distances must be checked under further slice refinement before quantitative claims."
+    );
     Ok(())
 }
