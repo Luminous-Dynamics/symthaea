@@ -493,7 +493,14 @@ mod tests {
             world_id: id.into(),
             mechanism_family: family.into(),
             source_revision_sha256: digest('a'),
-            world_spec_sha256: digest('b'),
+            world_spec_sha256: digest(match id {
+                "W-local" => 'b',
+                "W-central" => 'c',
+                "W-sensory" => 'd',
+                "W-mechanical" => 'e',
+                "W-shared-drive" => 'f',
+                _ => '0',
+            }),
             baseline_summary: summary(),
             baseline_trajectory: baseline(unique_mech_baseline),
             interventions: vec![
@@ -693,11 +700,18 @@ mod tests {
     }
 
     #[test]
-    fn infeasible_intervention_cannot_be_counted_as_discriminating_evidence() {
+    fn removing_a_feasible_intervention_merges_previously_separated_worlds() {
         let (worlds, mut interventions) = fixture();
-        interventions[3].feasible = false;
+        // Without the contact-conditioned kick, local CPG and sensory
+        // feedback become observationally equivalent in the remaining set.
+        interventions[1].feasible = false;
         let report = audit_mechanism_identifiability(&worlds, &interventions).unwrap();
-        assert_eq!(report.feasible_portfolio_unresolved_pairs, 1);
-        assert_eq!(report.unavailable_candidate_interventions.len(), 1);
+        assert_eq!(report.feasible_portfolio_classes.len(), 3);
+        assert_eq!(report.feasible_portfolio_unresolved_pairs, 2);
+        assert_eq!(report.unavailable_candidate_interventions.len(), 2);
+        assert_eq!(
+            report.status,
+            "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO"
+        );
     }
 }
