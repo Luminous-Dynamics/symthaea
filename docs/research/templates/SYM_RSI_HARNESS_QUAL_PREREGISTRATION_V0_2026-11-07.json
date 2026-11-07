@@ -16,7 +16,7 @@
   "source_release": {
     "source_lock_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
     "harness_bench_release": {
-      "selected_snapshot": "paper_v2_or_live_site_snapshot",
+      "selected_snapshot": "__REQUIRED_BEFORE_PREREGISTRATION__",
       "exact_source_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
       "task_catalog_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
       "oracle_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
