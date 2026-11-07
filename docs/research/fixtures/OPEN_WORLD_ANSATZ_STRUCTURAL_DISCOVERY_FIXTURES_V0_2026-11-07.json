@@ -1,0 +1,382 @@
+{
+  "schema_version": "open-world-ansatz-structural-discovery-fixtures-v0",
+  "status": "SYNTHETIC_CONTRACT_FIXTURES_NOT_UNSATZ_REPRODUCTION_OR_AGENT_RESULTS",
+  "source_issue": "#11042",
+  "purpose": "A public protocol-contract pack to test benchmark tier semantics, matched A0/A2 parameter-versus-structure control, split separation, agent-visible versus evaluator-only fields, identifiability dispositions and positive/negative transfer. It does not contain a secret world corpus or measure an agent's scientific ability.",
+  "evaluation_contract": {
+    "structural_score_unit": "identified_structural_equivalence_class",
+    "coefficient_score_separate": true,
+    "non_identifiable_policy": "report_equivalence_class_or_abstain; never force a unique structure",
+    "hidden_truth_boundary": "world_seed_id, evaluator_structure, latent_truth and confirmation outcomes are evaluator-only and absent from agent_visible_fields",
+    "cost_boundary": "experiment_budget and measurement_budget are identical across paired A0/A2 cases; runtime/inference/review costs are accounted separately in any agent comparison",
+    "task_claim_boundary": "fixture validation establishes only the integrity of this synthetic protocol contract"
+  },
+  "fixtures": [
+    {
+      "fixture_id": "ANS-A0-01",
+      "tier": "A0",
+      "world_id": "microcosm-pair-01",
+      "paired_control_group": "PAIR-STRUCTURE-01",
+      "world_seed_id": "world-seed-microcosm-01",
+      "discovery_split_id": "microcosm-01-discovery",
+      "calibration_split_id": "microcosm-01-calibration",
+      "confirmation_split_id": "microcosm-01-confirmation",
+      "structure_input": "supplied",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 12,
+      "measurement_budget": 12,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget",
+        "supplied_model_structure"
+      ],
+      "expected_disposition": "fit_parameters_given_structure",
+      "required_evidence": [
+        "parameter estimates with uncertainty",
+        "held-out prediction under an unseen intervention",
+        "long-horizon predictive check"
+      ],
+      "prohibited_inference": [
+        "a good coefficient fit proves the supplied structure is true"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A2-01",
+      "tier": "A2",
+      "world_id": "microcosm-pair-01",
+      "paired_control_group": "PAIR-STRUCTURE-01",
+      "world_seed_id": "world-seed-microcosm-01",
+      "discovery_split_id": "microcosm-01-discovery",
+      "calibration_split_id": "microcosm-01-calibration",
+      "confirmation_split_id": "microcosm-01-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 12,
+      "measurement_budget": 12,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "propose_structural_model",
+      "required_evidence": [
+        "proposed observable and latent variables",
+        "candidate interaction and dynamics structure",
+        "measurement model",
+        "predicted intervention outcomes",
+        "held-out and long-horizon predictions"
+      ],
+      "prohibited_inference": [
+        "A0 structure-supplied success is evidence that A2 structure was discovered",
+        "lower training error alone establishes the mechanism"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A2-02",
+      "tier": "A2",
+      "world_id": "hidden-resource-microcosm-02",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-hidden-resource-02",
+      "discovery_split_id": "hidden-resource-02-discovery",
+      "calibration_split_id": "hidden-resource-02-calibration",
+      "confirmation_split_id": "hidden-resource-02-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 16,
+      "measurement_budget": 16,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "propose_latent_state_and_interaction_model",
+      "required_evidence": [
+        "candidate latent-state representation",
+        "intervention that distinguishes latent mediation from direct interaction",
+        "long-horizon predictive check"
+      ],
+      "prohibited_inference": [
+        "an unobserved state may be asserted without a distinguishing prediction"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A3-01",
+      "tier": "A3",
+      "world_id": "distorted-sensor-system-03",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-distorted-sensor-03",
+      "discovery_split_id": "distorted-03-discovery",
+      "calibration_split_id": "distorted-03-calibration",
+      "confirmation_split_id": "distorted-03-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "distorted",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 14,
+      "measurement_budget": 14,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "partial_measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "jointly_identify_measurement_and_state_model",
+      "required_evidence": [
+        "measurement distortion hypothesis",
+        "calibration or cross-sensor experiment",
+        "separate latent-state and observation-model uncertainty"
+      ],
+      "prohibited_inference": [
+        "sensor output may be treated as the latent state without checking the measurement map"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A3-02",
+      "tier": "A3",
+      "world_id": "uninformative-channel-system-04",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-uninformative-04",
+      "discovery_split_id": "uninformative-04-discovery",
+      "calibration_split_id": "uninformative-04-calibration",
+      "confirmation_split_id": "uninformative-04-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "uninformative",
+      "identifiability": "not_identifiable",
+      "hidden_state_present": true,
+      "intervention_access": false,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 8,
+      "measurement_budget": 8,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "partial_measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "abstain_request_informative_measurement",
+      "required_evidence": [
+        "proof or diagnostic that current channel is uninformative",
+        "explicit statement of non-identifiability under current access",
+        "proposal for a new informative modality or intervention"
+      ],
+      "prohibited_inference": [
+        "repeated samples from an uninformative channel identify hidden state"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A2-03",
+      "tier": "A2",
+      "world_id": "equivalent-structures-system-05",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-equivalence-05",
+      "discovery_split_id": "equivalence-05-discovery",
+      "calibration_split_id": "equivalence-05-calibration",
+      "confirmation_split_id": "equivalence-05-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "equivalence_class",
+      "hidden_state_present": false,
+      "intervention_access": false,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 10,
+      "measurement_budget": 10,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "report_observational_equivalence_class",
+      "required_evidence": [
+        "equivalence-class definition over allowed observations",
+        "explicit statement of unresolved structural distinction",
+        "discriminating intervention needed for unique identification"
+      ],
+      "prohibited_inference": [
+        "select one syntactic structure as uniquely true when all allowed observations are equivalent"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A4-01",
+      "tier": "A4",
+      "world_id": "confounded-feedback-system-06",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-confounded-06",
+      "discovery_split_id": "confounded-06-discovery",
+      "calibration_split_id": "confounded-06-calibration",
+      "confirmation_split_id": "confounded-06-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 18,
+      "measurement_budget": 18,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "discriminate_confounding_with_intervention",
+      "required_evidence": [
+        "observationally compatible competing structures",
+        "intervention-specific divergent predictions",
+        "held-out interventional prediction"
+      ],
+      "prohibited_inference": [
+        "observational fit alone establishes causal direction"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A4-02",
+      "tier": "A4",
+      "world_id": "long-horizon-overfit-system-07",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-long-horizon-07",
+      "discovery_split_id": "long-horizon-07-discovery",
+      "calibration_split_id": "long-horizon-07-calibration",
+      "confirmation_split_id": "long-horizon-07-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "none",
+      "experiment_budget": 12,
+      "measurement_budget": 12,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget"
+      ],
+      "expected_disposition": "prefer_intervention_and_long_horizon_generalization",
+      "required_evidence": [
+        "separate discovery fit and long-horizon prediction",
+        "calibrated uncertainty growth",
+        "failure analysis for the lower-training-error candidate"
+      ],
+      "prohibited_inference": [
+        "minimum training error is the model-selection objective"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A5-01",
+      "tier": "A5",
+      "world_id": "related-mechanism-transfer-08",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-related-transfer-08",
+      "discovery_split_id": "related-08-discovery",
+      "calibration_split_id": "related-08-calibration",
+      "confirmation_split_id": "related-08-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "related",
+      "experiment_budget": 12,
+      "measurement_budget": 12,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget",
+        "source_world_model_artifact"
+      ],
+      "expected_disposition": "test_and_adapt_related_mechanism_transfer",
+      "required_evidence": [
+        "transfer hypothesis",
+        "evidence that source and target share the relevant mechanism",
+        "target-specific validation before acceptance"
+      ],
+      "prohibited_inference": [
+        "similar surface observations guarantee shared mechanism"
+      ]
+    },
+    {
+      "fixture_id": "ANS-A5-02",
+      "tier": "A5",
+      "world_id": "unrelated-mechanism-transfer-09",
+      "paired_control_group": null,
+      "world_seed_id": "world-seed-unrelated-transfer-09",
+      "discovery_split_id": "unrelated-09-discovery",
+      "calibration_split_id": "unrelated-09-calibration",
+      "confirmation_split_id": "unrelated-09-confirmation",
+      "structure_input": "withheld",
+      "measurement_channel": "ideal",
+      "identifiability": "identifiable",
+      "hidden_state_present": true,
+      "intervention_access": true,
+      "long_horizon_holdout": true,
+      "transfer_relation": "unrelated",
+      "experiment_budget": 12,
+      "measurement_budget": 12,
+      "agent_visible_fields": [
+        "task_objective",
+        "units",
+        "measurement_metadata",
+        "observations_after_acquisition",
+        "legal_experiments",
+        "remaining_budget",
+        "source_world_model_artifact"
+      ],
+      "expected_disposition": "reject_negative_transfer_and_reinfer",
+      "required_evidence": [
+        "test that contradicts the transferred mechanism",
+        "explicit rejection or quarantine of source structure",
+        "fresh target-specific structural hypothesis"
+      ],
+      "prohibited_inference": [
+        "a program discovered on a related-looking world is automatically transferable"
+      ]
+    }
+  ]
+}
