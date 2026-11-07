@@ -1,0 +1,121 @@
+{
+  "schema_version": "ar5b-direction-board-campaign-v0",
+  "campaign_id": "ar5b-synthetic-delayed-payoff-and-new-option-v0",
+  "budget": {
+    "available_cost_units": 100
+  },
+  "config": {
+    "exploration_weight": 0.25,
+    "prior_strength": 3,
+    "empty_history_prior_gain_per_cost": 0.001,
+    "max_allocation_slots": 20
+  },
+  "directions": [
+    {
+      "direction_id": "direction-alpha",
+      "canonical_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+      "target_capability_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "solution_object_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "construction_principle_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "scope_assumptions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "verifier_assignment_ref": "verifier://synthetic/alpha-assignment",
+      "protected_floor_audit_ref": "audit://synthetic/alpha-floor",
+      "status": "qualified",
+      "protected_capability_floor_passed": true,
+      "local_best_score": 0.71,
+      "estimated_cost_per_evaluation": 8,
+      "max_share_bps": 5000,
+      "history": [
+        {
+          "evaluation_id": "alpha-eval-001",
+          "task_family_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "disposition": "confirmed",
+          "delta_vs_local_best": 0.15,
+          "cost_units": 8
+        },
+        {
+          "evaluation_id": "alpha-eval-002",
+          "task_family_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "disposition": "rejected",
+          "delta_vs_local_best": -0.02,
+          "cost_units": 8
+        },
+        {
+          "evaluation_id": "alpha-eval-003",
+          "task_family_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+          "disposition": "inconclusive",
+          "delta_vs_local_best": 0,
+          "cost_units": 8
+        }
+      ]
+    },
+    {
+      "direction_id": "direction-beta",
+      "canonical_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+      "target_capability_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "solution_object_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "construction_principle_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scope_assumptions_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "verifier_assignment_ref": "verifier://synthetic/beta-assignment",
+      "protected_floor_audit_ref": "audit://synthetic/beta-floor",
+      "status": "qualified",
+      "protected_capability_floor_passed": true,
+      "local_best_score": 0.58,
+      "estimated_cost_per_evaluation": 10,
+      "max_share_bps": 5000,
+      "history": [
+        {
+          "evaluation_id": "beta-eval-001",
+          "task_family_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+          "disposition": "confirmed",
+          "delta_vs_local_best": 0.04,
+          "cost_units": 10
+        },
+        {
+          "evaluation_id": "beta-eval-002",
+          "task_family_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+          "disposition": "rejected",
+          "delta_vs_local_best": -0.01,
+          "cost_units": 10
+        },
+        {
+          "evaluation_id": "beta-eval-003",
+          "task_family_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+          "disposition": "rejected",
+          "delta_vs_local_best": -0.02,
+          "cost_units": 10
+        },
+        {
+          "evaluation_id": "beta-eval-004",
+          "task_family_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+          "disposition": "inconclusive",
+          "delta_vs_local_best": 0,
+          "cost_units": 10
+        }
+      ]
+    },
+    {
+      "direction_id": "direction-gamma",
+      "canonical_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333",
+      "target_capability_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "solution_object_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "construction_principle_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "scope_assumptions_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "verifier_assignment_ref": "verifier://synthetic/gamma-assignment",
+      "protected_floor_audit_ref": "audit://synthetic/gamma-floor",
+      "status": "qualified",
+      "protected_capability_floor_passed": true,
+      "local_best_score": 0.66,
+      "estimated_cost_per_evaluation": 12,
+      "max_share_bps": 3000,
+      "history": []
+    }
+  ],
+  "new_direction_option": {
+    "enabled": true,
+    "prior_gain_per_cost": 0.003,
+    "estimated_cost_per_evaluation": 14,
+    "max_share_bps": 1000,
+    "verifier_intake_ref": "verifier://synthetic/new-direction-intake"
+  }
+}
