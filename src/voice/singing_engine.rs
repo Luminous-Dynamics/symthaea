@@ -90,6 +90,24 @@ pub struct VocalPerformance {
     pub pitch_curve: Vec<PitchPoint>,
 }
 
+/// Reject text that the current English-only G2P frontend would silently
+/// skip or partially map. Punctuation at token boundaries is stripped by the
+/// frontend itself; internal punctuation, digits and non-ASCII graphemes are
+/// not covered by its dictionary/letter fallback and must remain explicit errors.
+fn validate_english_orthography(lyrics: &str) -> Result<()> {
+    for token in lyrics.split_whitespace() {
+        let core = token.trim_matches(|character: char| !character.is_alphanumeric());
+        for grapheme in core.chars() {
+            if !grapheme.is_ascii_alphabetic() {
+                bail!(
+                    "current English G2P accepts ASCII alphabetic words with boundary punctuation only; unsupported character {grapheme:?} in token {token:?}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 impl VocalPerformance {
     /// Bind English lyrics to a performed Muse melody and derive restrained expression.
     ///
@@ -107,6 +125,7 @@ impl VocalPerformance {
         if lyrics.trim().is_empty() || melody.is_empty() {
             bail!("a vocal performance requires lyrics and at least one aligned note");
         }
+        validate_english_orthography(lyrics)?;
         let lexical_syllables = symthaea_muse::singing_bridge::syllable_count(lyrics);
         if lexical_syllables == 0 {
             bail!("the lyric frontend did not produce any pronounceable syllables");
@@ -593,6 +612,33 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("language='en' only"));
+    }
+
+    #[test]
+    fn from_melody_rejects_uncovered_graphemes_internal_punctuation_and_digits() {
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        for lyrics in ["café", "don't", "2026"] {
+            let error = VocalPerformance::from_melody(lyrics, &[note], "en")
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("unsupported character"), "{lyrics}: {error}");
+        }
+    }
+
+    #[test]
+    fn from_melody_accepts_boundary_punctuation_around_supported_words() {
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        assert!(VocalPerformance::from_melody("\"light,\"", &[note], "en").is_ok());
     }
 
     #[test]
