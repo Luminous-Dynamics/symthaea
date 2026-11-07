@@ -1,13 +1,10 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use rustfft::num_complex::Complex;
 use std::error::Error;
 use std::f64::consts::PI;
-use rustfft::num_complex::Complex;
-use symthaea_fractal_time_lab::exact_floquet::{
-    KickedIsingFloquet,
-    analyze_subharmonic_response,
-};
+use symthaea_fractal_time_lab::exact_floquet::{KickedIsingFloquet, analyze_subharmonic_response};
 
 const SPINS: usize = 8;
 const PERIODS: usize = 200;
@@ -126,7 +123,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("fields=zero");
     println!("random_product_seeds={ENSEMBLE_SEEDS}");
     println!("haar_like_seeds={ENSEMBLE_SEEDS}");
-    println!("state_class,seed,zz_coupling,mean_demodulated_order,mean_absolute_order,sign_coherence,samples,norm_error");
+    println!(
+        "state_class,seed,zz_coupling,mean_demodulated_order,mean_absolute_order,sign_coherence,samples,norm_error"
+    );
 
     for coupling in [0.0, 0.5] {
         report_case("all_up", 0, coupling, &basis_state(dimension, 0))?;
@@ -166,6 +165,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     println!("The J=0 control can show a period-two response from the pulse alone.");
-    println!("Compare full state-class distributions at J=0 and J=0.5; do not infer a DTC phase from this finite chain.");
+    println!(
+        "Compare full state-class distributions at J=0 and J=0.5; do not infer a DTC phase from this finite chain."
+    );
     Ok(())
 }
