@@ -63,7 +63,7 @@ For each B3 task, independent domain adjudicators should define an **admissible 
 - expected artifacts and validation criteria;
 - observations that would justify switching methods.
 
-Where no finite admissible method set can be defined, adjudicate the method's assumptions and empirical support; do not force a single hidden gold answer.
+Where no finite admissible method set can be defined, adjudicate the method's assumptions and empirical support; do not force a single hidden gold answer. The machine-readable policy and a synthetic two-method example are in `SYM_RSI_METHOD_ADJUDICATION_FIXTURE_V0_2026-11-07.json`, with structural contract in `SYM_RSI_METHOD_ADJUDICATION_SCHEMA_V0_2026-11-07.json`. Its example demonstrates policy semantics only; it is not an expert reference label or measured model comparison.
 
 Method-selection regret may be calculated only where alternatives have comparable, independently justified utility estimates. Otherwise report categorical validity, assumption satisfaction and expert disagreement separately.
 
