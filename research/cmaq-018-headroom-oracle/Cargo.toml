@@ -1,0 +1,11 @@
+[package]
+name = "cmaq-018-headroom-oracle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact finite repeated-continuation oracle for CMAQ-018 selectable headroom"
+
+[dependencies]
+
+[workspace]
