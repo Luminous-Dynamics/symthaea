@@ -19,7 +19,9 @@
         "1",
         "5",
         "20"
-      ]
+      ],
+      "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
     },
     {
       "claim_id": "H2-off-diagonal-transfer",
@@ -30,7 +32,9 @@
         "1",
         "4",
         "15"
-      ]
+      ],
+      "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
     },
     {
       "claim_id": "H3-contact-modulation",
@@ -41,7 +45,9 @@
         "1",
         "3/2",
         "2"
-      ]
+      ],
+      "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
     }
   ],
   "oracle_expectations": {
