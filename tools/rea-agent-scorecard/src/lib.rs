@@ -15,7 +15,7 @@ use serde::{Deserialize as SerdeDeserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
-use symthaea_rea_compat::canonical_jcs_bytes;
+use symthaea_rea_compat::{canonical_jcs_bytes, sha256_hex};
 
 pub const ORACLE_SCHEMA: &str = "luminous.rea.agent-oracle.v0";
 pub const SUBMISSION_SCHEMA: &str = "luminous.rea.agent-submission.v0";
@@ -337,6 +337,9 @@ pub struct TaskScore {
     pub occurrence_exact: bool,
     pub evidence_grounded: bool,
     pub false_supported: bool,
+    /// SHA-256 of JCS-canonical answer, allowing pair comparisons without
+    /// copying answer contents into the scorecard receipt.
+    pub answer_commitment_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -423,6 +426,16 @@ pub struct Ratio {
     pub numerator: usize,
     pub denominator: usize,
     pub rate: Option<f64>,
+}
+
+fn answer_commitment(value: &Value) -> Result<String, ScorecardError> {
+    let canonical = canonical_jcs_bytes(value).map_err(|error| {
+        ScorecardError::new(
+            ScorecardErrorKind::Canonicalization,
+            format!("agent answer canonicalization failed: {error}"),
+        )
+    })?;
+    Ok(sha256_hex(&canonical))
 }
 
 fn ratio(numerator: usize, denominator: usize) -> Ratio {
@@ -875,6 +888,7 @@ fn evaluate_submission(
             occurrence_exact: false,
             evidence_grounded: false,
             false_supported: false,
+            answer_commitment_sha256: None,
         });
     };
 
@@ -883,6 +897,11 @@ fn evaluate_submission(
         && jcs_equal(&submission.answer, &task.expected_answer).map_err(|error| {
             ScorecardError::new(ScorecardErrorKind::Canonicalization, error.message)
         })?;
+    let answer_commitment_sha256 = if answered {
+        Some(answer_commitment(&submission.answer)?)
+    } else {
+        None
+    };
     let mut claimed_supported = false;
     let mut replay_status = ReplayStatus::NotAttempted;
     let mut claim_scope_exact = false;
@@ -916,6 +935,7 @@ fn evaluate_submission(
                 occurrence_exact,
                 evidence_grounded,
                 false_supported: claimed_supported,
+                answer_commitment_sha256,
             });
         };
 
@@ -937,6 +957,7 @@ fn evaluate_submission(
                         occurrence_exact: false,
                         evidence_grounded: false,
                         false_supported: claimed_supported,
+                        answer_commitment_sha256,
                     });
                 }
             };
@@ -985,6 +1006,7 @@ fn evaluate_submission(
         occurrence_exact,
         evidence_grounded,
         false_supported: claimed_supported && !evidence_grounded,
+        answer_commitment_sha256,
     })
 }
 
@@ -1030,10 +1052,8 @@ fn build_pair_metrics(
                     && baseline_score.raw_correct
                     && mutated_score.raw_correct
                     && !jcs_equal(&baseline.expected_answer, &mutated.expected_answer)?
-                    && !jcs_equal(
-                        &submission_answer_placeholder(baseline_score),
-                        &submission_answer_placeholder(mutated_score),
-                    )?
+                    && baseline_score.answer_commitment_sha256
+                        != mutated_score.answer_commitment_sha256
             }
             PairKind::IrrelevantMutation => {
                 baseline_submission_answered
@@ -1041,6 +1061,8 @@ fn build_pair_metrics(
                     && baseline_score.raw_correct
                     && mutated_score.raw_correct
                     && jcs_equal(&baseline.expected_answer, &mutated.expected_answer)?
+                    && baseline_score.answer_commitment_sha256
+                        == mutated_score.answer_commitment_sha256
             }
         };
         let both_grounded =
@@ -1092,13 +1114,6 @@ fn build_pair_metrics(
     })
 }
 
-// The submission's pair relation is scored per-task above. This helper returns
-// a stable placeholder; task answer equality is checked directly in the
-// submission map in the next implementation refinement.
-fn submission_answer_placeholder(_score: &TaskScore) -> Value {
-    Value::Null
-}
-
 pub fn evaluate_scorecard(
     oracle_json: &[u8],
     submission_json: &[u8],
@@ -1143,10 +1158,11 @@ pub fn evaluate_scorecard(
     for task in &oracle.tasks {
         let score = evaluate_submission(task, submissions.get(task.task_id.as_str()).copied())?;
         overall.add(&score);
-        by_fault_family
+        let family_counts = by_fault_family
             .entry(task.fault_family.clone())
-            .or_insert_with(|| Counts::new(0))
-            .add(&score);
+            .or_insert_with(|| Counts::new(0));
+        family_counts.eligible += 1;
+        family_counts.add(&score);
         result_map.insert(task.task_id.clone(), score.clone());
         task_results.push(score);
     }
