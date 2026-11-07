@@ -118,11 +118,12 @@
       "additionalProperties": false,
       "required": [
         "context",
-        "probe_class",
-        "source_leg_id",
+        "delay_index",
         "descending_neuron_id",
+        "magnitude_bin",
         "phase_bin",
-        "delay_index"
+        "probe_class",
+        "source_leg_id"
       ],
       "properties": {
         "context": {
@@ -178,6 +179,11 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 255
+        },
+        "magnitude_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
         }
       },
       "allOf": [
