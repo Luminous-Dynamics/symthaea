@@ -545,6 +545,41 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_claim_ids() {
+        let mut manifest = fixture();
+        manifest.claims[1].claim_id = manifest.claims[0].claim_id.clone();
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_inconsistent_path_horizon() {
+        let mut manifest = fixture();
+        manifest.claims[1].e_process_values.pop();
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_e_process_not_started_at_one() {
+        let mut manifest = fixture();
+        manifest.claims[1].e_process_values[0] = r(2, 1);
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_zero_weight_claim() {
+        let mut manifest = fixture();
+        manifest.claims[2].weight = Rational::zero();
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_receipt_digest() {
+        let mut manifest = fixture();
+        manifest.claims[0].component_validity_receipt_sha256 = "not-a-digest".into();
+        assert!(audit_family(&manifest).is_err());
+    }
+
+    #[test]
     fn rejects_mixed_global_filtrations() {
         let mut manifest = fixture();
         manifest.claims[1].global_filtration_sha256 = digest('9');
