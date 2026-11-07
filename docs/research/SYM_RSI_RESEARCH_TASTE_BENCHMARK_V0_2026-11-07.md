@@ -129,3 +129,13 @@ Every case records the expected action, required response elements, prohibited i
 
 A custom structural walk against the companion schema found zero errors, 16 unique fixture IDs, full coverage of all five stages, and non-empty anti-inference/evidence-request fields. This is a structure check, not a full standards-library JSON Schema run or an agent evaluation.
 
+## 8. Decision-theoretic value, not information volume
+
+The preregistration now freezes a decision-theory contract: decision options, prior hypothesis distribution, posterior update method, utility function and outcome units, expected value with/without the experiment, EVSI method, full experiment and opportunity cost, downside risk, and sensitivity analysis.
+
+Do not equate:
+- **entropy reduction / expected information gain:** how much uncertainty an observation is expected to remove;
+- **expected value of sample information (EVSI):** how much the observation is expected to improve the best downstream decision;
+- **net decision value:** EVSI minus full experimental and opportunity costs, with downside-risk and feasibility constraints.
+
+An experiment can be informative but not decision-relevant when all plausible outcomes leave the action unchanged. Conversely, a narrow measurement can have high decision value if it changes a costly or safety-critical choice. Freeze utility weights before outcomes; no post-hoc reweighting. If value estimates are not defensible or the choice is non-identifiable, the right action is to abstain or seek more evidence, not invent precision.
