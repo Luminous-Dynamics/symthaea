@@ -548,3 +548,9 @@ Also reuse [#7955 — metadata-first scans and payload cache residency](https://
 ### Related HDC core contract
 
 Exact/stride-sampled similarity semantics are tracked separately in [#10918 — HDC-SEMANTICS-002](https://github.com/Luminous-Dynamics/symthaea/issues/10918). HME must consume the canonical full-dimension exact reference and must not create a competing similarity implementation. The existing stride-based path is treated as an explicitly approximate/adaptive mode.
+
+## 15. Industry benchmark crosswalk and progressive exact retrieval
+
+The companion [HME industry benchmark crosswalk](HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md) maps HME claims to three separate benchmark layers: HDC representation/dynamics, agent-memory utility/governance, and storage/retrieval systems. It reuses #8427, #9145, #9075, #9177, #9139, #7922, #7934, #7955, #7864/#7866 and #10896; it does not create a competing benchmark runner.
+
+A new research child, [#10945 — HME-EXACT-PRUNE-001](https://github.com/Luminous-Dynamics/symthaea/issues/10945), investigates progressive exact scans using admissible partial-score bounds. The goal is to stop reading a candidate only after proving it cannot enter top-k, while preserving full-scan oracle IDs, ordering and scores. This is distinct from ANN: all candidates remain logically accounted for, and approximate indexes may reorder evaluation but may not omit candidates. The Binary/Hamming and Continuous/cosine bounds have separate proof and numeric-safety requirements. No speedup is claimed; a full scan remains the fallback and canonical oracle.
