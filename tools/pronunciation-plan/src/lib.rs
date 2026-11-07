@@ -295,6 +295,239 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
     Ok(())
 }
 
+
+/// Score event consumed by a vocal performance. Rests are explicit and remain
+/// unbound; a renderer must not turn them into sustained vowels.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScoreEvent {
+    pub start_s: f32,
+    pub duration_s: f32,
+    pub kind: ScoreEventKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreEventKind {
+    SungNote { frequency_hz: f32, velocity: f32 },
+    Rest,
+}
+
+/// Ordered note-index assignment for one resolved pronunciation syllable.
+/// Multiple consecutive note indices represent a melisma over one explicitly
+/// designated vowel phone from the selected pronunciation candidate.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SyllableNoteBinding {
+    pub word_index: usize,
+    pub syllable_index: usize,
+    pub note_indices: Vec<usize>,
+    pub melisma_phone_index: Option<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VocalPhraseSpan {
+    /// Half-open range into the flattened pronunciation syllable sequence.
+    pub syllable_start: usize,
+    pub syllable_end: usize,
+    pub breath_before_s: f32,
+    pub breath_after_s: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VocalScoreAlignment {
+    pub schema_version: u32,
+    pub events: Vec<ScoreEvent>,
+    pub syllable_bindings: Vec<SyllableNoteBinding>,
+    pub phrases: Vec<VocalPhraseSpan>,
+}
+
+impl VocalScoreAlignment {
+    /// Validate the score mapping against a fully resolved pronunciation plan.
+    /// Every selected syllable and every sung score event must be represented
+    /// exactly once. Rests are explicit and cannot be assigned to a syllable.
+    pub fn validate_against(&self, pronunciation: &PronunciationPlan) -> Result<(), String> {
+        pronunciation.validate_renderable()?;
+        if self.schema_version != 1 {
+            return Err(format!(
+                "unsupported vocal score-alignment schema version {}",
+                self.schema_version
+            ));
+        }
+        if self.events.is_empty() || self.syllable_bindings.is_empty() || self.phrases.is_empty() {
+            return Err("score events, syllable bindings, and phrases are required".into());
+        }
+
+        let mut previous_event_end = 0.0f32;
+        for (event_index, event) in self.events.iter().enumerate() {
+            if !event.start_s.is_finite()
+                || event.start_s < 0.0
+                || !event.duration_s.is_finite()
+                || event.duration_s <= 0.0
+            {
+                return Err(format!("score event {event_index} has invalid timing"));
+            }
+            let end = event.start_s + event.duration_s;
+            if !end.is_finite() || end <= event.start_s {
+                return Err(format!("score event {event_index} has invalid end time"));
+            }
+            if event.start_s < previous_event_end {
+                return Err(format!(
+                    "score event {event_index} overlaps or is out of chronological order"
+                ));
+            }
+            if let ScoreEventKind::SungNote {
+                frequency_hz,
+                velocity,
+            } = event.kind
+            {
+                if !frequency_hz.is_finite()
+                    || frequency_hz <= 0.0
+                    || !velocity.is_finite()
+                    || !(0.0..=1.0).contains(&velocity)
+                {
+                    return Err(format!("sung score event {event_index} has invalid pitch/velocity"));
+                }
+            }
+            previous_event_end = end;
+        }
+
+        let expected_syllables: Vec<(usize, usize)> = pronunciation
+            .words
+            .iter()
+            .enumerate()
+            .flat_map(|(word_index, word)| {
+                let selected = word
+                    .selected_candidate_id
+                    .as_deref()
+                    .and_then(|id| word.candidates.iter().find(|candidate| candidate.candidate_id == id))
+                    .expect("validate_renderable guarantees a selected candidate");
+                (0..selected.syllables.len()).map(move |syllable_index| (word_index, syllable_index))
+            })
+            .collect();
+
+        if self.syllable_bindings.len() != expected_syllables.len() {
+            return Err(format!(
+                "syllable binding count {} does not match selected pronunciation count {}",
+                self.syllable_bindings.len(),
+                expected_syllables.len()
+            ));
+        }
+
+        let mut bound_sung_events = std::collections::BTreeSet::new();
+        let mut previous_bound_event = None;
+        for (binding_index, (binding, expected)) in self
+            .syllable_bindings
+            .iter()
+            .zip(expected_syllables.iter())
+            .enumerate()
+        {
+            if (binding.word_index, binding.syllable_index) != *expected {
+                return Err(format!(
+                    "syllable binding {binding_index} is out of pronunciation order; expected word {} syllable {}",
+                    expected.0, expected.1
+                ));
+            }
+            if binding.note_indices.is_empty() {
+                return Err(format!("syllable binding {binding_index} has no score notes"));
+            }
+            for (span_index, note_index) in binding.note_indices.iter().copied().enumerate() {
+                let Some(event) = self.events.get(note_index) else {
+                    return Err(format!(
+                        "syllable binding {binding_index} references missing score event {note_index}"
+                    ));
+                };
+                if !matches!(event.kind, ScoreEventKind::SungNote { .. }) {
+                    return Err(format!(
+                        "syllable binding {binding_index} assigns a rest event {note_index}"
+                    ));
+                }
+                if span_index > 0 && note_index != binding.note_indices[span_index - 1] + 1 {
+                    return Err(format!(
+                        "syllable binding {binding_index} melisma note span must be contiguous"
+                    ));
+                }
+                if previous_bound_event.is_some_and(|previous| note_index <= previous) {
+                    return Err(format!(
+                        "syllable binding {binding_index} overlaps or reorders score notes"
+                    ));
+                }
+                if !bound_sung_events.insert(note_index) {
+                    return Err(format!("score event {note_index} is assigned more than once"));
+                }
+                previous_bound_event = Some(note_index);
+            }
+
+            let selected_id = pronunciation.words[binding.word_index]
+                .selected_candidate_id
+                .as_deref()
+                .expect("validate_renderable guarantees selected candidate");
+            let selected = pronunciation.words[binding.word_index]
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == selected_id)
+                .expect("validate_renderable guarantees selected candidate exists");
+            let syllable = &selected.syllables[binding.syllable_index];
+            if binding.note_indices.len() > 1 {
+                let Some(phone_index) = binding.melisma_phone_index else {
+                    return Err(format!(
+                        "multi-note syllable binding {binding_index} requires an explicit melisma vowel"
+                    ));
+                };
+                let Some(phone) = syllable.phones.get(phone_index) else {
+                    return Err(format!(
+                        "syllable binding {binding_index} melisma phone index is out of range"
+                    ));
+                };
+                if phone.kind != PhoneKind::Vowel {
+                    return Err(format!(
+                        "syllable binding {binding_index} melisma must sustain a vowel phone"
+                    ));
+                }
+            } else if binding.melisma_phone_index.is_some() {
+                return Err(format!(
+                    "single-note syllable binding {binding_index} must not declare a melisma phone"
+                ));
+            }
+        }
+
+        for (event_index, event) in self.events.iter().enumerate() {
+            match event.kind {
+                ScoreEventKind::SungNote { .. } if !bound_sung_events.contains(&event_index) => {
+                    return Err(format!("sung score event {event_index} is unassigned"));
+                }
+                ScoreEventKind::Rest if bound_sung_events.contains(&event_index) => {
+                    return Err(format!("rest event {event_index} cannot be bound"));
+                }
+                _ => {}
+            }
+        }
+
+        let mut next_syllable = 0usize;
+        for (phrase_index, phrase) in self.phrases.iter().enumerate() {
+            if phrase.syllable_start != next_syllable
+                || phrase.syllable_start >= phrase.syllable_end
+                || phrase.syllable_end > expected_syllables.len()
+                || !phrase.breath_before_s.is_finite()
+                || phrase.breath_before_s < 0.0
+                || !phrase.breath_after_s.is_finite()
+                || phrase.breath_after_s < 0.0
+            {
+                return Err(format!(
+                    "phrase {phrase_index} has invalid or non-partitioning syllable range/breath timing"
+                ));
+            }
+            next_syllable = phrase.syllable_end;
+        }
+        if next_syllable != expected_syllables.len() {
+            return Err("phrase ranges do not cover every pronunciation syllable".into());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
