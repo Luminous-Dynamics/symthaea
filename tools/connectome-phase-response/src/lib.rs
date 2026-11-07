@@ -30,6 +30,29 @@ impl Phase {
         Self(wrap_microturns(value) as i32)
     }
 
+    /// Construct a phase sample from an unwrapped phase in radians.
+    ///
+    /// The conversion quantizes to the nearest microturn using Rust's
+    /// round-half-away-from-zero rule. The quantization error is less than
+    /// half a microturn; upstream phase-estimator uncertainty is not included.
+    pub fn from_unwrapped_radians(value: f64) -> Result<Self, PhaseError> {
+        if !value.is_finite() {
+            return Err(PhaseError::NonFinitePhase);
+        }
+        let microturns = value * (PHASE_SCALE as f64) / std::f64::consts::TAU;
+        if !microturns.is_finite()
+            || microturns < i64::MIN as f64
+            || microturns >= i64::MAX as f64
+        {
+            return Err(PhaseError::PhaseOutOfRange);
+        }
+        let rounded = microturns.round();
+        if rounded < i64::MIN as f64 || rounded >= i64::MAX as f64 {
+            return Err(PhaseError::PhaseOutOfRange);
+        }
+        Ok(Self::from_unwrapped_microturns(rounded as i64))
+    }
+
     /// Return the canonical signed microturn count.
     pub const fn microturns(self) -> i32 {
         self.0
@@ -680,6 +703,8 @@ pub enum PhaseError {
     InvalidLeg(u8),
     InvalidPhaseBin(u8),
     InvalidMagnitudeBin(u8),
+    NonFinitePhase,
+    PhaseOutOfRange,
     SourceLegRequired(ProbeClass),
     SourceLegForbidden(ProbeClass),
     DescendingNeuronRequired,
@@ -708,6 +733,8 @@ impl fmt::Display for PhaseError {
             Self::InvalidLeg(value) => write!(f, "invalid leg ID {value}; expected 0..6"),
             Self::InvalidPhaseBin(value) => write!(f, "invalid phase bin {value}; expected 0..8"),
             Self::InvalidMagnitudeBin(value) => write!(f, "invalid magnitude bin {value}; expected 0..16"),
+            Self::NonFinitePhase => write!(f, "phase input is non-finite"),
+            Self::PhaseOutOfRange => write!(f, "unwrapped phase is outside the representable microturn range"),
             Self::SourceLegRequired(class) => write!(f, "probe class {class:?} requires a source leg"),
             Self::SourceLegForbidden(class) => write!(f, "probe class {class:?} is a global input and forbids a source leg"),
             Self::DescendingNeuronRequired => write!(f, "descending command probe requires an exact DNg100/DNg97/DNb08 identity"),
@@ -808,6 +835,32 @@ mod tests {
 
     fn zero_samples() -> [PhaseSample; LEG_COUNT] {
         [PhaseSample::from_unwrapped_microturns(0); LEG_COUNT]
+    }
+
+    #[test]
+    fn radians_ingestion_is_checked_and_preserves_cycle_winding() {
+        let one_cycle = PhaseSample::from_unwrapped_radians(std::f64::consts::TAU).unwrap();
+        assert_eq!(one_cycle.cycle_index(), 1);
+        assert_eq!(one_cycle.fractional_phase().microturns(), 0);
+
+        let before = PhaseSample::from_unwrapped_radians(0.99 * std::f64::consts::TAU).unwrap();
+        let after = PhaseSample::from_unwrapped_radians(1.01 * std::f64::consts::TAU).unwrap();
+        let fractional = Phase::difference(after.fractional_phase(), before.fractional_phase());
+        assert_eq!(fractional.microturns(), 20_000);
+        assert_eq!(cycle_slip_delta(after, before, fractional), 0);
+
+        assert_eq!(
+            PhaseSample::from_unwrapped_radians(f64::NAN),
+            Err(PhaseError::NonFinitePhase)
+        );
+        assert_eq!(
+            PhaseSample::from_unwrapped_radians(f64::INFINITY),
+            Err(PhaseError::NonFinitePhase)
+        );
+        assert_eq!(
+            PhaseSample::from_unwrapped_radians(1.0e300),
+            Err(PhaseError::PhaseOutOfRange)
+        );
     }
 
     #[test]
