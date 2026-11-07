@@ -235,7 +235,15 @@ mod tests {
         assert_eq!(sync_report.unique_valid_candidates, async_report.unique_valid_candidates);
         let sync_makespan = sync.attempts.iter().map(|attempt| attempt.end_ms).max().unwrap();
         let async_makespan = async_trace.attempts.iter().map(|attempt| attempt.end_ms).max().unwrap();
+        assert_eq!(sync_makespan, 1_400);
+        assert_eq!(async_makespan, 1_000);
         assert!(async_makespan < sync_makespan);
+        assert_eq!(sync_report.observed_worker_idle_ms, 900);
+        assert_eq!(async_report.observed_worker_idle_ms, 100);
+        assert!((sync_report.observed_worker_utilization - (1900.0 / 2800.0)).abs() < 1e-12);
+        assert!((async_report.observed_worker_utilization - 0.95).abs() < 1e-12);
+        assert!((async_report.valid_candidates_per_observed_hour
+            / sync_report.valid_candidates_per_observed_hour - 1.4).abs() < 1e-12);
     }
 
     #[test]
