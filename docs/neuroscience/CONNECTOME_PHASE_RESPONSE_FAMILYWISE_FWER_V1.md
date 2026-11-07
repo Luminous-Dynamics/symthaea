@@ -76,6 +76,7 @@ The family FWER bound is alpha * sum(weight) = 1/10. This arithmetic is a softwa
 Keep assurance targets on separate leaderboards:
 - weighted anytime e-Bonferroni / V1 (FWER);
 - terminal Holm/Bonferroni (fixed-horizon FWER);
+- asymptotic online FWER under dependent test statistics using consistent weights / low-intensity bootstrap (Jankovic, Fischer & Brannath, 2 July 2026, DOI: 10.1177/09622802261461776). Report as a separate **asymptotic** guarantee, not as finite-sample anytime-valid FWER;
 - naive current-value e-BH and naive running-max e-BH (negative controls, FDR/FDR-sup);
 - A1/A2 adjuster-based running-sup e-BH from the Carefree multiple-testing work and PR #9110 (FDR-sup);
 - e-LOND / e-GAI and e-PS only under their documented feedback/arrival assumptions;
