@@ -345,6 +345,16 @@ fn validate_melismas(
     Ok(())
 }
 
+/// A phone is an exact match only when its symbol, lexical position,
+/// syllable assignment, and vowel/consonant class all agree. Timing metrics
+/// must not reward a correctly spelled phone attached to the wrong lyric slot.
+fn same_phone_identity(reference: &PhoneEvent, predicted: &PredictedPhoneEvent) -> bool {
+    reference.symbol == predicted.symbol
+        && reference.word_index == predicted.word_index
+        && reference.syllable_index == predicted.syllable_index
+        && reference.is_vowel == predicted.is_vowel
+}
+
 fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEvent]) -> Vec<Edit> {
     let n = reference.len();
     let m = predicted.len();
@@ -359,11 +369,8 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
 
     for i in 1..=n {
         for j in 1..=m {
-            let substitution_cost = if reference[i - 1].symbol == predicted[j - 1].symbol {
-                0
-            } else {
-                1
-            };
+            let substitution_cost =
+                usize::from(!same_phone_identity(&reference[i - 1], &predicted[j - 1]));
             let diagonal = costs[i - 1][j - 1] + substitution_cost;
             let deletion = costs[i - 1][j] + 1;
             let insertion = costs[i][j - 1] + 1;
@@ -376,11 +383,10 @@ fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEv
     while i > 0 || j > 0 {
         // Deterministic tie-breaking: diagonal, then deletion, then insertion.
         if i > 0 && j > 0 {
-            let cost = if reference[i - 1].symbol == predicted[j - 1].symbol {
-                0
-            } else {
-                1
-            };
+            let cost = usize::from(!same_phone_identity(
+                &reference[i - 1],
+                &predicted[j - 1],
+            ));
             if costs[i][j] == costs[i - 1][j - 1] + cost {
                 if cost == 0 {
                     reversed.push(Edit::Exact {
@@ -510,6 +516,30 @@ mod tests {
         assert_eq!(result.timing.exact_phone_pairs, 1);
         assert!((result.timing.onset_mae_ms.unwrap() - 10.0).abs() < 1e-10);
         assert_eq!(result.edits.substitutions, 1);
+    }
+
+    #[test]
+    fn same_ipa_in_wrong_lexical_slot_is_not_an_exact_match() {
+        let reference = vec![reference("a", 0, 100, 500, true)];
+        let mut predicted = vec![prediction("a", 0, 100, 500, true)];
+        predicted[0].word_index = 1;
+
+        let result = score_alignment(16_000, 1_000, &reference, &predicted, &[]).unwrap();
+        assert_eq!(result.edits.exact_matches, 0);
+        assert_eq!(result.edits.substitutions, 1);
+        assert_eq!(result.phone_error_rate, 1.0);
+        assert_eq!(result.timing.onset_mae_ms, None);
+    }
+
+    #[test]
+    fn same_ipa_with_wrong_vowel_class_is_not_an_exact_match() {
+        let reference = vec![reference("m", 0, 100, 500, false)];
+        let predicted = vec![prediction("m", 0, 100, 500, true)];
+
+        let result = score_alignment(16_000, 1_000, &reference, &predicted, &[]).unwrap();
+        assert_eq!(result.edits.exact_matches, 0);
+        assert_eq!(result.edits.substitutions, 1);
+        assert_eq!(result.timing.offset_mae_ms, None);
     }
 
     #[test]
