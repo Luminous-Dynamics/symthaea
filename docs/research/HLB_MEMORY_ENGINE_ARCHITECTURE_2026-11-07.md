@@ -605,3 +605,6 @@ The HME branch now includes:
 - `docs/research/fixtures/hme_query_receipt_states_v0.json` — full synthetic receipts for ExactComplete (full scan and safe-pruned), ApproximateComplete, Incomplete/BudgetExhausted and UnavailableOrInvalid.
 
 The schema validates structure and status-dependent fields. It does not prove candidate-count arithmetic, manifest consistency, residual bounds or pruning validity. An independent semantic verifier must reconcile counts against the pinned generation and validate any proof/certificate claims before an ExactComplete or mathematical-proof status can be trusted.
+
+
+A companion [blockwise residual fixture](fixtures/hme_certified_compression_block_bounds_v0.json) illustrates why per-block certificates may be tighter than a single global residual radius. In its 4D synthetic example, the query-weighted block residual dot bound is 2.0 versus 10.1 under the global bound; the corresponding real-arithmetic cosine upper bounds are approximately 0.01048 and 0.05291. This is a geometry sanity check only; it does not validate a production quantizer or floating-point implementation.
