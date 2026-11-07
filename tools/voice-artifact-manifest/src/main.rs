@@ -145,7 +145,10 @@ fn normalized_root(path: &Path) -> Result<PathBuf, String> {
 
 fn ensure_manifest_outside_root(root: &Path, manifest_path: &Path) -> Result<(), String> {
     let root = normalized_root(root)?;
-    let parent = manifest_path.parent().unwrap_or_else(|| Path::new("."));
+    let parent = manifest_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     let parent = parent
         .canonicalize()
         .map_err(|error| fail(format!("manifest parent directory is unavailable: {error}")))?;
