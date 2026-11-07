@@ -213,3 +213,40 @@ Add proof backend as a controlled experimental factor. For SAT, compare proof-ca
 For exact #SAT, evaluate certificate-capable systems separately. The July 2026 analysis of kcps, MICE, CPOG and CLIP finds CPOG simulates MICE and kcps, while MICE and kcps are exponentially incomparable. CLIP simulates all three. These are proof-system strength statements, not a guarantee of practical proof-size or checker-time dominance. See https://doi.org/10.1007/s10817-026-09757-w and https://pmc.ncbi.nlm.nih.gov/articles/PMC13385077/.
 
 For every proof-aware experiment report: solving time, proof-generation overhead, certificate bytes, peak proof/checker memory, checker wall/CPU time, streaming feasibility, independent checker outcome and time-to-trusted-result. Keep solver search seed/configuration fixed between proof/no-proof ablations where feasible; disclose when proof logging changes search behaviour.
+
+
+## 11. Active experimental design: learn which benchmark to run next
+
+A strategy-discovery system should optimize not only which algorithm to execute, but also **which experiment to perform next**. Benchmark runs are expensive, and many easy or redundant instances do not materially distinguish competing strategies.
+
+Research basis: Fuchs, Bach & Iser, *Active Learning for SAT Solver Benchmarking*, Journal of Automated Reasoning (2025), https://doi.org/10.1007/s10817-025-09729-6. The work treats benchmark selection as dynamic active learning: select informative instances to estimate a new solver's rank while reducing benchmarking cost.
+
+For Symthaea, distinguish three processes:
+
+1. **Development-set active selection:** choose known, non-confirmatory instances that are most likely to change a strategy-selection decision.
+2. **Adversarial instance generation:** create new contract-valid cases that expose weaknesses or distinguish hypotheses.
+3. **Sealed confirmation:** evaluate the frozen successor on an untouched full corpus, or a preregistered statistically valid confirmatory design. The selector and generator cannot alter its membership, truth labels, scoring, or resource limits.
+
+### Baselines
+
+- Full fixed development set.
+- Uniform random sample.
+- Stratified sample by benchmark family, generator lineage and structural features.
+- Active-learning benchmark selector.
+- Adversarial generation alone.
+- Combined active selection + adversarial generation + strategy evolution.
+
+### Measurements
+
+- Strategy-rank accuracy and rank correlation.
+- Decision regret: quality lost by selecting the wrong strategy from the limited sample.
+- Compute spent before the selector reaches a stable decision.
+- Number of instances and total solver/checker CPU time required.
+- Selection-model calibration and uncertainty quality.
+- Coverage of families, generators and structural clusters.
+- Frequency with which a selected experiment actually changes the next research or engineering decision.
+- Selector overhead and the cost of false confidence.
+
+The acquisition function should estimate expected value of information: probability that an experiment changes a decision, multiplied by the consequence of that decision, balanced against experiment cost and coverage obligations. An experiment can be valuable because it falsifies a proposed transformation or invalidates an attractive strategy, not only because it improves a score.
+
+**No adaptive peeking at the confirmatory set.** Repeatedly selecting the most informative examples from a reused test set creates selection bias. Active sampling is for development and diagnosis; final promotion still requires a sealed evaluation and valid uncertainty accounting. Use #10805's existing receipt/manifest format to record the sampling policy, selected instance IDs and selection-model version; do not create a parallel evidence format.
