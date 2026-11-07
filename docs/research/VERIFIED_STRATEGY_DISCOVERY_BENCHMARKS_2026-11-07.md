@@ -270,3 +270,24 @@ Before benchmarking QBF, pin a distinct contract for:
 - proof backend and checker acceptance.
 
 Evaluate d4-QBF and reproducible artifacts for TR26-279 when available, tree versus DAG compilation, relevant #QBF proof systems and uncompiled QBF baselines. Record alternation depth, dependency width, Skolem artifact size, compilation size, exact count bit width, checker time/memory and time-to-trusted-result. No QBF implementation or SOTA claim follows from the structural prefix validator alone.
+
+
+## 13. Claim-specific proof and checker baselines
+
+Add proof capability as a typed benchmark factor, not just a Boolean "proof enabled" flag.
+
+| Claim | Candidate evidence family | Important non-equivalence |
+|---|---|---|
+| SAT / UNSAT | Direct source-level model validation; DRAT/LRAT checking for UNSAT | A solver's UNSAT status without a checked certificate is not a proved result |
+| Exact #SAT / WMC | CPOG, MICE, kcps and certified compiled representations | Decision UNSAT proofs do not establish a model count |
+| Projected count | Skolem-annotated projected knowledge-compilation certificates | Full-model count does not establish visible support cardinality |
+| QBF / #QBF | Quantifier prefix + Skolem strategy evidence; Q-MICE and QBF compilation proof systems | Unordered hidden-variable scopes erase dependency semantics |
+| MaxSAT optimum | MaxSAT-specific core-guided proof logging or a verified pseudo-Boolean proof such as VeriPB | An UNSAT check at one bound alone does not certify the complete optimum derivation |
+| PAC count | Theorem-backed approximation guarantee, epsilon/delta or alpha, seed/policy and checker | MPFR/high precision is not a PAC guarantee |
+
+Relevant research:
+- Q-MICE proof system for counting winning strategies / Skolem functions: https://eccc.weizmann.ac.il/report/2026/101/
+- MaxSAT-specific proof logging for core-guided OLL solvers: https://conf.researchr.org/details/ase-2025/ase-2025-papers/49/Efficient-and-Verifiable-Proof-Logging-for-MaxSAT-Solving
+- VeriPB general pseudo-Boolean proof ecosystem: https://veripb.org/
+
+Benchmark each producer/checker pair on the same instance family. Report proof bytes, generation overhead, independent checking time/memory, checker rejection rate under mutations, streaming support, and time-to-trusted-result. Do not compare only raw proof generation or only solver runtime. For MaxSAT, include proof-carrying lower-bound derivation cost in addition to incumbent feasibility.
