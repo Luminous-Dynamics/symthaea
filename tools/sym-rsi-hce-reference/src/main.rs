@@ -3,7 +3,8 @@ use std::fs;
 use std::process::ExitCode;
 
 use sym_rsi_hce_reference::{
-    analyze_worker_trace, parse_and_validate_operator_trace, HceEpoch, WorkerTrace,
+    analyze_worker_trace, compare_worker_regimes, parse_and_validate_operator_trace,
+    HceEpoch, WorkerSimulationPlan, WorkerTrace,
 };
 
 fn validate_synthetic_fixtures() -> Result<serde_json::Value, String> {
@@ -19,12 +20,19 @@ fn validate_synthetic_fixtures() -> Result<serde_json::Value, String> {
     let operator_report = parse_and_validate_operator_trace(include_str!("../fixtures/operator-trace-v0.json"))
         .map_err(|error| format!("interactive operator trace contract: {error}"))?;
 
+    let simulation_plan: WorkerSimulationPlan =
+        serde_json::from_str(include_str!("../fixtures/worker-regime-comparison-v0.json"))
+            .map_err(|error| format!("worker regime simulation fixture JSON: {error}"))?;
+    let regime_comparison = compare_worker_regimes(&simulation_plan)
+        .map_err(|error| format!("worker regime simulation: {error}"))?;
+
     Ok(serde_json::json!({
         "valid": true,
         "hce": hce_report,
         "worker_trace": trace_report,
         "interactive_operator": operator_report,
-        "claim_limit": "Synthetic contract and trace analysis only; no workers were scheduled, no model or tools were run, no hidden labels were accessed, and no research result was measured."
+        "worker_regime_simulation": regime_comparison,
+        "claim_limit": "Synthetic contract, event simulation and trace analysis only; no production workers were scheduled, no model or tools were run, no hidden labels were accessed, and no research result was measured."
     }))
 }
 
