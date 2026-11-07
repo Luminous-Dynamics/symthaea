@@ -52,6 +52,9 @@ jobs:
           assert fixture["rows"][3]["probe_key"]["descending_neuron_id"] == "DNg100"
           assert fixture["rows"][4]["probe_key"]["descending_neuron_id"] == "DNg97"
           assert fixture["rows"][3]["probe_key"] != fixture["rows"][4]["probe_key"]
+          assert fixture["rows"][3]["probe_key"]["magnitude_bin"] == 0
+          assert fixture["rows"][5]["probe_key"]["magnitude_bin"] == 1
+          assert fixture["rows"][3]["probe_key"]["magnitude_bin"] != fixture["rows"][5]["probe_key"]["magnitude_bin"]
           print("phase-response schema/fixture: PASS")
           PY
       - name: Format standalone crate
