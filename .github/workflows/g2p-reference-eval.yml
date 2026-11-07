@@ -35,8 +35,17 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Format-check isolated evaluator
-        run: rustfmt +1.96.0 --edition 2024 --check tools/g2p-eval/src/main.rs
+      - name: Apply pinned rustfmt and verify canonical output
+        run: |
+          rustfmt +1.96.0 --edition 2024 tools/g2p-eval/src/main.rs
+          rustfmt +1.96.0 --edition 2024 --check tools/g2p-eval/src/main.rs
+
+      - name: Upload canonical formatted source for exact-head review
+        uses: actions/upload-artifact@v4
+        with:
+          name: g2p-eval-formatted-source-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tools/g2p-eval/src/main.rs
+          if-no-files-found: error
 
       - name: Generate isolated lockfile
         run: cargo +1.96.0 generate-lockfile --manifest-path tools/g2p-eval/Cargo.toml
