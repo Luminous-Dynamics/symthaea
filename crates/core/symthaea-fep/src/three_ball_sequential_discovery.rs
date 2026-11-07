@@ -41,7 +41,7 @@ pub enum ThreeBallModelFamily {
 }
 
 /// Action-selection policy for the sequential discovery adaptation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ThreeBallSequentialPolicyKind {
     /// Select the lowest expected-free-energy gaze/choice action.
     ExpectedFreeEnergy,
@@ -151,6 +151,92 @@ pub struct ThreeBallSequentialDiscoveryResult {
     pub final_model_posterior: Vec<(String, f64)>,
 }
 
+/// Raw paired episodes for one policy arm. All arms in one benchmark use
+/// the same ordered seed list and the same hidden scenes for each seed.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallSequentialPolicyArm {
+    pub policy_kind: ThreeBallSequentialPolicyKind,
+    pub episodes: Vec<ThreeBallSequentialDiscoveryResult>,
+}
+
+/// Reproducible paired policy matrix. This stores raw per-seed episodes rather
+/// than only aggregate scores so independent analyses can recompute paired
+/// differences, bootstrap intervals, and calibration metrics.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThreeBallPairedPolicyBenchmark {
+    pub format_version: u32,
+    pub source_demo_commit: String,
+    pub source_rule_generator_commit: String,
+    pub parameterization_digest: String,
+    pub true_rule_one_based_index: usize,
+    pub model_family: ThreeBallModelFamily,
+    pub seeds: Vec<u64>,
+    pub arms: Vec<ThreeBallSequentialPolicyArm>,
+}
+
+/// Run a paired policy-ablation matrix over identical environment seeds.
+///
+/// The environment and policy RNG streams are domain-separated inside each
+/// episode. A random policy may consume extra policy draws without changing
+/// the hidden-scene sequence used by another arm with the same seed.
+pub fn run_three_ball_paired_policy_benchmark(
+    space: &ThreeBallRuleSpace,
+    true_rule_one_based_index: usize,
+    seeds: &[u64],
+    policy_kinds: &[ThreeBallSequentialPolicyKind],
+    base_config: ThreeBallSequentialDiscoveryConfig,
+) -> Result<ThreeBallPairedPolicyBenchmark, ThreeBallSequentialDiscoveryError> {
+    if seeds.is_empty() {
+        return Err(ThreeBallSequentialDiscoveryError::EmptySeedSet);
+    }
+    if policy_kinds.is_empty() {
+        return Err(ThreeBallSequentialDiscoveryError::EmptyPolicySet);
+    }
+    let mut seen_seeds = BTreeSet::new();
+    for seed in seeds.iter().copied() {
+        if !seen_seeds.insert(seed) {
+            return Err(ThreeBallSequentialDiscoveryError::DuplicateSeed(seed));
+        }
+    }
+    let mut seen_policies = BTreeSet::new();
+    for policy_kind in policy_kinds.iter().copied() {
+        if !seen_policies.insert(policy_kind) {
+            return Err(ThreeBallSequentialDiscoveryError::DuplicatePolicy(policy_kind));
+        }
+    }
+
+    let mut arms = Vec::with_capacity(policy_kinds.len());
+    for policy_kind in policy_kinds.iter().copied() {
+        let mut episodes = Vec::with_capacity(seeds.len());
+        for seed in seeds.iter().copied() {
+            episodes.push(run_three_ball_sequential_discovery(
+                space,
+                true_rule_one_based_index,
+                seed,
+                ThreeBallSequentialDiscoveryConfig {
+                    policy_kind,
+                    ..base_config
+                },
+            )?);
+        }
+        arms.push(ThreeBallSequentialPolicyArm {
+            policy_kind,
+            episodes,
+        });
+    }
+
+    Ok(ThreeBallPairedPolicyBenchmark {
+        format_version: 1,
+        source_demo_commit: space.source_demo_commit.clone(),
+        source_rule_generator_commit: space.source_rule_generator_commit.clone(),
+        parameterization_digest: space.parameterization_digest.clone(),
+        true_rule_one_based_index,
+        model_family: base_config.model_family,
+        seeds: seeds.to_vec(),
+        arms,
+    })
+}
+
 /// Errors from the multi-trial evaluator.
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum ThreeBallSequentialDiscoveryError {
@@ -166,6 +252,14 @@ pub enum ThreeBallSequentialDiscoveryError {
     InvalidTrueRuleIndex { index: usize, rule_count: usize },
     #[error("model family has no posterior support for the true semantic rule")]
     TrueRuleMissingFromModelFamily,
+    #[error("paired policy benchmark requires at least one seed")]
+    EmptySeedSet,
+    #[error("paired policy benchmark requires at least one policy arm")]
+    EmptyPolicySet,
+    #[error("paired policy benchmark contains duplicate seed {0}")]
+    DuplicateSeed(u64),
+    #[error("paired policy benchmark contains duplicate policy arm {0:?}")]
+    DuplicatePolicy(ThreeBallSequentialPolicyKind),
     #[error("selected action index {index} is outside 0..{action_count}")]
     InvalidSelectedAction { index: usize, action_count: usize },
     #[error("selected gaze has no contingency for the observed colour")]
@@ -604,6 +698,92 @@ mod tests {
             model_family,
             ..ThreeBallSequentialDiscoveryConfig::default()
         }
+    }
+
+    #[test]
+    fn paired_policy_matrix_preserves_seed_alignment_and_scene_identity() {
+        let space = build_three_ball_rule_space();
+        let seeds = [11, 23, 37];
+        let policies = [
+            ThreeBallSequentialPolicyKind::ExpectedFreeEnergy,
+            ThreeBallSequentialPolicyKind::StateInformationOnly,
+            ThreeBallSequentialPolicyKind::ModelInformationOnly,
+            ThreeBallSequentialPolicyKind::PragmaticOnly,
+            ThreeBallSequentialPolicyKind::ImmediateChoiceOnly,
+            ThreeBallSequentialPolicyKind::FixedGaze(ThreeBallLocation::Centre),
+            ThreeBallSequentialPolicyKind::UniformRandomLegalAction,
+        ];
+        let result = run_three_ball_paired_policy_benchmark(
+            &space,
+            65,
+            &seeds,
+            &policies,
+            ThreeBallSequentialDiscoveryConfig {
+                max_trials: 6,
+                ..Default::default()
+            },
+        )
+        .expect("paired policy matrix");
+        assert_eq!(result.seeds, seeds);
+        assert_eq!(result.arms.len(), policies.len());
+        for (arm_index, arm) in result.arms.iter().enumerate() {
+            assert_eq!(arm.policy_kind, policies[arm_index]);
+            assert_eq!(arm.episodes.len(), seeds.len());
+            for (seed_index, episode) in arm.episodes.iter().enumerate() {
+                assert_eq!(episode.seed, seeds[seed_index]);
+                assert_eq!(episode.policy_kind, policies[arm_index]);
+            }
+        }
+
+        for seed_index in 0..seeds.len() {
+            let reference_scenes = result.arms[0].episodes[seed_index]
+                .trial_receipts
+                .iter()
+                .map(|trial| trial.hidden_state_for_audit)
+                .collect::<Vec<_>>();
+            for arm in &result.arms[1..] {
+                let scenes = arm.episodes[seed_index]
+                    .trial_receipts
+                    .iter()
+                    .map(|trial| trial.hidden_state_for_audit)
+                    .collect::<Vec<_>>();
+                assert_eq!(reference_scenes, scenes);
+            }
+        }
+    }
+
+    #[test]
+    fn paired_policy_matrix_rejects_duplicate_seeds_and_policy_arms() {
+        let space = build_three_ball_rule_space();
+        let base = ThreeBallSequentialDiscoveryConfig {
+            max_trials: 1,
+            ..Default::default()
+        };
+        assert!(matches!(
+            run_three_ball_paired_policy_benchmark(
+                &space,
+                65,
+                &[1, 1],
+                &[ThreeBallSequentialPolicyKind::ExpectedFreeEnergy],
+                base,
+            ),
+            Err(ThreeBallSequentialDiscoveryError::DuplicateSeed(1))
+        ));
+        assert!(matches!(
+            run_three_ball_paired_policy_benchmark(
+                &space,
+                65,
+                &[1],
+                &[
+                    ThreeBallSequentialPolicyKind::ExpectedFreeEnergy,
+                    ThreeBallSequentialPolicyKind::ExpectedFreeEnergy
+                ],
+                base,
+            ),
+            Err(ThreeBallSequentialDiscoveryError::DuplicatePolicy(
+                ThreeBallSequentialPolicyKind::ExpectedFreeEnergy
+            ))
+        ));
     }
 
     #[test]
