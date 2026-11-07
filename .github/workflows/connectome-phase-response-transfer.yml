@@ -7,6 +7,7 @@ on:
       - "tools/connectome-phase-response/**"
       - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.md"
       - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_TRANSFER.example.json"
       - ".github/workflows/connectome-phase-response-transfer.yml"
   push:
     branches: [main, "research/**"]
