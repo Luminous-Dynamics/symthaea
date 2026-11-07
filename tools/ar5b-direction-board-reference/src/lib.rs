@@ -835,6 +835,43 @@ mod tests {
     }
 
     #[test]
+    fn reports_active_allocation_separately_from_advisory_recommendations() {
+        let campaign = fixture_campaign();
+        let report = allocate(&campaign).expect("valid fixture allocates");
+        assert_eq!(report.active_allocation_snapshot_ref, campaign.active_allocation_snapshot_ref);
+        assert_eq!(report.active_budget_cost_units, 20.0);
+        assert_eq!(report.reserved_or_unavailable_budget_units, 30.0);
+        let alpha = report
+            .recommendations
+            .iter()
+            .find(|item| item.candidate_id == "direction-alpha")
+            .expect("alpha receives advisory allocation");
+        assert_eq!(alpha.active_evaluations, 1);
+        assert_eq!(alpha.active_cost_units, 8.0);
+        assert!(alpha.recommended_evaluations > 0);
+    }
+
+    #[test]
+    fn rejects_active_plus_available_budget_over_total() {
+        let mut value = as_value(&fixture_campaign());
+        value["budget"]["total_cost_units"] = Value::from(50.0);
+        let report = validate_campaign(&from_value(value));
+        assert!(report
+            .iter()
+            .any(|issue| issue.starts_with("BUDGET_DOUBLE_COUNT")));
+    }
+
+    #[test]
+    fn rejects_active_allocation_count_cost_mismatch() {
+        let mut value = as_value(&fixture_campaign());
+        value["directions"][0]["active_evaluations"] = Value::from(0);
+        let report = validate_campaign(&from_value(value));
+        assert!(report
+            .iter()
+            .any(|issue| issue.starts_with("ACTIVE_ALLOCATION_MISMATCH")));
+    }
+
+    #[test]
     fn rejects_invalid_observation_cost() {
         let mut value = as_value(&fixture_campaign());
         value["directions"][0]["history"][0]["cost_units"] = Value::from(0.0);
