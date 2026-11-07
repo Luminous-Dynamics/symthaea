@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-research-protocol"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Outcome-blind preregistration, run binding, and deviation contracts for Symthaea research."
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
