@@ -23,8 +23,7 @@ const CASES: &[(&str, &str)] = &[
 ];
 
 fn main() {
-    let phonemizer = EnglishPhonemizer::new()
-        .expect("Piper Plus English phonemizer must initialize");
+    let phonemizer = EnglishPhonemizer::new_bundled();
 
     println!("case_id\ttext\tpiper_ipa_tokens\tmuse_ipa_tokens\tprosody_debug");
     for (case_id, text) in CASES {
@@ -59,7 +58,7 @@ mod tests {
 
     #[test]
     fn english_phonemizer_initializes_and_produces_tokens() {
-        let phonemizer = EnglishPhonemizer::new().expect("English phonemizer");
+        let phonemizer = EnglishPhonemizer::new_bundled();
         let (tokens, _prosody) = phonemizer
             .phonemize_with_prosody("hello world")
             .expect("known words should produce an output");
