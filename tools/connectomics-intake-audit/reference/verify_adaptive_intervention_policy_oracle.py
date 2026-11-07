@@ -410,6 +410,15 @@ def self_test(fixtures: list[Path]) -> None:
     require(capped_report["status"] == "INCOMPLETE_SEARCH_BUDGET_EXCEEDED", "exhausted search budget was not fail-closed")
     require(capped_report["search_complete"] is False, "exhausted search was marked complete")
 
+    too_deep = json.loads(json.dumps(data))
+    too_deep["search_limits"]["max_policy_depth"] = len(too_deep["actions"]) + 1
+    try:
+        validate_input(too_deep)
+    except ValueError as exc:
+        require("max_policy_depth" in str(exc), "wrong failure for a depth above the action universe")
+    else:
+        raise AssertionError("policy depth above the available action count was accepted")
+
     broken = json.loads(json.dumps(data))
     broken['potential_outcomes'][0]['observations'][0]['outcome_id'] = 'invented-outcome'
     try:
