@@ -31,11 +31,11 @@ finite-sample validation in 1+1D, 2+1D and 3+1D flat Minkowski spacetime.
 - Deterministic seeds and bounded-input validation.
 - Open-interval cardinality histogram: for each related endpoint pair,
   count the number of events strictly between them. The 1+1D implementation
-  uses a merge-sort range tree to answer closed-rectangle cardinality queries
-  and subtract endpoint-coordinate multiplicities, with O(N^2 log^2 N) time
-  and O(N log N) memory. The dimension-generic 2+1D/3+1D implementation
-  retains a successor/predecessor bitset intersection reference with
-  O(N^2) bits of storage and O(R ceil(N/64)) interval-intersection work.
+  uses persistent prefix segment trees over compressed null coordinates to
+  answer closed-rectangle cardinality queries in O(log N) each; total
+  complexity is O(N^2 log N) time and O(N log N) memory. The dimension-generic
+  2+1D/3+1D implementation retains a successor/predecessor bitset reference
+  with O(N^2) bits of storage and O(R ceil(N/64)) interval-intersection work.
   Both are differentially checked against brute force and Lorentz-boost tests.
 
 The implementation uses (u=t+x), (v=t-x). A 1+1D Alexandrov
