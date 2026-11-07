@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "family_id": "phase-response-confirmatory-family-v1",
+  "campaign_id": "synthetic-phase-response-campaign",
+  "requested_guarantee": "FWER",
+  "claim_scope": "synthetic_known_truth",
+  "registered_before_confirmatory_outcomes": true,
+  "confirmation_lockbox_opened_before_freeze": false,
+  "family_commitment_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "alpha": "1/10",
+  "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "claims": [
+    {
+      "claim_id": "C1-local-reset",
+      "key": {
+        "sender_leg": "left_fore",
+        "recipient_leg": "left_fore",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "descending_neuron": null,
+        "context": "BALL_CONTACT",
+        "phase_bin": 2,
+        "magnitude_bin": 1,
+        "delay_index": 3,
+        "endpoint": "PHASE_RESET"
+      },
+      "query_spec_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "null_envelope_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "component_e_process_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "component_validity_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS",
+      "weight": "1/2",
+      "e_process_values": [
+        "1",
+        "5",
+        "25"
+      ]
+    },
+    {
+      "claim_id": "C2-off-diagonal-transfer",
+      "key": {
+        "sender_leg": "left_fore",
+        "recipient_leg": "right_fore",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "descending_neuron": null,
+        "context": "BALL_CONTACT",
+        "phase_bin": 2,
+        "magnitude_bin": 1,
+        "delay_index": 3,
+        "endpoint": "PHASE_RESET"
+      },
+      "query_spec_sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+      "null_envelope_sha256": "2323232323232323232323232323232323232323232323232323232323232323",
+      "component_e_process_receipt_sha256": "3434343434343434343434343434343434343434343434343434343434343434",
+      "component_validity_receipt_sha256": "4545454545454545454545454545454545454545454545454545454545454545",
+      "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS",
+      "weight": "1/4",
+      "e_process_values": [
+        "1",
+        "10",
+        "50"
+      ]
+    },
+    {
+      "claim_id": "C3-contact-recovery",
+      "key": {
+        "sender_leg": "left_fore",
+        "recipient_leg": "right_fore",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "descending_neuron": null,
+        "context": "SLIPPERY_SURFACE",
+        "phase_bin": 2,
+        "magnitude_bin": 1,
+        "delay_index": 3,
+        "endpoint": "RECOVERY"
+      },
+      "query_spec_sha256": "5656565656565656565656565656565656565656565656565656565656565656",
+      "null_envelope_sha256": "6767676767676767676767676767676767676767676767676767676767676767",
+      "component_e_process_receipt_sha256": "7878787878787878787878787878787878787878787878787878787878787878",
+      "component_validity_receipt_sha256": "8989898989898989898989898989898989898989898989898989898989898989",
+      "global_filtration_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "confirmation_split_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "component_status": "VALIDATED_GLOBAL_FILTRATION_EPROCESS",
+      "weight": "1/4",
+      "e_process_values": [
+        "1",
+        "2",
+        "12"
+      ]
+    }
+  ]
+}
