@@ -33,9 +33,29 @@ V1 is intentionally the conservative, dependence-robust weighted anytime-Bonferr
 
 ## 3. Critical filtration condition
 
-Each component process must be valid in the common global filtration, not merely in its local observation stream. If claim i is sampled adaptively after observing another claim, the conditional e-process guarantee for i must still hold given the complete global past. A local-filtration e-process cannot be upgraded by storing a digest or by this family auditor.
+Each component process must be valid in the common global filtration, not merely in its local observation stream. If claim i is sampled adaptively after observing another claim, the conditional e-process guarantee for i must still hold given the complete global past. A local-filtration e-process cannot be upgraded by storing a digest or changing a status string.
 
-The family auditor requires each component's independent validity receipt and common filtration commitment. V1 checks their syntax, identity agreement and structural consistency. It does not authenticate those receipts or re-prove their statistical theorem.
+V1 now consumes the typed `GlobalLedger` and `FiltrationAdmission` from the as-of filtration auditor (#10982 / PR #10997) through a direct Rust path dependency. It calls `audit_ledger` and `audit_admission` for every claim. Only `ADMITTED_DIRECT_GLOBAL` and `ADMITTED_AFTER_LIFT` are combinable; local-only, incomparable, malformed, stale or mismatched receipts fail closed.
+
+Each claim binds:
+- campaign and process ID;
+- exact null specification digest;
+- input-process digest and output-process digest;
+- source and target filtration identity/digest;
+- observed global event IDs and process-output availability sequence;
+- independently reviewed proof receipt and assumption digest;
+- exact direct-global or adjuster-lifted admission mode.
+
+The output-process digest is recomputed from the exact rational path with this canonical encoding:
+
+    symthaea-eprocess-path-v1\\n
+    <reduced rational E_0>\\n
+    <reduced rational E_1>\\n
+    ...
+
+The path is hashed as UTF-8 bytes with SHA-256. The admission's output digest and the claim's path digest must both equal this recomputed value. The proof-receipt digest must also match the claim's validity receipt.
+
+This closes the prior status-string gap: a caller cannot turn a local stream into a combinable stream merely by setting `VALIDATED_GLOBAL_FILTRATION_EPROCESS`. It still does **not** prove the upstream supermartingale or adjuster theorem. The as-of auditor verifies chronology and receipt binding only; independent statistical review must inspect the proof referenced by the receipt.
 
 ## 4. Query identity and precommitment
 
@@ -86,4 +106,4 @@ The next power-oriented tranche should compose the proved A1/A2 adjusters with t
 
 ## 8. Claim ceiling
 
-A passing V1 contract establishes exact rational allocation, per-claim thresholding and persistent family decision semantics for the finite synthetic family. It assumes upstream component e-process validity in one common global filtration. It does not prove those e-processes, establish FDR-sup, identify a biological mechanism, or demonstrate SOTA superiority.
+A passing V1 contract establishes exact rational allocation, per-claim thresholding and persistent family decisions for the finite synthetic family, after replaying and structurally admitting each typed as-of filtration receipt and recomputing each e-process path digest. It still assumes the upstream direct-global proof or filtration-lifting theorem is mathematically valid; this software does not prove it. It does not establish FDR-sup, identify a biological mechanism, or demonstrate SOTA superiority.
