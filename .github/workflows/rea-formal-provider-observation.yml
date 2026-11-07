@@ -78,16 +78,30 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/rea-formal-lean-build/assurance
-          nix develop .#formal --command bash -euo pipefail -c '
+          nix develop .#formal --command bash -c '
+            set -uo pipefail
             export LEAN_PATH=/tmp/rea-formal-lean-build
             lean --version | tee /tmp/rea-formal-lean-version.txt
+
             lean -o "$LEAN_PATH/assurance/Closure.olean" formal/lean/assurance/Closure.lean \
               > /tmp/rea-formal-closure-output.txt 2>&1
+            closure_status=$?
+            cat /tmp/rea-formal-closure-output.txt
+            if test "$closure_status" -ne 0; then
+              echo "Closure.lean typecheck failed with exit $closure_status" >&2
+              exit "$closure_status"
+            fi
+
             lean -o "$LEAN_PATH/assurance/REAProviderObservation.olean" \
               formal/lean/assurance/REAProviderObservation.lean \
               > /tmp/rea-formal-adapter-output.txt 2>&1
-            cat /tmp/rea-formal-closure-output.txt
+            adapter_status=$?
             cat /tmp/rea-formal-adapter-output.txt
+            if test "$adapter_status" -ne 0; then
+              echo "REAProviderObservation.lean typecheck failed with exit $adapter_status" >&2
+              exit "$adapter_status"
+            fi
+
             if grep -q "sorryAx" /tmp/rea-formal-closure-output.txt /tmp/rea-formal-adapter-output.txt; then
               echo "forbidden sorryAx in Lean axiom census" >&2
               exit 1
@@ -97,6 +111,19 @@ jobs:
               exit 1
             fi
           '
+
+      - name: Retain Lean compiler diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-formal-lean-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/rea-formal-lean-version.txt
+            /tmp/rea-formal-closure-output.txt
+            /tmp/rea-formal-adapter-output.txt
+            /tmp/rea-formal-known-bad-output.txt
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Postflight immutability and exact-head qualification receipt
         run: |
