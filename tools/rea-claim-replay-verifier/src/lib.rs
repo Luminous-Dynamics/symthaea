@@ -544,6 +544,7 @@ fn parse_result(bytes: &[u8]) -> Result<(ClaimEvaluation, Value), ReplayError> {
             "source_predicate_type",
             "requested_evidence_ids",
             "assumptions",
+            "numeric_precision_warnings",
             "evidence_assessments",
             "missing_evidence_ids",
             "unmet_obligations",
@@ -587,6 +588,23 @@ fn parse_result(bytes: &[u8]) -> Result<(ClaimEvaluation, Value), ReplayError> {
                 "reason",
             ],
             &format!("result.evidence_assessments[{index}]"),
+        )?;
+    }
+
+    let precision_warnings = value
+        .get("numeric_precision_warnings")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ReplayError::new(
+                ReplayErrorKind::InvalidResult,
+                "result.numeric_precision_warnings must be an array",
+            )
+        })?;
+    for (index, warning) in precision_warnings.iter().enumerate() {
+        require_keys(
+            warning,
+            &["source", "evidence_id", "json_pointer", "integer_value"],
+            &format!("result.numeric_precision_warnings[{index}]"),
         )?;
     }
 
