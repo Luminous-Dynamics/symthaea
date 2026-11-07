@@ -493,7 +493,7 @@ def self_test() -> list[str]:
         "do not create a composite; not a universal correction factor; no task is admitted; #10064 #10369",
     ))
 
-    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str) -> list[str]:
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str, cf: str) -> list[str]:
         return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q, cf)
 
     crosswalk = "\n".join((
