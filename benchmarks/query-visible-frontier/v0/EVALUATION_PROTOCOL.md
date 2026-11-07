@@ -150,8 +150,13 @@ These targets are not interchangeable. In particular, the TEMPO ranking target m
 6. Use at least two independent human annotators for proposition identity, source-span boundaries, update/contradiction relationships and answer evidence-use on the adjudicated subset. Record agreement and adjudication outcomes. Do not use an LLM judge as the sole oracle.
 7. Keep benchmark answers, gold spans and scoring files out of online agent access. Audit inference-time web, local files, mounted corpora, caches, prompts and external tools for leakage.
 8. Audit dataset and source licenses before download, training, redistribution or commercial evaluation. A paper's benchmark release does not imply that all underlying source material is commercially reusable.
-9. Publish all failed, abstained, truncated, Unknown and invalidated cases. A run with unavailable evidence is not silently dropped from the denominator.
-10. Preserve exact-head source, artifact digests and validator outputs. A rebase or fixture mutation invalidates earlier qualification until rerun.
+9. Preserve these currently verified license distinctions in the experiment register:
+   - FRESCO's official repository states that most of the project/data are CC-BY-NC; the instruction-optimization code has separate MIT terms, and third-party source content is governed by its own licenses. Do not assume the benchmark data is cleared for commercial use: https://github.com/facebookresearch/fresco
+   - IndexRAG's official code repository identifies Apache-2.0 for the code, but the benchmark datasets retain their original licenses: https://github.com/Continuum-AI-Corp/IndexRAG
+   - TimelyRAG's official README lists four "public" overlapping-evolving sets (law, university, company policies, terms of service), each with 30,000 documents and 3,000 queries. No root LICENSE file was found in the checked repository paths; treat code/data permissions as unresolved and obtain author/source clearance before use: https://github.com/kaist-dmlab/TimelyRAG
+   - ProStruct-RAG/Asteria is described as fictional/contamination-resistant, but its dataset reuse terms still require direct repository/license review before redistribution or commercial use: https://aclanthology.org/2026.emnlp-main.294/
+10. Publish all failed, abstained, truncated, Unknown and invalidated cases. A run with unavailable evidence is not silently dropped from the denominator.
+11. Preserve exact-head source, artifact digests and validator outputs. A rebase or fixture mutation invalidates earlier qualification until rerun.
 11. For evidence-use/reader-format experiments, inject byte-identical gold evidence, randomize arm order, isolate session/cache state and bind the exact reader input. A clean-format recovery cannot be counted as a retrieval recall gain.
 
 ## Required result packet
