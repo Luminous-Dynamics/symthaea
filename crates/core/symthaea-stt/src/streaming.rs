@@ -800,6 +800,45 @@ mod tests {
     }
 
     #[test]
+    fn test_mel_delta_history_resets_at_overrun_discontinuity() {
+        let config = StreamConfig {
+            buffer_duration: 0.05,
+            frame_duration: 0.025,
+            hop_duration: 0.010,
+            ..StreamConfig::default()
+        };
+        let sample_rate = 16_000usize;
+        let samples: Vec<f32> = (0..3_200usize)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                0.30 * (std::f32::consts::TAU * 200.0 * t).sin()
+                    + 0.10 * (std::f32::consts::TAU * 900.0 * t).sin()
+            })
+            .collect();
+
+        let mut streaming = StreamProcessor::new(config);
+        streaming.push_audio(&samples);
+        let actual = streaming.process();
+        assert!(!actual.is_empty());
+        assert!(actual[0].discontinuity_before);
+        assert_eq!(actual[0].source_start_sample, 2_400);
+
+        // The retained segment begins at sample 2,400. The offline encoder
+        // starts with no previous mel frame, which must match the first live
+        // frame after the gap; it must not use a delta from discarded audio.
+        let mut offline = AudioProjector::default_config();
+        let expected = offline.project_raw(&samples[2_400..]);
+        assert_eq!(actual.len(), expected.len());
+        for (frame, offline_hv) in actual.iter().zip(expected.iter()) {
+            assert_eq!(
+                frame.hv, *offline_hv,
+                "post-gap delta reset mismatch at absolute sample {}",
+                frame.source_start_sample
+            );
+        }
+    }
+
+    #[test]
     fn test_streaming_hv_is_invariant_to_input_chunk_boundaries() {
         let sample_rate = 16_000usize;
         let samples: Vec<f32> = (0..12_000usize)
