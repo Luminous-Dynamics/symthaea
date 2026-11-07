@@ -127,10 +127,16 @@ impl FaultMap {
     }
 
     pub fn healthy_cells(&self) -> usize {
-        (0..self.rows).flat_map(|r| (0..self.cols).map(move |c| (r, c)))
-            .filter(|(r, c)| !self.failed_rows[*r] && !self.failed_cols[*c]
-                && self.cells[*r * self.cols + *c] == Cell::Healthy)
-            .count()
+        let mut total = 0;
+        for r in 0..self.rows {
+            if self.failed_rows[r] { continue; }
+            for c in 0..self.cols {
+                if !self.failed_cols[c] && self.cells[r * self.cols + c] == Cell::Healthy {
+                    total += 1;
+                }
+            }
+        }
+        total
     }
 
     pub fn rows_intact(&self) -> bool { !self.failed_rows.iter().any(|x| *x) }
