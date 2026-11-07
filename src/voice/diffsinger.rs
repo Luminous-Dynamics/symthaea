@@ -121,13 +121,10 @@ fn diffsinger_capability_manifest() -> SingingBackendCapabilities {
     .expect("static DiffSinger capability manifest is complete")
 }
 
-
 impl SingingVoiceEngine for DiffSingerEngine {
     fn id(&self) -> &str {
         &self.provider_id
     }
-
-
 
     fn capabilities(&self) -> SingingBackendCapabilities {
         diffsinger_capability_manifest()
