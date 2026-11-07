@@ -359,6 +359,36 @@ impl VocalPerformance {
                 self.syllables.len()
             );
         }
+        let primary_notes: Vec<Note> = self.syllables.iter().map(|syllable| syllable.note).collect();
+        let expected_alignment = symthaea_muse::singing_bridge::sing(&self.lyrics, &primary_notes);
+        if expected_alignment.len() != self.syllables.len() {
+            bail!(
+                "lyric/G2P alignment produced {} syllables for a {}-syllable performance",
+                expected_alignment.len(),
+                self.syllables.len()
+            );
+        }
+        for (syllable_index, (expected, observed)) in expected_alignment
+            .iter()
+            .zip(&self.syllables)
+            .enumerate()
+        {
+            if expected.phonemes.len() != observed.phonemes.len()
+                || expected
+                    .phonemes
+                    .iter()
+                    .zip(&observed.phonemes)
+                    .any(|(expected_phone, observed_phone)| {
+                        expected_phone.ipa != observed_phone.ipa
+                            || expected_phone.is_vowel != observed_phone.is_vowel
+                            || expected_phone.stress != observed_phone.stress
+                    })
+            {
+                bail!(
+                    "vocal syllable {syllable_index} phone sequence does not match the selected English G2P result; use a reviewed pronunciation-plan override rather than mutating v2 phones"
+                );
+            }
+        }
 
         let duration_s = self.duration_s();
         if !duration_s.is_finite() || duration_s <= 0.0 {
@@ -965,6 +995,14 @@ mod tests {
         no_g2p.lyrics = "q light".into();
         let error = no_g2p.validate().unwrap_err().to_string();
         assert!(error.contains("no pronounceable syllables"), "{error}");
+    }
+
+    #[test]
+    fn validate_rejects_phone_identity_changes_even_when_syllable_count_matches() {
+        let mut performance = performance_with_melisma();
+        performance.syllables[0].phonemes[0].ipa = "z".into();
+        let error = performance.validate().unwrap_err().to_string();
+        assert!(error.contains("phone sequence does not match"), "{error}");
     }
 
     #[test]
