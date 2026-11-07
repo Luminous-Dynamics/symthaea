@@ -744,6 +744,9 @@ mod capability_manifest_tests {
         manifest.validate().unwrap();
         assert_eq!(manifest.controls.len(), SingingControl::ALL.len());
         assert!(manifest.controls.iter().any(|entry| entry.control == SingingControl::ConsonantAnticipation));
+        super::super::singing_engine::SingingRenderPolicy::score_conditioned_comparison()
+            .validate_against(&manifest)
+            .unwrap();
     }
 }
 
