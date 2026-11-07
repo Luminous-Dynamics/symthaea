@@ -1034,7 +1034,7 @@ mod tests {
         assert_eq!(alignment.source_to_candidate, vec![1, 2, 0]);
         assert_eq!(alignment.source_model_digest, digest('a'));
         assert_eq!(alignment.candidate_model_digest, digest('b'));
-        assert_eq!(alignment.probe_digest, digest('p'));
+        assert_eq!(alignment.probe_digest, digest('c'));
         assert!(alignment.mean_squared_activation_error < 1e-15);
         assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
     }
