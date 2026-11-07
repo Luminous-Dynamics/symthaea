@@ -8,13 +8,25 @@
 
 Move from scoring steady-state coordination to measuring the dynamical response operator of coordination. The primary measurand is:
 
-    G[i,j](phi,u,c,tau)
-      = wrap(theta_i_perturbed(t0 + tau)
-             - theta_i_matched_control(t0 + tau))
+    G[i,j](phi,u,m,c,tau)
+      = wrap(theta_i_perturbed(t0 + tau; phi,u,m,c)
+             - theta_i_matched_control(t0 + tau; c))
 
-This six-leg phase-reset transfer tensor records how a perturbation to a sender leg or declared global input changes every recipient leg relative to a matched control, at a registered perturbation phase, class, context and delay.
+This six-leg phase-reset transfer tensor records how a perturbation to a sender leg or declared global input changes every recipient leg relative to a matched control, at a registered perturbation phase, class, context and delay. Here m is the preregistered perturbation-magnitude bin; the source receipt binds that bin to its physical dose.
 
 The diagonal response is local phase reset. Off-diagonal responses describe system-level transfer. Neither is direct synaptic causation: shared input, central coupling, proprioceptive feedback, contact/load pathways, biomechanical coupling and latent state can produce similar signatures.
+
+## Cross-repository implementation boundary
+
+Reuse existing Symtropy work:
+- [#3926 — six-leg distributed phase coordination](https://github.com/Luminous-Dynamics/symtropy/pull/3926) supplies synthetic phase-network traces;
+- [#3829 — locomotion intervention mechanism benchmark](https://github.com/Luminous-Dynamics/symtropy/pull/3829) supplies known-truth intervention/model families;
+- [#3454 — blind locomotion prediction oracle](https://github.com/Luminous-Dynamics/symtropy/pull/3454) owns noise-aware model separation and abstention;
+- [#3345 — CPG-to-contact harness](https://github.com/Luminous-Dynamics/symtropy/issues/3345) owns physical body/contact/terrain feedback;
+- [#3478 — embodied prediction to EIG/Fisher/EVSI bridge](https://github.com/Luminous-Dynamics/symtropy/issues/3478) owns the typed handoff to experiment-design objectives;
+- [#3357 — FlyGym 2.1.1 matched baselines](https://github.com/Luminous-Dynamics/symtropy/issues/3357) owns neuromechanical baseline fairness.
+
+This Symthaea crate owns only the source-bound phase-response measurement representation and exact synthetic phase/winding known answers. It does not implement another phase-network simulator, contact solver, causal prediction oracle, or EIG/Fisher/EVSI selector.
 
 A model that matches mean stepping frequency and steady-state PLV can still have the wrong response to a local disturbance. The synthetic known-answer control makes that failure explicit.
 
