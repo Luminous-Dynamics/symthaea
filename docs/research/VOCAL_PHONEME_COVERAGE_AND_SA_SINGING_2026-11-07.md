@@ -27,6 +27,46 @@ This patch:
 - records and repairs six source-only workspace paths and a stale `sha2` lockfile entry needed for a truthful feature compile.
 
 No claim is made that the physical waveguide singer is exposed or buildable by this patch. The comparison gate now covers only the integrated Kokoro path and optional DiffSinger worker. Its `run_manifest.json` records the source revision, voice ID, optional worker path, per-case seed/lyrics/style/score notes, and serialized VocalPerformance digest. Each blind clip carries the exact WAV-file digest and its performance-input digest. The manifest does not yet attest the full voicebank/model-weight tree; that needs a separate provisioned-model manifest before claiming complete model provenance.
+
+## G2P replacement candidates and isolated spike — 7 November 2026
+
+The current Muse English G2P is a small dictionary plus ASCII letter fallback. Its strict input checks prevent dropped characters and missing syllables, but do not prove correct pronunciation. Issue #10869 tracks the actual replacement.
+
+### Candidate A — Piper Plus G2P 0.5.3
+
+Piper Plus G2P 0.5.3 (26 October 2026) is a Rust crate documented as MIT-licensed and IPA-first. Its language backends include English (rule-based, CMUdict-derived), Japanese, Chinese, Korean, Spanish, French, Portuguese and Swedish. The direct output API includes IPA tokens and prosody; its separate encoder supports strict unknown-token behavior.
+
+This makes it a good *engineering candidate* for a reproducible spike, not yet a quality winner. Its English backend is itself rule/dictionary based. It does not cover isiZulu or isiXhosa, and a supported language label does not imply good singing pronunciation or dialect adaptation.
+
+An isolated probe has been added under `tools/g2p-spike/`, with fixed cases for common words, clusters, irregular -ough spellings, heteronyms, silent letters, contractions, multi-syllabic words, punctuation and OOV candidates. The dedicated workflow `.github/workflows/g2p-research-spike.yml` compiles/tests the exact pinned crate version and uploads a TSV of candidate IPA/prosody outputs bound to the exact source revision. This spike does not alter the production G2P path.
+
+### Candidate B — CMU Pronouncing Dictionary
+
+CMUdict is an established US-English pronunciation lexicon. Its upstream project states commercial and research use are unrestricted, requests attribution, and warns that errors, omissions and inconsistencies remain. It is useful as a supplemental lexicon/reference candidate, but must preserve variant pronunciations and regional limitations rather than treat one entry as universal truth.
+
+### Candidate C — pure-Rust eSpeak NG port
+
+The pure-Rust eSpeak NG port exposes text-to-phoneme output, and may be useful as a broad coverage comparison oracle. It is GPL-3.0-or-later. It should not be included in a commercial product distribution without an explicit license review; the current isolated spike does not depend on it.
+
+### Benchmark protocol
+
+For each fixture, compare current Muse, Piper Plus and any legally approved reference frontends against independently human-reviewed phones, syllable boundaries and stress. Report:
+- phone error rate and per-phone confusion/deletion;
+- word pronunciation accuracy, variant selection and heteronym accuracy;
+- syllable-boundary F1 and lexical stress accuracy;
+- OOV detection precision/recall and false-confidence rate;
+- coverage by word-frequency band, dialect and accent;
+- duration/stress transfer to singing score alignment.
+
+Do not use a library's own output as ground truth for scoring that library. For ambiguous words such as *read* and *lead*, the reference must encode context-conditioned acceptable variants. OOV words should produce an explicit candidate/uncertainty state, never a silent guessed pronunciation.
+
+### Sources
+
+- Piper Plus G2P 0.5.3 documentation and feature/license details: https://docs.rs/crate/piper-plus-g2p/latest
+- CMUdict project and license/accuracy notice: https://github.com/cmusphinx/cmudict
+- Pure Rust eSpeak NG API and GPL-3.0-or-later license: https://github.com/eugenehp/espeak-ng-rs
+
+
 ## Research framing: benchmark different tasks separately
 
 There is no single leaderboard that answers whether a system is a good singer under a prescribed score.
