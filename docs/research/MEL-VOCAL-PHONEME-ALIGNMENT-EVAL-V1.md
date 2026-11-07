@@ -59,6 +59,14 @@ Samsung Research's MusicJudge (Interspeech 2026) is especially relevant because 
 
 Source: https://arxiv.org/abs/2606.26451
 
+### Unified singing annotation: STARS
+
+STARS (Findings of ACL 2025) unifies singing transcription, phoneme-audio alignment, note transcription and temporal localization, vocal-technique identification, and global style/emotion/pace annotation. Its hierarchical representation spans frame, word, phoneme, note and sentence levels. This is an important comparator for our annotation *pipeline*, not just a single aligner: Symthaea should eventually export one coherent annotation bundle from which pronunciation plans, score alignments, technique labels and phrase-level expression can be independently inspected.
+
+The current work only implements the validated linguistic/score-alignment contract and a scorer for supplied phone events. It does not yet provide STARS-equivalent audio annotation, note transcription or technique recognition. We should not claim that a multi-level data structure alone reproduces the STARS model.
+
+Source: https://aclanthology.org/2025.findings-acl.781/
+
 ### Singing-quality predictors: SingMOS-Pro
 
 SingMOS-Pro is a useful auxiliary predictor and benchmark reference. Its published corpus contains 7,981 Chinese and Japanese singing clips from 41 systems across 12 datasets, with at least five professional ratings per clip and separate lyric, melody, and overall-quality annotations.
@@ -84,7 +92,7 @@ The evaluator should not ask one model whether the output is good. It should ass
 3. **Musical realization:** note map, beat map, pitch, duration, phrase boundaries, expressive timing, and melisma.
 4. **Perceptual judgment:** intelligibility, naturalness, expressive fit, timbral identity, emotional fit, and listener preference.
 
-The Rust crate is deliberately narrow: it scores the second layer when a recognizer/aligner supplies phone events. It also checks the relationship between a sustained vowel and its declared melisma note span. It does not infer the events from audio and does not claim to implement MusicJudge.
+The Rust crate is deliberately narrow: it scores the second layer when a recognizer/aligner supplies phone events. It also checks the relationship between a sustained vowel and its declared melisma note span. It does not infer the events from audio and does not claim to implement MusicJudge or STARS.
 
 ## Benchmark design
 
