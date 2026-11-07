@@ -47,15 +47,44 @@
       "doi": "10.1038/s41377-026-02206-8",
       "url": "https://www.nature.com/articles/s41377-026-02206-8",
       "paper_reported": {
-        "yolo_convolution_feature_extraction_frames_per_second": 100000000,
-        "operating_sample_rate_samples_per_second": 25000000000,
-        "stated_precision_bits": [
-          7,
-          8
-        ],
-        "optical_power_budget_watts_for_32x32_channels": 1,
-        "optical_detector_power_milliwatts": 1,
-        "slm_pixels": 2304000
+        "experimental": {
+          "vcsel_arrays": 8,
+          "vcsel_devices_per_array": 25,
+          "described_input_vcsel_configuration": "3x3",
+          "output_kernels": 9,
+          "balanced_photodetector_channels": 9,
+          "fpga_daq_channels": 9,
+          "vcsel_data_rate_samples_per_second": 100000000,
+          "arithmetic_throughput_gops": 45,
+          "random_signed_mvm_mean_error_std_percent": 3.27,
+          "precision_description": "over 6 bits (5 numerical bits plus sign)",
+          "mnist_accuracy_percent": 93.75,
+          "mnist_digital_reference_percent": 95.75,
+          "fashion_mnist_accuracy_percent": 80.75,
+          "fashion_mnist_digital_reference_percent": 84.88,
+          "yolo_convolution_feature_extraction_report": "100 million frames/s headline; not equivalent to complete end-to-end object-detection decisions/s",
+          "small_cnn_input_to_decision_latency_us": 1.4,
+          "estimated_electrical_system_energy_fj_per_operation": 370,
+          "estimated_electrical_system_efficiency_tops_per_watt": 3,
+          "included_energy_components": [
+            "VCSEL bias/laser drivers",
+            "DAC drivers",
+            "SLM weighting power",
+            "photodetector/TIA/ADC readout electronics"
+          ],
+          "evidence_class": "paper_reported_experimental_configuration_and_author_system_energy_estimate"
+        },
+        "projected_scale_up": {
+          "vcsel_array": "32x32",
+          "spatial_fanout": "32x32",
+          "vcsel_rate_samples_per_second": 25000000000,
+          "optical_budget_watts_approx": 1,
+          "projected_energy_fj_per_operation": 2,
+          "projected_efficiency_tops_per_watt": 500,
+          "projected_throughput_tops": 50000,
+          "evidence_class": "authors_projection_not_demonstrated",
+          "use_restriction": "Do not report as achieved prototype performance."
+        }
       },
       "architecture": [
         "VCSEL arrays",
@@ -65,11 +94,14 @@
       ],
       "evidence_class": "peer_reviewed_physical_optical_system_paper_report",
       "caveats": [
-        "FPS, optical sample rate and useful end-to-end inference throughput are different metrics.",
-        "1 W is an optical power figure, not a complete wall-input system measurement.",
-        "Include VCSEL drive, SLM control, detection, conversion, synchronization, cooling and host processing."
+        "Prototype 100 MS/s / 45 GOPS and projected 25 GS/s / >50,000 TOPS are different operating points.",
+        "The 100 MFPS YOLO feature-extraction headline is not 100 million complete end-to-end decisions per second.",
+        "The ~370 fJ/op / ~3 TOPS/W value is the authors' system estimate with their stated included electronics; it is not automatically equivalent to wall-input joules per accepted task.",
+        "The ~2 fJ/op / 500 TOPS/W, 32x32 arrays/fanout, and 25 GS/s figures are projected scale-up values, not measured hardware results.",
+        "Include host classification, model/weight programming, SLM updates, calibration, optical coupling, sync and full platform wall power in any independent Luminous comparison."
       ],
-      "code": "not established by the source audit"
+      "code": "not established by the source audit",
+      "experimental_vs_projection_audit_source": "https://www.nature.com/articles/s41377-026-02206-8"
     },
     {
       "id": "MEMRISTIVE_HDC_2026",
