@@ -1,0 +1,78 @@
+name: Connectome adaptive intervention policy oracle
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_V1.md"
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_*.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py"
+      - ".github/workflows/connectome-adaptive-intervention-policy.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_V1.md"
+      - "docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_*.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py"
+      - ".github/workflows/connectome-adaptive-intervention-policy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-adaptive-intervention-policy:
+    name: Exact deterministic adaptive intervention policy and fixed-plan oracle
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and all fixtures
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY.schema.json").read_text())
+          fixtures = sorted(Path("docs/neuroscience/examples").glob("CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_*.example.json"))
+          Draft202012Validator.check_schema(schema)
+          assert len(fixtures) == 3, f"expected three fixtures, found {len(fixtures)}"
+          for path in fixtures:
+              Draft202012Validator(schema).validate(json.loads(path.read_text()))
+              print(f"schema valid: {path}")
+          PY
+      - name: Run reference oracle and adversarial mutation controls
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py
+          python3 tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py --self-test
+      - name: Emit exact reports for all known-answer fixtures
+        run: |
+          python3 tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py --output-dir "$RUNNER_TEMP/adaptive-intervention-policy"
+          REPORT_DIR="$RUNNER_TEMP/adaptive-intervention-policy" python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ["REPORT_DIR"])
+          reports = sorted(root.glob("*.report.json"))
+          assert len(reports) == 3, f"expected three reports, found {len(reports)}"
+          rows = {json.loads(path.read_text())["analysis_id"]: json.loads(path.read_text()) for path in reports}
+          adaptive = rows["adaptive-screen-then-specialize-v1"]
+          erasure = rows["adaptive-screen-nuisance-erasure-v1"]
+          impossible = rows["adaptive-intervention-no-resolution-v1"]
+          assert adaptive["adaptive_worst_case_effort_units"] == 3
+          assert adaptive["fixed_minimum_effort_units"] == 4
+          assert adaptive["adaptivity_savings_basis_points"] == 2500
+          assert erasure["adaptive_worst_case_effort_units"] == 4
+          assert erasure["adaptivity_savings_units"] == 0
+          assert impossible["adaptive_status"] == "NO_GUARANTEED_QUERY_RESOLUTION"
+          print("adaptive/fixed exact known-answer report assertions: PASS")
+          PY

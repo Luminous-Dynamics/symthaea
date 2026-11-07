@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "analysis_id": "adaptive-screen-then-specialize-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_revision_commit_sha": "9999999999999999999999999999999999999999",
+  "query": {
+    "query_id": "critical-path-exists",
+    "query_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decision_rule_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "worlds": [
+    {
+      "world_id": "world-1",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true
+    },
+    {
+      "world_id": "world-2",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false
+    },
+    {
+      "world_id": "world-3",
+      "graph_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true
+    },
+    {
+      "world_id": "world-4",
+      "graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false
+    }
+  ],
+  "nuisance_models": [
+    {
+      "nuisance_model_id": "nominal",
+      "model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "description": "Nominal observation mapping."
+    },
+    {
+      "nuisance_model_id": "gain-shift",
+      "model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "description": "Coherent nuisance variant with identical partitions and a distinct outcome vocabulary."
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "screen-group",
+      "intervention_kind": "OPTOGENETIC",
+      "effort_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "safety_profile_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "action_id": "resolve-a",
+      "intervention_kind": "ELECTRICAL",
+      "effort_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "safety_profile_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "action_id": "resolve-b",
+      "intervention_kind": "ELECTRICAL",
+      "effort_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "safety_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "potential_outcomes": [
+    {
+      "world_id": "world-1",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-a"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "a-plus"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "indeterminate"
+        }
+      ]
+    },
+    {
+      "world_id": "world-2",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-a"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "a-minus"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "indeterminate"
+        }
+      ]
+    },
+    {
+      "world_id": "world-3",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-b"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "indeterminate"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "b-plus"
+        }
+      ]
+    },
+    {
+      "world_id": "world-4",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-b"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "indeterminate"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "b-minus"
+        }
+      ]
+    },
+    {
+      "world_id": "world-1",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-a-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "a-plus-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "indeterminate-2"
+        }
+      ]
+    },
+    {
+      "world_id": "world-2",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-a-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "a-minus-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "indeterminate-2"
+        }
+      ]
+    },
+    {
+      "world_id": "world-3",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-b-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "indeterminate-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "b-plus-2"
+        }
+      ]
+    },
+    {
+      "world_id": "world-4",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "group-b-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "indeterminate-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "b-minus-2"
+        }
+      ]
+    }
+  ],
+  "search_limits": {
+    "max_memo_states": 200000,
+    "max_policy_depth": 3
+  },
+  "expected": {
+    "adaptive_status": "EXACT_POLICY",
+    "adaptive_worst_case_effort_units": 3,
+    "adaptive_root_action_id": "screen-group",
+    "fixed_status": "EXACT_FIXED_PLAN",
+    "fixed_minimum_effort_units": 4,
+    "fixed_action_ids": [
+      "resolve-a",
+      "resolve-b"
+    ],
+    "adaptivity_savings_units": 1
+  },
+  "notes": [
+    "Synthetic known-answer only.",
+    "The two nuisance models use distinct labels but preserve the same outcome partition.",
+    "Adaptive policy screens the world family and then executes only the matching specialist intervention."
+  ]
+}

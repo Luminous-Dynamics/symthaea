@@ -1,0 +1,242 @@
+{
+  "schema_version": 1,
+  "analysis_id": "adaptive-intervention-no-resolution-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_revision_commit_sha": "9999999999999999999999999999999999999999",
+  "query": {
+    "query_id": "critical-path-exists",
+    "query_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "decision_rule_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "worlds": [
+    {
+      "world_id": "world-1",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true
+    },
+    {
+      "world_id": "world-2",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false
+    },
+    {
+      "world_id": "world-3",
+      "graph_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true
+    },
+    {
+      "world_id": "world-4",
+      "graph_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false
+    }
+  ],
+  "nuisance_models": [
+    {
+      "nuisance_model_id": "nominal",
+      "model_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "description": "Nominal observation mapping."
+    },
+    {
+      "nuisance_model_id": "gain-shift",
+      "model_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "description": "Coherent nuisance variant with identical partitions and a distinct outcome vocabulary."
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "screen-group",
+      "intervention_kind": "OPTOGENETIC",
+      "effort_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "safety_profile_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    {
+      "action_id": "resolve-a",
+      "intervention_kind": "ELECTRICAL",
+      "effort_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "safety_profile_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    {
+      "action_id": "resolve-b",
+      "intervention_kind": "ELECTRICAL",
+      "effort_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "safety_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "potential_outcomes": [
+    {
+      "world_id": "world-1",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same"
+        }
+      ]
+    },
+    {
+      "world_id": "world-2",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same"
+        }
+      ]
+    },
+    {
+      "world_id": "world-3",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same"
+        }
+      ]
+    },
+    {
+      "world_id": "world-4",
+      "nuisance_model_id": "nominal",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same"
+        }
+      ]
+    },
+    {
+      "world_id": "world-1",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same-2"
+        }
+      ]
+    },
+    {
+      "world_id": "world-2",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same-2"
+        }
+      ]
+    },
+    {
+      "world_id": "world-3",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same-2"
+        }
+      ]
+    },
+    {
+      "world_id": "world-4",
+      "nuisance_model_id": "gain-shift",
+      "observations": [
+        {
+          "action_id": "screen-group",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-a",
+          "outcome_id": "same-2"
+        },
+        {
+          "action_id": "resolve-b",
+          "outcome_id": "same-2"
+        }
+      ]
+    }
+  ],
+  "search_limits": {
+    "max_memo_states": 200000,
+    "max_policy_depth": 3
+  },
+  "expected": {
+    "adaptive_status": "NO_GUARANTEED_QUERY_RESOLUTION",
+    "adaptive_worst_case_effort_units": null,
+    "adaptive_root_action_id": null,
+    "fixed_status": "NO_GUARANTEED_FIXED_PLAN",
+    "fixed_minimum_effort_units": null,
+    "fixed_action_ids": [],
+    "adaptivity_savings_units": null
+  },
+  "notes": [
+    "Synthetic impossibility control only.",
+    "Every action has overlapping outcomes across opposite-query worlds under both coherent nuisance models; no guaranteed policy exists."
+  ]
+}
