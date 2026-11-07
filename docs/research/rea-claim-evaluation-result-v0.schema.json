@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-claim-evaluation-result-v0.schema.json",
+  "title": "REA typed claim evaluation result v0",
+  "description": "A deterministic claim-evaluation result. The derivation digest commits to this body without derivation_sha256. It is not a producer signature or proof of underlying artifact truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "evaluator_version",
+    "rule_id",
+    "claim_id",
+    "claim_request_sha256",
+    "predicate",
+    "disposition",
+    "scope",
+    "asserted_value",
+    "source_predicate_type",
+    "requested_evidence_ids",
+    "assumptions",
+    "evidence_assessments",
+    "missing_evidence_ids",
+    "unmet_obligations",
+    "falsification_condition",
+    "claim_ceiling",
+    "derivation_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "luminous.rea.claim-evaluation.v0"
+    },
+    "evaluator_version": {
+      "const": "rea-claim-evaluator/v0"
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "predicate": {
+      "enum": [
+        "provider_reported_observation",
+        "member_content_integrity",
+        "archive_content_identity",
+        "whole_archive_completeness",
+        "producer_authenticity",
+        "signature_cryptographic_validity",
+        "signer_identity",
+        "signer_trust",
+        "package_authorization",
+        "platform_acceptance",
+        "provider_corroboration",
+        "causal_finding",
+        "security_control_pass"
+      ]
+    },
+    "disposition": {
+      "enum": [
+        "supported_within_scope",
+        "refuted_within_scope",
+        "underdetermined",
+        "conflicted",
+        "inapplicable",
+        "unverified"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_sha256",
+        "operation",
+        "platform",
+        "platform_version",
+        "environment_id"
+      ],
+      "properties": {
+        "subject_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": ["string", "null"]
+        },
+        "platform_version": {
+          "type": ["string", "null"]
+        },
+        "environment_id": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "asserted_value": {},
+    "source_predicate_type": {
+      "type": ["string", "null"]
+    },
+    "requested_evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ev_[0-9a-f]{64}$"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "kind",
+          "provider_id",
+          "provider_name",
+          "provider_version",
+          "confidence",
+          "authority",
+          "reason"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^ev_[0-9a-f]{64}$"
+          },
+          "kind": {
+            "enum": [
+              "supports",
+              "contradicts",
+              "inapplicable",
+              "scope_unverifiable",
+              "not_evaluated"
+            ]
+          },
+          "provider_id": {
+            "type": ["string", "null"]
+          },
+          "provider_name": {
+            "type": ["string", "null"]
+          },
+          "provider_version": {
+            "type": ["string", "null"]
+          },
+          "confidence": {
+            "type": ["string", "null"]
+          },
+          "authority": {
+            "type": ["string", "null"]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "missing_evidence_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ev_[0-9a-f]{64}$"
+      }
+    },
+    "unmet_obligations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "falsification_condition": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "derivation_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

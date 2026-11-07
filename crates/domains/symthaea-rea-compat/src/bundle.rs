@@ -728,7 +728,7 @@ fn normalize_and_verify_unknown(value: &Value) -> Result<Value, BundleError> {
 
     let resolution = field(map, "resolution", "ResidualUnknown")?;
     normalize_resolution(&mut normalized, resolution)?;
-    if (status == "resolved") != !resolution.is_null() {
+    if (status == "resolved") == resolution.is_null() {
         return Err(schema_error(
             "Only resolved residual unknowns carry a resolution",
         ));
@@ -1442,7 +1442,7 @@ fn nonempty_string<'a>(value: &'a Value, context: &str) -> Result<&'a str, Bundl
     Ok(value)
 }
 
-fn trimmed_text<'a>(value: &'a Value, context: &str) -> Result<String, BundleError> {
+fn trimmed_text(value: &Value, context: &str) -> Result<String, BundleError> {
     let value = string_value(value, context)?;
     let value = trim_ecmascript_whitespace(value);
     if value.is_empty() {
@@ -1530,7 +1530,7 @@ fn safe_integer(value: &Value, context: &str) -> Result<f64, BundleError> {
     let n = value
         .as_f64()
         .ok_or_else(|| schema_error(format!("{context} must be a safe integer")))?;
-    if !n.is_finite() || n.fract() != 0.0 || n < 0.0 || n > MAX_SAFE_INTEGER {
+    if !n.is_finite() || n.fract() != 0.0 || !(0.0..=MAX_SAFE_INTEGER).contains(&n) {
         return Err(schema_error(format!(
             "{context} must be a non-negative safe integer"
         )));

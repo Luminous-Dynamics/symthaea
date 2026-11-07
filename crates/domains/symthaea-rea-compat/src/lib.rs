@@ -763,7 +763,7 @@ pub fn compute_evidence_id(value: &Value) -> Result<String, EvidenceError> {
 
 /// Validate the envelope and analysis-profile commitment, then verify Evidence ID.
 /// This does not authenticate the producer or prove the underlying observation.
-pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, EvidenceError> {
+fn verify_evidence_identity(value: &Value) -> Result<(String, String), EvidenceError> {
     validate_evidence_schema(value)?;
     let expected = compute_evidence_id(value)?;
     let actual = field(object(value, "Evidence")?, "evidence_id", "Evidence")?
@@ -779,8 +779,13 @@ pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, Evidence
         .strip_prefix(EVIDENCE_ID_PREFIX)
         .expect("computed Evidence ID has prefix")
         .to_owned();
+    Ok((expected, semantic_sha256))
+}
+
+pub fn verify_evidence_value(value: &Value) -> Result<VerifiedEvidence, EvidenceError> {
+    let (evidence_id, semantic_sha256) = verify_evidence_identity(value)?;
     Ok(VerifiedEvidence {
-        evidence_id: expected,
+        evidence_id,
         semantic_sha256,
         raw_file_sha256: None,
         value: value.clone(),
@@ -831,9 +836,13 @@ pub(crate) fn parse_strict_json_bytes(
 
 pub fn verify_evidence_json(input: &[u8]) -> Result<VerifiedEvidence, EvidenceError> {
     let parsed = parse_strict_json_bytes(input, MAX_EVIDENCE_JSON_BYTES)?;
-    let mut verified = verify_evidence_value(&parsed)?;
-    verified.raw_file_sha256 = Some(sha256_hex(input));
-    Ok(verified)
+    let (evidence_id, semantic_sha256) = verify_evidence_identity(&parsed)?;
+    Ok(VerifiedEvidence {
+        evidence_id,
+        semantic_sha256,
+        raw_file_sha256: Some(sha256_hex(input)),
+        value: parsed,
+    })
 }
 
 struct StrictJsonValue(Value);
@@ -1206,5 +1215,20 @@ mod tests {
             validate_evidence_schema(&evidence).unwrap_err().kind,
             EvidenceErrorKind::SchemaViolation
         );
+    }
+    #[test]
+    fn byte_and_value_admission_share_identity_and_semantics() {
+        let raw = include_str!("../tests/fixtures/rea-evidence-v1.json").as_bytes();
+        let from_bytes = verify_evidence_json(raw).unwrap();
+        let from_value = verify_evidence_value(&from_bytes.value).unwrap();
+
+        assert_eq!(from_bytes.evidence_id, from_value.evidence_id);
+        assert_eq!(from_bytes.semantic_sha256, from_value.semantic_sha256);
+        assert_eq!(from_bytes.value, from_value.value);
+        assert_eq!(
+            from_bytes.raw_file_sha256.as_deref(),
+            Some(sha256_hex(raw).as_str())
+        );
+        assert!(from_value.raw_file_sha256.is_none());
     }
 }
