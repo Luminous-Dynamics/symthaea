@@ -1255,6 +1255,12 @@ pub fn multi_start_sift_strategy_function_robdd(
     budget: StrategyBddBudget,
 ) -> Result<StrategyBddMultiStartReport, StrategyBddError> {
     validate_truth_table(function, budget)?;
+    if budget.max_variable_order_evaluations == 0 {
+        return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+            required: 1,
+            limit: 0,
+        });
+    }
     let dependency_count = function.dependencies.len();
     let (interaction_graph, interaction_pair_checks) =
         strategy_interaction_graph(function, budget)?;
@@ -1302,12 +1308,6 @@ pub fn multi_start_sift_strategy_function_robdd(
         }
     }
 
-    if budget.max_variable_order_evaluations == 0 {
-        return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
-            required: 1,
-            limit: 0,
-        });
-    }
     let mut remaining_budget = budget.max_variable_order_evaluations;
     let mut order_evaluations = 0usize;
     let mut seeds_evaluated = 0usize;
@@ -2463,6 +2463,23 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn zero_global_order_budget_fails_before_interaction_graph_work() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let tight = StrategyBddBudget {
+            max_interaction_checks: 0,
+            max_variable_order_evaluations: 0,
+            ..budget()
+        };
+        assert_eq!(
+            multi_start_sift_strategy_function_robdd(&source, tight).unwrap_err(),
+            StrategyBddError::VariableOrderSearchBudgetExceeded {
+                required: 1,
+                limit: 0
+            }
+        );
     }
 
     #[test]
