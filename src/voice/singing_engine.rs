@@ -286,11 +286,32 @@ impl VocalPerformance {
         if self.version != VOCAL_PERFORMANCE_VERSION {
             bail!("unsupported vocal performance version {}", self.version);
         }
-        if self.lyrics.trim().is_empty()
-            || self.language.trim().is_empty()
-            || self.syllables.is_empty()
-        {
-            bail!("lyrics, language, and syllables are required");
+        if self.lyrics.trim().is_empty() || self.syllables.is_empty() {
+            bail!("lyrics and syllables are required");
+        }
+        if self.language != "en" {
+            bail!(
+                "VocalPerformance v2 currently supports language='en' only; got {:?}",
+                self.language
+            );
+        }
+        validate_english_orthography(&self.lyrics)?;
+        for token in self.lyrics.split_whitespace() {
+            let core = token.trim_matches(|character: char| !character.is_alphanumeric());
+            if !core.is_empty()
+                && symthaea_muse::singing_bridge::syllable_count(core) == 0
+            {
+                bail!(
+                    "English G2P produced no pronounceable syllables for lyric token {token:?}"
+                );
+            }
+        }
+        let expected_syllables = symthaea_muse::singing_bridge::syllable_count(&self.lyrics);
+        if expected_syllables == 0 || self.syllables.len() != expected_syllables {
+            bail!(
+                "lyric/performance syllable mismatch: G2P produced {expected_syllables} syllable(s), performance contains {}",
+                self.syllables.len()
+            );
         }
 
         let duration_s = self.duration_s();
@@ -531,6 +552,27 @@ mod tests {
             },
         ];
         VocalPerformance::from_melody("light", &notes, "en").unwrap()
+    }
+
+    #[test]
+    fn validate_rejects_non_english_or_unpronounceable_serialized_performance() {
+        let mut non_english = performance_with_melisma();
+        non_english.language = "zu".into();
+        let error = non_english.validate().unwrap_err().to_string();
+        assert!(error.contains("language='en' only"), "{error}");
+
+        let mut no_g2p = performance_with_melisma();
+        no_g2p.lyrics = "q light".into();
+        let error = no_g2p.validate().unwrap_err().to_string();
+        assert!(error.contains("no pronounceable syllables"), "{error}");
+    }
+
+    #[test]
+    fn validate_rejects_lyric_syllable_count_mismatch() {
+        let mut performance = performance_with_melisma();
+        performance.lyrics = "light bright".into();
+        let error = performance.validate().unwrap_err().to_string();
+        assert!(error.contains("lyric/performance syllable mismatch"), "{error}");
     }
 
     #[test]
