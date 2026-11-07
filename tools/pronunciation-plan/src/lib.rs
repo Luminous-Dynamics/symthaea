@@ -139,6 +139,8 @@ struct SelectionDigestPayload<'a> {
     surface: &'a str,
     selected_candidate_id: &'a str,
     candidate_digest: &'a str,
+    authority: SelectionAuthority,
+    evidence_reference: &'a str,
 }
 
 fn candidate_digest(candidate: &PronunciationCandidate) -> Result<String, String> {
@@ -158,6 +160,8 @@ fn selection_digest(
     word: &WordPronunciation,
     selected_candidate_id: &str,
     candidate_digest: &str,
+    authority: SelectionAuthority,
+    evidence_reference: &str,
 ) -> Result<String, String> {
     let payload = SelectionDigestPayload {
         domain: "luminous-dynamics/pronunciation-selection/v1",
@@ -169,6 +173,8 @@ fn selection_digest(
         surface: &word.surface,
         selected_candidate_id,
         candidate_digest,
+        authority,
+        evidence_reference,
     };
     let bytes = serde_json::to_vec(&payload)
         .map_err(|error| format!("cannot serialize pronunciation selection binding: {error}"))?;
@@ -190,6 +196,7 @@ impl SelectionReceipt {
         candidate: &PronunciationCandidate,
     ) -> Result<Self, String> {
         let candidate_digest = candidate_digest(candidate)?;
+        let evidence_reference = evidence_reference.into();
         let selection_digest = selection_digest(
             schema_version,
             language,
@@ -197,10 +204,12 @@ impl SelectionReceipt {
             word,
             &candidate.candidate_id,
             &candidate_digest,
+            authority,
+            &evidence_reference,
         )?;
         Ok(Self {
             authority,
-            evidence_reference: evidence_reference.into(),
+            evidence_reference,
             candidate_digest,
             selection_digest,
         })
@@ -431,6 +440,8 @@ fn validate_word_state(
                 word,
                 selected,
                 &expected_candidate_digest,
+                receipt.authority,
+                &receipt.evidence_reference,
             )?;
             if receipt.selection_digest != expected_selection_digest {
                 return Err(format!(
