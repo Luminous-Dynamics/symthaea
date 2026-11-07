@@ -299,7 +299,7 @@ Before any scenario can be promoted to a task-specific design:
 5. Extend the #10723 experiment protocol with evidence-modality arms and targeted-check value.
 6. Only after #10064/#10369 and admission/custody requirements are qualified, decide whether any candidate task can be executed or independently regraded.
 
-## 13. Two-axis review outcomes: defect detection versus usefulness
+## 12. Two-axis review outcomes: defect detection versus usefulness
 
 CR-Bench-v2 (November 2, revised November 3, 2026) formalizes a distinction that CEB should preserve. Its 584-instance CR-Bench / 174-instance CR-Bench-Verified set gives each instance one SWE-Bench-derived known defect and measures both Known-Defect Detection Rate (KDDR) and comment Usefulness Rate. In the verified slice, GPT-5.2 Reflexion reports 33.0% KDDR / 89.8% Usefulness Rate; GPT-5-mini Reflexion 33.7% / 72.6%; Gemini Code Assist 8.1% / 78.0%. These are paper-specific results, not CEB outcomes; KDDR is not issue resolution and the benchmark is Python-only with 11 source repositories in the verified subset. [Pereira et al., arXiv:2611.02566](https://arxiv.org/abs/2611.02566)
 
@@ -381,6 +381,6 @@ Do not multiply KDDR by Usefulness Rate or combine them into a single opaque sco
 
 **Invalid behavior:** Treat a correct function-name/line citation as a complete root cause; extrapolate local tests to downstream callers; invent a runtime path without an observed trace.
 
-## 18. Claim boundary
+## 13. Claim boundary
 
 This document contributes twenty synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
