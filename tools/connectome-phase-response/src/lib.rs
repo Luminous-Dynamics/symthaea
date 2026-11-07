@@ -427,6 +427,15 @@ pub fn minimum_pairwise_probe_separation(
     Ok(result)
 }
 
+fn checked_cycle_slip_vector_distance(
+    left: &[i64; LEG_COUNT],
+    right: &[i64; LEG_COUNT],
+) -> Option<u64> {
+    left.iter()
+        .zip(right.iter())
+        .try_fold(0_u64, |total, (a, b)| total.checked_add(a.abs_diff(*b)))
+}
+
 /// Compute the minimum pairwise cycle-slip separation for every probe cell.
 /// This remains a separate quantity from fractional phase distance.
 pub fn minimum_pairwise_cycle_slip_separation(
@@ -461,12 +470,11 @@ pub fn minimum_pairwise_cycle_slip_separation(
         let mut minimum = u64::MAX;
         for left in 0..maps.len() {
             for right in (left + 1)..maps.len() {
-                let distance = maps[left][&key]
-                    .1
-                    .iter()
-                    .zip(maps[right][&key].1.iter())
-                    .map(|(a, b)| a.abs_diff(*b))
-                    .sum::<u64>();
+                let distance = checked_cycle_slip_vector_distance(
+                    &maps[left][&key].1,
+                    &maps[right][&key].1,
+                )
+                .ok_or(PhaseError::ArithmeticOverflow)?;
                 minimum = minimum.min(distance);
             }
         }
@@ -514,13 +522,13 @@ pub fn minimum_joint_campaign_phase_separation(
         for right in (left + 1)..maps.len() {
             let portfolio_distance = reference_keys
                 .iter()
-                .map(|key| {
-                    response_vector_distance(
+                .try_fold(0_u64, |total, key| {
+                    total.checked_add(response_vector_distance(
                         &maps[left][key].0,
                         &maps[right][key].0,
-                    )
+                    ))
                 })
-                .sum::<u64>();
+                .ok_or(PhaseError::ArithmeticOverflow)?;
             minimum = minimum.min(portfolio_distance);
         }
     }
@@ -564,15 +572,14 @@ pub fn minimum_joint_campaign_cycle_slip_separation(
         for right in (left + 1)..maps.len() {
             let portfolio_distance = reference_keys
                 .iter()
-                .map(|key| {
-                    maps[left][key]
-                        .1
-                        .iter()
-                        .zip(maps[right][key].1.iter())
-                        .map(|(a, b)| a.abs_diff(*b))
-                        .sum::<u64>()
+                .try_fold(0_u64, |total, key| {
+                    let cell_distance = checked_cycle_slip_vector_distance(
+                        &maps[left][key].1,
+                        &maps[right][key].1,
+                    )?;
+                    total.checked_add(cell_distance)
                 })
-                .sum::<u64>();
+                .ok_or(PhaseError::ArithmeticOverflow)?;
             minimum = minimum.min(portfolio_distance);
         }
     }
@@ -616,6 +623,7 @@ pub enum PhaseError {
     DuplicateModelId(String),
     ModelProbeGridMismatch { model_id: String },
     EmptyProbeGrid,
+    ArithmeticOverflow,
 }
 
 impl fmt::Display for PhaseError {
@@ -640,6 +648,7 @@ impl fmt::Display for PhaseError {
             Self::DuplicateModelId(model) => write!(f, "duplicate model ID {model}"),
             Self::ModelProbeGridMismatch { model_id } => write!(f, "model {model_id} does not predict the identical probe grid"),
             Self::EmptyProbeGrid => write!(f, "phase-response probe grid is empty"),
+            Self::ArithmeticOverflow => write!(f, "phase-response separation overflowed its exact integer range"),
         }
     }
 }
