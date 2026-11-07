@@ -198,7 +198,11 @@ pub fn gospa_frame(
         let unmatched_columns = m - matched;
         let cardinality_cost = miss_penalty * (unmatched_rows + unmatched_columns) as f64;
         let total = accumulated - miss_penalty * unmatched_rows as f64 + cardinality_cost;
-        if total < best_total {
+        // At exactly the cutoff, matching and leaving both objects
+        // unmatched can have the same GOSPA objective (alpha=2). Prefer the
+        // maximum-cardinality assignment on an exact cost tie so the
+        // localization/cardinality breakdown is deterministic and informative.
+        if total < best_total || (total == best_total && matched > best_matches) {
             best_total = total;
             best_matches = matched;
             // Remove the per-row unmatched penalty already included in DP.
@@ -229,6 +233,79 @@ mod tests {
 
     fn p(x: f64, y: f64, z: f64) -> Vector3 {
         Vector3::new(x, y, z)
+    }
+
+    fn brute_force_gospa(
+        truth: &[Vector3],
+        estimates: &[Vector3],
+        config: GospaConfig,
+    ) -> (f64, usize) {
+        fn enumerate(
+            row: usize,
+            truth: &[Vector3],
+            estimates: &[Vector3],
+            used: &mut [bool],
+            config: GospaConfig,
+            cost: f64,
+            matched: usize,
+            best: &mut (f64, usize),
+        ) {
+            if row == truth.len() {
+                let unmatched_estimates = used.iter().filter(|used| !**used).count();
+                let total = cost
+                    + unmatched_estimates as f64
+                        * config.cutoff_m.powf(config.order)
+                        / config.alpha;
+                if total < best.0 || (total == best.0 && matched > best.1) {
+                    *best = (total, matched);
+                }
+                return;
+            }
+
+            let penalty = config.cutoff_m.powf(config.order) / config.alpha;
+            enumerate(
+                row + 1,
+                truth,
+                estimates,
+                used,
+                config,
+                cost + penalty,
+                matched,
+                best,
+            );
+
+            for column in 0..estimates.len() {
+                if used[column] {
+                    continue;
+                }
+                used[column] = true;
+                let distance = truth[row].subtract(estimates[column]).norm();
+                enumerate(
+                    row + 1,
+                    truth,
+                    estimates,
+                    used,
+                    config,
+                    cost + distance.min(config.cutoff_m).powf(config.order),
+                    matched + 1,
+                    best,
+                );
+                used[column] = false;
+            }
+        }
+
+        let mut best = (f64::INFINITY, 0);
+        enumerate(
+            0,
+            truth,
+            estimates,
+            &mut vec![false; estimates.len()],
+            config,
+            0.0,
+            0,
+            &mut best,
+        );
+        best
     }
 
     #[test]
@@ -304,6 +381,50 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_program_matches_exhaustive_assignment_oracle() {
+        let config = GospaConfig {
+            cutoff_m: 7.0,
+            order: 2.0,
+            alpha: 2.0,
+        };
+        for truth_count in 0..=4 {
+            for estimate_count in 0..=4 {
+                let truth = (0..truth_count)
+                    .map(|index| {
+                        p(
+                            (index * 7 % 11) as f64,
+                            (index * 3 % 5) as f64,
+                            (index % 2) as f64,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let estimates = (0..estimate_count)
+                    .map(|index| {
+                        p(
+                            (index * 5 % 13) as f64 + 0.25,
+                            (index * 2 % 7) as f64 - 0.5,
+                            (index * 3 % 4) as f64,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                let expected = brute_force_gospa(&truth, &estimates, config);
+                let actual = gospa_frame(&truth, &estimates, config).unwrap();
+                assert!(
+                    (actual.distance_m.powf(config.order) - expected.0).abs() < 1.0e-9,
+                    "truth={truth_count}, estimates={estimate_count}, actual={actual:?}, expected={expected:?}"
+                );
+                assert_eq!(
+                    actual.matched_targets, expected.1,
+                    "truth={truth_count}, estimates={estimate_count}"
+                );
+                assert_eq!(actual.missed_targets, truth_count - expected.1);
+                assert_eq!(actual.false_targets, estimate_count - expected.1);
+            }
+        }
+    }
+
+    #[test]
     fn malformed_inputs_fail_closed() {
         assert_eq!(
             gospa_frame(
@@ -323,14 +444,51 @@ mod tests {
     }
 
     #[test]
-    fn overly_large_assignment_side_is_rejected_without_allocating() {
+    fn a_large_one_sided_set_uses_the_cardinality_fast_path() {
+        // With no truth objects there is no assignment problem: all estimates
+        // are false targets. The algorithm bitmasks the smaller side (zero),
+        // so this must not be rejected merely because the other side is large.
         let estimates = vec![p(0.0, 0.0, 0.0); MAX_GOSPA_ASSIGNMENT_SIDE + 1];
+        let result = gospa_frame(&[], &estimates, GospaConfig::default()).unwrap();
+        assert_eq!(result.matched_targets, 0);
+        assert_eq!(result.missed_targets, 0);
+        assert_eq!(result.false_targets, MAX_GOSPA_ASSIGNMENT_SIDE + 1);
+        let expected_cost = (MAX_GOSPA_ASSIGNMENT_SIDE + 1) as f64
+            * GospaConfig::default().cutoff_m.powf(GospaConfig::default().order)
+            / GospaConfig::default().alpha;
+        assert!((result.distance_m.powf(2.0) - expected_cost).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn an_oversized_smaller_assignment_side_is_rejected_before_dp_allocation() {
+        let count = MAX_GOSPA_ASSIGNMENT_SIDE + 1;
+        let truth = (0..count)
+            .map(|index| p(index as f64, 0.0, 0.0))
+            .collect::<Vec<_>>();
+        let estimates = (0..count)
+            .map(|index| p(index as f64 + 0.1, 0.0, 0.0))
+            .collect::<Vec<_>>();
         assert_eq!(
-            gospa_frame(&[], &estimates, GospaConfig::default()),
+            gospa_frame(&truth, &estimates, GospaConfig::default()),
             Err(GospaError::AssignmentSideTooLarge {
-                count: MAX_GOSPA_ASSIGNMENT_SIDE + 1,
+                count,
                 maximum: MAX_GOSPA_ASSIGNMENT_SIDE
             })
         );
+    }
+
+    #[test]
+    fn exact_cutoff_tie_prefers_a_match_but_cost_remains_capped() {
+        let config = GospaConfig {
+            cutoff_m: 10.0,
+            order: 2.0,
+            alpha: 2.0,
+        };
+        let result = gospa_frame(&[p(0.0, 0.0, 0.0)], &[p(10.0, 0.0, 0.0)], config).unwrap();
+        assert_eq!(result.matched_targets, 1);
+        assert_eq!(result.missed_targets, 0);
+        assert_eq!(result.false_targets, 0);
+        assert!((result.localization_cost_m_p - 100.0).abs() < 1.0e-12);
+        assert!((result.distance_m - 10.0).abs() < 1.0e-12);
     }
 }
