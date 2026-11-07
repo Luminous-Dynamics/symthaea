@@ -306,7 +306,7 @@ pub struct ScoreEvent {
     pub kind: ScoreEventKind,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ScoreEventKind {
     SungNote { frequency_hz: f32, velocity: f32 },
@@ -378,6 +378,11 @@ impl VocalScoreAlignment {
                     "score event {event_index} overlaps or is out of chronological order"
                 ));
             }
+            if event_index > 0 && (event.start_s - previous_event_end).abs() > 0.000_01 {
+                return Err(format!(
+                    "score event {event_index} has an implicit gap; represent it as an explicit Rest event"
+                ));
+            }
             if let ScoreEventKind::SungNote {
                 frequency_hz,
                 velocity,
@@ -394,19 +399,22 @@ impl VocalScoreAlignment {
             previous_event_end = end;
         }
 
-        let expected_syllables: Vec<(usize, usize)> = pronunciation
-            .words
-            .iter()
-            .enumerate()
-            .flat_map(|(word_index, word)| {
-                let selected = word
-                    .selected_candidate_id
-                    .as_deref()
-                    .and_then(|id| word.candidates.iter().find(|candidate| candidate.candidate_id == id))
-                    .expect("validate_renderable guarantees a selected candidate");
-                (0..selected.syllables.len()).map(move |syllable_index| (word_index, syllable_index))
-            })
-            .collect();
+        let mut expected_syllables: Vec<(usize, usize)> = Vec::new();
+        for (word_index, word) in pronunciation.words.iter().enumerate() {
+            let Some(selected_id) = word.selected_candidate_id.as_deref() else {
+                return Err(format!("word {word_index} has no selected pronunciation"));
+            };
+            let Some(selected) = word
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == selected_id)
+            else {
+                return Err(format!("word {word_index} selects a missing pronunciation"));
+            };
+            for syllable_index in 0..selected.syllables.len() {
+                expected_syllables.push((word_index, syllable_index));
+            }
+        }
 
         if self.syllable_bindings.len() != expected_syllables.len() {
             return Err(format!(
@@ -460,16 +468,22 @@ impl VocalScoreAlignment {
                 previous_bound_event = Some(note_index);
             }
 
-            let selected_id = pronunciation.words[binding.word_index]
-                .selected_candidate_id
-                .as_deref()
-                .expect("validate_renderable guarantees selected candidate");
-            let selected = pronunciation.words[binding.word_index]
+            let word = &pronunciation.words[binding.word_index];
+            let Some(selected_id) = word.selected_candidate_id.as_deref() else {
+                return Err(format!("word {} has no selected pronunciation", binding.word_index));
+            };
+            let Some(selected) = word
                 .candidates
                 .iter()
                 .find(|candidate| candidate.candidate_id == selected_id)
-                .expect("validate_renderable guarantees selected candidate exists");
-            let syllable = &selected.syllables[binding.syllable_index];
+            else {
+                return Err(format!("word {} selects a missing pronunciation", binding.word_index));
+            };
+            let Some(syllable) = selected.syllables.get(binding.syllable_index) else {
+                return Err(format!(
+                    "syllable binding {binding_index} references a missing pronunciation syllable"
+                ));
+            };
             if binding.note_indices.len() > 1 {
                 let Some(phone_index) = binding.melisma_phone_index else {
                     return Err(format!(
@@ -782,6 +796,149 @@ mod tests {
             words: vec![selected],
         };
         assert!(plan.validate_renderable().is_ok());
+    }
+
+    fn selected_word(surface: &str, start_byte: usize, vowel: &str) -> WordPronunciation {
+        let mut candidate = PronunciationCandidate {
+            candidate_id: format!("{surface}-variant-1"),
+            provenance: provenance(CandidateSource::HumanReviewed, "review-fixture"),
+            raw_provider_score: None,
+            syllables: vec![PronunciationSyllable {
+                stress: 1,
+                phones: vec![
+                    Phone { ipa: "ɹ".into(), kind: PhoneKind::Consonant },
+                    Phone { ipa: vowel.into(), kind: PhoneKind::Vowel },
+                    Phone { ipa: "d".into(), kind: PhoneKind::Consonant },
+                ],
+            }],
+        };
+        candidate.provenance.source_digest = "blake3:review-fixture".into();
+        WordPronunciation {
+            start_byte,
+            end_byte: start_byte + surface.len(),
+            surface: surface.into(),
+            state: ResolutionState::Selected,
+            selected_candidate_id: Some(candidate.candidate_id.clone()),
+            candidates: vec![candidate],
+            selection_receipt: Some(SelectionReceipt {
+                authority: SelectionAuthority::HumanReviewer,
+                evidence_reference: "review:fixture".into(),
+            }),
+        }
+    }
+
+    fn alignment_fixture() -> (PronunciationPlan, VocalScoreAlignment) {
+        let pronunciation = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read now".into(),
+            words: vec![
+                selected_word("read", 0, "ɛ"),
+                selected_word("now", 5, "aʊ"),
+            ],
+        };
+        let alignment = VocalScoreAlignment {
+            schema_version: 1,
+            events: vec![
+                ScoreEvent {
+                    start_s: 0.0,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 220.0,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.4,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 246.94,
+                        velocity: 0.7,
+                    },
+                },
+                ScoreEvent {
+                    start_s: 0.8,
+                    duration_s: 0.4,
+                    kind: ScoreEventKind::SungNote {
+                        frequency_hz: 261.63,
+                        velocity: 0.7,
+                    },
+                },
+            ],
+            syllable_bindings: vec![
+                SyllableNoteBinding {
+                    word_index: 0,
+                    syllable_index: 0,
+                    note_indices: vec![0, 1],
+                    melisma_phone_index: Some(1),
+                },
+                SyllableNoteBinding {
+                    word_index: 1,
+                    syllable_index: 0,
+                    note_indices: vec![2],
+                    melisma_phone_index: None,
+                },
+            ],
+            phrases: vec![VocalPhraseSpan {
+                syllable_start: 0,
+                syllable_end: 2,
+                breath_before_s: 0.0,
+                breath_after_s: 0.2,
+            }],
+        };
+        (pronunciation, alignment)
+    }
+
+    #[test]
+    fn medial_melisma_is_valid_and_phrase_partition_is_explicit() {
+        let (pronunciation, alignment) = alignment_fixture();
+        assert!(alignment.validate_against(&pronunciation).is_ok());
+    }
+
+    #[test]
+    fn melisma_must_sustain_a_vowel_not_a_consonant() {
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.syllable_bindings[0].melisma_phone_index = Some(0);
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("must sustain a vowel"), "{error}");
+    }
+
+    #[test]
+    fn every_sung_note_must_be_assigned_once_and_rests_must_remain_unbound() {
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.syllable_bindings[0].note_indices = vec![0];
+        alignment.syllable_bindings[0].melisma_phone_index = None;
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("does not match") || error.contains("unassigned"), "{error}");
+
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.events[1].kind = ScoreEventKind::Rest;
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("assigns a rest"), "{error}");
+    }
+
+    #[test]
+    fn phrase_ranges_must_partition_every_syllable_once() {
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.phrases[0].syllable_start = 1;
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("phrase 0"), "{error}");
+    }
+
+    #[test]
+    fn score_events_must_have_explicit_rests_for_timing_gaps() {
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.events[1].start_s = 0.5;
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("explicit Rest"), "{error}");
+    }
+
+    #[test]
+    fn note_assignments_cannot_overlap_or_reorder() {
+        let (pronunciation, mut alignment) = alignment_fixture();
+        alignment.syllable_bindings[1].note_indices = vec![1];
+        let error = alignment.validate_against(&pronunciation).unwrap_err();
+        assert!(error.contains("overlaps or reorders"), "{error}");
     }
 
 }
