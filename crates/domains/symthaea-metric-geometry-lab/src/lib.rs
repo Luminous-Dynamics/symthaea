@@ -704,6 +704,21 @@ mod tests {
             MetricInertia { negative: 1, zero: 0, positive: 3 }
         );
 
+        // A non-diagonal flat metric under a linear shear of the time
+        // coordinate must retain the same Lorentzian inertia.
+        let shear: f64 = 0.3;
+        let sheared_minkowski = MetricTensor4::new([
+            [-1.0, -shear, 0.0, 0.0],
+            [-shear, 1.0 - shear * shear, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
+        .unwrap();
+        assert_eq!(
+            sheared_minkowski.inertia(),
+            MetricInertia { negative: 1, zero: 0, positive: 3 }
+        );
+
         let euclidean = MetricTensor4::new([
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
