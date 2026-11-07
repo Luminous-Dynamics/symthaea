@@ -167,7 +167,7 @@ def self_test() -> list[str]:
         "https://arxiv.org/abs/2610.33509",
         "https://arxiv.org/abs/2611.02566",
         "https://arxiv.org/abs/2610.13668",
-        "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane",
+        "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane candidate-specific and appears in both numerator and denominator",
         "#10064 #10369",
     ))
     challenge = "\n\n".join(
