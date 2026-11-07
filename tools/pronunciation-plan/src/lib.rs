@@ -841,11 +841,7 @@ mod tests {
                 vec![bad_source],
             )],
         };
-        assert!(
-            plan.validate()
-                .unwrap_err()
-                .contains("provenance digest")
-        );
+        assert!(plan.validate().unwrap_err().contains("provenance digest"));
     }
     #[test]
     fn unresolved_heteronym_is_valid_but_not_renderable() {
@@ -901,9 +897,18 @@ mod tests {
             syllables: vec![PronunciationSyllable {
                 stress: 1,
                 phones: vec![
-                    Phone { ipa: "ɹ".into(), kind: PhoneKind::Consonant },
-                    Phone { ipa: vowel.into(), kind: PhoneKind::Vowel },
-                    Phone { ipa: "d".into(), kind: PhoneKind::Consonant },
+                    Phone {
+                        ipa: "ɹ".into(),
+                        kind: PhoneKind::Consonant,
+                    },
+                    Phone {
+                        ipa: vowel.into(),
+                        kind: PhoneKind::Vowel,
+                    },
+                    Phone {
+                        ipa: "d".into(),
+                        kind: PhoneKind::Consonant,
+                    },
                 ],
             }],
         };
