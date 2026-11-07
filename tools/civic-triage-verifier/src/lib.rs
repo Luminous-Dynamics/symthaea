@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub const EXPECTED_SCHEMA: &str = "luminous.civic_triage_cases.v0.1";
 pub const EXPECTED_STATUS: &str = "synthetic_non_identifying_effects_disabled";
 pub const EXPECTED_AUTHORITY_CEILING: &str = "advisory_only_human_review_required";
+pub const EXPECTED_FIXTURE_SHA256: &str = "32f8c68268d8874d567a41c857dd69adaa70a01961b4978ebb625b4f0b84f206";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -55,6 +56,13 @@ const REQUIRED_CASES: [(&str, &str, &[&str]); 11] = [
 pub fn verify_manifest(bytes: &[u8]) -> VerificationReport {
     let digest = format!("{:x}", Sha256::digest(bytes));
     let mut errors = Vec::new();
+    if digest != EXPECTED_FIXTURE_SHA256 {
+        errors.push(format!(
+            "fixture_digest_mismatch: expected {}, got {}",
+            EXPECTED_FIXTURE_SHA256,
+            digest
+        ));
+    }
 
     let manifest: Option<Manifest> = match serde_json::from_slice(bytes) {
         Ok(value) => Some(value),
@@ -172,7 +180,7 @@ mod tests {
         assert_eq!(report.status, "CONFORMS", "{:?}", report.errors);
         assert_eq!(report.case_count, REQUIRED_CASES.len());
         assert_eq!(report.checked_case_ids.len(), REQUIRED_CASES.len());
-        assert_eq!(report.manifest_sha256.len(), 64);
+        assert_eq!(report.manifest_sha256, EXPECTED_FIXTURE_SHA256);
     }
 
     #[test]
@@ -220,4 +228,13 @@ mod tests {
         assert_eq!(report.status, "REJECTED");
         assert!(report.errors.iter().any(|error| error.starts_with("expected_state_mismatch: CT-008")));
     }
+    #[test]
+    fn fixture_byte_change_is_rejected_by_digest() {
+        let changed = FIXTURE.replace("benign_maintenance_access", "benign_maintenance_access ");
+        assert_ne!(changed, FIXTURE);
+        let report = verify_manifest(changed.as_bytes());
+        assert_eq!(report.status, "REJECTED");
+        assert!(report.errors.iter().any(|e| e.starts_with("fixture_digest_mismatch:")));
+    }
+
 }
