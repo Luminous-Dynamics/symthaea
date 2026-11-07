@@ -149,7 +149,9 @@ impl PronunciationPlan {
                 return Err(format!("word {word_index} overlaps or is out of order"));
             }
             if word.surface != self.source_text[word.start_byte..word.end_byte] {
-                return Err(format!("word {word_index} surface does not match source_text"));
+                return Err(format!(
+                    "word {word_index} surface does not match source_text"
+                ));
             }
             if word.surface.chars().all(char::is_whitespace) {
                 return Err(format!("word {word_index} contains only whitespace"));
@@ -166,9 +168,10 @@ impl PronunciationPlan {
             if character.is_whitespace() {
                 continue;
             }
-            let covered = self.words.iter().any(|word| {
-                byte_index >= word.start_byte && byte_index < word.end_byte
-            });
+            let covered = self
+                .words
+                .iter()
+                .any(|word| byte_index >= word.start_byte && byte_index < word.end_byte);
             if !covered {
                 return Err(format!(
                     "source character {character:?} at byte {byte_index} is not covered by a word span"
@@ -202,25 +205,35 @@ impl PronunciationPlan {
 fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), String> {
     let mut ids = std::collections::BTreeSet::new();
     for candidate in &word.candidates {
-        if candidate.candidate_id.trim().is_empty()
-            || !ids.insert(candidate.candidate_id.as_str())
+        if candidate.candidate_id.trim().is_empty() || !ids.insert(candidate.candidate_id.as_str())
         {
-            return Err(format!("word {index} has an empty or duplicate candidate ID"));
+            return Err(format!(
+                "word {index} has an empty or duplicate candidate ID"
+            ));
         }
         if candidate.provenance.provider_id.trim().is_empty()
             || candidate.provenance.provider_version.trim().is_empty()
             || candidate.provenance.source_digest.trim().is_empty()
         {
-            return Err(format!("candidate {} has incomplete provenance", candidate.candidate_id));
+            return Err(format!(
+                "candidate {} has incomplete provenance",
+                candidate.candidate_id
+            ));
         }
         if candidate
             .raw_provider_score
             .is_some_and(|score| !score.is_finite())
         {
-            return Err(format!("candidate {} has a non-finite raw score", candidate.candidate_id));
+            return Err(format!(
+                "candidate {} has a non-finite raw score",
+                candidate.candidate_id
+            ));
         }
         if candidate.syllables.is_empty() {
-            return Err(format!("candidate {} has no syllables", candidate.candidate_id));
+            return Err(format!(
+                "candidate {} has no syllables",
+                candidate.candidate_id
+            ));
         }
         for (syllable_index, syllable) in candidate.syllables.iter().enumerate() {
             if syllable.stress > 2 || syllable.phones.is_empty() {
@@ -229,9 +242,10 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
                     candidate.candidate_id
                 ));
             }
-            let has_nucleus = syllable.phones.iter().any(|phone| {
-                matches!(phone.kind, PhoneKind::Vowel | PhoneKind::SyllabicConsonant)
-            });
+            let has_nucleus = syllable
+                .phones
+                .iter()
+                .any(|phone| matches!(phone.kind, PhoneKind::Vowel | PhoneKind::SyllabicConsonant));
             if !has_nucleus {
                 return Err(format!(
                     "candidate {} syllable {syllable_index} has no vowel or syllabic nucleus",
@@ -278,7 +292,9 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
                 return Err(format!("word {index} selection has no evidence receipt"));
             };
             if receipt.evidence_reference.trim().is_empty() {
-                return Err(format!("word {index} selection evidence reference is empty"));
+                return Err(format!(
+                    "word {index} selection evidence reference is empty"
+                ));
             }
         }
         ResolutionState::OutOfVocabulary | ResolutionState::Unsupported => {
@@ -294,7 +310,6 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
     }
     Ok(())
 }
-
 
 /// Score event consumed by a vocal performance. Rests are explicit and remain
 /// unbound; a renderer must not turn them into sustained vowels.
@@ -393,7 +408,9 @@ impl VocalScoreAlignment {
                     || !velocity.is_finite()
                     || !(0.0..=1.0).contains(&velocity)
                 {
-                    return Err(format!("sung score event {event_index} has invalid pitch/velocity"));
+                    return Err(format!(
+                        "sung score event {event_index} has invalid pitch/velocity"
+                    ));
                 }
             }
             previous_event_end = end;
@@ -439,7 +456,9 @@ impl VocalScoreAlignment {
                 ));
             }
             if binding.note_indices.is_empty() {
-                return Err(format!("syllable binding {binding_index} has no score notes"));
+                return Err(format!(
+                    "syllable binding {binding_index} has no score notes"
+                ));
             }
             for (span_index, note_index) in binding.note_indices.iter().copied().enumerate() {
                 let Some(event) = self.events.get(note_index) else {
@@ -463,21 +482,29 @@ impl VocalScoreAlignment {
                     ));
                 }
                 if !bound_sung_events.insert(note_index) {
-                    return Err(format!("score event {note_index} is assigned more than once"));
+                    return Err(format!(
+                        "score event {note_index} is assigned more than once"
+                    ));
                 }
                 previous_bound_event = Some(note_index);
             }
 
             let word = &pronunciation.words[binding.word_index];
             let Some(selected_id) = word.selected_candidate_id.as_deref() else {
-                return Err(format!("word {} has no selected pronunciation", binding.word_index));
+                return Err(format!(
+                    "word {} has no selected pronunciation",
+                    binding.word_index
+                ));
             };
             let Some(selected) = word
                 .candidates
                 .iter()
                 .find(|candidate| candidate.candidate_id == selected_id)
             else {
-                return Err(format!("word {} selects a missing pronunciation", binding.word_index));
+                return Err(format!(
+                    "word {} selects a missing pronunciation",
+                    binding.word_index
+                ));
             };
             let Some(syllable) = selected.syllables.get(binding.syllable_index) else {
                 return Err(format!(
@@ -563,9 +590,18 @@ mod tests {
             syllables: vec![PronunciationSyllable {
                 stress: 1,
                 phones: vec![
-                    Phone { ipa: "ɹ".into(), kind: PhoneKind::Consonant },
-                    Phone { ipa: vowel.into(), kind: PhoneKind::Vowel },
-                    Phone { ipa: "d".into(), kind: PhoneKind::Consonant },
+                    Phone {
+                        ipa: "ɹ".into(),
+                        kind: PhoneKind::Consonant,
+                    },
+                    Phone {
+                        ipa: vowel.into(),
+                        kind: PhoneKind::Vowel,
+                    },
+                    Phone {
+                        ipa: "d".into(),
+                        kind: PhoneKind::Consonant,
+                    },
                 ],
             }],
         }
@@ -708,7 +744,11 @@ mod tests {
             source_text: "read".into(),
             words: vec![unknown],
         };
-        assert!(plan.validate().unwrap_err().contains("unknown pronunciation"));
+        assert!(
+            plan.validate()
+                .unwrap_err()
+                .contains("unknown pronunciation")
+        );
     }
 
     #[test]
@@ -724,12 +764,19 @@ mod tests {
         assert!(plan.validate().unwrap_err().contains("normalized IPA"));
 
         let mut no_nucleus = candidate("no-nucleus", "ɛ", CandidateSource::Dictionary);
-        no_nucleus.syllables[0].phones.retain(|phone| phone.kind == PhoneKind::Consonant);
+        no_nucleus.syllables[0]
+            .phones
+            .retain(|phone| phone.kind == PhoneKind::Consonant);
         let plan = PronunciationPlan {
             schema_version: 1,
             language: "en".into(),
             source_text: "read".into(),
-            words: vec![word("read", 0, ResolutionState::NeedsReview, vec![no_nucleus])],
+            words: vec![word(
+                "read",
+                0,
+                ResolutionState::NeedsReview,
+                vec![no_nucleus],
+            )],
         };
         assert!(plan.validate().unwrap_err().contains("no vowel"));
     }
@@ -742,7 +789,12 @@ mod tests {
             schema_version: 1,
             language: "en".into(),
             source_text: "read".into(),
-            words: vec![word("read", 0, ResolutionState::NeedsReview, vec![bad_score])],
+            words: vec![word(
+                "read",
+                0,
+                ResolutionState::NeedsReview,
+                vec![bad_score],
+            )],
         };
         assert!(plan.validate().unwrap_err().contains("non-finite"));
 
@@ -752,9 +804,18 @@ mod tests {
             schema_version: 1,
             language: "en".into(),
             source_text: "read".into(),
-            words: vec![word("read", 0, ResolutionState::NeedsReview, vec![bad_source])],
+            words: vec![word(
+                "read",
+                0,
+                ResolutionState::NeedsReview,
+                vec![bad_source],
+            )],
         };
-        assert!(plan.validate().unwrap_err().contains("incomplete provenance"));
+        assert!(
+            plan.validate()
+                .unwrap_err()
+                .contains("incomplete provenance")
+        );
     }
     #[test]
     fn unresolved_heteronym_is_valid_but_not_renderable() {
@@ -773,7 +834,11 @@ mod tests {
             )],
         };
         assert!(plan.validate().is_ok());
-        assert!(plan.validate_renderable().unwrap_err().contains("rendering requires"));
+        assert!(
+            plan.validate_renderable()
+                .unwrap_err()
+                .contains("rendering requires")
+        );
     }
 
     #[test]
@@ -832,10 +897,7 @@ mod tests {
             schema_version: 1,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![
-                selected_word("read", 0, "ɛ"),
-                selected_word("now", 5, "aʊ"),
-            ],
+            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
         };
         let alignment = VocalScoreAlignment {
             schema_version: 1,
@@ -909,7 +971,10 @@ mod tests {
         alignment.syllable_bindings[0].note_indices = vec![0];
         alignment.syllable_bindings[0].melisma_phone_index = None;
         let error = alignment.validate_against(&pronunciation).unwrap_err();
-        assert!(error.contains("does not match") || error.contains("unassigned"), "{error}");
+        assert!(
+            error.contains("does not match") || error.contains("unassigned"),
+            "{error}"
+        );
 
         let (pronunciation, mut alignment) = alignment_fixture();
         alignment.events[1].kind = ScoreEventKind::Rest;
@@ -940,5 +1005,4 @@ mod tests {
         let error = alignment.validate_against(&pronunciation).unwrap_err();
         assert!(error.contains("overlaps or reorders"), "{error}");
     }
-
 }
