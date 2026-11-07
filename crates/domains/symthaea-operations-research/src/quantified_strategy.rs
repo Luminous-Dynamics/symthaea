@@ -942,7 +942,10 @@ mod tests {
     fn forall_exists_equality_extracts_skolem_identity() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
@@ -964,7 +967,10 @@ mod tests {
     fn exists_forall_equality_extracts_herbrand_identity() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::Exists, &[1]), block(Quantifier::ForAll, &[0])],
+            vec![
+                block(Quantifier::Exists, &[1]),
+                block(Quantifier::ForAll, &[0]),
+            ],
             2,
         );
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
@@ -985,7 +991,10 @@ mod tests {
     fn forall_forall_equality_returns_constant_herbrand_counterstrategy() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::ForAll, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::ForAll, &[1]),
+            ],
             2,
         );
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
@@ -1011,13 +1020,26 @@ mod tests {
     fn exists_exists_equality_returns_constant_skolem_witness() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::Exists, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::Exists, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
         assert!(result.value);
-        let x = result.strategy.functions.iter().find(|f| f.variable == 0).unwrap();
-        let y = result.strategy.functions.iter().find(|f| f.variable == 1).unwrap();
+        let x = result
+            .strategy
+            .functions
+            .iter()
+            .find(|f| f.variable == 0)
+            .unwrap();
+        let y = result
+            .strategy
+            .functions
+            .iter()
+            .find(|f| f.variable == 1)
+            .unwrap();
         assert_eq!(x.table.get(&vec![]), Some(&false));
         assert_eq!(y.table.get(&vec![]), Some(&false));
     }
@@ -1028,10 +1050,26 @@ mod tests {
             variables: vec!["x".into(), "y".into(), "z".into()],
             // z = x XOR y.
             clauses: vec![
-                vec![Literal::positive(0), Literal::positive(1), Literal::negative(2)],
-                vec![Literal::negative(0), Literal::negative(1), Literal::negative(2)],
-                vec![Literal::positive(0), Literal::negative(1), Literal::positive(2)],
-                vec![Literal::negative(0), Literal::positive(1), Literal::positive(2)],
+                vec![
+                    Literal::positive(0),
+                    Literal::positive(1),
+                    Literal::negative(2),
+                ],
+                vec![
+                    Literal::negative(0),
+                    Literal::negative(1),
+                    Literal::negative(2),
+                ],
+                vec![
+                    Literal::positive(0),
+                    Literal::negative(1),
+                    Literal::positive(2),
+                ],
+                vec![
+                    Literal::negative(0),
+                    Literal::positive(1),
+                    Literal::positive(2),
+                ],
             ],
         };
         let prefix = make_prefix(
@@ -1086,7 +1124,10 @@ mod tests {
     fn independent_checker_rejects_tampered_skolem_function() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
@@ -1108,11 +1149,19 @@ mod tests {
     fn independent_checker_rejects_incomplete_strategy_table() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
-        let y = result.strategy.functions.iter_mut().find(|function| function.variable == 1).unwrap();
+        let y = result
+            .strategy
+            .functions
+            .iter_mut()
+            .find(|function| function.variable == 1)
+            .unwrap();
         y.table.remove(&vec![true]);
         assert!(matches!(
             verify_winning_strategy(&problem, &prefix, &result.strategy, budget()),
@@ -1124,7 +1173,10 @@ mod tests {
     fn independent_checker_rejects_missing_strategy_function() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
@@ -1139,7 +1191,10 @@ mod tests {
     fn independent_checker_rejects_unexpected_opponent_function() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
@@ -1157,7 +1212,10 @@ mod tests {
     fn quantifier_node_budget_exhaustion_is_not_a_truth_value() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let tight = QuantifiedEvaluationBudget {
@@ -1174,7 +1232,10 @@ mod tests {
     fn strategy_table_budget_exhaustion_is_rejected_before_search() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let tight = QuantifiedEvaluationBudget {
@@ -1191,7 +1252,10 @@ mod tests {
     fn opponent_assignment_budget_exhaustion_is_rejected() {
         let problem = equality_problem();
         let prefix = make_prefix(
-            vec![block(Quantifier::ForAll, &[0]), block(Quantifier::Exists, &[1])],
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+            ],
             2,
         );
         let tight = QuantifiedEvaluationBudget {
@@ -1244,8 +1308,7 @@ mod tests {
                         .collect();
                     let prefix = make_prefix(blocks, 2);
                     let expected = independent_qbf_oracle(problem, &prefix);
-                    let result =
-                        evaluate_qbf_with_strategy(problem, &prefix, budget()).unwrap();
+                    let result = evaluate_qbf_with_strategy(problem, &prefix, budget()).unwrap();
                     assert_eq!(
                         result.value, expected,
                         "formula {formula_index}, order {order:?}, quantifier mask {quantifier_mask}"
