@@ -15,6 +15,7 @@ on:
       - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
       - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
       - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
+      - "crates/core/symthaea-fep/src/three_ball_partial_observation.rs"
       - "crates/core/symthaea-fep/src/lib.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
@@ -37,6 +38,7 @@ on:
       - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
       - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
       - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
+      - "crates/core/symthaea-fep/src/three_ball_partial_observation.rs"
       - "crates/core/symthaea-fep/src/lib.rs"
       - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
@@ -106,7 +108,8 @@ jobs:
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/bayesian_model_reduction.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/dirichlet_model_reduction.rs
-          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_rule_space.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/three_ball_partial_observation.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_partial_observation.rs
           rustfmt --edition 2024 --check crates/core/symthaea-fep/src/lib.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
@@ -142,6 +145,7 @@ jobs:
           cargo test --locked --release -p symthaea-fep --lib bayesian_model_reduction::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib dirichlet_model_reduction::tests -- --nocapture
           cargo test --locked --release -p symthaea-fep --lib three_ball_rule_space::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib three_ball_partial_observation::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
           cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
           cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
