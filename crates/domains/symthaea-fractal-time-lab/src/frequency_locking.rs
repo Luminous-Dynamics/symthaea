@@ -108,8 +108,13 @@ impl Error for FrequencyLockingError {}
 pub struct SubharmonicPeak {
     /// Peak frequency in cycles per drive period.
     pub frequency: f64,
-    /// Absolute frequency-bin spacing after zero padding.
+    /// FFT frequency-bin spacing after zero padding (grid spacing only).
     pub frequency_resolution: f64,
+    /// Observation-limited frequency scale, approximately 1 / window duration.
+    ///
+    /// Zero padding makes the FFT peak grid finer but does not improve this
+    /// physical resolution.
+    pub observation_frequency_resolution: f64,
     /// Hann-window-normalized sinusoidal amplitude.
     pub amplitude: f64,
     /// Peak amplitude divided by the median local search-band background.
@@ -245,6 +250,7 @@ pub fn estimate_subharmonic_peak(
     Some(SubharmonicPeak {
         frequency,
         frequency_resolution,
+        observation_frequency_resolution: 1.0 / samples.len() as f64,
         amplitude,
         spectral_prominence,
         samples: samples.len(),
@@ -397,6 +403,7 @@ mod tests {
         assert!((peak.frequency - 0.5).abs() <= peak.frequency_resolution);
         assert!((peak.amplitude - 0.8).abs() < 1.0e-6);
         assert!(peak.spectral_prominence > 3.0);
+        assert!(peak.frequency_resolution < peak.observation_frequency_resolution);
     }
 
     #[test]
