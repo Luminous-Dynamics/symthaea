@@ -119,6 +119,7 @@
         "context",
         "probe_class",
         "source_leg_id",
+        "descending_neuron_id",
         "phase_bin",
         "delay_index"
       ],
@@ -152,6 +153,18 @@
             "right_fore",
             "right_middle",
             "right_hind",
+            null
+          ]
+        },
+        "descending_neuron_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "DNg100",
+            "DNg97",
+            "DNb08",
             null
           ]
         },
