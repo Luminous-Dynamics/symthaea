@@ -67,11 +67,28 @@ QVF-R is provider-neutral. Product comparisons should record observable capabili
 
 These are documentation-backed product configurations, not claims about private vendor internals or a complete product-wide capability inventory.
 
+## Known v0.1 gap: requested constraints vs applied constraints
+
+A retrieval plan's declared constraints and a committed request/filter digest establish what was intended or serialized; they do not, by themselves, prove how the provider executed those constraints.
+
+A follow-on adapter observation should bind, per retrieval step:
+- exact planned constraint refs;
+- exact post-adaptation request commitment;
+- provider/adapter filter mode: pre-filter, post-filter, strict post-filter, client-side validation, provider-managed opaque, or unknown;
+- which constraints were actually applied and the evidence supporting that observation;
+- whether a client-side verifier checked every returned candidate against the required constraints.
+
+Do not claim server-side filtering merely because the request contains a filter. When filter execution is opaque, preserve that limitation. Client-side checking can reject an ineligible returned item, but it cannot prove that the provider returned every eligible item.
+
+Measure filtered candidate recall and false-negative rate against a frozen eligible corpus, stratified by filter selectivity, k, shard/partition count and provider filter mode. Keep this separate from temporal-version correctness and query-visible precision.
+
 ## Required next validator checks
 
 The schema is structural only. An offline semantic validator must additionally reject:
 
 - query execution before the declared known-at cutoff or mismatched query/index/replica identity;
+- required planned constraints not represented in the exact adapted request or a typed application observation;
+- opaque provider-side filters incorrectly treated as exhaustive or independently verified;
 - visibility evidence for a different representation, revision or serving replica;
 - materialization after cutoff;
 - rights denial/revocation effective at or before cutoff;
@@ -84,6 +101,7 @@ These rules should be implemented inside the existing knowledge/evidence benchma
 ## Metrics to report separately
 
 - query-visible precision/recall at K;
+- filtered candidate recall and filter false-negative rate, stratified by provider filter mode/selectivity/k;
 - proposition-version accuracy under overlapping amendments;
 - exact source-span locator precision/recall;
 - obsolete-clause substitution rate and amendment propagation correctness;
