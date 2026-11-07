@@ -28,11 +28,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::dirichlet_model_reduction::{
-    evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
-    DirichletActionPrediction, DirichletBayesianModelReductionError,
-    DirichletConcentrationTensor, DirichletModelInformationGain,
-    DirichletModelInformationGainError, DirichletPredictedOutcome,
-    ReducedDirichletModelHypothesis,
+    DirichletActionPrediction, DirichletBayesianModelReductionError, DirichletConcentrationTensor,
+    DirichletModelInformationGain, DirichletModelInformationGainError, DirichletPredictedOutcome,
+    ReducedDirichletModelHypothesis, evaluate_dirichlet_model_information_gain,
+    reduce_dirichlet_models,
 };
 
 pub const THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT: usize = 81;
@@ -263,22 +262,20 @@ impl ThreeBallRuleSpace {
     /// The uncompressed reduced_model_hypotheses remains available for
     /// source-faithful reproduction and comparisons against the paper's labelled
     /// hypothesis count.
-    pub fn semantic_unique_model_hypotheses(
-        &self,
-    ) -> Vec<ReducedDirichletModelHypothesis> {
+    pub fn semantic_unique_model_hypotheses(&self) -> Vec<ReducedDirichletModelHypothesis> {
         let mut classes = BTreeMap::<usize, ReducedDirichletModelHypothesis>::new();
         for rule in &self.rules {
             let representative_index = rule
                 .duplicate_of_one_based_index
                 .unwrap_or(rule.one_based_index);
             let representative_id = format!("three-ball-semantic-rule-{representative_index:02}");
-            let entry = classes
-                .entry(representative_index)
-                .or_insert_with(|| ReducedDirichletModelHypothesis {
+            let entry = classes.entry(representative_index).or_insert_with(|| {
+                ReducedDirichletModelHypothesis {
                     model_id: representative_id,
                     prior_probability: 0.0,
                     parameter_prior: rule.parameter_prior.clone(),
-                });
+                }
+            });
             entry.prior_probability += rule.prior_probability;
         }
         classes.into_values().collect()
@@ -380,7 +377,6 @@ fn arithmetic_mean_prior(rules: &[ThreeBallRule]) -> DirichletConcentrationTenso
     }
 }
 
-
 /// Log preferences over feedback in the order no-feedback, correct, incorrect.
 pub const THREE_BALL_FEEDBACK_LOG_PREFERENCES_NATS: [f64; 3] = [0.0, 2.0, -6.0];
 
@@ -459,17 +455,24 @@ pub enum ThreeBallFeedbackDecisionError {
         column_index: usize,
         column_count: usize,
     },
-    #[error("model {model_id} has invalid posterior predictive concentration at outcome {outcome_index}")]
+    #[error(
+        "model {model_id} has invalid posterior predictive concentration at outcome {outcome_index}"
+    )]
     InvalidPosteriorPredictiveConcentration {
         model_id: String,
         outcome_index: usize,
     },
-    #[error("model {model_id} has no positive posterior predictive concentration in the selected column")]
+    #[error(
+        "model {model_id} has no positive posterior predictive concentration in the selected column"
+    )]
     EmptyPosteriorPredictiveColumn { model_id: String },
     #[error("posterior predictive distribution for model {model_id} sums to {sum}, expected 1")]
     ModelPosteriorPredictiveMassNotNormalized { model_id: String, sum: f64 },
     #[error("action {action_id} produced unknown feedback outcome ID {outcome_id}")]
-    UnknownFeedbackOutcome { action_id: String, outcome_id: String },
+    UnknownFeedbackOutcome {
+        action_id: String,
+        outcome_id: String,
+    },
     #[error("pragmatic KL risk is numerically invalid: {0}")]
     InvalidPragmaticRisk(f64),
 }
@@ -506,11 +509,8 @@ pub fn build_three_ball_feedback_action_prediction(
     let choice_index = choice.map(|value| value as usize).unwrap_or(3);
     let gaze_index = gaze.map(|value| 1 + value as usize).unwrap_or(0);
     let [left, centre, right] = ball_colours.map(|value| value as usize);
-    let column_index =
-        choice_index * 4 * 27 + gaze_index * 27 + right * 9 + centre * 3 + left;
-    if column_index >= full_prior.columns.len()
-        || column_index >= full_posterior.columns.len()
-    {
+    let column_index = choice_index * 4 * 27 + gaze_index * 27 + right * 9 + centre * 3 + left;
+    if column_index >= full_prior.columns.len() || column_index >= full_posterior.columns.len() {
         return Err(ThreeBallFeedbackDecisionError::InvalidLikelihoodColumn {
             column_index,
             column_count: full_prior.columns.len().min(full_posterior.columns.len()),
@@ -558,9 +558,11 @@ pub fn build_three_ball_feedback_action_prediction(
         }
         let total = concentrations.iter().sum::<f64>();
         if !total.is_finite() || total <= 0.0 {
-            return Err(ThreeBallFeedbackDecisionError::EmptyPosteriorPredictiveColumn {
-                model_id: model.model_id.clone(),
-            });
+            return Err(
+                ThreeBallFeedbackDecisionError::EmptyPosteriorPredictiveColumn {
+                    model_id: model.model_id.clone(),
+                },
+            );
         }
         let probabilities = concentrations
             .iter()
@@ -592,8 +594,10 @@ pub fn build_three_ball_feedback_action_prediction(
         if mixture_probability <= 0.0 {
             continue;
         }
-        let mut posterior_count_increment =
-            vec![vec![0.0; THREE_BALL_FEEDBACK_OUTCOME_COUNT]; THREE_BALL_HIDDEN_STATE_COLUMN_COUNT];
+        let mut posterior_count_increment = vec![
+            vec![0.0; THREE_BALL_FEEDBACK_OUTCOME_COUNT];
+            THREE_BALL_HIDDEN_STATE_COLUMN_COUNT
+        ];
         posterior_count_increment[column_index][outcome_index] = 1.0;
         let feedback_id = match outcome_index {
             0 => "no_feedback",
@@ -606,9 +610,7 @@ pub fn build_three_ball_feedback_action_prediction(
             full_model_predictive_probability: mixture_probability,
             model_predictive_probabilities: per_model_predictions
                 .iter()
-                .map(|(model_id, probabilities)| {
-                    (model_id.clone(), probabilities[outcome_index])
-                })
+                .map(|(model_id, probabilities)| (model_id.clone(), probabilities[outcome_index]))
                 .collect(),
             posterior_count_increment,
         });
@@ -649,7 +651,11 @@ pub fn score_three_ball_known_state_feedback_actions(
             config.epistemic_weight,
         ));
     }
-    if config.log_preferences_nats.iter().any(|value| !value.is_finite()) {
+    if config
+        .log_preferences_nats
+        .iter()
+        .any(|value| !value.is_finite())
+    {
         return Err(ThreeBallFeedbackDecisionError::NonFinitePreference);
     }
 
@@ -721,8 +727,8 @@ pub fn score_three_ball_known_state_feedback_actions(
             };
             let probability = outcome.predictive_probability;
             if probability > 0.0 {
-                pragmatic_risk_nats += probability
-                    * (probability.ln() - normalized_log_preferences[outcome_index]);
+                pragmatic_risk_nats +=
+                    probability * (probability.ln() - normalized_log_preferences[outcome_index]);
             }
             predictive_feedback.push((feedback, probability));
         }
@@ -775,8 +781,8 @@ pub fn score_three_ball_known_state_feedback_actions(
 mod tests {
     use super::*;
     use crate::dirichlet_model_reduction::{
-        evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
-        DirichletActionPrediction,
+        DirichletActionPrediction, evaluate_dirichlet_model_information_gain,
+        reduce_dirichlet_models,
     };
 
     #[test]
@@ -867,8 +873,19 @@ mod tests {
     fn semantic_quotient_preserves_the_model_average_prior() {
         let space = build_three_ball_rule_space();
         let compressed = space.semantic_unique_model_hypotheses();
-        assert_eq!(compressed.len(), THREE_BALL_PUBLIC_GENERATOR_UNIQUE_TENSOR_COUNT);
-        assert!((compressed.iter().map(|model| model.prior_probability).sum::<f64>() - 1.0).abs() < 1e-12);
+        assert_eq!(
+            compressed.len(),
+            THREE_BALL_PUBLIC_GENERATOR_UNIQUE_TENSOR_COUNT
+        );
+        assert!(
+            (compressed
+                .iter()
+                .map(|model| model.prior_probability)
+                .sum::<f64>()
+                - 1.0)
+                .abs()
+                < 1e-12
+        );
 
         for column in 0..THREE_BALL_HIDDEN_STATE_COLUMN_COUNT {
             for outcome in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
@@ -1023,10 +1040,7 @@ mod tests {
                     .abs()
                     < 1e-12
             );
-            assert_eq!(
-                source_result.outcomes.len(),
-                quotient_result.outcomes.len()
-            );
+            assert_eq!(source_result.outcomes.len(), quotient_result.outcomes.len());
             assert!(
                 (source_result.model_information_gain_nats
                     - quotient_result.model_information_gain_nats)
@@ -1080,10 +1094,12 @@ mod tests {
             quotient_eig.push(quotient_result.model_information_gain_nats);
         }
 
-        assert!(labelled_eig
-            .iter()
-            .zip(quotient_eig.iter())
-            .all(|(source, quotient)| (source - quotient).abs() < 1e-10));
+        assert!(
+            labelled_eig
+                .iter()
+                .zip(quotient_eig.iter())
+                .all(|(source, quotient)| (source - quotient).abs() < 1e-10)
+        );
         let source_best = labelled_eig
             .iter()
             .enumerate()
@@ -1143,20 +1159,31 @@ mod tests {
         .expect("finite one-step known-state decision");
 
         assert_eq!(decision.action_scores.len(), 4);
-        assert_eq!(decision.selected_action_id, decision.action_scores[decision.selected_action_index].action_id);
+        assert_eq!(
+            decision.selected_action_id,
+            decision.action_scores[decision.selected_action_index].action_id
+        );
         for score in &decision.action_scores {
             assert!(score.pragmatic_risk_nats.is_finite());
             assert!(score.model_information_gain_nats >= 0.0);
             assert!(score.expected_free_energy_nats.is_finite());
             assert!(
                 (score.expected_free_energy_nats
-                    - (score.pragmatic_risk_nats
-                        - score.epistemic_value_nats
+                    - (score.pragmatic_risk_nats - score.epistemic_value_nats
                         + score.action_cost_nats))
                     .abs()
                     < 1e-12
             );
-            assert!((score.predictive_feedback.iter().map(|(_, p)| p).sum::<f64>() - 1.0).abs() < 1e-10);
+            assert!(
+                (score
+                    .predictive_feedback
+                    .iter()
+                    .map(|(_, p)| p)
+                    .sum::<f64>()
+                    - 1.0)
+                    .abs()
+                    < 1e-10
+            );
         }
 
         let no_choice = decision
@@ -1246,7 +1273,11 @@ mod tests {
                 &space,
                 &posterior,
                 &models,
-                [ThreeBallColour::Red, ThreeBallColour::Green, ThreeBallColour::Blue],
+                [
+                    ThreeBallColour::Red,
+                    ThreeBallColour::Green,
+                    ThreeBallColour::Blue
+                ],
                 Some(ThreeBallLocation::Centre),
                 &action,
                 ThreeBallFeedbackDecisionConfig::default(),
@@ -1268,7 +1299,11 @@ mod tests {
                 &space,
                 &posterior,
                 &models,
-                [ThreeBallColour::Red, ThreeBallColour::Green, ThreeBallColour::Blue],
+                [
+                    ThreeBallColour::Red,
+                    ThreeBallColour::Green,
+                    ThreeBallColour::Blue
+                ],
                 Some(ThreeBallLocation::Centre),
                 &valid_action,
                 invalid_config,
