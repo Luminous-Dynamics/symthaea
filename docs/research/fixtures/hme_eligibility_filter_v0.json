@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "HME-ELIGIBILITY-2026-11-07",
+  "status": "synthetic_policy_filter_contract_not_runtime_security_test",
+  "pinned_snapshot": {
+    "hme_manifest_generation": 12,
+    "hme_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "policy_id": "fixture-policy-v1",
+    "policy_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "authorization_generation": 3,
+    "source_ledger_generation": 9,
+    "principal_scope_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "valid_at": "2026-11-07T10:00:00Z",
+    "known_at": "2026-11-07T16:00:00Z"
+  },
+  "physical_items": [
+    {
+      "id": "mem-eligible-01",
+      "metadata_status": "eligible",
+      "payload_present": true,
+      "expected_payload_read": true,
+      "primary_disposition": "eligible"
+    },
+    {
+      "id": "mem-eligible-02",
+      "metadata_status": "eligible",
+      "payload_present": true,
+      "expected_payload_read": true,
+      "primary_disposition": "eligible"
+    },
+    {
+      "id": "mem-outside-valid-time",
+      "metadata_status": "outside_valid_time",
+      "payload_present": true,
+      "expected_payload_read": false,
+      "primary_disposition": "outside_valid_time"
+    },
+    {
+      "id": "mem-unauthorized",
+      "metadata_status": "unauthorized_or_revoked",
+      "payload_present": true,
+      "expected_payload_read": false,
+      "primary_disposition": "unauthorized_or_revoked"
+    },
+    {
+      "id": "mem-retracted",
+      "metadata_status": "retracted_or_superseded",
+      "payload_present": true,
+      "expected_payload_read": false,
+      "primary_disposition": "retracted_or_superseded"
+    },
+    {
+      "id": "mem-forgotten-but-retained",
+      "metadata_status": "forgotten_from_active_index",
+      "payload_present": true,
+      "expected_payload_read": false,
+      "primary_disposition": "forgotten_from_active_index"
+    },
+    {
+      "id": "mem-privacy-erasure-pending",
+      "metadata_status": "privacy_erased_or_unavailable",
+      "payload_present": false,
+      "expected_payload_read": false,
+      "primary_disposition": "privacy_erased_or_unavailable"
+    }
+  ],
+  "expected": {
+    "physical_count": 7,
+    "eligible_count": 2,
+    "excluded_count": 5,
+    "primary_exclusion_counts": {
+      "outside_valid_time": 1,
+      "not_known_at_known_time": 0,
+      "retracted_or_superseded": 1,
+      "quarantined": 0,
+      "out_of_scope": 0,
+      "unauthorized_or_revoked": 1,
+      "forgotten_from_active_index": 1,
+      "privacy_erased_or_unavailable": 1,
+      "retention_expired": 0,
+      "invalid_metadata": 0
+    },
+    "payload_reads_for_excluded_count": 0,
+    "candidate_scan_population": [
+      "mem-eligible-01",
+      "mem-eligible-02"
+    ]
+  },
+  "adversarial_controls": [
+    {
+      "id": "stale_lsh_returns_revoked_candidate",
+      "stale_candidate_hint": "mem-unauthorized",
+      "expected": "metadata eligibility check rejects before payload access; stale index cannot resurrect it"
+    },
+    {
+      "id": "policy_generation_advances_during_query",
+      "before_generation": 3,
+      "after_generation": 4,
+      "expected": "query remains pinned only if authority policy permits snapshot semantics; otherwise cancel/restart/fail; never mix generations"
+    },
+    {
+      "id": "tombstone_hidden_but_old_payload_remains",
+      "item": "mem-forgotten-but-retained",
+      "expected": "active retrieval excludes it, but status is not physical erasure; retained copy remains subject to #9139 purge/retention policy"
+    },
+    {
+      "id": "privacy_erasure_completed",
+      "item": "mem-privacy-erasure-pending",
+      "expected": "payload is unavailable under the declared erasure evidence; absence alone is not proof of cryptographic erasure"
+    },
+    {
+      "id": "malformed_eligibility_metadata",
+      "item": "mem-eligible-02",
+      "expected": "invalid or stale policy metadata fails closed as UnavailableOrInvalid; do not silently include"
+    }
+  ],
+  "lifecycle_distinctions": [
+    "Query-excluded due to scope or valid time does not mean forgotten.",
+    "Forgotten from active index does not mean physically purged from immutable segments.",
+    "Physical purge is distinct from cryptographic erasure.",
+    "A stale index hit is only a hint; it cannot bypass current pinned eligibility metadata."
+  ],
+  "invariants": [
+    "Eligibility is evaluated before HDC payload load, decode, decompression or scoring.",
+    "Exact and approximate retrieval use the identical pinned eligibility boundary.",
+    "Exact top-k is defined over the eligible candidate population.",
+    "The internal receipt binds all exclusion counts and the protected exclusion-set digest; unauthorized callers do not receive excluded IDs.",
+    "This fixture is synthetic and does not prove runtime security, physical erasure or side-channel resistance."
+  ]
+}
