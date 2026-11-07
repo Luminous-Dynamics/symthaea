@@ -395,3 +395,32 @@ The paper reports 10.1% ranking flips for scalar int4 on its hardest fifth of ma
 Machine-readable decision-margin example:
 [hme_quantized_decision_margins_v0.json](fixtures/hme_quantized_decision_margins_v0.json).
 It demonstrates large- versus small-margin ranking stability and shared-query residual cancellation versus anti-correlation. This is a synthetic arithmetic fixture, not an empirical quantizer result.
+
+
+## 2026-11-07 addendum: per-query reliability and selective exactness
+
+The PQR-Search paper is now treated as a direct competitive baseline, not merely an ANN comparison. Loh & Lee, *Per-Query Recall Guarantees for Approximate Nearest Neighbor Search in Dynamic Vector Databases*, arXiv:2611.07579 (2026-11-05), states:
+
+\[
+\Pr[\operatorname{Recall}(q)<\tau]\leq\delta
+\]
+
+for every fixed query, with probability over the index's random orthogonal transformation and the stated condition that queries and updates do not depend on that transformation. The authors report 20 datasets up to 100M vectors and dynamic-update audits. Their abstract reports that, in compared settings, PQR-Search incurred 2.5x HNSW single-query latency and 1.3x lower batch throughput where HNSW met the 0.99 per-query target, while average-recall-tuned HNSW left 3–29% of queries below 0.99. These are paper-reported figures, not reproduced HME comparisons.
+
+**Guarantee boundary:** per-fixed-query probabilistic recall is not deterministic exact top-k. A client choosing later queries after observing index-dependent responses requires a separate adaptive-query threat model; do not claim the original independence premise covers that case without proof.
+
+Xiao & Cao, arXiv:2609.09854 (2026-09-09), provide a complementary decision-margin and covariance-aware quantization framework. Its frozen-candidate / frozen-trace results do not independently establish candidate-generation coverage or end-to-end recall. HME must report quantization/ranking/pruning decision flips separately from candidate coverage and final Recall@k.
+
+The new [#11022 — HME-PQR-001: per-query recall guarantees and selective exact fallback](https://github.com/Luminous-Dynamics/symthaea/issues/11022) owns a common reliability audit across PQR-Search, conventional ANN, and HME profiles. It reuses #10945, #10973, #10974, #10978 and #11000 rather than creating another ANN index or query engine.
+
+New protocol and fixture:
+- [Per-query reliability and selective exactness protocol](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/HME_PER_QUERY_RELIABILITY_2026-11-07.md)
+- [Machine-readable query-strata / guarantee matrix](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_per_query_reliability_v0.json)
+
+The benchmark separates five classes: ExactFull, ExactProgressive, ProbabilisticPerQuery, EmpiricalSelective, and IncompleteOrUncertified. It freezes a non-adaptive query panel before index-transform generation, then adds a separate adaptive-feedback panel. Dynamic insert/delete traces are audited at declared update watermarks. Report per-query recall quantiles, failure fractions by stratum, candidate coverage, decision flips, latency tails, index memory, bytes read, build/update/compaction cost and fallback frequency.
+
+For a zero-failure binomial audit, the one-sided upper limit is \(p_{upper}=1-\alpha^{1/n}\). Approximate audit planning counts are 299 independent transforms per fixed query for \(\delta=0.01\) at 95% confidence, 459 at 99%, 2,995 for \(\delta=0.001\) at 95%, and 4,603 at 99%. These are empirical-audit planning values, not proof of a theorem; use an exact upper interval when failures occur and predeclare multiple-claim correction. Do not pool heterogeneous queries to claim per-query reliability.
+
+Project promotion targets: exact profiles require 100% canonical-oracle agreement and zero false pruning; a probabilistic standard tier targets \(\tau\geq0.99,\delta\leq0.01\) per fixed query under a reviewed proof and explicit assumptions; a stretch tier targets \(\tau\geq0.999,\delta\leq0.001\) only if practical and proven. Empirical selective bounds remain explicitly empirical.
+
+No HME runtime result, PQR reproduction, per-query theorem, or SOTA win is claimed by these research artifacts.
