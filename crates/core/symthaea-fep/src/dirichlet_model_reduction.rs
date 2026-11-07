@@ -99,7 +99,9 @@ pub struct DirichletBayesianModelReductionResult {
 /// Validation and numerical failures for Dirichlet Bayesian model reduction.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DirichletBayesianModelReductionError {
-    EmptyColumnSet { distribution: &'static str },
+    EmptyColumnSet {
+        distribution: &'static str,
+    },
     EmptyColumn {
         distribution: &'static str,
         column: usize,
@@ -156,13 +158,17 @@ pub enum DirichletBayesianModelReductionError {
         actual: String,
     },
     EmptyModelSet,
-    EmptyModelId { index: usize },
+    EmptyModelId {
+        index: usize,
+    },
     DuplicateModelId(String),
     InvalidModelPrior {
         model_id: String,
         probability: f64,
     },
-    ModelPriorMassNotNormalized { sum: f64 },
+    ModelPriorMassNotNormalized {
+        sum: f64,
+    },
     NonPositiveReducedPosteriorConcentration {
         model_id: String,
         column: usize,
@@ -182,10 +188,16 @@ impl std::fmt::Display for DirichletBayesianModelReductionError {
             Self::EmptyColumnSet { distribution } => {
                 write!(f, "{distribution} has no Dirichlet columns")
             }
-            Self::EmptyColumn { distribution, column } => {
+            Self::EmptyColumn {
+                distribution,
+                column,
+            } => {
                 write!(f, "{distribution} column {column} is empty")
             }
-            Self::EmptySupport { distribution, column } => {
+            Self::EmptySupport {
+                distribution,
+                column,
+            } => {
                 write!(f, "{distribution} column {column} has no active outcomes")
             }
             Self::SupportMismatch {
@@ -233,7 +245,10 @@ impl std::fmt::Display for DirichletBayesianModelReductionError {
                 "{distribution} support mask at column {column} has length {actual}, expected {expected}"
             ),
             Self::EmptyReducedSupport { model_id, column } => {
-                write!(f, "model {model_id} has empty active support at column {column}")
+                write!(
+                    f,
+                    "model {model_id} has empty active support at column {column}"
+                )
             }
             Self::PosteriorBelowPrior {
                 model_id,
@@ -302,10 +317,7 @@ pub fn reduce_dirichlet_models(
     full_posterior: &DirichletConcentrationTensor,
     full_prior: &DirichletConcentrationTensor,
     reduced_models: &[ReducedDirichletModelHypothesis],
-) -> Result<
-    DirichletBayesianModelReductionResult,
-    DirichletBayesianModelReductionError,
-> {
+) -> Result<DirichletBayesianModelReductionResult, DirichletBayesianModelReductionError> {
     let column_count = full_posterior.columns.len();
     validate_tensor(full_posterior, "full posterior", None, true)?;
     validate_tensor(full_prior, "full prior", Some(full_posterior), true)?;
@@ -331,9 +343,7 @@ pub fn reduce_dirichlet_models(
                 model.model_id.clone(),
             ));
         }
-        if !model.prior_probability.is_finite()
-            || !(0.0..=1.0).contains(&model.prior_probability)
-        {
+        if !model.prior_probability.is_finite() || !(0.0..=1.0).contains(&model.prior_probability) {
             return Err(DirichletBayesianModelReductionError::InvalidModelPrior {
                 model_id: model.model_id.clone(),
                 probability: model.prior_probability,
@@ -354,9 +364,9 @@ pub fn reduce_dirichlet_models(
         )?;
     }
     if (prior_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(DirichletBayesianModelReductionError::ModelPriorMassNotNormalized {
-            sum: prior_sum,
-        });
+        return Err(
+            DirichletBayesianModelReductionError::ModelPriorMassNotNormalized { sum: prior_sum },
+        );
     }
 
     let mut log_weights = Vec::with_capacity(reduced_models.len());
@@ -419,13 +429,11 @@ pub fn reduce_dirichlet_models(
         .zip(log_evidence_ratios.iter().copied())
         .zip(posterior.iter().copied())
         .map(
-            |((model, log_evidence_ratio), posterior_probability)| {
-                ReducedDirichletModelEvidence {
-                    model_id: model.model_id.clone(),
-                    prior_probability: model.prior_probability,
-                    log_evidence_ratio,
-                    posterior_probability,
-                }
+            |((model, log_evidence_ratio), posterior_probability)| ReducedDirichletModelEvidence {
+                model_id: model.model_id.clone(),
+                prior_probability: model.prior_probability,
+                log_evidence_ratio,
+                posterior_probability,
             },
         )
         .collect();
@@ -536,9 +544,9 @@ fn validate_tensor(
     allow_support_restriction: bool,
 ) -> Result<(), DirichletBayesianModelReductionError> {
     if !is_sha256_digest(&tensor.parameterization_digest) {
-        return Err(DirichletBayesianModelReductionError::InvalidParameterizationDigest {
-            distribution,
-        });
+        return Err(
+            DirichletBayesianModelReductionError::InvalidParameterizationDigest { distribution },
+        );
     }
     if tensor.columns.is_empty() {
         return Err(DirichletBayesianModelReductionError::EmptyColumnSet { distribution });
@@ -586,8 +594,11 @@ fn validate_tensor(
                 actual: support.len(),
             });
         }
-        for (outcome_index, (concentration, active)) in
-            column.iter().copied().zip(support.iter().copied()).enumerate()
+        for (outcome_index, (concentration, active)) in column
+            .iter()
+            .copied()
+            .zip(support.iter().copied())
+            .enumerate()
         {
             let valid = if active {
                 concentration.is_finite() && concentration > 0.0
@@ -682,11 +693,13 @@ fn ensure_parameterization_matches(
     actual: &str,
 ) -> Result<(), DirichletBayesianModelReductionError> {
     if actual != expected {
-        return Err(DirichletBayesianModelReductionError::ParameterizationMismatch {
-            distribution,
-            expected: expected.to_owned(),
-            actual: actual.to_owned(),
-        });
+        return Err(
+            DirichletBayesianModelReductionError::ParameterizationMismatch {
+                distribution,
+                expected: expected.to_owned(),
+                actual: actual.to_owned(),
+            },
+        );
     }
     Ok(())
 }
@@ -720,12 +733,8 @@ fn log_gamma_positive(value: f64) -> f64 {
         series += coefficient / (shifted + index as f64);
     }
     let t = shifted + LANCZOS_G + 0.5;
-    0.5 * (2.0 * std::f64::consts::PI).ln()
-        + (shifted + 0.5) * t.ln()
-        - t
-        + series.ln()
+    0.5 * (2.0 * std::f64::consts::PI).ln() + (shifted + 0.5) * t.ln() - t + series.ln()
 }
-
 
 /// One possible observation under an action, with its full-model predictive
 /// probability and the expected Dirichlet sufficient-statistic increment.
@@ -774,13 +783,17 @@ pub enum DirichletModelInformationGainError {
     ModelReduction(DirichletBayesianModelReductionError),
     EmptyActionId,
     EmptyOutcomeSet,
-    EmptyOutcomeId { index: usize },
+    EmptyOutcomeId {
+        index: usize,
+    },
     DuplicateOutcomeId(String),
     InvalidPredictiveProbability {
         outcome_id: String,
         probability: f64,
     },
-    PredictiveProbabilityMassNotNormalized { sum: f64 },
+    PredictiveProbabilityMassNotNormalized {
+        sum: f64,
+    },
     CountIncrementColumnCountMismatch {
         outcome_id: String,
         expected: usize,
@@ -804,7 +817,9 @@ pub enum DirichletModelInformationGainError {
         expected: f64,
         actual: f64,
     },
-    InvalidModelInformationGain { value: f64 },
+    InvalidModelInformationGain {
+        value: f64,
+    },
 }
 
 impl std::fmt::Display for DirichletModelInformationGainError {
@@ -825,7 +840,10 @@ impl std::fmt::Display for DirichletModelInformationGainError {
                 "outcome {outcome_id} has invalid full-model predictive probability {probability}"
             ),
             Self::PredictiveProbabilityMassNotNormalized { sum } => {
-                write!(f, "full-model predictive outcome mass sums to {sum}, expected 1")
+                write!(
+                    f,
+                    "full-model predictive outcome mass sums to {sum}, expected 1"
+                )
             }
             Self::CountIncrementColumnCountMismatch {
                 outcome_id,
@@ -999,12 +1017,8 @@ pub fn evaluate_dirichlet_model_information_gain(
             }
         }
 
-        let reduced = reduce_dirichlet_models(
-            &hypothetical_posterior,
-            full_prior,
-            reduced_models,
-        )
-        .map_err(DirichletModelInformationGainError::ModelReduction)?;
+        let reduced = reduce_dirichlet_models(&hypothetical_posterior, full_prior, reduced_models)
+            .map_err(DirichletModelInformationGainError::ModelReduction)?;
 
         // Eq. 10-11: expectation is under the predictive outcome distribution
         // of the current full / Bayesian-model-average parent model. BMR supplies
@@ -1026,12 +1040,13 @@ pub fn evaluate_dirichlet_model_information_gain(
         });
     }
 
-    let raw_information_gain =
-        current_model_entropy_nats - expected_posterior_model_entropy_nats;
+    let raw_information_gain = current_model_entropy_nats - expected_posterior_model_entropy_nats;
     if !raw_information_gain.is_finite() || raw_information_gain < -1e-8 {
-        return Err(DirichletModelInformationGainError::InvalidModelInformationGain {
-            value: raw_information_gain,
-        });
+        return Err(
+            DirichletModelInformationGainError::InvalidModelInformationGain {
+                value: raw_information_gain,
+            },
+        );
     }
     Ok(DirichletModelInformationGain {
         action_id: action.action_id.clone(),
@@ -1144,9 +1159,7 @@ mod tests {
             }],
         )
         .expect("proper reduced posterior");
-        assert!(
-            (result.models[0].log_evidence_ratio - (4.0_f64 / 3.0).ln()).abs() < 1e-11
-        );
+        assert!((result.models[0].log_evidence_ratio - (4.0_f64 / 3.0).ln()).abs() < 1e-11);
     }
 
     #[test]
@@ -1301,16 +1314,9 @@ mod tests {
 
     #[test]
     fn full_support_mismatch_and_reduced_support_expansion_are_rejected() {
-        let prior = tensor_with_support(
-            &[&[1.0, 0.0, 0.0]],
-            &[&[true, false, false]],
-            'a',
-        );
-        let mismatched_posterior = tensor_with_support(
-            &[&[2.0, 1.0, 0.0]],
-            &[&[true, true, false]],
-            'a',
-        );
+        let prior = tensor_with_support(&[&[1.0, 0.0, 0.0]], &[&[true, false, false]], 'a');
+        let mismatched_posterior =
+            tensor_with_support(&[&[2.0, 1.0, 0.0]], &[&[true, true, false]], 'a');
         assert!(matches!(
             reduce_dirichlet_models(
                 &mismatched_posterior,
@@ -1327,11 +1333,7 @@ mod tests {
             })
         ));
 
-        let posterior = tensor_with_support(
-            &[&[2.0, 0.0, 0.0]],
-            &[&[true, false, false]],
-            'a',
-        );
+        let posterior = tensor_with_support(&[&[2.0, 0.0, 0.0]], &[&[true, false, false]], 'a');
         let expanded_reduced_support = tensor(&[&[1.0, 1.0, 1.0]], 'a');
         assert!(matches!(
             reduce_dirichlet_models(
@@ -1352,11 +1354,7 @@ mod tests {
 
     #[test]
     fn full_column_with_empty_support_is_rejected() {
-        let empty = tensor_with_support(
-            &[&[0.0, 0.0]],
-            &[&[false, false]],
-            'a',
-        );
+        let empty = tensor_with_support(&[&[0.0, 0.0]], &[&[false, false]], 'a');
         let result = reduce_dirichlet_models(
             &empty,
             &empty,
@@ -1406,7 +1404,9 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(DirichletBayesianModelReductionError::NonPositiveReducedPosteriorConcentration { .. })
+            Err(
+                DirichletBayesianModelReductionError::NonPositiveReducedPosteriorConcentration { .. }
+            )
         ));
     }
 
@@ -1414,11 +1414,7 @@ mod tests {
     fn explicit_support_restriction_has_finite_evidence_when_excluded_outcome_is_unobserved() {
         let full_prior = tensor(&[&[1.0, 1.0]], 'a');
         let posterior = tensor(&[&[4.0, 1.0]], 'a');
-        let reduced_prior = tensor_with_support(
-            &[&[2.0, 0.0]],
-            &[&[true, false]],
-            'a',
-        );
+        let reduced_prior = tensor_with_support(&[&[2.0, 0.0]], &[&[true, false]], 'a');
         let result = reduce_dirichlet_models(
             &posterior,
             &full_prior,
@@ -1431,20 +1427,14 @@ mod tests {
         .expect("proper support-restricted model");
         // Full Beta(1,1) assigns evidence 1/4 to three successes and no failures.
         // The reduced model fixes P(success)=1, so its evidence is 1 and BF=4.
-        assert!(
-            (result.models[0].log_evidence_ratio - 4.0_f64.ln()).abs() < 1e-11
-        );
+        assert!((result.models[0].log_evidence_ratio - 4.0_f64.ln()).abs() < 1e-11);
     }
 
     #[test]
     fn observing_an_excluded_outcome_gives_the_reduced_model_zero_evidence() {
         let full_prior = tensor(&[&[1.0, 1.0]], 'a');
         let posterior = tensor(&[&[4.0, 2.0]], 'a');
-        let reduced_prior = tensor_with_support(
-            &[&[2.0, 0.0]],
-            &[&[true, false]],
-            'a',
-        );
+        let reduced_prior = tensor_with_support(&[&[2.0, 0.0]], &[&[true, false]], 'a');
         let result = reduce_dirichlet_models(
             &posterior,
             &full_prior,
@@ -1471,11 +1461,7 @@ mod tests {
     fn empty_reduced_support_is_rejected() {
         let full_prior = tensor(&[&[1.0, 1.0]], 'a');
         let posterior = tensor(&[&[1.0, 1.0]], 'a');
-        let empty = tensor_with_support(
-            &[&[0.0, 0.0]],
-            &[&[false, false]],
-            'a',
-        );
+        let empty = tensor_with_support(&[&[0.0, 0.0]], &[&[false, false]], 'a');
         let result = reduce_dirichlet_models(
             &posterior,
             &full_prior,
@@ -1529,34 +1515,23 @@ mod tests {
                 },
             ],
         };
-        let result = evaluate_dirichlet_model_information_gain(
-            &full_prior,
-            &full_prior,
-            &models,
-            &action,
-        )
-        .expect("coherent one-step BMR model-EIG prediction");
+        let result =
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &action)
+                .expect("coherent one-step BMR model-EIG prediction");
 
-        let expected_posterior_entropy =
-            -(0.8_f64 * 0.8_f64.ln() + 0.2_f64 * 0.2_f64.ln());
+        let expected_posterior_entropy = -(0.8_f64 * 0.8_f64.ln() + 0.2_f64 * 0.2_f64.ln());
         let expected_information_gain = std::f64::consts::LN_2 - expected_posterior_entropy;
         assert!((result.current_model_entropy_nats - std::f64::consts::LN_2).abs() < 1e-12);
         assert!(
             (result.expected_posterior_model_entropy_nats - expected_posterior_entropy).abs()
                 < 1e-10
         );
-        assert!(
-            (result.model_information_gain_nats - expected_information_gain).abs() < 1e-10
-        );
+        assert!((result.model_information_gain_nats - expected_information_gain).abs() < 1e-10);
         assert!((result.predictive_probability_mass - 1.0).abs() < 1e-12);
         assert!((result.outcomes[0].predictive_probability - 0.5).abs() < 1e-12);
         assert!((result.outcomes[1].predictive_probability - 0.5).abs() < 1e-12);
-        assert!(
-            (result.outcomes[0].posterior_model_probabilities[0].1 - 0.8).abs() < 1e-10
-        );
-        assert!(
-            (result.outcomes[1].posterior_model_probabilities[0].1 - 0.2).abs() < 1e-10
-        );
+        assert!((result.outcomes[0].posterior_model_probabilities[0].1 - 0.8).abs() < 1e-10);
+        assert!((result.outcomes[1].posterior_model_probabilities[0].1 - 0.2).abs() < 1e-10);
     }
 
     #[test]
@@ -1577,13 +1552,9 @@ mod tests {
                 },
             ],
         };
-        let result = evaluate_dirichlet_model_information_gain(
-            &full_prior,
-            &full_prior,
-            &models,
-            &action,
-        )
-        .expect("uninformative but normalized action prediction");
+        let result =
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &action)
+                .expect("uninformative but normalized action prediction");
         assert!(result.model_information_gain_nats.abs() < 1e-12);
         assert!((result.outcomes[0].posterior_model_probabilities[0].1 - 0.5).abs() < 1e-12);
         assert!((result.outcomes[1].posterior_model_probabilities[0].1 - 0.5).abs() < 1e-12);
@@ -1608,12 +1579,7 @@ mod tests {
             ],
         };
         assert!(matches!(
-            evaluate_dirichlet_model_information_gain(
-                &full_prior,
-                &full_prior,
-                &models,
-                &action,
-            ),
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &action,),
             Err(DirichletModelInformationGainError::PredictiveProbabilityMassNotNormalized { .. })
         ));
 
