@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_ANYTIME_VALID_DISCREPANCY_MONITOR.schema.json",
+  "title": "Connectome anytime-valid discrepancy monitor input V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "horizon",
+    "alpha",
+    "outcome_alphabet",
+    "actions",
+    "policy",
+    "null_models",
+    "challenger_models",
+    "observed_history",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "horizon": {
+      "const": 2
+    },
+    "alpha": {
+      "$ref": "#/$defs/rational"
+    },
+    "outcome_alphabet": {
+      "const": [
+        "H",
+        "L"
+      ]
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "policy": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/policy_row"
+      }
+    },
+    "null_models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/null_model"
+      }
+    },
+    "challenger_models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/challenger_model"
+      }
+    },
+    "observed_history": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/observed_step"
+      }
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "rational": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(/[1-9][0-9]*)?$"
+    },
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "feasibility_status",
+        "feasibility_receipt_sha256"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feasibility_status": {
+          "const": "SYNTHETIC_FIXTURE_ELIGIBLE"
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "policy_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history",
+        "action_id"
+      ],
+      "properties": {
+        "history": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "enum": [
+              "H",
+              "L"
+            ]
+          }
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "kernel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history",
+        "action_id",
+        "probabilities"
+      ],
+      "properties": {
+        "history": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "enum": [
+              "H",
+              "L"
+            ]
+          }
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "H",
+            "L"
+          ],
+          "properties": {
+            "H": {
+              "$ref": "#/$defs/rational"
+            },
+            "L": {
+              "$ref": "#/$defs/rational"
+            }
+          }
+        }
+      }
+    },
+    "null_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "kernels"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kernels": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/kernel"
+          }
+        }
+      }
+    },
+    "challenger_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "prior_probability",
+        "kernels"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_probability": {
+          "$ref": "#/$defs/rational"
+        },
+        "kernels": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/kernel"
+          }
+        }
+      }
+    },
+    "observed_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "outcome_id"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "predictive_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history",
+        "probabilities"
+      ],
+      "properties": {
+        "history": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "enum": [
+              "H",
+              "L"
+            ]
+          }
+        },
+        "probabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "H",
+            "L"
+          ],
+          "properties": {
+            "H": {
+              "$ref": "#/$defs/rational"
+            },
+            "L": {
+              "$ref": "#/$defs/rational"
+            }
+          }
+        }
+      }
+    },
+    "e_factor_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "history",
+        "factors"
+      ],
+      "properties": {
+        "history": {
+          "type": "array",
+          "maxItems": 1,
+          "items": {
+            "enum": [
+              "H",
+              "L"
+            ]
+          }
+        },
+        "factors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "H",
+            "L"
+          ],
+          "properties": {
+            "H": {
+              "$ref": "#/$defs/rational"
+            },
+            "L": {
+              "$ref": "#/$defs/rational"
+            }
+          }
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenger_predictive_by_history",
+        "e_factors_by_history",
+        "crossing_path",
+        "observed_e_value",
+        "false_alarm_probability_by_null",
+        "expected_status"
+      ],
+      "properties": {
+        "challenger_predictive_by_history": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/predictive_row"
+          }
+        },
+        "e_factors_by_history": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "$ref": "#/$defs/e_factor_row"
+          }
+        },
+        "crossing_path": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "enum": [
+              "H",
+              "L"
+            ]
+          }
+        },
+        "observed_e_value": {
+          "$ref": "#/$defs/rational"
+        },
+        "false_alarm_probability_by_null": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "N0",
+            "N1"
+          ],
+          "properties": {
+            "N0": {
+              "$ref": "#/$defs/rational"
+            },
+            "N1": {
+              "$ref": "#/$defs/rational"
+            }
+          }
+        },
+        "expected_status": {
+          "const": "MODEL_DISCREPANCY_DETECTED"
+        }
+      }
+    }
+  }
+}
