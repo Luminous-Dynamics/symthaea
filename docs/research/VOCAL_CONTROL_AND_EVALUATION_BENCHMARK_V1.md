@@ -7,7 +7,7 @@
 
 A singing system can sound impressive while ignoring supplied lyrics, changing notes, losing consonants, or changing singer identity. Conversely, a system can satisfy a score and phoneme contract but sound artificial. These are separate capabilities.
 
-VCEB evaluates Symthaea as a controllable vocal performer. It complements the existing 60-case Muse vocal release set and the MEL-VOCAL-001 phoneme-alignment scorer. The current physical-tract code is not yet an integrated renderer; physiology results remain a future track until issue #10860 is resolved. English G2P remains a known accuracy limitation: issue #10869 tracks replacing the small dictionary/letter fallback with versioned pronunciation candidates and explicit uncertainty.
+VCEB evaluates Symthaea as a controllable vocal performer. It complements the existing 60-case Muse vocal release set and the MEL-VOCAL-001 phoneme-alignment scorer. The current physical-tract code is not yet an integrated renderer; physiology results remain a future track until issue #10860 is resolved. English G2P remains a known accuracy limitation: issue #10869 tracks replacing the small dictionary/letter fallback with versioned pronunciation candidates and explicit uncertainty. The target architecture now has isolated pronunciation-lattice and score-alignment contracts under `tools/pronunciation-plan`; they are not yet production adapters. Generalized medial melisma and phrase-aware note binding are tracked in issue #10903.
 
 The central research question is:
 
