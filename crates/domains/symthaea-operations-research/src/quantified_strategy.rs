@@ -675,6 +675,7 @@ fn search(
                 problem,
                 prefix,
                 assignment,
+                variable_positions,
                 budget,
                 stats,
             )?;
@@ -708,6 +709,7 @@ fn search(
                 problem,
                 prefix,
                 assignment,
+                variable_positions,
                 budget,
                 stats,
             )?;
@@ -732,6 +734,7 @@ fn search(
                 problem,
                 prefix,
                 assignment,
+                variable_positions,
                 budget,
                 stats,
             )?;
