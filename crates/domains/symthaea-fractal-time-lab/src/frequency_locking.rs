@@ -203,11 +203,14 @@ pub fn estimate_subharmonic_peak(
     let mut magnitudes = Vec::with_capacity(maximum_bin - minimum_bin + 1);
     for bin in minimum_bin..=maximum_bin {
         let magnitude = spectrum[bin].norm();
-        let one_sided_scale = if bin == transform_length / 2 {
-            1.0
-        } else {
-            2.0
-        };
+        // Near the Nyquist boundary, the positive and negative Hann-window
+        // leakage lobes overlap. Applying the ordinary factor-of-two
+        // one-sided correction there double-counts a period-two component.
+        // Within one observation-limited frequency scale of Nyquist, use the
+        // non-doubled amplitude and accept the finite-window resolution limit.
+        let frequency = bin as f64 / transform_length as f64;
+        let nyquist_overlap = 0.5 - frequency <= 1.0 / samples.len() as f64;
+        let one_sided_scale = if nyquist_overlap { 1.0 } else { 2.0 };
         let amplitude = one_sided_scale * magnitude / window_sum;
         if !amplitude.is_finite() {
             return None;
@@ -400,6 +403,15 @@ mod tests {
         assert!((peak.amplitude - 0.8).abs() < 1.0e-6);
         assert!(peak.spectral_prominence > 3.0);
         assert!(peak.frequency_resolution < peak.observation_frequency_resolution);
+    }
+
+    #[test]
+    fn off_nyquist_amplitude_uses_the_standard_one_sided_correction() {
+        let signal = sinusoid(1024, 0.42, 0.7);
+        let peak = estimate_subharmonic_peak(&signal, 16, 0.42, 0.08).unwrap();
+
+        assert!((peak.frequency - 0.42).abs() <= peak.observation_frequency_resolution);
+        assert!((peak.amplitude - 0.7).abs() < 0.01);
     }
 
     #[test]
