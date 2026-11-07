@@ -26,15 +26,40 @@ use std::fmt;
 /// Errors constructing an exact finite-dimensional Floquet system.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FloquetError {
-    InvalidSpinCount { n_spins: usize },
+    InvalidSpinCount {
+        n_spins: usize,
+    },
     DimensionOverflow,
-    CouplingCount { expected: usize, actual: usize },
-    FieldCount { expected: usize, actual: usize },
-    NonFiniteParameter { name: &'static str, index: usize },
-    InitialBasisOutOfRange { basis: usize, dimension: usize },
-    InvalidEdge { edge_index: usize, first: usize, second: usize, n_spins: usize },
-    DuplicateEdge { first: usize, second: usize },
-    InvalidTrotterSlices { slices: usize, maximum: usize },
+    CouplingCount {
+        expected: usize,
+        actual: usize,
+    },
+    FieldCount {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteParameter {
+        name: &'static str,
+        index: usize,
+    },
+    InitialBasisOutOfRange {
+        basis: usize,
+        dimension: usize,
+    },
+    InvalidEdge {
+        edge_index: usize,
+        first: usize,
+        second: usize,
+        n_spins: usize,
+    },
+    DuplicateEdge {
+        first: usize,
+        second: usize,
+    },
+    InvalidTrotterSlices {
+        slices: usize,
+        maximum: usize,
+    },
 }
 
 impl fmt::Display for FloquetError {
@@ -54,16 +79,30 @@ impl fmt::Display for FloquetError {
                 write!(f, "{name}[{index}] is not finite")
             }
             Self::InitialBasisOutOfRange { basis, dimension } => {
-                write!(f, "basis index {basis} is outside state dimension {dimension}")
+                write!(
+                    f,
+                    "basis index {basis} is outside state dimension {dimension}"
+                )
             }
-            Self::InvalidEdge { edge_index, first, second, n_spins } => {
-                write!(f, "edge {edge_index} ({first}, {second}) is invalid for {n_spins} spins")
+            Self::InvalidEdge {
+                edge_index,
+                first,
+                second,
+                n_spins,
+            } => {
+                write!(
+                    f,
+                    "edge {edge_index} ({first}, {second}) is invalid for {n_spins} spins"
+                )
             }
             Self::DuplicateEdge { first, second } => {
                 write!(f, "duplicate Ising edge ({first}, {second})")
             }
             Self::InvalidTrotterSlices { slices, maximum } => {
-                write!(f, "Trotter slice count must be in 1..={maximum}, got {slices}")
+                write!(
+                    f,
+                    "Trotter slice count must be in 1..={maximum}, got {slices}"
+                )
             }
         }
     }
@@ -160,10 +199,7 @@ impl KickedIsingFloquet {
 
         let mut seen_edges = BTreeSet::new();
         for (edge_index, edge) in edges.iter().enumerate() {
-            if edge.first >= n_spins
-                || edge.second >= n_spins
-                || edge.first == edge.second
-            {
+            if edge.first >= n_spins || edge.second >= n_spins || edge.first == edge.second {
                 return Err(FloquetError::InvalidEdge {
                     edge_index,
                     first: edge.first,
@@ -177,10 +213,7 @@ impl KickedIsingFloquet {
                     index: edge_index,
                 });
             }
-            let canonical = (
-                edge.first.min(edge.second),
-                edge.first.max(edge.second),
-            );
+            let canonical = (edge.first.min(edge.second), edge.first.max(edge.second));
             if !seen_edges.insert(canonical) {
                 return Err(FloquetError::DuplicateEdge {
                     first: canonical.0,
@@ -299,7 +332,11 @@ impl KickedIsingFloquet {
             let probability = amplitude.norm_sqr();
             let mut magnet = 0.0;
             for spin in 0..self.n_spins {
-                let z = if (basis & (1 << spin)) == 0 { 1.0 } else { -1.0 };
+                let z = if (basis & (1 << spin)) == 0 {
+                    1.0
+                } else {
+                    -1.0
+                };
                 magnet += z;
             }
             expectation += probability * magnet / self.n_spins as f64;
@@ -345,12 +382,24 @@ impl KickedIsingFloquet {
         for (basis, amplitude) in self.amplitudes.iter_mut().enumerate() {
             let mut energy = 0.0;
             for spin in 0..self.n_spins {
-                let z = if (basis & (1 << spin)) == 0 { 1.0 } else { -1.0 };
+                let z = if (basis & (1 << spin)) == 0 {
+                    1.0
+                } else {
+                    -1.0
+                };
                 energy += self.fields[spin] * z;
             }
             for edge in &self.edges {
-                let z_first = if (basis & (1 << edge.first)) == 0 { 1.0 } else { -1.0 };
-                let z_second = if (basis & (1 << edge.second)) == 0 { 1.0 } else { -1.0 };
+                let z_first = if (basis & (1 << edge.first)) == 0 {
+                    1.0
+                } else {
+                    -1.0
+                };
+                let z_second = if (basis & (1 << edge.second)) == 0 {
+                    1.0
+                } else {
+                    -1.0
+                };
                 energy += edge.coupling * z_first * z_second;
             }
             *amplitude *= Complex::from_polar(1.0, -energy);
@@ -384,10 +433,7 @@ pub struct SubharmonicResponse {
 /// Sample zero is the initial state and sample n is after n Floquet periods.
 /// None is returned for an invalid start, fewer than two samples or any
 /// non-finite value.
-pub fn analyze_subharmonic_response(
-    signal: &[f64],
-    start: usize,
-) -> Option<SubharmonicResponse> {
+pub fn analyze_subharmonic_response(signal: &[f64], start: usize) -> Option<SubharmonicResponse> {
     if start >= signal.len() || signal.len() - start < 2 {
         return None;
     }
@@ -448,8 +494,7 @@ mod tests {
 
     #[test]
     fn ideal_pi_pulse_is_a_period_two_reference_even_without_interactions() {
-        let mut model =
-            KickedIsingFloquet::new(4, vec![0.0; 3], vec![0.0; 4], PI).unwrap();
+        let mut model = KickedIsingFloquet::new(4, vec![0.0; 3], vec![0.0; 4], PI).unwrap();
         let signal = model.stroboscopic_magnetization(8);
         for (step, magnetization) in signal.iter().enumerate() {
             let expected = if step % 2 == 0 { 1.0 } else { -1.0 };
@@ -466,8 +511,7 @@ mod tests {
         let h0 = 0.11;
         let h1 = -0.23;
         let theta: f64 = 0.7;
-        let mut model =
-            KickedIsingFloquet::new(2, vec![coupling], vec![h0, h1], theta).unwrap();
+        let mut model = KickedIsingFloquet::new(2, vec![coupling], vec![h0, h1], theta).unwrap();
         model.step();
 
         let c = (theta / 2.0).cos();
@@ -493,8 +537,7 @@ mod tests {
     #[test]
     fn single_spin_pulse_error_drifts_without_interaction_locking() {
         let epsilon = 0.12;
-        let mut model =
-            KickedIsingFloquet::new(1, vec![], vec![0.0], PI + epsilon).unwrap();
+        let mut model = KickedIsingFloquet::new(1, vec![], vec![0.0], PI + epsilon).unwrap();
         let signal = model.stroboscopic_magnetization(12);
         let demodulated_first = signal[1] * -1.0;
         let demodulated_last = signal[12];
@@ -506,8 +549,7 @@ mod tests {
 
     #[test]
     fn subharmonic_metric_distinguishes_period_two_trace_and_phase_slip() {
-        let mut ideal =
-            KickedIsingFloquet::new(4, vec![0.0; 3], vec![0.0; 4], PI).unwrap();
+        let mut ideal = KickedIsingFloquet::new(4, vec![0.0; 3], vec![0.0; 4], PI).unwrap();
         let ideal_signal = ideal.stroboscopic_magnetization(100);
         let ideal_response = analyze_subharmonic_response(&ideal_signal, 20).unwrap();
         assert!((ideal_response.mean_demodulated_order - 1.0).abs() < 1e-12);
@@ -521,16 +563,14 @@ mod tests {
         let mut interacting =
             KickedIsingFloquet::new(8, vec![0.5; 7], vec![0.0; 8], PI + 0.1).unwrap();
         let interacting_signal = interacting.stroboscopic_magnetization(100);
-        let interacting_response =
-            analyze_subharmonic_response(&interacting_signal, 20).unwrap();
+        let interacting_response = analyze_subharmonic_response(&interacting_signal, 20).unwrap();
 
         assert!(
             interacting_response.mean_demodulated_order
                 > unlocked_response.mean_demodulated_order + 0.5
         );
         assert!(
-            interacting_response.mean_absolute_order
-                > unlocked_response.mean_absolute_order + 0.5
+            interacting_response.mean_absolute_order > unlocked_response.mean_absolute_order + 0.5
         );
     }
 
@@ -546,9 +586,21 @@ mod tests {
         let mut graph = KickedIsingFloquet::new_graph(
             4,
             vec![
-                IsingEdge { first: 0, second: 1, coupling: 0.3 },
-                IsingEdge { first: 1, second: 2, coupling: 0.7 },
-                IsingEdge { first: 2, second: 3, coupling: -0.2 },
+                IsingEdge {
+                    first: 0,
+                    second: 1,
+                    coupling: 0.3,
+                },
+                IsingEdge {
+                    first: 1,
+                    second: 2,
+                    coupling: 0.7,
+                },
+                IsingEdge {
+                    first: 2,
+                    second: 3,
+                    coupling: -0.2,
+                },
             ],
             vec![0.1, -0.2, 0.05, 0.17],
             PI + 0.06,
@@ -564,14 +616,10 @@ mod tests {
 
     #[test]
     fn square_lattice_kicked_ising_has_interaction_stabilized_subharmonic_response() {
-        let mut noninteracting = KickedIsingFloquet::new_square_lattice(
-            2, 2, 0.0, 0.0, vec![0.0; 4], PI + 0.1,
-        )
-        .unwrap();
-        let mut interacting = KickedIsingFloquet::new_square_lattice(
-            2, 2, 0.5, 0.5, vec![0.0; 4], PI + 0.1,
-        )
-        .unwrap();
+        let mut noninteracting =
+            KickedIsingFloquet::new_square_lattice(2, 2, 0.0, 0.0, vec![0.0; 4], PI + 0.1).unwrap();
+        let mut interacting =
+            KickedIsingFloquet::new_square_lattice(2, 2, 0.5, 0.5, vec![0.0; 4], PI + 0.1).unwrap();
         assert_eq!(interacting.edge_count(), 4);
 
         let unlocked_signal = noninteracting.stroboscopic_magnetization(100);
@@ -589,8 +637,16 @@ mod tests {
             KickedIsingFloquet::new_graph(
                 3,
                 vec![
-                    IsingEdge { first: 0, second: 1, coupling: 0.5 },
-                    IsingEdge { first: 1, second: 0, coupling: 0.5 },
+                    IsingEdge {
+                        first: 0,
+                        second: 1,
+                        coupling: 0.5
+                    },
+                    IsingEdge {
+                        first: 1,
+                        second: 0,
+                        coupling: 0.5
+                    },
                 ],
                 vec![0.0; 3],
                 PI,
@@ -600,7 +656,11 @@ mod tests {
         assert!(matches!(
             KickedIsingFloquet::new_graph(
                 3,
-                vec![IsingEdge { first: 0, second: 3, coupling: 0.5 }],
+                vec![IsingEdge {
+                    first: 0,
+                    second: 3,
+                    coupling: 0.5
+                }],
                 vec![0.0; 3],
                 PI,
             ),
