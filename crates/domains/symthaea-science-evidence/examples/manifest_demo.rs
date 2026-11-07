@@ -9,6 +9,7 @@ use symthaea_science_evidence::{
     ExperimentManifest,
     RunEnvironment,
     RunReceipt,
+    VerificationCheck,
     VerificationStatus,
     SCIENCE_EVIDENCE_SCHEMA,
 };
@@ -55,6 +56,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             "Myrheim_Meyer_dimension".to_string(),
             "longest_chain_length".to_string(),
         ],
+        required_checks: vec![
+            "unit-tests".to_string(),
+            "analytic-oracle".to_string(),
+            "format-check".to_string(),
+        ],
         uncertainty_method: "multi-seed Monte Carlo SD and t interval".to_string(),
         claim_boundary: ClaimBoundary::NumericalSimulation,
         claims: vec![
@@ -71,13 +77,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     manifest.validate()?;
     let manifest_digest = manifest.digest()?;
 
-    // This example does not run the experiment. Its receipt is deliberately
-    // NotRun, with no checks and no outputs, and therefore cannot qualify.
+    // This example does not run the experiment. Each preregistered check is
+    // explicitly marked NotRun, with no logs or outputs, and cannot qualify.
     let receipt = RunReceipt {
         manifest_blake3_hex: manifest_digest.clone(),
         source_commit_sha: manifest.source_commit_sha.clone(),
         status: VerificationStatus::NotRun,
-        checks: vec![],
+        checks: manifest
+            .required_checks
+            .iter()
+            .map(|name| VerificationCheck {
+                name: name.clone(),
+                status: VerificationStatus::NotRun,
+                source_commit_sha: manifest.source_commit_sha.clone(),
+                log_artifact: None,
+                notes: "not executed by manifest demonstration".to_string(),
+            })
+            .collect(),
         output_artifacts: vec![],
         environment: RunEnvironment {
             toolchain,
@@ -88,6 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("manifest_blake3={manifest_digest}");
     println!("receipt_status={:?}", receipt.status);
+    println!("receipt_valid={}", receipt.validate_against(&manifest).is_ok());
     println!("qualifies_as_pass={}", receipt.qualifies_as_pass(&manifest));
     println!("{}", serde_json::to_string_pretty(&manifest)?);
     Ok(())
