@@ -221,6 +221,83 @@ fn recompute_request_digest(request: &ClaimRequest) -> Result<String, FormalMapp
     Ok(sha256_hex(&canonical))
 }
 
+fn validate_precision_warnings(
+    evaluation: &ClaimEvaluation,
+) -> Result<(), FormalMappingError> {
+    const MAX_SAFE: i64 = 9_007_199_254_740_991;
+    let requested: HashSet<&str> = evaluation
+        .requested_evidence_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let mut seen = HashSet::new();
+
+    for warning in &evaluation.numeric_precision_warnings {
+        if !warning.json_pointer.is_empty() && !warning.json_pointer.starts_with('/') {
+            return Err(FormalMappingError::new(
+                FormalMappingErrorKind::InvalidEvaluation,
+                "precision warning JSON Pointer must be empty or start with '/'",
+            ));
+        }
+
+        match warning.source {
+            super::claims::ClaimPrecisionSource::AssertedValue => {
+                if warning.evidence_id.is_some() {
+                    return Err(FormalMappingError::new(
+                        FormalMappingErrorKind::InvalidEvaluation,
+                        "asserted-value precision warning must not name an Evidence ID",
+                    ));
+                }
+            }
+            super::claims::ClaimPrecisionSource::EvidenceRecord => {
+                let Some(evidence_id) = warning.evidence_id.as_deref() else {
+                    return Err(FormalMappingError::new(
+                        FormalMappingErrorKind::InvalidEvaluation,
+                        "Evidence precision warning must name an Evidence ID",
+                    ));
+                };
+                if !requested.contains(evidence_id) {
+                    return Err(FormalMappingError::new(
+                        FormalMappingErrorKind::InvalidReferences,
+                        "precision warning references an unrequested Evidence ID",
+                    ));
+                }
+            }
+        }
+
+        let unsafe_integer = if let Ok(value) = warning.integer_value.parse::<i64>() {
+            value < -MAX_SAFE || value > MAX_SAFE
+        } else if let Ok(value) = warning.integer_value.parse::<u64>() {
+            value > MAX_SAFE as u64
+        } else {
+            return Err(FormalMappingError::new(
+                FormalMappingErrorKind::InvalidEvaluation,
+                "precision warning integer_value must be an exact signed or unsigned 64-bit decimal integer",
+            ));
+        };
+        if !unsafe_integer {
+            return Err(FormalMappingError::new(
+                FormalMappingErrorKind::InvalidEvaluation,
+                "precision warning must identify an integer outside the ECMAScript safe-integer range",
+            ));
+        }
+
+        let key = (
+            warning.source as u8,
+            warning.evidence_id.as_deref(),
+            warning.json_pointer.as_str(),
+            warning.integer_value.as_str(),
+        );
+        if !seen.insert(key) {
+            return Err(FormalMappingError::new(
+                FormalMappingErrorKind::InvalidEvaluation,
+                "duplicate numeric precision warning",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_evaluation(
     evaluation: &ClaimEvaluation,
 ) -> Result<FormalSemanticPolarity, FormalMappingError> {
@@ -259,6 +336,7 @@ fn validate_evaluation(
 
     let request = request_from_evaluation(evaluation)?;
     validate_reference_partition(evaluation)?;
+    validate_precision_warnings(evaluation)?;
     let actual_request_digest = recompute_request_digest(&request)?;
     if actual_request_digest != evaluation.claim_request_sha256 {
         return Err(FormalMappingError::new(
@@ -351,6 +429,18 @@ pub fn export_formal_provider_observation(
         falsification_condition: evaluation.falsification_condition.clone(),
     };
 
+    let mut claim_ceiling = vec![
+        "This formal object represents only a provider-reported observation meta-claim.".to_owned(),
+        "It does not prove the underlying artifact proposition, producer authenticity, signature validity, signer trust, package authorization, completeness or safety.".to_owned(),
+        "The derivation SHA-256 is an integrity commitment, not a producer signature or trust anchor.".to_owned(),
+        "Independent semantic replay is a separate required check and is not performed by this exporter.".to_owned(),
+    ];
+    if !evaluation.numeric_precision_warnings.is_empty() {
+        claim_ceiling.push(
+            "The embedded REA evaluation records JSON integer tokens outside the ECMAScript safe-integer range; RFC 8785 uses their binary64 interpretation, so exact integer preservation is not established.".to_owned(),
+        );
+    }
+
     Ok(FormalProviderObservation {
         schema: FORMAL_PROVIDER_OBSERVATION_SCHEMA.to_owned(),
         mapping_rule: FORMAL_PROVIDER_OBSERVATION_RULE.to_owned(),
@@ -359,12 +449,7 @@ pub fn export_formal_provider_observation(
         rea_disposition: evaluation.disposition,
         binding,
         rea_evaluation: evaluation.clone(),
-        claim_ceiling: vec![
-            "This formal object represents only a provider-reported observation meta-claim.".to_owned(),
-            "It does not prove the underlying artifact proposition, producer authenticity, signature validity, signer trust, package authorization, completeness or safety.".to_owned(),
-            "The derivation SHA-256 is an integrity commitment, not a producer signature or trust anchor.".to_owned(),
-            "Independent semantic replay is a separate required check and is not performed by this exporter.".to_owned(),
-        ],
+        claim_ceiling,
     })
 }
 
@@ -565,6 +650,7 @@ fn validate_formal_required_fields(value: &Value) -> Result<(), FormalMappingErr
             "source_predicate_type",
             "requested_evidence_ids",
             "assumptions",
+            "numeric_precision_warnings",
             "evidence_assessments",
             "missing_evidence_ids",
             "unmet_obligations",
@@ -586,6 +672,23 @@ fn validate_formal_required_fields(value: &Value) -> Result<(), FormalMappingErr
         ],
         "formal envelope.rea_evaluation.scope",
     )?;
+
+    let precision_warnings = evaluation
+        .get("numeric_precision_warnings")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            FormalMappingError::new(
+                FormalMappingErrorKind::InvalidJson,
+                "formal envelope.rea_evaluation.numeric_precision_warnings must be an array",
+            )
+        })?;
+    for (index, warning) in precision_warnings.iter().enumerate() {
+        require_formal_object_keys(
+            warning,
+            &["source", "evidence_id", "json_pointer", "integer_value"],
+            &format!("formal envelope.rea_evaluation.numeric_precision_warnings[{index}]"),
+        )?;
+    }
 
     let assessments = evaluation
         .get("evidence_assessments")
