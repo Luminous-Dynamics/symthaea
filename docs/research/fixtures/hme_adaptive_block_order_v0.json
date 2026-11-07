@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "fixture_id": "HME-ADAPTIVE-BLOCK-ORDER-2026-11-07",
+  "status": "synthetic_real_arithmetic_ordering_fixture_not_benchmark",
+  "dimension": 4,
+  "query": [
+    1,
+    1,
+    1,
+    1
+  ],
+  "candidate": [
+    -1,
+    -1,
+    1,
+    1
+  ],
+  "blocks": [
+    [
+      0,
+      1
+    ],
+    [
+      2,
+      3
+    ]
+  ],
+  "exact_dot": 0,
+  "query_norm": 2,
+  "candidate_norm": 2,
+  "exact_cosine": 0,
+  "kth_exact_threshold": 0.1,
+  "block_metadata": [
+    {
+      "block": 0,
+      "query_norm": 1.4142135623730951,
+      "candidate_norm": 1.4142135623730951,
+      "admissible_dot_abs_bound": 2,
+      "exact_block_dot": -2,
+      "ordering_hint": "negative"
+    },
+    {
+      "block": 1,
+      "query_norm": 1.4142135623730951,
+      "candidate_norm": 1.4142135623730951,
+      "admissible_dot_abs_bound": 2,
+      "exact_block_dot": 2,
+      "ordering_hint": "positive"
+    }
+  ],
+  "executions": [
+    {
+      "id": "fixed_order_positive_first",
+      "block_order": [
+        1,
+        0
+      ],
+      "steps": [
+        {
+          "after_block": 1,
+          "partial_dot": 2,
+          "remaining_dot_upper_bound": 2,
+          "total_dot_upper_bound": 4,
+          "cosine_upper_bound": 1,
+          "prune": false
+        }
+      ],
+      "expected_full_scoring_required": true
+    },
+    {
+      "id": "candidate_hint_negative_first",
+      "block_order": [
+        0,
+        1
+      ],
+      "steps": [
+        {
+          "after_block": 0,
+          "partial_dot": -2,
+          "remaining_dot_upper_bound": 2,
+          "total_dot_upper_bound": 0,
+          "cosine_upper_bound": 0,
+          "prune": true
+        }
+      ],
+      "expected_full_scoring_required": false
+    }
+  ],
+  "invariants": [
+    "The ordering hint chooses evaluation order only; it is not trusted as a pruning bound.",
+    "Every unprocessed block remains covered by its admissible norm-product upper bound.",
+    "Prune only when the conservative final cosine upper bound is strictly below the current kth exact threshold.",
+    "If the hint is wrong, search may do extra work but must not lose exact results.",
+    "Any surviving candidate must be scored using the canonical full exact reduction from #10918.",
+    "All arithmetic here is real arithmetic; production f32/f64 interval safety is separately required."
+  ],
+  "interpretation": "The candidate's exact block contributions are -2 and +2, giving exact cosine 0. Processing the negative block first yields a safe upper bound 0 below the 0.1 threshold; processing the positive block first yields upper bound 1 and cannot prune at that point. This shows why candidate-specific block ordering may improve early abandonment, provided the ordering hint never participates in the proof."
+}
