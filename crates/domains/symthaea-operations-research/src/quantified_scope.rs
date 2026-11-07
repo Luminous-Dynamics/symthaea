@@ -451,6 +451,62 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_three_variable_prefixes_preserve_skolem_dependencies() {
+        let orders = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+
+        for order in orders {
+            for quantifier_mask in 0..8usize {
+                let blocks: Vec<QuantifierBlock> = order
+                    .iter()
+                    .enumerate()
+                    .map(|(index, &variable)| QuantifierBlock {
+                        quantifier: if ((quantifier_mask >> index) & 1) == 0 {
+                            Quantifier::ForAll
+                        } else {
+                            Quantifier::Exists
+                        },
+                        variables: vec![variable],
+                    })
+                    .collect();
+                let prefix = ValidatedQuantifierPrefix::new(
+                    3,
+                    blocks.clone(),
+                    QuantifierPrefixBudget::default(),
+                )
+                .unwrap();
+
+                for (position, block) in blocks.iter().enumerate() {
+                    let variable = block.variables[0];
+                    if block.quantifier == Quantifier::Exists {
+                        let expected: Vec<usize> = blocks[..position]
+                            .iter()
+                            .filter(|previous| previous.quantifier == Quantifier::ForAll)
+                            .flat_map(|previous| previous.variables.iter().copied())
+                            .collect();
+                        assert_eq!(
+                            prefix.existential_dependencies(variable).unwrap(),
+                            expected,
+                            "quantifier mask {quantifier_mask}, order {order:?}, variable {variable}"
+                        );
+                    } else {
+                        assert_eq!(
+                            prefix.existential_dependencies(variable).unwrap_err(),
+                            QuantifierScopeError::NotExistential { variable }
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn empty_prefix_is_valid_for_empty_universe() {
         let prefix =
             ValidatedQuantifierPrefix::new(0, vec![], QuantifierPrefixBudget::default()).unwrap();
