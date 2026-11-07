@@ -1763,6 +1763,11 @@ fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Option<(Vec<usize>, f64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_core::sequential_weight_program::{
+        SequentialEvidenceBatch, SequentialWeightProgramTemplate,
+        accept_verified_sequential_candidate, begin_sequential_edit_session,
+        prepare_sequential_candidate,
+    };
     use symthaea_core::weight_space_program::WeightProgramOperation;
 
     fn digest(byte: char) -> String {
@@ -3198,6 +3203,183 @@ mod tests {
         assert_eq!(
             repair.validate_and_materialize(&healthy_now),
             Err(WeightProgramError::StaleDigest("base model"))
+        );
+    }
+
+    #[test]
+    fn sequential_evidence_program_executes_through_native_cfc_candidate_boundary() {
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-sequential-wsp-integration-v1");
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 4,
+            num_layers: 1,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 4,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let source = CfCNetwork::from_genesis(config, &genesis, "sequential-wsp");
+        let task_digest = digest('d');
+        let initial_snapshot =
+            cfc_weight_model_snapshot(&source, task_digest.clone()).expect("initial snapshot");
+        let tau_group_id = CfCWeightGroupId::CellTimeConstant { cell: 0 };
+        let tau_group = initial_snapshot
+            .groups
+            .iter()
+            .find(|group| group.target == WeightProgramTarget::CfC(tau_group_id.clone()))
+            .expect("cell tau parameter group");
+        let template = SequentialWeightProgramTemplate {
+            format_version: 1,
+            architecture_digest: initial_snapshot.architecture_digest.clone(),
+            manifest_digest: initial_snapshot.manifest_digest.clone(),
+            target_specification_digest: task_digest.clone(),
+            fault_hypothesis_ids: vec!["fault:recurrent-timescale-drift".into()],
+            operations: vec![WeightProgramOperation::ScaleRange {
+                target: tau_group.target.clone(),
+                start: 0,
+                end: tau_group.values.len(),
+                factor: 1.01,
+            }],
+            max_changed_parameters_per_batch: tau_group.values.len(),
+            max_total_l2_delta_per_batch: 1.0,
+            max_abs_delta_per_batch: 1.0,
+            max_cumulative_l2_path: 2.0,
+            max_cumulative_parameter_change_events: 2 * tau_group.values.len(),
+            max_batches: 2,
+        };
+        let session_id = digest('s');
+        let session =
+            begin_sequential_edit_session(session_id.clone(), &template, &initial_snapshot)
+                .expect("begin native CfC sequential session");
+
+        let first_batch = SequentialEvidenceBatch {
+            session_id: session_id.clone(),
+            batch_index: 0,
+            parent_candidate_model_digest: initial_snapshot.model_digest.clone(),
+            evidence_batch_digest: digest('e'),
+            observation_manifest_digest: digest('o'),
+        };
+        let first_prepared =
+            prepare_sequential_candidate(&session, &template, &initial_snapshot, &first_batch)
+                .expect("prepare first evidence batch");
+        let first_native = materialize_cfc_weight_program(
+            &source,
+            task_digest.clone(),
+            &first_prepared.program,
+        )
+        .expect("materialize first native CfC candidate");
+        assert_eq!(
+            source.fingerprint().expect("source remains immutable").model_digest,
+            initial_snapshot.model_digest
+        );
+        assert_ne!(
+            first_native.candidate_native_model_digest,
+            initial_snapshot.model_digest
+        );
+
+        // The session must not advance merely because a detached candidate exists.
+        assert_eq!(session.next_batch_index, 0);
+        assert!(matches!(
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &first_prepared,
+                &first_native.candidate_native_model_digest,
+                &digest('v'),
+                false,
+            ),
+            Err(
+                symthaea_core::sequential_weight_program::SequentialWeightProgramError::VerifierRejectedCandidate
+            )
+        ));
+        assert_eq!(session.next_batch_index, 0);
+
+        // Only a positive verifier attestation over the exact native candidate
+        // advances the reusable edit program to the next evidence batch.
+        let (session_after_first, first_receipt) =
+            accept_verified_sequential_candidate(
+                &session,
+                &template,
+                &first_prepared,
+                &first_native.candidate_native_model_digest,
+                &digest('v'),
+                true,
+            )
+            .expect("accept verified first native candidate");
+        assert_eq!(first_receipt.batch_index, 0);
+        assert_eq!(
+            session_after_first.latest_candidate_model_digest,
+            first_native.candidate_native_model_digest
+        );
+        assert_eq!(session_after_first.next_batch_index, 1);
+
+        let second_snapshot = cfc_weight_model_snapshot(&first_native.network, task_digest.clone())
+            .expect("second parent snapshot");
+        assert_eq!(
+            second_snapshot.model_digest,
+            session_after_first.latest_candidate_model_digest
+        );
+        let second_batch = SequentialEvidenceBatch {
+            session_id,
+            batch_index: 1,
+            parent_candidate_model_digest: second_snapshot.model_digest.clone(),
+            evidence_batch_digest: digest('g'),
+            observation_manifest_digest: digest('p'),
+        };
+        let second_prepared = prepare_sequential_candidate(
+            &session_after_first,
+            &template,
+            &second_snapshot,
+            &second_batch,
+        )
+        .expect("prepare second evidence batch against latest candidate");
+        let second_native = materialize_cfc_weight_program(
+            &first_native.network,
+            task_digest,
+            &second_prepared.program,
+        )
+        .expect("materialize second native CfC candidate");
+        let (session_after_second, second_receipt) =
+            accept_verified_sequential_candidate(
+                &session_after_first,
+                &template,
+                &second_prepared,
+                &second_native.candidate_native_model_digest,
+                &digest('w'),
+                true,
+            )
+            .expect("accept verified second native candidate");
+
+        assert_eq!(second_receipt.batch_index, 1);
+        assert_eq!(session_after_second.next_batch_index, 2);
+        assert_eq!(
+            session_after_second.latest_candidate_model_digest,
+            second_native.candidate_native_model_digest
+        );
+        assert_ne!(
+            second_native.candidate_native_model_digest,
+            first_native.candidate_native_model_digest
+        );
+        assert!(
+            session_after_second.cumulative_l2_path
+                > session_after_first.cumulative_l2_path
+        );
+        assert_eq!(
+            session_after_second.cumulative_parameter_change_events,
+            2 * tau_group.values.len()
+        );
+        assert_eq!(
+            source.fingerprint().expect("original source still immutable").model_digest,
+            initial_snapshot.model_digest
         );
     }
 
