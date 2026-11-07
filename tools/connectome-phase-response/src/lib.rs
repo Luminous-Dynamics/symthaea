@@ -854,6 +854,7 @@ mod tests {
             source_leg: None,
             descending_neuron: None,
             phase_bin: 0,
+            magnitude_bin: 0,
             delay_index: 0,
         };
         assert_eq!(invalid.validate(), Err(PhaseError::DescendingNeuronRequired));
