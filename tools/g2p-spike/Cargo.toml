@@ -9,5 +9,6 @@ description = "Isolated comparative G2P probe; not a production phonemizer"
 
 [dependencies]
 piper-plus-g2p = { version = "=0.5.3", default-features = false, features = ["english"] }
+symthaea-muse = { path = "../../crates/domains/symthaea-muse", features = ["voice"] }
 
 [workspace]
