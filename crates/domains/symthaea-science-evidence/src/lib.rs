@@ -510,6 +510,24 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_artifact_paths_and_required_check_names_are_rejected() {
+        let mut manifest = manifest();
+        let input = manifest.input_artifacts[0].clone();
+        manifest.input_artifacts.push(input);
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::DuplicateArtifactPath("fixture.json".to_string()))
+        );
+
+        let mut manifest = manifest();
+        manifest.required_checks.push("unit-tests".to_string());
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::DuplicateRequiredCheck("unit-tests".to_string()))
+        );
+    }
+
+    #[test]
     fn receipt_must_contain_exactly_the_frozen_required_check_set() {
         let manifest = manifest();
         let mut missing = passing_receipt(&manifest);
