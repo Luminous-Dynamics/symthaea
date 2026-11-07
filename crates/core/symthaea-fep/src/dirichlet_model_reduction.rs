@@ -350,20 +350,6 @@ pub fn reduce_dirichlet_models(
 }
 
 fn reduce_dirichlet_models_with_evidence(
-    full_posterior: &DirichletConcentrationTensor,
-    full_prior: &DirichletConcentrationTensor,
-    reduced_models: &[ReducedDirichletModelHypothesis],
-    evidence_ratio: fn(
-        &DirichletConcentrationTensor,
-        &DirichletConcentrationTensor,
-        &DirichletConcentrationTensor,
-        &str,
-    ) -> Result<f64, DirichletBayesianModelReductionError>,
-) -> Result<DirichletBayesianModelReductionResult, DirichletBayesianModelReductionError> {
-    full_posterior: &DirichletConcentrationTensor,
-    full_prior: &DirichletConcentrationTensor,
-    reduced_models: &[ReducedDirichletModelHypothesis],
-) -> Result<DirichletBayesianModelReductionResult, DirichletBayesianModelReductionError> {
     let column_count = full_posterior.columns.len();
     validate_tensor(full_posterior, "full posterior", None, true)?;
     validate_tensor(full_prior, "full prior", Some(full_posterior), true)?;
@@ -1131,17 +1117,6 @@ pub fn evaluate_dirichlet_model_information_gain(
 }
 
 fn evaluate_dirichlet_model_information_gain_with_mode(
-    full_posterior: &DirichletConcentrationTensor,
-    full_prior: &DirichletConcentrationTensor,
-    reduced_models: &[ReducedDirichletModelHypothesis],
-    action: &DirichletActionPrediction,
-    spm_compatible: bool,
-) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
-    full_posterior: &DirichletConcentrationTensor,
-    full_prior: &DirichletConcentrationTensor,
-    reduced_models: &[ReducedDirichletModelHypothesis],
-    action: &DirichletActionPrediction,
-) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
     validate_tensor(full_posterior, "full posterior", None, true)
         .map_err(DirichletModelInformationGainError::ModelReduction)?;
     validate_tensor(full_prior, "full prior", Some(full_posterior), true)
