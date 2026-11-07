@@ -23,6 +23,8 @@ An improvement in one loop is not evidence that the other two improved. This dis
 | **AIDE²** (arXiv:2609.26457) | Seven successive agent improvements in an autonomous eight-day run; transfer to four held-out R&D task families, including an OOD weather-forecasting family; reported reward-hacking rate fell from 55% to 32%. | A serious current reference for iterative self-editing and transfer. | Its separate ignition comparison used three seeds per arm from the same AIDE47 inner-agent start and 50 outer steps; mean endpoints 0.780 vs 0.782 were judged inconclusive. Product-loop progress is not established outer-loop superiority. |
 | **AREX** (arXiv:2607.21461v3, revised 2026-09-01) | BrowseComp ablation: complete trajectory/no context update/first answer 59.6; context refresh only 71.4; full outer continuation 82.5. | Mechanism for preserving useful evidence and unresolved constraints, refining the next objective, or restarting a low-recoverability investigation. | Within-investigation continuation/state refresh, not persistent cross-task learning or improved improver. The protocol caps 300 inner turns and five outer operations per episode; equal turn limits do not establish equal actual tokens/cost. Confidence-bin separation does not establish acceptance precision. |
 | **Harness-Zero** (arXiv:2609.24974, 2026-09-21) | Reports harness-distilled student macro-average task success 44.3%, above 41.7% with the specialized harness attached; 82.3% average recovery across 28 behaviors. | Transfers useful harness procedures into student-native actions/weights so behavior may survive external scaffolding removal. | Domain results are mixed: USPTO student 30% vs 38% with specialized harness; teacher with specialized harness has 62% collection success but student only 3% when it attempts unavailable actions. Macro mean pools different metrics and separate trained students. Not R4. |
+| **RRSI** (arXiv:2609.24972v3, revised 2026-10-04) | Regularizes harness evolution with a temporally annealed edit budget, exploration of under-tried trajectories, a critic for benchmark-specific proposals and a pruner for tiny, expensive or no-longer-useful edits. Reports up to +6.0 points on evolved split, +4.3 points on five OOD benchmarks and 30% fewer policy tokens than unregularized evolution. | Strong direct baseline for regularized harness-edit search, edit granularity, reusable mechanisms and token-efficient proposal/pruning. | Gains are reported across a task suite, not proof of same-start matched-realized-cost R4 ignition. Symthaea should reproduce the published component ablations and test whether regularization preserves capability and post-initialization improvement across complete successor loops. |
+| **Harness-Bench** (arXiv:2605.27922v2, revised 2026-10-15; live site checked 2026-11-07) | Paper v2 reports 300 sandboxed tasks, 7 harnesses, 10 general-model backends, 7 multimodal backends and 5,194 execution trajectories. The current site reports 20,454 evaluated runs. Task-specific hidden oracles check final artifacts/workspace state, with module-level partial credit and safety gates; no LLM judge. | Best current baseline for paired, model×harness configuration comparisons across realistic work, explicit deliverables, operational constraints and measured API/token cost. | This benchmarks harness selection/configuration, not a harness improver or recursive loop. Preserve version-specific counts: the paper's 5,194 trajectories and live site's 20,454 run count are distinct snapshots, not one denominator. |
 | **Routed Continual Learning** (arXiv:2610.38796, 2026-10-28) | Heterogeneous stream of 398 instances across seven source-task sequences; five complete matched rollouts per model. Jointly chooses memory representation and immutable-scope state cluster; Routed CL beats global and routed ICL conditions for all four tested models. | Direct comparator for scope-aware research-state routing: what to remember and which tasks may share it are separate decisions. | Continual task execution with a frozen memory-system library, not recursive improvement of the improver. The router can miscluster; a Gemini Poker merge incurred 2.41× API cost versus partitioned ICL in merged rollouts. No simultaneous updates or cross-model state sharing were tested. |
 | **AMA-Bench** (ICML 2026) | AMA-Agent reports 57.22% accuracy, 11.16 points above the strongest baseline on trajectory-based long-horizon memory. | Useful baseline for trajectory-grounded recall, causal/objective-bearing memory and long-horizon evidence reconstruction. | QA memory accuracy alone does not prove correct cross-task scope, currentness or useful transfer into the next research decision. |
 | **RSI-Env** (arXiv:2611.01736, submitted 2026-11-01) | Persistent environment for coordinated model/harness change with a separate Host Controller; seven tasks across Open-General, Capability-Directed and Benchmark-Guided settings. Open-General Self: GPQA 65.2→73.2 and AIME 53.3→56.7; Knowledge Self: SimpleQA 82→85→88 across H0/M0→H1/M0→H1/M1. | New direct comparator for persistent research state, controller isolation, model/harness co-evolution and recursive continuation. | Scores are avg@3/pass@3 on four capability benchmarks; gains coexist with regressions (e.g. Open-General SimpleQA −4.8 points; Knowledge GPQA −12.2 and Terminal-Bench −6.8). Several Self runs used 24.9–28.95 h against 1.19–6.97 h for Teachers under a common 30 h allocation. A common ceiling is not a matched realized-cost comparison; the paper's sustained three-stage sequence is one task-specific case, not a powered R4 ignition comparison. |
@@ -39,6 +41,8 @@ An improvement in one loop is not evidence that the other two improved. This dis
 
 ### Comparator interpretation
 
+- **RRSI is the missing regularized-search baseline.** It addresses overfitting by constraining edit bundle size over time, steering toward underexplored trajectories, screening benchmark-specific proposals and pruning low-value/expensive edits. Symthaea should compare these controls independently and measure OOD transfer, protected capability retention, actual later invocation of the changed improver and full inclusive cost—not just token savings.
+- **Harness-Bench provides an immediately actionable harness baseline.** Reproduce its model×native-harness matrix on the pinned paper v2 and, separately, the current live-site snapshot. Optimize both mean score and complete delivery/full-credit rate; include module-level oracles, safety gates, partial-credit trajectories and API/token cost. Its result that no one harness wins across all backends argues for a model-conditioned policy, while its 2.53–2.73-point held-out full-credit gain from selecting a harness per model is a useful selection baseline. It does not test an agent that improves its own harness.
 - **AREX adds an evidence-preserving continuation policy.** Preserve verified findings, explicit exclusions and unresolved constraints; convert remaining constraints into the next objective when a trajectory is recoverable, otherwise restart. Do not mistake local research-state refresh for persistent cross-task learning or R4.
 - **Harness-Zero adds a model-internalization treatment.** Compare an attached specialized harness with a student trained to perform the same checks in its deployment-available action space. Count both collection and held-out student outcomes; a high-performing teacher trace can be unusable supervision if the student cannot execute its tools.
 - **Routed Continual Learning adds scope as a second routing decision.** The system chooses both a memory mechanism and the cluster whose state can be reused. A global knowledge pool is not always better: interleaved tasks can make irrelevant histories harmful, and a bad merge can increase context cost. #10844 owns this state-scope-routing benchmark; it composes with #10630/#10749 rather than creating another memory engine.
@@ -146,7 +150,47 @@ Measure task outcome, protected capability vector, cost, number of probes, compo
 
 Run a factorial comparison: data-only, training-setting-only, harness-only, model-weight-only where meaningful, harness→model, model→harness, and joint alternating updates. Keep the original base model and starting harness exact; run the same seed and task families; account for all data-generation, training, inference, evaluator and recovery costs. The interaction term is a first-class result: joint change may be super-additive, redundant or destructive. Do not credit the full joint gain to either component alone.
 
-## 5. Research-state routing and harness-to-native transfer
+## 5. Harness selection, regularized editing and complete-delivery evaluation
+
+### Reuse Harness-Bench as the model×harness measurement floor
+
+Harness-Bench (arXiv:2605.27922v2) evaluates seven native harnesses across ten model backends on shared sandboxed tasks, with 1,408 hidden-oracle scoring modules and hard safety/risk gates. The paper v2 reports 300 tasks and 5,194 execution trajectories; the live project site checked on November 7 reports 20,454 evaluated runs. These are different versioned snapshots and must not be pooled into one denominator.
+
+Reproduce separately:
+1. a fixed shared harness selected across models;
+2. the best validation-selected harness per model;
+3. a per-task or per-family router selected only from development evidence;
+4. a no-harness / minimal harness baseline where interface equivalence permits;
+5. Symthaea's candidate harnesses.
+
+Report mean score, R0.8 (at least 0.80), full-credit R1, all safety gates, per-module completion, API cost, input/output tokens, request count, tool errors, wall time, context/turn usage and failure category. The published results show harness choice is model-dependent: six of seven harnesses lead at least one backend; harness per-model selection improves held-out R1 by 2.53–2.73 points versus one shared harness, while mean-score gains stay within ±0.14. GPT-5.6 Sol's full-credit variation is 9.12 points despite only 1.93-point SD in mean score across harnesses; one harness costs 2.97× another yet has lower R1. These are selection/configuration results, not recursive-improver results.
+
+### Add regularized harness evolution (RRSI) as a direct search baseline
+
+RRSI (arXiv:2609.24972v3) constrains the edit search rather than allowing unconstrained accumulation:
+- temporally anneal the maximum number of edits bundled into a proposal;
+- encourage unexplored trajectories based on evolution history;
+- critic-screen benchmark-specific proposals;
+- prune changes that are too small, too expensive, or no longer useful.
+
+The paper reports up to +6.0 points on its evolved split, +4.3 on five OOD benchmarks and 30% fewer policy tokens than unregularized evolution. Treat these as paper-reported targets, not a Symthaea reproduction or R4 claim.
+
+Symthaea's comparison should isolate each regularizer:
+- unregularized evolution;
+- annealed edit budget only;
+- exploration encouragement only;
+- benchmark-specific critic only;
+- cost/utility pruner only;
+- full RRSI-style regularization;
+- full regularization plus Symthaea verifier-grounded direction board.
+
+Keep proposal model, base harness, task population, evaluator and total budget matched. Measure proposal success, post-init improvement, OOD transfer, per-capability regression, edit count/size, policy tokens, evaluator calls, full inference/search cost and cost per independently confirmed reusable edit. A smaller policy-token count alone does not establish greater total efficiency if it causes more candidate attempts or evaluator calls.
+
+### Complete delivery as an objective, not an afterthought
+
+Harness-Bench shows high partial credit can conceal unfinished work: roughly 50.81% of general-task attempts reach R0.8, but only 26.22% receive full credit. Track module completion and whether feedback changes the next action; require all mandatory artifacts, evidence and safety gates rather than rewarding plausible intermediate progress.
+
+## 6. Research-state routing and harness-to-native transfer
 
 ### Evidence retention, scope routing and continuation are separate decisions
 
@@ -191,7 +235,7 @@ The full rollout/stream is the replication unit when later outcomes depend on ea
 - Routed Continual Learning evaluates 398 interleaved instances over five complete rollouts per model. It finds both mechanism selection and cluster scope matter, but bad merges can increase cost; the authors did not evaluate simultaneous state updates or cross-model sharing.
 - AMA-Bench is a long-horizon trajectory-memory task benchmark, not evidence of correct cross-task state transfer by itself.
 
-## 6. Evaluator-research experiment (#10756)
+## 7. Evaluator-research experiment (#10756)
 
 Compare a human-designed compact suite, deterministic rules, frontier-model evaluator builders and Symthaea under matched information and cost. Use separate discovery, development, calibration, sealed target and fresh-family transfer splits.
 
@@ -210,16 +254,18 @@ A high-concordance evaluator is a measurement instrument, not an authority. The 
 
 The first synthetic adversarial-control pack is tracked in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_V0_2026-11-06.json`, with its companion Draft 2020-12 schema in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_SCHEMA_V0_2026-11-06.json`. It contains 16 hard-gate negative controls and four synthetic positive/inconclusive controls. A custom structural walk found zero schema errors, 16 unique negative-control IDs and the expected hard-gate/non-hard-gate split. These fixtures specify threat mutations and expected dispositions; they are not real task data, sealed tests or a substitute for an independently custodied target portfolio.
 
-## 7. Immediate execution sequence
+## 8. Immediate execution sequence
 
 1. Finish semantic R4 preregistration checks in #10749, including scope-routed research-state comparisons, and preserve TEMPLATE_NOT_PREREGISTERED until an actual experiment is frozen.
 2. Use #10844 to separate state representation from scope routing and test global, routed, shuffled and oracle assignments under matched complete-rollout cost.
-3. Extend #10756 with evaluator-integrity tasks and #10691 with clean-start algorithm/agent transfer controls.
-4. Compare attached harness, agent-as-harness and harness-to-student transfer without conflating teacher collection success and student deployment capability.
-5. Audit Coral Discovery's best-of-three reporting against its per-task evaluation caps; do not treat six/tie/two as a mean-over-seeds effect.
-6. Use #10717 for causal attribution and #10497 for the same-start test of whether the inherited improvement procedure itself gets better.
+3. Reproduce Harness-Bench paper v2 and current live-site snapshots separately; pin task/harness/model manifests and retain both mean score and full-credit outcomes.
+4. Add RRSI as a regularized proposal/pruning baseline; isolate annealing, exploration, critic and cost pruner, then test the complete improver under matched costs.
+5. Extend #10756 with evaluator-integrity tasks and #10691 with clean-start algorithm/agent transfer controls.
+6. Compare attached harness, agent-as-harness and harness-to-student transfer without conflating teacher collection success and student deployment capability.
+7. Audit Coral Discovery's best-of-three reporting against its per-task evaluation caps; do not treat six/tie/two as a mean-over-seeds effect.
+8. Use #10717 for causal attribution and #10497 for the same-start test of whether the inherited improvement procedure itself gets better.
 
-## 8. Claim boundaries and reproducibility
+## 9. Claim boundaries and reproducibility
 
 - A structural or semantic validator pass is not evidence that referenced files, digests, signatures or custodians are authentic.
 - A disjointness declaration is not proof of population independence; an independent custodian must inspect the actual manifests.
@@ -250,3 +296,5 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 18. Routed Continual Learning: https://arxiv.org/abs/2610.38796
 19. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
 20. Harness-RSI survey (revised 2026-11-04, not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
+21. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
+22. RRSI: https://arxiv.org/abs/2609.24972
