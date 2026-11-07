@@ -74,5 +74,8 @@ jobs:
       - name: Compile the integrated comparative vocal release gate
         run: cargo +1.96.0 check --locked -p symthaea --example muse_vocal_release_gate --features "singing,voice-tts"
 
+      - name: Test human rating coverage and provenance receipt validation
+        run: cargo +1.96.0 test --locked -p symthaea --example muse_vocal_release_gate --features "singing,voice-tts" rating_validation_tests -- --test-threads=1
+
       - name: Confirm the frozen lockfile remained unchanged
         run: git diff --exit-code -- Cargo.lock
