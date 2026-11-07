@@ -79,13 +79,13 @@ This turns triangulation into a sensor-design question: given an assumed
 target region and current observations, which sensor placement is expected
 to add the most independent geometric information?
 
-This is a local design calculation at one assumed target point, not a global
-optimal deployment solution. It currently treats the target point and
-candidate angular noise as known. It omits uncertainty over target location,
-pose/boresight, clock synchronization, visibility, terrain/occlusion,
-atmospheric propagation, weather, cost, and platform constraints. It must
-not recommend real sensor placement without those constraints and an
-independent geometric reference.
+The point-target API is a local design calculation, not a global deployment
+solution. The target-region API handles a finite weighted scenario set, not a
+continuous-region guarantee. Both currently treat candidate pose and angular
+noise as known. They omit pose/boresight covariance, clock synchronization,
+visibility, terrain/occlusion, atmospheric propagation, weather, cost, and
+platform constraints. They must not recommend real sensor placement without
+those constraints and independent geometric references.
 
 ### Current independent synthetic reference
 
@@ -96,6 +96,50 @@ about 3.1 cm and the local Gaussian 95% covariance ellipsoid covered about
 94.4% of the synthetic target positions. These are reference-design numbers,
 not Rust execution or real-instrument results; the complete protocol and
 limitations are in `docs/research/uap-bearing-triangulation-reference-v0.1.md`.
+
+## Multi-target evaluation metric (new reference)
+
+The `tracking_metrics` module implements a frame-level GOSPA metric with
+global optimal assignment, cutoff localization cost, and separate cardinality
+penalties for missed and false targets. The dynamic programme solves the
+assignment exactly on the smaller side (up to 20 targets); it fails closed
+above that bound rather than substituting a greedy algorithm.
+
+The output reports:
+
+- total GOSPA distance;
+- matched localization cost before the p-root;
+- number of missed and false targets;
+- separate missed-target and false-target penalty contributions;
+- number of matched targets.
+
+This is a metric oracle, not a multi-target tracker. It does not implement
+trajectory-level GOSPA/T-GOSPA, identity-switch or fragmentation penalties,
+data association, track filtering, or classification. Those need separate
+algorithms and evaluation code.
+
+### UAP track benchmark contract
+
+Any future tracker should be compared on a sealed known-object corpus using
+at least:
+
+1. Frame GOSPA with frozen p, cutoff c and alpha; report its localization,
+   missed-target and false-target components separately.
+2. Trajectory-level OSPA(2)/T-GOSPA or a documented equivalent, including
+   identity switches, fragmentation and track continuity.
+3. NEES/NIS consistency and empirical 50/90/95/99% uncertainty coverage.
+4. False tracks per sensor-hour, missed-track rate and detection probability
+   at a predeclared false-alarm rate.
+5. Track initiation delay, termination delay, localization RMSE and runtime.
+6. Ablations for sensor calibration, timestamp errors, parallax, boresight
+   drift, occlusion, multipath, missing modalities and adversarial negatives.
+7. Matched EKF/UKF/ESKF, JPDA/MHT or random-finite-set baselines where the
+   measurement model warrants them. A baseline must use the same input data,
+   sensor information and truth set.
+
+A GOSPA score is not directly comparable across different cutoffs, orders,
+alpha values, units or truth sets. Freeze those parameters and publish all
+three error components; do not report only the scalar distance.
 
 ## Run
 
