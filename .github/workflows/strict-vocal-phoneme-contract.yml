@@ -13,6 +13,8 @@ on:
       - "scripts/diffsinger_worker.py"
       - "scripts/diffsinger_phonemes.py"
       - "scripts/test_diffsinger_phonemes.py"
+      - "tools/pronunciation-plan/**"
+      - ".github/workflows/pronunciation-plan-contract.yml"
       - "docs/FUNCTIONAL_VOCAL_TRACT.md"
       - "docs/VOCAL_PHYSIOLOGY_ARCHITECTURE.md"
       - "docs/research/VOCAL_PHONEME_COVERAGE_AND_SA_SINGING_2026-11-07.md"
@@ -61,6 +63,15 @@ jobs:
 
       - name: Format-check only the changed Rust files
         run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+
+      - name: Format-check standalone pronunciation lattice
+        run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+
+      - name: Resolve pinned pronunciation-plan dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/pronunciation-plan/Cargo.toml
+
+      - name: Test pronunciation lattice and phrase-aware score alignment
+        run: cargo +1.96.0 test --locked --manifest-path tools/pronunciation-plan/Cargo.toml
 
       - name: Compile the feature-gated vocal renderer with frozen dependencies
         run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
