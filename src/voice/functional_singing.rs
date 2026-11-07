@@ -723,5 +723,4 @@ mod tests {
         assert!(error.contains("language='en' only"));
         assert!(error.contains("zu"));
     }
-
 }
