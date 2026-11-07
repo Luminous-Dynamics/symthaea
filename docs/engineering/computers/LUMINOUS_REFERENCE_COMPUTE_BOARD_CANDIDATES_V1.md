@@ -215,3 +215,58 @@ The guide covers connector pinout, supported I/O standards, signal-routing guida
 **Execution refinement:** first qualify the HDC accelerator on a known evaluation platform (KV260 or another exact K26 carrier) and treat its exact SOM SKU, boot storage, firmware, cooling and board revision as part of the result identity. Only then design a custom carrier. The first custom carrier should be justified by a measured need for instrumentation, serviceability, power/thermal telemetry, or required I/O that the evaluation board cannot satisfy—not by the desire to have a custom PCB.
 
 No claim of PCIe, SATA, GTH or other simultaneous connectivity is valid until the selected topology is checked against the exact SOM revision, connector pins, power domains and transceiver allocation.
+
+
+## 12. Open-flow FPGA portability lane and current Vivado licensing (2026-11-07)
+
+The current plan should be **two-tier rather than K26-only**.
+
+### 12.1 Portable open-hardware prototype — ULX3S ECP5-85F
+
+The ULX3S is an open-hardware ECP5 board with an 85F variant. The upstream hardware project documents:
+- Lattice ECP5 LFE5U-85F-6BG381C (85K LUT class);
+- 16-bit SDR SDRAM, with common 32 MB configuration;
+- QSPI flash and microSD;
+- 56 GPIO, USB/JTAG, 25 MHz reference clock and expansion I/O;
+- KiCad board design files and board documentation.
+
+Sources:
+- Upstream hardware project and specifications: https://github.com/emard/ulx3s
+- ULX3S manual / project site: https://ulx3s.github.io/
+- ECP5 board and flow catalog (cross-checked against upstream): https://kelu124.github.io/lattice-verilog-projects/boards/ecp5.html
+
+An open synthesis/place-and-route/bitstream path exists for ECP5 using Yosys `synth_ecp5`, nextpnr-ecp5, Project Trellis/ecppack and openFPGALoader:
+- https://github.com/YosysHQ/nextpnr
+- https://github.com/YosysHQ/prjtrellis
+
+**Limitations:** Project Trellis/nextpnr ECP5 support is an open, evolving toolchain. Its own example documentation warns that support is incomplete/experimental and not for mission-critical designs. Do not assume BRAM/EBR, PLL, SERDES, SDRAM controller timing, every I/O primitive or production-grade signoff works for our exact design/revision until the selected flow is run and its limitations documented. Verify the precise board revision, FPGA speed grade, package and LPF constraint file. An open-flow bitstream is not an industrial qualification.
+
+**Recommended role:** portable RTL/logic proof and early physical test of HDC XOR/popcount/reducer, simple on-chip query buffering and a narrow SDRAM streaming experiment. It is not a K26 performance substitute and has substantially different host/DDR resources.
+
+### 12.2 Integrated SoC prototype — AMD Kria K26 / KV260
+
+Keep the K26 as the larger integrated FPGA/processor/memory platform. AMD's current page lists the KV260 Vision AI Starter Kit at US$249 MSRP; this is a manufacturer MSRP, not a South African retail quote or verified local availability:
+- https://www.amd.com/en/products/system-on-modules/kria/k26.html
+
+Vivado licensing changed with 2026.1:
+- AMD states Vivado BASIC is free but requires an annual license file/renewal.
+- The 2026.1 device support table lists all Kria SOM devices under BASIC, CORE and PRO.
+- AMD says Kria SOM development kits receive a CORE-tier license voucher from 2026.1; general development-kit terms state a free one-year subscription, after which a new subscription is needed to continue on that tier.
+- CORE has broader simulation/debug features than BASIC; the exact required feature tier should be checked against the selected IP and flow.
+
+Sources:
+- 2026.1 licensing FAQ: https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/licensing-faq.html
+- 2026.1 supported devices / tier matrix: https://docs.amd.com/r/en-US/ug973-vivado-release-notes-install-license/Device-Availability-by-Subscription-Tier
+- Vivado licensing options: https://www.amd.com/en/products/software/adaptive-socs-and-fpgas/vivado/vivado-licensing-options.html
+
+This reduces the entry cost for a K26 prototype but does not remove vendor-tool dependence. Record the exact Vivado/Vitis version, licence tier, voucher expiry/renewal, feature/IP entitlement and host OS in every run receipt. The K26 custom carrier/SOM distinction and KV260 non-production SOM storage exception remain as described above.
+
+### 12.3 Two-tier execution plan
+
+1. Run portable, vendor-neutral RTL lint and simulation (Verilator/Icarus) first.
+2. Implement the smallest exact datapath on an ECP5-85F open-flow board where the required primitives are supported; record unsupported features and tool warnings.
+3. Port the identical RTL and oracle fixtures to an identified K26/KV260 revision using the supported AMD flow.
+4. Compare the **same exact function** across the two FPGA targets, but do not treat them as equal-resource or equal-host comparisons.
+5. Use the K26 platform for the larger DDR/SoC/host-transfer system benchmark and the ECP5 platform for open-flow portability and hardware sovereignty evidence.
+
+The ECP5 and K26 tracks are complementary: open toolchain portability versus larger integrated SoC capability. Neither by itself establishes ASIC PPA or local semiconductor manufacturing.
