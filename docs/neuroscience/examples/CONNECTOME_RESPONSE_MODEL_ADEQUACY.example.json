@@ -1,0 +1,341 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-response-model-adequacy-v1",
+  "claim_scope": "synthetic_known_truth",
+  "dataset_binding": {
+    "dataset_id": "synthetic-connectome-response-model-challenge",
+    "revision_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "evidence_tier": "SYNTHETIC",
+    "source_access_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "query": {
+    "query_id": "critical-path-exists",
+    "query_spec_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "decision_rule_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "baseline_decision": true,
+    "loss_false_true": 1,
+    "loss_true_false": 1
+  },
+  "worlds": [
+    {
+      "world_id": "H-PLUS",
+      "graph_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true,
+      "prior_probability": 0.1
+    },
+    {
+      "world_id": "H-MINUS",
+      "graph_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": false,
+      "prior_probability": 0.1
+    },
+    {
+      "world_id": "H-SAME",
+      "graph_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "source_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "biological_disposition": "ADMISSIBLE",
+      "query_decision": true,
+      "prior_probability": 0.8
+    }
+  ],
+  "baseline_model_id": "nominal",
+  "models": [
+    {
+      "model_id": "nominal",
+      "role": "BASELINE",
+      "model_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "observation_kernel_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "ancestry_group_ids": [
+        "shared-training-corpus-01",
+        "nominal-indicator-calibration"
+      ],
+      "challenge_id": null
+    },
+    {
+      "model_id": "indicator-saturation",
+      "role": "CHALLENGER",
+      "model_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "observation_kernel_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "ancestry_group_ids": [
+        "shared-training-corpus-01",
+        "heldout-calibration-77"
+      ],
+      "challenge_id": "CH-001"
+    }
+  ],
+  "challenges": [
+    {
+      "challenge_id": "CH-001",
+      "challenge_channel_id": "heldout-response-audit",
+      "challenge_kind": "HELD_OUT_RESIDUAL",
+      "disposition": "ADMITTED",
+      "challenge_unit_ids": [
+        "challenge-animal-77"
+      ],
+      "raw_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "challenge_report_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "adjudication_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "ancestry_group_ids": [
+        "heldout-calibration-77",
+        "shared-training-corpus-01"
+      ],
+      "model_id": "indicator-saturation"
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "A-cheap-nominal",
+      "cost_units": 1,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "safety_profile_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "cost_units": 2,
+      "feasibility_status": "FEASIBLE",
+      "feasibility_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "safety_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "cost_units": 0.01,
+      "feasibility_status": "DISALLOWED",
+      "feasibility_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "safety_profile_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "predictions": [
+    {
+      "intervention_id": "A-cheap-nominal",
+      "world_id": "H-PLUS",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "A-cheap-nominal",
+      "world_id": "H-MINUS",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "A-cheap-nominal",
+      "world_id": "H-SAME",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "world_id": "H-PLUS",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "world_id": "H-MINUS",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "world_id": "H-SAME",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "world_id": "H-PLUS",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "world_id": "H-MINUS",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "world_id": "H-SAME",
+      "model_id": "nominal",
+      "outcomes": [
+        {
+          "outcome_id": "Z",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "A-cheap-nominal",
+      "world_id": "H-PLUS",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "A-cheap-nominal",
+      "world_id": "H-MINUS",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "A-cheap-nominal",
+      "world_id": "H-SAME",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "world_id": "H-PLUS",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "world_id": "H-MINUS",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "B-orthogonal-robust",
+      "world_id": "H-SAME",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "world_id": "H-PLUS",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "X",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "world_id": "H-MINUS",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "Y",
+          "probability": 1
+        }
+      ]
+    },
+    {
+      "intervention_id": "C-infeasible-perfect",
+      "world_id": "H-SAME",
+      "model_id": "indicator-saturation",
+      "outcomes": [
+        {
+          "outcome_id": "Z",
+          "probability": 1
+        }
+      ]
+    }
+  ],
+  "split_manifest": {
+    "model_fit_units": [
+      "fit-animal-01",
+      "fit-animal-02"
+    ],
+    "challenge_units": [
+      "challenge-animal-77"
+    ],
+    "policy_lockbox_units": [
+      "lockbox-animal-91"
+    ],
+    "split_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "oracle_expectations": {
+    "baseline_expected_query_loss": 0.1,
+    "baseline_envelope_best_intervention_id": "A-cheap-nominal",
+    "expanded_envelope_best_intervention_id": "B-orthogonal-robust",
+    "baseline_envelope_robust_loss": {
+      "A-cheap-nominal": 0,
+      "B-orthogonal-robust": 0,
+      "C-infeasible-perfect": 0
+    },
+    "expanded_envelope_robust_loss": {
+      "A-cheap-nominal": 0.1,
+      "B-orthogonal-robust": 0,
+      "C-infeasible-perfect": 0
+    },
+    "status": "SYNTHETIC_CONTRACT_VALIDATED"
+  }
+}
