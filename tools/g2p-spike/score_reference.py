@@ -206,10 +206,9 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
 
     adjudicated = []
     reference_slots: dict[str, set[int]] = {}
+    all_reference_slots: dict[str, set[int]] = {}
     for row in reference_rows:
         status = row["reference_status"].strip()
-        if status == "pending" or not status:
-            continue
         case_id = row["case_id"].strip()
         try:
             word_index = int(row["word_index"])
@@ -217,6 +216,12 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
             raise ValueError(f"{case_id}: word_index must be a non-negative integer") from exc
         if not case_id or word_index < 0:
             raise ValueError("reference case IDs must be non-empty and word_index non-negative")
+        all_reference_slots.setdefault(case_id, set())
+        if word_index in all_reference_slots[case_id]:
+            raise ValueError(f"{case_id}: duplicate word_index {word_index}")
+        all_reference_slots[case_id].add(word_index)
+        if status == "pending" or not status:
+            continue
         if status == "reviewed" and not row["reviewer_evidence"].strip():
             raise ValueError(
                 f"{case_id} word {word_index}: reviewed row requires reviewer evidence"
@@ -244,17 +249,17 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
 
     if not adjudicated:
         raise ValueError("no adjudicated reference rows found; pending rows are not scored")
-    for case_id, indices in reference_slots.items():
+    for case_id, indices in all_reference_slots.items():
         expected = set(range(len(indices)))
         if indices != expected:
             raise ValueError(
-                f"{case_id}: adjudicated word indices must form a contiguous zero-based range"
+                f"{case_id}: reference word slots (including pending rows) must form a contiguous zero-based range"
             )
-    if set(candidate_rows) != set(reference_slots):
-        missing = sorted(set(reference_slots) - set(candidate_rows))
-        extra = sorted(set(candidate_rows) - set(reference_slots))
+    if set(candidate_rows) != set(all_reference_slots):
+        missing = sorted(set(all_reference_slots) - set(candidate_rows))
+        extra = sorted(set(candidate_rows) - set(all_reference_slots))
         raise ValueError(f"candidate/reference case mismatch; missing={missing}, extra={extra}")
-    for case_id, indices in reference_slots.items():
+    for case_id, indices in all_reference_slots.items():
         expected_word_count = len(indices)
         for system_name in ("piper", "muse"):
             actual_word_count = len(candidate_rows[case_id][system_name])
@@ -278,7 +283,7 @@ def evaluate(candidate_tsv: Path, reference_csv: Path) -> dict[str, Any]:
             "phone_unit": "Unicode code point after IPA token-boundary flattening",
             "stress_markers": "excluded from PER; score stress separately in a future annotation release",
             "multiple_reference_variants": "minimum edit distance among explicitly accepted variants",
-            "pending_rows": "excluded",
+            "pending_rows": "excluded from metrics but retained as positional placeholders so later lexical words cannot shift",
             "oov": "non-empty returned phone sequence on a reviewed OOV reference is reported as a non-empty-guess rate; this does not imply the G2P engine exposes an OOV classifier",
         },
     }
