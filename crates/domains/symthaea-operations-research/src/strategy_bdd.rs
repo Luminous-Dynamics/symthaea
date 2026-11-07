@@ -147,6 +147,10 @@ pub enum StrategyBddError {
     InteractionGraphSelfEdge {
         vertex: usize,
     },
+    InteractionGraphAsymmetricEdge {
+        vertex: usize,
+        neighbor: usize,
+    },
     StrategyVariableMismatch {
         original: usize,
         reduced: usize,
@@ -1064,9 +1068,9 @@ fn validate_interaction_graph(
                 return Err(StrategyBddError::InteractionGraphSelfEdge { vertex });
             }
             if !graph[neighbor].contains(&vertex) {
-                return Err(StrategyBddError::DependencyScopeMismatch {
-                    expected: (0..graph.len()).collect(),
-                    actual: vec![vertex, neighbor],
+                return Err(StrategyBddError::InteractionGraphAsymmetricEdge {
+                    vertex,
+                    neighbor,
                 });
             }
         }
@@ -2089,11 +2093,9 @@ mod tests {
                 for second in first + 1..3 {
                     let mut expected = false;
                     for context in 0..2 {
-                        let mut keys = [[false; 3]; 4];
-                        keys[0][3 - first - second] = false;
                         let mut base = [false; 3];
                         base[3 - first - second] = context != 0;
-                        let mut f00 = base;
+                        let f00 = base;
                         let mut f01 = base;
                         let mut f10 = base;
                         let mut f11 = base;
