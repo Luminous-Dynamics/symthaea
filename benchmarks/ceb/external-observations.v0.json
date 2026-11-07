@@ -354,6 +354,40 @@
       "supports": [
         "CEB-RESOLUTION"
       ]
+    },
+    {
+      "source_id": "sdr-ca-paper",
+      "source_url": "https://doi.org/10.1016/j.jss.2026.112931",
+      "title": "SDRCA: causal-graph software defect root-cause analysis",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "unival-paper",
+      "source_url": "https://arxiv.org/abs/2102.06292",
+      "title": "UniVal: predicate- and value-based causal fault localization",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "aacr-bench-paper",
+      "source_url": "https://arxiv.org/abs/2601.19494",
+      "title": "AACR-Bench: annotated AI code review benchmark with repository context",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW",
+        "CEB-REPO"
+      ]
     }
   ],
   "comparators": [
@@ -1073,6 +1107,93 @@
         "Claude Opus 5 xhigh reaches 67.7% Pass@1, the highest table result; Fable 5 high reports 65.3%; GPT-5.6 Sol max 61.2%.",
         "This is greenfield whole-repository generation from implementation-independent specifications, not maintenance of an existing repository or PR review.",
         "The authors perform static specification/test alignment and rollout-guided task auditing; 59.4% of a separate 138-task SWE-Bench Verified audit is not a result on E2E-SWE."
+      ]
+    },
+    {
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "ReviewBench",
+      "benchmark_version": "live high-severity grounded leaderboard; rechecked 2026-11-07 20:14 SAST",
+      "split": "High-severity grounded-F1 leaderboard; 20:14 SAST capture",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 219,
+        "unit": "pull_requests"
+      },
+      "source_id": "reviewbench-leaderboard",
+      "supporting_source_ids": [
+        "reviewbench-methodology"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Later same-day capture than the earlier OhMyBug observation; preserve both as separate dated leaderboard observations rather than replacing the earlier record.",
+        "Top row in this capture: intent-review-agent, run dated 2026-10-20, at 82.2 grounded F1 / 92.0 precision / 74.4 recall.",
+        "219 PRs / 187 repositories / 19 languages describe the benchmark dataset; the exact high-severity true-positive denominator is not separately exposed in the live row.",
+        "Grounded F1/precision/recall are not equivalent to CEB Recall@5 or blinded actionable precision.",
+        "Mutable live leaderboard; recapture filter, row, model run date and time before any matched comparison."
+      ]
+    },
+    {
+      "comparator_id": "sdr-ca-runtime-root-cause",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "SDRCA",
+      "benchmark_version": "Journal of Systems and Software, 2026, DOI 10.1016/j.jss.2026.112931",
+      "split": "Runtime root-cause analysis across PetShop, RE1 and RE3",
+      "sample_denominator": {
+        "status": "not_reported",
+        "value": null,
+        "unit": "benchmark_instances; exact task denominator not recorded here"
+      },
+      "source_id": "sdr-ca-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Runtime root-cause localization over monitored signals, not source-only pre-merge PR review.",
+        "Uses causal graphs, in-distribution counterfactual interventions and Shapley-style contribution allocation; contribution allocation alone is not causal identification.",
+        "Reports Recall@1/Recall@3 in its own runtime RCA setting; these are not CEB Recall@5 or ReviewBench grounded F1.",
+        "Task denominator, exact system configurations and uncertainty must be taken from the paper before any quantitative replication."
+      ]
+    },
+    {
+      "comparator_id": "unival-causal-fault-localization",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "UniVal",
+      "benchmark_version": "ICSE 2021 Distinguished Paper",
+      "split": "Defects4J real-fault program versions",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 835,
+        "unit": "program_versions"
+      },
+      "source_id": "unival-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Uses execution profiles combining predicate outcomes and variable values for causal statistical fault localization.",
+        "The published 835 program-version population is a fault-localization dataset denominator, not PR review tasks.",
+        "Execution-profile evidence is not equivalent to source-only counterfactual predictions or human-adjudicated review comments.",
+        "Do not compare its fault-localization rank directly with CEB defect Recall@5."
+      ]
+    },
+    {
+      "comparator_id": "aacr-bench-repository-context",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "AACR-Bench",
+      "benchmark_version": "2026 paper; public benchmark context snapshot accessed 2026-11-07",
+      "split": "200 PRs from 50 active projects across 10 languages",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 200,
+        "unit": "pull_requests"
+      },
+      "source_id": "aacr-bench-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Provides full repository context and expert-verified annotation; relevant to cross-file and multilingual review context.",
+        "The reported 285% increase is annotation defect-coverage expansion against a prior comparison baseline, not model performance improvement.",
+        "Does not directly establish P/I/F/N/M/IRR counterfactual diagnosis, causal topology correctness or residual-path detection.",
+        "Map its annotation and review metrics to CEB only after task-unit, denominator, judge and rubric harmonization."
       ]
     }
   ],
@@ -4401,6 +4522,111 @@
         }
       },
       "notes": []
+    },
+    {
+      "observation_id": "reviewbench-intent-agent-grounded-f1",
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard; capture 2026-11-07 20:14 SAST; intent-review-agent row (run dated 2026-10-20)",
+      "system": {
+        "system_id": "reviewbench-intent-review-agent",
+        "model": "not_reported_on_leaderboard",
+        "harness": "intent-review-agent submission",
+        "configuration": "High-severity grounded leaderboard; model run dated 2026-10-20; live row captured 2026-11-07 20:14 SAST"
+      },
+      "metric": {
+        "metric_id": "grounded_f1",
+        "label": "Grounded F1",
+        "definition": "Harmonic mean of grounded precision and grounded recall against the fixed human-reviewed gold set.",
+        "value": 82.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "82.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by leaderboard",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "grounded_f1",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
+        "High-severity only. Not a CEB result or a matched comparison."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-intent-agent-grounded-precision",
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard; capture 2026-11-07 20:14 SAST; intent-review-agent row (run dated 2026-10-20)",
+      "system": {
+        "system_id": "reviewbench-intent-review-agent",
+        "model": "not_reported_on_leaderboard",
+        "harness": "intent-review-agent submission",
+        "configuration": "High-severity grounded leaderboard; model run dated 2026-10-20; live row captured 2026-11-07 20:14 SAST"
+      },
+      "metric": {
+        "metric_id": "grounded_precision",
+        "label": "Grounded precision",
+        "definition": "Fraction of candidate findings matched to fixed-gold actionable findings under the ReviewBench matcher.",
+        "value": 92,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "92.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by leaderboard",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "grounded_precision",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
+        "High-severity only. Not a CEB result or a matched comparison."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-intent-agent-grounded-recall",
+      "comparator_id": "reviewbench-high-severity-recheck-2014",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard; capture 2026-11-07 20:14 SAST; intent-review-agent row (run dated 2026-10-20)",
+      "system": {
+        "system_id": "reviewbench-intent-review-agent",
+        "model": "not_reported_on_leaderboard",
+        "harness": "intent-review-agent submission",
+        "configuration": "High-severity grounded leaderboard; model run dated 2026-10-20; live row captured 2026-11-07 20:14 SAST"
+      },
+      "metric": {
+        "metric_id": "grounded_recall",
+        "label": "Grounded recall",
+        "definition": "Fraction of fixed-gold true-positive findings identified by the candidate.",
+        "value": 74.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "74.4%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported by leaderboard",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported",
+          "applies_to_metric_id": "grounded_recall",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Later live-board capture; retain earlier OhMyBug observation as a separate same-day snapshot.",
+        "High-severity only. Not a CEB result or a matched comparison."
+      ]
     }
   ]
 }
