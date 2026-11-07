@@ -1128,6 +1128,87 @@ pub fn evaluate_scorecard(
         &["schema", "suite_id", "submissions"],
         "submission",
     )?;
+
+    let oracle_tasks = oracle_value
+        .get("tasks")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ScorecardError::new(
+                ScorecardErrorKind::InvalidOracle,
+                "oracle.tasks must be an array",
+            )
+        })?;
+    for (index, task) in oracle_tasks.iter().enumerate() {
+        let context = format!("oracle.tasks[{index}]");
+        require_keys(
+            task,
+            &[
+                "task_id",
+                "artifact_sha256",
+                "expected_scope",
+                "expected_answer",
+                "fault_family",
+                "pair",
+                "occurrence",
+            ],
+            &context,
+        )?;
+        require_keys(
+            task.get("expected_scope").unwrap_or(&Value::Null),
+            &[
+                "subject_sha256",
+                "operation",
+                "platform",
+                "platform_version",
+                "environment_id",
+            ],
+            &format!("{context}.expected_scope"),
+        )?;
+        if task.get("pair").is_some_and(|value| !value.is_null()) {
+            require_keys(
+                &task["pair"],
+                &["pair_id", "kind", "role"],
+                &format!("{context}.pair"),
+            )?;
+        }
+        if task.get("occurrence").is_some_and(|value| !value.is_null()) {
+            require_keys(
+                &task["occurrence"],
+                &[
+                    "index_json_pointer",
+                    "occurrence_index",
+                    "raw_name_sha256_json_pointer",
+                    "raw_name_sha256",
+                ],
+                &format!("{context}.occurrence"),
+            )?;
+        }
+    }
+
+    let agent_submissions = submission_value
+        .get("submissions")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            ScorecardError::new(
+                ScorecardErrorKind::InvalidSubmission,
+                "submission.submissions must be an array",
+            )
+        })?;
+    for (index, item) in agent_submissions.iter().enumerate() {
+        require_keys(
+            item,
+            &[
+                "task_id",
+                "abstained",
+                "answer",
+                "claim_json",
+                "result_json",
+                "evidence_json",
+            ],
+            &format!("submission.submissions[{index}]"),
+        )?;
+    }
+
     let oracle: OracleManifest = serde_json::from_value(oracle_value).map_err(|error| {
         ScorecardError::new(
             ScorecardErrorKind::InvalidOracle,
