@@ -34,6 +34,7 @@ pub enum FloquetError {
     InitialBasisOutOfRange { basis: usize, dimension: usize },
     InvalidEdge { edge_index: usize, first: usize, second: usize, n_spins: usize },
     DuplicateEdge { first: usize, second: usize },
+    InvalidTrotterSlices { slices: usize, maximum: usize },
 }
 
 impl fmt::Display for FloquetError {
@@ -60,6 +61,9 @@ impl fmt::Display for FloquetError {
             }
             Self::DuplicateEdge { first, second } => {
                 write!(f, "duplicate Ising edge ({first}, {second})")
+            }
+            Self::InvalidTrotterSlices { slices, maximum } => {
+                write!(f, "Trotter slice count must be in 1..={maximum}, got {slices}")
             }
         }
     }
