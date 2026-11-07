@@ -617,3 +617,16 @@ This extends standard PGM numerical benchmarks into evidence-qualified decision 
   - https://blog.mc-stan.org/2026/
 
 These are not replacements for finite exact variable elimination. Their role is to challenge continuous-parameter and hierarchical uncertainty workflows where Markov-chain or variational inference is appropriate. Our exact finite rational engine can serve as a tiny discrete latent-variable oracle; for a fair comparison, integrate over the same discrete states and hold continuous parameters/data fixed or compare posterior summaries after matched marginalization.
+
+
+### One-pass expectation-semiring posterior route — 2026-11-07
+
+The rational posterior module now includes `posterior_marginals_expectation_semiring`. It lifts each coefficient from a scalar mass to `(mass, weighted_features)`, with multiplication:
+
+`(p,u) × (q,v) = (p q, u q + v p)`
+
+Unary marker factors attach one feature per variable state. A single VE pass returns the partition function plus every unnormalized state mass. The existing repeated-conditioning `posterior_marginals` remains the simpler reference implementation.
+
+This uses established expectation-semiring / dual-number machinery rather than claiming a new algebra: Li & Eisner (2009) describe first-/second-order expectation semirings and one inside pass for expectations/gradients; see https://aclanthology.org/D09-1005/ and https://www.cs.jhu.edu/~jason/papers/eisner.fsmnlp01.pdf.
+
+Qualification must compare both routes on the same frozen graphs. The one-pass route has a moment vector whose width is the sum of variable cardinalities, so its memory and scalar arithmetic may exceed repeated conditioning for broad queries. Report moment dimension, peak table payload, rational bit-height, semiring operation counts and measured time. It is an algorithmic alternative, not presumed faster.
