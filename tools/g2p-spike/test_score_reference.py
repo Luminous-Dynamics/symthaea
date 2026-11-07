@@ -28,7 +28,7 @@ class G2PReferenceScorerTests(unittest.TestCase):
         )
 
     def test_edit_distance_counts_phone_edits(self):
-        self.assertEqual(edit_distance(list("quick"), list("kwik")), 2)
+        self.assertEqual(edit_distance(list("quick"), list("kwik")), 3)
         self.assertEqual(edit_distance(list("read"), list("read")), 0)
 
     def test_scoring_requires_adjudication_and_flags_guessed_oov(self):
