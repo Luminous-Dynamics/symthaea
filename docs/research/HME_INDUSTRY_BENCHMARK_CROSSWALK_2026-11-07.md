@@ -32,11 +32,11 @@ A score in one layer must not be presented as a result in another. For example, 
 
 ### Storage benchmark guidance
 
-MLPerf Storage v3.0 added a vector-database workload in 2026. It is a useful external on-disk retrieval and I/O-pattern comparator, but HME should not claim MLPerf compliance unless it runs the exact suite and configuration. Treat its results as workload-specific, not as a single universal storage ranking.
+MLPerf Storage v3.0 added a vector-database workload in 2026. Its published CLOSED configuration uses 10 million 1,536-dimensional float32 vectors (about 61 GB raw) in Milvus with DiskANN, measures sustained top-10 queries, reports QPS and p99 latency, and checks recall against exact brute-force ground truth. It is a useful on-disk ANN / random-read storage comparator, but its embedding dimension and ANN semantics are not the same as Symthaea's 16K–256K HDC profiles. HME should use its measurement discipline and only claim MLPerf compliance if it runs the exact suite and configuration. Treat results as workload-specific, not as a universal storage ranking.
 
 For vector search, report the recall–throughput–latency–index-size frontier. ANN-Benchmarks is useful for recall versus QPS and index/build overhead; MLPerf Storage is useful for storage-path behavior. Neither replaces HME's canonical exact HDC oracle.
 
-The existing symthaea-hdc-store is a critical incumbent: it already owns mmap-backed packed BinaryHV entries, journaled batch updates, checksummed headers, recovery/failpoints, exact and LSH scans, snapshots, compaction and portable restore. HME should extend this capability boundary rather than clone it. #7922 and #7934 own the missing layout and workload evidence.
+The existing symthaea-hdc-store is a critical incumbent: its format-v2 is a fixed 16,384-bit BinaryHV mmap store with redundant checksummed headers, strict HdcStoreReader, deterministic exact full-store scan, optional LSH scan with examined/total/exact/fallback diagnostics, journaled batch updates, recovery/failpoints, snapshots, compaction and portable restore. HME should delegate this representation family to that store rather than clone it. Its schema is not a generic 2K–256K ContinuousHV store; a distinct ContinuousHV segment profile remains a possible HME extension after the exact semantics are established. #7922 and #7934 own the existing store's missing layout and workload evidence.
 
 ### Agent-memory benchmark guidance
 
