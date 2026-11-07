@@ -1,0 +1,283 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "analytical_memory_footprint_matrix",
+  "status": "synthetic_arithmetic_only",
+  "source_commit": "e327835a6d8ac815135c92dd582785fbe2928833",
+  "source_contracts": [
+    "HdcLtcUnifiedNeuron stores eight ContinuousHV-sized arrays",
+    "HdcLtcBridge default input_dim and output_dim are 256",
+    "ContinuousHV stores f32 values",
+    "BinaryHV logical packed size is dimension divided by eight"
+  ],
+  "assumptions": {
+    "bytes_per_f32": 4,
+    "bytes_per_binary_dimension": 0.125,
+    "unified_neuron_continuous_vector_array_count": 8,
+    "bridge_default_input_dim": 256,
+    "bridge_default_output_dim": 256,
+    "metadata_allocator_alignment_snapshots_temporary_buffers_and_indexes_included": false
+  },
+  "semantic_vs_evolution_width_matrix": [
+    {
+      "semantic_dimension": 16384,
+      "evolution_dimension": 1024,
+      "semantic_continuous_f32_bytes": 65536,
+      "semantic_binary_bytes": 2048,
+      "unified_neuron_eight_vector_state_bytes": 32768,
+      "bridge_projection_pair_default_256x256_bytes": 2097152,
+      "semantic_to_evolution_state_bytes_ratio": 2
+    },
+    {
+      "semantic_dimension": 16384,
+      "evolution_dimension": 4096,
+      "semantic_continuous_f32_bytes": 65536,
+      "semantic_binary_bytes": 2048,
+      "unified_neuron_eight_vector_state_bytes": 131072,
+      "bridge_projection_pair_default_256x256_bytes": 8388608,
+      "semantic_to_evolution_state_bytes_ratio": 0.5
+    },
+    {
+      "semantic_dimension": 16384,
+      "evolution_dimension": 16384,
+      "semantic_continuous_f32_bytes": 65536,
+      "semantic_binary_bytes": 2048,
+      "unified_neuron_eight_vector_state_bytes": 524288,
+      "bridge_projection_pair_default_256x256_bytes": 33554432,
+      "semantic_to_evolution_state_bytes_ratio": 0.125
+    },
+    {
+      "semantic_dimension": 16384,
+      "evolution_dimension": 32768,
+      "semantic_continuous_f32_bytes": 65536,
+      "semantic_binary_bytes": 2048,
+      "unified_neuron_eight_vector_state_bytes": 1048576,
+      "bridge_projection_pair_default_256x256_bytes": 67108864,
+      "semantic_to_evolution_state_bytes_ratio": 0.0625
+    },
+    {
+      "semantic_dimension": 32768,
+      "evolution_dimension": 1024,
+      "semantic_continuous_f32_bytes": 131072,
+      "semantic_binary_bytes": 4096,
+      "unified_neuron_eight_vector_state_bytes": 32768,
+      "bridge_projection_pair_default_256x256_bytes": 2097152,
+      "semantic_to_evolution_state_bytes_ratio": 4
+    },
+    {
+      "semantic_dimension": 32768,
+      "evolution_dimension": 4096,
+      "semantic_continuous_f32_bytes": 131072,
+      "semantic_binary_bytes": 4096,
+      "unified_neuron_eight_vector_state_bytes": 131072,
+      "bridge_projection_pair_default_256x256_bytes": 8388608,
+      "semantic_to_evolution_state_bytes_ratio": 1
+    },
+    {
+      "semantic_dimension": 32768,
+      "evolution_dimension": 16384,
+      "semantic_continuous_f32_bytes": 131072,
+      "semantic_binary_bytes": 4096,
+      "unified_neuron_eight_vector_state_bytes": 524288,
+      "bridge_projection_pair_default_256x256_bytes": 33554432,
+      "semantic_to_evolution_state_bytes_ratio": 0.25
+    },
+    {
+      "semantic_dimension": 32768,
+      "evolution_dimension": 32768,
+      "semantic_continuous_f32_bytes": 131072,
+      "semantic_binary_bytes": 4096,
+      "unified_neuron_eight_vector_state_bytes": 1048576,
+      "bridge_projection_pair_default_256x256_bytes": 67108864,
+      "semantic_to_evolution_state_bytes_ratio": 0.125
+    },
+    {
+      "semantic_dimension": 65536,
+      "evolution_dimension": 1024,
+      "semantic_continuous_f32_bytes": 262144,
+      "semantic_binary_bytes": 8192,
+      "unified_neuron_eight_vector_state_bytes": 32768,
+      "bridge_projection_pair_default_256x256_bytes": 2097152,
+      "semantic_to_evolution_state_bytes_ratio": 8
+    },
+    {
+      "semantic_dimension": 65536,
+      "evolution_dimension": 4096,
+      "semantic_continuous_f32_bytes": 262144,
+      "semantic_binary_bytes": 8192,
+      "unified_neuron_eight_vector_state_bytes": 131072,
+      "bridge_projection_pair_default_256x256_bytes": 8388608,
+      "semantic_to_evolution_state_bytes_ratio": 2
+    },
+    {
+      "semantic_dimension": 65536,
+      "evolution_dimension": 16384,
+      "semantic_continuous_f32_bytes": 262144,
+      "semantic_binary_bytes": 8192,
+      "unified_neuron_eight_vector_state_bytes": 524288,
+      "bridge_projection_pair_default_256x256_bytes": 33554432,
+      "semantic_to_evolution_state_bytes_ratio": 0.5
+    },
+    {
+      "semantic_dimension": 65536,
+      "evolution_dimension": 32768,
+      "semantic_continuous_f32_bytes": 262144,
+      "semantic_binary_bytes": 8192,
+      "unified_neuron_eight_vector_state_bytes": 1048576,
+      "bridge_projection_pair_default_256x256_bytes": 67108864,
+      "semantic_to_evolution_state_bytes_ratio": 0.25
+    },
+    {
+      "semantic_dimension": 131072,
+      "evolution_dimension": 1024,
+      "semantic_continuous_f32_bytes": 524288,
+      "semantic_binary_bytes": 16384,
+      "unified_neuron_eight_vector_state_bytes": 32768,
+      "bridge_projection_pair_default_256x256_bytes": 2097152,
+      "semantic_to_evolution_state_bytes_ratio": 16
+    },
+    {
+      "semantic_dimension": 131072,
+      "evolution_dimension": 4096,
+      "semantic_continuous_f32_bytes": 524288,
+      "semantic_binary_bytes": 16384,
+      "unified_neuron_eight_vector_state_bytes": 131072,
+      "bridge_projection_pair_default_256x256_bytes": 8388608,
+      "semantic_to_evolution_state_bytes_ratio": 4
+    },
+    {
+      "semantic_dimension": 131072,
+      "evolution_dimension": 16384,
+      "semantic_continuous_f32_bytes": 524288,
+      "semantic_binary_bytes": 16384,
+      "unified_neuron_eight_vector_state_bytes": 524288,
+      "bridge_projection_pair_default_256x256_bytes": 33554432,
+      "semantic_to_evolution_state_bytes_ratio": 1
+    },
+    {
+      "semantic_dimension": 131072,
+      "evolution_dimension": 32768,
+      "semantic_continuous_f32_bytes": 524288,
+      "semantic_binary_bytes": 16384,
+      "unified_neuron_eight_vector_state_bytes": 1048576,
+      "bridge_projection_pair_default_256x256_bytes": 67108864,
+      "semantic_to_evolution_state_bytes_ratio": 0.5
+    },
+    {
+      "semantic_dimension": 262144,
+      "evolution_dimension": 1024,
+      "semantic_continuous_f32_bytes": 1048576,
+      "semantic_binary_bytes": 32768,
+      "unified_neuron_eight_vector_state_bytes": 32768,
+      "bridge_projection_pair_default_256x256_bytes": 2097152,
+      "semantic_to_evolution_state_bytes_ratio": 32
+    },
+    {
+      "semantic_dimension": 262144,
+      "evolution_dimension": 4096,
+      "semantic_continuous_f32_bytes": 1048576,
+      "semantic_binary_bytes": 32768,
+      "unified_neuron_eight_vector_state_bytes": 131072,
+      "bridge_projection_pair_default_256x256_bytes": 8388608,
+      "semantic_to_evolution_state_bytes_ratio": 8
+    },
+    {
+      "semantic_dimension": 262144,
+      "evolution_dimension": 16384,
+      "semantic_continuous_f32_bytes": 1048576,
+      "semantic_binary_bytes": 32768,
+      "unified_neuron_eight_vector_state_bytes": 524288,
+      "bridge_projection_pair_default_256x256_bytes": 33554432,
+      "semantic_to_evolution_state_bytes_ratio": 2
+    },
+    {
+      "semantic_dimension": 262144,
+      "evolution_dimension": 32768,
+      "semantic_continuous_f32_bytes": 1048576,
+      "semantic_binary_bytes": 32768,
+      "unified_neuron_eight_vector_state_bytes": 1048576,
+      "bridge_projection_pair_default_256x256_bytes": 67108864,
+      "semantic_to_evolution_state_bytes_ratio": 1
+    }
+  ],
+  "corpus_payload_scale_matrix": [
+    {
+      "items": 64,
+      "bytes_at_16k_continuous_f32": 4194304,
+      "bytes_at_64k_continuous_f32": 16777216,
+      "bytes_at_256k_continuous_f32": 67108864,
+      "bytes_at_16k_binary": 131072,
+      "bytes_at_64k_binary": 524288,
+      "bytes_at_256k_binary": 2097152
+    },
+    {
+      "items": 256,
+      "bytes_at_16k_continuous_f32": 16777216,
+      "bytes_at_64k_continuous_f32": 67108864,
+      "bytes_at_256k_continuous_f32": 268435456,
+      "bytes_at_16k_binary": 524288,
+      "bytes_at_64k_binary": 2097152,
+      "bytes_at_256k_binary": 8388608
+    },
+    {
+      "items": 1024,
+      "bytes_at_16k_continuous_f32": 67108864,
+      "bytes_at_64k_continuous_f32": 268435456,
+      "bytes_at_256k_continuous_f32": 1073741824,
+      "bytes_at_16k_binary": 2097152,
+      "bytes_at_64k_binary": 8388608,
+      "bytes_at_256k_binary": 33554432
+    },
+    {
+      "items": 4096,
+      "bytes_at_16k_continuous_f32": 268435456,
+      "bytes_at_64k_continuous_f32": 1073741824,
+      "bytes_at_256k_continuous_f32": 4294967296,
+      "bytes_at_16k_binary": 8388608,
+      "bytes_at_64k_binary": 33554432,
+      "bytes_at_256k_binary": 134217728
+    },
+    {
+      "items": 16384,
+      "bytes_at_16k_continuous_f32": 1073741824,
+      "bytes_at_64k_continuous_f32": 4294967296,
+      "bytes_at_256k_continuous_f32": 17179869184,
+      "bytes_at_16k_binary": 33554432,
+      "bytes_at_64k_binary": 134217728,
+      "bytes_at_256k_binary": 536870912
+    },
+    {
+      "items": 65536,
+      "bytes_at_16k_continuous_f32": 4294967296,
+      "bytes_at_64k_continuous_f32": 17179869184,
+      "bytes_at_256k_continuous_f32": 68719476736,
+      "bytes_at_16k_binary": 134217728,
+      "bytes_at_64k_binary": 536870912,
+      "bytes_at_256k_binary": 2147483648
+    },
+    {
+      "items": 262144,
+      "bytes_at_16k_continuous_f32": 17179869184,
+      "bytes_at_64k_continuous_f32": 68719476736,
+      "bytes_at_256k_continuous_f32": 274877906944,
+      "bytes_at_16k_binary": 536870912,
+      "bytes_at_64k_binary": 2147483648,
+      "bytes_at_256k_binary": 8589934592
+    },
+    {
+      "items": 1048576,
+      "bytes_at_16k_continuous_f32": 68719476736,
+      "bytes_at_64k_continuous_f32": 274877906944,
+      "bytes_at_256k_continuous_f32": 1099511627776,
+      "bytes_at_16k_binary": 2147483648,
+      "bytes_at_64k_binary": 8589934592,
+      "bytes_at_256k_binary": 34359738368
+    }
+  ],
+  "nonclaims": [
+    "Not measured RSS, cache traffic, memory bandwidth, latency, energy, allocator overhead, or device use",
+    "Does not include model-specific projections except the explicitly named default bridge projection pair",
+    "Does not imply semantic quality or trajectory fidelity at any dimension",
+    "Does not claim binary and continuous representations have equivalent algebra or retrieval quality",
+    "Does not select an HME storage backend"
+  ]
+}
