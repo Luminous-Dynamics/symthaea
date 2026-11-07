@@ -224,8 +224,23 @@
         "real_message_count": 5170000,
         "satellite_count": 66,
         "collection_days": 32,
+        "estimated_iq_archive_bytes": 744000000000,
+        "capture_chain": {
+          "antenna": "RST740 active antenna",
+          "digitizer": "USRP B210",
+          "centre_frequency_hz": 1621000000,
+          "sample_rate_complex_hz": 16000000,
+          "bandwidth_hz": 8000000,
+          "receiver_gain_db": 60
+        },
         "spoofing_signal_collection": "SDR-generated signals collected in indoor and outdoor settings",
-        "note": "Paper abstract description; exact file inventory and source-level terms require independent inspection."
+        "limitations": [
+          "One primary receiver pipeline and one primary spoofing SDR device.",
+          "One principal rooftop collection site.",
+          "32-day campaign does not establish seasonal drift or cross-hardware generalization.",
+          "The cited paper is a preprint; independent reproduction has not been performed."
+        ],
+        "note": "Paper description; exact file inventory, source terms, and redistribution/training rights require separate review."
       },
       "reported_tasks": [
         "temporal_robustness",
@@ -240,13 +255,15 @@
         "Reported metrics are paper results, not independent reproduction.",
         "Unknown-signal rejection does not establish reliable identity assignment.",
         "Satellite RF fingerprinting is not GNSS PNT integrity.",
-        "No physical emitter location, hostile intent, or operational actor attribution is inferred."
+        "No physical emitter location, hostile intent, or operational actor attribution is inferred.",
+        "The single primary receiver pipeline and single spoofing SDR limit claims of hardware generalization."
       ],
       "rights_state": "PENDING_REVIEW",
       "payload_state": "NOT_IMPORTED",
       "intended_use": "research",
       "license_review_required": true,
-      "reproduction_state": "NOT_REPRODUCED"
+      "reproduction_state": "NOT_REPRODUCED",
+      "dataset_uri": "https://zenodo.org/records/21292280"
     }
   ],
   "required_output_states": [
