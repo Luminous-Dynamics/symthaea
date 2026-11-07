@@ -641,3 +641,12 @@ A concrete fast-transform hypothesis for HdcLtcBridge is:
 - Output reduction D→256: independently seeded sign/permutation + FWHT, then select 256 coordinates (or compare a Hadamard-submatrix readout). A structured fixed base can be paired with the exact rank-one trainable adapter tracked in #10981.
 
 The FWHT arithmetic model is O(D log D), compared with the dense O(256D) projection. The transform is not assumed equivalent to the existing random dense map, and static regression improvement does not imply HDC-LTC trajectory fidelity. Include random/structured/adversarial inputs, irregular dt, sequence prediction, online learning, and high→low→high transitions. The transform seed, sign/permutation generation, normalization, selected coordinate indices and implementation version are part of the representation/checkpoint identity.
+
+
+## 23. Quantized sketch versus certified residual bound
+
+A new approximate-compression comparator is Korakitis and Nakos, “Fast Quantized Johnson–Lindenstrauss Transforms,” arXiv:2610.16289 (2026-10-12). D-FQJL and P-FQJL combine randomized Hadamard sketches with one-bit quantization (Gaussian dithering or permutation-based covariance regularization) to estimate inner products in O(D log D) time under their stated probabilistic guarantees.
+
+Use these as approximate fast-tier profiles within #10978, not as exact pruning certificates. An unbiased estimator or high-probability error interval is not a worst-case bound on each stored candidate. It may order candidates, trigger exact refinement or support a separately labelled statistical early-stop policy with a nonzero error budget; it cannot emit ExactComplete or justify a zero-false-prune claim without an independently verified conservative bound.
+
+Compare FQJL D/P profiles against raw payloads and global/blockwise residual certificates at equal total memory and task quality. Report statistical confidence, empirical recall and mathematical certificates separately; never fuse them into one generic "confidence" field.
