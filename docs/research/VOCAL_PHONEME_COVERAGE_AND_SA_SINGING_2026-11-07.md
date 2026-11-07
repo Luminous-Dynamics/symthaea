@@ -40,6 +40,24 @@ This makes it a good *engineering candidate* for a reproducible spike, not yet a
 
 An isolated probe has been added under `tools/g2p-spike/`, with fixed cases for common words, clusters, irregular -ough spellings, heteronyms, silent letters, contractions, multi-syllabic words, punctuation and OOV candidates. The dedicated workflow `.github/workflows/g2p-research-spike.yml` compiles/tests the exact pinned crate version and uploads a TSV of candidate IPA/prosody outputs bound to the exact source revision. This spike does not alter the production G2P path.
 
+
+### First exact-head spike observations
+
+The G2P workflow completed successfully on source revision `dea2b8fd14dc10c029d34106b586ac56dff25e09`. Its artifact (`piper-plus-g2p-spike-...`) was downloaded and inspected. These are raw outputs, not a human-verified accuracy score.
+
+Observed examples:
+- **"quick queen strength sixth":** the current Muse fallback emits `ʌ ɪ k` for "quick" and `k ʌ ɛ n` for "queen", because the grapheme fallback drops unsupported `q` and treats `u` as a vowel. Piper Plus emits `k w ɪ k` and `k w iː n`, which are plausible English pronunciations.
+- **"though through rough tough cough bough":** Muse's fallback repeats a largely spelling-driven sequence across these irregular words. Piper Plus produces distinct candidates (`ð oʊ`, `θ ɹ uː`, `ɹ ʌ f`, `t ʌ f`, `k ɑ f`, `b aʊ`). These look more useful but still require accent-specific review.
+- **"colonel":** Muse emits a spelling-like sequence (`k ɒ l ɒ n ɛ l`); Piper Plus emits a candidate closer to the common US pronunciation (`k ɜː n ə l`).
+- **Contextual heteronym "read":** in "I read the book yesterday and I will read it tomorrow", Piper Plus emits the same `r ɛ d`-like sequence for both occurrences. The current Muse output also fails to distinguish them. This proves that simply swapping in a CMUdict-derived G2P is not enough for contextual pronunciation.
+- **OOV behavior:** for nonsense input such as "xqzpl flurble", Piper Plus returns a long spelling-derived phone sequence instead of an explicit unknown/OOV status. A non-empty output is not evidence that the word was understood.
+- **Prosody output:** Piper Plus emits stress markers as separate IPA tokens (for example `ˈ` and `ˌ`) and long-vowel markers separately in some cases. Any adapter needs a normalized, versioned token contract and tests for tie/bar/length/stress markers; do not feed raw debug tokens to a singing voicebank.
+
+No corpus-level PER/WER was calculated: a manually reviewed reference lexicon and normalization policy do not yet exist. The artifact does, however, confirm that the current Muse letter fallback has concrete failure modes and that Piper Plus has its own contextual/OOV limitations.
+
+**Decision:** retain Piper Plus as a comparative candidate, not a production phonemizer. The higher-value architecture is a pronunciation lattice: multiple candidates from a lexicon and one or more G2P frontends, context-sensitive variant selection, calibrated confidence/OOV detection, user/community corrections, and a frozen selected pronunciation plan consumed unchanged by score alignment and renderers. This turns uncertainty into an explicit system state rather than a silent substitution.
+
+
 ### Candidate B — CMU Pronouncing Dictionary
 
 CMUdict is an established US-English pronunciation lexicon. Its upstream project states commercial and research use are unrestricted, requests attribution, and warns that errors, omissions and inconsistencies remain. It is useful as a supplemental lexicon/reference candidate, but must preserve variant pronunciations and regional limitations rather than treat one entry as universal truth.
