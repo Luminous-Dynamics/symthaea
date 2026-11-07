@@ -64,3 +64,25 @@ Direct baseline uses the output-row or output-column mask for those topologies, 
 ## Limitations
 
 This is a simplified real-valued binary-mask model, not the author's method. It has no conductance levels, differential pairs, compensation circuits, stuck-on faults, measured correlation, read/write noise, drift, temperature, ADC/DAC, calibration, physical cells, energy, area or yield. Seed counts are small and exploratory. It does not support a SOTA or hardware robustness claim.
+
+
+## Reliability sizing — expected value is not availability
+
+For the shared latent-channel model, if each installed channel independently survives with probability 0.61, then the probability of retaining at least 32 active channels is:
+
+```
+P(X >= 32),  X ~ Binomial(n, 0.61)
+```
+
+The exact binomial-tail calculation gives:
+
+| Required availability | Minimum installed channels | P(X ≥ 32) at this n | P(X ≥ 32) at n−1 | Raw parameter ratio 2n/32 |
+|---:|---:|---:|---:|---:|
+| 95% | 63 | 96.2047% | 94.8822% | 3.9375× |
+| 99% | 68 | 99.2878% | 98.9821% | 4.2500× |
+| 99.9% | 74 | 99.9322% | 99.8973% | 4.6250× |
+| 99.99% | 79 | 99.9925% | 99.9882% | 4.9375× |
+
+At n=53, the expected active count is 32.33, but the chance of having at least 32 active channels is only 59.61%. Therefore 53 is an expectation-only estimate and must not be used as a reliability design.
+
+These calculations assume independent identical Bernoulli failures. Spatially correlated/clustered defects, common-mode failures, nonuniform channel quality, repair/remapping and non-binomial aging violate that assumption. A physical design needs empirical fault distributions, confidence intervals and an explicit outage/availability target. Parameter ratios exclude all differential pairs, conductance, compensation, peripheral, routing, calibration and controller overhead.
