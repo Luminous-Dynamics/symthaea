@@ -244,3 +244,50 @@ Measure candidate coverage, pairwise ranking flips, pruning-action flips and fin
 This protocol does not claim that HME implements PQR-Search, has a per-query probability theorem, beats PQR-Search, achieves exact retrieval faster than PQR, or has passed a runtime benchmark. It does not claim a statistical audit proves a universal guarantee. It does not treat a checksum, a synthetic fixture, a quantization error average or a frozen-trace result as proof of end-to-end retrieval correctness.
 
 The immediate deliverable is a reproducible evaluation contract and a falsifiable set of hypotheses. A later implementation must be reviewed against the theorem, the exact oracle, the dynamic update protocol and the independent audit harness.
+
+
+## 10. Approximate indexes as schedulers, not authorities
+
+A useful composition of #10945 and #11000 is a two-level exact branch-and-bound scheduler.
+
+### Candidate-level scheduling
+
+Use an ANN/PQR/LSH/quantized index to propose a promising candidate evaluation order. Strong candidates are exact-scored early, which can raise the exact kth threshold. That stronger threshold may allow admissible bounds to prune more remaining payloads.
+
+The approximate index is only a scheduler in this mode:
+- its candidate list cannot define the eligible candidate set;
+- omitted candidates must still be visited or covered by an independent admissible corpus-level bound;
+- stale candidates still pass metadata-first eligibility;
+- candidate order may affect work, never the final answer;
+- every eligible ID is reconciled as exact-scored, safely pruned, or unprocessed.
+
+A PQR guarantee is not required for correctness when its output is used only to order an exact query. A poor order can cost time, but cannot cost recall if all candidates are still covered by the exact accounting and conservative bounds.
+
+### Within-candidate block scheduling
+
+For a candidate partitioned into blocks, define r_b = ||q_b|| ||x_b|| and s_b = q_b · x_b. In real arithmetic:
+
+U(E) = Σ_(b in E) s_b + Σ_(b not in E) r_b
+
+is an upper bound on the complete dot product. Examining block b tightens it by:
+
+Δ_b = r_b - s_b >= 0.
+
+A compact sketch may predict s_b before the payload block is read. Test predicted slack per byte:
+
+priority_b = (r_b - predicted_s_b) / payload_cost_b.
+
+The predictor influences order only. The exact block score and conservative interval bound decide whether pruning is permitted.
+
+### Combined experiment
+
+Compare:
+1. fixed candidate order + fixed block order;
+2. ANN/PQR candidate order + fixed block order;
+3. fixed candidate order + predicted-slack block order;
+4. ANN/PQR candidate order + predicted-slack block order;
+5. exact-slack hindsight candidate/block ordering as a diagnostic ceiling only.
+
+Keep index construction and memory overhead in the total-cost comparison. Report how quickly the exact kth threshold rises, bound-tightening per byte, payload bytes read, exact candidates completed, safe prunes, p50/p95/p99 and exact top-k agreement. The full exact baseline must include any extra sketch/metadata work.
+
+This is a particularly promising HME proposition: **approximate intelligence can decide where to look first; independently verified mathematics decides what may be ignored.** It combines industry ANN scheduling with deterministic HDC exactness without claiming that the ANN itself became exact.
