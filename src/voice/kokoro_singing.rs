@@ -191,7 +191,11 @@ fn trim_outer_silence(samples: &[f32], sample_rate: u32) -> &[f32] {
 }
 
 fn render_syllable(source: &[f32], syllable: &VocalSyllable, sample_rate: u32) -> Vec<f32> {
-    let target_duration = (syllable.end_time_s() - syllable.note.start_time).max(0.06);
+    // render() places the stem at note.start_time - consonant_advance_s.
+    // Include that same pre-onset interval in its length so the rendered stem
+    // still reaches the final note/melisma boundary instead of ending early.
+    let onset_start_s = (syllable.note.start_time - syllable.consonant_advance_s).max(0.0);
+    let target_duration = (syllable.end_time_s() - onset_start_s).max(0.06);
     let target_len = (target_duration * sample_rate as f32) as usize;
     if source.is_empty() {
         return vec![0.0; target_len];
@@ -691,6 +695,29 @@ mod tests {
             rms(&output[3_400..4_700]) > 1e-3,
             "melisma note should contain audio"
         );
+    }
+
+    #[test]
+    fn syllable_render_duration_includes_consonant_anticipation() {
+        let sample_rate = 8_000u32;
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.5,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let mut performance =
+            VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        performance.syllables[0].consonant_advance_s = 0.1;
+        let syllable = &performance.syllables[0];
+        let source: Vec<f32> = (0..9_600)
+            .map(|index| {
+                (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin()
+            })
+            .collect();
+        let rendered = render_syllable(source.as_slice(), syllable, sample_rate);
+        // The output starts at 0.4s and still terminates at the 1.0s note end.
+        assert_eq!(rendered.len(), 4_800);
     }
 
     #[test]
