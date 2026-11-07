@@ -8,6 +8,7 @@ on:
       - "docs/neuroscience/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY.schema.json"
       - "docs/neuroscience/examples/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_*.example.json"
       - "tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py"
+      - "tools/connectomics-intake-audit/src/bin/connectome_adaptive_intervention_policy_audit.rs"
       - ".github/workflows/connectome-adaptive-intervention-policy.yml"
   push:
     branches: [main, "research/**"]
@@ -54,6 +55,21 @@ jobs:
         run: |
           python3 -m py_compile tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py --self-test
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Check Rust formatting
+        run: rustfmt --edition 2024 --check tools/connectomics-intake-audit/src/bin/connectome_adaptive_intervention_policy_audit.rs
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_intervention_policy_audit -- -D warnings
+      - name: Run Rust adaptive policy tests
+        run: cargo test --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_intervention_policy_audit
+      - name: Produce Rust reports and independently replay each exact output
+        run: |
+          for fixture in docs/neuroscience/examples/CONNECTOME_ADAPTIVE_INTERVENTION_POLICY_*.example.json; do
+            report="$RUNNER_TEMP/$(basename "$fixture" .example.json).rust-report.json"
+            cargo run --manifest-path tools/connectomics-intake-audit/Cargo.toml --bin connectome_adaptive_intervention_policy_audit -- --input "$fixture" --output "$report"
+            python3 tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py --fixture "$fixture" --verify-report "$report"
+          done
       - name: Emit exact reports for all known-answer fixtures
         run: |
           python3 tools/connectomics-intake-audit/reference/verify_adaptive_intervention_policy_oracle.py --output-dir "$RUNNER_TEMP/adaptive-intervention-policy"

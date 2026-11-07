@@ -275,7 +275,7 @@ def build_report(raw: bytes, data: dict) -> dict:
     ]
     report = {
         'schema_version': 1,
-        'tool': 'connectome-adaptive-intervention-policy-reference-oracle',
+        'tool': 'connectome-adaptive-intervention-policy-audit',
         'analysis_id': data['analysis_id'],
         'input_sha256': hashlib.sha256(raw).hexdigest(),
         'dataset_revision_commit_sha': data['dataset_revision_commit_sha'],
@@ -434,6 +434,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--fixture', type=Path, action='append')
     parser.add_argument('--output-dir', type=Path)
+    parser.add_argument('--verify-report', type=Path)
     parser.add_argument('--self-test', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[3]
@@ -445,6 +446,19 @@ def main() -> int:
     try:
         if args.self_test:
             self_test(fixtures)
+            return 0
+        if args.verify_report is not None:
+            require(len(fixtures) == 1, '--verify-report requires exactly one --fixture')
+            fixture = fixtures[0]
+            raw = fixture.read_bytes()
+            expected_report = build_report(raw, json.loads(raw))
+            actual_report = json.loads(args.verify_report.read_text(encoding='utf-8'))
+            require(actual_report == expected_report, 'Rust report differs from independent Python reference oracle')
+            print(
+                'independent adaptive intervention report replay: PASS; '
+                f"analysis_id={expected_report['analysis_id']}; "
+                f"input_sha256={expected_report['input_sha256']}"
+            )
             return 0
         if args.output_dir is not None:
             args.output_dir.mkdir(parents=True, exist_ok=True)
