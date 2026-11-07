@@ -294,3 +294,6 @@ New research child [#10981](https://github.com/Luminous-Dynamics/symthaea/issues
 Machine-readable arithmetic fixture:
 [hme_bridge_projection_footprint_v0.json](fixtures/hme_bridge_projection_footprint_v0.json).
 It includes the dense pair, theoretical multiply-accumulate counts, and exact factor-log size across rank values. These are analytical byte/op counts, not RSS or runtime results.
+
+
+The source-derived checkpoint inventory now includes the HdcLtcBridge adapter, not just its inner HdcLtcUnifiedNetwork: bridge config, input/output projection state, cached output, step/diversity/resize counters and GenesisSeed lineage. The Bridge type itself is not serde-derived; scratch buffers are transient. See [hme_dyn_checkpoint_field_matrix_v0.json](fixtures/hme_dyn_checkpoint_field_matrix_v0.json).
