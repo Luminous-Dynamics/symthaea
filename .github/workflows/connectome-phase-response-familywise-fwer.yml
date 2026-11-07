@@ -1,0 +1,54 @@
+name: Connectome phase-response familywise FWER contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/connectome-phase-response-family/**"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.md"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.example.json"
+      - ".github/workflows/connectome-phase-response-familywise-fwer.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectome-phase-response-family/**"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.md"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.example.json"
+      - ".github/workflows/connectome-phase-response-familywise-fwer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-phase-response-familywise-fwer:
+    name: Validate exact weighted anytime-FWER claim family
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - name: Validate Draft 2020-12 schema and fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["requested_guarantee"] == "FWER"
+          assert sum(float(claim["weight"].split("/")[0]) / (float(claim["weight"].split("/")[1]) if "/" in claim["weight"] else 1) for claim in fixture["claims"]) == 1.0
+          print("phase-response familywise schema/fixture: PASS")
+          PY
+      - name: Run standalone exact-rational Rust audit
+        working-directory: tools/connectome-phase-response-family
+        run: |
+          cargo fmt --all -- --check
+          cargo test --locked
