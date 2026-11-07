@@ -16,7 +16,8 @@
     "acceptance",
     "evidence",
     "required_output",
-    "input_requirements"
+    "input_requirements",
+    "process_residuals"
   ],
   "properties": {
     "service_id": {
@@ -96,7 +97,8 @@
             "potable_water",
             "seawater_feed",
             "fuel",
-            "other_material"
+            "other_material",
+            "brine_concentrate"
           ]
         }
       }
@@ -304,7 +306,8 @@
               "potable_water",
               "seawater_feed",
               "fuel",
-              "other_material"
+              "other_material",
+              "brine_concentrate"
             ]
           },
           "quantity": {
@@ -316,6 +319,44 @@
             "minLength": 1
           },
           "availability_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quality_constraint_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "process_residuals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "carrier",
+          "expected_quantity",
+          "unit",
+          "disposition_ref",
+          "quality_constraint_ref"
+        ],
+        "properties": {
+          "carrier": {
+            "enum": [
+              "brine_concentrate",
+              "other_material"
+            ]
+          },
+          "expected_quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition_ref": {
             "type": "string",
             "minLength": 1
           },
