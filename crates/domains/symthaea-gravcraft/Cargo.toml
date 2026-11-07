@@ -12,6 +12,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-metric-geometry-lab = { path = "../symthaea-metric-geometry-lab" }
 serde = { workspace = true }
 
 [dev-dependencies]
