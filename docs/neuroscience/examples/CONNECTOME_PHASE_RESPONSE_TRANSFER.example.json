@@ -34,21 +34,121 @@
       },
       "outcome": {
         "status": "MEASURED",
-        "control_phase_microturns": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
+        "control_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
         ],
-        "perturbed_phase_microturns": [
-          100000,
-          0,
-          25000,
-          0,
-          0,
-          0
+        "perturbed_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 100000
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 25000
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
+        ]
+      }
+    },
+    {
+      "probe_key": {
+        "context": "AIR_STEPPING",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "source_leg_id": "left_middle",
+        "phase_bin": 4,
+        "delay_index": 2
+      },
+      "outcome": {
+        "status": "MEASURED",
+        "control_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
+        ],
+        "perturbed_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 1,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
         ]
       }
     },
@@ -67,7 +167,7 @@
   ],
   "oracle_expectations": {
     "measured_row_index": 0,
-    "phase_reset_microturns": [
+    "phase_reset_fractional_microturns": [
       100000,
       0,
       25000,
@@ -75,7 +175,16 @@
       0,
       0
     ],
+    "cycle_slips_by_leg": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
     "local_reset_microturns": 100000,
-    "off_diagonal_l1_microturns": 25000
+    "off_diagonal_l1_microturns": 25000,
+    "off_diagonal_cycle_slips_l1": 0
   }
 }
