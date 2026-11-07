@@ -569,6 +569,9 @@ mod tests {
     fn rejects_failed_execution_without_observe_and_revise() {
         let mut trace = valid_trace();
         trace.actions.remove(4);
+        for (index, action) in trace.actions.iter_mut().enumerate() {
+            action.step = index as u32 + 1;
+        }
         assert_eq!(
             trace.validate().expect_err("failed execution needs recovery"),
             OperatorTraceError::RevisionRequired(5)
@@ -579,9 +582,12 @@ mod tests {
     fn rejects_execution_before_hypothesis() {
         let mut trace = valid_trace();
         trace.actions.remove(1);
+        for (index, action) in trace.actions.iter_mut().enumerate() {
+            action.step = index as u32 + 1;
+        }
         assert_eq!(
             trace.validate().expect_err("hypothesis must precede execute"),
-            OperatorTraceError::HypothesisRequired(2)
+            OperatorTraceError::HypothesisRequired(3)
         );
     }
 
@@ -620,8 +626,28 @@ mod tests {
         let mut trace = valid_trace();
         trace.actions[6].kind = OperatorActionKind::Submit;
         assert_eq!(
-            trace.validate().expect_err("submit cannot replace observation"),
-            OperatorTraceError::SubmitBeforeSuccessfulExecution(7)
+            trace.validate().expect_err("submit cannot replace pending observation"),
+            OperatorTraceError::ObservationRequired(7)
+        );
+    }
+
+    #[test]
+    fn rejects_execution_using_a_different_hypothesis_artifact() {
+        let mut trace = valid_trace();
+        trace.actions[2].input_sha256 = Some("9999999999999999999999999999999999999999999999999999999999999999".to_owned());
+        assert_eq!(
+            trace.validate().expect_err("execution must bind the current hypothesis"),
+            OperatorTraceError::ActionInputMismatch(3)
+        );
+    }
+
+    #[test]
+    fn rejects_submission_not_bound_to_the_last_observation() {
+        let mut trace = valid_trace();
+        trace.actions[7].input_sha256 = Some("9999999999999999999999999999999999999999999999999999999999999999".to_owned());
+        assert_eq!(
+            trace.validate().expect_err("submission must bind the last observation"),
+            OperatorTraceError::ActionInputMismatch(8)
         );
     }
 
