@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea synthetic pivotal research-correction decision fixtures v0",
+  "description": "Synthetic policy fixtures for decision-context sensitivity and invariance. Not a reproduction of SciPiVot, expert gold or measured model performance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_issue",
+    "purpose",
+    "evaluation_policy",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-research-taste-pivotal-correction-fixtures-v0"
+    },
+    "status": {
+      "const": "SYNTHETIC_POLICY_CASES_NOT_SCIPIVOT_REPRODUCTION_OR_EXPERT_GOLD"
+    },
+    "source_issue": {
+      "const": "#10877"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adjudication",
+        "context_ablation",
+        "scoring",
+        "denominator",
+        "no_single_oracle"
+      ],
+      "properties": {
+        "adjudication": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_ablation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scoring": {
+          "type": "string",
+          "minLength": 1
+        },
+        "denominator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "no_single_oracle": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "decision_class",
+          "context_effect",
+          "scenario",
+          "facts",
+          "original_plan",
+          "proposed_correction",
+          "expected_disposition",
+          "required_response",
+          "prohibited_inference",
+          "evidence_to_request"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^PJ-0[1-9]$"
+          },
+          "decision_class": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context_effect": {
+            "enum": [
+              "must_change",
+              "must_be_invariant",
+              "must_abstain"
+            ]
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "facts": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "original_plan": {
+            "type": "string",
+            "minLength": 1
+          },
+          "proposed_correction": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_response": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "prohibited_inference": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "evidence_to_request": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}
