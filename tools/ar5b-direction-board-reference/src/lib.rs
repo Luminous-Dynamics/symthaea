@@ -694,6 +694,28 @@ mod tests {
     }
 
     #[test]
+    fn under_sampled_low_initial_yield_direction_receives_exploration_budget() {
+        let report = allocate(&fixture_campaign()).expect("valid fixture allocates");
+        let beta = report
+            .recommendations
+            .iter()
+            .find(|item| item.candidate_id == "direction-beta");
+        assert!(beta.is_some(), "low-initial-yield direction was starved");
+        assert!(beta.unwrap().recommended_evaluations > 0);
+    }
+
+    #[test]
+    fn verifier_gated_new_direction_option_receives_a_budget_feasible_slot() {
+        let report = allocate(&fixture_campaign()).expect("valid fixture allocates");
+        let new_option = report
+            .recommendations
+            .iter()
+            .find(|item| item.candidate_id == RESERVED_NEW_ID);
+        assert!(new_option.is_some(), "NEW intake option was never explored");
+        assert!(new_option.unwrap().recommended_evaluations > 0);
+    }
+
+    #[test]
     fn new_direction_option_respects_its_explicit_share_cap() {
         let campaign = fixture_campaign();
         let report = allocate(&campaign).expect("valid fixture allocates");
