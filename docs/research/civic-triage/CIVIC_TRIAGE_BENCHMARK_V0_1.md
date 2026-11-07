@@ -21,6 +21,16 @@ The benchmark optimizes *decision quality and evidence discipline*, not alert vo
 
 The new issue adds an evaluated civilian incident-triage profile; it does not create an independent authority, alert-dispatch service or operational response controller.
 
+## Industry baseline and buy/build/bridge boundary
+
+A fair physical-security baseline must include mature unified platforms, not just a rules script:
+- [Genetec Security Center](https://techdocs.genetec.com/r/en-US/Security-Center-Administrator-Guide-5.12/About-Security-Center) combines video management, access control, automatic license plate recognition, intrusion panel integration, alarm management, communications and third-party integrations behind shared operator/configuration interfaces. Genetec's SaaS intrusion-management release further documents integration of intrusion, video, access and identity/visitor workflows: https://www.genetec.com/press-center/press-releases/2025/02/genetec-enhances-security-center-saas-with-the-addition-of-intrusion-management.
+- Evaluate existing building-management, fire/life-safety and access-control systems as deployed at the participating site; do not presume vendor interoperability or source independence from a feature list.
+
+Luminous should **bridge** into existing approved security devices and operational workflows, not recreate a VMS, access-control controller, ALPR stack, camera network or fire panel. Its candidate advantage is evidence semantics across heterogeneous sources: source health and common dependencies, contradictory cyber/physical observations, explicit unknowns, human review and separately authorized response/outcome.
+
+V0 remains camera-free and non-identifying. Genetec features involving video, ALPR, tracking or biometrics are comparison context, not requirements for the Luminous feature set. A matched study must use only sources legitimately available to every compared workflow and must state when the integration or licensing boundary makes a feature non-comparable.
+
 ## Paradigm shift
 
 Replace:
