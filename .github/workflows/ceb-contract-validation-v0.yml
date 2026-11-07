@@ -26,6 +26,10 @@ on:
       - "docs/research/CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md"
       - "docs/research/CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_KEY_V0_2026-11-07.md"
       - "scripts/validate_ceb_review_causal_topology_pack.py"
+      - "docs/research/CEB_REVIEW_CAUSAL_IDENTIFIABILITY_PROTOCOL_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_CAUSAL_IDENTIFIABILITY_CHALLENGE_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_CAUSAL_IDENTIFIABILITY_KEY_V0_2026-11-07.md"
+      - "scripts/validate_ceb_review_causal_identifiability_pack.py"
       - "docs/research/CEB_ENGINEERING_QUALITY_SCORECARD_V0_2026-11-04.md"
       - "scripts/validate_ceb_review_research_pack.py"
       - ".github/workflows/ceb-contract-validation-v0.yml"
@@ -592,6 +596,12 @@ jobs:
           python scripts/validate_ceb_integration_boundary_protocol.py --self-test --repo-root .
           python scripts/validate_ceb_integration_boundary_protocol.py --repo-root .
 
+      - name: Validate CEB causal-identifiability development pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_ceb_review_causal_identifiability_pack.py --self-test --repo-root .
+          python scripts/validate_ceb_review_causal_identifiability_pack.py --repo-root .
       - name: Validate CEB causal-topology development pack
         shell: bash
         run: |
