@@ -60,6 +60,16 @@ Use constrained/lexicographic decisions, not a free weighted sum:
 
 V0 is shadow/recommendation mode only. It cannot command the watermaker, generator, battery, HVAC, refrigerator, propulsion or protection devices. Physical controllers, certified local interlocks and operator authority remain independent.
 
+## 5. Weather-routing research context and authority boundary
+
+Recent weather-routing literature reinforces why route, speed and energy must be co-designed under uncertainty, but that work belongs to the existing MARINE-DESIGN-001 owner:
+
+- Chen et al., *State-of-the-art optimization algorithms in weather routing — ship decision support systems: challenge, taxonomy, and review*, Ocean Engineering (1 July 2025), reviews optimization methods and common terminology issues: https://doi.org/10.1016/j.oceaneng.2025.121198
+- Timas and Mohammadi, *Integrating weather-informed routing and energy optimization for sustainable maritime transportation*, Ocean Engineering (30 July 2025), present a two-stage route/energy optimization with intermediate waypoints, weather, power, speed, safety and refuelling constraints: https://doi.org/10.1016/j.oceaneng.2025.121463
+- Golsefidi et al., *Containerships routing problem: Incorporating uncertain weather impact on fuel consumption by considering speed optimization*, Ocean Engineering (30 November 2025), report in their container-ship simulation that ignoring weather could underestimate fuel by up to 11%, while variable-speed policies saved up to 21% fuel in the studied scenario at the cost of delays up to 20 hours: https://doi.org/10.1016/j.oceaneng.2025.122410
+
+These are research results from different vessel classes and scenarios, not transferable performance claims for LOS-18. They justify matched weather/forecast uncertainty and explicit fuel-versus-delay trade-offs. The marine resource scheduler consumes a frozen route/propulsion demand profile; it does not generate the route or change speed in V0. A future joint study can compose the route owner and service scheduler using exact shared case identities, then compare the full Pareto frontier.
+
 ## 5. Benchmark policy baselines
 
 Compare on identical frozen cases and the same information:
