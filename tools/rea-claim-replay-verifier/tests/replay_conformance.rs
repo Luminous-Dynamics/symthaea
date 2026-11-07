@@ -1531,10 +1531,12 @@ fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation
     claim.asserted_value = evidence.value["normalized_result"].clone();
     let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
 
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
-    assert_eq!(replay.expected_disposition, Disposition::SupportedWithinScope);
+    assert_eq!(
+        replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
 
     let mut result: Value = serde_json::from_slice(&result_bytes).unwrap();
     let warnings = result["numeric_precision_warnings"]
@@ -1553,10 +1555,7 @@ fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation
         warnings[1]["json_pointer"],
         json!("/normalized_result/large_count")
     );
-    assert_eq!(
-        warnings[2]["integer_value"],
-        json!("18446744073709551615")
-    );
+    assert_eq!(warnings[2]["integer_value"], json!("18446744073709551615"));
 
     // The warning array is required, not a defaulted or UI-only annotation.
     let mut missing_warnings = result.clone();
@@ -1565,21 +1564,14 @@ fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation
         .unwrap()
         .remove("numeric_precision_warnings");
     let missing_bytes = serde_json::to_vec(&missing_warnings).unwrap();
-    let error = replay_claim_evaluation(
-        &claim_bytes,
-        &[&evidence_bytes],
-        &missing_bytes,
-    )
-    .unwrap_err();
+    let error =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &missing_bytes).unwrap_err();
     assert_eq!(error.kind, ReplayErrorKind::InvalidJson);
 
     // A precision warning is part of the complete derivation. Changing it
     // must fail independent replay.
-    result["numeric_precision_warnings"][0]["integer_value"] =
-        json!("9007199254740992");
+    result["numeric_precision_warnings"][0]["integer_value"] = json!("9007199254740992");
     let changed = serde_json::to_vec(&result).unwrap();
-    let replay =
-        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &changed).unwrap();
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &changed).unwrap();
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
 }
-
