@@ -1,0 +1,75 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic",
+  "case": {
+    "profile": {
+      "profile_id": "synthetic-liveaboard-14d",
+      "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "target_days": 14,
+      "required_dimension_ids": [
+        "potable_water",
+        "food_protein",
+        "blackwater_headroom"
+      ]
+    },
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "operating_case_id": "synthetic-offshore-14d",
+    "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "resources": [
+      {
+        "dimension_id": "potable_water",
+        "quantity_unit": "L",
+        "rate_unit": "L/day",
+        "usable_stock": [
+          30,
+          30
+        ],
+        "net_depletion_per_day": [
+          10,
+          10
+        ],
+        "evidence_ref": "synthetic:water",
+        "evidence_class": "synthetic"
+      },
+      {
+        "dimension_id": "food_protein",
+        "quantity_unit": "kg",
+        "rate_unit": "kg/day",
+        "usable_stock": [
+          300,
+          300
+        ],
+        "net_depletion_per_day": [
+          10,
+          10
+        ],
+        "evidence_ref": "synthetic:food",
+        "evidence_class": "synthetic"
+      },
+      {
+        "dimension_id": "blackwater_headroom",
+        "quantity_unit": "L",
+        "rate_unit": "L/day",
+        "usable_stock": [
+          50,
+          50
+        ],
+        "net_depletion_per_day": [
+          10,
+          10
+        ],
+        "evidence_ref": "synthetic:waste",
+        "evidence_class": "synthetic"
+      }
+    ]
+  },
+  "expected": {
+    "target_days": 14,
+    "dimension_minimum_days": {
+      "potable_water": 3,
+      "food_protein": 30,
+      "blackwater_headroom": 5
+    },
+    "overall_disposition": "AtLeastOneDimensionDoesNotCoverTarget"
+  }
+}
