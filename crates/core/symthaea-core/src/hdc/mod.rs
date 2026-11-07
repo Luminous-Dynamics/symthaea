@@ -278,6 +278,8 @@ pub mod gwt_cincinnati_integration; // Cincinnati-LTC + Global Workspace Theory 
 mod hdc_ltc_learning_tests; // Comprehensive learning dynamics tests for HdcLtcUnifiedNeuron
 pub mod hdc_ltc_neuron; // HDC-LTC neuron integration with Hebbian learning
 pub mod hdc_ltc_unified; // Revolutionary unified HDC-LTC: state AS hypervector with closed-form solution
+/// Candidate-only adapter from typed WeightPrograms to unified HDC-LTC neurons.
+pub mod weight_program_adapter;
 pub mod hdc_ltc_unified_validation; // Numerical validation of closed-form solution accuracy
 pub mod structured_mixer; // Experimental orthogonal cross-coordinate HDC mixing
 pub mod hrr; // Unitary HRR circular-convolution binding backend
@@ -986,7 +988,7 @@ impl SemanticSpace {
         let mut result = vectors[0].clone();
 
         for vec in &vectors[1..] {
-            result = circular_convolution(&result, vec);
+            result = circular_convolution_f32(&result, vec);
         }
 
         Ok(result)
@@ -1098,7 +1100,7 @@ impl SemanticSpace {
 
 use crate::math::cosine_similarity_f32 as cosine_similarity;
 
-fn circular_convolution(a: &[f32], b: &[f32]) -> Vec<f32> {
+fn circular_convolution_f32(a: &[f32], b: &[f32]) -> Vec<f32> {
     let n = a.len();
     let mut result = vec![0.0; n];
 

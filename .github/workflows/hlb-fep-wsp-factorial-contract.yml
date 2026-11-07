@@ -1,0 +1,166 @@
+name: HLB FEP-WSP Factorial Contract
+
+on:
+  pull_request:
+    branches: [main, research/swi-001-weight-space-introspection]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
+      - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
+      - "crates/core/symthaea-core/src/weight_space_program.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_program.rs"
+      - "src/dynamics/cfc/weight_program_adapter.rs"
+      - "src/dynamics/cfc/mod.rs"
+      - "src/dynamics/cfc/network.rs"
+  push:
+    branches: [research/hlb-fep-wsp-factorial-v2]
+    paths:
+      - ".github/workflows/hlb-fep-wsp-factorial-contract.yml"
+      - "crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs"
+      - "crates/core/symthaea-core/Cargo.toml"
+      - "Cargo.lock"
+      - "docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md"
+      - "docs/research/hlb-fep-wsp-factorial-v1.json"
+      - "crates/core/symthaea-fep/src/hierarchical_information_gain.rs"
+      - "crates/core/symthaea-fep/src/bayesian_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/dirichlet_model_reduction.rs"
+      - "crates/core/symthaea-fep/src/three_ball_rule_space.rs"
+      - "crates/core/symthaea-fep/src/lib.rs"
+      - "crates/core/symthaea-core/src/hdc/weight_program_adapter.rs"
+      - "crates/core/symthaea-core/src/hdc/mod.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs"
+      - "crates/core/symthaea-core/src/weight_space_program.rs"
+      - "crates/core/symthaea-core/src/sequential_weight_program.rs"
+      - "src/dynamics/cfc/weight_program_adapter.rs"
+      - "src/dynamics/cfc/mod.rs"
+      - "src/dynamics/cfc/network.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  protocol-contract:
+    name: Validate four-factor protocol contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check protocol schema and disjoint seeds
+        run: |
+          set -euo pipefail
+          jq -e '
+            .schema_version == "hlb-fep-wsp-factorial-v1" and
+            .status == "protocol_only" and
+            (.factors | length == 4) and
+            ([.factors[].id] | unique | length == 4) and
+            (.profiles | length == 16) and
+            ([.profiles[].id] | unique | length == 16) and
+            ([.profiles[].execution_status] | all(. == "planned_not_executed")) and
+            (.tasks | length >= 4) and
+            (.baselines | length >= 16) and
+            (.seeds.development | length == 10) and
+            (.seeds.held_out | length == 20) and
+            (([.seeds.development[], .seeds.held_out[]] | unique | length) == 30) and
+            (.hard_gates | length >= 12)
+          ' docs/research/hlb-fep-wsp-factorial-v1.json >/dev/null
+
+      - name: Check validator formatting
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/weight_space_program.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/sequential_weight_program.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/weight_program_adapter.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/hierarchical_information_gain.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/bayesian_model_reduction.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/dirichlet_model_reduction.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/three_ball_rule_space.rs
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/src/lib.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/weight_program_adapter.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
+          rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
+
+      - name: Reconcile and capture workspace lockfile
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cp Cargo.lock research-results/Cargo.lock.before
+          # Workspace membership changed on this research branch (source-only
+          # directories are now excluded). Let Cargo produce the canonical
+          # pruned lockfile once, then make all test invocations fail-closed
+          # with --locked.
+          cargo metadata --format-version 1 > /dev/null
+          cp Cargo.lock research-results/Cargo.lock.generated
+          changed_files="$(git diff --name-only)"
+          if [ "$changed_files" != "Cargo.lock" ]; then
+            echo "Unexpected files changed during lockfile reconciliation:"
+            printf '%s\n' "$changed_files"
+            exit 1
+          fi
+          cargo metadata --locked --format-version 1 > /dev/null
+          sha256sum Cargo.lock research-results/Cargo.lock.generated > research-results/Cargo.lock.SHA256SUMS
+
+      - name: Test four-factor contract invariants
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 --no-deps > /dev/null
+          cargo test --locked --release -p symthaea-core --lib weight_space_program::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib sequential_weight_program::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib bayesian_model_reduction::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib dirichlet_model_reduction::tests -- --nocapture
+          cargo test --locked --release -p symthaea-fep --lib three_ball_rule_space::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --lib hdc::weight_program_adapter::tests -- --nocapture
+          cargo test --locked --release -p symthaea --lib dynamics::cfc::weight_program_adapter::tests -- --nocapture
+          cargo test --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract -- --nocapture
+
+      - name: Generate source-bound protocol receipt
+        env:
+          SYMTHAEA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p research-results
+          cargo run --locked --release -p symthaea-core --example hlb_fep_wsp_factorial_contract 2>&1 | tee research-results/hlb-fep-wsp-factorial-contract.log
+          sha256sum Cargo.lock docs/research/hlb-fep-wsp-factorial-v1.json docs/research/HLB_FEP_GUIDED_WEIGHT_SPACE_PROGRAMMING.md crates/core/symthaea-core/examples/hlb_fep_wsp_factorial_contract.rs crates/core/symthaea-core/src/weight_space_program.rs crates/core/symthaea-core/src/sequential_weight_program.rs src/dynamics/cfc/weight_program_adapter.rs src/dynamics/cfc/network.rs src/dynamics/cfc/mod.rs Cargo.toml crates/core/symthaea-core/src/hdc/weight_program_adapter.rs crates/core/symthaea-core/src/hdc/mod.rs crates/core/symthaea-core/src/hdc/hdc_ltc_unified.rs crates/core/symthaea-fep/src/hierarchical_information_gain.rs crates/core/symthaea-fep/src/bayesian_model_reduction.rs crates/core/symthaea-fep/src/dirichlet_model_reduction.rs crates/core/symthaea-fep/src/three_ball_rule_space.rs crates/core/symthaea-fep/src/lib.rs research-results/hlb-fep-wsp-factorial-contract.log > research-results/SHA256SUMS
+          cat research-results/SHA256SUMS
+
+      - name: Upload protocol-validation receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hlb-fep-wsp-factorial-contract-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research-results/
+          if-no-files-found: warn
+          retention-days: 30

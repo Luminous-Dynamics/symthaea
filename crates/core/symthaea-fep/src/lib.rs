@@ -138,14 +138,18 @@
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
 mod agent;
+pub mod bayesian_model_reduction;
 mod bridge;
+pub mod dirichlet_model_reduction;
 pub mod free_energy;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
+pub mod hierarchical_information_gain;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
+pub mod three_ball_rule_space;
 pub mod types;
 
 #[cfg(test)]
@@ -165,6 +169,20 @@ pub use td_learning::{
 };
 
 pub use generative_model::GenerativeModel;
+
+pub use dirichlet_model_reduction::{
+    DirichletActionPrediction, DirichletBayesianModelReductionError,
+    DirichletBayesianModelReductionResult, DirichletConcentrationTensor,
+    DirichletModelInformationGain, DirichletModelInformationGainError, DirichletOutcomeModelBelief,
+    DirichletPredictedOutcome, ReducedDirichletModelEvidence, ReducedDirichletModelHypothesis,
+    evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
+};
+
+pub use hierarchical_information_gain::{
+    EpistemicLevel, HierarchicalActionInformationGain, HierarchicalHypothesis,
+    HierarchicalInformationGainError, compute_hierarchical_information_gain,
+    compute_hierarchical_information_gains, most_informative_action_at_level,
+};
 
 pub use haptic_semantic_binder::HapticSemanticBinder;
 

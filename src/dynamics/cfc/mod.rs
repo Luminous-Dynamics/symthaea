@@ -24,6 +24,9 @@ pub(crate) mod network;
 mod phi_gated;
 pub(crate) mod types;
 
+/// Candidate-only adapter from typed WeightPrograms to transactional CfC edits.
+pub mod weight_program_adapter;
+
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
@@ -48,9 +51,18 @@ pub use gradients::{AdamState, CfCCellCache, CfCGradients, OutputAdamState};
 // Network
 pub use network::{
     CfCNetwork, CfCNetworkConfig, CfCNetworkFingerprint, CfCParameterGroup, CfCParameterGroupId,
-    CfCParameterGroupReplacement, CfCParameterManifest,
-    CfCParameterRole,
-    CfCWeightLoadError,
+    CfCParameterGroupReplacement, CfCParameterManifest, CfCParameterRole, CfCWeightLoadError,
+};
+
+// Weight-space programming
+pub use weight_program_adapter::{
+    CfCActivationSignatureSet, CfCAlignmentAcceptancePolicy, CfCDisambiguatingProbeSelection,
+    CfCFunctionalProbe, CfCHiddenUnitAlignment, CfCPermutationAlignmentError,
+    CfCProbeCandidateScore, CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
+    align_cfc_hidden_unit_signatures, build_cfc_hidden_unit_canonicalization_program,
+    build_cfc_network_hidden_unit_canonicalization_program, cfc_hidden_unit_activation_signatures,
+    cfc_weight_model_snapshot, materialize_cfc_weight_program, select_cfc_disambiguating_probe,
+    validate_cfc_alignment_for_parameter_transfer,
 };
 
 // Phi-gated attention
