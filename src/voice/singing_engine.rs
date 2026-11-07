@@ -682,6 +682,7 @@ pub enum SingingControl {
     Melisma,
     ContinuousPitchCurve,
     PhraseExpressionCurve,
+    PhraseBreathTiming,
     Breathiness,
     Energy,
     Tension,
@@ -693,7 +694,7 @@ pub enum SingingControl {
 }
 
 impl SingingControl {
-    pub const ALL: [Self; 19] = [
+    pub const ALL: [Self; 20] = [
         Self::LyricText,
         Self::Language,
         Self::ExactPhoneSequence,
@@ -705,6 +706,7 @@ impl SingingControl {
         Self::Melisma,
         Self::ContinuousPitchCurve,
         Self::PhraseExpressionCurve,
+        Self::PhraseBreathTiming,
         Self::Breathiness,
         Self::Energy,
         Self::Tension,
@@ -846,6 +848,20 @@ impl SingingRenderPolicy {
             allow_approximated,
             allow_conditional,
         })
+    }
+
+    /// Additional controls for comparisons specifically targeting phrase
+    /// shaping and breath planning. Current integrated renderers do not yet
+    /// satisfy this policy; they must not be advertised as breath-aware.
+    pub fn phrase_expression_comparison() -> Self {
+        Self {
+            required_controls: vec![
+                SingingControl::PhraseExpressionCurve,
+                SingingControl::PhraseBreathTiming,
+            ],
+            allow_approximated: true,
+            allow_conditional: true,
+        }
     }
 
     /// Minimum common contract for controlled score-conditioned comparisons.
