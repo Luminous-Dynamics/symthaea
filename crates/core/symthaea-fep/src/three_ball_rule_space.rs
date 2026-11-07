@@ -25,6 +25,7 @@
 //! - spm_MDP_rules.m: SPM commit 5852cadb300a81fd3f30e7056ee329bca20f0efe
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use crate::dirichlet_model_reduction::{
     DirichletConcentrationTensor, ReducedDirichletModelHypothesis,
@@ -247,6 +248,38 @@ impl ThreeBallRuleSpace {
             .collect()
     }
 
+    /// Return the quotient model family over semantically identical likelihood tensors.
+    ///
+    /// Source hypotheses with identical complete feedback likelihood tensors are
+    /// grouped under their first source index. Their prior probabilities are
+    /// summed, preserving the Bayesian-model-average parent prior exactly.
+    /// This removes label-only uncertainty without changing any prediction or
+    /// model evidence available to the feedback modality.
+    ///
+    /// The uncompressed reduced_model_hypotheses remains available for
+    /// source-faithful reproduction and comparisons against the paper's labelled
+    /// hypothesis count.
+    pub fn semantic_unique_model_hypotheses(
+        &self,
+    ) -> Vec<ReducedDirichletModelHypothesis> {
+        let mut classes = BTreeMap::<usize, ReducedDirichletModelHypothesis>::new();
+        for rule in &self.rules {
+            let representative_index = rule
+                .duplicate_of_one_based_index
+                .unwrap_or(rule.one_based_index);
+            let representative_id = format!("three-ball-semantic-rule-{representative_index:02}");
+            let entry = classes
+                .entry(representative_index)
+                .or_insert_with(|| ReducedDirichletModelHypothesis {
+                    model_id: representative_id,
+                    prior_probability: 0.0,
+                    parameter_prior: rule.parameter_prior.clone(),
+                });
+            entry.prior_probability += rule.prior_probability;
+        }
+        classes.into_values().collect()
+    }
+
     /// Whether the source paper's 79-unique count matches this source audit.
     pub fn unique_count_matches_paper(&self) -> bool {
         self.semantic_unique_rule_count == self.paper_reported_unique_rule_count
@@ -430,6 +463,88 @@ mod tests {
             THREE_BALL_PAPER_REPORTED_UNIQUE_RULE_COUNT
         );
         assert!(!space.unique_count_matches_paper());
+    }
+
+    #[test]
+    fn semantic_quotient_preserves_the_model_average_prior() {
+        let space = build_three_ball_rule_space();
+        let compressed = space.semantic_unique_model_hypotheses();
+        assert_eq!(compressed.len(), THREE_BALL_PUBLIC_GENERATOR_UNIQUE_TENSOR_COUNT);
+        assert!((compressed.iter().map(|model| model.prior_probability).sum::<f64>() - 1.0).abs() < 1e-12);
+
+        for column in 0..THREE_BALL_HIDDEN_STATE_COLUMN_COUNT {
+            for outcome in 0..THREE_BALL_FEEDBACK_OUTCOME_COUNT {
+                let compressed_average = compressed
+                    .iter()
+                    .map(|model| {
+                        model.prior_probability * model.parameter_prior.columns[column][outcome]
+                    })
+                    .sum::<f64>();
+                let original_average = space.full_model_average_prior.columns[column][outcome];
+                assert!((compressed_average - original_average).abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn semantic_quotient_preserves_bmr_evidence_and_aggregated_posterior() {
+        let space = build_three_ball_rule_space();
+        let original_models = space.reduced_model_hypotheses();
+        let compressed_models = space.semantic_unique_model_hypotheses();
+
+        let mut posterior = space.full_model_average_prior.clone();
+        // A deterministic, model-independent observation increment over the
+        // active coordinates of the BMA likelihood tensor.
+        for column in 0..posterior.columns.len() {
+            for outcome in 0..posterior.columns[column].len() {
+                if posterior.active_support[column][outcome] {
+                    posterior.columns[column][outcome] += 0.25;
+                }
+            }
+        }
+
+        let original_result = reduce_dirichlet_models(
+            &posterior,
+            &space.full_model_average_prior,
+            &original_models,
+        )
+        .expect("uncompressed BMR");
+        let compressed_result = reduce_dirichlet_models(
+            &posterior,
+            &space.full_model_average_prior,
+            &compressed_models,
+        )
+        .expect("quotient BMR");
+
+        let mut original_probabilities = std::collections::BTreeMap::<String, f64>::new();
+        for model in original_result.models {
+            original_probabilities.insert(model.model_id, model.posterior_probability);
+        }
+        for compressed in &compressed_result.models {
+            let representative_index: usize = compressed
+                .model_id
+                .rsplit('-')
+                .next()
+                .expect("index suffix")
+                .parse()
+                .expect("numeric representative index");
+            let source_group = space
+                .rules
+                .iter()
+                .filter(|rule| {
+                    rule.one_based_index == representative_index
+                        || rule.duplicate_of_one_based_index == Some(representative_index)
+                })
+                .collect::<Vec<_>>();
+            let aggregated_original = source_group
+                .iter()
+                .map(|rule| original_probabilities[&rule.model_id])
+                .sum::<f64>();
+            assert!(
+                (aggregated_original - compressed.posterior_probability).abs() < 1e-9,
+                "semantic class {representative_index} posterior changed under quotienting"
+            );
+        }
     }
 
     #[test]
