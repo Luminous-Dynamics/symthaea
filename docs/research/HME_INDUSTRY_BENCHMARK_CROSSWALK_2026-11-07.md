@@ -365,3 +365,12 @@ The branch includes deterministic synthetic fixtures:
 - [hme_consistent_cut_states_v0.json](fixtures/hme_consistent_cut_states_v0.json)
 
 Both fixtures demonstrate contract shapes only; they are not Rust runtime tests or storage crash-injection results.
+
+
+## 14. Eligibility and lifecycle governance at the HME query boundary
+
+[HME-ELIGIBILITY-001 / #11003](https://github.com/Luminous-Dynamics/symthaea/issues/11003) adds metadata-first bitemporal, principal/scope, retraction, revocation, retention and forgetting eligibility before any HDC payload is read.
+
+The query receipt schema and examples now bind the pinned eligibility snapshot and reconcile physical, eligible and excluded populations. The machine-readable [eligibility filter fixture](fixtures/hme_eligibility_filter_v0.json) expects zero payload reads for excluded candidates, including a stale LSH hint that points at a revoked item.
+
+This composes the existing #9075/#9139/#9177 owners. It explicitly separates query exclusion, active-index forgetting, physical purge and cryptographic erasure.
