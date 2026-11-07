@@ -879,10 +879,14 @@ mod tests {
         let mut perturbed = zero_samples();
         perturbed[0] = PhaseSample::from_unwrapped_microturns(100_000);
         perturbed[2] = PhaseSample::from_unwrapped_microturns(25_000);
-        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
-            key: probe,
-            outcome: RowOutcome::Measured { control, perturbed },
-        }]).unwrap();
+        let surface = PhaseResponseSurface::new(
+            test_source_binding(),
+            vec![TransferRow {
+                key: probe,
+                outcome: RowOutcome::Measured { control, perturbed },
+            }],
+        )
+        .unwrap();
 
         let response = surface.phase_reset(&probe).unwrap();
         assert_eq!(response.local_reset().unwrap().microturns(), 100_000);
@@ -896,11 +900,21 @@ mod tests {
         let control = zero_samples();
         let mut perturbed = zero_samples();
         perturbed[3] = PhaseSample::from_unwrapped_microturns(-80_000);
-        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
-            key: probe,
-            outcome: RowOutcome::Measured { control, perturbed },
-        }]).unwrap();
-        assert_eq!(surface.phase_reset(&probe).unwrap().off_diagonal_l1_microturns(), 0);
+        let surface = PhaseResponseSurface::new(
+            test_source_binding(),
+            vec![TransferRow {
+                key: probe,
+                outcome: RowOutcome::Measured { control, perturbed },
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            surface
+                .phase_reset(&probe)
+                .unwrap()
+                .off_diagonal_l1_microturns(),
+            0
+        );
     }
 
     #[test]
@@ -925,17 +939,27 @@ mod tests {
         );
 
         let surface = PhaseResponseSurface::new(test_source_binding(), vec![row]).unwrap();
-        assert_eq!(surface.source_binding().dataset_id, "synthetic-six-leg-phase-response");
+        assert_eq!(
+            surface.source_binding().dataset_id,
+            "synthetic-six-leg-phase-response"
+        );
     }
 
     #[test]
     fn unavailable_measurements_are_never_silently_zero_filled() {
         let probe = key(Context::BallContact, 0, 1, 1);
-        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
-            key: probe,
-            outcome: RowOutcome::Unavailable(MeasurementStatus::NoResponse),
-        }]).unwrap();
-        assert_eq!(surface.phase_reset(&probe), Err(PhaseError::Unavailable(MeasurementStatus::NoResponse)));
+        let surface = PhaseResponseSurface::new(
+            test_source_binding(),
+            vec![TransferRow {
+                key: probe,
+                outcome: RowOutcome::Unavailable(MeasurementStatus::NoResponse),
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            surface.phase_reset(&probe),
+            Err(PhaseError::Unavailable(MeasurementStatus::NoResponse))
+        );
     }
 
     #[test]
@@ -949,7 +973,10 @@ mod tests {
             magnitude_bin: 0,
             delay_index: 0,
         };
-        assert_eq!(invalid.validate(), Err(PhaseError::SourceLegRequired(ProbeClass::LocalPhaseKick)));
+        assert_eq!(
+            invalid.validate(),
+            Err(PhaseError::SourceLegRequired(ProbeClass::LocalPhaseKick))
+        );
 
         let invalid_global = ProbeKey {
             context: Context::AirStepping,
@@ -960,7 +987,12 @@ mod tests {
             magnitude_bin: 0,
             delay_index: 0,
         };
-        assert_eq!(invalid_global.validate(), Err(PhaseError::SourceLegForbidden(ProbeClass::DescendingCommand)));
+        assert_eq!(
+            invalid_global.validate(),
+            Err(PhaseError::SourceLegForbidden(
+                ProbeClass::DescendingCommand
+            ))
+        );
     }
 
     #[test]
@@ -1021,23 +1053,51 @@ mod tests {
             magnitude_bin: 0,
             delay_index: 0,
         };
-        assert_eq!(invalid.validate(), Err(PhaseError::DescendingNeuronRequired));
+        assert_eq!(
+            invalid.validate(),
+            Err(PhaseError::DescendingNeuronRequired)
+        );
     }
 
     #[test]
     fn phase_grid_rejects_duplicate_and_missing_rows() {
         let first = key(Context::BallContact, 0, 0, 1);
         let second = key(Context::BallContact, 0, 1, 1);
-        let surface = PhaseResponseSurface::new(test_source_binding(), vec![
-            TransferRow { key: first, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
-            TransferRow { key: second, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
-        ]).unwrap();
-        assert_eq!(surface.validate_complete(&[first]), Err(PhaseError::GridMismatch { missing: 0, unexpected: 1 }));
+        let surface = PhaseResponseSurface::new(
+            test_source_binding(),
+            vec![
+                TransferRow {
+                    key: first,
+                    outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed),
+                },
+                TransferRow {
+                    key: second,
+                    outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed),
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            surface.validate_complete(&[first]),
+            Err(PhaseError::GridMismatch {
+                missing: 0,
+                unexpected: 1
+            })
+        );
         assert!(matches!(
-            PhaseResponseSurface::new(test_source_binding(), vec![
-                TransferRow { key: first, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
-                TransferRow { key: first, outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed) },
-            ]),
+            PhaseResponseSurface::new(
+                test_source_binding(),
+                vec![
+                    TransferRow {
+                        key: first,
+                        outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed)
+                    },
+                    TransferRow {
+                        key: first,
+                        outcome: RowOutcome::Unavailable(MeasurementStatus::NotAssessed)
+                    },
+                ]
+            ),
             Err(PhaseError::DuplicateProbeKey)
         ));
     }
@@ -1116,8 +1176,16 @@ mod tests {
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 900,
             predictions: vec![
-                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
-                ProbePrediction { key: phase_half, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction {
+                    key: phase_zero,
+                    by_leg: common,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
+                ProbePrediction {
+                    key: phase_half,
+                    by_leg: common,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
             ],
         };
         let model_b = ModelSignature {
@@ -1125,8 +1193,16 @@ mod tests {
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 900,
             predictions: vec![
-                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
-                ProbePrediction { key: phase_half, by_leg: separated, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction {
+                    key: phase_zero,
+                    by_leg: common,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
+                ProbePrediction {
+                    key: phase_half,
+                    by_leg: separated,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
             ],
         };
         let separation = minimum_pairwise_probe_separation(&[model_a, model_b]).unwrap();
@@ -1147,8 +1223,16 @@ mod tests {
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 900,
             predictions: vec![
-                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
-                ProbePrediction { key: phase_half, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction {
+                    key: phase_zero,
+                    by_leg: common,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
+                ProbePrediction {
+                    key: phase_half,
+                    by_leg: common,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
             ],
         };
         let model_b = ModelSignature {
@@ -1156,8 +1240,16 @@ mod tests {
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 900,
             predictions: vec![
-                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
-                ProbePrediction { key: phase_half, by_leg: separated, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction {
+                    key: phase_zero,
+                    by_leg: common,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
+                ProbePrediction {
+                    key: phase_half,
+                    by_leg: separated,
+                    cycle_slips_by_leg: [0; LEG_COUNT],
+                },
             ],
         };
         assert_eq!(
@@ -1188,7 +1280,10 @@ mod tests {
             steady_state_plv_milli: 920,
             predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
-        assert_eq!(minimum_campaign_separation(&[central_path, common_drive]).unwrap(), 0);
+        assert_eq!(
+            minimum_campaign_separation(&[central_path, common_drive]).unwrap(),
+            0
+        );
     }
 
     #[test]
@@ -1202,12 +1297,18 @@ mod tests {
         ];
         let probe = key(Context::AirStepping, 1, 2, 1);
         for status in statuses {
-            let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
-                key: probe,
-                outcome: RowOutcome::Unavailable(status),
-            }])
+            let surface = PhaseResponseSurface::new(
+                test_source_binding(),
+                vec![TransferRow {
+                    key: probe,
+                    outcome: RowOutcome::Unavailable(status),
+                }],
+            )
             .unwrap();
-            assert_eq!(surface.phase_reset(&probe), Err(PhaseError::Unavailable(status)));
+            assert_eq!(
+                surface.phase_reset(&probe),
+                Err(PhaseError::Unavailable(status))
+            );
         }
     }
 
@@ -1284,10 +1385,13 @@ mod tests {
         let mut perturbed = zero_samples();
         control[0] = PhaseSample::from_unwrapped_microturns(990_000);
         perturbed[0] = PhaseSample::from_unwrapped_microturns(1_010_000);
-        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
-            key: probe,
-            outcome: RowOutcome::Measured { control, perturbed },
-        }])
+        let surface = PhaseResponseSurface::new(
+            test_source_binding(),
+            vec![TransferRow {
+                key: probe,
+                outcome: RowOutcome::Measured { control, perturbed },
+            }],
+        )
         .unwrap();
 
         let response = surface.phase_reset(&probe).unwrap();
