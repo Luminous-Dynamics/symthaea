@@ -469,7 +469,7 @@ impl StateRoutingValidationReport {
     }
 }
 
-const STATE_ROUTING_NEGATIVE_CONTROLS: [(&str, &str, &str, &str); STATE_ROUTING_NEGATIVE_CONTROLS] = [
+const STATE_ROUTING_NEGATIVE_CONTROLS: [(&str, &str, &str, &str); STATE_ROUTING_NEGATIVE_COUNT] = [
     ("SR-N01", "lexical_alias_unrelated_family", "false sharing", "REJECT_CROSS_SCOPE_SHARE"),
     ("SR-N02", "unreceipted_cross_cluster_copy", "transfer provenance", "REJECT_UNRECEIPTED_TRANSFER"),
     ("SR-N03", "stale_evaluator_epoch_currentness", "stale evidence", "REJECT_STALE_CURRENTNESS"),
@@ -482,14 +482,14 @@ const STATE_ROUTING_NEGATIVE_CONTROLS: [(&str, &str, &str, &str); STATE_ROUTING_
     ("SR-N10", "missing_lineage_false_share", "provenance failure", "REJECT_UNGROUNDED_SHARING"),
 ];
 
-const STATE_ROUTING_POSITIVE_CONTROLS: [(&str, &str); STATE_ROUTING_POSITIVE_CONTROLS] = [
+const STATE_ROUTING_POSITIVE_CONTROLS: [(&str, &str); STATE_ROUTING_POSITIVE_COUNT] = [
     ("SR-P01", "ALLOW_SCOPED_REUSE"),
     ("SR-P02", "ALLOW_RECEIPTED_TRANSFER"),
     ("SR-P03", "REVALIDATE_BEFORE_REUSE"),
     ("SR-P04", "PRESERVE_SCOPED_CONTRADICTION"),
 ];
 
-const STATE_ROUTING_ABSTENTION_CONTROLS: [(&str, &str); STATE_ROUTING_ABSTENTION_CONTROLS] = [
+const STATE_ROUTING_ABSTENTION_CONTROLS: [(&str, &str); STATE_ROUTING_ABSTENTION_COUNT] = [
     ("SR-A01", "ABSTAIN_SCOPE_UNIDENTIFIED"),
     ("SR-A02", "ABSTAIN_INSUFFICIENT_PROVENANCE"),
 ];
