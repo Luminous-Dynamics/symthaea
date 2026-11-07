@@ -249,8 +249,7 @@ impl<'de> Visitor<'de> for ObjectVisitor<'_, '_> {
 
             let child = map.next_value::<&RawValue>()?;
             let child_pointer = join_pointer(&self.pointer, &key);
-            if let Err(error) = self.state.visit(child, &child_pointer, self.depth + 1)
-            {
+            if let Err(error) = self.state.visit(child, &child_pointer, self.depth + 1) {
                 self.state.deferred_error = Some(error.clone());
                 return Err(de::Error::custom(error));
             }
@@ -279,8 +278,7 @@ impl<'de> Visitor<'de> for ArrayVisitor<'_, '_> {
         let mut index = 0usize;
         while let Some(child) = sequence.next_element::<&RawValue>()? {
             let child_pointer = join_pointer(&self.pointer, &index.to_string());
-            if let Err(error) = self.state.visit(child, &child_pointer, self.depth + 1)
-            {
+            if let Err(error) = self.state.visit(child, &child_pointer, self.depth + 1) {
                 self.state.deferred_error = Some(error.clone());
                 return Err(de::Error::custom(error));
             }
