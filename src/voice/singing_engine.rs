@@ -460,6 +460,81 @@ mod tests {
         assert_eq!(decoded.phrases.len(), 1);
     }
 
+    fn performance_with_melisma() -> VocalPerformance {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 246.94,
+                start_time: 0.2,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 261.63,
+                start_time: 0.4,
+                duration: 0.3,
+                velocity: 0.7,
+            },
+        ];
+        VocalPerformance::from_melody("light", &notes, "en").unwrap()
+    }
+
+    #[test]
+    fn non_finite_melisma_values_are_rejected() {
+        let mut performance = performance_with_melisma();
+        performance.syllables[0].melisma_notes[0].duration = f32::NAN;
+        assert!(performance.validate().is_err());
+    }
+
+    #[test]
+    fn overlapping_melisma_notes_are_rejected() {
+        let mut performance = performance_with_melisma();
+        performance.syllables[0].melisma_notes[0].start_time = 0.19;
+        let error = performance.validate().unwrap_err().to_string();
+        assert!(error.contains("overlap"), "{error}");
+    }
+
+    #[test]
+    fn invalid_note_velocity_and_phoneme_duration_are_rejected() {
+        let mut invalid_velocity = performance_with_melisma();
+        invalid_velocity.syllables[0].note.velocity = f32::INFINITY;
+        assert!(invalid_velocity.validate().is_err());
+
+        let mut invalid_phone = performance_with_melisma();
+        invalid_phone.syllables[0].phonemes[0].natural_duration_s = f32::NAN;
+        assert!(invalid_phone.validate().is_err());
+    }
+
+    #[test]
+    fn non_finite_and_non_chronological_pitch_curves_are_rejected() {
+        let mut non_finite = performance_with_melisma();
+        non_finite.pitch_curve[0].frequency_hz = f32::NAN;
+        assert!(non_finite.validate().is_err());
+
+        let mut backwards = performance_with_melisma();
+        backwards.pitch_curve[0].time_s = 0.05;
+        backwards.pitch_curve[1].time_s = 0.0;
+        let error = backwards.validate().unwrap_err().to_string();
+        assert!(error.contains("pitch curve point"), "{error}");
+    }
+
+    #[test]
+    fn expression_curves_must_be_chronological_and_phrase_ranges_complete() {
+        let mut backwards = performance_with_melisma();
+        backwards.phrases[0].expression_curve[0].time_s = 0.1;
+        backwards.phrases[0].expression_curve[1].time_s = 0.0;
+        assert!(backwards.validate().is_err());
+
+        let mut missing_syllable = performance_with_melisma();
+        missing_syllable.phrases[0].syllable_start = 1;
+        assert!(missing_syllable.validate().is_err());
+    }
+
     #[test]
     fn surplus_notes_become_melisma() {
         let notes = [
