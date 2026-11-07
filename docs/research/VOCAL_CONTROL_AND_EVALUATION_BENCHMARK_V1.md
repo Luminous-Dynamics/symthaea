@@ -31,7 +31,7 @@ Primary metrics:
 - exact-phone onset/offset/duration error;
 - note FFE, GPE and VDE;
 - score-independent F0 and voicing coverage;
-- melisma vowel-span coverage;
+- melisma vowel-span coverage, including rests within a melisma;
 - per-phone and per-register breakdowns.
 
 ### Track B — Zero-shot identity and voice consistency
@@ -229,7 +229,7 @@ These values are initial engineering goals. Freeze final thresholds only after t
 - Human-verified lyric comprehension at least 95% on the declared supported-language/register domain.
 - Median pitch error at most 25 cents and p95 at most 60 cents on qualified score-conditioned cases.
 - Median note/vowel onset error at most 30 ms on the frozen reference subset.
-- No silent lyric truncation, missing note, or invented vowel.
+- No silent lyric truncation, missing note, invented vowel, or compressed explicit rest.
 - 100% coverage for synthetic positive melisma controls; truncated and consonant-only negative controls must fail.
 
 ### Perceptual quality
