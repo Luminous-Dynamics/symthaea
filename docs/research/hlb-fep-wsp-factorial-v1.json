@@ -336,7 +336,14 @@
         "semantic_quotient_rule_count",
         "model_posterior_aggregation_error_nats",
         "quotient_action_ranking_invariance",
-        "label_redundancy_entropy_nats"
+        "label_redundancy_entropy_nats",
+        "known_state_feedback_score_decomposition_error_nats",
+        "known_state_feedback_pragmatic_risk_kl_nats",
+        "known_state_feedback_epistemic_value_nats",
+        "known_state_feedback_action_cost_nats",
+        "known_state_feedback_selected_action_id",
+        "known_state_feedback_posterior_support_size",
+        "known_state_feedback_zero_posterior_model_count"
       ],
       "negative_controls": [
         "random_partial_observation_policy",
@@ -723,6 +730,22 @@
     {
       "id": "label_permutation_semantic_canary",
       "scope": "Output-label permutation control: the function's indexed output pattern remains but semantic names are permuted; reader must recover the new index-to-name mapping or abstain"
+    },
+    {
+      "id": "three_ball_known_state_pragmatic_only",
+      "scope": "Minimize KL[Q(feedback | action) || C(feedback)] on the same known-state feedback probe set, with epistemic weight fixed to zero"
+    },
+    {
+      "id": "three_ball_known_state_model_eig_only",
+      "scope": "Maximize one-step Dirichlet-BMR model information gain on the same known-state feedback probe set, with pragmatic risk and action cost disabled"
+    },
+    {
+      "id": "three_ball_known_state_combined_one_step_efe",
+      "scope": "Minimize pragmatic KL minus a preregistered weight times prospective model EIG plus explicit action cost, using the shared known-state posterior predictive model"
+    },
+    {
+      "id": "three_ball_known_state_random_action",
+      "scope": "Uniform random legal feedback choice including no-choice, with identical action set and per-action cost"
     }
   ],
   "seeds": {
@@ -809,7 +832,12 @@
       "task_semantics_identification_accuracy",
       "heldout_function_prediction_accuracy",
       "causal_intervention_prediction_accuracy",
-      "semantic_claim_false_positive_rate"
+      "semantic_claim_false_positive_rate",
+      "known_state_feedback_pragmatic_risk_kl_nats",
+      "known_state_feedback_model_information_gain_nats",
+      "known_state_feedback_expected_free_energy_nats",
+      "known_state_feedback_action_ranking_regret",
+      "known_state_feedback_score_decomposition_error_nats"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -866,7 +894,11 @@
       "known_state_feedback_fixture_status",
       "full_pomdp_parent_state_posterior_update_status",
       "model_conditioned_parent_state_count_increment_contract",
-      "gaze_vision_action_information_gain_nats"
+      "gaze_vision_action_information_gain_nats",
+      "preference_log_normalization_error",
+      "negative_or_nonfinite_action_cost_rejection_rate",
+      "invalid_epistemic_weight_rejection_rate",
+      "zero_information_no_choice_control_error"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -956,7 +988,9 @@
     "The causal weight-reading task must distinguish structural weight arithmetic from semantic interpretation: output labels and task names are randomized, label permutations are hidden from the reader, and predictions are scored against actual outputs under sealed parameter-group interventions. Dataset-name guesses alone never count as successful interpretation.",
     "The feedback-only known-state three-ball quotient fixture is reported separately from full-task reproduction; it must compare prospective Dirichlet model-EIG, predictive outcome masses, post-outcome semantic-class posterior aggregation, and action rankings across 81 labelled versus 75 quotient hypotheses, including a no-choice zero-information control.",
     "Prospective Dirichlet model-EIG derives each action-outcome probability as the mixture of per-model posterior-predictive probabilities weighted by the current posterior model belief from BMR; it rejects missing, duplicate, or unknown model IDs, per-model predictive distributions that do not normalize, and caller-supplied aggregate probabilities that disagree with the reconstructed mixture.",
-    "The known-ball-state feedback-only Dirichlet EIG fixture must not be reported as full POMDP reproduction. Full partial-observation qualification requires action/outcome-conditioned parent-state posterior expectations and a declared, provenance-bound sufficient-statistic update convention; a shared known-state count increment is insufficient."
+    "The known-ball-state feedback-only Dirichlet EIG fixture must not be reported as full POMDP reproduction. Full partial-observation qualification requires action/outcome-conditioned parent-state posterior expectations and a declared, provenance-bound sufficient-statistic update convention; a shared known-state count increment is insufficient.",
+    "The known-state feedback action scorer is evaluated separately from the full partially observed task. It must reproduce G(a)=KL[Q(feedback|a,D)||C(feedback)]-lambda_info*I(model;feedback|a,D)+action_cost under a fixed known ball-colour state and fixed gaze, with the three-ball feedback log preferences [0,2,-6] nats in no-feedback/correct/incorrect order.",
+    "The known-state action score is compared against random, pragmatic-only (lambda_info=0), model-EIG-only, and combined one-step FEP-style baselines under the same legal action set and cost; preference risk, model EIG, epistemic weight, and action cost are reported separately. This is not evidence of full POMDP performance or production ActiveInferenceAgent integration."
   ],
   "research_references": [
     {
