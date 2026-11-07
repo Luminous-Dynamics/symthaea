@@ -36,7 +36,7 @@ pub struct SearchBudget {
     pub max_wall_clock_hours: f64,
 }
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SplitRole {
     Train,
@@ -266,11 +266,11 @@ impl HceEpoch {
         if self.splits.len() != 5 || roles != [1, 1, 1, 1, 1] {
             return Err(HceError::MissingOrDuplicateRole);
         }
-        if self.selection_policy.finalize_search_before_selection != true
-            || self.selection_policy.search_cannot_read_selection != true
-            || self.selection_policy.selection_score_not_returned_to_search != true
-            || self.selection_policy.confirmation_after_candidate_freeze != true
-            || self.selection_policy.transfer_after_candidate_freeze != true
+        if !self.selection_policy.finalize_search_before_selection
+            || !self.selection_policy.search_cannot_read_selection
+            || !self.selection_policy.selection_score_not_returned_to_search
+            || !self.selection_policy.confirmation_after_candidate_freeze
+            || !self.selection_policy.transfer_after_candidate_freeze
         {
             return Err(HceError::InvalidSelectionPolicy);
         }
@@ -306,7 +306,7 @@ pub enum ExecutionRegime {
     AsynchronousSteadyState,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AttemptDisposition {
     Valid,
@@ -445,6 +445,9 @@ pub fn analyze_worker_trace(trace: &WorkerTrace) -> Result<WorkerTraceReport, Tr
         let duration = attempt.end_ms - attempt.start_ms;
         total_busy = total_busy.checked_add(duration).ok_or(TraceError::WorkerCapacityOverflow)?;
         total_cost += attempt.resource_cost_units;
+        if !total_cost.is_finite() {
+            return Err(TraceError::InvalidResourceCost(attempt.attempt_id.clone()));
+        }
         durations.push(duration);
         per_worker.entry(attempt.worker_id).or_default().push(attempt);
 
