@@ -246,6 +246,25 @@ These counts use accepted statuses `sat-verified` and `unsat-verified`. Raw `uns
 
 The AI SAT subtrack's Lymphosat result remains a separate metric: **146 SAT instances**. The full `green_lymphosat[main-ai]` row in the instance-wise file has 251 verified results (146 SAT and 105 UNSAT), while `green_lymphosat-verified[main-ai]` is the SAT-only 146-result row used for the AI SAT subtrack comparison. Do not conflate the SAT-only recognition result with total Main Track solves.
 
+The competition's **award podiums are separate from the raw ordering of every submitted solver configuration**. The 2026 presentation's combined Main Track podium is 276 / 255 / 240 solved (satsuma-iter+kissat, Kissat-MAB-HyPre, EDA-Kissat-v2). The instance-wise CSV also has the same-team `anders_satsuma-iter-ae-kissat-mab[main]` row at 269; preserve it in raw solver comparisons even though the official award slide lists the next eligible podium entry. Do not discard a high-performing configuration from raw baseline analysis merely because prize eligibility yields a different podium.
+
+### Separate SAT and UNSAT track results
+
+The SAT-only ranking must not be inferred from total Main Track solves. Recomputed from the 191 SAT-labeled rows per solver in the pinned CSV (SAT PAR-2 uses the sum of the 191 SAT-instance score fields divided by 191), the leading rows are:
+
+| Main Track SAT solver | SAT solved | SAT PAR-2 |
+|---|---:|---:|
+| `anders_satsuma-iter-ae-kissat-mab[main]` | 136 | 3430.953508 |
+| `zheng_kissat-mab-hypre[main]` | 134 | 3445.917749 |
+| `guo_kissat-ae-hucb[main]` | 133 | 3507.773298 |
+| `guo_kissat-ae-eg[main]` | 133 | 3521.796230 |
+
+The AI SAT subtrack includes Lymphosat at 146 / PAR-2 2813.498010. The official SAT award table lists satsuma-iter+ae-kissat-mab (136), Kissat-MAB-HyPre (134), and AE-kissat-HUCB (133); its AI row is listed separately.
+
+For the UNSAT-only table, the leading Main rows are satsuma-iter+kissat at 149 / PAR-2 1743.835904, Kissat-MAB-HyPre-V2 at 121 / PAR-2 3073.614337, and EDA-Kissat-v3 at 111 / PAR-2 3843.298434. This is a different optimization surface from SAT solving and should have separate policy and specialist analysis.
+
+The source PDF's overall and subtrack tables are at slides 13, 16 and 18; the official index records the August 10 correction that included two initially omitted solvers and changed the Main SAT podium. Link: [updated SAT Competition 2026 presentation](https://satcompetition.github.io/2026/downloads/satcomp26slides.pdf) · [official index and correction notice](https://satcompetition.github.io/2026/).
+
 ### Recomputed virtual-best diagnostics
 
 The CSV does not provide a trusted explicit VBS row, so the following are **our derived per-instance oracles**, not official competition leaderboard rows.
