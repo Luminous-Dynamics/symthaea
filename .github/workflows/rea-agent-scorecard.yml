@@ -1,0 +1,82 @@
+name: REA Agent Scorecard
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "tools/rea-agent-scorecard/**"
+      - "tools/rea-claim-replay-verifier/**"
+      - "crates/domains/symthaea-rea-compat/**"
+      - "src/rea_compat/**"
+      - ".github/workflows/rea-agent-scorecard.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-agent-scorecard-${ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
+      RUSTUP_TOOLCHAIN: "1.99.1"
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: 1.99.1
+
+      - name: Verify exact compiler and source revision
+        run: |
+          test "$(rustc --version)" = "rustc 1.99.1 (58cf8f9c3 2026-10-13)"
+          echo "tested_commit=$(git rev-parse HEAD)"
+          rustc --version --verbose
+          cargo --version
+          uname -a
+
+      - name: Resolve isolated scorecard lockfile
+        run: cargo generate-lockfile --manifest-path tools/rea-agent-scorecard/Cargo.toml
+
+      - name: Audit scorecard dependency graph
+        run: cargo tree --manifest-path tools/rea-agent-scorecard/Cargo.toml --locked -e normal,dev
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path tools/rea-agent-scorecard/Cargo.toml -- --check
+
+      - name: Run scorer and adversarial conformance tests
+        run: cargo test --manifest-path tools/rea-agent-scorecard/Cargo.toml --locked
+
+      - name: Warnings-denied Clippy
+        run: cargo clippy --manifest-path tools/rea-agent-scorecard/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Record exact qualification context
+        if: always()
+        run: |
+          {
+            echo "tested_commit=$(git rev-parse HEAD)"
+            echo "rust_toolchain=1.99.1"
+            rustc --version --verbose
+            cargo --version
+            sha256sum tools/rea-agent-scorecard/Cargo.lock
+          } | tee tools/rea-agent-scorecard/qualification-context.txt
+
+      - name: Archive scorecard lockfile and qualification context
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-agent-scorecard-qualification
+          path: |
+            tools/rea-agent-scorecard/Cargo.lock
+            tools/rea-agent-scorecard/qualification-context.txt
+          if-no-files-found: warn
+          retention-days: 14
