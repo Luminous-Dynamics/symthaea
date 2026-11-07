@@ -177,6 +177,9 @@ fn divide_signed_by_unsigned(value: i128, divisor: u128) -> Result<i128, Rationa
     if divisor == 0 {
         return Err(RationalError::ZeroDenominator);
     }
+    if value == 0 {
+        return Ok(0);
+    }
     if divisor == (1u128 << 127) {
         return if value == i128::MIN { Ok(-1) } else { Err(RationalError::Overflow) };
     }
