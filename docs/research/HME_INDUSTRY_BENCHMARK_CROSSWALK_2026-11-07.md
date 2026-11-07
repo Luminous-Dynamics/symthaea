@@ -317,3 +317,21 @@ The projection comparison must include the September 2026 paper by Salahudeen, M
 - Output D→256: independently seeded sign/permutation, FWHT and selected-coordinate readout, or a Hadamard-submatrix alternative; compare with an exact rank-one learned adapter.
 
 The model is O(D log D) transform work versus the current dense O(256D) projection arithmetic, but operation counts are not latency claims. These transforms alter the projection profile; compare both static regression controls and actual HDC-LTC temporal/online-learning behavior. The paper's regression gains cannot be generalized to liquid dynamics without those experiments.
+
+
+## 16. Fast Quantized JL (October 2026): approximate compression comparator
+
+A current theoretical comparator is Korakitis and Nakos, “Fast Quantized Johnson–Lindenstrauss Transforms,” arXiv:2610.16289 (posted October 12, 2026). It proposes D-FQJL (Hadamard sketch plus Gaussian dithering) and P-FQJL (Hadamard sketch plus permutation) for one-bit asymmetric quantized inner-product estimation, with O(d log d) application time and different embedding-dimension guarantees. Its motivating application is transformer KV-cache compression.
+
+This work is relevant for HME's fast-tier approximate code, but its concentration/failure guarantees are statistical; the returned inner-product estimate is not a deterministic worst-case upper bound on an exact ContinuousHV score. Therefore:
+- benchmark D-FQJL and P-FQJL as explicitly approximate profiles;
+- measure estimator bias/variance, concentration failure, memory, compute and task quality;
+- allow them to order candidates or trigger refinement;
+- do not let their confidence estimate authorize a zero-false-prune ExactComplete result unless a separate, conservative, verified upper certificate is constructed.
+
+HME's distinctive test is to compare probabilistic quantized sketches against its certified global/blockwise residual bounds under the same task, memory budget and exact full-payload oracle. Keep exact assurance, statistical confidence and empirical recall as three different labels.
+
+Official/preprint references:
+- https://arxiv.org/abs/2610.16289
+- https://alma.di.uoa.gr/node/771
+
