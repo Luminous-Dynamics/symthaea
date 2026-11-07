@@ -43,6 +43,13 @@ from pathlib import Path
 import numpy as np
 import onnxruntime as ort
 
+from diffsinger_phonemes import (
+    duration_per_mapped_phone,
+    map_syllable_phones,
+    require_melisma_vowel,
+    resolve_language_id,
+)
+
 HEAD_FRAMES = 8
 TAIL_FRAMES = 8
 SAMPLE_RATE = 44100
@@ -51,26 +58,6 @@ FRAME_MS = 1000.0 * HOP_SIZE / SAMPLE_RATE  # ~11.61 ms
 PROTOCOL_VERSION = 1
 PROVIDER_ID = "diffsinger-local"
 
-# IPA -> ARPAbet-style phone (matches src/voice/diffsinger_phonemes.rs's
-# now-removed Rust table 1:1 -- kept here since this is the only remaining
-# copy after the Rust ONNX path was replaced by this worker).
-IPA_TO_ARPABET = {
-    "aɪ": ["ay"], "aʊ": ["aw"], "eɪ": ["ey"], "oʊ": ["ow"], "ɔɪ": ["oy"],
-    "iː": ["iy"], "uː": ["uw"], "ɑː": ["aa"], "ɔː": ["ao"], "ɜː": ["er"],
-    "æ": ["ae"], "ɑ": ["aa"], "ɒ": ["aa"], "ɔ": ["ao"], "ə": ["ax"],
-    "ɛ": ["eh"], "ɪ": ["ih"], "ʊ": ["uh"], "ʌ": ["ah"], "i": ["iy"],
-    "u": ["uw"], "a": ["ah"],
-    "tʃ": ["ch"], "dʒ": ["jh"], "ð": ["dh"], "ŋ": ["ng"], "ɹ": ["r"],
-    "ʃ": ["sh"], "ʒ": ["zh"], "θ": ["th"],
-    "b": ["b"], "d": ["d"], "f": ["f"], "ɡ": ["g"], "g": ["g"], "h": ["hh"],
-    "j": ["y"], "k": ["k"], "l": ["l"], "m": ["m"], "n": ["n"], "p": ["p"],
-    "s": ["s"], "t": ["t"], "v": ["v"], "w": ["w"], "z": ["z"],
-    "ks": ["k", "s"],
-}
-
-
-def ipa_to_arpabet(ipa: str):
-    return IPA_TO_ARPABET.get(ipa, ["ax"])
 
 
 def hz_to_tone(hz: float) -> float:
@@ -117,7 +104,7 @@ class DiffSingerModel:
         return self.phoneme_ids.get(phoneme)
 
     def language_id(self, lang: str) -> int:
-        return self.language_ids.get(lang, 0)
+        return resolve_language_id(self.language_ids, lang)
 
     def build_score(self, performance: dict):
         """Walk a serialized VocalPerformance into (tokens, languages,
@@ -129,27 +116,34 @@ class DiffSingerModel:
         durations_ms = []
         target_hz = []
 
-        for syllable in performance["syllables"]:
+        english_language_id = self.language_id("en")
+        for syllable_index, syllable in enumerate(performance["syllables"]):
             phonemes = syllable["phonemes"]
+            mapped_groups, last_vowel = map_syllable_phones(phonemes, syllable_index)
             total_natural_ms = max(sum(p["natural_duration_s"] * 1000.0 for p in phonemes), 1.0)
             note_ms = max(syllable["note"]["duration"] * 1000.0, 1.0)
-            last_arpabet = "ax"
-            for phoneme in phonemes:
-                for arpabet in ipa_to_arpabet(phoneme["ipa"]):
+            for phoneme, mapped_phones in zip(phonemes, mapped_groups, strict=True):
+                per_token_ms = duration_per_mapped_phone(
+                    phoneme["natural_duration_s"] * 1000.0,
+                    len(mapped_phones),
+                )
+                for arpabet in mapped_phones:
                     arpabet_phonemes.append(arpabet)
-                    share = (phoneme["natural_duration_s"] * 1000.0) / total_natural_ms
+                    share = per_token_ms / total_natural_ms
                     durations_ms.append(max(share * note_ms, 1.0))
                     target_hz.append(syllable["note"]["frequency"])
-                    last_arpabet = arpabet
             for melisma_note in syllable["melisma_notes"]:
-                arpabet_phonemes.append(last_arpabet)
+                arpabet_phonemes.append(require_melisma_vowel(last_vowel, syllable_index))
                 durations_ms.append(max(melisma_note["duration"] * 1000.0, 1.0))
                 target_hz.append(melisma_note["frequency"])
 
         if not arpabet_phonemes:
             return None
 
-        tokens = [self.phoneme_token("SP")]
+        silence_token = self.phoneme_token("SP")
+        if silence_token is None:
+            raise ValueError("voicebank phonemes.json has no entry for 'SP'")
+        tokens = [silence_token]
         languages = [0]
         for arpabet in arpabet_phonemes:
             namespaced = f"en/{arpabet}"
@@ -157,8 +151,8 @@ class DiffSingerModel:
             if token is None:
                 raise ValueError(f"voicebank phonemes.json has no entry for '{namespaced}'")
             tokens.append(token)
-            languages.append(self.language_id("en"))
-        tokens.append(self.phoneme_token("SP"))
+            languages.append(english_language_id)
+        tokens.append(silence_token)
         languages.append(0)
 
         head_ms = FRAME_MS * HEAD_FRAMES
