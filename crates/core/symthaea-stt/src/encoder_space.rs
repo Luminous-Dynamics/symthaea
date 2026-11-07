@@ -158,8 +158,8 @@ impl AudioEncoderSpace {
         if let ProjectionSemantics::CenteredWindow {
             radius_frames,
             rotation_step_bits,
-        } = self.projection
-            && (radius_frames == 0 || rotation_step_bits == 0)
+        } = &self.projection
+            && (*radius_frames == 0 || *rotation_step_bits == 0)
         {
             invalid.push("temporal_window");
         }
