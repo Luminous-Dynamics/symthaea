@@ -124,9 +124,10 @@ struct CaseReceipt {
 #[derive(Serialize)]
 struct RunManifest {
     schema: &'static str,
-    source_revision: Option<String>,
+    source_revision: String,
     voice_id: String,
     diffsinger_worker: Option<String>,
+    diffsinger_worker_blake3: Option<String>,
     case_count: usize,
     cases: Vec<CaseReceipt>,
 }
@@ -181,22 +182,33 @@ fn blind_id(salt: &str, backend: &str, case_id: usize) -> String {
     format!("vocal-{}", &digest.to_hex()[..12])
 }
 
-fn source_revision() -> Option<String> {
-    std::env::var("VOCAL_PHONEME_REVISION")
-        .ok()
+fn source_revision(args: &[String]) -> Result<String> {
+    let revision = arg(args, "--source-revision")
+        .or_else(|| std::env::var("VOCAL_PHONEME_REVISION").ok())
         .or_else(|| std::env::var("GITHUB_SHA").ok())
         .or_else(|| {
-            let output = Command::new("git")
-                .args(["rev-parse", "HEAD"])
+            let status = Command::new("git")
+                .args(["status", "--porcelain", "--untracked-files=all"])
                 .output()
                 .ok()?;
+            if !status.status.success() || !status.stdout.is_empty() {
+                return None;
+            }
+            let output = Command::new("git").args(["rev-parse", "HEAD"]).output().ok()?;
             if !output.status.success() {
                 return None;
             }
-            let revision = String::from_utf8(output.stdout).ok()?;
-            let revision = revision.trim();
-            (!revision.is_empty()).then(|| revision.to_string())
+            String::from_utf8(output.stdout)
+                .ok()
+                .map(|value| value.trim().to_string())
         })
+        .context(
+            "exact source revision unavailable; provide --source-revision, VOCAL_PHONEME_REVISION, or a clean Git checkout",
+        )?;
+    if revision.len() != 40 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        anyhow::bail!("source revision must be a 40-character hexadecimal Git commit SHA");
+    }
+    Ok(revision.to_ascii_lowercase())
 }
 
 fn performance_digest(performance: &VocalPerformance) -> Result<String> {
@@ -511,9 +523,10 @@ fn main() -> Result<()> {
     }
     let run_manifest = RunManifest {
         schema: "muse-vocal-run/v1",
-        source_revision: source_revision(),
+        source_revision: source_revision(&args)?,
         voice_id: voice.clone(),
         diffsinger_worker: worker.as_ref().map(|path| path.display().to_string()),
+        diffsinger_worker_blake3: worker.as_ref().map(|path| artifact_digest(path)).transpose()?,
         case_count: case_receipts.len(),
         cases: case_receipts,
     };
