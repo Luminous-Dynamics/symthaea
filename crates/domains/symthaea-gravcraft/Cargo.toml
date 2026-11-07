@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Non-inertial embodiment: metric perturbation propulsion via gravity amplifiers — the craft moves by warping spacetime, not applying force"
+description = "Experimental ADM metric-ansatz and geodesic reference sandbox for three-amplifier shift fields"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/luminous-dynamics/symthaea"
 keywords = ["gravcraft", "metric-engineering", "embodiment", "alcubierre", "hdc"]
@@ -12,6 +12,7 @@ categories = ["science", "simulation"]
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-metric-geometry-lab = { path = "../symthaea-metric-geometry-lab" }
 serde = { workspace = true }
 
 [dev-dependencies]

@@ -1,0 +1,102 @@
+name: Causal-Temporal-Geometric Physics Research
+
+on:
+  push:
+    branches:
+      - main
+      - research/causal-temporal-physics-v0.1
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/domains/symthaea-causal-set-lab/**"
+      - "crates/domains/symthaea-chain-theory-audit/**"
+      - "crates/domains/symthaea-fractal-time-lab/**"
+      - "crates/domains/symthaea-gravcraft/**"
+      - "crates/domains/symthaea-metric-geometry-lab/**"
+      - "crates/domains/symthaea-science-evidence/**"
+      - "crates/domains/symthaea-uap-observatory/**"
+      - "docs/research/CAUSAL_TEMPORAL_GEOMETRIC_PHYSICS_PROGRAM_2026-11-06.md"
+      - "docs/research/*reference-results-v0.*.md"
+      - "docs/research/uap-bearing-triangulation-reference-v0.1.md"
+      - ".github/workflows/causal-temporal-physics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: causal-temporal-physics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-rust-validation:
+    name: "${{ matrix.package }} (format + test + examples)"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - symthaea-causal-set-lab
+          - symthaea-chain-theory-audit
+          - symthaea-fractal-time-lab
+          - symthaea-gravcraft
+          - symthaea-metric-geometry-lab
+          - symthaea-science-evidence
+          - symthaea-uap-observatory
+    steps:
+      - name: Checkout exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record source and toolchain identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "source_sha=$(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "source_tree_clean=$(test -z "$(git status --porcelain)" && echo true || echo false)" | tee -a "$GITHUB_STEP_SUMMARY"
+          rustc --version | tee -a "$GITHUB_STEP_SUMMARY"
+          cargo --version | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Cache Cargo registry and build outputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-ctgp-${{ matrix.package }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-ctgp-${{ matrix.package }}-
+
+      - name: Format package
+        run: cargo fmt --check -p ${{ matrix.package }}
+
+      - name: Test package library on locked dependency graph
+        run: cargo test --locked -p ${{ matrix.package }} --lib
+
+      - name: Compile package examples on locked dependency graph
+        run: cargo check --locked -p ${{ matrix.package }} --examples
+
+      - name: Additional anisotropic-Heisenberg executable check
+        if: matrix.package == 'symthaea-fractal-time-lab'
+        run: cargo check --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep
+
+      - name: Publish package summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## ${{ matrix.package }}"
+            echo "- Source: ${{ github.sha }}"
+            echo "- Job result: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
