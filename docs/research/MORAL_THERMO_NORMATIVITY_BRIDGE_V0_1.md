@@ -55,7 +55,20 @@ This bridge should strengthen and operationalize that work, not replace it with 
 
 Those audits are essential prerequisites. An ethical theory cannot be stronger than the physical quantities it relies on.
 
-## 2. Nearby research and the actual novelty challenge
+## 2. Symtropy execution counterpart
+
+The formal bridge now has a concrete multi-agent simulation owner in [Symtropy CIVDYN-THERMO-AGENCY-001 #4014](https://github.com/Luminous-Dynamics/symtropy/issues/4014) and research specification [PR #4018](https://github.com/Luminous-Dynamics/symtropy/pull/4018).
+
+The project already has:
+- an inspectable six-seat collective-risk reference and exact best-response search (#3606 / #3609);
+- exact small-instance welfare allocation and persuasion/floor negative controls (#3610 / #3614);
+- a cross-scale basin/district/household resource shock and recovery path (#3621 / #3666);
+- a separate finite-population selection extension (#3646 / #3648);
+- an embodied multi-entity `ConsciousnessField` with partner history/resonance and energy-policy coupling in `symtropy-consciousness-physics`.
+
+This means the research has an existing Symtropy and multi-agent foundation. It does **not** mean the integrated thermodynamics-to-morality experiment has already been run. The current embodied energy/entropy ledger is model bookkeeping, not a fully closed physical thermodynamic model; Symtropy #3577 remains the physical claim gate. The new CIVDYN work keeps resource-stock conservation, physical thermodynamics, viability, social behavior and normative conclusions separate.
+
+## 3. Nearby research and the actual novelty challenge
 
 ### Kerdotism: a close comparator, not a reason to retreat
 
