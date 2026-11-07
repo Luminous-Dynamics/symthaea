@@ -24,6 +24,7 @@ use crate::semiring::{CheckedRational, EliminationStats, ExactFactorGraph};
 use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
+use sha2::{Digest, Sha256};
 
 
 /// Canonical transcript encoding failure.
@@ -123,6 +124,26 @@ pub fn canonical_model_transcript(
     Ok(bytes)
 }
 
+
+/// Compute the lowercase SHA-256 content identity of a canonical rational model.
+///
+/// The digest is computed here rather than accepted as caller-supplied metadata.
+/// The versioned transcript is the hash preimage; changing its encoding requires
+/// a new transcript version and therefore a new model identity.
+pub fn canonical_model_sha256_hex(
+    graph: &ExactFactorGraph<CheckedRational>,
+) -> Result<String, CanonicalModelTranscriptError> {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let transcript = canonical_model_transcript(graph)?;
+    let digest = Sha256::digest(&transcript);
+    let mut encoded = String::with_capacity(64);
+    for byte in digest.iter() {
+        encoded.push(HEX[(byte >> 4) as usize] as char);
+        encoded.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    Ok(encoded)
+}
+
 fn append_len(
     output: &mut Vec<u8>,
     field: &'static str,
@@ -151,6 +172,8 @@ pub struct FiniteModelRef<'a> {
 pub enum FiniteFamilyError {
     EmptyFamily,
     InvalidModelDigest { index: usize, digest: String },
+    ModelDigestMismatch { index: usize, supplied: String, computed: String },
+    CanonicalModelEncoding { index: usize, source: CanonicalModelTranscriptError },
     DuplicateModelDigest { digest: String },
     MissingStateBounds { variable_index: usize, state_index: usize },
     MissingQueryAssignmentWitness { query_assignment_index: usize },
@@ -182,6 +205,14 @@ impl fmt::Display for FiniteFamilyError {
             Self::InvalidModelDigest { index, digest } => write!(
                 f,
                 "model at family index {index} has invalid SHA-256 digest {digest:?}"
+            ),
+            Self::ModelDigestMismatch { index, supplied, computed } => write!(
+                f,
+                "model at family index {index} supplied digest {supplied}, but canonical model content hashes to {computed}"
+            ),
+            Self::CanonicalModelEncoding { index, source } => write!(
+                f,
+                "model at family index {index} cannot be canonically encoded: {source}"
             ),
             Self::DuplicateModelDigest { digest } => {
                 write!(f, "finite model family repeats model digest {digest}")
@@ -309,25 +340,7 @@ pub fn evaluate_finite_model_family(
         return Err(FiniteFamilyError::EmptyFamily);
     }
 
-    let mut ordered = models.iter().copied().collect::<Vec<_>>();
-    for (index, model) in ordered.iter().enumerate() {
-        if !is_sha256_digest(model.model_digest) {
-            return Err(FiniteFamilyError::InvalidModelDigest {
-                index,
-                digest: model.model_digest.to_owned(),
-            });
-        }
-    }
-    ordered.sort_by(|left, right| left.model_digest.cmp(right.model_digest));
-
-    let mut seen = BTreeSet::new();
-    for model in &ordered {
-        if !seen.insert(model.model_digest) {
-            return Err(FiniteFamilyError::DuplicateModelDigest {
-                digest: model.model_digest.to_owned(),
-            });
-        }
-    }
+    let ordered = ordered_model_refs(models)?;
 
     let cardinalities = ordered[0].graph.cardinalities().to_vec();
     let mut lower_upper: Vec<Vec<Option<StateProbabilityBounds>>> = cardinalities
@@ -499,25 +512,7 @@ pub fn evaluate_finite_model_joint_event(
         return Err(FiniteFamilyError::EmptyFamily);
     }
 
-    let mut ordered = models.iter().copied().collect::<Vec<_>>();
-    for (index, model) in ordered.iter().enumerate() {
-        if !is_sha256_digest(model.model_digest) {
-            return Err(FiniteFamilyError::InvalidModelDigest {
-                index,
-                digest: model.model_digest.to_owned(),
-            });
-        }
-    }
-    ordered.sort_by(|left, right| left.model_digest.cmp(right.model_digest));
-
-    let mut seen = BTreeSet::new();
-    for model in &ordered {
-        if !seen.insert(model.model_digest) {
-            return Err(FiniteFamilyError::DuplicateModelDigest {
-                digest: model.model_digest.to_owned(),
-            });
-        }
-    }
+    let ordered = ordered_model_refs(models)?;
 
     let cardinalities = ordered[0].graph.cardinalities().to_vec();
     let mut canonical_query = query_assignments.to_vec();
@@ -741,25 +736,7 @@ pub fn evaluate_finite_family_credal_map(
         });
     }
 
-    let mut ordered = models.iter().copied().collect::<Vec<_>>();
-    for (index, model) in ordered.iter().enumerate() {
-        if !is_sha256_digest(model.model_digest) {
-            return Err(FiniteFamilyError::InvalidModelDigest {
-                index,
-                digest: model.model_digest.to_owned(),
-            });
-        }
-    }
-    ordered.sort_by(|left, right| left.model_digest.cmp(right.model_digest));
-
-    let mut seen = BTreeSet::new();
-    for model in &ordered {
-        if !seen.insert(model.model_digest) {
-            return Err(FiniteFamilyError::DuplicateModelDigest {
-                digest: model.model_digest.to_owned(),
-            });
-        }
-    }
+    let ordered = ordered_model_refs(models)?;
 
     let cardinalities = ordered[0].graph.cardinalities().to_vec();
     let mut canonical_query = query_variables.to_vec();
@@ -1011,6 +988,67 @@ fn decode_query_assignment(mut index: usize, cardinalities: &[usize]) -> Vec<usi
         index /= cardinalities[position];
     }
     assignment
+}
+
+
+fn ordered_model_refs<'a>(
+    models: &[FiniteModelRef<'a>],
+) -> Result<Vec<FiniteModelRef<'a>>, FiniteFamilyError> {
+    if models.is_empty() {
+        return Err(FiniteFamilyError::EmptyFamily);
+    }
+
+    let mut ordered = models.to_vec();
+    for (index, model) in ordered.iter().enumerate() {
+        if !is_sha256_digest(model.model_digest) {
+            return Err(FiniteFamilyError::InvalidModelDigest {
+                index,
+                digest: model.model_digest.to_owned(),
+            });
+        }
+
+        let computed = canonical_model_sha256_hex(model.graph).map_err(|source| {
+            match source {
+                CanonicalModelTranscriptError::NegativeProbabilityPotential { factor_index } => {
+                    let factor = &model.graph.factors()[factor_index];
+                    let value = factor.values.iter()
+                        .find(|value| value.is_negative())
+                        .copied()
+                        .unwrap_or(CheckedRational::zero());
+                    FiniteFamilyError::ModelInference {
+                        model_digest: model.model_digest.to_owned(),
+                        source: RationalInferenceError::NegativePotential {
+                            factor_index,
+                            numerator: value.numerator(),
+                            denominator: value.denominator(),
+                        },
+                    }
+                }
+                other => FiniteFamilyError::CanonicalModelEncoding {
+                    index,
+                    source: other,
+                },
+            }
+        })?;
+        if computed != model.model_digest {
+            return Err(FiniteFamilyError::ModelDigestMismatch {
+                index,
+                supplied: model.model_digest.to_owned(),
+                computed,
+            });
+        }
+    }
+
+    ordered.sort_by(|left, right| left.model_digest.cmp(right.model_digest));
+    let mut seen = BTreeSet::new();
+    for model in &ordered {
+        if !seen.insert(model.model_digest) {
+            return Err(FiniteFamilyError::DuplicateModelDigest {
+                digest: model.model_digest.to_owned(),
+            });
+        }
+    }
+    Ok(ordered)
 }
 
 fn is_sha256_digest(value: &str) -> bool {
