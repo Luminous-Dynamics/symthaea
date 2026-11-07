@@ -8,7 +8,7 @@
 //! validates the DAG structure, and exhaustively checks semantic equivalence.
 //! It is a bounded circuit-compilation experiment, not a scalable QBF solver.
 
-use super::quantified_strategy::BooleanStrategyFunction;
+use super::quantified_strategy::{BooleanStrategyFunction, StrategyOwner, WinningStrategy};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A terminal or indexed decision node.
@@ -109,6 +109,10 @@ pub enum StrategyBddError {
     },
     DuplicateDependencyVariable {
         variable: usize,
+    },
+    StrategyFunctionsNotCanonical {
+        previous: usize,
+        current: usize,
     },
     UnreachableNode {
         node: usize,
@@ -218,6 +222,39 @@ pub struct StrategyBddExactOrderSearchReport {
     pub minimum_node_count: usize,
     pub orders_evaluated: usize,
     pub bdd: ReducedOrderedBdd,
+}
+
+/// Strategy-function compiler selected by the bounded optimization pipeline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StrategyBddOptimizationMethod {
+    ExactOrderSearch,
+    Sifting,
+}
+
+/// One compiled strategy function, retaining the reduced truth-table
+/// semantics and the independently checked ROBDD representation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompiledStrategyFunction {
+    pub variable: usize,
+    pub original_dependencies: Vec<usize>,
+    pub reduced_function: BooleanStrategyFunction,
+    pub support_report: StrategySupportReductionReport,
+    pub optimization_method: StrategyBddOptimizationMethod,
+    pub order_evaluations: usize,
+    pub bdd: ReducedOrderedBdd,
+}
+
+/// Collection of compiled functions belonging to one winning player.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompiledWinningStrategy {
+    pub owner: StrategyOwner,
+    pub functions: Vec<CompiledStrategyFunction>,
+    pub original_dependency_count: usize,
+    pub reduced_dependency_count: usize,
+    pub original_truth_table_entries: u128,
+    pub reduced_truth_table_entries: u128,
+    pub total_bdd_nodes: usize,
+    pub total_order_evaluations: usize,
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, StrategyBddError> {
@@ -872,6 +909,116 @@ pub fn find_exact_minimum_robdd_order(
     })
 }
 
+fn exact_order_space_fits(
+    dependency_count: usize,
+    evaluation_budget: usize,
+) -> bool {
+    let mut permutations = 1usize;
+    for factor in 2..=dependency_count {
+        let Some(next) = permutations.checked_mul(factor) else {
+            return false;
+        };
+        if next > evaluation_budget {
+            return false;
+        }
+        permutations = next;
+    }
+    true
+}
+
+/// Compile all functions of a winning strategy into support-minimized ROBDDs.
+///
+/// The caller must first independently verify the source winning strategy
+/// against its QBF prefix and CNF matrix. This function then independently
+/// verifies each support reduction and each BDD against the corresponding
+/// source truth table. It chooses exact permutation search whenever n! fits
+/// the declared order budget, and deterministic sifting otherwise.
+pub fn compile_winning_strategy_functions(
+    strategy: &WinningStrategy,
+    budget: StrategyBddBudget,
+) -> Result<CompiledWinningStrategy, StrategyBddError> {
+    let mut functions = Vec::with_capacity(strategy.functions.len());
+    let mut previous_variable = None;
+    let mut original_dependency_count = 0usize;
+    let mut reduced_dependency_count = 0usize;
+    let mut original_truth_table_entries = 0u128;
+    let mut reduced_truth_table_entries = 0u128;
+    let mut total_bdd_nodes = 0usize;
+    let mut total_order_evaluations = 0usize;
+
+    for source_function in &strategy.functions {
+        if let Some(previous) = previous_variable {
+            if source_function.variable <= previous {
+                return Err(StrategyBddError::StrategyFunctionsNotCanonical {
+                    previous,
+                    current: source_function.variable,
+                });
+            }
+        }
+        previous_variable = Some(source_function.variable);
+
+        let support = minimize_strategy_function_support(source_function, budget)?;
+        let optimization_method;
+        let order_evaluations;
+        let bdd = if exact_order_space_fits(
+            support.function.dependencies.len(),
+            budget.max_variable_order_evaluations,
+        ) {
+            let report = find_exact_minimum_robdd_order(&support.function, budget)?;
+            optimization_method = StrategyBddOptimizationMethod::ExactOrderSearch;
+            order_evaluations = report.orders_evaluated;
+            report.bdd
+        } else {
+            let report = sift_strategy_function_robdd(&support.function, budget)?;
+            optimization_method = StrategyBddOptimizationMethod::Sifting;
+            order_evaluations = report.order_evaluations;
+            report.bdd
+        };
+
+        verify_robdd_matches_strategy_function(&bdd, &support.function, budget)?;
+
+        original_dependency_count = original_dependency_count
+            .checked_add(source_function.dependencies.len())
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        reduced_dependency_count = reduced_dependency_count
+            .checked_add(support.function.dependencies.len())
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        original_truth_table_entries = original_truth_table_entries
+            .checked_add(checked_power_of_two(source_function.dependencies.len())?)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        reduced_truth_table_entries = reduced_truth_table_entries
+            .checked_add(support.report.reduced_table_entries)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        total_bdd_nodes = total_bdd_nodes
+            .checked_add(bdd.nodes.len())
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        total_order_evaluations = total_order_evaluations
+            .checked_add(order_evaluations)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+
+        functions.push(CompiledStrategyFunction {
+            variable: source_function.variable,
+            original_dependencies: source_function.dependencies.clone(),
+            reduced_function: support.function,
+            support_report: support.report,
+            optimization_method,
+            order_evaluations,
+            bdd,
+        });
+    }
+
+    Ok(CompiledWinningStrategy {
+        owner: strategy.owner,
+        functions,
+        original_dependency_count,
+        reduced_dependency_count,
+        original_truth_table_entries,
+        reduced_truth_table_entries,
+        total_bdd_nodes,
+        total_order_evaluations,
+    })
+}
+
 /// Evaluate an ROBDD using the default resource envelope.
 pub fn evaluate_robdd(
     bdd: &ReducedOrderedBdd,
@@ -1277,6 +1424,83 @@ mod tests {
                 required: 3,
                 limit: 2
             })
+        ));
+    }
+
+    #[test]
+    fn high_level_strategy_compiler_reduces_support_and_builds_exact_bdd() {
+        let source = BooleanStrategyFunction {
+            variable: 3,
+            dependencies: vec![0, 1],
+            table: BTreeMap::from([
+                (vec![false, false], false),
+                (vec![false, true], true),
+                (vec![true, false], false),
+                (vec![true, true], true),
+            ]),
+        };
+        let strategy = WinningStrategy {
+            owner: StrategyOwner::Existential,
+            functions: vec![source],
+        };
+        let compiled = compile_winning_strategy_functions(&strategy, budget()).unwrap();
+        assert_eq!(compiled.owner, StrategyOwner::Existential);
+        assert_eq!(compiled.functions.len(), 1);
+        assert_eq!(compiled.original_dependency_count, 2);
+        assert_eq!(compiled.reduced_dependency_count, 1);
+        assert_eq!(compiled.original_truth_table_entries, 4);
+        assert_eq!(compiled.reduced_truth_table_entries, 2);
+        assert_eq!(compiled.total_bdd_nodes, 1);
+        assert_eq!(
+            compiled.functions[0].optimization_method,
+            StrategyBddOptimizationMethod::ExactOrderSearch
+        );
+    }
+
+    #[test]
+    fn high_level_strategy_compiler_uses_sifting_when_exact_order_exceeds_budget() {
+        let values: Vec<bool> = (0..64)
+            .map(|mask| mask.count_ones() % 2 == 1)
+            .collect();
+        let source = function(&[0, 1, 2, 3, 4, 5], &values);
+        let strategy = WinningStrategy {
+            owner: StrategyOwner::Universal,
+            functions: vec![source],
+        };
+        let constrained = StrategyBddBudget {
+            max_variable_order_evaluations: 128,
+            ..budget()
+        };
+        let compiled = compile_winning_strategy_functions(&strategy, constrained).unwrap();
+        assert_eq!(
+            compiled.functions[0].optimization_method,
+            StrategyBddOptimizationMethod::Sifting
+        );
+        assert_eq!(compiled.functions[0].reduced_function.dependencies.len(), 6);
+        assert!(compiled.total_bdd_nodes > 0);
+        assert!(compiled.total_order_evaluations <= 128);
+    }
+
+    #[test]
+    fn high_level_compiler_rejects_noncanonical_strategy_function_order() {
+        let first = function(&[0], &[false, true]);
+        let second = BooleanStrategyFunction {
+            variable: 1,
+            ..function(&[0], &[false, true])
+        };
+        let strategy = WinningStrategy {
+            owner: StrategyOwner::Existential,
+            functions: vec![
+                BooleanStrategyFunction {
+                    variable: 2,
+                    ..second.clone()
+                },
+                first,
+            ],
+        };
+        assert!(matches!(
+            compile_winning_strategy_functions(&strategy, budget()),
+            Err(StrategyBddError::StrategyFunctionsNotCanonical { .. })
         ));
     }
 
