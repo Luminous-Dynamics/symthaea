@@ -31,3 +31,5 @@ For discrete outcomes, CVaR averages the worst 1 - confidence fraction of the pr
 Information gain and EVSI differ. An observation may be informative while never changing the optimal decision, producing zero EVSI. The calculator validates probability mass, dimensions, unique labels, finite utilities/costs and risk inputs, but it does not validate whether states, priors, likelihoods, utilities, costs or downside models are scientifically defensible.
 
 The crate is research tooling, not an evaluator authority, receipt service, scientific oracle or promotion service. It is intentionally outside the root production Cargo workspace.
+
+The EVSI input's structural contract is also published at `docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_SCHEMA_V0_2026-11-07.json`. The Rust semantic validator additionally checks cross-array dimensions and probability mass. The JSON Schema and semantic checks are separate; neither authenticates the source estimates or proves the model complete.
