@@ -270,11 +270,11 @@
         },
         "minimum_decimal": {
           "type": "string",
-          "pattern": "^-?(0|[1-9][0-9]*)$"
+          "pattern": "^(?:0|[1-9][0-9]*|-[1-9][0-9]*)$"
         },
         "maximum_decimal": {
           "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)$"
+          "pattern": "^(?:0|[1-9][0-9]*|-[1-9][0-9]*)$"
         },
         "token_form": {
           "const": "integer_token_only"
@@ -313,11 +313,11 @@
         },
         "minimum_decimal": {
           "type": "string",
-          "pattern": "^-?(0|[1-9][0-9]*)$"
+          "pattern": "^(?:0|[1-9][0-9]*|-[1-9][0-9]*)$"
         },
         "maximum_decimal": {
           "type": "string",
-          "pattern": "^(0|[1-9][0-9]*)$"
+          "pattern": "^(?:0|[1-9][0-9]*|-[1-9][0-9]*)$"
         },
         "grammar": {
           "const": "canonical_decimal_integer"
