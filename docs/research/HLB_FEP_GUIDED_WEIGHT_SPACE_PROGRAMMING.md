@@ -485,6 +485,26 @@ Keep four claims distinct:
 
 Only the fourth supports a strong claim of weight-space diagnosis. This task is initially a benchmark specification; no Symthaea semantic-reading capability result is claimed.
 
+### F.1 Joint-belief foveation and gaze/choice lookahead
+
+The new `crates/core/symthaea-fep/src/three_ball_partial_observation.rs` module adds the partial-observation layer that the earlier known-state feedback evaluator explicitly omitted.
+
+It maintains a normalized joint posterior (P(M,S)) over rule identity (M) and the 27 possible left/centre/right colour assignments (S). The initial model prior can be source-labelled (all 81 hypotheses) or quotient-compressed (75 semantic feedback tensors in the audited public SPM generator); hidden-state priors are independently supplied. Following observations, the full joint matrix is conditioned directly, so model/state correlations are not discarded by separately updating two marginals.
+
+For a gaze action (g), the sensor deterministically reveals the selected ball's colour in this first task adapter. The module computes:
+
+```text
+I(M; O_g)
+I(S; O_g | M)
+I((M,S); O_g) = I(M; O_g) + I(S; O_g | M)
+```
+
+For each possible visual colour, it conditions the joint belief, evaluates the four feedback actions (red, green, blue, no response), and chooses the lowest expected-free-energy response. It compares each gaze-then-choice contingency with the immediate-choice baseline. The two-step policy score contains the expected downstream choice free energy, gaze cost, and the gaze observation's model/conditional-state information value.
+
+**Scope and claim boundary:** this is a finite-hypothesis, deterministic-sensor, two-step receding-horizon approximation. It does not yet represent SPM's complete multi-step POMDP, continuous Dirichlet parameter uncertainty, noisy vision, gaze dynamics, or a learned visual generative model. It is useful as an executable intermediate and a target for exact comparison with the published task, not as an exact reproduction by itself.
+
+Qualification tests cover the `ln(3)` nats of state information from one uniformly distributed ball colour, zero model information under an independent model/state prior, preservation of model/state correlations after feedback, impossible-observation rejection, and invariance of gaze/choice scores between labelled and semantically quotient rule families.
+
 ## 6. Baselines and fairness requirements
 
 ### Temporal models
