@@ -246,7 +246,9 @@ pub fn run_three_ball_paired_policy_benchmark(
     let mut seen_policies = BTreeSet::new();
     for policy_kind in policy_kinds.iter().copied() {
         if !seen_policies.insert(policy_kind) {
-            return Err(ThreeBallSequentialDiscoveryError::DuplicatePolicy(policy_kind));
+            return Err(ThreeBallSequentialDiscoveryError::DuplicatePolicy(
+                policy_kind,
+            ));
         }
     }
 
@@ -285,12 +287,16 @@ pub fn run_three_ball_paired_policy_benchmark(
             paired_seed_count: seeds.len(),
             mean_delta_final_true_semantic_class_posterior: mean(&deltas.final_true_posterior),
             ci95_delta_final_true_semantic_class_posterior: bootstrap_interval(
-                &deltas.final_true_posterior, bootstrap_seed ^ 0x01,
+                &deltas.final_true_posterior,
+                bootstrap_seed ^ 0x01,
             ),
             mean_delta_brier_score: mean(&deltas.brier),
             ci95_delta_brier_score: bootstrap_interval(&deltas.brier, bootstrap_seed ^ 0x02),
             mean_delta_correct_commitment_rate: mean(&deltas.correct_commitment),
-            ci95_delta_correct_commitment_rate: bootstrap_interval(&deltas.correct_commitment, bootstrap_seed ^ 0x03),
+            ci95_delta_correct_commitment_rate: bootstrap_interval(
+                &deltas.correct_commitment,
+                bootstrap_seed ^ 0x03,
+            ),
             mean_delta_cumulative_reward: mean(&deltas.reward),
             ci95_delta_cumulative_reward: bootstrap_interval(&deltas.reward, bootstrap_seed ^ 0x04),
             mean_delta_gaze_count: mean(&deltas.gaze_count),
@@ -474,23 +480,22 @@ pub fn run_three_ball_sequential_discovery(
                     action_count: decision.action_scores.len(),
                 })?,
         };
-        let action = decision
-            .action_scores
-            .get(selected_action_index)
-            .ok_or(ThreeBallSequentialDiscoveryError::InvalidSelectedAction {
+        let action = decision.action_scores.get(selected_action_index).ok_or(
+            ThreeBallSequentialDiscoveryError::InvalidSelectedAction {
                 index: decision.selected_action_index,
                 action_count: decision.action_scores.len(),
-            })?;
+            },
+        )?;
 
         let selected_gaze = action.location;
-        let (belief_after_gaze, observed_colour, selected_choice) =
-            if let Some(location) = selected_gaze {
-                gaze_count += 1;
-                let colour = hidden_state[location as usize];
-                let posterior = belief.condition_on_gaze(location, colour)?;
-                let selected_choice = if config.policy_kind
-                    == ThreeBallSequentialPolicyKind::UniformRandomLegalAction
-                {
+        let (belief_after_gaze, observed_colour, selected_choice) = if let Some(location) =
+            selected_gaze
+        {
+            gaze_count += 1;
+            let colour = hidden_state[location as usize];
+            let posterior = belief.condition_on_gaze(location, colour)?;
+            let selected_choice =
+                if config.policy_kind == ThreeBallSequentialPolicyKind::UniformRandomLegalAction {
                     random_response(&mut policy_rng)
                 } else {
                     action
@@ -500,17 +505,16 @@ pub fn run_three_ball_sequential_discovery(
                         .ok_or(ThreeBallSequentialDiscoveryError::MissingGazeContingency)?
                         .selected_choice
                 };
-                (posterior, Some(colour), selected_choice)
-            } else {
-                let selected_choice = if config.policy_kind
-                    == ThreeBallSequentialPolicyKind::UniformRandomLegalAction
-                {
+            (posterior, Some(colour), selected_choice)
+        } else {
+            let selected_choice =
+                if config.policy_kind == ThreeBallSequentialPolicyKind::UniformRandomLegalAction {
                     random_response(&mut policy_rng)
                 } else {
                     action.immediate_choice
                 };
-                (belief.clone(), None, selected_choice)
-            };
+            (belief.clone(), None, selected_choice)
+        };
 
         let feedback = true_rule.feedback(hidden_state, selected_choice);
         match feedback {
@@ -698,8 +702,7 @@ fn paired_policy_metric_deltas(
             .iter()
             .zip(candidate)
             .map(|(left, right)| {
-                right.final_true_semantic_class_posterior
-                    - left.final_true_semantic_class_posterior
+                right.final_true_semantic_class_posterior - left.final_true_semantic_class_posterior
             })
             .collect(),
         brier: reference
@@ -713,8 +716,15 @@ fn paired_policy_metric_deltas(
             .iter()
             .zip(candidate)
             .map(|(left, right)| {
-                (if right.trials_to_correct_rule_commitment.is_some() { 1.0 } else { 0.0 })
-                    - (if left.trials_to_correct_rule_commitment.is_some() { 1.0 } else { 0.0 })
+                (if right.trials_to_correct_rule_commitment.is_some() {
+                    1.0
+                } else {
+                    0.0
+                }) - (if left.trials_to_correct_rule_commitment.is_some() {
+                    1.0
+                } else {
+                    0.0
+                })
             })
             .collect(),
         reward: reference
@@ -736,10 +746,7 @@ fn mean(values: &[f64]) -> f64 {
 
 /// Deterministic 95% percentile bootstrap over paired seed-level differences.
 /// Fewer than two pairs do not support an interval and return None.
-fn bootstrap_interval(
-    values: &[f64],
-    seed: u64,
-) -> Option<ThreeBallBootstrapInterval> {
+fn bootstrap_interval(values: &[f64], seed: u64) -> Option<ThreeBallBootstrapInterval> {
     if values.len() < 2 {
         return None;
     }
@@ -1053,10 +1060,10 @@ mod tests {
                 policy_kind,
                 ..Default::default()
             };
-            let first = run_three_ball_sequential_discovery(&space, 65, 77, config)
-                .expect("policy arm");
-            let replay = run_three_ball_sequential_discovery(&space, 65, 77, config)
-                .expect("policy replay");
+            let first =
+                run_three_ball_sequential_discovery(&space, 65, 77, config).expect("policy arm");
+            let replay =
+                run_three_ball_sequential_discovery(&space, 65, 77, config).expect("policy replay");
             assert_eq!(first, replay);
             assert_eq!(first.policy_kind, policy_kind);
             assert!(first.final_model_entropy_nats.is_finite());
