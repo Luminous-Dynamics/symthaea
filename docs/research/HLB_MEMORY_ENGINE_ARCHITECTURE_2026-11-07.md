@@ -596,3 +596,12 @@ For x = x_hat + r with a verified ||r||₂ ≤ ε, Cauchy–Schwarz yields a con
 The intended first benefit is lower hot-memory residency and fewer cold-payload reads, not necessarily lower total bytes. Every exact result still reranks survivors from original payloads. This must remain distinct from ANN and from lossy quantized output.
 
 The mathematical formula is not a floating-point certificate: outward rounding, metadata provenance, transform/codebook digest and independent validation of the residual envelope are mandatory. A checksum alone cannot prove that epsilon is conservative.
+
+
+## 19. Machine-readable bounded-query receipt
+
+The HME branch now includes:
+- `docs/research/schemas/hme_query_receipt_v0.schema.json` — structural JSON Schema for a versioned query receipt.
+- `docs/research/fixtures/hme_query_receipt_states_v0.json` — full synthetic receipts for ExactComplete (full scan and safe-pruned), ApproximateComplete, Incomplete/BudgetExhausted and UnavailableOrInvalid.
+
+The schema validates structure and status-dependent fields. It does not prove candidate-count arithmetic, manifest consistency, residual bounds or pruning validity. An independent semantic verifier must reconcile counts against the pinned generation and validate any proof/certificate claims before an ExactComplete or mathematical-proof status can be trusted.
