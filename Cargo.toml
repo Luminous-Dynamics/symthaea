@@ -16,6 +16,7 @@ members = [
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
     # Incomplete/orphan roots have no Cargo.toml; keep them outside the
+    "crates/core/symthaea-iit",
     # workspace glob until their packages are restored (see PR #9361).
     "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-rea-evidence-verifier",
