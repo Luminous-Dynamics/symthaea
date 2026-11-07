@@ -187,6 +187,16 @@ Acceptance is not proof of correctness. Rejection is not proof of a false findin
 
 **Research requirement:** build the human review calibration exercise before using production uptake to compare systems. Independently label truth/actionability first; then analyze uptake. Preserve all four outcomes separately, including false-but-accepted suggestions and correct-but-rejected findings. The current [CEB Review Human Calibration Pack V0](CEB_REVIEW_HUMAN_CALIBRATION_PACK_V0_2026-11-07.md) provides three source-only causal cases and eighteen shuffled variants for dry-run adjudication; it is public development material, not a sealed benchmark.
 
+## 3.14 From historical fix commits to qualified counterfactual controls
+
+A parent/introduction/fix revision triad is not automatically a controlled causal experiment. Bug-fix commits are frequently tangled: Herbold et al.'s fine-grained study reports that only 17–32% of all changed lines in sampled bug-fix commits directly fix the underlying problem, and estimates 3–47% dataset noise without manual untangling depending on use case. These are study-specific estimates, but they make commit-level causal claims unsafe without change-contribution review. Schulte et al. (2026) further show how process variables and confounders complicate claims about bug-introducing changes, while explicitly distinguishing observed relations from causal inference. [Herbold et al.](https://link.springer.com/article/10.1007/s10664-021-10083-5) · [Schulte et al.](https://link.springer.com/article/10.1007/s10664-026-10822-6).
+
+**CEB shift:** qualify each control for the specific claim. Independently disentangle target-causal hunks from validation, contract context, enabling/follow-on changes, unrelated edits and disputed changes. Check every in-scope alternate path, residual path, causal parent, configuration and environment. “Minimal” means minimal in the causal model, not fewest changed lines. “Irrelevant” must be demonstrated relative to the target mechanism, not inferred from code distance. Historical P/I/F states are observational source snapshots; M/IRR are interventions only to the extent their treatment fidelity is established.
+
+Use six separate support dimensions: exact lineage; change disentanglement; mechanism/reachability; intervention fidelity; environment/applicability; outcome/oracle validity. Do not average them into one qualification score. Source-only evidence supports bounded structural claims; runtime causal claims require qualified execution and exact-bound outcomes. A fixed companion is target-specific, not whole-program safety.
+
+The detailed [CEB Review Counterfactual-Control Qualification V0](CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md) defines the annotations, confounder inventory, mutation-equivalence caveats, stop/go rules and human worksheet. It adds no metric lane, schema or receipt.
+
 ## 4. Matched industry comparison design
 
 For every CEB slice, compare:
