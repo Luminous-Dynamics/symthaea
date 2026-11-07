@@ -1244,7 +1244,8 @@ mod tests {
             2,
         );
         let mut result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
-        result.strategy.functions.push(result.strategy.functions[0].clone());
+        let duplicate = result.strategy.functions[0].clone();
+        result.strategy.functions.push(duplicate);
         assert_eq!(
             verify_winning_strategy(&problem, &prefix, &result.strategy, budget()).unwrap_err(),
             QuantifiedStrategyError::StrategyFunctionCountMismatch {
