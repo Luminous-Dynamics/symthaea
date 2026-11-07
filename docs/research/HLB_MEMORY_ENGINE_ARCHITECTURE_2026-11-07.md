@@ -615,3 +615,6 @@ A companion [blockwise residual fixture](fixtures/hme_certified_compression_bloc
 New child: [#10979 — HME-DYN-CHECKPOINT-001](https://github.com/Luminous-Dynamics/symthaea/issues/10979).
 
 The current HdcLtcUnifiedNetwork has a separate NetworkStateSnapshot intentionally limited to dynamic state, layer outputs and evolution clocks; its own documentation says weights and momentum are excluded. This is useful for in-memory evolution restore but cannot, alone, resume a trained learner. HME therefore separates EvolutionSnapshot, LearnerCheckpoint, ReplayCheckpoint and WeightsOnlyArtifact, and requires training-continuation parity after restore.
+
+
+A machine-readable source-derived field matrix is available at `docs/research/fixtures/hme_dyn_checkpoint_field_matrix_v0.json`. It distinguishes the actual NetworkStateSnapshot contents from the full neuron/network fields required by LearnerCheckpoint and ReplayCheckpoint. It is a field inventory, not a stable wire schema or executed persistence test.
