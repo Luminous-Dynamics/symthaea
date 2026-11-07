@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod operator_trace;
+pub mod worker_simulation;
 pub use operator_trace::{parse_and_validate_operator_trace, OperatorTrace, OperatorTraceReport};
+pub use worker_simulation::{simulate_worker_regime, SimulationError, SimulationTask};
 
 const HCE_SCHEMA: &str = "sym-rsi-hce-epoch-v0";
 const HCE_FIXTURE_STATUS: &str = "SYNTHETIC_HCE_FIXTURE_NOT_PREREGISTERED";
@@ -350,6 +352,12 @@ pub struct WorkerTraceReport {
     pub regime: ExecutionRegime,
     pub worker_count: u32,
     pub wall_clock_budget_ms: u64,
+    pub observed_start_ms: u64,
+    pub observed_end_ms: u64,
+    pub observed_elapsed_ms: u64,
+    pub observed_worker_idle_ms: u64,
+    pub observed_worker_utilization: f64,
+    pub valid_candidates_per_observed_hour: f64,
     pub total_attempts: usize,
     pub unique_valid_candidates: usize,
     pub valid_attempts: usize,
@@ -418,6 +426,8 @@ pub fn analyze_worker_trace(trace: &WorkerTrace) -> Result<WorkerTraceReport, Tr
     let mut per_worker: BTreeMap<u32, Vec<&WorkerAttempt>> = BTreeMap::new();
     let mut durations = Vec::with_capacity(trace.attempts.len());
     let mut total_busy = 0u64;
+    let mut observed_start = u64::MAX;
+    let mut observed_end = 0u64;
     let mut total_cost = 0.0f64;
     let mut valid_candidates = BTreeSet::new();
     let mut valid_attempts = 0usize;
@@ -450,6 +460,8 @@ pub fn analyze_worker_trace(trace: &WorkerTrace) -> Result<WorkerTraceReport, Tr
         }
 
         let duration = attempt.end_ms - attempt.start_ms;
+        observed_start = observed_start.min(attempt.start_ms);
+        observed_end = observed_end.max(attempt.end_ms);
         total_busy = total_busy.checked_add(duration).ok_or(TraceError::WorkerCapacityOverflow)?;
         total_cost += attempt.resource_cost_units;
         if !total_cost.is_finite() {
@@ -494,6 +506,20 @@ pub fn analyze_worker_trace(trace: &WorkerTrace) -> Result<WorkerTraceReport, Tr
     let p95 = percentile_nearest_rank(&durations, 0.95);
     let utilization = total_busy as f64 / capacity as f64;
     let budget_hours = trace.wall_clock_budget_ms as f64 / 3_600_000.0;
+    let observed_elapsed = observed_end.saturating_sub(observed_start);
+    if observed_elapsed == 0 {
+        return Err(TraceError::WorkerCapacityOverflow);
+    }
+    let observed_capacity = (trace.worker_count as u64)
+        .checked_mul(observed_elapsed)
+        .ok_or(TraceError::WorkerCapacityOverflow)?;
+    if total_busy > observed_capacity {
+        return Err(TraceError::WorkerCapacityOverflow);
+    }
+    let observed_idle = observed_capacity - total_busy;
+    let observed_utilization = total_busy as f64 / observed_capacity as f64;
+    let observed_hours = observed_elapsed as f64 / 3_600_000.0;
+    let valid_per_observed_hour = valid_candidates.len() as f64 / observed_hours;
     let p95_to_p50 = if p50 == 0 { 0.0 } else { p95 as f64 / p50 as f64 };
 
     Ok(WorkerTraceReport {
@@ -501,6 +527,12 @@ pub fn analyze_worker_trace(trace: &WorkerTrace) -> Result<WorkerTraceReport, Tr
         regime: trace.regime,
         worker_count: trace.worker_count,
         wall_clock_budget_ms: trace.wall_clock_budget_ms,
+        observed_start_ms: observed_start,
+        observed_end_ms: observed_end,
+        observed_elapsed_ms: observed_elapsed,
+        observed_worker_idle_ms: observed_idle,
+        observed_worker_utilization: observed_utilization,
+        valid_candidates_per_observed_hour: valid_per_observed_hour,
         total_attempts: trace.attempts.len(),
         unique_valid_candidates: valid_candidates.len(),
         valid_attempts,
@@ -605,6 +637,10 @@ mod tests {
         assert_eq!(report.failed_attempts, 1);
         assert_eq!(report.total_worker_busy_ms, 1700);
         assert_eq!(report.total_worker_idle_ms, 300);
+        assert_eq!(report.observed_elapsed_ms, 1000);
+        assert_eq!(report.observed_worker_idle_ms, 300);
+        assert!((report.observed_worker_utilization - 0.85).abs() < 1e-12);
+        assert!((report.valid_candidates_per_observed_hour - 10800.0).abs() < 1e-9);
         assert!((report.worker_utilization - 0.85).abs() < 1e-12);
         assert_eq!(report.p50_attempt_duration_ms, 400);
         assert_eq!(report.p95_attempt_duration_ms, 500);
