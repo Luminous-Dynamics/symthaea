@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sym-rsi-harness-bench-source-lock-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-harness-bench-source-lock-v0"
+    },
+    "status": {
+      "const": "MANIFEST_TEMPLATE_UNACQUIRED"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_on": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "issue": {
+      "const": "#10846"
+    },
+    "sources": {
+      "type": "object",
+      "properties": {
+        "paper_v2": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 1
+            },
+            "arxiv_id": {
+              "const": "2605.27922v2"
+            },
+            "revision_date": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "html_url": {
+              "type": "string",
+              "minLength": 1
+            },
+            "manuscript_license": {
+              "const": "CC-BY-4.0"
+            },
+            "reported_tasks": {
+              "type": "object",
+              "properties": {
+                "total": {
+                  "const": 300
+                },
+                "general": {
+                  "const": 274
+                },
+                "multimodal": {
+                  "const": 26
+                }
+              },
+              "required": [
+                "total",
+                "general",
+                "multimodal"
+              ],
+              "additionalProperties": false
+            },
+            "reported_harnesses": {
+              "const": 7
+            },
+            "reported_backends": {
+              "type": "object",
+              "properties": {
+                "general": {
+                  "const": 10
+                },
+                "multimodal": {
+                  "const": 7
+                }
+              },
+              "required": [
+                "general",
+                "multimodal"
+              ],
+              "additionalProperties": false
+            },
+            "reported_execution_trajectories": {
+              "const": 5194
+            },
+            "reported_scored_modules": {
+              "const": 1408
+            },
+            "task_oracle": {
+              "type": "string",
+              "minLength": 1
+            },
+            "immutable_source_commit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "paper_file_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_asset_manifest_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_catalog_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "oracle_version_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evaluation_protocol_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "acquired": {
+              "const": false
+            }
+          },
+          "required": [
+            "title",
+            "arxiv_id",
+            "revision_date",
+            "url",
+            "html_url",
+            "manuscript_license",
+            "reported_tasks",
+            "reported_harnesses",
+            "reported_backends",
+            "reported_execution_trajectories",
+            "reported_scored_modules",
+            "task_oracle",
+            "immutable_source_commit",
+            "paper_file_sha256",
+            "source_asset_manifest_sha256",
+            "task_catalog_sha256",
+            "oracle_version_sha256",
+            "evaluation_protocol_sha256",
+            "acquired"
+          ],
+          "additionalProperties": false
+        },
+        "live_site_snapshot": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "observed_on": {
+              "const": "2026-11-07"
+            },
+            "site_reported_tasks": {
+              "const": 300
+            },
+            "site_reported_harnesses": {
+              "const": 7
+            },
+            "site_reported_model_backends": {
+              "const": 10
+            },
+            "site_reported_evaluated_runs": {
+              "const": 20454
+            },
+            "snapshot_html_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_catalog_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "oracle_version_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "run_release_manifest_sha256": {
+              "type": "string",
+              "minLength": 1
+            },
+            "acquired": {
+              "const": false
+            }
+          },
+          "required": [
+            "title",
+            "url",
+            "observed_on",
+            "site_reported_tasks",
+            "site_reported_harnesses",
+            "site_reported_model_backends",
+            "site_reported_evaluated_runs",
+            "snapshot_html_sha256",
+            "task_catalog_sha256",
+            "oracle_version_sha256",
+            "run_release_manifest_sha256",
+            "acquired"
+          ],
+          "additionalProperties": false
+        },
+        "code_repository": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string"
+            },
+            "exact_commit": {
+              "type": "string"
+            },
+            "archive_sha256": {
+              "type": "string"
+            },
+            "license": {
+              "type": "string"
+            },
+            "acquired": {
+              "const": false
+            }
+          },
+          "required": [
+            "url",
+            "exact_commit",
+            "archive_sha256",
+            "license",
+            "acquired"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "paper_v2",
+        "live_site_snapshot",
+        "code_repository"
+      ],
+      "additionalProperties": false
+    },
+    "non_equivalence_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "right_and_access_review": {
+      "type": "object",
+      "properties": {
+        "benchmark_task_assets": {
+          "const": "REVIEW_REQUIRED"
+        },
+        "task_input_rights": {
+          "const": "REVIEW_REQUIRED"
+        },
+        "reference_solution_rights": {
+          "const": "REVIEW_REQUIRED"
+        },
+        "hidden_oracle_rights": {
+          "const": "REVIEW_REQUIRED"
+        },
+        "redistribution_permitted": {
+          "const": false
+        },
+        "use_scope": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "benchmark_task_assets",
+        "task_input_rights",
+        "reference_solution_rights",
+        "hidden_oracle_rights",
+        "redistribution_permitted",
+        "use_scope"
+      ],
+      "additionalProperties": false
+    },
+    "reproduction_design": {
+      "type": "object",
+      "properties": {
+        "matrix": {
+          "type": "string"
+        },
+        "primary_outcomes": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string"
+          }
+        },
+        "secondary_outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "comparison_arms": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string"
+          }
+        },
+        "split_policy": {
+          "type": "string"
+        },
+        "checkpoint_policy": {
+          "type": "string"
+        },
+        "cost_boundary": {
+          "type": "string"
+        },
+        "run_replication_unit": {
+          "type": "string"
+        },
+        "comparison_note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "matrix",
+        "primary_outcomes",
+        "secondary_outcomes",
+        "comparison_arms",
+        "split_policy",
+        "checkpoint_policy",
+        "cost_boundary",
+        "run_replication_unit",
+        "comparison_note"
+      ],
+      "additionalProperties": false
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "status",
+    "purpose",
+    "generated_on",
+    "issue",
+    "sources",
+    "non_equivalence_policy",
+    "right_and_access_review",
+    "reproduction_design",
+    "limitations"
+  ],
+  "additionalProperties": false
+}

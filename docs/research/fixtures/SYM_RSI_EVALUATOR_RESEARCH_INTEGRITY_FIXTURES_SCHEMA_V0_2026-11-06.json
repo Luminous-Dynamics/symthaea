@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sym-rsi-evaluator-integrity-fixtures-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-evaluator-integrity-fixtures-v0"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "const": "SYNTHETIC_FIXTURES_NOT_BENCHMARK_RESULTS"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_issue": {
+      "const": "#10756"
+    },
+    "source_preregistration": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_control_count": {
+      "const": 16
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "pattern": "^ERB-(N[0-9]{2}|P0[1-4])$"
+          },
+          "fixture_class": {
+            "enum": [
+              "adversarial_negative_control",
+              "positive_control"
+            ]
+          },
+          "control_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threat_category": {
+            "type": "string"
+          },
+          "synthetic_only": {
+            "type": "boolean"
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_disposition": {
+            "enum": [
+              "REJECT_SEALED_PORTFOLIO",
+              "REJECT_SPLIT_DESIGN",
+              "REJECT_EVALUATOR_OR_ABSTAIN",
+              "REJECT_EVALUATOR",
+              "REJECT_SCORE_NORMALIZATION",
+              "ABSTAIN_INCONCLUSIVE",
+              "REJECT_SELECTION_PROTOCOL",
+              "ABSTAIN_INVALID_MEASUREMENT",
+              "ABSTAIN_INCOMPLETE_RUN",
+              "REJECT_EVIDENCE_LINEAGE",
+              "REJECT_ANALYSIS",
+              "REQUIRE_NEW_EPOCH_AND_REQUALIFICATION",
+              "REJECT_INFERENCE_PLAN",
+              "REJECT_BUDGET_MATCH",
+              "REJECT_MATCHED_COMPARISON",
+              "ELIGIBLE_FOR_INDEPENDENT_REVIEW",
+              "ABSTAIN_TARGET_DISAGREEMENT",
+              "ELIGIBLE_FOR_COST_QUALITY_COMPARISON"
+            ]
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "expected_claim_ceiling": {
+            "type": "string"
+          },
+          "required_report_fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "expected_semantics": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "fixture_id",
+          "fixture_class",
+          "control_id",
+          "synthetic_only",
+          "scenario",
+          "expected_disposition",
+          "required_report_fields"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "fixture_class": {
+                  "const": "adversarial_negative_control"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "control_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "synthetic_only": {
+                  "const": true
+                },
+                "hard_gate": {
+                  "const": true
+                },
+                "expected_claim_ceiling": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "expected_semantics": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "control_id",
+                "synthetic_only",
+                "hard_gate",
+                "expected_claim_ceiling",
+                "expected_semantics",
+                "threat_category"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "fixture_class": {
+                  "const": "positive_control"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "control_id": {
+                  "type": "null"
+                },
+                "hard_gate": {
+                  "const": false
+                },
+                "synthetic_only": {
+                  "const": true
+                }
+              },
+              "required": [
+                "hard_gate",
+                "synthetic_only"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "scoring_policy": {
+      "type": "object",
+      "properties": {
+        "hard_gate_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "no_truth_claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "denominator_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requalification_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "external_authority": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "hard_gate_rule",
+        "no_truth_claim",
+        "denominator_rule",
+        "requalification_rule",
+        "external_authority"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "date",
+    "status",
+    "purpose",
+    "source_issue",
+    "source_preregistration",
+    "expected_control_count",
+    "fixtures",
+    "scoring_policy"
+  ],
+  "additionalProperties": false
+}

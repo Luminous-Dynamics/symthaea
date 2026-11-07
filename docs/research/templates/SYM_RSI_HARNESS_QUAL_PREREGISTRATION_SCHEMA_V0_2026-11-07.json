@@ -1,0 +1,1145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sym-rsi-harness-qual-preregistration-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-harness-qual-preregistration-v0"
+    },
+    "document_status": {
+      "enum": [
+        "TEMPLATE_NOT_PREREGISTERED",
+        "PREREGISTERED"
+      ]
+    },
+    "warning": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issue": {
+      "const": "#10846"
+    },
+    "experiment": {
+      "type": "object",
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preregistered_at_utc": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preregistration_commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "primary_question": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "experiment_id",
+        "protocol_version",
+        "preregistered_at_utc",
+        "preregistration_commit",
+        "reviewers",
+        "primary_question"
+      ],
+      "additionalProperties": false
+    },
+    "source_release": {
+      "type": "object",
+      "properties": {
+        "source_lock_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "harness_bench_release": {
+          "type": "object",
+          "properties": {
+            "selected_snapshot": {
+              "enum": [
+                "__REQUIRED_BEFORE_PREREGISTRATION__",
+                "paper_v2",
+                "live_site_snapshot"
+              ]
+            },
+            "exact_source_commit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "task_catalog_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "oracle_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "rights_review_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "selected_snapshot",
+            "exact_source_commit",
+            "task_catalog_digest",
+            "oracle_digest",
+            "rights_review_ref"
+          ],
+          "additionalProperties": false
+        },
+        "rrsi_source_lock_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "rrsi_implementation_commit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "do_not_pool_paper_and_live_counts": {
+          "const": true
+        }
+      },
+      "required": [
+        "source_lock_digest",
+        "harness_bench_release",
+        "rrsi_source_lock_digest",
+        "rrsi_implementation_commit",
+        "do_not_pool_paper_and_live_counts"
+      ],
+      "additionalProperties": false
+    },
+    "frozen_system": {
+      "type": "object",
+      "properties": {
+        "base_policy_model_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "proposer_model_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "critic_model_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "evaluator_model_oracle_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "harness_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "tool_permission_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "sandbox_image_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "prompt_and_policy_bundle_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "frozen_starting_harness_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "code_and_configuration_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        }
+      },
+      "required": [
+        "base_policy_model_manifest_digest",
+        "proposer_model_manifest_digest",
+        "critic_model_manifest_digest",
+        "evaluator_model_oracle_manifest_digest",
+        "harness_manifest_digest",
+        "tool_permission_manifest_digest",
+        "sandbox_image_digest",
+        "prompt_and_policy_bundle_digest",
+        "frozen_starting_harness_digest",
+        "code_and_configuration_digest"
+      ],
+      "additionalProperties": false
+    },
+    "phase_a_configuration_selection": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "arms": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "enum": [
+                  "shared_harness",
+                  "per_model_harness",
+                  "model_agnostic_router",
+                  "per_task_family_harness",
+                  "minimal_harness"
+                ]
+              },
+              "selection_source": {
+                "const": "development_only"
+              },
+              "selection_rule": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "arm_id",
+              "selection_source",
+              "selection_rule"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "model_backend_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "native_harness_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "pairwise_matrix_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "heldout_backend_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "arms",
+        "model_backend_manifest_digest",
+        "native_harness_manifest_digest",
+        "pairwise_matrix_manifest_digest",
+        "heldout_backend_manifest_digest"
+      ],
+      "additionalProperties": false
+    },
+    "phase_b_harness_evolution": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "fixed_base_policy_for_primary_comparison": {
+          "const": true
+        },
+        "arms": {
+          "type": "array",
+          "minItems": 9,
+          "items": {
+            "type": "object",
+            "properties": {
+              "arm_id": {
+                "enum": [
+                  "fixed_incumbent_no_evolution",
+                  "unregularized_evolution",
+                  "annealed_edit_budget_only",
+                  "evidence_history_only",
+                  "stalled_search_exploration_only",
+                  "critic_only",
+                  "selection_pruning_only",
+                  "full_rrsi",
+                  "full_rrsi_plus_direction_board"
+                ]
+              },
+              "regularizers": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "annealed_edit_budget",
+                    "falsified_hypothesis_memory",
+                    "untried_component_exploration",
+                    "benchmark_specific_leakage_critic",
+                    "noise_adjusted_acceptance",
+                    "cost_complexity_rule",
+                    "unproductive_component_pruning",
+                    "verifier_grounded_direction_allocation"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "arm_id",
+              "regularizers"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "same_start_harness_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "same_backbone_and_tool_privileges": {
+          "const": true
+        },
+        "proposal_budget_per_arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_evaluation_budget_per_arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "round_count": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maximum_candidates_per_round": {
+          "type": "string",
+          "minLength": 1
+        },
+        "edit_budget_schedule_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "critic_policy_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "noise_calibration_manifest_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "cost_complexity_rule_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "pruning_window_and_rule_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "direction_board_policy_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "fixed_base_policy_for_primary_comparison",
+        "arms",
+        "same_start_harness_digest",
+        "same_backbone_and_tool_privileges",
+        "proposal_budget_per_arm",
+        "total_evaluation_budget_per_arm",
+        "round_count",
+        "maximum_candidates_per_round",
+        "edit_budget_schedule_digest",
+        "critic_policy_digest",
+        "noise_calibration_manifest_digest",
+        "cost_complexity_rule_digest",
+        "pruning_window_and_rule_digest",
+        "direction_board_policy_digest"
+      ],
+      "additionalProperties": false
+    },
+    "splits": {
+      "type": "object",
+      "properties": {
+        "discovery": {
+          "type": "object",
+          "properties": {
+            "family_manifest_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "accessible_to_proposer": {
+              "const": true
+            }
+          },
+          "required": [
+            "family_manifest_digest",
+            "accessible_to_proposer"
+          ],
+          "additionalProperties": false
+        },
+        "development": {
+          "type": "object",
+          "properties": {
+            "family_manifest_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "accessible_to_selector": {
+              "const": true
+            }
+          },
+          "required": [
+            "family_manifest_digest",
+            "accessible_to_selector"
+          ],
+          "additionalProperties": false
+        },
+        "calibration": {
+          "type": "object",
+          "properties": {
+            "family_manifest_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "access_policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "family_manifest_digest",
+            "access_policy"
+          ],
+          "additionalProperties": false
+        },
+        "sealed_confirmation": {
+          "type": "object",
+          "properties": {
+            "family_manifest_commitment": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "custodian_independent_of_candidates": {
+              "type": "string",
+              "minLength": 1
+            },
+            "one_shot_policy": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "family_manifest_commitment",
+            "custodian_independent_of_candidates",
+            "one_shot_policy"
+          ],
+          "additionalProperties": false
+        },
+        "fresh_family_transfer": {
+          "type": "object",
+          "properties": {
+            "family_manifest_commitment": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "custodian_independent_of_candidates": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retuning_prohibited": {
+              "const": true
+            }
+          },
+          "required": [
+            "family_manifest_commitment",
+            "custodian_independent_of_candidates",
+            "retuning_prohibited"
+          ],
+          "additionalProperties": false
+        },
+        "unseen_backend_transfer": {
+          "type": "object",
+          "properties": {
+            "backend_manifest_commitment": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "retuning_prohibited": {
+              "const": true
+            }
+          },
+          "required": [
+            "backend_manifest_commitment",
+            "retuning_prohibited"
+          ],
+          "additionalProperties": false
+        },
+        "family_lineage_audit": {
+          "type": "object",
+          "properties": {
+            "method_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "report_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "independent_auditor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expected_overlap_count": {
+              "const": 0
+            }
+          },
+          "required": [
+            "method_digest",
+            "report_ref",
+            "independent_auditor",
+            "expected_overlap_count"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "discovery",
+        "development",
+        "calibration",
+        "sealed_confirmation",
+        "fresh_family_transfer",
+        "unseen_backend_transfer",
+        "family_lineage_audit"
+      ],
+      "additionalProperties": false
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "currency_and_price_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_inclusive_budget_per_arm": {
+          "type": "string",
+          "minLength": 1
+        },
+        "shared_budget_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "includes_proposer_inference": {
+          "const": true
+        },
+        "includes_critic_inference": {
+          "const": true
+        },
+        "includes_analyst_and_digester_inference": {
+          "const": true
+        },
+        "includes_candidate_execution_inference": {
+          "const": true
+        },
+        "includes_evaluator_and_oracle_cost": {
+          "const": true
+        },
+        "includes_failed_invalid_and_retried_attempts": {
+          "const": true
+        },
+        "includes_human_review_and_rework": {
+          "const": true
+        },
+        "includes_tool_api_calls_and_provider_price": {
+          "const": true
+        },
+        "includes_wall_clock_and_compute": {
+          "const": true
+        },
+        "detailed_cost_ledger_schema_digest": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+            }
+          ]
+        },
+        "per_arm_cost_refs": {
+          "type": "object",
+          "properties": {
+            "proposer_tokens_and_cost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "critic_tokens_and_cost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "analyst_tokens_and_cost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "candidate_tokens_and_cost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evaluator_calls_and_cost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tool_api_cost": {
+              "type": "string",
+              "minLength": 1
+            },
+            "retries_and_failures": {
+              "type": "string",
+              "minLength": 1
+            },
+            "human_minutes": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cpu_gpu_energy_wall_time": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "proposer_tokens_and_cost",
+            "critic_tokens_and_cost",
+            "analyst_tokens_and_cost",
+            "candidate_tokens_and_cost",
+            "evaluator_calls_and_cost",
+            "tool_api_cost",
+            "retries_and_failures",
+            "human_minutes",
+            "cpu_gpu_energy_wall_time"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "currency_and_price_basis",
+        "total_inclusive_budget_per_arm",
+        "shared_budget_digest",
+        "includes_proposer_inference",
+        "includes_critic_inference",
+        "includes_analyst_and_digester_inference",
+        "includes_candidate_execution_inference",
+        "includes_evaluator_and_oracle_cost",
+        "includes_failed_invalid_and_retried_attempts",
+        "includes_human_review_and_rework",
+        "includes_tool_api_calls_and_provider_price",
+        "includes_wall_clock_and_compute",
+        "detailed_cost_ledger_schema_digest",
+        "per_arm_cost_refs"
+      ],
+      "additionalProperties": false
+    },
+    "outcomes": {
+      "type": "object",
+      "properties": {
+        "primary": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "enum": [
+              "full_credit_delivery_R1",
+              "independently_verified_improvements_per_fully_inclusive_cost",
+              "fresh_family_transfer_R1"
+            ]
+          }
+        },
+        "secondary": {
+          "type": "array",
+          "minItems": 10,
+          "items": {
+            "enum": [
+              "mean_module_score",
+              "R0_8",
+              "module_completion_vector",
+              "safety_and_risk_gate_pass",
+              "unmet_requirement_count",
+              "best_so_far_and_final_separately",
+              "cost_per_independently_confirmed_edit",
+              "time_to_first_confirmed_improvement",
+              "accepted_rejected_invalid_and_noop_edit_counts",
+              "edit_count_and_bundle_size",
+              "policy_tokens_and_total_inference_cost",
+              "critic_false_reject_and_false_accept",
+              "unseen_backend_transfer",
+              "worst_family_regression",
+              "protected_capability_retention"
+            ]
+          }
+        },
+        "noncompensatory_gates": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "enum": [
+              "zero critical safety gate violations",
+              "zero sealed family/answer leakage",
+              "no post-hoc checkpoint selection using confirmation metrics",
+              "no omitted failed/invalid denominator or cost",
+              "no protected capability regression beyond preregistered margin"
+            ]
+          }
+        },
+        "practical_effect_threshold": {
+          "type": "string",
+          "minLength": 1
+        },
+        "multiplicity_and_sequential_look_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clustering_unit": {
+          "const": "complete task-family block and complete stateful harness-evolution run"
+        }
+      },
+      "required": [
+        "primary",
+        "secondary",
+        "noncompensatory_gates",
+        "practical_effect_threshold",
+        "multiplicity_and_sequential_look_policy",
+        "uncertainty_method",
+        "clustering_unit"
+      ],
+      "additionalProperties": false
+    },
+    "replicate_plan": {
+      "type": "object",
+      "properties": {
+        "pilot_seed_count": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "confirmatory_seed_count": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "const": "DETERMINE_AFTER_PILOT_AND_FREEZE_BEFORE_CONFIRMATION"
+            }
+          ]
+        },
+        "sample_size_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_complete_evolution_runs_required": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimum_complete_outer_cycles_for_R4": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "paired_seed_and_common_random_number_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "all_trajectories_and_checkpoints_retained": {
+          "const": true
+        }
+      },
+      "required": [
+        "pilot_seed_count",
+        "confirmatory_seed_count",
+        "sample_size_method",
+        "independent_complete_evolution_runs_required",
+        "minimum_complete_outer_cycles_for_R4",
+        "paired_seed_and_common_random_number_policy",
+        "all_trajectories_and_checkpoints_retained"
+      ],
+      "additionalProperties": false
+    },
+    "analysis": {
+      "type": "object",
+      "properties": {
+        "statistical_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "clustered_inference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missing_invalid_and_censored_run_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stopping_rule": {
+          "type": "string",
+          "minLength": 1
+        },
+        "best_so_far_final_and_predeclared_selected_checkpoint_reported_separately": {
+          "const": true
+        },
+        "analysis_code_commit": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "statistical_unit",
+        "clustered_inference",
+        "missing_invalid_and_censored_run_policy",
+        "stopping_rule",
+        "best_so_far_final_and_predeclared_selected_checkpoint_reported_separately",
+        "analysis_code_commit"
+      ],
+      "additionalProperties": false
+    },
+    "claim_profile": {
+      "type": "object",
+      "properties": {
+        "configuration_selection": {
+          "type": "boolean"
+        },
+        "product_harness_improvement": {
+          "type": "boolean"
+        },
+        "regularized_search_gain": {
+          "type": "boolean"
+        },
+        "reusable_improver_change": {
+          "type": "boolean"
+        },
+        "r4_ignition": {
+          "type": "boolean"
+        },
+        "recursive_progress": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "configuration_selection",
+        "product_harness_improvement",
+        "regularized_search_gain",
+        "reusable_improver_change",
+        "r4_ignition",
+        "recursive_progress"
+      ],
+      "additionalProperties": false
+    },
+    "governance": {
+      "type": "object",
+      "properties": {
+        "candidate_can_change_oracle": {
+          "const": false
+        },
+        "candidate_can_access_sealed_confirmation": {
+          "const": false
+        },
+        "candidate_can_change_preregistered_outcomes": {
+          "const": false
+        },
+        "independent_custodian_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_epoch_owner": {
+          "const": "#10708"
+        },
+        "promotion_authority": {
+          "const": "#10573"
+        },
+        "canonical_receipt_and_cost_owners": {
+          "const": "#10314/#10370/#10533"
+        },
+        "r4_improver_owner": {
+          "const": "#10497"
+        },
+        "no_new_evaluator_or_receipt_authority": {
+          "const": true
+        }
+      },
+      "required": [
+        "candidate_can_change_oracle",
+        "candidate_can_access_sealed_confirmation",
+        "candidate_can_change_preregistered_outcomes",
+        "independent_custodian_ref",
+        "evaluator_epoch_owner",
+        "promotion_authority",
+        "canonical_receipt_and_cost_owners",
+        "r4_improver_owner",
+        "no_new_evaluator_or_receipt_authority"
+      ],
+      "additionalProperties": false
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "schema_version",
+    "document_status",
+    "warning",
+    "issue",
+    "experiment",
+    "source_release",
+    "frozen_system",
+    "phase_a_configuration_selection",
+    "phase_b_harness_evolution",
+    "splits",
+    "resources",
+    "outcomes",
+    "replicate_plan",
+    "analysis",
+    "claim_profile",
+    "governance",
+    "claim_ceiling"
+  ],
+  "additionalProperties": false
+}

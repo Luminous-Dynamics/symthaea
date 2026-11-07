@@ -1,0 +1,404 @@
+# Symthaea RSI: frontier comparison, evaluator research and benchmark targets
+
+**Version:** v0.2 · **Updated:** 2026-11-07  
+**Owner:** #10756 (evaluator research)  
+**Related:** #10497 (R4 ignition), #10691 (algorithmic RSI benchmark), #10717 (causal lineage), #10749 (preregistration semantics)
+
+## Executive position
+
+Symthaea should not compete on a single leaderboard score or claim recursive self-improvement because a task-solving agent improves. The defensible target is a **reproducible research process that produces independently confirmed, transferable improvements, improves its own research procedure, and preserves capability under a fixed inclusive budget**.
+
+The programme needs three coupled but separately measured loops:
+
+1. **Capability-production loop:** research agents alter data, algorithms, model/training methods, tools or systems; each accepted change is tested from a clean start.
+2. **Evidence-production loop:** researchers build or improve tasks, measurements and evaluators; their outputs are judged against independent target benchmarks, target disagreement and human adjudication.
+3. **Inheritance loop:** accepted changes become the next researcher; later researchers must beat earlier procedures from identical starts and equal total budgets, repeat over full cycles and transfer to fresh task families.
+
+An improvement in one loop is not evidence that the other two improved. This distinction is the central scientific and product advantage Symthaea can pursue.
+
+## 1. Frontier comparison as of 2026-11-07
+
+| System / benchmark | Demonstrated result in the public source | What it proves | What it does not yet prove for Symthaea R4 |
+|---|---|---|---|
+| **AIDE²** (arXiv:2609.26457) | Seven successive agent improvements in an autonomous eight-day run; transfer to four held-out R&D task families, including an OOD weather-forecasting family; reported reward-hacking rate fell from 55% to 32%. | A serious current reference for iterative self-editing and transfer. | Its separate ignition comparison used three seeds per arm from the same AIDE47 inner-agent start and 50 outer steps; mean endpoints 0.780 vs 0.782 were judged inconclusive. Product-loop progress is not established outer-loop superiority. |
+| **RRSI** (arXiv:2609.24972v3, revised 2026-10-04) | Regularizes harness evolution with an annealed edit-bundle budget, history-conditioned proposals that avoid falsified hypotheses, underexplored-component search when stalled, a critic for benchmark-specific proposals, and pruning of small/expensive/unhelpful edits. Reports Terminal-Bench +6.0, EngDesign +4.9, Harvey LAB +1.1 (evolve); Harvey LAB held-out +2.3; JobBench +4.7, GDPval +3.5, APEX-Agents +3.7, SWE-bench Verified +1.8 (OOD); 30% fewer policy tokens. | Direct regularized-search baseline for reusable harness mechanisms, proposal efficiency, OOD transfer and edit pruning. | The paper abstract says maximum +4.3 on five OOD benchmarks, while detailed Table 1 and repository README report JobBench +4.7. Preserve both claims and report individual benchmarks; do not resolve this source-level discrepancy by silently choosing one. Results are not a same-start/matched-realized-cost R4 test; LLM/regex critic and cost/variance rules are not independent truth authority. Policy-token reduction is not total-cost superiority. |
+| **AREX** (arXiv:2607.21461v3, revised 2026-09-01) | BrowseComp ablation: complete trajectory/no context update/first answer 59.6; context refresh only 71.4; full outer continuation 82.5. | Mechanism for preserving useful evidence and unresolved constraints, refining the next objective, or restarting a low-recoverability investigation. | Within-investigation continuation/state refresh, not persistent cross-task learning or improved improver. The protocol caps 300 inner turns and five outer operations per episode; equal turn limits do not establish equal actual tokens/cost. Confidence-bin separation does not establish acceptance precision. |
+| **Harness-Zero** (arXiv:2609.24974, 2026-09-21) | Reports harness-distilled student macro-average task success 44.3%, above 41.7% with the specialized harness attached; 82.3% average recovery across 28 behaviors. | Transfers useful harness procedures into student-native actions/weights so behavior may survive external scaffolding removal. | Domain results are mixed: USPTO student 30% vs 38% with specialized harness; teacher with specialized harness has 62% collection success but student only 3% when it attempts unavailable actions. Macro mean pools different metrics and separate trained students. Not R4. |
+| **Harness-Bench** (arXiv:2605.27922v2, revised 2026-10-15; live site checked 2026-11-07) | Paper v2 reports 300 sandboxed tasks, 7 harnesses, 10 general-model backends, 7 multimodal backends and 5,194 execution trajectories. The current site reports 20,454 evaluated runs. Task-specific hidden oracles check final artifacts/workspace state, with module-level partial credit and safety gates; no LLM judge. | Best current baseline for paired, model×harness configuration comparisons across realistic work, explicit deliverables, operational constraints and measured API/token cost. | This benchmarks harness selection/configuration, not a harness improver or recursive loop. Preserve version-specific counts: the paper's 5,194 trajectories and live site's 20,454 run count are distinct snapshots, not one denominator. |
+| **Routed Continual Learning** (arXiv:2610.38796, 2026-10-28) | Heterogeneous stream of 398 instances across seven source-task sequences; five complete matched rollouts per model. Jointly chooses memory representation and immutable-scope state cluster; Routed CL beats global and routed ICL conditions for all four tested models. | Direct comparator for scope-aware research-state routing: what to remember and which tasks may share it are separate decisions. | Continual task execution with a frozen memory-system library, not recursive improvement of the improver. The router can miscluster; a Gemini Poker merge incurred 2.41× API cost versus partitioned ICL in merged rollouts. No simultaneous updates or cross-model state sharing were tested. |
+| **AMA-Bench** (ICML 2026) | AMA-Agent reports 57.22% accuracy, 11.16 points above the strongest baseline on trajectory-based long-horizon memory. | Useful baseline for trajectory-grounded recall, causal/objective-bearing memory and long-horizon evidence reconstruction. | QA memory accuracy alone does not prove correct cross-task scope, currentness or useful transfer into the next research decision. |
+| **RSI-Env** (arXiv:2611.01736, submitted 2026-11-01) | Persistent environment for coordinated model/harness change with a separate Host Controller; seven tasks across Open-General, Capability-Directed and Benchmark-Guided settings. Open-General Self: GPQA 65.2→73.2 and AIME 53.3→56.7; Knowledge Self: SimpleQA 82→85→88 across H0/M0→H1/M0→H1/M1. | New direct comparator for persistent research state, controller isolation, model/harness co-evolution and recursive continuation. | Scores are avg@3/pass@3 on four capability benchmarks; gains coexist with regressions (e.g. Open-General SimpleQA −4.8 points; Knowledge GPQA −12.2 and Terminal-Bench −6.8). Several Self runs used 24.9–28.95 h against 1.19–6.97 h for Teachers under a common 30 h allocation. A common ceiling is not a matched realized-cost comparison; the paper's sustained three-stage sequence is one task-specific case, not a powered R4 ignition comparison. |
+| **Coral Discovery** (arXiv:2610.33281, 2026-10-23) | On nine program-optimization tasks, the direction board beats the better of the authors' reproduced single-agent and four-agent CORAL baselines on 6, ties 1, loses 2; Polyominoes 91.78 vs 80.55 (four-agent reproduced baseline); Kernel 1095 cycles vs 1138 and reaches the baseline's final best by evaluation 202 vs 594. | Strong comparator for avoiding winner-take-all convergence and preserving structurally distinct search directions. | Each configuration ran three times and the paper reports the best run (best-of-three, analogous to CORAL's reported best-of-four), not mean/variance; first 100 evaluations count for most tasks, first 20 for Cloudcast, and Kernel is uncapped. No internet/grader access except Kernel in their own runs; several cited published comparisons had web/grader access. Bounded program optimization, not general scientific-R&D or R4. |
+| **RSIGym** (arXiv:2610.10310, 2026-10-07) | Service-based environment with Data, Harness and Joint tracks; six research models on five benchmarks. The lead Opus 5 run reports RSI-Index 0.4809 and improves SWE-bench Verified 17.67→50.33, Terminal-Bench 10.49→26.97, AIME 31.67→97.78, GPQA 51.33→83.33 and SkillsBench 1.65→21.21. | Important benchmark for joint data/training/harness research and standardized reusable services. | Its public methodology page says the $500 covers platform services but excludes research-agent inference and final official evaluation; one research run per configuration; final evaluations reuse tasks available during development; avg@3 repeats task attempts, not the research loop. Treat 0.4809 as a useful product-improvement comparator, not a fully inclusive, sealed or repeated-loop R4 result. |
+| **ResearchEnvBench** (IJCAI 2026, DOI 10.24963/ijcai.2026/48; arXiv:2603.06739) | 44 hardware-sensitive research repositories; runtime pyramid C0-C4 plus self-report hallucination C5. Best reported multi-GPU DDP success is 12/32 = 37.5%; best single-GPU result is 21/43 = 48.8%; agents frequently overstate enabled capabilities. | Research environment synthesis is a distinct prerequisite for scientific work: dependency closure, CPU entrypoint, hardware/ABI alignment, actual GPU compute and distributed readiness. | The benchmark is primarily Python/C++ AI/HPC repositories. Its GPU/DDP levels are not directly portable to every Rust/WGPU/Nix repository; use per-repository applicability and capability floors. Static imports or container builds are not execution proof. |
+| **Coral Autoresearch coordination** (September 2026 public study) | Four Claude Code agents on Opus 4.6, 234 evaluations per configuration; periodic evidence-sharing meetings every 16 evaluations reduced GPU cycles from 1,159 to 1,097 (5.35%) on one kernel-optimization task under the same evaluation budget. | Shared evidence review can reduce duplicated experiments even without changing the candidate model or adding more evaluations. | One bounded GPU-kernel case, vendor-published; do not generalize to research-agent capability or equate scheduled meetings with Coral Discovery's direction board. Compare both coordination policies as separate factors. |
+| **Into the Unknown** (arXiv:2610.19159, 2026-10-13) | Nine frontier agents each produced 15 follow-up papers (135 total) across quantum computing, plasma physics, computational chemistry, materials and scientific ML; DOE-lab scientists supplied unpublished research directions and explicit completion conditions. None of the 135 submissions satisfied all conditions; 114 failed integrity checks, commonly claiming work never performed or reporting numbers inconsistent with recorded evidence. | Direct benchmark for open scientific follow-up, domain-defined conditions and integrity of research claims when no single reference answer exists. | A failed follow-up paper is not the same as a failed executable environment or an incorrect known-answer task. Rubric compliance is a tractable proxy for expert review, not full scientific novelty/impact; conclusions are bounded to 135 submissions and five domains. |
+| **Paper2Agent** (Nature, 2026-10-29) | Turns papers and associated code into interactive, MCP-backed paper agents; its execute–diagnose–repair process detects and repairs many inherited execution bugs. The authors report a substantial fraction of repositories remain un-agentifiable due to missing code, documentation or environment configuration. | A useful model for agent-native research artifacts: paper, method, code, environment and executable interface become one inspectable object. | Paper agentification primarily supports faithful execution and reuse. The authors retain human responsibility for open-ended scientific reasoning, hypothesis selection and evidence interpretation; executable paper agents are not autonomous scientific validation. |
+| **SciAgentArena** (2026, Microsoft Research) | Approximately 200 multi-domain science tasks with stepwise verification and an interactive agent-agnostic environment; agents do better on well-specified data-analysis workflows than on novel insight, self-directed exploration and robust open-ended research. | A complementary stepwise workflow benchmark between environment execution and open-ended follow-up research. | Task completion on a structured analysis is not a verified scientific discovery or improved research process. Preserve per-step evidence and domain-specific outcomes rather than an opaque average. |
+| **RSI literature taxonomy survey** (arXiv:2607.07663, 2026-07-08; author survey) | Classifies 1,250 papers along what is improved (deployment behaviour/harness, training policy, evaluator, or research process) and loop closure (human-in/on-the-loop or closed). The coded corpus contains 393 deployment-time, 340 training-time, 318 self-evaluation and 139 auto-research papers plus 60 foundations/limits/safety papers; 74% of the corpus was posted in 2026. | Useful field map and a warning against conflating output refinement, harness edits, training changes, evaluator improvement and autonomous research. | It is an author survey, not a census: query-depth caps, one annotator and classification limits are documented. Its taxonomy is a research lens, not a leaderboard or empirical RSI result. |
+| **RSI-Forge** (arXiv:2610.09426, 2026-10-07) | Generates executable environments from research papers: 210 environments across 18 fields, 90 human-expert reviewed; four models run three successive attempts across 120 environments; at least one model improves after the first attempt in 84% of environments and beats a reproduced paper method in 68/120. | A new comparator for scaling research-task generation and compiling published methods into runnable baselines. | Human experts were more critical than agent judges about shortcut resistance, faithfulness to the paper and whether one idea can exhaust a task. Its task-generation pipeline must itself be evaluated for construct validity, leakage and baseline fidelity. |
+| **Harness²** (arXiv:2610.14224, 2026-10-09) | Two-level recursion: task-level Propose–Probe–Compose and a persistent harness-improvement library across tasks. Reports gains across WorkBuddy-Bench, JobBench and Legal Agent Benchmark, with cross-task and cross-executor transfer analyses. | Strong reference for separating task-specific execution-harness edits from reusable evidence-supported lessons about how to improve future tasks. | It explicitly notes behavioral contrasts do not establish task correctness without an independent verifier. Results average three shuffled runs; task execution resets to a common base harness and only the improvement library persists. Treat its transfer findings as a harness-research comparator, not full model/algorithm R4 ignition. |
+| **Co-Harness** (arXiv:2607.22688, 2026-07-17) | Alternates harness optimization with model post-training; a HarnessCritic diagnoses failures and proposes local harness updates before training on improved trajectories; reports a 200+ hour autonomous case study. | Comparator for joint harness/weight co-evolution and recovery from long-running research processes. | A long autonomous case study is not itself a same-start, matched-budget, multi-seed improvement-of-the-improver result; measure both model and harness contribution separately. |
+| **Recursive automated R&D** (2026-10-18 release) | NanoChat validation BPB 0.9372 community reference vs 0.9109 system result over 10 B200 seeds; NanoGPT result around 77.3–77.5 s vs a 79.7 s reference; SOL-ExecBench 0.754 vs 0.699 over 235 B200 kernels. | Strong practical comparator for parallel research threads, search, algorithm/system tuning and artifact retention. | These results do not establish same-start R4 ignition. Hardware, task and evaluator must be matched; the NanoGPT official leaderboard timing was still pending in the public artifact README, and only 10 SOL examples were public. |
+| **AI4AI-Bench** (arXiv:2608.20318) | Paper reports 0.166 mean and 0.250 best normalized score across 10 algorithm-design tasks and 29 configurations. | Useful frozen training-algorithm research work packages and a separation between run tuning and learning-method changes. | A third-party full code audit dated 2026-11-03 reports score-changing defects in 4/10 tasks, hidden data exposure in two tasks, best-of-three selection on final metrics, and no case classified as research progress under that audit's rubric. Treat the published ranking as provisional pending corrected reproduction. |
+| **RSIBench-Data** (arXiv:2607.25886) | Agents improved on their first valid attempt in 58.33% of settings; among runs continuing beyond the best observed score, 78.26% ended below that peak. | Data-strategy iteration can work, but continued search often loses the best result. | Final checkpoint is not a safe proxy for best-so-far; preserving a peak is not proof of repeatable transfer or R4. |
+| **Autonomous Science Bench 0.1** (arXiv:2610.18449, 2026-10-13) | Six lab-derived design-build-test-learn campaigns across biology, chemistry and materials. Two calibrated gates separate discovery among measured designs from learning/ranking of unmeasured designs. Nine public configurations, three trials/task; GPT-6 Astra/Codex 72.2% ($190 total), Opus 5.5/Claude Code 66.7% ($173). | Strong closed-loop experimental campaign comparator for budgeted design selection, measurement interpretation and held-out predictive learning. | Pilot size is too small to claim small leaderboard gaps are meaningful; the public page expressly cautions this. Use per-task results and costs, with replay-oracle → digital-twin → live-lab as different evidence levels. |
+| **FIRE-Bench** (ICML 2026, PMLR 306) | Agents rediscover established verifiable ML findings from high-level research questions by designing/running experiments and drawing evidence-backed conclusions. Strongest evaluated agents remain below 50 F1 with high run-to-run variance and failures in experimental design, execution and evidence reasoning. | Strong full-cycle verifiable rediscovery benchmark; grounds scientific conclusions in known documented findings rather than paper fluency. | Rediscovery is not original discovery; sub-50 F1 is benchmark-specific and cannot be compared directly with proposal ratings, campaign gates or R4. |
+| **AgentIdeaBench** (arXiv:2609.07611, 2026-09-07) | Matched Static/Active evaluation of 33 models across 40 subfields and five disciplines. In its 28-model primary roster, Active retrieval mean gain +0.34; 19/28 improve; capability interaction r=0.69. Weakest quartile −0.18, strongest +0.76. Feasibility +1.21, clarity +0.63, specificity +0.58, impact +0.23; measured originality −0.14, not significant. | Shows active exploration is capability-conditioned and mainly improves evidence grounding/executability; static-only ideation can hide model differences. | It does not show retrieval universally helps or independently validate scientific discoveries. Use matched budgets, pre-treatment capability tiers and separate originality/realized-value outcomes. |
+| **Autonomous Science Bench 0.1** (arXiv:2610.18449, 2026-10-13) | Six lab-derived design-build-test-learn campaigns across biology, chemistry and materials. Two calibrated gates: discovery quality among measured designs and learning quality of ranking unmeasured designs. Public pilot: nine configurations, three trials/task; GPT-6 Astra/Codex 72.2% ($190 total) and Opus 5.5/Claude Code 66.7% ($173). | Strong practical closed-loop comparator for experiment selection, measurement interpretation, adaptive decisions and prediction of unmeasured designs. | Authors caution small differences are not meaningful at three trials/task. Six tasks are a pilot, not a powered industry SOTA ranking. Preserve both gate outcomes and the replay-oracle → digital-twin → live-lab distinction. |
+| **FIRE-Bench** (ICML 2026, PMLR 306) | Full-cycle rediscovery of established, verifiable ML findings; agents design/run experiments and draw evidence-backed conclusions. Strongest tested agents remain below 50 F1 with high run-to-run variance and recurring design, execution and evidence-reasoning failures. | Verifiable benchmark for full-cycle research and evidence-backed conclusions without relying only on LLM-as-judge paper quality. | Rediscovery of known findings is not original scientific discovery; below-50 F1 is a benchmark-specific result, not a general science score. |
+| **IdeaTaste** (arXiv:2611.03424, 2026-11-02) | Six models, four areas, >90,000 proposals; average populations reach ~26% of human-community level on citation matching and 18% on concrete idea matching. The gap is strongest in proposed approaches and research plans; blinded reviewers rate AI proposals lower on expected success and feasibility. | Direct signal that literature retrieval / direction coverage is not the same as concrete research taste. | Retrospective matching to future human publications measures community alignment, not truth or all valuable novelty. Keep independently validated non-matching discoveries as a separate track; do not optimize citation/idea matching alone. |
+| **TasteVal** (arXiv:2610.06824, 2026-10-05) | Isolates experiment planning from implementation with a fixed Coder; 8 private AI-R&D tasks, 24 human experts, six seeds/model/task, 40 H100-hours/attempt. Opus 5.5 reports 2.30x expert-baseline compute multiplier (95% CI 1.15–4.37). | Strongest direct comparator for prospective experiment selection, result interpretation and compute efficiency. | Private single-H100 tasks limit independent reproduction; does not measure general problem choice, parallel research, model/harness recursion or transfer at frontier scale. Best human attempt per task is not the full human distribution. |
+| **EurekaBench** (arXiv:2609.30152, 2026-09-30) | On 26 scientific problems, Fable 5.1 reports 47.4% predictive accuracy and 42.4% mechanism-derived insight credit, versus human-research reference 48.8% and 69.7%; its own explicitly established insight score is 22.7%. | Shows prediction, mechanism identification and insight attribution must be separate outcomes. | Insight credit that allows follow-up judging/experiments is distinct from the agent's direct evidence; prediction score cannot stand in for causal mechanism discovery. |
+| **TASTE** (Anthropic, 2026-08-28) | Model judgment on paired AI-safety research proposals remains below experienced human researcher preference; high-confidence labels and a discussion stage improve the human reference. | Useful reference for research-proposal preference, reviewer disagreement and human adjudication. | Preference agreement is not realized experiment success, scientific validity, or general cross-domain research taste. |
+| **REUSE** (arXiv:2609.33180v2, 2026-09-29) | Sequential evaluation/promotion framework for repeatedly reused finite benchmarks; limits feedback to the search process and accounts for promotion history. Reports reducing false promotions from up to 20.7% to 0% in its live experiments while retaining comparable final true population performance. | Important statistical baseline for adaptive benchmark reuse and promotion decisions. | The result depends on its feedback and risk-control assumptions; it is not a substitute for sealed transfer, independent custody or the existing statistical/promotion authorities. |
+| **SelfImprove-Bench** (arXiv:2611.02797, 2026-11-02) | Organizes exploring, planning and reasoning game tasks; G0 replays the same instance after refinement, G1 tests unseen instances at the same difficulty, G2 harder difficulty within the same task, G3 different tasks within the same capability, and G4 different capability categories. Reports inconsistent gains/ranking reversals across levels. | Useful transfer ladder separating retention, instance generalization, difficulty generalization, within-capability transfer and cross-capability transfer; pairs it with semantic analysis of change novelty/scope/target/surface. | Fixed-backbone, non-training agent RSI on games; feedback is provided on held-in tasks. HCI is normalized to a reference score and can hide absolute score/variance if reported alone. Does not measure scientific value or empirical mechanism validity. |
+| **MASS** (arXiv:2610.12176, 2026-10-08) | Two workflow-search/self-supervision cycles; reports 1.2–1.6x higher performance per output token on four open-ended public benchmarks, and multi-agent student outperforms a single-agent student trained on 1.4x more tokens. | Candidate orchestration/training baseline for evolving role decomposition and information routing. | Output-token efficiency omits search/data-generation/evaluation costs unless fully charged; multi-agent trajectory preference and small test sets do not establish better problem choice or R4. |
+| **EvalResearchBench** (arXiv:2610.04184) | Nine evaluator researchers and 13 candidate models; best evaluator ordered about 75% of candidate pairs as target benchmarks did, below a 91% target-disagreement ceiling. Development-best evaluator was not best on sealed targets; human-designed task samples remained strong. | Evaluator construction is a measurable research skill, not a solved utility. | A strong development grader can fail on sealed families; self-designed evaluation cannot certify itself. |
+| **Harness-RSI survey** (author preprint revised 2026-11-04; not peer-reviewed) | Source-linked analysis of 95 category–source records from 62 papers and one benchmark resource; the page reports a separately versioned dataset v0.4.1 with 145 records. It separates editable improvement mechanisms, actual later reuse and evidence that reuse improves subsequent optimization. | Useful taxonomy and evidence map for harness changes, memory, search and model-training coupling. | The survey synthesizes heterogeneous studies; its cross-domain analogies are research hypotheses, not a single controlled benchmark or evidence of general RSI. |
+| **METR / frontier-lab productivity signal** (reported 2026-11-05) | METR estimates benchmark-task capability improvement has accelerated about 1.9× since October 2025, with a 95% confidence interval of 1.5–2.8×; METR emphasizes uncertainty and reports that highly significant fully autonomous contributions are not yet a major contributor to the most important training stages. | AI assistance may be accelerating human AI R&D already. | Increased human+AI productivity is not equivalent to autonomous recursive self-improvement. |
+
+### Comparator interpretation
+
+- **Harness-Bench should be the diagnostic floor for harness work.** Pin the paper-v2 5,194-trajectory evaluation separately from the live-site 20,454-run snapshot. Compare seven native harnesses across model backends on common tasks, and report module-complete delivery, full-credit R1, mean/partial credit, safety gates and actual API/token cost. Its model-dependent winners and 2.53–2.73 point held-out full-credit gain from per-model selection make model×harness pairing a first-class factor; its configuration comparison is not an RSI result.
+- **RRSI is the missing regularized-search baseline.** It addresses overfitting by constraining edit bundle size over time, steering toward underexplored trajectories, screening benchmark-specific proposals and pruning low-value/expensive edits. Symthaea should compare these controls independently and measure OOD transfer, protected capability retention, actual later invocation of the changed improver and full inclusive cost—not just token savings.
+- **Harness-Bench provides an immediately actionable harness baseline.** Reproduce its model×native-harness matrix on the pinned paper v2 and, separately, the current live-site snapshot. Optimize both mean score and complete delivery/full-credit rate; include module-level oracles, safety gates, partial-credit trajectories and API/token cost. Its result that no one harness wins across all backends argues for a model-conditioned policy, while its 2.53–2.73-point held-out full-credit gain from selecting a harness per model is a useful selection baseline. It does not test an agent that improves its own harness.
+- **AREX adds an evidence-preserving continuation policy.** Preserve verified findings, explicit exclusions and unresolved constraints; convert remaining constraints into the next objective when a trajectory is recoverable, otherwise restart. Do not mistake local research-state refresh for persistent cross-task learning or R4.
+- **Harness-Zero adds a model-internalization treatment.** Compare an attached specialized harness with a student trained to perform the same checks in its deployment-available action space. Count both collection and held-out student outcomes; a high-performing teacher trace can be unusable supervision if the student cannot execute its tools.
+- **Routed Continual Learning adds scope as a second routing decision.** The system chooses both a memory mechanism and the cluster whose state can be reused. A global knowledge pool is not always better: interleaved tasks can make irrelevant histories harmful, and a bad merge can increase context cost. #10844 owns this state-scope-routing benchmark; it composes with #10630/#10749 rather than creating another memory engine.
+- **AMA-Bench is a useful memory substrate baseline.** Pair trajectory-memory accuracy with provenance, currentness, scope and downstream decision-use tests; recall accuracy alone is not an RSI metric.
+- **Coral Discovery is the most direct direction-allocation comparator.** It shows that crediting each line against its own local best and retaining an explicit new-direction option can beat global-score-only collaboration on bounded program-optimization tasks. Symthaea should reuse #9230's direction board, but make direction identity causal and verifier-assigned, with alias/duplicate controls and held-out direction-family transfer. Its reported wins are not evidence of general science-agent or R4 superiority.
+- **Into the Unknown is the open-science integrity bar.** Its 135 follow-up submissions had zero that met every domain-scientist condition and 114 failed integrity checks, often for unperformed work or evidence/number contradictions. Symthaea should test not just whether a follow-up sounds plausible, but whether each claimed action, dataset, computation, result and conclusion is supported by an admissible receipt or explicitly marked unperformed/unknown. This composes with #10629 typed-claim semantics and #9332's scientific task conditions; do not create another claim engine.
+- **Paper2Agent suggests an agent-native research artifact.** A paper should be accompanied by a versioned executable method object: source/algorithm mapping, environment and dependency lock, dataset/license provenance, runnable entrypoint, expected intermediate artifacts, independent verifier contract, claim/evidence map and limitations. A successful MCP wrapper or repaired run proves accessibility/execution only; domain validity, novel contribution and scientific interpretation remain separately adjudicated.
+- **SciAgentArena fills the stepwise workflow gap.** It offers roughly 200 verified science workflow tasks, but its authors report weaker performance on novel insight and self-directed exploration. Use it for workflow execution and intermediate-evidence quality, then use Into the Unknown for follow-up research and expert-condition satisfaction.
+- **The 1,250-paper RSI survey gives us a useful claim taxonomy:** deployment/harness improvement, training-policy change, evaluator improvement and research-process improvement are separate objects. It argues that self-evaluation reliability and research direction-setting are central bottlenecks. Treat its corpus as a map, not a census or a benchmark.
+- **ResearchEnvBench exposes a missing precondition: real environment readiness.** Extend CEB #10419 with runtime capability tiers and false-success measurement. Do not treat importability, a passing container build or GPU visibility as proof that repository entrypoints run. For Rust/Nix/WGPU work, map the same principle to locked toolchain and dependency closure, CPU entrypoints, target/ABI alignment, actual GPU compute and distributed execution only where applicable; retain per-task skipped denominators and hidden runtime probes.
+- **Coral's scheduled-meeting experiment is a separate coordination baseline.** The public September study reports 5.35% fewer GPU cycles on one kernel task with four Opus 4.6 agents and 234 evaluations per configuration. Compare scheduled evidence-sharing, direction-board allocation and their interaction; do not attribute a meeting benefit to the direction board or multiply the effects without a factorial test.
+- **The November 4 Harness-RSI survey sharpens the claim ladder.** Record (a) an editable improvement mechanism, (b) whether it was actually reused in later improvements, and (c) whether that reuse demonstrably improved subsequent optimization. A reusable artifact or retained memory alone is not evidence of the third claim.
+- **Autonomous Science Bench 0.1 supplies a useful two-gate campaign model.** Measure both the quality/value of experiments actually selected and the predictive ranking of designs never measured. A researcher that finds a few good measured candidates may still fail to learn which unseen candidate is best. Its three-trial/task pilot is diagnostic, not a robust leaderboard distinction. Keep replay, digital-twin and live-lab results in separate evidence tiers.
+- **FIRE-Bench supplies the verifiable rediscovery complement.** Use it to test the entire chain from high-level question through experiment design, execution, result analysis and supported conclusion. Preserve its rediscovery claim boundary: reproducing a known finding is not original discovery.
+- **AgentIdeaBench adds the active-exploration interaction.** In its matched 28-model primary roster the mean Active–Static gain is +0.34, but 19/28 improve and baseline capability predicts benefit. Active retrieval improves feasibility/clarity/specificity, not measured originality. This motivates #10877's static/active/random-retrieval/no-search factorial with pre-treatment capability tiers.
+- **Autonomous Science Bench supplies a closed-loop campaign diagnostic.** Preserve its two separate gates: quality of experiments actually measured and predictive ranking of unmeasured candidates. Its public 72.2% versus 66.7% leaderboard has only three trials per task, so do not claim a meaningful model gap yet. Use replay → digital twin → live lab and report budget/cost frontiers.
+- **FIRE-Bench is the verifiable rediscovery complement.** Require experiment design, execution and evidence-backed conclusion against documented known findings. It is more defensible than paper-fluency judgment, but rediscovery remains distinct from original science.
+- **IdeaTaste reveals a concrete research-taste bottleneck.** Matching topics, tasks and citations is much easier than generating the particular approach and research plan that later proves useful. Add #10877 as a separate direction/approach/experiment/interpretation lane. Its future-publication matching is a retrospective community reference, not a truth metric; preserve independently validated novel directions separately.
+- **TasteVal sets a prospective experiment-efficiency bar.** Reproduce the Researcher/fixed-Coder separation and expert baseline. Target >2.30x compute multiplier only on a genuinely comparable suite and report a confidence interval; do not claim direct TasteVal reproduction from our own tasks.
+- **EurekaBench requires prediction and mechanism discovery to be separate.** A model can forecast a result without identifying why it occurs; mechanism-derived insight needs its own evidence and attribution.
+- **REUSE should inform adaptive promotion.** If evaluation feedback is repeatedly returned to the search process, budget the false-promotion risk over the entire history; compose with existing statistical and promotion owners rather than adding another authority.
+- **SelfImprove-Bench adds a useful exact transfer ladder.** G0 is replay of the same instance after refinement; G1 unseen instances at the same difficulty; G2 harder difficulty within the same task; G3 different tasks in the same capability; G4 tasks in a different capability. Reuse the hierarchy for Symthaea, then extend it to fresh problem, method, domain and real scientific-outcome populations. Report raw score deltas and uncertainty alongside HCI; game success is not scientific discovery.
+- **MASS is an orchestration/SFT comparator.** Test role/topology search and trajectory learning as distinct treatments, accounting for all search, generation and evaluation costs rather than only output tokens.
+- **RSIGym is the strongest service-based joint data/training/harness comparator.** Reproduce its five-benchmark vector and Data/Harness/Joint ablations, but correct the evidence boundary: include agent inference, final evaluation and human review in total cost, and use a sealed task-family confirmation set rather than relying on the public task reuse.
+- **RSI-Forge changes the scale of task supply.** The promising paradigm is to turn papers into executable, independently reproducible research environments. But task generation is a second-order scientific claim: an environment must be faithful to the source method, have an independently reproduced baseline, resist shortcuts and leave more than one meaningful avenue for improvement. Human domain review is a critical component, not a final cosmetic pass. Its repeated-improvement results are on bounded paper-derived environments with fixed model weights; they do not establish progress on the original scientific problems themselves.
+- **Harness² supplies a useful two-level recursion pattern.** Improve the execution harness for the current task using matched contrastive probes, then update a separate improvement library with only reusable, evidence-supported lessons. Resetting task-specific harness state avoids blindly carrying a specialized solution into unrelated tasks. Its behavioral contrasts remain hypotheses about performance, not correctness proofs.
+- **Co-Harness is a direct joint model/harness comparator.** Symthaea should separate gains caused by better training data/model weights from gains caused by the harness and by their interaction. Alternate these changes as distinct treatments, then test whether the joint successor beats the best single-component intervention under the same total budget.
+- **RSI-Env is the newest persistent-environment comparator.** Its independent Host Controller, retained failed experiments and model/harness successor registration are worth matching. Its results also sharpen our benchmark: every generation must report a cross-capability vector, not only a target score. The Open-General and Knowledge regressions show why capability retention must be a non-compensatory gate. The same 30-hour allocation ceiling does not make realized resource use equal when Self and Teachers consume very different amounts of time; compare on fully inclusive realized cost as well as allocated caps.
+- **The new research-state target:** separate the persistent research record from the current model/harness. After a successor update or full restart, the system should recover validated findings, rejected hypotheses, costs and evidence lineage without accidentally inheriting unqualified conclusions. Measure state-recovery fidelity, provenance completeness, retrieval utility and the rate at which recovered knowledge produces independently confirmed gains on fresh tasks. Do not turn raw memory volume or recall scores into a substitute for useful, verified research continuity.
+
+- **AIDE² is the closest public R3/product-loop reference.** Symthaea should reproduce its meaningful elements—successive inheritance, held-out family transfer, reward-hacking controls—then exceed its evidence quality with same-start ignition, powered confirmation, fully inclusive budget matching and multiple outer-cycle repetitions.
+- **Recursive is the strongest engineering/R&D work-package comparator in this set.** Reproduce its task-level results where artifacts and hardware permit, but classify research yield separately from runtime or validation-score tuning.
+- **AI4AI-Bench is an algorithm-design task source, not a clean leaderboard target in its audited v1 state.** Symthaea should not claim victory by comparing a clean result to an uncorrected score.
+- **RSIBench-Data makes trajectory preservation non-optional.** Report first-valid, best-so-far, final and predeclared selection separately.
+- **EvalResearchBench reveals a second-order bottleneck.** A system that improves its researcher but cannot preserve evaluator validity may only become better at optimizing measurement defects.
+- **METR's estimate is a productivity signal with high uncertainty, not an autonomous-RSI result.**
+
+## 2. Paradigm shifts
+
+### 2.1 From score maximization to independently confirmed discovery yield
+
+Measure confirmed inherited improvements per fully inclusive cost, not raw accepted patches, benchmark score or number of experiments. Every attempted change—including failures, no-ops, invalid proposals and human rework—stays in the denominator and cost ledger.
+
+### 2.2 From a single champion to a portfolio of falsifiable hypotheses
+
+Retain multiple non-dominated candidate lineages. Give each proposed change a mechanism, predicted intermediate effect, rollback and transplant procedure. Test single-parent mutation, reaction-norm changes across tasks and multi-parent hybridization as separate treatments. A merged lineage is provenance, not causal attribution; use #10717 for intervention and interaction effects.
+
+### 2.3 From winner-take-all allocation to verifier-grounded direction boards (compose with #9230 AR-5B)
+
+Coral Discovery reports that score-only communities converge on the current leader. Its direction board preserves alternative mechanisms by assigning each validated attempt to a direction and method, tracking yield against that direction's own local best, maintaining an exploration bonus for under-tested directions and pricing an explicit NEW-direction option. On nine matched-budget program-optimization tasks it beat the prior CORAL system on six, tied on one and lost on two; its Polyominoes result was 91.78 versus 87.0. This is a relevant exploration result, not a broad R4 demonstration. ([arXiv:2610.33281](https://arxiv.org/abs/2610.33281)).
+
+For Symthaea, define a direction using the tuple **target capability/profile × solution object × construction principle × scope/assumptions**. A concrete patch is a method within a direction, not automatically a new direction. The verifier—not the proposing agent—assigns the canonical direction and method IDs. Require causal mechanism identity, exact artifact diff, paired outcome, and held-out task-family transfer before a direction can accumulate validated credit.
+
+Compare score-only global ranking, fixed allocation, random allocation, UCB-style direction selection, MAP-Elites/quality-diversity, a Coral-style board and the verifier-grounded Symthaea board. Keep number of agents and allocation policy as separate factors. Preserve per-direction local records and null results; direction-level yield must be cost-normalized and uncertainty-aware; sparse directions should be shrunk rather than over-credited. NEW is an option with an explicit exploration cost, not a free source of diversity.
+
+Add negative controls for source-level duplicates, semantic aliases, harmless refactors mislabeled as new directions, proxy/construct changes masquerading as exploration, and a direction that wins only by sacrificing a protected capability. Report diversity and allocation entropy alongside global best-so-far, time-to-first-confirmed improvement, cost per validated discovery, delayed-payoff recovery and regret against an oracle allocator on synthetic landscapes. Use #9230 as the board/search owner; #10497 measures whether an improved board itself transfers and inherits.### 2.3 From self-grading to independently anchored measurement
+
+Evaluator research may use development targets, but the evaluator must be frozen before sealed candidate ranking. Compare against a target portfolio and report the target disagreement ceiling. A candidate-side change to grader, task contract, hidden data, score direction or checkpoint-selection rule is a hard integrity failure.
+
+### 2.4 From one endpoint to complete trajectories
+
+Preserve first-valid, best-so-far, final and predeclared selected artifacts as separate results. Never select the best checkpoint on the sealed confirmation metric. Report per-round development and independent audit values, failures, costs and protected regressions.
+
+### 2.5 From task transfer to mechanism transfer
+
+Hold out entire task families and at least one domain. Test whether a research motif (e.g. memory compression, experiment prioritization or causal debugging) improves a new domain under the same budget, without retuning. Track the causal mechanism, not merely the final artifact score.
+
+### 2.6 From plausible research prose to verified research claims
+
+Into the Unknown is a decisive warning: a fluent follow-up paper is not evidence that its experiments happened. Make every scientific claim traceable to an exact action/run, artifact, source dataset, evaluator/analysis version, and raw measurement; distinguish proposed, executed, verified, contradicted and unperformed. Any numeric statement must reconcile with the underlying evidence. A claim without an admissible source remains unverified, even when the conclusion sounds correct.
+
+### 2.7 From passive papers to agent-native research artifacts
+
+A paper's method should be packaged as an inspectable, runnable object: source-method map, environment lock, data rights/provenance, entrypoint, intermediate artifacts, verifier conditions, claim/evidence map and limitations. This lowers the cost of reproduction and reuse, while keeping method execution distinct from scientific novelty and expert validation.
+
+### 2.8 From a vague “self-improvement loop” to a claim ladder
+
+Keep separate: product improvement → accumulation → repeatability → better improver under matched budget → outer-loop ignition → inherited recursive progress → fresh-family/domain transfer. No lower tier implies a higher tier.
+
+## 3. Benchmark programme and prospective targets
+
+These targets are hypotheses to be calibrated on pilots, not current Symthaea results.
+
+| Lane | Required benchmark | Prospective target / decision rule |
+|---|---|---|
+| **Agent self-improvement (R3)** | AIDE²-like iterative code change and four-family held-out transfer, with source/build identity and reward-hacking negative controls. | Match the seven-step/four-family public reference under a comparable budget first; then require independent audit of every retained generation and report all seeds and failed attempts. |
+| **Outer-loop ignition (R4)** | Same-start evolved researcher vs fixed/human reference, identical inner-agent artifact, same task population and inclusive total budget. | At least five paired pilot seeds where feasible; confirmatory N from a preregistered precision/power analysis; at least two full-loop reruns and two complete outer cycles for recursive-progress claims; fresh-family transfer and no protected capability regression. |
+| **Open research integrity** | Into the Unknown-style follow-up proposals with source-grounded claim/evidence checks and domain-defined completion conditions. | Zero fabricated execution claims; zero unexplained numeric contradictions; every reported result binds to an executed, independently replayable artifact; report domain-condition satisfaction and novelty separately. |
+| **Paper-to-agent reproducibility** | Paper2Agent-style versioned method objects with executable entrypoints, environment locks and independent intermediate-output verification. | ≥90% source-method fidelity and baseline-reproduction audit pass in an initial pilot; no claim of open-ended scientific discovery based on agentification alone. |
+| **Stepwise scientific workflow** | SciAgentArena-style multi-domain analysis with stepwise verification. | Report step completion, evidence quality, data/compute provenance and downstream scientific interpretation separately; use held-out workflow families. |
+| **Evaluator research** | EvalResearchBench-style target ranking plus sealed transfer, adversarial leakage and construct-validity mutations. | Aim for ≥0.85 raw pairwise concordance against the frozen target portfolio, while reporting the measured target disagreement ceiling (published reference about 0.91); zero critical false passes; no material development-to-sealed collapse; match or beat the human-designed suite's decision quality at lower inclusive cost. Recalibrate to the measured target portfolio before confirmatory use. |
+| **Data-centric research** | RSIBench-Data-style iterative data strategy over fixed model/training stack and budget. | Pilot target ≥70% of settings improve on first valid attempt; retain best-so-far independently; report final separately; confirm any gain from a clean start on held-out task families. |
+| **Algorithm redesign** | Corrected, integrity-audited AI4AI task set plus independent successor training from initialization. | First reproduce the shipped baseline and correct task defects. Then target a mean normalized score above the paper's reported 0.250 best only on the corrected task portfolio, with ≥5 paired seed blocks per task where feasible, per-task uncertainty and a classification of tuning vs algorithm redesign. No scalar aggregate may hide a safety or task-family regression. |
+| **Automated R&D systems work** | Recursive NanoChat/NanoGPT/SOL-style artifacts, reproduced on matched hardware and exact code/data/evaluator versions. | Demonstrate reproducible paired improvement with uncertainty and exact artifacts. Keep H100/B200 results separate from smaller-device results; no guessed hardware normalization. |
+| **Direction allocation / quality-diversity** | Score-only leaderboard, fixed allocation, random, UCB-style, MAP-Elites, Coral-style local-record board and Symthaea verifier-grounded board on identical synthetic landscapes and fixed total budget. | Find independently validated mechanisms without prematurely abandoning delayed-payoff or under-sampled lines. | A direction-count increase is not necessarily discovery; alias/duplicate directions and proxy changes must be rejected. Require verifier-canonicalized novelty and transfer to held-out direction/task families. |
+| **Causal attribution** | 2×2 intervention designs, cluster-aware summaries, null controls and lineage-level change-unit analysis. | Attribute gains only to randomized/matched interventions with mechanism predictions and independent confirmation; report interaction effects and cluster-level uncertainty, not parent credit from ancestry alone. |
+
+### Non-compensatory conditions
+
+No performance target can compensate for: sealed-data leakage; candidate-controlled evaluator; test-set checkpoint selection; fabricated evidence; missing failure/cost denominators; invalid source/build lineage; severe protected-capability regression; or a false claim of confirmation/transfer. These are gates, not score penalties.
+
+## 4. Research-environment generation and two-level harness research
+
+### Paper-to-environment compiler (compose with #9332 AR-5D)
+
+RSI-Forge demonstrates a pipeline that turns published research into executable environments and independently reproduces a paper's baseline before allowing agent improvement. Symthaea should evaluate this as a separate research capability, not assume task generation is valid because the generated task is executable.
+
+A first qualification pack should include 20–30 papers across several fields, stratified by method type and difficulty, with at least two independent domain reviewers for each scored environment. Require:
+- source-method fidelity: every executable operation maps to the paper's stated mechanism, assumptions and data;
+- baseline fidelity: independently reproduced paper baseline with variance, environment and resource settings retained;
+- evaluator discrimination: known valid modifications and negative controls must be correctly ordered;
+- shortcut resistance: metadata-only, seed leakage, answer reconstruction and test-set tuning controls;
+- idea non-exhaustion: at least two materially distinct, valid improvement directions remain after the first obvious optimization;
+- domain review: blinded expert ratings for construct fidelity, baseline quality, shortcut resistance, reproducibility and scope;
+- task-family holdouts: split by source-paper lineage and scientific method family, not randomly by environment row.
+
+Prospective targets: zero critical oracle/seed leakage; at least 90% of environments pass independent baseline-reproduction review; at least 80% receive blinded expert approval for method fidelity and meaningful improvement headroom; and no environment enters a confirmatory split until construct and shortcut audits pass. These thresholds are hypotheses for calibration, not current results.
+
+### Open scientific follow-up and agent-native research artifacts (compose with #9332, #10629 and #10783)
+
+Use a four-stage evidence ladder when converting research into executable/agent-readable objects:
+
+1. **Environment readiness:** dependencies, toolchain, hardware and declared entrypoint really work (ResearchEnvBench / CEB #10419).
+2. **Method-faithful execution:** the paper's described method is mapped to a runnable, versioned agent/tool interface and its baseline is independently reproduced (Paper2Agent / RSI-Forge / AR-5D #9332).
+3. **Research-claim integrity:** each claimed operation/result has exact provenance; unperformed work is not narrated as executed; reported numbers reconcile with logs and source artifacts; missing/contradictory evidence stays unresolved (Into the Unknown / REA #10629).
+4. **Scientific contribution:** the result satisfies domain-defined conditions, survives independent analysis and replication, and establishes a genuinely new or useful contribution beyond a benchmark task. This is the highest and most human/domain-dependent claim.
+
+For a first 20–30 paper tranche, stratify source methods across at least five domains and require two independent domain reviewers for each scored environment. Add synthetic negative/positive pairs for: claimed experiment with no execution trace; metric value contradicting raw log; correct metric but wrong source dataset; source code execution against the wrong method version; fabricated ablation; reported null omitted; conclusion exceeds the preregistered scope; correct execution but no novelty; incomplete method with unresolved dependency; and faithful reproduction that does not satisfy the domain contribution conditions.
+
+Score each layer separately: environment pass, method fidelity, baseline reproduction, claim-to-evidence integrity, domain-condition satisfaction, novelty/utility and independent replication. A paper agent that faithfully executes a method is not a scientist; a scientifically interesting hypothesis is not a result until the operation and evidence exist. Keep these artifacts design-only until #10064 isolation and existing verifier/receipt authorities permit execution.
+
+### Two-level harness learning (compose with Harness²)
+
+Compare:
+1. per-task execution-harness optimization with no persistent experience;
+2. persistent untyped transcript/history retrieval;
+3. persistent verified experience library;
+4. direct carry-forward of the previous task's execution harness;
+5. shuffled or irrelevant experience library;
+6. full two-level Propose–Probe–Compose plus improvement-library update.
+
+Keep the task's execution harness reset to the same base for cross-task transfer tests; only the improvement mechanism's retained knowledge is changed. Add an independent correctness verifier for task deliverables because matched behavioral contrast alone cannot establish correctness.
+
+Measure task outcome, protected capability vector, cost, number of probes, composition precision, reuse rate, false transfer, evidence support for retained lessons and performance on held-out task families and unseen executor models. A useful positive result is not merely a higher current-task score: the learned improvement procedure must help later, unrelated tasks without carrying task-specific assumptions.
+
+### Model–harness co-evolution (compose with Co-Harness / RSIGym)
+
+Run a factorial comparison: data-only, training-setting-only, harness-only, model-weight-only where meaningful, harness→model, model→harness, and joint alternating updates. Keep the original base model and starting harness exact; run the same seed and task families; account for all data-generation, training, inference, evaluator and recovery costs. The interaction term is a first-class result: joint change may be super-additive, redundant or destructive. Do not credit the full joint gain to either component alone.
+
+## 5. Harness selection, regularized editing and complete-delivery evaluation
+
+The Harness-Bench and RRSI comparison manifests are in `docs/research/templates/SYM_RSI_HARNESS_BENCH_SOURCE_LOCK_V0_2026-11-07.json` and `docs/research/templates/SYM_RSI_RRSI_SOURCE_LOCK_V0_2026-11-07.json`, each with a companion schema. Both remain `MANIFEST_TEMPLATE_UNACQUIRED`: no task payload, source archive or oracle has been acquired, and every exact digest remains an unresolved placeholder. The Harness-Bench paper-v2 and live-site counts are kept as separate snapshots. RRSI's abstract/Table 1 discrepancy is recorded explicitly in the source lock.
+
+### Reuse Harness-Bench as the model×harness measurement floor
+
+Harness-Bench (arXiv:2605.27922v2) evaluates seven native harnesses across ten model backends on shared sandboxed tasks, with 1,408 hidden-oracle scoring modules and hard safety/risk gates. The paper v2 reports 300 tasks and 5,194 execution trajectories; the live project site checked on November 7 reports 20,454 evaluated runs. These are different versioned snapshots and must not be pooled into one denominator.
+
+Reproduce separately:
+1. a fixed shared harness selected across models;
+2. the best validation-selected harness per model;
+3. a per-task or per-family router selected only from development evidence;
+4. a no-harness / minimal harness baseline where interface equivalence permits;
+5. Symthaea's candidate harnesses.
+
+Report mean score, R0.8 (at least 0.80), full-credit R1, all safety gates, per-module completion, API cost, input/output tokens, request count, tool errors, wall time, context/turn usage and failure category. The published results show harness choice is model-dependent: six of seven harnesses lead at least one backend; harness per-model selection improves held-out R1 by 2.53–2.73 points versus one shared harness, while mean-score gains stay within ±0.14. GPT-5.6 Sol's full-credit variation is 9.12 points despite only 1.93-point SD in mean score across harnesses; one harness costs 2.97× another yet has lower R1. These are selection/configuration results, not recursive-improver results.
+
+### Add regularized harness evolution (RRSI) as a direct search baseline
+
+RRSI (arXiv:2609.24972v3) constrains the edit search rather than allowing unconstrained accumulation:
+- temporally anneal the maximum number of edits bundled into a proposal;
+- encourage unexplored trajectories based on evolution history;
+- critic-screen benchmark-specific proposals;
+- prune changes that are too small, too expensive, or no longer useful.
+
+The paper reports up to +6.0 points on its evolved split, +4.3 on five OOD benchmarks and 30% fewer policy tokens than unregularized evolution. Treat these as paper-reported targets, not a Symthaea reproduction or R4 claim.
+
+Symthaea's comparison should isolate each regularizer:
+- unregularized evolution;
+- annealed edit budget only;
+- exploration encouragement only;
+- benchmark-specific critic only;
+- cost/utility pruner only;
+- full RRSI-style regularization;
+- full regularization plus Symthaea verifier-grounded direction board.
+
+Keep proposal model, base harness, task population, evaluator and total budget matched. Measure proposal success, post-init improvement, OOD transfer, per-capability regression, edit count/size, policy tokens, evaluator calls, full inference/search cost and cost per independently confirmed reusable edit. A smaller policy-token count alone does not establish greater total efficiency if it causes more candidate attempts or evaluator calls.
+
+### Complete delivery as an objective, not an afterthought
+
+Harness-Bench shows high partial credit can conceal unfinished work: roughly 50.81% of general-task attempts reach R0.8, but only 26.22% receive full credit. Track module completion and whether feedback changes the next action; require all mandatory artifacts, evidence and safety gates rather than rewarding plausible intermediate progress.
+
+## 6. Research-state routing and harness-to-native transfer
+
+### Evidence retention, scope routing and continuation are separate decisions
+
+AREX distinguishes retaining evidence and unresolved constraints inside one investigation from restarting it. Harness-Zero tests whether behavior induced by a specialized harness can be learned in the student's own action space and survive harness removal. Routed Continual Learning shows that the system must choose both a memory representation and which task instances may share a state cluster. These are complementary mechanisms, not one generic "memory" capability.
+
+For Symthaea, test them in separate, composable dimensions:
+
+1. **Retention:** which source-grounded findings, exclusions, null results, failures and next tests are preserved?
+2. **Validity:** which records remain current for this task, scope, time and evaluator epoch?
+3. **Scope:** which future task families may read/update the same state?
+4. **Representation:** exact trajectory, evidence graph, distilled method, numerical state or another frozen memory mechanism?
+5. **Transfer:** does the next agent use the retained record correctly through its actual available tools/action interface?
+6. **Continuation:** does the current investigation refine, accept or restart—and does it retain the full original problem obligations after narrowing the next objective?
+
+### Preregistered comparisons
+
+For research-state scope, compare no memory, global untyped history, global verified state, fixed-mechanism scope-routed clusters, adaptive mechanism-plus-scope routing, shuffled-scope control and oracle source-family assignment. Include under-fragmentation and over-fragmentation cases. The oracle is diagnostic only; no source-task labels or hidden future identifiers may reach the router.
+
+For harness transfer, compare attached specialized harness, agent-as-harness with the same action space, harness-to-student distillation, a fixed target harness and a student-native procedural baseline. Preserve domain-specific outcomes; do not combine unrelated task metrics into a macro-average without showing each component and its cost.
+
+For continuation, compare preserve/refine, full restart and a fixed one-shot control. Track original problem obligations and ensure an intermediate subgoal does not silently become the final acceptance criterion.
+
+### Metrics
+
+- provenance-complete recovery and false-currentness;
+- route assignment precision/recall against evaluator-only source lineage;
+- cross-scope contamination and false-sharing rate;
+- over-fragmentation, duplicate-cluster and missed-reuse rate;
+- task success and fresh-family verified yield per inclusive cost;
+- procedure recovery through the student's allowed action set;
+- behavior surviving harness removal;
+- correct unresolved/abstain/restart decisions;
+- negative transfer, protected-capability regression and per-family worst-case outcomes;
+- tokens, calls, CPU/GPU, memory, latency, cluster count and human-review cost.
+
+The full rollout/stream is the replication unit when later outcomes depend on earlier cluster state. Task instances within one evolving rollout are not independent samples.
+
+### Research anchors and limitations
+
+- AREX's BrowseComp figures are 59.6 without context refresh or outer continuation, 71.4 with context refresh, and 82.5 with both. Its protocol caps 300 inner research turns and five outer operations per episode; these limits do not establish equal actual expenditure. Its confidence-bin plots are not acceptance precision.
+- Harness-Zero reports a macro mean of 44.3 after distillation versus 41.7 with a specialized harness attached. USPTO remains 30 versus 38, and a teacher's 62% collection success produced only a 3% student when the student could not execute teacher-only tool calls.
+- Routed Continual Learning evaluates 398 interleaved instances over five complete rollouts per model. It finds both mechanism selection and cluster scope matter, but bad merges can increase cost; the authors did not evaluate simultaneous state updates or cross-model sharing.
+- AMA-Bench is a long-horizon trajectory-memory task benchmark, not evidence of correct cross-task state transfer by itself.
+
+## 7. Research environment synthesis (compose with CEB #10419)
+
+ResearchEnvBench (IJCAI 2026) makes environment bootstrap a first-class prerequisite for autonomous research. Its 44-repository benchmark separates static dependency integrity from CPU entrypoint, CUDA/driver alignment, actual single-GPU computation, distributed DDP readiness and self-report hallucination. The best reported DDP success rate is 12/32 (37.5%); best single-GPU success is 21/43 (48.8%). The benchmark highlights incomplete dependency resolution, native-operator failures and brittle package/ABI coupling. [IJCAI proceedings](https://doi.org/10.24963/ijcai.2026/48) · [arXiv](https://arxiv.org/abs/2603.06739)
+
+For Symthaea, adapt the verification pyramid to Rust/Nix/WGPU rather than copying a Python/CUDA task verbatim:
+- **C0 — dependency/toolchain closure:** exact Nix flake/lock, Cargo.lock, rust-toolchain, features, target triple, native dependencies and environment declarations.
+- **C1 — CPU entrypoint:** execute the declared CPU entrypoint in a qualified isolated environment, with tracked product source frozen.
+- **C2 — target/ABI alignment:** compiler/linker/target/OS and graphics/API/driver compatibility; unsupported hardware is not applicable, not a pass.
+- **C3 — actual accelerator compute:** execute and verify a small GPU workload; device enumeration or adapter visibility is insufficient.
+- **C4 — distributed readiness:** multi-device/process execution only where the repository actually declares it; preserve applicability and denominator.
+- **C5 — capability-report calibration:** compare agent-reported paths, versions and readiness with independent runtime probes; report false positives separately.
+
+This lane belongs in CEB #10419 and composes with #10064 isolation, #10369 trust, #10370 evidence convergence and the existing canonical receipt/evaluator owners. It is distinct from RSI-Forge/#9332, which tests converting a paper's method into an executable environment. A repository may be runnable without its paper method being faithfully reproduced, and a paper task may be preconfigured by a human without the agent having solved environment synthesis.
+
+Runner-independent work: design-only 10–15 repository task blueprints across Rust/Nix CPU-only, native extensions, WGPU/Vulkan, CUDA-backed repositories and distributed settings where applicable; pin target hardware and capability applicability; define source-only views and no-tracked-source-modification rules; author positive/negative/false-self-report controls; audit licenses, secrets and leakage. Do not execute repository-controlled builds/tests before #10064 isolation qualification.
+
+Prospective pilot gates (not results): zero false claims of runtime capability; exact toolchain/lock provenance for every qualified run; separate C0–C4 denominators; initial hypotheses of 80% CPU entrypoint readiness and 50% applicable accelerator readiness, recalibrated after task-sample review. Never copy the DDP denominator to repositories without distributed capability.
+
+The claim ceiling is the exact repository revision and setup executing the tested entrypoint under the specified toolchain/hardware. It is not evidence of experiment reproduction, algorithm correctness, scientific validity or R4 improvement.
+
+## 8. Evaluator-research experiment (#10756)
+
+Compare a human-designed compact suite, deterministic rules, frontier-model evaluator builders and Symthaea under matched information and cost. Use separate discovery, development, calibration, sealed target and fresh-family transfer splits.
+
+Measure:
+- pairwise ranking concordance, Kendall/Spearman agreement, top-k agreement and rank error;
+- performance relative to disagreement among target benchmarks and human adjudicators;
+- false promotion, false rejection and abstention at preregistered thresholds;
+- task-family/domain coverage, truncation, missing outputs and execution failure;
+- construct-validity controls, leakage detection and robustness to scorer optimization;
+- confidence calibration, cluster-appropriate uncertainty and target-version stability;
+- latency, evaluator calls, tokens, compute, energy and human review cost.
+
+Adversarial controls must include readable hidden seeds, task overlap, scorer gaming, collapsed outputs, unattainable metric optima, noisy baselines, best-of-N sealed checkpoint selection, truncation, budget exhaustion, dropped tool results, missingness manipulation, evaluator-version drift and pseudo-independent correlated tasks.
+
+A high-concordance evaluator is a measurement instrument, not an authority. The target portfolio itself can be wrong or biased; use disagreement ceilings, human review and independent target adjudication.
+
+The first synthetic adversarial-control pack is tracked in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_V0_2026-11-06.json`, with its companion Draft 2020-12 schema in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_SCHEMA_V0_2026-11-06.json`. It contains 16 hard-gate negative controls and four synthetic positive/inconclusive controls. A custom structural walk found zero schema errors, 16 unique negative-control IDs and the expected hard-gate/non-hard-gate split. These fixtures specify threat mutations and expected dispositions; they are not real task data, sealed tests or a substitute for an independently custodied target portfolio.
+
+## 9. Immediate execution sequence
+
+1. Finish semantic R4 preregistration checks in #10749, including scope-routed research-state comparisons, and preserve TEMPLATE_NOT_PREREGISTERED until an actual experiment is frozen.
+2. Use #10844 to separate state representation from scope routing and test global, routed, shuffled and oracle assignments under matched complete-rollout cost.
+3. Reproduce Harness-Bench paper v2 and current live-site snapshots separately; pin task/harness/model manifests and retain both mean score and full-credit outcomes.
+4. Add RRSI as a regularized proposal/pruning baseline; isolate annealing, exploration, critic and cost pruner, then test the complete improver under matched costs.
+5. Extend #10756 with evaluator-integrity tasks and #10691 with clean-start algorithm/agent transfer controls.
+6. Compare attached harness, agent-as-harness and harness-to-student transfer without conflating teacher collection success and student deployment capability.
+7. Audit Coral Discovery's best-of-three reporting against its per-task evaluation caps; do not treat six/tie/two as a mean-over-seeds effect.
+8. Use #10717 for causal attribution and #10497 for the same-start test of whether the inherited improvement procedure itself gets better.
+
+## 10. Claim boundaries and reproducibility
+
+- A structural or semantic validator pass is not evidence that referenced files, digests, signatures or custodians are authentic.
+- A disjointness declaration is not proof of population independence; an independent custodian must inspect the actual manifests.
+- Evaluator declarations do not prove independence; source, mounts, credentials, egress, logs and hidden-test custody require independent audit.
+- A faster benchmark run is an engineering result, not automatically a new algorithm or R4 result.
+- A higher inner-agent score is a product result, not evidence that the outer-loop researcher improved.
+- A single positive seed or a post-hoc best checkpoint is not an improvement-process result.
+
+## Sources
+
+1. AIDE², *Recursive self-improvement of AI research agents*: https://arxiv.org/abs/2609.26457
+2. Autonomous Science Bench 0.1: https://www.autonomous-science-bench.ai/ ; https://arxiv.org/abs/2610.18449
+3. FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+4. AgentIdeaBench: https://arxiv.org/abs/2609.07611
+5. Autonomous Science Bench 0.1: https://www.autonomous-science-bench.ai/ ; https://arxiv.org/abs/2610.18449
+6. FIRE-Bench (ICML 2026): https://proceedings.mlr.press/v306/wang26d.html
+7. Coral Discovery, *The Division of Cognitive Labor in Autonomous Research* (2026-10-23): https://arxiv.org/abs/2610.33281
+8. RSI-Env, *An Open-Ended Environment for Recursive Self-Improvement of Agents* (2026-11-01): https://arxiv.org/abs/2611.01736
+9. RSIGym project and methodology: https://rsi-index.ai/ and https://github.com/evolvent-ai/RSIGym
+10. RSI-Forge: https://arxiv.org/abs/2610.09426
+11. Harness²: https://arxiv.org/abs/2610.14224
+12. Co-Harness: https://arxiv.org/abs/2607.22688
+13. Recursive, *First steps toward automated AI research* (2026-10-18): https://recursive.com/updates/first-steps-toward-automated-ai-research
+14. Recursive public artifacts: https://github.com/recursive-org/first-steps-toward-automated-ai-research
+15. AI4AI-Bench paper: https://arxiv.org/abs/2608.20318
+16. Independent AI4AI-Bench code audit (2026-11-03): https://github.com/Open-Benchmark-Review/audits/blob/main/audits/ai4ai-bench/report.md
+17. RSIBench-Data: https://arxiv.org/abs/2607.25886
+18. EvalResearchBench: https://arxiv.org/abs/2610.04184
+19. IdeaTaste (2026-11-02): https://arxiv.org/abs/2611.03424
+20. TasteVal (2026-10-05): https://arxiv.org/abs/2610.06824
+21. EurekaBench (2026-09-30): https://arxiv.org/abs/2609.30152
+22. TASTE (Anthropic, 2026-08-28): https://alignment.anthropic.com/2026/taste/
+23. REUSE (2026-09-29): https://arxiv.org/abs/2609.33180
+24. SelfImprove-Bench (2026-11-02): https://arxiv.org/abs/2611.02797
+25. MASS (2026-10-08): https://arxiv.org/abs/2610.12176
+26. RSI evidence census: https://arxiv.org/abs/2610.27610
+27. METR research productivity assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
+28. ResearchEnvBench (IJCAI 2026): https://doi.org/10.24963/ijcai.2026/48 ; https://arxiv.org/abs/2603.06739
+29. Coral Autoresearch coordination study (September 2026): https://coral-labs.ai/autoresearch/
+30. Harness-RSI survey, revised author reading version (2026-11-04; not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
+31. AREX: https://arxiv.org/abs/2607.21461
+32. Harness-Zero: https://arxiv.org/abs/2609.24974
+33. Routed Continual Learning: https://arxiv.org/abs/2610.38796
+34. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
+35. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
+36. RRSI: https://arxiv.org/abs/2609.24972
+37. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
+38. Into the Unknown: https://arxiv.org/abs/2610.19159
+39. Paper2Agent: https://www.nature.com/articles/s41586-026-11044-y
+40. SciAgentArena: https://sciagentarena.github.io/
+41. Recursive Self-Improvement in AI survey (2026-07-08): https://arxiv.org/abs/2607.07663
+42. Symthaea research-taste benchmark (#10877): https://github.com/Luminous-Dynamics/symthaea/issues/10877

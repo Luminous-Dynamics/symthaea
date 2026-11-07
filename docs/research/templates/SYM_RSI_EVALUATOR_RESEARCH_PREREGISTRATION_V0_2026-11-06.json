@@ -1,0 +1,287 @@
+{
+  "schema_version": "sym-rsi-evaluator-research-preregistration-v0",
+  "document_status": "TEMPLATE_NOT_PREREGISTERED",
+  "warning": "Unfilled protocol template only. It is not a preregistration, proof of execution, evaluator approval, target-benchmark authority or R4 result.",
+  "experiment": {
+    "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "protocol_version": "v0",
+    "preregistered_at_utc": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "preregistration_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "reviewers": [
+      "__REQUIRED_BEFORE_PREREGISTRATION__"
+    ],
+    "question": "Can a researcher build a compact evaluator that preserves independent target-portfolio judgments on sealed candidate comparisons while reducing inclusive evaluation cost?"
+  },
+  "target_portfolio": {
+    "portfolio_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "target_benchmarks": [
+      {
+        "benchmark_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "domain": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "task_family": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "version_or_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "metric_definition_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "authority_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+        "custodian_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+      }
+    ],
+    "target_pairwise_disagreement": {
+      "candidate_pair_population_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "pairwise_agreement_estimate": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "disagreement_ceiling_estimate": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "adjudication_method_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_adjudicator_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "uncertainty_method": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  },
+  "arms": [
+    {
+      "arm_id": "human_designed",
+      "researcher_artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "researcher_config_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "information_access_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "deterministic_baseline",
+      "researcher_artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "researcher_config_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "information_access_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "frontier_model_researcher",
+      "researcher_artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "researcher_config_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "information_access_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "arm_id": "symthaea_researcher",
+      "researcher_artifact_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "researcher_config_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "information_access_digest": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  ],
+  "matched_conditions": {
+    "shared_budget_envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "same_total_budget_for_all_arms": true,
+    "same_discovery_materials": true,
+    "same_model_candidate_panel": true,
+    "same_target_portfolio": true,
+    "same_output_and_tool_contract": true,
+    "all_human_active_and_review_time_costed": true,
+    "arm_specific_differences": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "splits": {
+    "discovery": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accessible_to_researcher": true
+    },
+    "development": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accessible_to_researcher": true
+    },
+    "calibration": {
+      "manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "access_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "sealed_target": {
+      "manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_researcher": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "one_shot_policy": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "fresh_family_transfer": {
+      "manifest_commitment": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "custodian_independent_of_researcher": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "retuning_prohibited": true
+    },
+    "disjointness_audit": {
+      "audit_method_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "audit_report_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "independent_auditor": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_overlap_count": 0,
+      "unit": "task_instance_id_and_task_family_id"
+    }
+  },
+  "evaluator_artifact": {
+    "frozen_source_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "executable_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "configuration_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "task_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "grader_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "score_aggregation_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "freeze_commit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "frozen_before_sealed_scoring": true,
+    "researcher_can_change_after_freeze": false
+  },
+  "adversarial_controls": [
+    {
+      "control_id": "hidden_seed_in_workspace",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "hidden_seed_in_config",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "train_test_family_overlap",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "proxy_metric_gaming",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "construct_collapse",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "unreachable_metric_optimum",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "noisy_baseline",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "sealed_checkpoint_selection",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "output_truncation",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "evaluation_budget_exhaustion",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "dropped_tool_results",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "missingness_denominator_manipulation",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "evaluator_epoch_drift",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "correlated_tasks_as_independent",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "cost_ledger_omission",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    {
+      "control_id": "cross_arm_privilege_drift",
+      "fixture_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "expected_disposition": "REJECT_OR_ABSTAIN",
+      "adjudication_ref": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    }
+  ],
+  "outcomes": {
+    "primary": {
+      "name": "pairwise_candidate_ranking_concordance_against_independent_target_portfolio",
+      "definition": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "decision_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cluster_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "practical_effect_threshold": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "secondary": [
+      "Kendall tau and Spearman rank agreement",
+      "Top-k candidate agreement and rank error",
+      "Concordance relative to target disagreement ceiling",
+      "False promotion, false rejection and abstention",
+      "Per-domain coverage, truncation and evaluator failure rate",
+      "Fresh-family transfer without retuning",
+      "Fully inclusive cost and human review time"
+    ],
+    "noncompensatory_gates": [
+      "zero critical false passes on leakage and construct-validity controls",
+      "no candidate write access to grader or sealed materials",
+      "no sealed checkpoint selection or post-hoc task weighting",
+      "no silent denominator reduction for missing/invalid outcomes"
+    ]
+  },
+  "resources": {
+    "currency_and_price_basis": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "total_budget": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "budget_envelope_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "per_arm_shared_caps": {
+      "researcher_tokens": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "model_calls": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "evaluator_calls": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "wall_clock_hours": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cpu_hours": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "accelerator_hours_by_type": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "peak_memory": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "energy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_active_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "human_review_and_rework_minutes": "__REQUIRED_BEFORE_PREREGISTRATION__"
+    },
+    "failure_accounting_policy": "All attempts, invalid outputs, timeouts, truncations, retries, build failures and human review/rework remain in the cost and outcome ledger."
+  },
+  "analysis_plan": {
+    "statistical_unit": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "clustered_dependence": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "paired_candidate_sampling": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "uncertainty_method": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "confidence_level": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "multiplicity_and_sequential_looks": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "missingness_and_failure_policy": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "stopping_rule": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "sensitivity_analyses": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "analysis_code_commit": "__REQUIRED_BEFORE_PREREGISTRATION__"
+  },
+  "governance": {
+    "sealed_target_candidate_access": false,
+    "target_material_write_access": false,
+    "candidate_can_modify_frozen_evaluator": false,
+    "independent_custodian_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+    "evaluator_epoch_owner": "#10708",
+    "promotion_authority": "#10573",
+    "canonical_receipt_owners": "#10314/#10370/#10533",
+    "final_claim_authority": "Independent adjudicators and existing promotion authority; this template has no authority."
+  },
+  "reporting": {
+    "raw_pairwise_judgments_required": true,
+    "all_candidate_and_failed_runs_retained": true,
+    "grader_logs_and_truncation_required": true,
+    "cost_ledger_required": true,
+    "target_disagreement_reported": true,
+    "per_domain_breakdown_required": true,
+    "sealed_and_transfer_results_reported_separately": true
+  },
+  "claim_ceiling": "A high-concordance evaluator is a measurement instrument, not proof that the target portfolio is perfect, not an R4 result, and not authority to promote a candidate."
+}
