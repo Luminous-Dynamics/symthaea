@@ -34,6 +34,10 @@ pub enum CheckedBPError {
     InvalidIterationLimit,
     InvalidTolerance(f64),
     InvalidDamping(f64),
+    /// A particular message/belief update has no support under the current
+    /// messages. On a forest this implies the corresponding component has no
+    /// consistent assignment; on a loopy graph it is not a global
+    /// unsatisfiability certificate.
     ZeroSupport { context: &'static str },
     NonFiniteMessage { context: &'static str },
 }
@@ -75,6 +79,10 @@ pub enum InferenceStatus {
     /// Undamped sum-product converged on a forest. Exact algorithmically;
     /// returned f64 values still have ordinary floating-point rounding.
     ExactForest,
+    /// Undamped forest messages reached a nonzero residual that is below
+    /// the configured tolerance. A converged tolerance test is not, by itself,
+    /// proof that the finite message schedule has reached its exact fixed point.
+    ApproximateForest,
     /// A damped forest run converged to the tolerance. This is an iterative
     /// approximation because damping can preserve mass on exact-zero states.
     ApproximateDampedForest,
@@ -236,10 +244,11 @@ pub fn run_sum_product(
     let inference_status = if !converged {
         InferenceStatus::NotConverged
     } else {
-        match (structure, config.damping == 1.0) {
-            (GraphStructure::Forest, true) => InferenceStatus::ExactForest,
-            (GraphStructure::Forest, false) => InferenceStatus::ApproximateDampedForest,
-            (GraphStructure::Loopy, _) => InferenceStatus::ApproximateLoopy,
+        match (structure, config.damping == 1.0, final_delta == 0.0 && final_log_delta == 0.0) {
+            (GraphStructure::Forest, true, true) => InferenceStatus::ExactForest,
+            (GraphStructure::Forest, true, false) => InferenceStatus::ApproximateForest,
+            (GraphStructure::Forest, false, _) => InferenceStatus::ApproximateDampedForest,
+            (GraphStructure::Loopy, _, _) => InferenceStatus::ApproximateLoopy,
         }
     };
 
@@ -723,6 +732,22 @@ mod tests {
         assert!(result.converged);
         assert_eq!(result.graph_structure, GraphStructure::Forest);
         assert_eq!(result.inference_status, InferenceStatus::ApproximateDampedForest);
+    }
+
+    #[test]
+    fn tolerance_convergence_without_exact_fixed_point_is_not_labelled_exact() {
+        let graph = two_node_tree();
+        let result = run_sum_product(&graph, &BPConfig {
+            max_iterations: 1,
+            tolerance: 10.0,
+            damping: 1.0,
+            schedule: MessageSchedule::Parallel,
+        }).unwrap();
+
+        assert!(result.converged);
+        assert!(result.max_message_delta > 0.0);
+        assert!(result.max_log_message_delta > 0.0);
+        assert_eq!(result.inference_status, InferenceStatus::ApproximateForest);
     }
 
     #[test]
