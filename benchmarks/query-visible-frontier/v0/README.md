@@ -34,6 +34,18 @@ Missing visibility evidence means Unknown, not visible and not not-visible. An i
 - synthetic-cases.jsonl — deterministic examples. All timestamps and references are synthetic test data.
 - This README — semantics, ownership and claim ceiling.
 
+## Proposition-version and source-span controls
+
+The fixture also models an overlapping amendment:
+- v1 and v2 represent the same logical proposition but have distinct canonical version refs and exact source-span refs.
+- The v2 amendment has a typed replacement-relation reference to v1.
+- Both versions may be present and visible in the same index revision.
+- A pre-amendment query resolves to v1 even when v2 is already indexed and visible.
+- A post-amendment query resolves to v2; the semantically similar old clause must not be substituted.
+- A query whose known-at cutoff precedes v2 materialization cannot retrieve v2, even when its valid-time resolution points to the amended clause.
+
+The benchmark carries opaque canonical statement/version, relation, temporal-resolution and source-span references. It does not define a second proposition graph, version ledger or selector ontology. Exact span contents and coordinate semantics remain owned by the source/provenance contracts.
+
 ## Included negative controls
 
 1. Source receipt predates the query, but embedding materialization follows the cutoff.
@@ -59,6 +71,9 @@ These rules should be implemented inside the existing knowledge/evidence benchma
 ## Metrics to report separately
 
 - query-visible precision/recall at K;
+- proposition-version accuracy under overlapping amendments;
+- exact source-span locator precision/recall;
+- obsolete-clause substitution rate and amendment propagation correctness;
 - post-cutoff visibility leakage;
 - unknown-visibility rate;
 - stale/revoked derived-payload leakage;
