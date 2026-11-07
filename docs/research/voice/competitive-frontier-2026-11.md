@@ -52,11 +52,12 @@ Sources:
 
 ### Meta Omnilingual ASR
 
-Meta's November 2025 release describes ASR coverage for more than 1,600 languages, a 7B-parameter multilingual wav2vec 2.0 representation model, CTC and LLM-style decoder variants, and an extensibility path using a small number of paired audio/text examples. The release is an important architecture and breadth comparator. Do not assume that every South African language, variety or conversational domain has an independently reproduced result.
+Meta's November 10, 2025 release describes ASR coverage for more than 1,600 languages, a 7B-parameter multilingual wav2vec 2.0 representation model, CTC and LLM-style decoder variants, and an extensibility path using a small number of paired audio/text examples. The project repository records a December 2025 v2 update with improved CTC and LLM-ASR checkpoints at 300M, 1B, 3B and 7B sizes, plus unlimited-audio-length LLM-ASR variants at the same sizes. The repository notes that the unlimited-length variants have comparable reported accuracy but do not yet have supported fine-tuning recipes. These versions should be represented separately from the original release, with the exact checkpoint ID, revision, decoder and long-audio mode recorded.
 
-Include the exact model/checkpoint size (300M, 1B, 7B where applicable), language, decoder, revision and inference configuration in the run manifest.
+Meta's release is an important architecture and breadth comparator. Do not assume that every South African language, variety or conversational domain has an independently reproduced result merely because the suite covers 1,600+ languages.
 
 Source: https://ai.meta.com/blog/omnilingual-asr-advancing-automatic-speech-recognition/
+Model repository and December 2025 v2 update: https://github.com/facebookresearch/omnilingual-asr
 
 ### PazaBench and data-scaling evidence
 
