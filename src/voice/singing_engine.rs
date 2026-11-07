@@ -298,12 +298,8 @@ impl VocalPerformance {
         validate_english_orthography(&self.lyrics)?;
         for token in self.lyrics.split_whitespace() {
             let core = token.trim_matches(|character: char| !character.is_alphanumeric());
-            if !core.is_empty()
-                && symthaea_muse::singing_bridge::syllable_count(core) == 0
-            {
-                bail!(
-                    "English G2P produced no pronounceable syllables for lyric token {token:?}"
-                );
+            if !core.is_empty() && symthaea_muse::singing_bridge::syllable_count(core) == 0 {
+                bail!("English G2P produced no pronounceable syllables for lyric token {token:?}");
             }
         }
         let expected_syllables = symthaea_muse::singing_bridge::syllable_count(&self.lyrics);
@@ -572,7 +568,10 @@ mod tests {
         let mut performance = performance_with_melisma();
         performance.lyrics = "light bright".into();
         let error = performance.validate().unwrap_err().to_string();
-        assert!(error.contains("lyric/performance syllable mismatch"), "{error}");
+        assert!(
+            error.contains("lyric/performance syllable mismatch"),
+            "{error}"
+        );
     }
 
     #[test]
