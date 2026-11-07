@@ -281,6 +281,30 @@ pub struct SensorPlacementScore {
     pub observations_after_placement: usize,
 }
 
+/// One point in a target-region design prior. Weights are relative probabilities.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TargetHypothesis {
+    pub target_ecef_m: Vector3,
+    pub weight: f64,
+}
+
+/// Robust placement score aggregated over a finite target-region hypothesis set.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RobustSensorPlacementScore {
+    pub sensor_id: String,
+    /// Prior-weighted mean of log(det(FIM)); higher is better.
+    pub expected_log_determinant_information: f64,
+    /// Minimum log(det(FIM)) over all supplied target hypotheses; higher is better.
+    pub worst_case_log_determinant_information: f64,
+    /// Prior-weighted mean of trace(CRLB covariance); lower is better.
+    pub expected_a_optimal_variance_sum_m2: f64,
+    /// Maximum trace(CRLB covariance) over supplied hypotheses; lower is better.
+    pub worst_case_a_optimal_variance_sum_m2: f64,
+    /// Maximum local Fisher-information condition number over the hypotheses.
+    pub worst_case_condition_number: f64,
+    pub target_hypotheses: usize,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum TriangulationError {
     InsufficientObservations,
@@ -443,16 +467,7 @@ pub fn bearing_fisher_information(
     if observations.is_empty() || !assumed_target_ecef_m.is_finite() {
         return Err(TriangulationError::InsufficientObservations);
     }
-    let mut seen = BTreeSet::new();
-    let mut rays = Vec::with_capacity(observations.len());
-    for observation in observations {
-        if !seen.insert(observation.sensor_id.as_str()) {
-            return Err(TriangulationError::DuplicateSensorId(
-                observation.sensor_id.clone(),
-            ));
-        }
-        rays.push(observation.prepare()?);
-    }
+    let rays = predicted_existing_sensor_rays(observations, assumed_target_ecef_m)?;
     angular_information_matrix(&rays, assumed_target_ecef_m)
 }
 
@@ -471,16 +486,11 @@ pub fn rank_sensor_placements(
         return Err(TriangulationError::NonFiniteVector);
     }
 
-    let mut seen_ids = BTreeSet::new();
-    let mut rays = Vec::with_capacity(existing_observations.len() + 1);
-    for observation in existing_observations {
-        if !seen_ids.insert(observation.sensor_id.as_str()) {
-            return Err(TriangulationError::DuplicateSensorId(
-                observation.sensor_id.clone(),
-            ));
-        }
-        rays.push(observation.prepare()?);
-    }
+    let rays = predicted_existing_sensor_rays(existing_observations, assumed_target_ecef_m)?;
+    let seen_ids: BTreeSet<&str> = existing_observations
+        .iter()
+        .map(|observation| observation.sensor_id.as_str())
+        .collect();
 
     let mut candidate_ids = BTreeSet::new();
     let mut scores = Vec::with_capacity(candidates.len());
@@ -534,6 +544,106 @@ pub fn rank_sensor_placements(
     Ok(scores)
 }
 
+/// Rank candidate placements over a finite weighted target-region prior.
+///
+/// The robust order is lexicographic: maximize worst-case log(det(FIM)),
+/// then maximize prior-weighted mean log(det(FIM)), then minimize worst-case
+/// A-optimal covariance trace. The expected metrics use normalized hypothesis
+/// weights; worst-case metrics treat every supplied hypothesis as admissible.
+///
+/// Each target hypothesis gets freshly predicted bearings for every existing
+/// sensor pose and each candidate pose. This avoids reusing nominal measured
+/// angles at a different hypothesized target point. The routine is fail-closed:
+/// a singular or behind-sensor geometry at any supplied hypothesis rejects the
+/// candidate set rather than silently dropping that region.
+///
+/// This remains a finite-scenario local design, not a continuous-region
+/// guarantee. It omits pose/calibration covariance, visibility/occlusion,
+/// correlated noise, target dynamics, and deployment cost.
+pub fn rank_sensor_placements_over_target_region(
+    existing_observations: &[RayObservation],
+    target_hypotheses: &[TargetHypothesis],
+    candidates: &[SensorPlacementCandidate],
+) -> Result<Vec<RobustSensorPlacementScore>, TriangulationError> {
+    if target_hypotheses.is_empty() {
+        return Err(TriangulationError::InsufficientObservations);
+    }
+
+    let mut total_weight = 0.0;
+    for hypothesis in target_hypotheses {
+        if !hypothesis.target_ecef_m.is_finite() {
+            return Err(TriangulationError::NonFiniteVector);
+        }
+        if !hypothesis.weight.is_finite() || hypothesis.weight <= 0.0 {
+            return Err(TriangulationError::InvalidConfiguration);
+        }
+        total_weight += hypothesis.weight;
+    }
+    if !total_weight.is_finite() || total_weight <= 0.0 {
+        return Err(TriangulationError::InvalidConfiguration);
+    }
+
+    let mut aggregate: Vec<RobustSensorPlacementScore> = candidates
+        .iter()
+        .map(|candidate| RobustSensorPlacementScore {
+            sensor_id: candidate.sensor_id.clone(),
+            expected_log_determinant_information: 0.0,
+            worst_case_log_determinant_information: f64::INFINITY,
+            expected_a_optimal_variance_sum_m2: 0.0,
+            worst_case_a_optimal_variance_sum_m2: 0.0,
+            worst_case_condition_number: 0.0,
+            target_hypotheses: target_hypotheses.len(),
+        })
+        .collect();
+
+    for hypothesis in target_hypotheses {
+        let weight = hypothesis.weight / total_weight;
+        let scenario_scores = rank_sensor_placements(
+            existing_observations,
+            hypothesis.target_ecef_m,
+            candidates,
+        )?;
+
+        for aggregate_score in &mut aggregate {
+            let scenario = scenario_scores
+                .iter()
+                .find(|score| score.sensor_id == aggregate_score.sensor_id)
+                .ok_or(TriangulationError::NonFiniteIntermediate)?;
+
+            aggregate_score.expected_log_determinant_information +=
+                weight * scenario.log_determinant_information;
+            aggregate_score.worst_case_log_determinant_information = aggregate_score
+                .worst_case_log_determinant_information
+                .min(scenario.log_determinant_information);
+            aggregate_score.expected_a_optimal_variance_sum_m2 +=
+                weight * scenario.a_optimal_variance_sum_m2;
+            aggregate_score.worst_case_a_optimal_variance_sum_m2 = aggregate_score
+                .worst_case_a_optimal_variance_sum_m2
+                .max(scenario.a_optimal_variance_sum_m2);
+            aggregate_score.worst_case_condition_number = aggregate_score
+                .worst_case_condition_number
+                .max(scenario.condition_number);
+        }
+    }
+
+    aggregate.sort_by(|left, right| {
+        right
+            .worst_case_log_determinant_information
+            .total_cmp(&left.worst_case_log_determinant_information)
+            .then_with(|| {
+                right
+                    .expected_log_determinant_information
+                    .total_cmp(&left.expected_log_determinant_information)
+            })
+            .then_with(|| {
+                left.worst_case_a_optimal_variance_sum_m2
+                    .total_cmp(&right.worst_case_a_optimal_variance_sum_m2)
+            })
+            .then_with(|| left.sensor_id.cmp(&right.sensor_id))
+    });
+    Ok(aggregate)
+}
+
 fn predicted_candidate_bearing(
     candidate: &SensorPlacementCandidate,
     target: Vector3,
@@ -563,6 +673,33 @@ fn predicted_candidate_bearing(
         sigma_azimuth_rad: candidate.sigma_azimuth_rad,
         sigma_elevation_rad: candidate.sigma_elevation_rad,
     })
+}
+
+fn predicted_existing_sensor_rays(
+    observations: &[RayObservation],
+    target: Vector3,
+) -> Result<Vec<PreparedRay>, TriangulationError> {
+    let mut seen_ids = BTreeSet::new();
+    let mut rays = Vec::with_capacity(observations.len());
+    for observation in observations {
+        if !seen_ids.insert(observation.sensor_id.as_str()) {
+            return Err(TriangulationError::DuplicateSensorId(
+                observation.sensor_id.clone(),
+            ));
+        }
+        // Validate the recorded observation as a real sensor measurement before
+        // using its pose and noise model to predict a bearing at this target.
+        observation.prepare()?;
+        let candidate = SensorPlacementCandidate {
+            sensor_id: observation.sensor_id.clone(),
+            origin_ecef_m: observation.origin_ecef_m,
+            sensor_to_ecef: observation.sensor_to_ecef,
+            sigma_azimuth_rad: observation.sigma_azimuth_rad,
+            sigma_elevation_rad: observation.sigma_elevation_rad,
+        };
+        rays.push(predicted_candidate_bearing(&candidate, target)?.prepare()?);
+    }
+    Ok(rays)
 }
 
 fn angular_information_matrix(
@@ -1019,6 +1156,143 @@ mod tests {
             Err(TriangulationError::DuplicateCandidateId(
                 "north".to_string()
             ))
+        );
+    }
+
+    #[test]
+    fn target_region_ranking_is_weighted_and_worst_case_ordered() {
+        let centre = Vector3::new(50.0, 40.0, 200.0);
+        let existing = vec![
+            bearing_from_target("north", Vector3::new(0.0, 0.0, 0.0), centre, 1.0e-4),
+            bearing_from_target("east", Vector3::new(100.0, 0.0, 0.0), centre, 1.0e-4),
+        ];
+        let candidates = vec![
+            SensorPlacementCandidate {
+                sensor_id: "north-far".to_string(),
+                origin_ecef_m: Vector3::new(-100.0, 0.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "south".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 100.0, 0.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+            SensorPlacementCandidate {
+                sensor_id: "high".to_string(),
+                origin_ecef_m: Vector3::new(0.0, 0.0, 100.0),
+                sensor_to_ecef: Quaternion::IDENTITY,
+                sigma_azimuth_rad: 1.0e-4,
+                sigma_elevation_rad: 1.0e-4,
+            },
+        ];
+        let hypotheses = vec![
+            TargetHypothesis {
+                target_ecef_m: Vector3::new(50.0, 40.0, 200.0),
+                weight: 0.5,
+            },
+            TargetHypothesis {
+                target_ecef_m: Vector3::new(70.0, 30.0, 180.0),
+                weight: 0.3,
+            },
+            TargetHypothesis {
+                target_ecef_m: Vector3::new(35.0, 55.0, 230.0),
+                weight: 0.2,
+            },
+        ];
+
+        let ranking =
+            rank_sensor_placements_over_target_region(&existing, &hypotheses, &candidates)
+                .unwrap();
+        assert_eq!(ranking.len(), 3);
+        assert!(ranking.iter().all(|score| score.target_hypotheses == 3));
+        assert!(ranking.iter().all(|score| {
+            score.expected_log_determinant_information.is_finite()
+                && score.worst_case_log_determinant_information.is_finite()
+                && score.expected_a_optimal_variance_sum_m2.is_finite()
+                && score.worst_case_a_optimal_variance_sum_m2.is_finite()
+                && score.worst_case_condition_number.is_finite()
+                && score.expected_log_determinant_information
+                    >= score.worst_case_log_determinant_information
+                && score.expected_a_optimal_variance_sum_m2
+                    <= score.worst_case_a_optimal_variance_sum_m2
+        }));
+        assert!(ranking.windows(2).all(|pair| {
+            pair[0].worst_case_log_determinant_information
+                >= pair[1].worst_case_log_determinant_information
+        }));
+    }
+
+    #[test]
+    fn target_region_ranking_normalizes_weights_and_rejects_invalid_weights() {
+        let centre = Vector3::new(50.0, 40.0, 200.0);
+        let existing = vec![
+            bearing_from_target("north", Vector3::new(0.0, 0.0, 0.0), centre, 1.0e-4),
+            bearing_from_target("east", Vector3::new(100.0, 0.0, 0.0), centre, 1.0e-4),
+        ];
+        let candidate = SensorPlacementCandidate {
+            sensor_id: "high".to_string(),
+            origin_ecef_m: Vector3::new(0.0, 0.0, 100.0),
+            sensor_to_ecef: Quaternion::IDENTITY,
+            sigma_azimuth_rad: 1.0e-4,
+            sigma_elevation_rad: 1.0e-4,
+        };
+        let first = TargetHypothesis {
+            target_ecef_m: centre,
+            weight: 1.0,
+        };
+        let second = TargetHypothesis {
+            target_ecef_m: Vector3::new(55.0, 45.0, 210.0),
+            weight: 3.0,
+        };
+        let a = rank_sensor_placements_over_target_region(
+            &existing,
+            &[first.clone(), second.clone()],
+            std::slice::from_ref(&candidate),
+        )
+        .unwrap();
+        let b = rank_sensor_placements_over_target_region(
+            &existing,
+            &[
+                TargetHypothesis {
+                    weight: 10.0,
+                    ..first
+                },
+                TargetHypothesis {
+                    weight: 30.0,
+                    ..second
+                },
+            ],
+            std::slice::from_ref(&candidate),
+        )
+        .unwrap();
+        assert!(
+            (a[0].expected_log_determinant_information
+                - b[0].expected_log_determinant_information)
+                .abs()
+                < 1.0e-10
+        );
+        assert!(
+            (a[0].expected_a_optimal_variance_sum_m2
+                - b[0].expected_a_optimal_variance_sum_m2)
+                .abs()
+                < 1.0e-12
+        );
+
+        let invalid = TargetHypothesis {
+            target_ecef_m: centre,
+            weight: 0.0,
+        };
+        assert_eq!(
+            rank_sensor_placements_over_target_region(
+                &existing,
+                &[invalid],
+                std::slice::from_ref(&candidate),
+            ),
+            Err(TriangulationError::InvalidConfiguration)
         );
     }
 
