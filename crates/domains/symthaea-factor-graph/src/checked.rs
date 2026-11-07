@@ -40,6 +40,9 @@ pub enum CheckedBPError {
     /// unsatisfiability certificate.
     ZeroSupport { context: &'static str },
     NonFiniteMessage { context: &'static str },
+    LoopyGraphUnsupported,
+    MessagePassingDidNotConverge { max_passes: usize },
+    InconsistentTraceback { variable: usize, existing: usize, proposed: usize },
 }
 
 impl fmt::Display for CheckedBPError {
@@ -61,6 +64,9 @@ impl fmt::Display for CheckedBPError {
             Self::InvalidDamping(value) => write!(f, "damping must be finite and in (0, 1], got {value}"),
             Self::ZeroSupport { context } => write!(f, "zero probability support while computing {context}"),
             Self::NonFiniteMessage { context } => write!(f, "non-finite message while computing {context}"),
+            Self::LoopyGraphUnsupported => write!(f, "exact forest MAP inference does not accept loopy graphs"),
+            Self::MessagePassingDidNotConverge { max_passes } => write!(f, "forest max-product messages did not stabilize within {max_passes} passes"),
+            Self::InconsistentTraceback { variable, existing, proposed } => write!(f, "MAP traceback assigned variable {variable} both {existing} and {proposed}"),
         }
     }
 }
@@ -262,6 +268,345 @@ pub fn run_sum_product(
         graph_structure: structure,
         inference_status,
     })
+}
+
+/// Exact joint-MAP result on a validated forest.
+///
+/// Ties use deterministic lowest-state / first-row-major backpointer selection.
+/// The returned score is recomputed directly from the original factor tables;
+/// it is not a sum of singleton max-marginals.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CheckedMAPResult {
+    pub assignment: Vec<usize>,
+    /// Unnormalized joint log potential of the returned complete assignment.
+    pub joint_log_potential: f64,
+    pub message_passes: usize,
+    pub graph_structure: GraphStructure,
+}
+
+/// Exact joint MAP/MPE by max-product messages plus global traceback.
+///
+/// Only validated forests are accepted. Loopy graphs are rejected rather than
+/// returning a local-belief argmax as though it were globally optimal.
+///
+/// Messages are max-normalized in log space. Factor-to-variable messages
+/// retain a deterministic maximizing factor configuration for every supported
+/// target state. A root state is selected independently per connected
+/// component, then those backpointers reconstruct a globally consistent
+/// assignment. Finally, the original factors are reevaluated to verify the
+/// assignment and compute its joint log potential.
+///
+/// Complexity is exponential in the largest factor scope (each factor message
+/// enumerates its local table), and linear in the number of message passes
+/// times factor-table work. This is an exact small/medium forest algorithm,
+/// not an arbitrary-graph MAP solver.
+pub fn run_max_product_forest(
+    graph: &FactorGraph,
+) -> Result<CheckedMAPResult, CheckedBPError> {
+    validate_graph(graph)?;
+    let structure = graph_structure(graph);
+    if structure != GraphStructure::Forest {
+        return Err(CheckedBPError::LoopyGraphUnsupported);
+    }
+
+    let n_variables = graph.variables.len();
+    let n_factors = graph.factors.len();
+    let total_nodes = n_variables.checked_add(n_factors)
+        .ok_or(CheckedBPError::TableSizeOverflow { factor: usize::MAX })?;
+    let max_passes = total_nodes.saturating_add(1);
+
+    let mut variable_to_factor: HashMap<(usize, usize), Vec<f64>> = HashMap::new();
+    let mut factor_to_variable: HashMap<(usize, usize), Vec<f64>> = HashMap::new();
+    let mut backpointers: HashMap<(usize, usize), Vec<Option<Vec<usize>>>> = HashMap::new();
+
+    // Max-normalized uniform initialization is the all-zero log message.
+    for factor in &graph.factors {
+        for &variable in &factor.variables {
+            let cardinality = graph.variables[variable].cardinality;
+            variable_to_factor.insert((variable, factor.id), vec![0.0; cardinality]);
+            factor_to_variable.insert((factor.id, variable), vec![0.0; cardinality]);
+        }
+    }
+
+    let mut stable = false;
+    let mut message_passes = 0usize;
+    for pass in 0..max_passes {
+        message_passes = pass + 1;
+
+        let mut next_variable_to_factor = HashMap::with_capacity(variable_to_factor.len());
+        for variable in 0..n_variables {
+            for &factor in &graph.variables[variable].neighbors {
+                let message = compute_var_to_factor_max(
+                    graph,
+                    &factor_to_variable,
+                    variable,
+                    factor,
+                )?;
+                next_variable_to_factor.insert((variable, factor), message);
+            }
+        }
+
+        let mut next_factor_to_variable = HashMap::with_capacity(factor_to_variable.len());
+        let mut next_backpointers = HashMap::with_capacity(backpointers.len());
+        for factor in 0..n_factors {
+            for &variable in &graph.factors[factor].variables {
+                let (message, pointers) = compute_factor_to_var_max(
+                    graph,
+                    &variable_to_factor,
+                    factor,
+                    variable,
+                )?;
+                next_factor_to_variable.insert((factor, variable), message);
+                next_backpointers.insert((factor, variable), pointers);
+            }
+        }
+
+        stable = next_variable_to_factor == variable_to_factor
+            && next_factor_to_variable == factor_to_variable;
+        variable_to_factor = next_variable_to_factor;
+        factor_to_variable = next_factor_to_variable;
+        backpointers = next_backpointers;
+        if stable {
+            break;
+        }
+    }
+    if !stable {
+        return Err(CheckedBPError::MessagePassingDidNotConverge { max_passes });
+    }
+
+    let mut assignment = vec![None; n_variables];
+    let mut visited_factors = vec![false; n_factors];
+
+    // Root each disconnected variable-containing component at its lowest
+    // unassigned variable ID. Isolated variables deterministically choose 0.
+    for root in 0..n_variables {
+        if assignment[root].is_some() {
+            continue;
+        }
+
+        let mut root_scores = vec![0.0; graph.variables[root].cardinality];
+        for &factor in &graph.variables[root].neighbors {
+            let incoming = factor_to_variable
+                .get(&(factor, root))
+                .expect("converged forest has every factor-to-variable message");
+            for state in 0..root_scores.len() {
+                if root_scores[state] == f64::NEG_INFINITY || incoming[state] == f64::NEG_INFINITY {
+                    root_scores[state] = f64::NEG_INFINITY;
+                } else {
+                    root_scores[state] += incoming[state];
+                }
+            }
+        }
+        let root_state = argmax_lowest(&root_scores)
+            .ok_or(CheckedBPError::ZeroSupport { context: "forest MAP root" })?;
+        assignment[root] = Some(root_state);
+
+        let mut queue = std::collections::VecDeque::new();
+        queue.push_back((root, None::<usize>));
+        while let Some((variable, parent_factor)) = queue.pop_front() {
+            let state = assignment[variable]
+                .ok_or(CheckedBPError::ZeroSupport { context: "forest MAP traceback" })?;
+
+            for &factor in &graph.variables[variable].neighbors {
+                if Some(factor) == parent_factor || visited_factors[factor] {
+                    continue;
+                }
+                visited_factors[factor] = true;
+
+                let pointers = backpointers
+                    .get(&(factor, variable))
+                    .expect("converged forest has factor backpointers");
+                let chosen = pointers.get(state)
+                    .and_then(|pointer| pointer.as_ref())
+                    .ok_or(CheckedBPError::ZeroSupport { context: "forest MAP backpointer" })?;
+
+                for (position, &child) in graph.factors[factor].variables.iter().enumerate() {
+                    if child == variable {
+                        continue;
+                    }
+                    let proposed = chosen[position];
+                    match assignment[child] {
+                        Some(existing) if existing != proposed => {
+                            return Err(CheckedBPError::InconsistentTraceback {
+                                variable: child,
+                                existing,
+                                proposed,
+                            });
+                        }
+                        Some(_) => {}
+                        None => {
+                            assignment[child] = Some(proposed);
+                            queue.push_back((child, Some(factor)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let assignment = assignment.into_iter()
+        .enumerate()
+        .map(|(variable, state)| state.ok_or(CheckedBPError::ZeroSupport {
+            context: if variable < n_variables { "incomplete forest MAP assignment" } else { "forest MAP assignment" },
+        }))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    // Verify the complete assignment against original factor tables and
+    // recompute the score. Do not derive a joint score from singleton beliefs.
+    let mut factor_log_terms = Vec::with_capacity(graph.factors.len());
+    for factor in &graph.factors {
+        let table_index = factor.variables.iter().fold(0usize, |index, &variable| {
+            index * graph.variables[variable].cardinality + assignment[variable]
+        });
+        let potential = factor.table[table_index];
+        if potential == 0.0 {
+            return Err(CheckedBPError::ZeroSupport { context: "joint MAP assignment verification" });
+        }
+        factor_log_terms.push(potential.ln());
+    }
+    factor_log_terms.sort_by(f64::total_cmp);
+    let joint_log_potential = compensated_sum(&factor_log_terms);
+    if !joint_log_potential.is_finite() {
+        return Err(CheckedBPError::NonFiniteMessage { context: "joint MAP score" });
+    }
+
+    Ok(CheckedMAPResult {
+        assignment,
+        joint_log_potential,
+        message_passes,
+        graph_structure: structure,
+    })
+}
+
+fn compute_var_to_factor_max(
+    graph: &FactorGraph,
+    messages: &HashMap<(usize, usize), Vec<f64>>,
+    variable: usize,
+    excluded_factor: usize,
+) -> Result<Vec<f64>, CheckedBPError> {
+    let cardinality = graph.variables[variable].cardinality;
+    let mut result = vec![0.0; cardinality];
+    for state in 0..cardinality {
+        let mut terms = Vec::with_capacity(graph.variables[variable].neighbors.len());
+        let mut unsupported = false;
+        for &factor in &graph.variables[variable].neighbors {
+            if factor == excluded_factor {
+                continue;
+            }
+            let incoming = messages.get(&(factor, variable))
+                .expect("initialized factor-to-variable message");
+            if incoming[state] == f64::NEG_INFINITY {
+                unsupported = true;
+                break;
+            }
+            terms.push(incoming[state]);
+        }
+        result[state] = if unsupported { f64::NEG_INFINITY } else { compensated_sum(&terms) };
+    }
+    normalize_max(&mut result, "max-product variable-to-factor message")?;
+    Ok(result)
+}
+
+fn compute_factor_to_var_max(
+    graph: &FactorGraph,
+    messages: &HashMap<(usize, usize), Vec<f64>>,
+    factor_index: usize,
+    target_variable: usize,
+) -> Result<(Vec<f64>, Vec<Option<Vec<usize>>>), CheckedBPError> {
+    let factor = &graph.factors[factor_index];
+    let cardinalities = factor.variables.iter()
+        .map(|&variable| graph.variables[variable].cardinality)
+        .collect::<Vec<_>>();
+    let target_position = factor.variables.iter()
+        .position(|&variable| variable == target_variable)
+        .expect("validated factor scope");
+    let total = cardinalities.iter().try_fold(1usize, |count, &cardinality| {
+        count.checked_mul(cardinality)
+    }).ok_or(CheckedBPError::TableSizeOverflow { factor: factor_index })?;
+
+    let mut result = vec![f64::NEG_INFINITY; cardinalities[target_position]];
+    let mut pointers = vec![None; cardinalities[target_position]];
+
+    for flat_index in 0..total {
+        let config = decode_assignment(flat_index, &cardinalities);
+        let potential = factor.table[flat_index];
+        if potential == 0.0 {
+            continue;
+        }
+        let mut terms = vec![potential.ln()];
+        let mut supported = true;
+        for (position, &variable) in factor.variables.iter().enumerate() {
+            if position == target_position {
+                continue;
+            }
+            let incoming = messages.get(&(variable, factor_index))
+                .expect("initialized variable-to-factor message");
+            let value = incoming[config[position]];
+            if value == f64::NEG_INFINITY {
+                supported = false;
+                break;
+            }
+            terms.push(value);
+        }
+        if !supported {
+            continue;
+        }
+        terms.sort_by(f64::total_cmp);
+        let score = compensated_sum(&terms);
+        if !score.is_finite() {
+            return Err(CheckedBPError::NonFiniteMessage { context: "max-product factor score" });
+        }
+
+        let target_state = config[target_position];
+        if score > result[target_state] || (score == result[target_state] && pointers[target_state].is_none()) {
+            result[target_state] = score;
+            pointers[target_state] = Some(config);
+        }
+    }
+
+    normalize_max(&mut result, "max-product factor-to-variable message")?;
+    Ok((result, pointers))
+}
+
+fn normalize_max(values: &mut [f64], context: &'static str) -> Result<(), CheckedBPError> {
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    if maximum == f64::NEG_INFINITY {
+        return Err(CheckedBPError::ZeroSupport { context });
+    }
+    if !maximum.is_finite() {
+        return Err(CheckedBPError::NonFiniteMessage { context });
+    }
+    for value in values {
+        *value -= maximum;
+    }
+    Ok(())
+}
+
+fn argmax_lowest(values: &[f64]) -> Option<usize> {
+    let mut best_state = None;
+    let mut best_value = f64::NEG_INFINITY;
+    for (state, &value) in values.iter().enumerate() {
+        if value > best_value {
+            best_value = value;
+            best_state = Some(state);
+        }
+    }
+    best_state
+}
+
+fn compensated_sum(values: &[f64]) -> f64 {
+    let mut sum = 0.0;
+    let mut correction = 0.0;
+    for &value in values {
+        let next = sum + value;
+        if sum.abs() >= value.abs() {
+            correction += (sum - next) + value;
+        } else {
+            correction += (value - next) + sum;
+        }
+        sum = next;
+    }
+    sum + correction
 }
 
 fn validate_config(config: &BPConfig) -> Result<(), CheckedBPError> {
@@ -775,6 +1120,76 @@ mod tests {
 
         assert_eq!(actual.beliefs, expected.beliefs);
         assert_eq!(actual.inference_status, expected.inference_status);
+    }
+
+    #[test]
+    fn forest_joint_map_traceback_resolves_incompatible_local_ties() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let c = graph.add_variable("C", 2);
+        // A=B and B!=C. Valid global maxima: (0,0,1) and (1,1,0).
+        graph.add_factor(&[a, b], vec![1.0, 0.0, 0.0, 1.0]);
+        graph.add_factor(&[b, c], vec![0.0, 1.0, 1.0, 0.0]);
+
+        let result = run_max_product_forest(&graph).unwrap();
+        assert_eq!(result.assignment, vec![0, 0, 1]);
+        assert_eq!(result.joint_log_potential, 0.0);
+        assert_eq!(result.graph_structure, GraphStructure::Forest);
+        assert!(result.message_passes <= graph.variables.len() + graph.factors.len() + 1);
+    }
+
+    #[test]
+    fn forest_joint_map_handles_mixed_cardinality_and_verifies_joint_score() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 3);
+        graph.add_factor(&[a, b], vec![1.0, 2.0, 3.0, 4.0, 5.0, 9.0]);
+
+        let result = run_max_product_forest(&graph).unwrap();
+        assert_eq!(result.assignment, vec![1, 2]);
+        assert!((result.joint_log_potential - 9.0_f64.ln()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn forest_joint_map_combines_disconnected_components_and_isolated_variables() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let isolated = graph.add_variable("I", 3);
+        graph.add_factor(&[a], vec![0.1, 0.9]);
+        graph.add_factor(&[b], vec![0.8, 0.2]);
+
+        let result = run_max_product_forest(&graph).unwrap();
+        assert_eq!(result.assignment, vec![1, 0, 0]);
+        assert!((result.joint_log_potential - (0.9_f64 * 0.8).ln()).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn exact_joint_map_refuses_loopy_graphs() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let c = graph.add_variable("C", 2);
+        graph.add_factor(&[a, b], vec![0.9, 0.1, 0.1, 0.9]);
+        graph.add_factor(&[b, c], vec![0.9, 0.1, 0.1, 0.9]);
+        graph.add_factor(&[a, c], vec![0.9, 0.1, 0.1, 0.9]);
+        assert_eq!(
+            run_max_product_forest(&graph),
+            Err(CheckedBPError::LoopyGraphUnsupported)
+        );
+    }
+
+    #[test]
+    fn forest_joint_map_returns_zero_support_on_contradictory_factors() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        graph.add_factor(&[a], vec![1.0, 0.0]);
+        graph.add_factor(&[a], vec![0.0, 1.0]);
+        assert!(matches!(
+            run_max_product_forest(&graph),
+            Err(CheckedBPError::ZeroSupport { .. })
+        ));
     }
 
     #[test]
