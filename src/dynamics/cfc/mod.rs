@@ -59,8 +59,9 @@ pub use weight_program_adapter::{
     CfCActivationSignatureSet, CfCAlignmentAcceptancePolicy, CfCDisambiguatingProbeSelection,
     CfCFunctionalProbe, CfCHiddenUnitAlignment, CfCPermutationAlignmentError,
     CfCProbeCandidateScore, CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
-    align_cfc_hidden_unit_signatures, cfc_hidden_unit_activation_signatures,
-    cfc_weight_model_snapshot, materialize_cfc_weight_program, select_cfc_disambiguating_probe,
+    align_cfc_hidden_unit_signatures, build_cfc_hidden_unit_canonicalization_program,
+    cfc_hidden_unit_activation_signatures, cfc_weight_model_snapshot,
+    materialize_cfc_weight_program, select_cfc_disambiguating_probe,
     validate_cfc_alignment_for_parameter_transfer,
 };
 
