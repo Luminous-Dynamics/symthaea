@@ -1,12 +1,13 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Blind, backend-comparative Muse vocal release gate for integrated backends.
- //! The unintegrated physical-tract prototype is tracked separately and is not
- //! represented as a selectable singing backend here.
+//! The unintegrated physical-tract prototype is tracked separately and is not
+//! represented as a selectable singing backend here.
 
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -84,6 +85,8 @@ struct BlindClip {
     case_id: usize,
     lyrics: String,
     audio: String,
+    audio_blake3: String,
+    performance_blake3: Option<String>,
     category: String,
     challenge: String,
 }
@@ -93,6 +96,33 @@ struct KeyEntry {
     clip_id: String,
     backend: String,
     case_id: usize,
+    performance_blake3: Option<String>,
+    audio_blake3: String,
+}
+
+#[derive(Serialize)]
+struct CaseReceipt {
+    case_id: usize,
+    seed: u64,
+    lyrics: String,
+    challenge: String,
+    category: String,
+    style: String,
+    valence: f32,
+    arousal: f32,
+    transpose_semitones: f32,
+    melody: Vec<symthaea_muse::Note>,
+    performance_blake3: String,
+}
+
+#[derive(Serialize)]
+struct RunManifest {
+    schema: &'static str,
+    source_revision: Option<String>,
+    voice_id: String,
+    diffsinger_worker: Option<String>,
+    case_count: usize,
+    cases: Vec<CaseReceipt>,
 }
 
 #[derive(Serialize)]
@@ -143,6 +173,28 @@ fn blind_id(salt: &str, backend: &str, case_id: usize) -> String {
     format!("vocal-{}", &digest.to_hex()[..12])
 }
 
+fn source_revision() -> Option<String> {
+    std::env::var("GITHUB_SHA").ok().or_else(|| {
+        let output = Command::new("git").args(["rev-parse", "HEAD"]).output().ok()?;
+        if !output.status.success() {
+            return None;
+        }
+        let revision = String::from_utf8(output.stdout).ok()?;
+        let revision = revision.trim();
+        (!revision.is_empty()).then(|| revision.to_string())
+    })
+}
+
+fn performance_digest(performance: &VocalPerformance) -> Result<String> {
+    let bytes = serde_json::to_vec(performance)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+fn artifact_digest(path: &Path) -> Result<String> {
+    let bytes = std::fs::read(path)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
 fn blind_salt(args: &[String], output: &Path) -> Result<String> {
     if let Some(seed) = arg(args, "--blind-seed") {
         return Ok(blake3::hash(seed.as_bytes()).to_hex().to_string());
@@ -173,13 +225,18 @@ fn render_one(
     let stem = engine.render(performance)?;
     let id = blind_id(salt, &stem.backend, case_id);
     let filename = format!("{id}.wav");
-    save(&output.join(&filename), &stem)?;
+    let audio_path = output.join(&filename);
+    save(&audio_path, &stem)?;
+    let audio_blake3 = artifact_digest(&audio_path)?;
+    let performance_blake3 = performance_digest(performance)?;
     let metrics = analyze_vocal_stem(performance, &stem);
     clips.push(BlindClip {
         clip_id: id.clone(),
         case_id,
         lyrics: performance.lyrics.clone(),
         audio: filename,
+        audio_blake3: audio_blake3.clone(),
+        performance_blake3: Some(performance_blake3.clone()),
         category: case.category.to_string(),
         challenge: case.challenge.to_string(),
     });
@@ -187,6 +244,8 @@ fn render_one(
         clip_id: id.clone(),
         backend: stem.backend.clone(),
         case_id,
+        performance_blake3: Some(performance_blake3),
+        audio_blake3,
     });
     objective.push(ObjectiveEntry {
         clip_id: id,
@@ -214,12 +273,16 @@ fn import_references(
             anyhow::bail!("duplicate human-reference case_id {}", reference.case_id);
         }
         let filename = format!("{id}.wav");
-        std::fs::copy(&reference.audio, output.join(&filename))?;
+        let destination = output.join(&filename);
+        std::fs::copy(&reference.audio, &destination)?;
+        let audio_blake3 = artifact_digest(&destination)?;
         clips.push(BlindClip {
             clip_id: id.clone(),
             case_id: reference.case_id,
             lyrics: reference.lyrics,
             audio: filename,
+            audio_blake3: audio_blake3.clone(),
+            performance_blake3: None,
             category: reference.category,
             challenge: reference.challenge,
         });
@@ -227,6 +290,8 @@ fn import_references(
             clip_id: id,
             backend: "human-reference".to_string(),
             case_id: reference.case_id,
+            performance_blake3: None,
+            audio_blake3,
         });
     }
     Ok(())
@@ -254,6 +319,7 @@ fn main() -> Result<()> {
     let mut clips = Vec::new();
     let mut key = Vec::new();
     let mut objective = Vec::new();
+    let mut case_receipts = Vec::new();
 
     let cases = cases();
     for (case_id, case) in cases.iter().enumerate() {
@@ -283,6 +349,19 @@ fn main() -> Result<()> {
         let ratio = 2.0f32.powf(case.transpose_semitones / 12.0);
         melody.iter_mut().for_each(|note| note.frequency *= ratio);
         let performance = VocalPerformance::from_melody(case.lyrics, &melody, "en")?;
+        case_receipts.push(CaseReceipt {
+            case_id,
+            seed: case_id as u64 + 9001,
+            lyrics: case.lyrics.to_string(),
+            challenge: case.challenge.to_string(),
+            category: case.category.to_string(),
+            style: format!("{:?}", case.style),
+            valence: case.valence,
+            arousal: case.arousal,
+            transpose_semitones: case.transpose_semitones,
+            melody: melody.clone(),
+            performance_blake3: performance_digest(&performance)?,
+        });
         render_one(
             &mut kokoro,
             &performance,
@@ -308,6 +387,19 @@ fn main() -> Result<()> {
             )?;
         }
     }
+    let run_manifest = RunManifest {
+        schema: "muse-vocal-run/v1",
+        source_revision: source_revision(),
+        voice_id: voice.clone(),
+        diffsinger_worker: worker.as_ref().map(|path| path.display().to_string()),
+        case_count: case_receipts.len(),
+        cases: case_receipts,
+    };
+    std::fs::write(
+        output.join("run_manifest.json"),
+        serde_json::to_vec_pretty(&run_manifest)?,
+    )?;
+
     if let Some(manifest) = reference_manifest {
         import_references(&manifest, &salt, &output, &mut clips, &mut key)?;
     }
