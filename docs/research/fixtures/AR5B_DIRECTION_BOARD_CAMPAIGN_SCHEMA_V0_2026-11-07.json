@@ -16,10 +16,15 @@
         "available_cost_units": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "total_cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       },
       "required": [
-        "available_cost_units"
+        "available_cost_units",
+        "total_cost_units"
       ],
       "additionalProperties": false
     },
@@ -147,6 +152,14 @@
               ],
               "additionalProperties": false
             }
+          },
+          "active_evaluations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "active_cost_units": {
+            "type": "number",
+            "minimum": 0
           }
         },
         "required": [
@@ -163,7 +176,9 @@
           "local_best_score",
           "estimated_cost_per_evaluation",
           "max_share_bps",
-          "history"
+          "history",
+          "active_evaluations",
+          "active_cost_units"
         ],
         "additionalProperties": false
       }
@@ -191,6 +206,14 @@
             "string",
             "null"
           ]
+        },
+        "active_evaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "active_cost_units": {
+          "type": "number",
+          "minimum": 0
         }
       },
       "required": [
@@ -198,7 +221,9 @@
         "prior_gain_per_cost",
         "estimated_cost_per_evaluation",
         "max_share_bps",
-        "verifier_intake_ref"
+        "verifier_intake_ref",
+        "active_evaluations",
+        "active_cost_units"
       ],
       "additionalProperties": false,
       "allOf": [
@@ -220,6 +245,10 @@
           }
         }
       ]
+    },
+    "active_allocation_snapshot_ref": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [
@@ -228,7 +257,8 @@
     "budget",
     "config",
     "directions",
-    "new_direction_option"
+    "new_direction_option",
+    "active_allocation_snapshot_ref"
   ],
   "additionalProperties": false
 }
