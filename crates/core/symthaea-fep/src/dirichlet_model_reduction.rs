@@ -1031,16 +1031,23 @@ pub fn evaluate_dirichlet_model_information_gain(
         let mut derived_mixture_probability = 0.0;
         for (model_id, model_probability) in &outcome.model_predictive_probabilities {
             if !outcome_model_ids.insert(model_id.clone()) {
-                return Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch {
-                    outcome_id: outcome.outcome_id.clone(),
-                });
+                return Err(
+                    DirichletModelInformationGainError::ModelPredictiveSetMismatch {
+                        outcome_id: outcome.outcome_id.clone(),
+                    },
+                );
             }
             let Some(current_model_probability) = current_model_probabilities.get(model_id) else {
-                return Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch {
-                    outcome_id: outcome.outcome_id.clone(),
-                });
+                return Err(
+                    DirichletModelInformationGainError::ModelPredictiveSetMismatch {
+                        outcome_id: outcome.outcome_id.clone(),
+                    },
+                );
             };
-            if !model_probability.is_finite() || *model_probability < 0.0 || *model_probability > 1.0 {
+            if !model_probability.is_finite()
+                || *model_probability < 0.0
+                || *model_probability > 1.0
+            {
                 return Err(
                     DirichletModelInformationGainError::InvalidModelPredictiveProbability {
                         model_id: model_id.clone(),
@@ -1052,16 +1059,19 @@ pub fn evaluate_dirichlet_model_information_gain(
             derived_mixture_probability += current_model_probability * model_probability;
             *model_predictive_mass
                 .get_mut(model_id)
-                .expect("model IDs were checked against the current posterior") += model_probability;
+                .expect("model IDs were checked against the current posterior") +=
+                model_probability;
         }
         if outcome_model_ids.len() != current_model_probabilities.len()
             || current_model_probabilities
                 .keys()
                 .any(|model_id| !outcome_model_ids.contains(model_id))
         {
-            return Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch {
-                outcome_id: outcome.outcome_id.clone(),
-            });
+            return Err(
+                DirichletModelInformationGainError::ModelPredictiveSetMismatch {
+                    outcome_id: outcome.outcome_id.clone(),
+                },
+            );
         }
         if (probability - derived_mixture_probability).abs() > PROBABILITY_TOLERANCE {
             return Err(
@@ -1151,9 +1161,7 @@ pub fn evaluate_dirichlet_model_information_gain(
         let predictive_probability = outcome
             .model_predictive_probabilities
             .iter()
-            .map(|(model_id, probability)| {
-                current_model_probabilities[model_id] * probability
-            })
+            .map(|(model_id, probability)| current_model_probabilities[model_id] * probability)
             .sum::<f64>();
         expected_posterior_model_entropy_nats +=
             predictive_probability * reduced.posterior_model_entropy_nats;
@@ -1650,8 +1658,18 @@ mod tests {
         let action = DirichletActionPrediction {
             action_id: "inspect-outcome".into(),
             outcomes: vec![
-                predicted_outcome("success", 0.5, &[("success-favouring", 0.8), ("failure-favouring", 0.2)], vec![vec![1.0, 0.0]]),
-                predicted_outcome("failure", 0.5, &[("success-favouring", 0.2), ("failure-favouring", 0.8)], vec![vec![0.0, 1.0]]),
+                predicted_outcome(
+                    "success",
+                    0.5,
+                    &[("success-favouring", 0.8), ("failure-favouring", 0.2)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.5,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.8)],
+                    vec![vec![0.0, 1.0]],
+                ),
             ],
         };
         let result =
@@ -1679,8 +1697,18 @@ mod tests {
         let action = DirichletActionPrediction {
             action_id: "uninformative-action".into(),
             outcomes: vec![
-                predicted_outcome("outcome-a", 0.3, &[("success-favouring", 0.3), ("failure-favouring", 0.3)], vec![vec![0.0, 0.0]]),
-                predicted_outcome("outcome-b", 0.7, &[("success-favouring", 0.7), ("failure-favouring", 0.7)], vec![vec![0.0, 0.0]]),
+                predicted_outcome(
+                    "outcome-a",
+                    0.3,
+                    &[("success-favouring", 0.3), ("failure-favouring", 0.3)],
+                    vec![vec![0.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "outcome-b",
+                    0.7,
+                    &[("success-favouring", 0.7), ("failure-favouring", 0.7)],
+                    vec![vec![0.0, 0.0]],
+                ),
             ],
         };
         let result =
@@ -1729,13 +1757,21 @@ mod tests {
                 predicted_outcome(
                     "success",
                     0.5,
-                    &[("red-labelled-a", 2.0 / 3.0), ("red-labelled-b", 2.0 / 3.0), ("blue", 1.0 / 3.0)],
+                    &[
+                        ("red-labelled-a", 2.0 / 3.0),
+                        ("red-labelled-b", 2.0 / 3.0),
+                        ("blue", 1.0 / 3.0),
+                    ],
                     vec![vec![1.0, 0.0]],
                 ),
                 predicted_outcome(
                     "failure",
                     0.5,
-                    &[("red-labelled-a", 1.0 / 3.0), ("red-labelled-b", 1.0 / 3.0), ("blue", 2.0 / 3.0)],
+                    &[
+                        ("red-labelled-a", 1.0 / 3.0),
+                        ("red-labelled-b", 1.0 / 3.0),
+                        ("blue", 2.0 / 3.0),
+                    ],
                     vec![vec![0.0, 1.0]],
                 ),
             ],
@@ -1746,13 +1782,19 @@ mod tests {
                 predicted_outcome(
                     "success",
                     0.5,
-                    &[("red-equivalence-class", 2.0 / 3.0), ("blue-equivalence-class", 1.0 / 3.0)],
+                    &[
+                        ("red-equivalence-class", 2.0 / 3.0),
+                        ("blue-equivalence-class", 1.0 / 3.0),
+                    ],
                     vec![vec![1.0, 0.0]],
                 ),
                 predicted_outcome(
                     "failure",
                     0.5,
-                    &[("red-equivalence-class", 1.0 / 3.0), ("blue-equivalence-class", 2.0 / 3.0)],
+                    &[
+                        ("red-equivalence-class", 1.0 / 3.0),
+                        ("blue-equivalence-class", 2.0 / 3.0),
+                    ],
                     vec![vec![0.0, 1.0]],
                 ),
             ],
@@ -1811,8 +1853,18 @@ mod tests {
         let action = DirichletActionPrediction {
             action_id: "bad-prediction".into(),
             outcomes: vec![
-                predicted_outcome("success", 0.6, &[("success-favouring", 0.8), ("failure-favouring", 0.2)], vec![vec![1.0, 0.0]]),
-                predicted_outcome("failure", 0.3, &[("success-favouring", 0.2), ("failure-favouring", 0.8)], vec![vec![0.0, 1.0]]),
+                predicted_outcome(
+                    "success",
+                    0.6,
+                    &[("success-favouring", 0.8), ("failure-favouring", 0.2)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.3,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.8)],
+                    vec![vec![0.0, 1.0]],
+                ),
             ],
         };
         assert!(matches!(
@@ -1824,8 +1876,18 @@ mod tests {
         let coherent_action = DirichletActionPrediction {
             action_id: "coherent-shape-but-wrong-parent".into(),
             outcomes: vec![
-                predicted_outcome("success", 0.5, &[("success-favouring", 0.8), ("failure-favouring", 0.2)], vec![vec![1.0, 0.0]]),
-                predicted_outcome("failure", 0.5, &[("success-favouring", 0.2), ("failure-favouring", 0.8)], vec![vec![0.0, 1.0]]),
+                predicted_outcome(
+                    "success",
+                    0.5,
+                    &[("success-favouring", 0.8), ("failure-favouring", 0.2)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.5,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.8)],
+                    vec![vec![0.0, 1.0]],
+                ),
             ],
         };
         assert!(matches!(
@@ -1908,13 +1970,19 @@ mod tests {
                 predicted_outcome(
                     "success",
                     11.0 / 15.0,
-                    &[("success-favouring", 5.0 / 6.0), ("failure-favouring", 1.0 / 3.0)],
+                    &[
+                        ("success-favouring", 5.0 / 6.0),
+                        ("failure-favouring", 1.0 / 3.0),
+                    ],
                     vec![vec![1.0, 0.0]],
                 ),
                 predicted_outcome(
                     "failure",
                     4.0 / 15.0,
-                    &[("success-favouring", 1.0 / 6.0), ("failure-favouring", 2.0 / 3.0)],
+                    &[
+                        ("success-favouring", 1.0 / 6.0),
+                        ("failure-favouring", 2.0 / 3.0),
+                    ],
                     vec![vec![0.0, 1.0]],
                 ),
             ],
