@@ -23,7 +23,8 @@ const CASES: &[(&str, &str)] = &[
 ];
 
 fn main() {
-    let phonemizer = EnglishPhonemizer::new_bundled();
+    let phonemizer = EnglishPhonemizer::new_bundled()
+        .expect("bundled Piper Plus English dictionary must initialize");
 
     println!("case_id\ttext\tpiper_ipa_tokens\tmuse_ipa_tokens\tprosody_debug");
     for (case_id, text) in CASES {
