@@ -1172,7 +1172,6 @@ mod tests {
         assert!(report.variance_decomposition.decomposition.is_none());
     }
 
-
     fn support_record(
         candidate_id: &str,
         disposition: CandidateSupportDisposition,
