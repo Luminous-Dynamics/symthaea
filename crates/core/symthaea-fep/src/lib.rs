@@ -175,7 +175,9 @@ pub use dirichlet_model_reduction::{
     DirichletBayesianModelReductionResult, DirichletConcentrationTensor,
     DirichletModelInformationGain, DirichletModelInformationGainError, DirichletOutcomeModelBelief,
     DirichletPredictedOutcome, ReducedDirichletModelEvidence, ReducedDirichletModelHypothesis,
-    evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
+    evaluate_dirichlet_model_information_gain,
+    evaluate_dirichlet_model_information_gain_spm_compatible, reduce_dirichlet_models,
+    reduce_dirichlet_models_spm_compatible,
 };
 
 pub use hierarchical_information_gain::{
