@@ -112,10 +112,7 @@ class DiffSingerModel:
                 f"DiffSinger worker currently supports language='en' only; got {language!r}"
             )
         language_id = self.language_id(language)
-        events = flatten_performance_phones(
-            performance,
-            minimum_silence_ms=FRAME_MS * 0.5,
-        )
+        events = flatten_performance_phones(performance)
         if not events:
             return None
         arpabet_phonemes = [event[0] for event in events]
