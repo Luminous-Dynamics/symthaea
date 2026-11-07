@@ -149,6 +149,34 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
         self.assertEqual(events[3][2], 261.63)
         self.assertEqual(events[6][2], 293.66)
 
+    def test_non_melismatic_coda_duration_is_conserved_before_next_note(self) -> None:
+        performance = {
+            "language": "en",
+            "syllables": [
+                {
+                    "phonemes": [
+                        {"ipa": "m", "is_vowel": False, "natural_duration_s": 0.1},
+                        {"ipa": "ɛ", "is_vowel": True, "natural_duration_s": 0.3},
+                        {"ipa": "t", "is_vowel": False, "natural_duration_s": 0.1},
+                    ],
+                    "note": {"start_time": 0.0, "duration": 0.5, "frequency": 220.0},
+                    "melisma_notes": [],
+                },
+                {
+                    "phonemes": [
+                        {"ipa": "k", "is_vowel": False, "natural_duration_s": 0.1},
+                        {"ipa": "æ", "is_vowel": True, "natural_duration_s": 0.3},
+                    ],
+                    "note": {"start_time": 0.5, "duration": 0.5, "frequency": 246.94},
+                    "melisma_notes": [],
+                },
+            ],
+        }
+        events = flatten_performance_phones(performance)
+        self.assertEqual([event[0] for event in events], ["m", "eh", "t", "k", "ae"])
+        self.assertAlmostEqual(sum(event[1] for event in events), 1_000.0)
+        self.assertNotIn("SP", [event[0] for event in events])
+
     def test_subframe_score_gaps_are_preserved_before_cumulative_frame_quantization(self) -> None:
         performance = {
             "language": "en",
