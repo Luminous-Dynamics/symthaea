@@ -315,7 +315,7 @@ impl VocalPerformance {
             bail!("vocal performance duration must be finite and positive");
         }
 
-        let mut previous_syllable_start = 0.0f32;
+        let mut previous_syllable_end = 0.0f32;
         for (syllable_index, syllable) in self.syllables.iter().enumerate() {
             if syllable.lyric.trim().is_empty() || syllable.phonemes.is_empty() {
                 bail!("vocal syllable {syllable_index} requires a lyric and phonemes");
@@ -324,10 +324,11 @@ impl VocalPerformance {
                 &syllable.note,
                 &format!("vocal syllable {syllable_index} note"),
             )?;
-            if syllable.note.start_time < previous_syllable_start {
-                bail!("vocal syllables must be chronological");
+            if syllable.note.start_time < previous_syllable_end {
+                bail!(
+                    "vocal syllable {syllable_index} overlaps the preceding syllable or melisma"
+                );
             }
-            previous_syllable_start = syllable.note.start_time;
 
             if syllable.phrase_index >= self.phrases.len()
                 || !syllable.consonant_advance_s.is_finite()
@@ -375,6 +376,7 @@ impl VocalPerformance {
                 }
                 previous_note_end = melisma_end;
             }
+            previous_syllable_end = previous_note_end;
         }
 
         let mut next_syllable = 0usize;
@@ -579,6 +581,33 @@ mod tests {
         let mut performance = performance_with_melisma();
         performance.syllables[0].melisma_notes[0].duration = f32::NAN;
         assert!(performance.validate().is_err());
+    }
+
+    #[test]
+    fn syllable_cannot_overlap_a_preceding_melisma_span() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 246.94,
+                start_time: 0.5,
+                duration: 0.2,
+                velocity: 0.7,
+            },
+        ];
+        let mut performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        performance.syllables[0].melisma_notes.push(Note {
+            frequency: 233.08,
+            start_time: 0.2,
+            duration: 0.4,
+            velocity: 0.7,
+        });
+        let error = performance.validate().unwrap_err().to_string();
+        assert!(error.contains("overlaps the preceding syllable or melisma"), "{error}");
     }
 
     #[test]
