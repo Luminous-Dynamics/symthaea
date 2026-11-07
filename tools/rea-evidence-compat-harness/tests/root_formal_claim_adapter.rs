@@ -355,3 +355,47 @@ fn formal_parser_rejects_omitted_nullable_fields_instead_of_defaulting_them() {
         );
     }
 }
+
+#[test]
+fn formal_export_preserves_jcs_integer_precision_warnings_and_ceiling() {
+    let original = verify_evidence_json(fixture_bytes()).unwrap();
+    let mut value = original.value.clone();
+    value["normalized_result"]["large_count"] = json!(9_007_199_254_740_993_u64);
+    value["parameters"]["large_offset"] = json!(18_446_744_073_709_551_615_u64);
+    value["evidence_id"] = json!(compute_evidence_id(&value).unwrap());
+
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = verify_evidence_json(&evidence_bytes).unwrap();
+    let mut claim = provider_claim(evidence.evidence_id.clone());
+    claim.asserted_value = evidence.value["normalized_result"].clone();
+    let result = evaluate_claim(&claim, std::slice::from_ref(&evidence)).unwrap();
+
+    assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
+    assert_eq!(result.numeric_precision_warnings.len(), 3);
+
+    let formal = export_formal_provider_observation(&result).unwrap();
+    assert_eq!(
+        formal.rea_evaluation.numeric_precision_warnings,
+        result.numeric_precision_warnings
+    );
+    assert!(
+        formal
+            .claim_ceiling
+            .iter()
+            .any(|line| line.contains("exact integer preservation is not established"))
+    );
+
+    let bytes = serde_json::to_vec(&formal).unwrap();
+    let parsed = parse_formal_provider_observation_json(&bytes).unwrap();
+    assert_eq!(parsed, formal);
+
+    let mut missing_warnings: Value = serde_json::from_slice(&bytes).unwrap();
+    missing_warnings["rea_evaluation"]
+        .as_object_mut()
+        .unwrap()
+        .remove("numeric_precision_warnings");
+    let altered = serde_json::to_vec(&missing_warnings).unwrap();
+    let error = parse_formal_provider_observation_json(&altered).unwrap_err();
+    assert_eq!(error.kind, FormalMappingErrorKind::InvalidJson);
+}
+
