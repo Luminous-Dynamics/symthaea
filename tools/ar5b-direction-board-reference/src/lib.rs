@@ -161,6 +161,7 @@ pub struct BoardReport {
     pub campaign_id: String,
     pub mode: String,
     pub total_budget_units: f64,
+    pub completed_budget_cost_units: f64,
     pub active_budget_cost_units: f64,
     pub reserved_or_unavailable_budget_units: f64,
     pub active_allocation_snapshot_ref: String,
@@ -304,6 +305,12 @@ pub fn validate_campaign(campaign: &Campaign) -> Vec<String> {
     if !non_empty(&campaign.active_allocation_snapshot_ref) {
         issues.push("ACTIVE_ALLOCATION_SNAPSHOT: an independent snapshot reference is required".to_owned());
     }
+    let completed_history_cost: f64 = campaign
+        .directions
+        .iter()
+        .flat_map(|direction| direction.history.iter())
+        .map(|observation| observation.cost_units)
+        .sum();
     let active_cost_from_directions: f64 = campaign
         .directions
         .iter()
@@ -311,11 +318,14 @@ pub fn validate_campaign(campaign: &Campaign) -> Vec<String> {
         .sum();
     let active_new_cost = campaign.new_direction_option.active_cost_units;
     let total_active_cost = active_cost_from_directions + active_new_cost;
-    if !finite(total_active_cost)
-        || total_active_cost + campaign.budget.available_cost_units
+    if !finite(completed_history_cost) || !finite(total_active_cost)
+        || completed_history_cost + total_active_cost + campaign.budget.available_cost_units
             > campaign.budget.total_cost_units + EPSILON
     {
-        issues.push("BUDGET_DOUBLE_COUNT: active plus available budget exceeds total campaign envelope".to_owned());
+        issues.push(
+            "BUDGET_DOUBLE_COUNT: completed history plus active plus available budget exceeds total campaign envelope"
+                .to_owned(),
+        );
     }
     if !finite(campaign.config.exploration_weight) || campaign.config.exploration_weight < 0.0 {
         issues.push("EXPLORATION_WEIGHT: must be finite and non-negative".to_owned());
@@ -668,9 +678,16 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
     recommendations.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
     let allocated = campaign.budget.available_cost_units - remaining;
+    let completed_budget_cost_units: f64 = campaign
+        .directions
+        .iter()
+        .flat_map(|direction| direction.history.iter())
+        .map(|observation| observation.cost_units)
+        .sum();
     let active_budget_cost_units = states.iter().map(|state| state.active_cost_units).sum();
     let reserved_or_unavailable_budget_units =
         (campaign.budget.total_cost_units
+            - completed_budget_cost_units
             - active_budget_cost_units
             - campaign.budget.available_cost_units)
             .max(0.0);
@@ -682,6 +699,7 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
         campaign_id: campaign.campaign_id.clone(),
         mode: "advisory_only".to_owned(),
         total_budget_units: campaign.budget.total_cost_units,
+        completed_budget_cost_units,
         active_budget_cost_units,
         reserved_or_unavailable_budget_units,
         active_allocation_snapshot_ref: campaign.active_allocation_snapshot_ref.clone(),
@@ -839,8 +857,9 @@ mod tests {
         let campaign = fixture_campaign();
         let report = allocate(&campaign).expect("valid fixture allocates");
         assert_eq!(report.active_allocation_snapshot_ref, campaign.active_allocation_snapshot_ref);
+        assert_eq!(report.completed_budget_cost_units, 64.0);
         assert_eq!(report.active_budget_cost_units, 20.0);
-        assert_eq!(report.reserved_or_unavailable_budget_units, 30.0);
+        assert_eq!(report.reserved_or_unavailable_budget_units, 16.0);
         let alpha = report
             .recommendations
             .iter()
@@ -855,6 +874,16 @@ mod tests {
     fn rejects_active_plus_available_budget_over_total() {
         let mut value = as_value(&fixture_campaign());
         value["budget"]["total_cost_units"] = Value::from(50.0);
+        let report = validate_campaign(&from_value(value));
+        assert!(report
+            .iter()
+            .any(|issue| issue.starts_with("BUDGET_DOUBLE_COUNT")));
+    }
+
+    #[test]
+    fn rejects_completed_plus_active_plus_available_budget_over_total() {
+        let mut value = as_value(&fixture_campaign());
+        value["budget"]["total_cost_units"] = Value::from(150.0);
         let report = validate_campaign(&from_value(value));
         assert!(report
             .iter()
