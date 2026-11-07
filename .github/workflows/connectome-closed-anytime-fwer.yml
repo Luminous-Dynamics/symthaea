@@ -69,7 +69,7 @@ jobs:
               for entry in ledger["entries"] if entry["kind"] == "EVIDENCE"
           }
           for claim in claims:
-              path_bytes = ("symthaea-eprocess-path-v1\\n" + "".join(x + "\\n" for x in claim["e_process_values"])).encode()
+              path_bytes = ("symthaea-eprocess-path-v1\n" + "".join(x + "\n" for x in claim["e_process_values"])).encode()
               path_sha = hashlib.sha256(path_bytes).hexdigest()
               admission = claim["filtration_admission"]
               assert claim["e_process_path_sha256"] == path_sha
