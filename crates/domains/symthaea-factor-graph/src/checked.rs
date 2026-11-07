@@ -385,16 +385,24 @@ pub fn run_max_product_forest(
         }
 
         let mut root_scores = vec![0.0; graph.variables[root].cardinality];
-        for &factor in &graph.variables[root].neighbors {
-            let incoming = factor_to_variable
-                .get(&(factor, root))
-                .expect("converged forest has every factor-to-variable message");
-            for state in 0..root_scores.len() {
-                if root_scores[state] == f64::NEG_INFINITY || incoming[state] == f64::NEG_INFINITY {
-                    root_scores[state] = f64::NEG_INFINITY;
-                } else {
-                    root_scores[state] += incoming[state];
+        for state in 0..root_scores.len() {
+            let mut terms = Vec::with_capacity(graph.variables[root].neighbors.len());
+            let mut unsupported = false;
+            for &factor in &graph.variables[root].neighbors {
+                let incoming = factor_to_variable
+                    .get(&(factor, root))
+                    .expect("converged forest has every factor-to-variable message");
+                if incoming[state] == f64::NEG_INFINITY {
+                    unsupported = true;
+                    break;
                 }
+                terms.push(incoming[state]);
+            }
+            if unsupported {
+                root_scores[state] = f64::NEG_INFINITY;
+            } else {
+                terms.sort_by(f64::total_cmp);
+                root_scores[state] = compensated_sum(&terms);
             }
         }
         let root_state = argmax_lowest(&root_scores)
@@ -501,6 +509,7 @@ fn compute_var_to_factor_max(
             }
             terms.push(incoming[state]);
         }
+        terms.sort_by(f64::total_cmp);
         result[state] = if unsupported { f64::NEG_INFINITY } else { compensated_sum(&terms) };
     }
     normalize_max(&mut result, "max-product variable-to-factor message")?;
