@@ -158,7 +158,11 @@ pub enum FiniteFamilyError {
     QueryStateOutOfRange { variable_index: usize, state: usize, cardinality: usize },
     AssignmentSpaceOverflow,
     AssignmentLimitExceeded { required: usize, limit: usize },
-    EnumerationPartitionMismatch { model_digest: String },
+    EnumerationPartitionMismatch {
+        model_digest: String,
+        elimination_mass: CheckedRational,
+        enumerated_mass: CheckedRational,
+    },
     CardinalityManifestMismatch {
         model_digest: String,
         expected: Vec<usize>,
@@ -186,23 +190,27 @@ impl fmt::Display for FiniteFamilyError {
                 "no posterior bound was accumulated for variable {variable_index}, state {state_index}"
             ),
             Self::InvalidQueryVariable { variable_index } => {
-                write!(f, "joint event references unknown variable {variable_index}")
+                write!(f, "query references unknown variable {variable_index}")
             }
             Self::DuplicateQueryVariable { variable_index } => {
-                write!(f, "joint event assigns variable {variable_index} more than once")
+                write!(f, "query repeats variable {variable_index}")
             }
             Self::QueryStateOutOfRange { variable_index, state, cardinality } => write!(
                 f,
-                "joint event state {state} is outside variable {variable_index} cardinality {cardinality}"
+                "query state {state} is outside variable {variable_index} cardinality {cardinality}"
             ),
             Self::AssignmentSpaceOverflow => write!(f, "full assignment-space size overflowed usize"),
             Self::AssignmentLimitExceeded { required, limit } => write!(
                 f,
                 "exact enumeration requires {required} full assignments; configured limit is {limit}"
             ),
-            Self::EnumerationPartitionMismatch { model_digest } => write!(
+            Self::EnumerationPartitionMismatch {
+                model_digest,
+                elimination_mass,
+                enumerated_mass,
+            } => write!(
                 f,
-                "direct assignment enumeration disagrees with variable-elimination partition for model {model_digest}"
+                "direct assignment enumeration for model {model_digest} produced {enumerated_mass}, but variable elimination produced {elimination_mass}"
             ),
             Self::CardinalityManifestMismatch {
                 model_digest,
@@ -871,6 +879,8 @@ pub fn evaluate_finite_family_credal_map(
         if enumerated_partition != evidence_mass {
             return Err(FiniteFamilyError::EnumerationPartitionMismatch {
                 model_digest: model.model_digest.to_owned(),
+                elimination_mass: evidence_mass,
+                enumerated_mass: enumerated_partition,
             });
         }
 
