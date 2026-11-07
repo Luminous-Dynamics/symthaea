@@ -124,6 +124,40 @@ Its near-term value is exact finite-size reference evolution, auditable
 unitarity, explicit zero-interaction controls, graph generality and
 reproducible parameter sweeps.
 
+## v0.3 anisotropic-Heisenberg solver reference
+
+A separate finite-graph kicked-XYZ solver has been added. It uses an analytic
+two-spin gate and a symmetric second-order Suzuki-Trotter decomposition over
+edge-color matchings. It explicitly exposes the Trotter slice count and does
+not label the overlapping-edge interaction exponential exact.
+
+An independent Python dense-matrix diagonalization reference (3 spins,
+two overlapping edges, nonuniform longitudinal fields, pulse angle 0.41)
+was compared with the second-order matching implementation after one Floquet
+period. State-vector L2 errors were:
+
+| Trotter slices | L2 error against dense exact exponential |
+|---:|---:|
+| 1 | 1.72826736e-3 |
+| 2 | 4.30361626e-4 |
+| 4 | 1.07482523e-4 |
+| 8 | 2.68638679e-5 |
+| 16 | 6.71554400e-6 |
+| 32 | 1.67885956e-6 |
+
+Doubling the slice count reduces the error by approximately four, consistent
+with a second-order global Trotter approximation for this test point. This
+is a small-system one-period numerical reference, not a multi-cycle phase
+benchmark. The Rust test suite now carries a test-only dense Hamiltonian
+action and Taylor-series exponential oracle to enforce the same convergence
+behavior; those tests remain unexecuted on the pinned Rust toolchain.
+
+The January 28, 2026 Nature Communications paper by Switzer et al. reports a
+two-dimensional DTC with anisotropic Heisenberg interactions using IBM
+quantum processors and tensor-network methods. Symthaea's new implementation
+is a step toward small-system model-family parity, but it does not yet match
+that paper's protocol, tensor-network scale, hardware or phase diagram.
+
 ## Next gates
 
 1. Run the Rust unit tests and both exact Floquet examples with the pinned
