@@ -346,6 +346,24 @@ def validate_documents(
         if required.lower() not in cross_framing.lower():
             errors.append(f"cross-framing protocol is missing {required}")
 
+    for required in (
+        "C1 — Contract preservation",
+        "C2 — Target identity",
+        "C3 — Information inventory",
+        "C4 — Objective/output",
+        "C5 — Interaction realism",
+        "C6 — Target leakage",
+        "W — Wording-only",
+        "R — Information-reduced",
+        "A — Information-added",
+        "O — Objective-changed",
+        "X — Invalid / unresolved",
+        "two reviewers independently",
+        "not convert these labels into a new metric",
+    ):
+        if required.lower() not in cross_framing.lower():
+            errors.append(f"cross-framing prompt-fidelity protocol is missing {required}")
+
     anchor_headings = (
         "## 3. Single-defect anchor CF-A01",
         "## 4. Single-defect anchor CF-A02",
@@ -372,6 +390,17 @@ def validate_documents(
     ):
         if required.lower() not in cross_framing_calibration_pack.lower():
             errors.append(f"cross-framing calibration pack is missing {required}")
+
+    for required in (
+        "Reviewer 1 C1–C6 dispositions",
+        "Reviewer 2 C1–C6 dispositions",
+        "Final framing class: W / R / A / O / X",
+        "Information ledger (present / absent / added)",
+        "F4 is normally A",
+        "Do not label F1 as W",
+    ):
+        if required.lower() not in cross_framing_calibration_pack.lower():
+            errors.append(f"cross-framing calibration pack is missing prompt-fidelity field: {required}")
 
     for required in (
         "six independent control-qualification dimensions",
@@ -520,6 +549,8 @@ def self_test() -> list[str]:
         "same source/defect anchor; wording-only mutation; information content",
         "randomize condition order; fresh isolated contexts; clustered under the original anchor",
         "do not create a composite; not a universal correction factor; no task is admitted; #10064 #10369",
+        "C1 — Contract preservation; C2 — Target identity; C3 — Information inventory; C4 — Objective/output; C5 — Interaction realism; C6 — Target leakage",
+        "W — Wording-only; R — Information-reduced; A — Information-added; O — Objective-changed; X — Invalid / unresolved; two reviewers independently; not convert these labels into a new metric",
     ))
 
     cross_framing_calibration_pack = "\n".join((
@@ -545,6 +576,8 @@ def self_test() -> list[str]:
         "## 6. Multi-defect repository anchor CF-B01",
         "### F5 — Open-world multi-bug sweep",
         "Cross-framing information matrix; wording-only mutation; information-package contrast; fresh isolated conversation/context; No code was compiled or executed",
+        "Reviewer 1 C1–C6 dispositions; Reviewer 2 C1–C6 dispositions; Final framing class: W / R / A / O / X; Information ledger (present / absent / added)",
+        "F4 is normally A; Do not label F1 as W",
     ))
 
     def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str, cf: str, cfp: str) -> list[str]:
@@ -597,6 +630,8 @@ def self_test() -> list[str]:
         ("missing LoopControlBench scope caveat", "triangulation", triangulation.replace("not 65.7% of software bugs generally", "claim removed")),
         ("missing F5 framing condition", "cross_framing", cross_framing.replace("F5 — Open-world multi-bug sweep", "F5 removed")),
         ("missing CF-A02 F4", "cross_framing_calibration_pack", cross_framing_calibration_pack.replace("### F4 — Failing-test-guided repair", "### F4 removed", 2)),
+        ("missing W disposition", "cross_framing", cross_framing.replace("W — Wording-only", "W removed")),
+        ("missing second prompt reviewer", "cross_framing_calibration_pack", cross_framing_calibration_pack.replace("Reviewer 2 C1–C6 dispositions", "Second reviewer removed")),
     )
     for label, target, mutant in mutations:
         args = {
@@ -656,7 +691,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 30 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 32 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
