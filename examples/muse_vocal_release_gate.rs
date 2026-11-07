@@ -236,6 +236,17 @@ fn render_one(
     key: &mut Vec<KeyEntry>,
     objective: &mut Vec<ObjectiveEntry>,
 ) -> Result<()> {
+    let capabilities = engine.capabilities();
+    capabilities.validate()?;
+    if capabilities.backend_id != engine.id() {
+        anyhow::bail!(
+            "backend capability ID {:?} does not match renderer ID {:?}",
+            capabilities.backend_id,
+            engine.id()
+        );
+    }
+    let capability_manifest_blake3 =
+        blake3::hash(&serde_json::to_vec(&capabilities)?).to_hex().to_string();
     let stem = engine.render(performance)?;
     let id = blind_id(salt, &stem.backend, case_id);
     let filename = format!("{id}.wav");
