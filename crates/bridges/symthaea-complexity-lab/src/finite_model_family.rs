@@ -1077,16 +1077,16 @@ mod tests {
         graph
     }
 
-    fn digest(byte: char) -> String {
-        std::iter::repeat(byte).take(64).collect()
+    fn digest(graph: &ExactFactorGraph<CheckedRational>) -> String {
+        canonical_model_sha256_hex(graph).unwrap()
     }
 
     #[test]
     fn unary_posterior_bounds_are_exact_and_have_endpoint_witnesses() {
         let model_a = graph([q(3, 1), q(1, 1)]);
         let model_b = graph([q(1, 1), q(3, 1)]);
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&model_a);
+        let id_b = digest(&model_b);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &model_a },
             FiniteModelRef { model_digest: &id_b, graph: &model_b },
@@ -1111,8 +1111,8 @@ mod tests {
     fn input_order_does_not_change_envelope_or_witness_selection() {
         let model_a = graph([q(3, 1), q(1, 1)]);
         let model_b = graph([q(1, 1), q(3, 1)]);
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&model_a);
+        let id_b = digest(&model_b);
 
         let forward = [
             FiniteModelRef { model_digest: &id_a, graph: &model_a },
@@ -1131,8 +1131,8 @@ mod tests {
         let supported = graph([q(1, 1), q(1, 1)]);
         let mut impossible = graph([q(1, 1), q(0, 1)]);
         impossible.add_factor(vec![0], vec![q(0, 1), q(1, 1)]).unwrap();
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&supported);
+        let id_b = digest(&impossible);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &supported },
             FiniteModelRef { model_digest: &id_b, graph: &impossible },
@@ -1154,8 +1154,8 @@ mod tests {
         impossible_a.add_factor(vec![0], vec![q(0, 1), q(1, 1)]).unwrap();
         let mut impossible_b = graph([q(0, 1), q(1, 1)]);
         impossible_b.add_factor(vec![0], vec![q(1, 1), q(0, 1)]).unwrap();
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&impossible_a);
+        let id_b = digest(&impossible_b);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &impossible_a },
             FiniteModelRef { model_digest: &id_b, graph: &impossible_b },
@@ -1171,7 +1171,7 @@ mod tests {
     #[test]
     fn duplicate_or_malformed_model_digests_are_rejected() {
         let model = graph([q(1, 1), q(1, 1)]);
-        let id = digest('a');
+        let id = digest(&model);
         let duplicate = [
             FiniteModelRef { model_digest: &id, graph: &model },
             FiniteModelRef { model_digest: &id, graph: &model },
@@ -1200,8 +1200,8 @@ mod tests {
             CheckedRational::one(),
         ).unwrap();
         ternary.add_factor(vec![0], vec![q(1, 1), q(1, 1), q(1, 1)]).unwrap();
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&binary);
+        let id_b = digest(&ternary);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &binary },
             FiniteModelRef { model_digest: &id_b, graph: &ternary },
@@ -1216,7 +1216,7 @@ mod tests {
     #[test]
     fn invalid_elimination_order_is_reported_with_model_identity() {
         let model = graph([q(1, 1), q(1, 1)]);
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
 
         assert!(matches!(
@@ -1228,7 +1228,7 @@ mod tests {
     #[test]
     fn negative_probability_potential_fails_closed_for_the_whole_family() {
         let negative = graph([q(1, 1), q(-1, 1)]);
-        let id = digest('a');
+        let id = digest(&negative);
         let models = [FiniteModelRef { model_digest: &id, graph: &negative }];
 
         assert!(matches!(
@@ -1256,8 +1256,8 @@ mod tests {
         ).unwrap();
         model_b.add_factor(vec![0, 1], vec![q(4, 1), q(3, 1), q(2, 1), q(1, 1)]).unwrap();
 
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&model_a);
+        let id_b = digest(&model_b);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &model_a },
             FiniteModelRef { model_digest: &id_b, graph: &model_b },
@@ -1280,7 +1280,7 @@ mod tests {
             CheckedRational::one(),
         ).unwrap();
         model.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
 
         let forward = evaluate_finite_model_joint_event(&models, &[(0, 1), (1, 0)], &[0, 1]).unwrap();
@@ -1296,7 +1296,7 @@ mod tests {
     #[test]
     fn empty_joint_event_is_certain_for_every_supported_model() {
         let model = graph([q(3, 1), q(1, 1)]);
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
         let result = evaluate_finite_model_joint_event(&models, &[], &[0]).unwrap();
         let bounds = result.bounds.unwrap();
@@ -1372,8 +1372,8 @@ mod tests {
         ).unwrap();
         model_b.add_factor(vec![0, 1], vec![q(4, 1), q(3, 1), q(2, 1), q(1, 1)]).unwrap();
 
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&model_a);
+        let id_b = digest(&model_b);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &model_a },
             FiniteModelRef { model_digest: &id_b, graph: &model_b },
@@ -1401,7 +1401,7 @@ mod tests {
         ).unwrap();
         model.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
         model.add_factor(vec![1, 2], vec![q(4, 1), q(3, 1), q(2, 1), q(1, 1)]).unwrap();
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
 
         let left = evaluate_finite_family_credal_map(&models, &[0, 2], &[0, 1, 2], 8).unwrap();
@@ -1418,7 +1418,7 @@ mod tests {
     #[test]
     fn empty_credal_map_query_is_the_certain_event() {
         let model = graph([q(3, 1), q(1, 1)]);
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
         let result = evaluate_finite_family_credal_map(&models, &[], &[0], 2).unwrap();
         assert_eq!(result.maximax.as_ref().unwrap().assignment, Vec::<usize>::new());
@@ -1429,7 +1429,7 @@ mod tests {
     #[test]
     fn credal_map_rejects_unknown_or_duplicate_query_variables() {
         let model = graph([q(3, 1), q(1, 1)]);
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
         assert!(matches!(
             evaluate_finite_family_credal_map(&models, &[1], &[0], 2),
@@ -1446,8 +1446,8 @@ mod tests {
         let supported = graph([q(1, 1), q(1, 1)]);
         let mut impossible = graph([q(1, 1), q(0, 1)]);
         impossible.add_factor(vec![0], vec![q(0, 1), q(1, 1)]).unwrap();
-        let id_a = digest('a');
-        let id_b = digest('b');
+        let id_a = digest(&supported);
+        let id_b = digest(&impossible);
         let models = [
             FiniteModelRef { model_digest: &id_a, graph: &supported },
             FiniteModelRef { model_digest: &id_b, graph: &impossible },
@@ -1466,11 +1466,36 @@ mod tests {
             CheckedRational::zero(),
             CheckedRational::one(),
         ).unwrap();
-        let id = digest('a');
+        let id = digest(&model);
         let models = [FiniteModelRef { model_digest: &id, graph: &model }];
         assert!(matches!(
             evaluate_finite_family_credal_map(&models, &[0], &[0, 1, 2], 7),
             Err(FiniteFamilyError::AssignmentLimitExceeded { required: 8, limit: 7 })
+        ));
+    }
+
+
+    #[test]
+    fn canonical_sha256_matches_independent_known_answer() {
+        let model = graph([q(3, 1), q(1, 1)]);
+        assert_eq!(
+            canonical_model_sha256_hex(&model).unwrap(),
+            "fd389042cfcfcdacbcf87c1c14ff5cfa16b5a71d3974aece32d7d6092c7e0654"
+        );
+    }
+
+    #[test]
+    fn model_reference_rejects_digest_that_does_not_match_graph_content() {
+        let supplied_model = graph([q(3, 1), q(1, 1)]);
+        let changed_model = graph([q(2, 1), q(1, 1)]);
+        let supplied_digest = digest(&supplied_model);
+        let models = [FiniteModelRef {
+            model_digest: &supplied_digest,
+            graph: &changed_model,
+        }];
+        assert!(matches!(
+            evaluate_finite_model_family(&models, &[0]),
+            Err(FiniteFamilyError::ModelDigestMismatch { .. })
         ));
     }
 
