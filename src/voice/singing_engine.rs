@@ -325,9 +325,7 @@ impl VocalPerformance {
                 &format!("vocal syllable {syllable_index} note"),
             )?;
             if syllable.note.start_time < previous_syllable_end {
-                bail!(
-                    "vocal syllable {syllable_index} overlaps the preceding syllable or melisma"
-                );
+                bail!("vocal syllable {syllable_index} overlaps the preceding syllable or melisma");
             }
 
             if syllable.phrase_index >= self.phrases.len()
@@ -607,7 +605,10 @@ mod tests {
             velocity: 0.7,
         });
         let error = performance.validate().unwrap_err().to_string();
-        assert!(error.contains("overlaps the preceding syllable or melisma"), "{error}");
+        assert!(
+            error.contains("overlaps the preceding syllable or melisma"),
+            "{error}"
+        );
     }
 
     #[test]
