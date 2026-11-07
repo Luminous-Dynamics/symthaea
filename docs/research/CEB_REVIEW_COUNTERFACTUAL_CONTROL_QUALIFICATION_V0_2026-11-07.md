@@ -38,7 +38,7 @@ with:
 
 > “For this exact claim, these source states provide this bounded level of evidence, under these assumptions and unresolved alternatives.”
 
-A control is not globally “valid” or “invalid.” Its qualification is **claim-specific**. A fixed companion may establish that a target branch was removed while remaining insufficient to establish whole-program safety. A parent may show that a line was introduced without proving that its behavior was reachable in the deployment configuration. A source-level intervention can support a structural claim without establishing runtime behavior.
+A control is not globally “valid” or “invalid.” Historical P/I/F source-state observations are not randomized assignments; their qualification is **claim-specific**. A fixed companion may establish that a target branch was removed while remaining insufficient to establish whole-program safety. A parent may show that a line was introduced without proving that its behavior was reachable in the deployment configuration. A source-level intervention can support a structural claim without establishing runtime behavior.
 
 Keep the existing evidence authorities:
 - `source_declared`
