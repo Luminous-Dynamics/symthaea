@@ -14,6 +14,8 @@ ASI-Bench 0.3.0, pinned to `apexin-ai/ASI-Bench@eb60952124b90e9f0886c1212bf7463e
 
 The experiment protocol is in `SYM_RSI_GUIDANCE_WITHDRAWAL_PROTOCOL_V0_2026-11-07.md`.
 
+The preregistered B3 method-selection policy is supported by `SYM_RSI_METHOD_ADJUDICATION_FIXTURE_V0_2026-11-07.json` and its schema. The synthetic fixture contains two admissible method families to demonstrate that alternative valid methods can pass when assumptions and evidence fit; it is not human expert gold.
+
 ## Key design safeguards
 
 1. B1–B4 are reproduced exactly before adding local extensions.
