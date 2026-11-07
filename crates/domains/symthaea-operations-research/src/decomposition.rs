@@ -48,6 +48,7 @@ pub struct CnfProblem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnumerationBudget {
     pub max_variables: usize,
+    pub max_total_variable_name_bytes: usize,
     pub max_clauses: usize,
     pub max_literals: usize,
     pub max_total_assignment_evaluations: u128,
@@ -58,6 +59,7 @@ impl Default for EnumerationBudget {
     fn default() -> Self {
         Self {
             max_variables: 20,
+            max_total_variable_name_bytes: 64 * 1024,
             max_clauses: 1 << 16,
             max_literals: 1 << 20,
             max_total_assignment_evaluations: 1 << 20,
@@ -80,6 +82,7 @@ pub enum DecompositionError {
     SplitVariableOutOfRange { variable: usize, variable_count: usize },
     AssignmentSpaceOverflow { variable_count: usize },
     VariableBudgetExceeded { required: usize, limit: usize },
+    VariableNameBudgetExceeded { required: usize, limit: usize },
     AssignmentBudgetExceeded { required: u128, limit: u128 },
     ClauseBudgetExceeded { required: usize, limit: usize },
     LiteralBudgetExceeded { required: usize, limit: usize },
@@ -110,6 +113,17 @@ fn validate_problem(
         return Err(DecompositionError::VariableBudgetExceeded {
             required: problem.variables.len(),
             limit: budget.max_variables,
+        });
+    }
+    let variable_name_bytes = problem.variables.iter().try_fold(0usize, |total, name| {
+        total
+            .checked_add(name.len())
+            .ok_or(DecompositionError::ResourceAccountingOverflow)
+    })?;
+    if variable_name_bytes > budget.max_total_variable_name_bytes {
+        return Err(DecompositionError::VariableNameBudgetExceeded {
+            required: variable_name_bytes,
+            limit: budget.max_total_variable_name_bytes,
         });
     }
     if problem.clauses.len() > budget.max_clauses {
@@ -582,6 +596,7 @@ mod tests {
     fn budget() -> EnumerationBudget {
         EnumerationBudget {
             max_variables: 8,
+            max_total_variable_name_bytes: 256,
             max_clauses: 64,
             max_literals: 256,
             max_total_assignment_evaluations: 1 << 8,
@@ -710,6 +725,7 @@ mod tests {
     fn resource_limit_is_unknown_not_zero_models() {
         let tight = EnumerationBudget {
             max_variables: 8,
+            max_total_variable_name_bytes: 256,
             max_clauses: 64,
             max_literals: 256,
             max_total_assignment_evaluations: 4,
@@ -728,6 +744,7 @@ mod tests {
     fn branch_sum_enforces_composed_total_enumeration_budget() {
         let tight = EnumerationBudget {
             max_variables: 8,
+            max_total_variable_name_bytes: 256,
             max_clauses: 64,
             max_literals: 256,
             max_total_assignment_evaluations: 12,
@@ -746,6 +763,7 @@ mod tests {
     fn independent_product_enforces_composed_total_enumeration_budget() {
         let tight = EnumerationBudget {
             max_variables: 8,
+            max_total_variable_name_bytes: 256,
             max_clauses: 64,
             max_literals: 256,
             max_total_assignment_evaluations: 35,
@@ -762,6 +780,21 @@ mod tests {
             DecompositionError::AssignmentBudgetExceeded {
                 required: 40,
                 limit: 35
+            }
+        );
+    }
+
+    #[test]
+    fn variable_name_byte_budget_is_checked_before_cloning() {
+        let tight = EnumerationBudget {
+            max_total_variable_name_bytes: 2,
+            ..budget()
+        };
+        assert_eq!(
+            count_models(&branch_fixture(), tight).unwrap_err(),
+            DecompositionError::VariableNameBudgetExceeded {
+                required: 3,
+                limit: 2
             }
         );
     }
