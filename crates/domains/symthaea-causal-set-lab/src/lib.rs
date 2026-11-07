@@ -19,6 +19,65 @@ use std::error::Error;
 use std::f64::consts::PI;
 use std::fmt;
 
+/// Count the number of order intervals containing k interior events.
+///
+/// The returned vector is indexed by k: entry k counts unordered related
+/// endpoint pairs (a,b) for which exactly k events z satisfy a ≺ z ≺ b.
+/// A pair is considered once, in its causal orientation. The implementation
+/// builds successor/predecessor bitsets, so it is a reference primitive with
+/// O(N^2) bits of storage and O(R ceil(N/64)) interval-intersection work,
+/// where R is the number of related pairs. This is intended for finite-size
+/// action/reference tests, not yet a sparse large-N production implementation.
+fn interval_size_histogram_by<F>(event_count: usize, mut precedes: F) -> Vec<u64>
+where
+    F: FnMut(usize, usize) -> bool,
+{
+    let mut histogram = vec![0_u64; event_count.saturating_sub(1)];
+    if event_count < 2 {
+        return histogram;
+    }
+
+    let word_count = event_count.div_ceil(64);
+    let mut successors = vec![vec![0_u64; word_count]; event_count];
+    let mut predecessors = vec![vec![0_u64; word_count]; event_count];
+
+    for first in 0..event_count {
+        for second in 0..event_count {
+            if first != second && precedes(first, second) {
+                successors[first][second / 64] |= 1_u64 << (second % 64);
+                predecessors[second][first / 64] |= 1_u64 << (first % 64);
+            }
+        }
+    }
+
+    for first in 0..event_count {
+        for second_word in 0..word_count {
+            let mut related = successors[first][second_word];
+            while related != 0 {
+                let bit = related.trailing_zeros() as usize;
+                let second = second_word * 64 + bit;
+                related &= related - 1;
+                if second >= event_count {
+                    continue;
+                }
+
+                // A strict interior event is both a successor of first and
+                // a predecessor of second. Endpoints are absent by irreflexivity.
+                let interior_count: usize = successors[first]
+                    .iter()
+                    .zip(&predecessors[second])
+                    .map(|(after_first, before_second)| {
+                        (after_first & before_second).count_ones() as usize
+                    })
+                    .sum();
+                histogram[interior_count] += 1;
+            }
+        }
+    }
+
+    histogram
+}
+
 /// One sprinkled event in 1+1D Minkowski spacetime, represented in null
 /// coordinates u = t + x and v = t - x.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -280,6 +339,17 @@ impl CausalSet2D {
         }
 
         related
+    }
+
+    /// Histogram of cardinalities of open order intervals.
+    ///
+    /// Bin k counts causally related endpoint pairs with exactly k events
+    /// strictly between the endpoints. The histogram is invariant under
+    /// order-preserving relabelling and Lorentz boosts of the embedding.
+    pub fn interval_size_histogram(&self) -> Vec<u64> {
+        interval_size_histogram_by(self.events.len(), |first, second| {
+            self.events[first].causally_precedes(self.events[second])
+        })
     }
 
     /// Myrheim ordering fraction r = R / binom(N,2), where R counts
@@ -599,6 +669,10 @@ mod tests {
             let boosted = causet.lorentz_boosted(rapidity).unwrap();
             assert_eq!(causet.related_pair_count(), boosted.related_pair_count());
             assert_eq!(
+                causet.interval_size_histogram(),
+                boosted.interval_size_histogram()
+            );
+            assert_eq!(
                 causet.longest_chain_ids(),
                 boosted.longest_chain_ids(),
                 "selected maximum chain changed under boost eta={rapidity}"
@@ -608,6 +682,19 @@ mod tests {
                     < 1e-12
             );
         }
+    }
+
+    #[test]
+    fn interval_size_histogram_matches_a_four_event_total_order() {
+        let events = (0..4)
+            .map(|id| Event2D {
+                id,
+                u: id as f64,
+                v: id as f64,
+            })
+            .collect();
+        let causet = CausalSet2D::new(events, 4.0, 4.0).unwrap();
+        assert_eq!(causet.interval_size_histogram(), vec![3, 2, 1]);
     }
 
     #[test]
