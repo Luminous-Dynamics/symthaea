@@ -68,6 +68,11 @@ pub enum QuantifierScopeError {
     VariableMissing { variable: usize },
     NotExistential { variable: usize },
     DuplicateSkolemDependency { existential: usize, dependency: usize },
+    SkolemDependencyCountExceedsVariableCount {
+        existential: usize,
+        required: usize,
+        variable_count: usize,
+    },
     SkolemDependencyNotAvailable { existential: usize, dependency: usize },
     ResourceAccountingOverflow,
 }
@@ -95,9 +100,9 @@ impl ValidatedQuantifierPrefix {
             });
         }
 
-        let occurrence_count = blocks.iter().try_fold(0usize, |total, block| {
+        let occurrence_count = blocks.iter().enumerate().try_fold(0usize, |total, (block_index, block)| {
             if block.variables.is_empty() {
-                return Err(QuantifierScopeError::EmptyQuantifierBlock { block: 0 });
+                return Err(QuantifierScopeError::EmptyQuantifierBlock { block: block_index });
             }
             total
                 .checked_add(block.variables.len())
@@ -200,16 +205,41 @@ impl ValidatedQuantifierPrefix {
         existential: usize,
         declared: &[usize],
     ) -> Result<(), QuantifierScopeError> {
-        let available = self.existential_dependencies(existential)?;
-        let mut seen = std::collections::HashSet::with_capacity(declared.len());
+        let Some(&(target_block, quantifier)) = self.locations.get(existential) else {
+            return Err(QuantifierScopeError::QuantifiedVariableOutOfRange {
+                block: self.blocks.len(),
+                variable: existential,
+                variable_count: self.variable_count,
+            });
+        };
+        if quantifier != Quantifier::Exists {
+            return Err(QuantifierScopeError::NotExistential { variable: existential });
+        }
+        if declared.len() > self.variable_count {
+            return Err(QuantifierScopeError::SkolemDependencyCountExceedsVariableCount {
+                existential,
+                required: declared.len(),
+                variable_count: self.variable_count,
+            });
+        }
+
+        let mut seen = vec![false; self.variable_count];
         for &dependency in declared {
-            if !seen.insert(dependency) {
+            if dependency >= self.variable_count {
+                return Err(QuantifierScopeError::SkolemDependencyNotAvailable {
+                    existential,
+                    dependency,
+                });
+            }
+            if seen[dependency] {
                 return Err(QuantifierScopeError::DuplicateSkolemDependency {
                     existential,
                     dependency,
                 });
             }
-            if !available.contains(&dependency) {
+            seen[dependency] = true;
+            let (dependency_block, dependency_quantifier) = self.locations[dependency];
+            if dependency_quantifier != Quantifier::ForAll || dependency_block >= target_block {
                 return Err(QuantifierScopeError::SkolemDependencyNotAvailable {
                     existential,
                     dependency,
@@ -267,6 +297,18 @@ mod tests {
             QuantifierScopeError::SkolemDependencyNotAvailable {
                 existential: 1,
                 dependency: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn existential_rejects_duplicate_skolem_dependencies() {
+        let prefix = standard_prefix();
+        assert_eq!(
+            prefix.validate_skolem_dependencies(3, &[0, 0]).unwrap_err(),
+            QuantifierScopeError::DuplicateSkolemDependency {
+                existential: 3,
+                dependency: 0,
             }
         );
     }
