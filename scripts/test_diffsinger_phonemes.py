@@ -67,9 +67,9 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
 
     def test_melisma_sustains_last_vowel_not_final_consonant(self) -> None:
         phones = [
-            {"ipa": "m", "is_vowel": False},
-            {"ipa": "a", "is_vowel": True},
-            {"ipa": "t", "is_vowel": False},
+            {"ipa": "m", "is_vowel": False, "natural_duration_s": 0.05},
+            {"ipa": "a", "is_vowel": True, "natural_duration_s": 0.1},
+            {"ipa": "t", "is_vowel": False, "natural_duration_s": 0.05},
         ]
         mapped, last_vowel = map_syllable_phones(phones, 0)
         self.assertEqual(mapped, [["m"], ["ah"], ["t"]])
@@ -77,7 +77,10 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
 
     def test_consonant_only_syllable_cannot_gain_implicit_schwa_for_melisma(self) -> None:
         _, last_vowel = map_syllable_phones(
-            [{"ipa": "t", "is_vowel": False}, {"ipa": "s", "is_vowel": False}],
+            [
+                {"ipa": "t", "is_vowel": False, "natural_duration_s": 0.05},
+                {"ipa": "s", "is_vowel": False, "natural_duration_s": 0.05},
+            ],
             3,
         )
         with self.assertRaisesRegex(ValueError, "no mapped vowel"):
