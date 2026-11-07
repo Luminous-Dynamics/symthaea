@@ -498,7 +498,6 @@ fn probability_delta(left: &[f64], right: &[f64]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FactorGraph;
 
     fn two_node_tree() -> FactorGraph {
         let mut graph = FactorGraph::new();
