@@ -104,9 +104,9 @@ pub struct AlignmentMetrics {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum Edit {
     Exact { reference: usize, predicted: usize },
-    Substitute { reference: usize, predicted: usize },
-    Delete { reference: usize },
-    Insert { predicted: usize },
+    Substitute,
+    Delete,
+    Insert,
 }
 
 /// Score a supplied phoneme alignment against an independently authored
@@ -161,9 +161,9 @@ pub fn score_alignment(
                     expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms,
                 );
             }
-            Edit::Substitute { .. } => counts.substitutions += 1,
-            Edit::Delete { .. } => counts.deletions += 1,
-            Edit::Insert { .. } => counts.insertions += 1,
+            Edit::Substitute => counts.substitutions += 1,
+            Edit::Delete => counts.deletions += 1,
+            Edit::Insert => counts.insertions += 1,
         }
     }
 
@@ -386,10 +386,7 @@ fn align_phone_sequences(
                         predicted: j - 1,
                     });
                 } else {
-                    reversed.push(Edit::Substitute {
-                        reference: i - 1,
-                        predicted: j - 1,
-                    });
+                    reversed.push(Edit::Substitute);
                 }
                 i -= 1;
                 j -= 1;
@@ -397,10 +394,10 @@ fn align_phone_sequences(
             }
         }
         if i > 0 && costs[i][j] == costs[i - 1][j] + 1 {
-            reversed.push(Edit::Delete { reference: i - 1 });
+            reversed.push(Edit::Delete);
             i -= 1;
         } else {
-            reversed.push(Edit::Insert { predicted: j - 1 });
+            reversed.push(Edit::Insert);
             j -= 1;
         }
     }
