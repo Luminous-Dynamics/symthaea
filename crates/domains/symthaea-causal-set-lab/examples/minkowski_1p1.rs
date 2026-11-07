@@ -28,6 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         causet.estimate_myrheim_meyer_dimension(8.0).unwrap()
     );
     println!("longest_chain={}", causet.longest_chain_length());
+    println!("interval_histogram={:?}", causet.interval_size_histogram());
     println!(
         "longest_chain_over_sqrt_n={:.6}",
         causet.longest_chain_length() as f64 / (causet.len() as f64).sqrt()
