@@ -540,7 +540,7 @@ pub enum CfCPermutationAlignmentError {
     #[error("alignment receipt does not match the current {field} fingerprint")]
     StaleAlignment { field: &'static str },
     #[error(
-        "permutation canonicalization supports only a one-layer, non-residual, non-backbone, unidirectional CfC network"
+        "permutation canonicalization supports only non-residual, non-backbone, unidirectional CfC stacks"
     )]
     UnsupportedCanonicalizationTopology,
     #[error("required CfC parameter group is absent from the candidate snapshot: {0}")]
@@ -2765,6 +2765,211 @@ mod tests {
             "partial permutation must change the function, error={}",
             negative_control_squared_error.sqrt()
         );
+    }
+
+    #[test]
+    fn multilayer_canonicalization_propagates_each_layer_permutation_through_adjacent_projections() {
+        let genesis =
+            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-multilayer-canonicalization-v1");
+        let config = CfCNetworkConfig {
+            input_dim: 2,
+            hidden_dim: 3,
+            num_layers: 2,
+            output_dim: 2,
+            cell_config: CfCConfig {
+                input_dim: 2,
+                hidden_dim: 3,
+                use_backbone: false,
+                dropout: 0.0,
+                ..Default::default()
+            },
+            residual: false,
+            bidirectional: false,
+            enable_online_learning: false,
+            ..Default::default()
+        };
+        let source = CfCNetwork::from_genesis(config, &genesis, "multilayer-source");
+        let mut permuted = source.clone();
+        let task_digest = digest('d');
+        let snapshot =
+            cfc_weight_model_snapshot(&source, task_digest.clone()).expect("source snapshot");
+        let layer_permutations = [vec![2usize, 0, 1], vec![1usize, 2, 0]];
+
+        let get = |id: CfCWeightGroupId| {
+            snapshot
+                .groups
+                .iter()
+                .find(|group| group.target == WeightProgramTarget::CfC(id.clone()))
+                .expect("parameter group")
+                .values
+                .clone()
+        };
+        let mut replacements = Vec::new();
+        for layer_index in 0..2 {
+            let permutation = &layer_permutations[layer_index];
+            let input_id = CfCWeightGroupId::CellInputProjection { cell: layer_index };
+            let input = get(input_id.clone());
+            let input_width = if layer_index == 0 { 2 } else { 3 };
+            let mut permuted_input = permute_rows(&input, 3, input_width, permutation);
+            if layer_index > 0 {
+                permuted_input = permute_columns(
+                    &permuted_input,
+                    3,
+                    input_width,
+                    &layer_permutations[layer_index - 1],
+                );
+            }
+            replacements.push(CfCParameterGroupReplacement {
+                id: native_group_id(&input_id),
+                values: permuted_input,
+            });
+
+            let recurrent_id = CfCWeightGroupId::CellRecurrentProjection { cell: layer_index };
+            replacements.push(CfCParameterGroupReplacement {
+                id: native_group_id(&recurrent_id),
+                values: permute_square(&get(recurrent_id.clone()), 3, permutation),
+            });
+
+            for group_id in [
+                CfCWeightGroupId::CellHiddenBias { cell: layer_index },
+                CfCWeightGroupId::CellTimeConstant { cell: layer_index },
+            ] {
+                let values = get(group_id.clone());
+                replacements.push(CfCParameterGroupReplacement {
+                    id: native_group_id(&group_id),
+                    values: permutation.iter().map(|index| values[*index]).collect(),
+                });
+            }
+        }
+
+        let output_id = CfCWeightGroupId::OutputProjection;
+        replacements.push(CfCParameterGroupReplacement {
+            id: native_group_id(&output_id),
+            values: permute_columns(
+                &get(output_id.clone()),
+                2,
+                3,
+                &layer_permutations[1],
+            ),
+        });
+        let source_digest = source.fingerprint().expect("source fingerprint").model_digest;
+        let permuted_digest_before = permuted
+            .fingerprint()
+            .expect("permuted base fingerprint")
+            .model_digest;
+        permuted
+            .try_apply_parameter_group_replacements(&permuted_digest_before, &replacements)
+            .expect("apply coupled two-layer symmetry");
+
+        let probe_set = vec![
+            CfCFunctionalProbe {
+                input: vec![0.25, -0.75],
+                dt: 0.05,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.4, 0.6],
+                dt: 0.2,
+            },
+            CfCFunctionalProbe {
+                input: vec![0.9, 0.1],
+                dt: 0.1,
+            },
+            CfCFunctionalProbe {
+                input: vec![-0.2, -0.8],
+                dt: 0.15,
+            },
+        ];
+        let mut alignments = Vec::new();
+        for layer_index in 0..2 {
+            let source_signatures =
+                cfc_hidden_unit_activation_signatures(&source, layer_index, &probe_set)
+                    .expect("source layer signatures");
+            let candidate_signatures =
+                cfc_hidden_unit_activation_signatures(&permuted, layer_index, &probe_set)
+                    .expect("permuted layer signatures");
+            let alignment = align_cfc_hidden_unit_signatures(
+                &source_signatures,
+                &candidate_signatures,
+            )
+            .expect("layer hidden-unit alignment");
+            let expected_inverse = match layer_index {
+                0 => vec![1, 2, 0],
+                1 => vec![2, 0, 1],
+                _ => unreachable!(),
+            };
+            assert_eq!(alignment.source_to_candidate, expected_inverse);
+            assert!(alignment.mean_squared_activation_error < 1e-10);
+            assert!(alignment.minimum_assignment_margin.is_some_and(|margin| margin > 0.0));
+            alignments.push(alignment);
+        }
+
+        let canonicalization = build_cfc_network_hidden_unit_canonicalization_program(
+            &source,
+            &permuted,
+            task_digest.clone(),
+            &alignments,
+            CfCAlignmentAcceptancePolicy {
+                max_mean_squared_activation_error: 1e-10,
+                min_assignment_margin: 0.0,
+            },
+        )
+        .expect("multi-layer canonicalization program");
+        assert_eq!(canonicalization.operations.len(), 9);
+
+        let canonicalized =
+            materialize_cfc_weight_program(&permuted, task_digest, &canonicalization)
+                .expect("candidate-only multi-layer canonicalization");
+        assert_eq!(canonicalized.receipt.edited_group_count, 9);
+        assert!(canonicalized.receipt.changed_parameter_count > 0);
+        assert_ne!(canonicalized.candidate_native_model_digest, permuted_digest_before);
+        assert_eq!(canonicalized.candidate_native_model_digest, source_digest);
+
+        let source_digest_after = source.fingerprint().expect("source remains unchanged").model_digest;
+        let permuted_digest_after = permuted
+            .fingerprint()
+            .expect("permuted source remains unchanged")
+            .model_digest;
+        assert_eq!(source_digest_after, source_digest);
+        assert_eq!(permuted_digest_after, permuted_digest_before);
+
+        let inputs = probe_set
+            .iter()
+            .map(|probe| ndarray::Array1::from_vec(probe.input.clone()))
+            .collect::<Vec<_>>();
+        let mut source_eval = source.clone();
+        let mut permuted_eval = permuted.clone();
+        let mut canonical_eval = canonicalized.network.clone();
+        let mut source_permuted_error = 0.0_f64;
+        let mut source_canonical_error = 0.0_f64;
+        for (input, probe) in inputs.iter().zip(probe_set.iter()) {
+            let expected = source_eval.forward(input, probe.dt);
+            let equivalent = permuted_eval.forward(input, probe.dt);
+            let restored = canonical_eval.forward(input, probe.dt);
+            for ((a, b), restored_value) in expected
+                .iter()
+                .zip(equivalent.iter())
+                .zip(restored.iter())
+            {
+                source_permuted_error += f64::from((*a - *b).powi(2));
+                source_canonical_error += f64::from((*a - *restored_value).powi(2));
+            }
+        }
+        assert!(source_permuted_error.sqrt() < 1e-5);
+        assert!(source_canonical_error.sqrt() < 1e-5);
+
+        assert!(matches!(
+            build_cfc_network_hidden_unit_canonicalization_program(
+                &source,
+                &permuted,
+                digest('d'),
+                &alignments[..1],
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: 1e-10,
+                    min_assignment_margin: 0.0,
+                },
+            ),
+            Err(CfCPermutationAlignmentError::UnsupportedCanonicalizationTopology)
+        ));
     }
 
     #[test]
