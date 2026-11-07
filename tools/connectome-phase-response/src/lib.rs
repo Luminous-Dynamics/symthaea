@@ -16,6 +16,8 @@ pub const PHASE_SCALE: i64 = 1_000_000;
 pub const PHASE_HALF_TURN: i64 = PHASE_SCALE / 2;
 /// V1 phase-grid size. Biological studies may preregister a different grid.
 pub const DEFAULT_PHASE_BINS: u8 = 8;
+/// Maximum registered perturbation magnitude levels in V1.
+pub const MAX_MAGNITUDE_BINS: u8 = 16;
 
 /// Canonical fixed-point oscillator phase.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd, Hash)]
@@ -118,6 +120,7 @@ pub struct ProbeKey {
     pub source_leg: Option<LegId>,
     pub descending_neuron: Option<DescendingNeuron>,
     pub phase_bin: u8,
+    pub magnitude_bin: u8,
     pub delay_index: u8,
 }
 
@@ -125,6 +128,9 @@ impl ProbeKey {
     pub fn validate(self) -> Result<(), PhaseError> {
         if self.phase_bin >= DEFAULT_PHASE_BINS {
             return Err(PhaseError::InvalidPhaseBin(self.phase_bin));
+        }
+        if self.magnitude_bin >= MAX_MAGNITUDE_BINS {
+            return Err(PhaseError::InvalidMagnitudeBin(self.magnitude_bin));
         }
         match self.class {
             ProbeClass::LocalPhaseKick => {
@@ -606,6 +612,7 @@ pub fn minimum_campaign_cycle_slip_separation(
 pub enum PhaseError {
     InvalidLeg(u8),
     InvalidPhaseBin(u8),
+    InvalidMagnitudeBin(u8),
     SourceLegRequired(ProbeClass),
     SourceLegForbidden(ProbeClass),
     DescendingNeuronRequired,
@@ -631,6 +638,7 @@ impl fmt::Display for PhaseError {
         match self {
             Self::InvalidLeg(value) => write!(f, "invalid leg ID {value}; expected 0..6"),
             Self::InvalidPhaseBin(value) => write!(f, "invalid phase bin {value}; expected 0..8"),
+            Self::InvalidMagnitudeBin(value) => write!(f, "invalid magnitude bin {value}; expected 0..16"),
             Self::SourceLegRequired(class) => write!(f, "probe class {class:?} requires a source leg"),
             Self::SourceLegForbidden(class) => write!(f, "probe class {class:?} is a global input and forbids a source leg"),
             Self::DescendingNeuronRequired => write!(f, "descending command probe requires an exact DNg100/DNg97/DNb08 identity"),
@@ -703,6 +711,7 @@ mod tests {
             source_leg: Some(LegId::new(source).unwrap()),
             descending_neuron: None,
             phase_bin,
+            magnitude_bin: 0,
             delay_index,
         }
     }
@@ -773,6 +782,7 @@ mod tests {
             source_leg: None,
             descending_neuron: None,
             phase_bin: 0,
+            magnitude_bin: 0,
             delay_index: 0,
         };
         assert_eq!(invalid.validate(), Err(PhaseError::SourceLegRequired(ProbeClass::LocalPhaseKick)));
@@ -783,9 +793,31 @@ mod tests {
             source_leg: Some(LegId::new(0).unwrap()),
             descending_neuron: Some(DescendingNeuron::DNg100),
             phase_bin: 0,
+            magnitude_bin: 0,
             delay_index: 0,
         };
         assert_eq!(invalid_global.validate(), Err(PhaseError::SourceLegForbidden(ProbeClass::DescendingCommand)));
+    }
+
+    #[test]
+    fn perturbation_magnitude_is_a_distinct_design_coordinate() {
+        let lower = key(Context::BallContact, 0, 2, 1);
+        let stronger = ProbeKey {
+            magnitude_bin: 1,
+            ..lower
+        };
+        assert!(lower.validate().is_ok());
+        assert!(stronger.validate().is_ok());
+        assert_ne!(lower, stronger);
+
+        let invalid = ProbeKey {
+            magnitude_bin: MAX_MAGNITUDE_BINS,
+            ..lower
+        };
+        assert_eq!(
+            invalid.validate(),
+            Err(PhaseError::InvalidMagnitudeBin(MAX_MAGNITUDE_BINS))
+        );
     }
 
     #[test]
@@ -796,6 +828,7 @@ mod tests {
             source_leg: None,
             descending_neuron: Some(DescendingNeuron::DNg100),
             phase_bin: 2,
+            magnitude_bin: 0,
             delay_index: 1,
         };
         let dng97 = ProbeKey {
