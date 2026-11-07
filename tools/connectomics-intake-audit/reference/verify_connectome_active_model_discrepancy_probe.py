@@ -247,6 +247,40 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
 def self_test() -> None:
     require(abs(tv({"X": 1.0}, {"X": 0.5, "Y": 0.5}) - 0.5) <= 1e-12, "TV known answer")
     require(abs(tv({"X": 0.5, "Y": 0.5}, {"X": 0.5, "Y": 0.5})) <= 1e-12, "zero TV known answer")
+    require(
+        abs(
+            model_mi_bits(
+                "B",
+                [
+                    {"model_id": "M0", "model_prior_probability": 0.5},
+                    {"model_id": "M1", "model_prior_probability": 0.5},
+                ],
+                [
+                    {"world_id": "T", "prior_probability": 0.5},
+                    {"world_id": "F", "prior_probability": 0.5},
+                ],
+                {
+                    ("B", "T", "M0"): {"X": 1.0},
+                    ("B", "F", "M0"): {"X": 1.0},
+                    ("B", "T", "M1"): {"X": 1.0},
+                    ("B", "F", "M1"): {"Y": 1.0},
+                },
+            ) - 0.31127812445913283
+        ) <= 1e-12,
+        "model-mutual-information diagnostic known answer",
+    )
+    require(
+        pareto_frontier(
+            [
+                {"action_id": "query", "feasibility_status": "FEASIBLE", "cost_units": 1.0},
+                {"action_id": "model", "feasibility_status": "FEASIBLE", "cost_units": 1.0},
+                {"action_id": "blocked", "feasibility_status": "DISALLOWED", "cost_units": 0.1},
+            ],
+            {"query": 0.5, "model": 0.0, "blocked": 5.0},
+            {"query": 0.0, "model": 0.5, "blocked": 0.0},
+        ) == ["model", "query"],
+        "Pareto frontier or feasibility exclusion control",
+    )
     print("active model-discrepancy probe oracle self-test: PASS")
 
 
