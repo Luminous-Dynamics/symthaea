@@ -746,6 +746,14 @@
     {
       "id": "three_ball_known_state_random_action",
       "scope": "Uniform random legal feedback choice including no-choice, with identical action set and per-action cost"
+    },
+    {
+      "id": "spm_source_compatible_dirichlet_bmr",
+      "scope": "Pinned SPM spm_MDP_log_evidence semantics: 1/32 dense pseudocount, independent Dirichlet columns, globally normalized weighted sum of reduced prior tensors, posterior model odds"
+    },
+    {
+      "id": "strict_structural_zero_dirichlet_bmr",
+      "scope": "Strict simplex-face BMR with exact structural zeros and zero evidence for posterior counts outside reduced support"
     }
   ],
   "seeds": {
@@ -898,7 +906,11 @@
       "preference_log_normalization_error",
       "negative_or_nonfinite_action_cost_rejection_rate",
       "invalid_epistemic_weight_rejection_rate",
-      "zero_information_no_choice_control_error"
+      "zero_information_no_choice_control_error",
+      "spm_bmr_log_evidence_ratio_difference_nats_vs_pinned_reference",
+      "spm_full_prior_global_normalization_error",
+      "spm_pseudocount_coordinate_coverage",
+      "strict_vs_spm_posterior_model_kl_nats"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -990,7 +1002,10 @@
     "Prospective Dirichlet model-EIG derives each action-outcome probability as the mixture of per-model posterior-predictive probabilities weighted by the current posterior model belief from BMR; it rejects missing, duplicate, or unknown model IDs, per-model predictive distributions that do not normalize, and caller-supplied aggregate probabilities that disagree with the reconstructed mixture.",
     "The known-ball-state feedback-only Dirichlet EIG fixture must not be reported as full POMDP reproduction. Full partial-observation qualification requires action/outcome-conditioned parent-state posterior expectations and a declared, provenance-bound sufficient-statistic update convention; a shared known-state count increment is insufficient.",
     "The known-state feedback action scorer is evaluated separately from the full partially observed task. It must reproduce G(a)=KL[Q(feedback|a,D)||C(feedback)]-lambda_info*I(model;feedback|a,D)+action_cost under a fixed known ball-colour state and fixed gaze, with the three-ball feedback log preferences [0,2,-6] nats in no-feedback/correct/incorrect order.",
-    "The known-state action score is compared against random, pragmatic-only (lambda_info=0), model-EIG-only, and combined one-step FEP-style baselines under the same legal action set and cost; preference risk, model EIG, epistemic weight, and action cost are reported separately. This is not evidence of full POMDP performance or production ActiveInferenceAgent integration."
+    "The known-state action score is compared against random, pragmatic-only (lambda_info=0), model-EIG-only, and combined one-step FEP-style baselines under the same legal action set and cost; preference risk, model EIG, epistemic weight, and action cost are reported separately. This is not evidence of full POMDP performance or production ActiveInferenceAgent integration.",
+    "The three-ball source-reproduction profile must use the pinned SPM globally normalized prior over all Dirichlet tensor entries, not independent per-column arithmetic normalization.",
+    "The three-ball source-reproduction profile must apply the pinned SPM 1/32 pseudocount to every posterior, full-prior, and reduced-prior coordinate in Dirichlet model evidence; strict structural-zero BMR is registered as a separate ablation.",
+    "The BMR reference test must reproduce spm_MDP_log_evidence with first-dimension multivariate-beta columns and source-pinned SPM revision metadata; the source digest and formula must be recorded in the experiment receipt."
   ],
   "research_references": [
     {
