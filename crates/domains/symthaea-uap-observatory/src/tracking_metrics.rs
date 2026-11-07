@@ -275,12 +275,14 @@ mod tests {
             alpha: 2.0,
         };
         let truth = [p(0.0, 0.0, 0.0), p(10.0, 0.0, 0.0)];
-        let estimate = [p(4.0, 0.0, 0.0), p(-3.0, 0.0, 0.0)];
+        // Greedy nearest-neighbour assignment takes 0->4 first and leaves
+        // 10->-5 (cost 241); the global optimum is 0->-5 and 10->4 (cost 61).
+        let estimate = [p(4.0, 0.0, 0.0), p(-5.0, 0.0, 0.0)];
         let forward = gospa_frame(&truth, &estimate, config).unwrap();
         let reversed = gospa_frame(&truth, &estimate.iter().copied().rev().collect::<Vec<_>>(), config).unwrap();
         assert!((forward.distance_m - reversed.distance_m).abs() < 1.0e-12);
         assert_eq!(forward.matched_targets, 2);
-        assert!((forward.localization_cost_m_p - 25.0).abs() < 1.0e-12);
+        assert!((forward.localization_cost_m_p - 61.0).abs() < 1.0e-12);
     }
 
     #[test]
