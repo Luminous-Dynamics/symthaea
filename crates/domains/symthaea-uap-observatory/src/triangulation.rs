@@ -36,7 +36,11 @@ pub struct Vector3 {
 }
 
 impl Vector3 {
-    pub const ZERO: Self = Self { x: 0.0, y: 0.0, z: 0.0 };
+    pub const ZERO: Self = Self {
+        x: 0.0,
+        y: 0.0,
+        z: 0.0,
+    };
 
     pub fn new(x: f64, y: f64, z: f64) -> Self {
         Self { x, y, z }
@@ -93,10 +97,7 @@ impl Quaternion {
     };
 
     pub fn normalized(self) -> Result<Self, TriangulationError> {
-        if !self.w.is_finite()
-            || !self.x.is_finite()
-            || !self.y.is_finite()
-            || !self.z.is_finite()
+        if !self.w.is_finite() || !self.x.is_finite() || !self.y.is_finite() || !self.z.is_finite()
         {
             return Err(TriangulationError::InvalidQuaternion);
         }
@@ -187,8 +188,7 @@ impl RayObservation {
             cos_elevation * azimuth.sin(),
             elevation.sin(),
         );
-        let azimuth_tangent_body =
-            Vector3::new(-azimuth.sin(), azimuth.cos(), 0.0);
+        let azimuth_tangent_body = Vector3::new(-azimuth.sin(), azimuth.cos(), 0.0);
         let elevation_tangent_body = Vector3::new(
             -elevation.sin() * azimuth.cos(),
             -elevation.sin() * azimuth.sin(),
@@ -196,12 +196,8 @@ impl RayObservation {
         );
 
         let direction = self.sensor_to_ecef.rotate_vector(direction_body)?;
-        let tangent_azimuth = self
-            .sensor_to_ecef
-            .rotate_vector(azimuth_tangent_body)?;
-        let tangent_elevation = self
-            .sensor_to_ecef
-            .rotate_vector(elevation_tangent_body)?;
+        let tangent_azimuth = self.sensor_to_ecef.rotate_vector(azimuth_tangent_body)?;
+        let tangent_elevation = self.sensor_to_ecef.rotate_vector(elevation_tangent_body)?;
 
         Ok(PreparedRay {
             sensor_id: self.sensor_id.clone(),
@@ -313,11 +309,17 @@ impl fmt::Display for TriangulationError {
             }
             Self::EmptySensorId => write!(f, "sensor id must not be empty"),
             Self::DuplicateSensorId(id) => write!(f, "sensor id {id} appears more than once"),
-            Self::DuplicateCandidateId(id) => write!(f, "candidate sensor id {id} is duplicated or already observed"),
+            Self::DuplicateCandidateId(id) => write!(
+                f,
+                "candidate sensor id {id} is duplicated or already observed"
+            ),
             Self::NonFiniteVector => write!(f, "sensor ECEF origin is not finite"),
             Self::NonFiniteAngle => write!(f, "bearing angle is not finite"),
             Self::InvalidAngularUncertainty => {
-                write!(f, "one-sigma angular uncertainty must be finite and positive")
+                write!(
+                    f,
+                    "one-sigma angular uncertainty must be finite and positive"
+                )
             }
             Self::ElevationOutOfBounds => {
                 write!(f, "elevation must lie between -pi/2 and +pi/2")
@@ -391,10 +393,7 @@ pub fn triangulate_bearings_with_config(
     }
 
     let (initial_normal, initial_rhs) = line_intersection_normal_equations(&rays);
-    let initial_inverse = invert_well_conditioned(
-        initial_normal,
-        config.max_condition_number,
-    )?;
+    let initial_inverse = invert_well_conditioned(initial_normal, config.max_condition_number)?;
     let mut position = matrix_vector(initial_inverse, initial_rhs);
 
     let mut converged = false;
@@ -417,8 +416,7 @@ pub fn triangulate_bearings_with_config(
         return Err(TriangulationError::NonConvergence);
     }
 
-    let (normal, _, chi_square, sum_residual_squared) =
-        angular_normal_equations(&rays, position)?;
+    let (normal, _, chi_square, sum_residual_squared) = angular_normal_equations(&rays, position)?;
     let covariance = invert_well_conditioned(normal, config.max_condition_number)?;
     let condition_number = symmetric_condition_number(normal)?;
     let degrees_of_freedom = 2 * rays.len() - 3;
@@ -506,9 +504,7 @@ pub fn rank_sensor_placements(
         let covariance_lower_bound = invert_well_conditioned(information, 1.0e14)?;
         let determinant = determinant3(information);
         if !determinant.is_finite() || determinant <= 0.0 {
-            return Err(TriangulationError::ParallelOrIllConditioned {
-                condition_number,
-            });
+            return Err(TriangulationError::ParallelOrIllConditioned { condition_number });
         }
         let log_determinant_information = determinant.ln();
         let a_optimal_variance_sum_m2 = covariance_lower_bound[0][0]
@@ -589,8 +585,7 @@ fn angular_information_matrix(
         if displacement.dot(ray.direction) <= 0.0 {
             return Err(TriangulationError::BehindSensor(ray.sensor_id.clone()));
         }
-        let jacobian_azimuth =
-            ray.tangent_azimuth.scale(1.0 / (range * ray.cos_elevation));
+        let jacobian_azimuth = ray.tangent_azimuth.scale(1.0 / (range * ray.cos_elevation));
         let jacobian_elevation = ray.tangent_elevation.scale(1.0 / range);
         matrix_add_outer(
             &mut normal,
@@ -651,12 +646,9 @@ fn angular_normal_equations(
             return Err(TriangulationError::BehindSensor(ray.sensor_id.clone()));
         }
 
-        let residual_azimuth =
-            displacement.dot(ray.tangent_azimuth) / (range * ray.cos_elevation);
-        let residual_elevation =
-            displacement.dot(ray.tangent_elevation) / range;
-        let jacobian_azimuth =
-            ray.tangent_azimuth.scale(1.0 / (range * ray.cos_elevation));
+        let residual_azimuth = displacement.dot(ray.tangent_azimuth) / (range * ray.cos_elevation);
+        let residual_elevation = displacement.dot(ray.tangent_elevation) / range;
+        let jacobian_azimuth = ray.tangent_azimuth.scale(1.0 / (range * ray.cos_elevation));
         let jacobian_elevation = ray.tangent_elevation.scale(1.0 / range);
         let weight_azimuth = 1.0 / ray.sigma_azimuth.powi(2);
         let weight_elevation = 1.0 / ray.sigma_elevation.powi(2);
@@ -708,12 +700,7 @@ fn matrix_add_assign(target: &mut Matrix3, addend: Matrix3) {
     }
 }
 
-fn matrix_add_outer(
-    target: &mut Matrix3,
-    left: Vector3,
-    right: Vector3,
-    weight: f64,
-) {
+fn matrix_add_outer(target: &mut Matrix3, left: Vector3, right: Vector3, weight: f64) {
     let left_values = [left.x, left.y, left.z];
     let right_values = [right.x, right.y, right.z];
     for row in 0..3 {
@@ -798,11 +785,7 @@ fn symmetric_condition_number(matrix: Matrix3) -> Result<f64, TriangulationError
         diagonalized[q][p] = 0.0;
     }
 
-    let eigenvalues = [
-        diagonalized[0][0],
-        diagonalized[1][1],
-        diagonalized[2][2],
-    ];
+    let eigenvalues = [diagonalized[0][0], diagonalized[1][1], diagonalized[2][2]];
     let maximum = eigenvalues.iter().copied().fold(0.0_f64, f64::max);
     let minimum = eigenvalues.iter().copied().fold(f64::INFINITY, f64::min);
     if !maximum.is_finite() || !minimum.is_finite() || minimum <= 0.0 {
@@ -950,7 +933,13 @@ mod tests {
         observations[3].elevation_rad += 1.2e-5;
         let result = triangulate_bearings(&observations).unwrap();
         assert!(result.position_ecef_m.subtract(target).norm() < 0.2);
-        assert!(result.covariance_ecef_m2.iter().flatten().all(|value| value.is_finite()));
+        assert!(
+            result
+                .covariance_ecef_m2
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
         assert!(result.residual_chi_square > 0.0);
         assert!(result.rms_angular_residual_rad < 1.0e-8);
         assert!(result.condition_number < 1.0e10);
@@ -1003,7 +992,11 @@ mod tests {
         assert!(ranking.iter().all(|score| {
             score.condition_number.is_finite()
                 && score.a_optimal_variance_sum_m2.is_finite()
-                && score.covariance_lower_bound_m2.iter().flatten().all(|v| v.is_finite())
+                && score
+                    .covariance_lower_bound_m2
+                    .iter()
+                    .flatten()
+                    .all(|v| v.is_finite())
         }));
     }
 
@@ -1023,7 +1016,9 @@ mod tests {
         };
         assert_eq!(
             rank_sensor_placements(&existing, target, &[candidate]),
-            Err(TriangulationError::DuplicateCandidateId("north".to_string()))
+            Err(TriangulationError::DuplicateCandidateId(
+                "north".to_string()
+            ))
         );
     }
 
