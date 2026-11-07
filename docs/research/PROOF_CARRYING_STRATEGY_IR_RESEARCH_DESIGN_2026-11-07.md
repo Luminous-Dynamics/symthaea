@@ -383,3 +383,23 @@ Evaluation should optimize a multi-objective tuple rather than a single benchmar
 8. robust performance on held-out quantifier patterns and application families.
 
 A small certificate is valuable only if the original strategy is sound and the compiled object is independently checkable.
+
+
+## 17. Frontier-aware interaction ordering and multi-start strategy compilation
+
+The BDD optimizer now uses the exact pairwise Boolean interaction graph of each support-minimized strategy function. Its edges are computed from mixed Boolean derivatives over all assignments of the other support variables. This is deliberately distinct from the semantic QBF dependency scope.
+
+A deterministic min-fill order seeds a bounded insertion refinement. Its score is lexicographic in maximum frontier, total frontier mass and the full frontier profile. Since refinement accepts only score improvements, the maximum frontier is guaranteed not to exceed the min-fill seed's maximum. Natural, reverse, min-fill, reverse min-fill, frontier-refined and reverse frontier-refined starts are deduplicated and passed through a globally budgeted sifting search.
+
+This adds a structure-aware layer without making the structural graph a proof object. The acceptance path remains:
+1. validate the source QBF strategy against the original matrix and ordered prefix;
+2. remove only semantically inessential function dependencies and verify equivalence;
+3. build and optimize an ROBDD under an explicit variable order;
+4. verify the BDD's structural canonicality and every function row;
+5. retain exact small-scope permutation search as the optimal-order oracle.
+
+The recent frontier-aware OBDD study reports strong pathwidth/frontier results for CNF compilation. We adapt its structural principle to strategy functions, but the CNF theorem and measured gains do not transfer automatically. Our empirical question is whether pairwise strategy interaction plus frontier refinement predicts smaller verified strategy BDDs on held-out QBF application functions.
+
+The higher-order limitation is important: pairwise mixed derivatives can reveal pairwise interactions induced by higher-order monomials, but a graph cannot encode the full Boolean interaction hypergraph. Future experiments should compare graph seeds against interaction hypergraphs, hypergraph partitioning, FORCE-like placement, clause/gate order where available, and counterexample-guided order selection.
+
+A separate strategic direction is proof-derived synthesis. The 2026 SAT paper *Proof Systems for QBF Synthesis* provides a sound and complete QBF proof system from which Skolem/Herbrand functions and intermediate game values can be extracted in polynomial time. Symthaea's exhaustive engine should remain the finite oracle; a future adapter should target a proof system with explicit derivation/checking semantics rather than scaling recursive expansion. See https://doi.org/10.4230/LIPIcs.SAT.2026.3.
