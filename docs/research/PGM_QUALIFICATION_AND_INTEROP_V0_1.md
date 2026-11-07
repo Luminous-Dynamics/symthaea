@@ -642,7 +642,9 @@ Its result labels distinguish:
 - converged loopy BP (approximate);
 - iteration exhaustion (not converged).
 
-The 11 authored tests include direct exhaustive comparison on two- and three-variable trees, zero-support contradiction, malformed input, extreme repeated likelihood dynamic range, schedule comparison, forest/loopy labeling, and damped / unconverged status checks. Rust compile/test and exact-head CI remain unverified; draft workflows are not passes.
+The checked result returns normalized `log_beliefs` alongside exponentiated probability vectors, preserving finite log mass when a probability underflows to f64 zero. Convergence now checks both probability-space residual and maximum log-message change / support transitions. The extreme-range regression deliberately drives an ordinary posterior probability below f64 representability while verifying the finite normalized log posterior remains available.
+
+The 13 authored tests include direct exhaustive comparison on two- and three-variable trees, zero-support contradiction, malformed input, extreme repeated likelihood dynamic range, schedule comparison, forest/loopy labeling, and damped / unconverged status checks. Rust compile/test and exact-head CI remain unverified; draft workflows are not passes.
 
 Two separate issues now track the remaining legacy semantic defects:
 - https://github.com/Luminous-Dynamics/symthaea/issues/10940 — joint MAP traceback and truthful assignment score. Per-variable max-marginal argmax is not a global MAP assignment.
@@ -654,3 +656,6 @@ These are intentionally not folded into the checked sum-product PR.
 ### Checked BP follow-up test expansion
 
 The checked BP PR now authors 13 tests, including stale/corrupted cached-message rejection (the checked path rebuilds messages) and invalid zero-iteration configuration. The latest source commit is tracked on draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10939. Rust compilation remains unverified in this environment.
+
+
+The query-aware algorithm-portfolio/compiler follow-up is tracked in https://github.com/Luminous-Dynamics/symthaea/issues/10943.
