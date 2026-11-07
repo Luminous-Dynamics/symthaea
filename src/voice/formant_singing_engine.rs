@@ -12,7 +12,7 @@ use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
 use super::singing_engine::{
     CapabilitySupport, ControlCapability, ExpressionPoint, SingingBackendCapabilities,
-    SingingControl, SingingVoiceEngine, VocalPerformance, VocalStem,
+    SingingControl, SingingRenderPolicy, SingingVoiceEngine, VocalPerformance, VocalStem,
 };
 use super::vocoder::{FormantVocoder, VocoderConfig};
 
