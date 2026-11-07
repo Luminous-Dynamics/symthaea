@@ -59,13 +59,15 @@ Existing components:
   with nearest-neighbour ZZ interactions, longitudinal fields and a global X
   pulse. Its example compares interacting and noninteracting traces.
 
-Known limitation:
+Known limitation of the original scalar surrogate:
 - It is not a quantum many-body Hamiltonian simulator.
 - Its seeded alternating state and near-deterministic flip make period-two
   output easy to obtain by construction.
-- Its score does not yet establish spontaneous discrete time-translation
-  symmetry breaking, stability over a phase diagram, prethermal lifetime, or
-  resilience to generic perturbations.
+- Its score does not establish spontaneous discrete time-translation symmetry
+  breaking, stability over a phase diagram, prethermal lifetime or resilience
+  to generic perturbations.
+- The new exact state-vector oracle is a small-system reference, not a
+  many-body thermodynamic-limit solver or a DTC phase demonstration.
 - Its current semantic-stream adapter uses a single zero null score and one
   dimension at a time; this is not a suitable inferential design.
 
@@ -280,7 +282,6 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-02 | Causal-set scaling | Multi-N, multi-seed finite-size study | Error bars, convergence and null controls |
 | CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals (prototype added) | Rust tests + independent volume, distribution and boost checks |
 | CTGP-04 | Chain Theory reproduction | Independent std-only record enumerator and radical-sum audit (prototype added) | Per-record CSV match + Lean 4.35.0/axiom audit |
-
 | CTGP-05 | Chain Theory stress tests | Alternative choices, uniqueness and sensitivity analysis | All assumptions enumerated; blind alternatives |
 | CTGP-06 | Quantum DTC simulator | Floquet Ising and anisotropic Heisenberg reference systems | Exact diagonalization agreement on small systems |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
@@ -310,11 +311,6 @@ between competing hypotheses, not simply to the most complex simulation.
     O(N²) brute-force oracle through at least N=2,048; then target N=10^5 and
     N=10^6 for throughput and peak-memory measurements. Performance targets
     are not claims until measured on a named machine, exact commit and seed.
-8. **1+1D algorithmic scaling:** compare O(N log N) observables with an
-   O(N²) brute-force oracle through at least N=2,048; then target N=10⁵ and
-   N=10⁶ for throughput and peak-memory measurements. Performance targets
-   are not claims until measured on a named machine, exact commit and input
-   seed.
 
 ### Time crystals
 
