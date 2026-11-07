@@ -474,3 +474,52 @@ These finite experiments establish exact graph construction on three-input funct
 | Correctness | Exhaustive BDD equivalence and original QBF strategy acceptance |
 
 No claim of dominance is warranted unless the frontier seed reduces verified BDD node count on held-out, application-derived strategy functions at matched memory and time budgets.
+
+
+## 15. Exact #SAT proof logging — CPOG as a unifying candidate
+
+Exact #SAT proof logging is a separate evaluation lane from QBF strategy synthesis and #QBF strategy counting.
+
+### Current proof-complexity baseline
+
+Beyersdorff, Fichte, Hecher, Hoffmann and Kasche, *The Relative Strength of #SAT Proof Systems* (Journal of Automated Reasoning 70(2), article 12, published 20 July 2026; DOI 10.1007/s10817-026-09757-w), determines the simulation order among:
+- **kcps** — knowledge compilation proof system;
+- **MICE** — model-counting induction by claim extension;
+- **CPOG** — certified partitioned-operation graphs;
+- **CLIP** — circuit-linear introduction proposition, a stronger theoretical proof system.
+
+The paper establishes that CPOG polynomially simulates both MICE and kcps, while MICE and kcps are exponentially incomparable. CLIP simulates all three, but is primarily a theoretical strength baseline. The paper motivates CPOG as a plausible unified proof-logging target for #SAT solving approaches. These are proof-system simulation/size results, not evidence that a particular CPOG implementation will be faster or smaller on every benchmark.
+
+Sources:
+- https://doi.org/10.1007/s10817-026-09757-w
+- https://pmc.ncbi.nlm.nih.gov/articles/PMC13385077/
+
+### Symthaea comparison protocol
+
+Keep these claims distinct:
+1. exact #SAT result (count of satisfying assignments);
+2. proof object accepted by an independent CPOG checker;
+3. proof-system simulation/certification of another proof format;
+4. projected #SAT (support union, not arithmetic sum);
+5. weighted/algebraic counting (requires its own coefficient/aggregation contract);
+6. #QBF (counts winning Skolem functions), which is not #SAT.
+
+Compare:
+- direct enumeration and current exact decomposition reference;
+- pinned external exact #SAT solvers in count-only mode;
+- proof-emitting modes of compatible systems (kcps, MICE, CPOG);
+- translation from MICE/kcps into CPOG where the formal simulation is implemented;
+- CLIP as a theoretical proof-size reference unless a practical implementation exists.
+
+At matched source instances and compute limits, report exact count agreement, solved instances, proof size/bytes, generation time, independent checker time/bytes, peak memory, aggregation/decomposition structure, free-variable multiplicity preservation and worst-family performance.
+
+### Promotion gates
+
+- The complete CPOG formal rules and supported artifact/version must be pinned.
+- Independent proof checking must validate each implemented rule and the exact original CNF/variable universe.
+- No count is accepted from producer-supplied values/acceptance flags alone.
+- Direct enumeration differential tests cover every supported finite fixture.
+- Negative controls include omitted free variables, overlapping components, incomplete branches, incorrect sum/product/support union, stale source identity, invalid proof nodes and overflow.
+- No solver-performance claim until a pinned external corpus and matched proof/count interfaces are benchmarked.
+
+The CPOG workstream is tracked separately in #11036. It must reuse #10868/#10899/#10884/#10887/#10805 rather than introduce a second proof/result/receipt contract.
