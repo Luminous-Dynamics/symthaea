@@ -609,9 +609,7 @@ fn validate_formal_required_fields(value: &Value) -> Result<(), FormalMappingErr
                 "authority",
                 "reason",
             ],
-            &format!(
-                "formal envelope.rea_evaluation.evidence_assessments[{index}]"
-            ),
+            &format!("formal envelope.rea_evaluation.evidence_assessments[{index}]"),
         )?;
     }
     Ok(())
