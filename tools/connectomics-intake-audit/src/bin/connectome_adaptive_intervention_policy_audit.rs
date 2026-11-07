@@ -1018,6 +1018,21 @@ mod tests {
     }
 
     #[test]
+    fn policy_depth_above_available_action_count_is_rejected() {
+        let mut value: Value = serde_json::from_str(ADAPTIVE).unwrap();
+        let action_count = value["actions"].as_array().unwrap().len();
+        value["search_limits"]["max_policy_depth"] = json!(action_count + 1);
+        let raw = serde_json::to_vec(&value).unwrap();
+        assert!(run(&raw).unwrap_err().contains("max_policy_depth"));
+    }
+
+    #[test]
+    fn policy_depth_equal_to_action_count_is_valid() {
+        let report = check_fixture(ADAPTIVE);
+        assert_eq!(report["adaptive_status"], "EXACT_POLICY");
+    }
+
+    #[test]
     fn exhausted_memo_state_budget_returns_incomplete_not_exact() {
         let mut value: Value = serde_json::from_str(ADAPTIVE).unwrap();
         value["search_limits"]["max_memo_states"] = json!(1);
