@@ -530,14 +530,14 @@ mod tests {
     }
 
     fn dense_floquet_step_reference(
+        initial: &[Complex<f64>],
         n_spins: usize,
         edges: &[HeisenbergEdge],
         fields: &[f64],
         pulse_angle: f64,
     ) -> Vec<Complex<f64>> {
-        let mut initial = vec![Complex::new(0.0, 0.0); 1_usize << n_spins];
-        initial[0] = Complex::new(1.0, 0.0);
-        let after_pulse = dense_x_pulse(&initial, n_spins, pulse_angle);
+        assert_eq!(initial.len(), 1_usize << n_spins);
+        let after_pulse = dense_x_pulse(initial, n_spins, pulse_angle);
         dense_exact_interaction_exponential(&after_pulse, n_spins, edges, fields)
     }
 
@@ -722,7 +722,22 @@ mod tests {
         ];
         let fields = vec![0.03, -0.04, 0.02];
         let pulse_angle = 0.41;
-        let reference = dense_floquet_step_reference(3, &edges, &fields, pulse_angle);
+        let mut initial = vec![
+            Complex::new(1.0, 0.0),
+            Complex::new(0.5, -0.5),
+            Complex::new(-0.25, 0.75),
+            Complex::new(0.0, 1.0),
+            Complex::new(0.2, -0.3),
+            Complex::new(-0.6, 0.1),
+            Complex::new(0.4, 0.2),
+            Complex::new(0.1, 0.9),
+        ];
+        let initial_norm = initial.iter().map(|amplitude| amplitude.norm_sqr()).sum::<f64>().sqrt();
+        for amplitude in &mut initial {
+            *amplitude /= initial_norm;
+        }
+        let reference =
+            dense_floquet_step_reference(&initial, 3, &edges, &fields, pulse_angle);
 
         let mut errors = Vec::new();
         for slices in [1, 2, 4, 8, 16] {
@@ -734,6 +749,7 @@ mod tests {
                 slices,
             )
             .unwrap();
+            candidate.set_initial_state(&initial).unwrap();
             candidate.step();
             let error = candidate
                 .amplitudes()
