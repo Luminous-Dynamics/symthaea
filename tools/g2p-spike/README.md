@@ -9,7 +9,7 @@ cargo run --manifest-path tools/g2p-spike/Cargo.toml
 cargo test --manifest-path tools/g2p-spike/Cargo.toml
 ```
 
-The output is a tab-separated diagnostic table containing case ID, input text, IPA token debug output, and prosody debug output. It is intended to be compared with the current Muse G2P output and, ultimately, independent human-reviewed phonetic references.
+The output is a tab-separated diagnostic table containing case ID, input text, Piper Plus IPA tokens, current Muse IPA tokens, and Piper Plus prosody debug output. Both frontends receive the same fixture text. Muse is given one synthetic note per syllable so the existing singing bridge exposes its current per-syllable phone sequence. This makes the baseline comparison executable, while the human-reviewed reference remains a separate source of truth.
 
 ## Why this candidate
 
@@ -20,7 +20,7 @@ That is a useful implementation candidate, not evidence of pronunciation quality
 ## Evaluation protocol
 
 For each text case, compare:
-1. current Muse output;
+1. the current Muse output produced by `symthaea_muse::singing_bridge`;
 2. Piper Plus IPA and prosody output;
 3. independently reviewed reference phones and syllable boundaries.
 
