@@ -315,7 +315,7 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 8. RSIBench-Data: https://arxiv.org/abs/2607.25886
 9. EvalResearchBench: https://arxiv.org/abs/2610.04184
 10. RSI evidence census: https://arxiv.org/abs/2610.27610
-11. METR research productivity coverage (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
+11. METR research productivity assessment (2026-11-05): https://metr.org/blog/2026-11-05-anthropic-ai-rd-acceleration-assessment/
 12. RSIGym project and methodology: https://rsi-index.ai/ and https://github.com/evolvent-ai/RSIGym
 13. RSI-Forge: https://arxiv.org/abs/2610.09426
 14. Harness²: https://arxiv.org/abs/2610.14224
