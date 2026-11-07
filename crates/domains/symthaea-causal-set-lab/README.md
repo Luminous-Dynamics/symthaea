@@ -61,6 +61,7 @@ dimension oracle for arbitrary graphs.
 ```bash
 cargo test -p symthaea-causal-set-lab
 cargo run -p symthaea-causal-set-lab --example minkowski_1p1
+cargo run -p symthaea-causal-set-lab --example interval_histogram_benchmark
 ```
 
 No benchmark result should be promoted to a scientific claim unless the
@@ -90,3 +91,20 @@ This example reports ordering fractions, dimension estimates and longest-chain
 lengths for fixed-seed samples in all three dimensions. It is a kinematics
 benchmark only: no curved-spacetime reconstruction, causal-set action,
 d'Alembertian, quantum measure or continuum dynamics is implemented.
+
+## Interval-abundance algorithm comparison
+
+The 1+1D exact histogram uses persistent prefix segment trees over compressed
+null coordinates. A rectangle cardinality query is O(log N), so enumerating
+all related endpoint pairs gives O(N^2 log N) time and O(N log N) memory.
+
+The generic dimension-independent bitset implementation remains available as
+`interval_size_histogram_bitset_reference`. It uses O(N^2) bits and
+O(R ceil(N/64)) interval-intersection work, where R is the number of related
+pairs. Run the deterministic exact comparison:
+
+    cargo run --locked -p symthaea-causal-set-lab --example interval_histogram_benchmark
+
+The example verifies exact histogram equality before printing single-process
+timings. Timings are diagnostic only; publish machine/compiler details and
+repeat trials before making performance claims.
