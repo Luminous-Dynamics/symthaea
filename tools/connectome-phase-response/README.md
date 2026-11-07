@@ -12,7 +12,9 @@ For sender leg j, recipient leg i, perturbation phase phi, perturbation class u,
 
 `G[i,j](phi,u,c,tau) = wrap(theta_i_perturbed(t0+tau) - theta_i_matched_control(t0+tau))`
 
-Phase is stored as signed integer microturns, with 1,000,000 units per cycle and canonical range [-500,000, 500,000). This avoids floating point in phase wrapping and synthetic known answers. It is a quantized phase representation; source phase-estimator uncertainty must be carried by any biological adapter.
+Each phase sample stores an integer cycle index and a signed fractional phase in microturns, with 1,000,000 units per cycle and canonical fractional range [-500,000, 500,000). This avoids floating point in phase wrapping and preserves whole-cycle advances/delays that modulo-only phase would alias to zero. It is a quantized phase representation; source phase-estimator uncertainty must be carried by any biological adapter.
+
+The output keeps two separate vectors: wrapped fractional phase displacement and integer cycle slips. They are never collapsed into one scalar.
 
 A measured row has paired six-leg control and perturbed phases. The output vector preserves canonical axis order:
 1. left foreleg
