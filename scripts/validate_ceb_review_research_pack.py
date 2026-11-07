@@ -103,10 +103,6 @@ def validate_documents(
         "https://arxiv.org/abs/2610.13668",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
-        "https://www.codereviewbenchmark.com/",
-        "https://www.codereviewbenchmark.com/",
-        "https://www.codereviewbench.com/leaderboard",
-        "https://www.codereviewbenchmark.com/",
     ):
         if url not in triangulation:
             errors.append(f"triangulation document is missing source URL {url}")
@@ -183,10 +179,6 @@ def validate_documents(
         errors.append("triangulation must distinguish Martian production adoption")
     if "acceptance is not proof of correctness" not in triangulation.lower():
         errors.append("triangulation must not equate production uptake with factual correctness")
-    if "Martian production review adoption" not in triangulation:
-        errors.append("triangulation must distinguish Martian production adoption from correctness")
-    if "adoption is not proof of correctness" not in triangulation.lower():
-        errors.append("triangulation must state that adoption is not proof of correctness")
     if "Gold-Completeness and Open-Set Discovery" not in triangulation:
         errors.append("triangulation must link the gold-completeness protocol")
     if "Sequential Evidence Acquisition" not in triangulation:
@@ -306,6 +298,7 @@ def self_test() -> list[str]:
         "https://arxiv.org/abs/2611.02566",
         "https://arxiv.org/abs/2610.13668",
         "https://www.codereviewbench.com/leaderboard",
+        "https://www.codereviewbenchmark.com/",
         "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane",
         "candidate-specific and appears in both numerator and denominator",
         "CodeReviewBench human-flagged bug recall",
