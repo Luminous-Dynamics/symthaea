@@ -90,7 +90,8 @@ pub struct ThreeBallSequentialTrialReceipt {
     pub true_semantic_class_posterior_after: f64,
     pub winning_semantic_class_one_based_index_after: usize,
     pub winning_semantic_class_posterior_after: f64,
-    pub winning_model_log_odds_after_nats: f64,
+    /// None represents +infinity when the winning semantic class has posterior 1.
+    pub winning_model_log_odds_after_nats: Option<f64>,
     pub cumulative_reward: i64,
     pub preferences_restored: bool,
     pub committed_after_trial: bool,
@@ -217,7 +218,7 @@ pub fn run_three_ball_sequential_discovery(
         let model_entropy_before = entropy(&model_posterior_before);
         let (_, max_probability_before) = winning_semantic_class(&model_posterior_before)?;
         preferences_restored |=
-            log_odds(max_probability_before) > config.commitment_log_odds_threshold_nats;
+            exceeds_log_odds_threshold(max_probability_before, config.commitment_log_odds_threshold_nats);
 
         let mut trial_policy = config.policy;
         trial_policy.feedback_log_preferences_nats = if preferences_restored {
@@ -273,9 +274,11 @@ pub fn run_three_ball_sequential_discovery(
             .ok_or(ThreeBallSequentialDiscoveryError::TrueRuleMissingFromModelFamily)?;
         let (winning_rule, winning_probability) =
             winning_semantic_class(&model_posterior_after)?;
-        let winning_log_odds = log_odds(winning_probability);
-        let committed_after_trial =
-            winning_log_odds > config.commitment_log_odds_threshold_nats;
+        let winning_log_odds = finite_log_odds(winning_probability);
+        let committed_after_trial = exceeds_log_odds_threshold(
+            winning_probability,
+            config.commitment_log_odds_threshold_nats,
+        );
         let correct_commitment_after_trial = committed_after_trial
             && winning_rule == true_semantic_class_one_based_index;
 
@@ -432,14 +435,19 @@ fn entropy(posterior: &BTreeMap<usize, f64>) -> f64 {
         .sum()
 }
 
-fn log_odds(probability: f64) -> f64 {
-    if probability <= 0.0 {
-        f64::NEG_INFINITY
-    } else if probability >= 1.0 {
-        f64::INFINITY
+fn finite_log_odds(probability: f64) -> Option<f64> {
+    if probability >= 1.0 {
+        None
+    } else if probability <= 0.0 {
+        Some(f64::NEG_INFINITY)
     } else {
-        (probability / (1.0 - probability)).ln()
+        Some((probability / (1.0 - probability)).ln())
     }
+}
+
+fn exceeds_log_odds_threshold(probability: f64, threshold: f64) -> bool {
+    probability >= 1.0
+        || finite_log_odds(probability).is_some_and(|log_odds| log_odds > threshold)
 }
 
 fn colour_from_index(index: usize) -> ThreeBallColour {
@@ -527,8 +535,11 @@ mod tests {
                 )
             })
         }));
+        // A particular observation can increase posterior entropy; only
+        // the policy's expected entropy change is constrained by mutual information.
         assert!(result.trial_receipts.iter().all(|trial| {
-            trial.model_entropy_after_nats <= trial.model_entropy_before_nats + 1e-9
+            trial.model_entropy_before_nats.is_finite()
+                && trial.model_entropy_after_nats.is_finite()
         }));
         assert!(result.final_model_entropy_nats.is_finite());
     }
