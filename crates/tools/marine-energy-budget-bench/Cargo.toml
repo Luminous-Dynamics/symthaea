@@ -1,0 +1,13 @@
+[package]
+name = "marine-energy-budget-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent mission-equivalent marine input-energy and uncertainty verifier"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
