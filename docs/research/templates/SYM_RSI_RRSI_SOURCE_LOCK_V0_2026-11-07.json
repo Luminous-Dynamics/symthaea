@@ -179,5 +179,18 @@
     "Policy-token reduction is not total-cost reduction unless proposer, critic, target inference, evaluation, retries and human work are counted.",
     "A regularized harness win is a product/harness result, not R4 unless the improved procedure itself is inherited and improves later optimization.",
     "All source, environment, task, oracle and baseline digests remain unacquired placeholders."
+  ],
+  "reported_source_discrepancies": [
+    {
+      "metric": "maximum_ood_improvement_in_paper",
+      "paper_abstract_claim_points": 4.3,
+      "detailed_table_jobbench_points": 4.7,
+      "public_repository_readme_jobbench_points": 4.7,
+      "handling": "Preserve as a source-level discrepancy. The reproduction ledger must report every named OOD benchmark individually and must not quote one maximum without naming whether it came from the abstract or detailed table/README.",
+      "sources": [
+        "https://arxiv.org/abs/2609.24972v3",
+        "https://github.com/google-research/rrsi"
+      ]
+    }
   ]
 }
