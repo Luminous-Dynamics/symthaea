@@ -46,10 +46,11 @@ A biological row must bind the exact source revision/materialization, animal/ses
 Each phase sample preserves an integer cycle index and a signed fractional phase in microturns:
 - one cycle = 1,000,000 microturns;
 - canonical fractional interval = [-500,000, 500,000);
-- wrapped reset = fractional perturbed phase minus fractional matched-control phase;
-- cycle slip = perturbed cycle index minus matched-control cycle index.
+- unwrapped delta = (perturbed cycle index - control cycle index) × 1,000,000 + (perturbed fractional phase - control fractional phase);
+- wrapped reset = wrapped fractional perturbed phase minus fractional matched-control phase;
+- cycle slip = (unwrapped delta - wrapped reset) / 1,000,000.
 
-A full-cycle advance can therefore have zero wrapped phase reset but a cycle slip of +1. The two quantities remain separate and are never collapsed into one scalar.
+A full-cycle advance can therefore have zero wrapped phase reset but a cycle slip of +1. A small fractional advance across the canonical fractional-phase boundary is not a cycle slip. The two quantities remain separate and are never collapsed into one scalar.
 
 The canonical six-leg axis is left fore, left middle, left hind, right fore, right middle, right hind. Any source matrix/annotation ordering must be independently mapped to stable leg IDs before populating this axis.
 
@@ -66,7 +67,7 @@ The standalone no-dependency Rust crate under `tools/connectome-phase-response` 
 - same-steady-state-frequency/PLV versus different-phase-response model signatures;
 - exact circular L1 response separation on identical probe grids.
 
-The response-distance diagnostic is measured in microturns. It is not a probability, likelihood, effect size, causal coefficient or biological model score. Its purpose is to verify that a phase-response design can separate finite synthetic signatures which steady-state-only scoring cannot.
+The response-distance diagnostics are measured in microturns and cycle counts. They are not probabilities, likelihoods, effect sizes, causal coefficients or biological model scores. The crate reports per-probe separation and joint-campaign separation over the concatenated registered probe portfolio, so one phase bin can be blind while multiple probe cells jointly distinguish finite model signatures. This does not prove global identifiability.
 
 ## Model challenge matrix
 
