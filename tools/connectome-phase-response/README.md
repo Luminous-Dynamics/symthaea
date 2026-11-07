@@ -1,0 +1,35 @@
+# Connectome phase-response transfer
+
+Standalone Rust 2024 crate for exact fixed-point circular phase-reset algebra:
+
+`cargo test --manifest-path tools/connectome-phase-response/Cargo.toml --locked`
+
+This crate is deliberately outside the root Cargo workspace. It has no third-party dependencies and does not simulate a fly, estimate a neural mechanism, or authorize physical interventions.
+
+## Measurand
+
+For sender leg j, recipient leg i, perturbation phase phi, perturbation class u, context c and delay tau:
+
+`G[i,j](phi,u,c,tau) = wrap(theta_i_perturbed(t0+tau) - theta_i_matched_control(t0+tau))`
+
+Phase is stored as signed integer microturns, with 1,000,000 units per cycle and canonical range [-500,000, 500,000). This avoids floating point in phase wrapping and synthetic known answers. It is a quantized phase representation; source phase-estimator uncertainty must be carried by any biological adapter.
+
+A measured row has paired six-leg control and perturbed phases. The output vector preserves canonical axis order:
+1. left foreleg
+2. left middle leg
+3. left hindleg
+4. right foreleg
+5. right middle leg
+6. right hindleg
+
+The local reset is the sender-axis component; off-diagonal transfer is the sum of absolute circular phase reset in the other axes. For a global descending input without a single sender leg, all six axes are retained.
+
+## Fail-closed semantics
+
+No response, failed assay, missing track, out-of-support and not-assessed are explicit states. They are not encoded as six zero phase shifts. Probe keys preserve context, perturbation class, sender leg, phase bin and response delay. Duplicate rows, missing grid cells, invalid phase bins and mismatched model probe grids are rejected.
+
+Model-separation diagnostics compare exact circular L1 distances over the same registered probe cells. They are deterministic phase-unit diagnostics, not likelihoods, probabilities, causal effects or biological effect sizes. A positive distance only distinguishes supplied finite model signatures on the supplied design.
+
+## Synthetic limitation
+
+The unit tests demonstrate fixed-point phase arithmetic, local versus off-diagonal indexing, non-response preservation and a synthetic example in which two models share the same mean frequency and steady-state PLV but differ in their perturbation response. No biological input is loaded and no biological mechanism is validated.
