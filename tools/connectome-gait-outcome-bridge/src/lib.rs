@@ -281,8 +281,10 @@ pub struct BridgeReport {
     pub stimulus: Stimulus,
     pub local_rhythm_measured_legs: usize,
     pub local_rhythm_state: CoverageState,
+    pub local_rhythm_coverage: Vec<MetricCoverage>,
     pub per_leg_stepping_measured_legs: usize,
     pub per_leg_stepping_state: CoverageState,
+    pub per_leg_stepping_coverage: Vec<MetricCoverage>,
     pub pairwise_coverage: Vec<MetricCoverage>,
     pub tripod_coverage: Vec<MetricCoverage>,
     pub phase_reset_measured_probe_cells: usize,
@@ -915,6 +917,11 @@ fn grouped_metric_coverage(
         let preprocessing = measurement.preprocessing_sha256.clone();
         let phase_estimator = measurement.phase_estimator_sha256.clone();
         let identity = match endpoint {
+            EndpointKind::LocalJointRhythmicity | EndpointKind::PerLegStepping => {
+                measurement.leg.map(|leg| {
+                    format!("{leg:?}:{}", measurement.channel_id.as_deref().unwrap_or(""))
+                })
+            }
             EndpointKind::PairwiseInterlegCoupling => measurement
                 .pair
                 .map(|pair| format!("{:?}:{:?}", pair.first, pair.second)),
@@ -994,6 +1001,10 @@ pub fn audit_packet(packet: &GaitOutcomePacket) -> Result<BridgeReport, BridgeEr
 
     let local_rhythm_legs = measured_legs(packet, EndpointKind::LocalJointRhythmicity);
     let stepping_legs = measured_legs(packet, EndpointKind::PerLegStepping);
+    let local_rhythm_coverage =
+        grouped_metric_coverage(packet, EndpointKind::LocalJointRhythmicity, LEG_COUNT);
+    let per_leg_stepping_coverage =
+        grouped_metric_coverage(packet, EndpointKind::PerLegStepping, LEG_COUNT);
     let pairwise_coverage =
         grouped_metric_coverage(packet, EndpointKind::PairwiseInterlegCoupling, PAIR_COUNT);
     let tripod_coverage =
@@ -1062,8 +1073,10 @@ pub fn audit_packet(packet: &GaitOutcomePacket) -> Result<BridgeReport, BridgeEr
         stimulus: packet.stimulus,
         local_rhythm_measured_legs: local_rhythm_legs,
         local_rhythm_state: coverage_state(local_rhythm_legs, LEG_COUNT),
+        local_rhythm_coverage,
         per_leg_stepping_measured_legs: stepping_legs,
         per_leg_stepping_state: coverage_state(stepping_legs, LEG_COUNT),
+        per_leg_stepping_coverage,
         pairwise_coverage,
         tripod_coverage,
         phase_reset_measured_probe_cells: transfer_measured,
@@ -1279,6 +1292,49 @@ mod tests {
                 .unwrap_err()
                 .contains(ReasonCode::MixedAggregationLevelFrame)
         );
+    }
+
+    #[test]
+    fn local_rhythm_coverage_does_not_merge_different_pipeline_digests() {
+        let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
+        for (index, leg) in LegId::ALL.into_iter().enumerate() {
+            let row = packet
+                .measurements
+                .iter_mut()
+                .find(|row| {
+                    row.endpoint == EndpointKind::LocalJointRhythmicity
+                        && row.leg == Some(leg)
+                })
+                .unwrap();
+            row.method_sha256 = digest(char::from(b'a' + index as u8));
+        }
+        let report = audit_packet(&packet).unwrap();
+        assert_eq!(report.local_rhythm_coverage.len(), LEG_COUNT);
+        assert!(report
+            .local_rhythm_coverage
+            .iter()
+            .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial));
+    }
+
+    #[test]
+    fn stepping_coverage_does_not_merge_different_channels_or_methods() {
+        let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
+        for (index, leg) in LegId::ALL.into_iter().enumerate() {
+            let row = packet
+                .measurements
+                .iter_mut()
+                .find(|row| {
+                    row.endpoint == EndpointKind::PerLegStepping && row.leg == Some(leg)
+                })
+                .unwrap();
+            row.channel_id = Some(format!("joint-{index}"));
+        }
+        let report = audit_packet(&packet).unwrap();
+        assert_eq!(report.per_leg_stepping_coverage.len(), LEG_COUNT);
+        assert!(report
+            .per_leg_stepping_coverage
+            .iter()
+            .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial));
     }
 
     #[test]
