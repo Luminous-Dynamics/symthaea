@@ -1286,7 +1286,7 @@ pub fn build_cfc_network_hidden_unit_canonicalization_program(
     let max_abs_delta = max_abs_delta * (1.0 + 1.0e-6) + budget_epsilon;
 
     let mut evidence_hasher = blake3::Hasher::new();
-    evidence_hasher.update(b"symthaea-cfc-network-hidden-unit-alignment-v1\\0");
+    evidence_hasher.update(b"symthaea-cfc-network-hidden-unit-alignment-v1\0");
     evidence_hasher.update(alignments[0].source_model_digest.as_bytes());
     evidence_hasher.update(alignments[0].candidate_model_digest.as_bytes());
     evidence_hasher.update(snapshot.architecture_digest.as_bytes());
