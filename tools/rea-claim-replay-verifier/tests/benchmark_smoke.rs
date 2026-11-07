@@ -16,13 +16,18 @@ fn precision_aware_benchmark_smoke_emits_all_workload_cells_and_four_stages() {
     let receipt: Value =
         serde_json::from_slice(&output.stdout).expect("benchmark emits machine-readable JSON");
 
-    assert_eq!(receipt["schema"], "luminous.rea.claim-replay-performance.v1");
+    assert_eq!(
+        receipt["schema"],
+        "luminous.rea.claim-replay-performance.v1"
+    );
     assert_eq!(receipt["sample_count_per_operation"], 1);
     assert_eq!(receipt["warmup_samples_per_operation"], 0);
     assert_eq!(receipt["percentile_method"], "nearest-rank");
     assert_eq!(receipt["timed_operations"].as_array().unwrap().len(), 4);
 
-    let scenarios = receipt["scenarios"].as_array().expect("scenarios is an array");
+    let scenarios = receipt["scenarios"]
+        .as_array()
+        .expect("scenarios is an array");
     assert_eq!(scenarios.len(), 24);
 
     let expected_counts = [1, 4, 16, 64];
@@ -37,7 +42,11 @@ fn precision_aware_benchmark_smoke_emits_all_workload_cells_and_four_stages() {
         assert!(expected_padding.contains(&padding));
         assert!(["none", "unsafe_integer_fields"].contains(&precision));
 
-        let expected_warning_count = if precision == "none" { 0 } else { 2 + count * 3 };
+        let expected_warning_count = if precision == "none" {
+            0
+        } else {
+            2 + count * 3
+        };
         assert_eq!(
             scenario["precision_warning_count"].as_u64().unwrap() as usize,
             expected_warning_count
