@@ -368,9 +368,9 @@ pub fn parse_and_validate(contents: &str) -> Result<ValidationReport, serde_json
 const STATE_ROUTING_SCHEMA_VERSION: &str = "sym-rsi-state-routing-fixtures-v0";
 const STATE_ROUTING_STATUS: &str = "SYNTHETIC_FIXTURE_DESCRIPTIONS_NOT_BENCHMARK_RESULTS";
 const STATE_ROUTING_TOTAL: usize = 16;
-const STATE_ROUTING_NEGATIVE: usize = 10;
-const STATE_ROUTING_POSITIVE: usize = 4;
-const STATE_ROUTING_ABSTENTION: usize = 2;
+const STATE_ROUTING_NEGATIVE_COUNT: usize = 10;
+const STATE_ROUTING_POSITIVE_COUNT: usize = 4;
+const STATE_ROUTING_ABSTENTION_COUNT: usize = 2;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -469,7 +469,7 @@ impl StateRoutingValidationReport {
     }
 }
 
-const STATE_ROUTING_NEGATIVE: [(&str, &str, &str, &str); STATE_ROUTING_NEGATIVE] = [
+const STATE_ROUTING_NEGATIVE_CONTROLS: [(&str, &str, &str, &str); STATE_ROUTING_NEGATIVE_CONTROLS] = [
     ("SR-N01", "lexical_alias_unrelated_family", "false sharing", "REJECT_CROSS_SCOPE_SHARE"),
     ("SR-N02", "unreceipted_cross_cluster_copy", "transfer provenance", "REJECT_UNRECEIPTED_TRANSFER"),
     ("SR-N03", "stale_evaluator_epoch_currentness", "stale evidence", "REJECT_STALE_CURRENTNESS"),
@@ -482,14 +482,14 @@ const STATE_ROUTING_NEGATIVE: [(&str, &str, &str, &str); STATE_ROUTING_NEGATIVE]
     ("SR-N10", "missing_lineage_false_share", "provenance failure", "REJECT_UNGROUNDED_SHARING"),
 ];
 
-const STATE_ROUTING_POSITIVE: [(&str, &str); STATE_ROUTING_POSITIVE] = [
+const STATE_ROUTING_POSITIVE_CONTROLS: [(&str, &str); STATE_ROUTING_POSITIVE_CONTROLS] = [
     ("SR-P01", "ALLOW_SCOPED_REUSE"),
     ("SR-P02", "ALLOW_RECEIPTED_TRANSFER"),
     ("SR-P03", "REVALIDATE_BEFORE_REUSE"),
     ("SR-P04", "PRESERVE_SCOPED_CONTRADICTION"),
 ];
 
-const STATE_ROUTING_ABSTENTIONS: [(&str, &str); STATE_ROUTING_ABSTENTION] = [
+const STATE_ROUTING_ABSTENTION_CONTROLS: [(&str, &str); STATE_ROUTING_ABSTENTION_CONTROLS] = [
     ("SR-A01", "ABSTAIN_SCOPE_UNIDENTIFIED"),
     ("SR-A02", "ABSTAIN_INSUFFICIENT_PROVENANCE"),
 ];
@@ -587,7 +587,7 @@ pub fn validate_state_routing_fixture_pack(
                 if !controls.insert(control_id.to_owned()) {
                     report.issue("DUPLICATE_CONTROL_ID", control_id);
                 }
-                match STATE_ROUTING_NEGATIVE.iter().find(|(_, id, _, _)| *id == control_id) {
+                match STATE_ROUTING_NEGATIVE_CONTROLS.iter().find(|(_, id, _, _)| *id == control_id) {
                     Some((expected_fixture_id, _, category, disposition)) => {
                         if fixture.fixture_id != *expected_fixture_id {
                             report.issue("NEGATIVE_FIXTURE_ID_MISMATCH", control_id);
@@ -616,7 +616,7 @@ pub fn validate_state_routing_fixture_pack(
                 if fixture.control_id.is_some() || fixture.category.is_some() {
                     report.issue("POSITIVE_HAS_NEGATIVE_METADATA", &fixture.fixture_id);
                 }
-                match STATE_ROUTING_POSITIVE.iter().find(|(id, _)| *id == fixture.fixture_id) {
+                match STATE_ROUTING_POSITIVE_CONTROLS.iter().find(|(id, _)| *id == fixture.fixture_id) {
                     Some((_, expected_disposition)) => {
                         if fixture.disposition != *expected_disposition {
                             report.issue("POSITIVE_DISPOSITION_MISMATCH", &fixture.fixture_id);
@@ -636,7 +636,7 @@ pub fn validate_state_routing_fixture_pack(
                 if fixture.control_id.is_some() || fixture.category.is_some() {
                     report.issue("ABSTENTION_HAS_NEGATIVE_METADATA", &fixture.fixture_id);
                 }
-                match STATE_ROUTING_ABSTENTIONS.iter().find(|(id, _)| *id == fixture.fixture_id) {
+                match STATE_ROUTING_ABSTENTION_CONTROLS.iter().find(|(id, _)| *id == fixture.fixture_id) {
                     Some((_, expected_disposition)) => {
                         if fixture.disposition != *expected_disposition {
                             report.issue("ABSTENTION_DISPOSITION_MISMATCH", &fixture.fixture_id);
@@ -655,16 +655,16 @@ pub fn validate_state_routing_fixture_pack(
     report.positive_control_count = positives;
     report.abstention_control_count = abstentions;
 
-    if negatives != STATE_ROUTING_NEGATIVE {
+    if negatives != STATE_ROUTING_NEGATIVE_COUNT {
         report.issue("NEGATIVE_CONTROL_COUNT", format!("expected {}, found {negatives}", STATE_ROUTING_NEGATIVE));
     }
-    if positives != STATE_ROUTING_POSITIVE {
+    if positives != STATE_ROUTING_POSITIVE_COUNT {
         report.issue("POSITIVE_CONTROL_COUNT", format!("expected {}, found {positives}", STATE_ROUTING_POSITIVE));
     }
-    if abstentions != STATE_ROUTING_ABSTENTION {
+    if abstentions != STATE_ROUTING_ABSTENTION_COUNT {
         report.issue("ABSTENTION_CONTROL_COUNT", format!("expected {}, found {abstentions}", STATE_ROUTING_ABSTENTION));
     }
-    for (fixture_id, control_id, _, _) in STATE_ROUTING_NEGATIVE {
+    for (fixture_id, control_id, _, _) in STATE_ROUTING_NEGATIVE_CONTROLS {
         if !ids.contains(fixture_id) {
             report.issue("REQUIRED_NEGATIVE_FIXTURE_MISSING", fixture_id);
         }
@@ -672,12 +672,12 @@ pub fn validate_state_routing_fixture_pack(
             report.issue("REQUIRED_NEGATIVE_CONTROL_MISSING", control_id);
         }
     }
-    for (fixture_id, _) in STATE_ROUTING_POSITIVE {
+    for (fixture_id, _) in STATE_ROUTING_POSITIVE_CONTROLS {
         if !ids.contains(fixture_id) {
             report.issue("REQUIRED_POSITIVE_FIXTURE_MISSING", fixture_id);
         }
     }
-    for (fixture_id, _) in STATE_ROUTING_ABSTENTIONS {
+    for (fixture_id, _) in STATE_ROUTING_ABSTENTION_CONTROLS {
         if !ids.contains(fixture_id) {
             report.issue("REQUIRED_ABSTENTION_FIXTURE_MISSING", fixture_id);
         }
