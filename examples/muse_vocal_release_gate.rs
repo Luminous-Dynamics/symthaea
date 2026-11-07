@@ -1,6 +1,8 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Blind, backend-comparative Muse vocal release gate.
+//! Blind, backend-comparative Muse vocal release gate for integrated backends.
+ //! The unintegrated physical-tract prototype is tracked separately and is not
+ //! represented as a selectable singing backend here.
 
 use std::collections::BTreeMap;
 use std::io::Read;
@@ -9,7 +11,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use symthaea::voice::diffsinger::DiffSingerEngine;
-use symthaea::voice::functional_singing::FunctionalSingingEngine;
 use symthaea::voice::kokoro_singing::KokoroSingingEngine;
 use symthaea::voice::singing_engine::{SingingVoiceEngine, VocalPerformance, VocalStem};
 use symthaea::voice::singing_quality::{VocalQualityMetrics, analyze_vocal_stem};
@@ -249,7 +250,6 @@ fn main() -> Result<()> {
     let salt = blind_salt(&args, &output)?;
 
     let mut kokoro = KokoroSingingEngine::load(&voice)?;
-    let mut functional = FunctionalSingingEngine::default();
     let mut diffsinger = worker.as_deref().map(DiffSingerEngine::spawn).transpose()?;
     let mut clips = Vec::new();
     let mut key = Vec::new();
@@ -285,17 +285,6 @@ fn main() -> Result<()> {
         let performance = VocalPerformance::from_melody(case.lyrics, &melody, "en")?;
         render_one(
             &mut kokoro,
-            &performance,
-            case_id,
-            case,
-            &salt,
-            &output,
-            &mut clips,
-            &mut key,
-            &mut objective,
-        )?;
-        render_one(
-            &mut functional,
             &performance,
             case_id,
             case,
