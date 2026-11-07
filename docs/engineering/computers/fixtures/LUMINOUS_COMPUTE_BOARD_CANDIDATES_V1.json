@@ -45,15 +45,70 @@
         "https://docs.amd.com/r/en-US/ds987-k26-som"
       ],
       "published_capabilities": {
-        "application_cpu": {"value": "4x Arm Cortex-A53", "maximum_frequency_hz": 1500000000, "evidence_class": "vendor_published_specification"},
-        "realtime_cpu": {"value": "2x Arm Cortex-R5F", "maximum_frequency_hz": 600000000, "evidence_class": "vendor_published_specification"},
-        "host_memory": {"capacity_bytes": 4294967296, "interface": "64-bit DDR4", "ecc": false, "evidence_class": "vendor_published_specification"},
-        "on_module_storage": {"capacity_bytes": 17179869184, "technology": "eMMC", "evidence_class": "vendor_published_specification"},
-        "programmable_logic": {"system_logic_cells": 256200, "dsp_slices": 1248, "block_ram_blocks_36kib": 144, "ultraram_blocks": 64, "evidence_class": "vendor_published_specification"},
-        "ps_high_speed_connectivity": {"pcie": "Gen2 x4", "usb3_ports": 2, "sata": "SATA 3.1", "displayport": true, "ethernet": "4x tri-mode Gigabit Ethernet", "evidence_class": "vendor_published_specification"},
-        "gth_transceivers": {"count": 4, "maximum_rate_bits_per_second": 12500000000, "supported_modes_include": ["PCIe Gen3 x4", "SLVS-EC", "HDMI 2.0", "DisplayPort 1.4"], "evidence_class": "vendor_published_specification"},
-        "power": {"typical_module_power_watts": 7.5, "maximum_module_power_watts": 15, "evidence_class": "vendor_published_specification", "boundary_note": "SOM published values, not measured complete-carrier or system wall power"},
-        "temperature_grade": {"commercial_celsius": [0, 85], "industrial_celsius": [-40, 100], "evidence_class": "vendor_published_specification"}
+        "application_cpu": {
+          "value": "4x Arm Cortex-A53",
+          "maximum_frequency_hz": 1500000000,
+          "evidence_class": "vendor_published_specification"
+        },
+        "realtime_cpu": {
+          "value": "2x Arm Cortex-R5F",
+          "maximum_frequency_hz": 600000000,
+          "evidence_class": "vendor_published_specification"
+        },
+        "host_memory": {
+          "capacity_bytes": 4294967296,
+          "interface": "64-bit DDR4",
+          "ecc": false,
+          "evidence_class": "vendor_published_specification"
+        },
+        "on_module_storage": {
+          "capacity_bytes": 17179869184,
+          "technology": "eMMC",
+          "evidence_class": "vendor_published_specification"
+        },
+        "programmable_logic": {
+          "system_logic_cells": 256200,
+          "dsp_slices": 1248,
+          "block_ram_blocks_36kib": 144,
+          "ultraram_blocks": 64,
+          "evidence_class": "vendor_published_specification"
+        },
+        "ps_high_speed_connectivity": {
+          "pcie": "Gen2 x4",
+          "usb3_ports": 2,
+          "sata": "SATA 3.1",
+          "displayport": true,
+          "ethernet": "4x tri-mode Gigabit Ethernet",
+          "evidence_class": "vendor_published_specification"
+        },
+        "gth_transceivers": {
+          "count": 4,
+          "maximum_rate_bits_per_second": 12500000000,
+          "supported_modes_include": [
+            "PCIe Gen3 x4",
+            "SLVS-EC",
+            "HDMI 2.0",
+            "DisplayPort 1.4"
+          ],
+          "evidence_class": "vendor_published_specification"
+        },
+        "power": {
+          "typical_module_power_watts": 7.5,
+          "maximum_module_power_watts": 15,
+          "evidence_class": "vendor_published_specification",
+          "boundary_note": "SOM published values, not measured complete-carrier or system wall power"
+        },
+        "temperature_grade": {
+          "commercial_celsius": [
+            0,
+            85
+          ],
+          "industrial_celsius": [
+            -40,
+            100
+          ],
+          "evidence_class": "vendor_published_specification"
+        }
       },
       "unresolved_before_schematic": [
         "exact commercial or industrial ordering code, hardware revision and datasheet revision",
@@ -83,11 +138,35 @@
         "https://www.raspberrypi.com/documentation/computers/compute-module.html"
       ],
       "published_capabilities": {
-        "application_cpu": {"value": "Broadcom BCM2712, 4x Arm Cortex-A76", "maximum_frequency_hz": 2400000000, "evidence_class": "vendor_published_specification"},
-        "host_memory_options_bytes": [2147483648, 4294967296, 8589934592, 17179869184],
-        "host_memory": {"technology": "LPDDR4-4267 SDRAM", "ecc": true, "evidence_class": "vendor_published_specification"},
-        "on_module_emmc_options_bytes": [0, 17179869184, 34359738368, 68719476736],
-        "pcie": {"generation": 2, "lanes": 1, "signalling_rate_gtps": 5, "role": "root_complex", "evidence_class": "vendor_published_specification"},
+        "application_cpu": {
+          "value": "Broadcom BCM2712, 4x Arm Cortex-A76",
+          "maximum_frequency_hz": 2400000000,
+          "evidence_class": "vendor_published_specification"
+        },
+        "host_memory_options_bytes": [
+          2147483648,
+          4294967296,
+          8589934592,
+          17179869184
+        ],
+        "host_memory": {
+          "technology": "LPDDR4-4267 SDRAM",
+          "ecc": true,
+          "evidence_class": "vendor_published_specification"
+        },
+        "on_module_emmc_options_bytes": [
+          0,
+          17179869184,
+          34359738368,
+          68719476736
+        ],
+        "pcie": {
+          "generation": 2,
+          "lanes": 1,
+          "signalling_rate_gtps": 5,
+          "role": "root_complex",
+          "evidence_class": "vendor_published_specification"
+        },
         "usb3_ports": 2,
         "gigabit_ethernet_phy": true,
         "production_commitment_minimum_end_date": "2036-01",
@@ -152,7 +231,10 @@
     },
     "ucie": {
       "current_specification": "UCIe 3.0",
-      "published_data_rates_gtps": [48, 64],
+      "published_data_rates_gtps": [
+        48,
+        64
+      ],
       "source": "https://www.uciexpress.org/specifications",
       "rule": "package-level die-to-die chiplet interface; not a motherboard connector"
     },
@@ -206,5 +288,38 @@
     "physical_carrier": "exact revision, assembled BOM and tested configuration only",
     "manufacturing": "board assembly does not imply semiconductor fabrication",
     "sota": "requires matched workload, full system boundary, independent baseline and reproducible raw results"
+  },
+  "carrier_card_design_gate": {
+    "mandatory_reference": {
+      "document": "AMD Kria SOM Carrier Card Design Guide UG1091",
+      "revision": "1.7",
+      "published_date": "2026-07-28",
+      "sources": [
+        "https://docs.amd.com/r/en-US/ug1091-carrier-card-design",
+        "https://docs.amd.com/r/en-US/ug1091-carrier-card-design/SOM-Connector-Overview",
+        "https://docs.amd.com/r/en-US/ug1091-carrier-card-design/SOM-Power-Integrity"
+      ],
+      "required_review_topics": [
+        "SOM connector pinout and bank voltage allocation",
+        "PS-GTR and K26 GTH signal routing and reference clocks",
+        "I/O standards and impedance/routing guidance",
+        "power input, sequencing, rail limits and power integrity",
+        "timing models, control/configuration signals and sideband",
+        "connector footprint, reflow, assembly and mechanical standoff"
+      ],
+      "k26_connector_count_and_pin_count": "two 240-pin SOM connectors",
+      "evidence_class": "vendor_published_design_guide"
+    },
+    "evaluation_kit_exception": {
+      "product": "AMD Kria KV260 Vision AI Starter Kit",
+      "source": "https://docs.amd.com/r/en-US/ds986-kv260-starter-kit/Product-Details",
+      "som_variant": "non-production K26 SOM",
+      "emmc_populated": false,
+      "primary_boot": "512 Mb QSPI",
+      "secondary_boot": "microSD",
+      "evidence_class": "vendor_published_specification",
+      "warning": "Do not transfer the commercial K26C SOM's 16 GB eMMC specification to the KV260 evaluation-kit SOM."
+    },
+    "execution_gate": "Qualify on an identified evaluation platform and exact SOM/board revision before custom carrier schematic freeze."
   }
 }
