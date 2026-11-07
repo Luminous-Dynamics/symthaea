@@ -9,6 +9,8 @@ cargo run --manifest-path tools/g2p-spike/Cargo.toml
 cargo test --manifest-path tools/g2p-spike/Cargo.toml
 ```
 
+The spike enables the crate's `bundled-dicts` feature and uses `EnglishPhonemizer::new_bundled()`, so CI does not depend on a machine-local `cmudict_data.json` path. This embeds the crate's bundled dictionary data in the research binary; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for CMUdict attribution.
+
 The output is a tab-separated diagnostic table containing case ID, input text, Piper Plus IPA tokens, current Muse IPA tokens, and Piper Plus prosody debug output. Both frontends receive the same fixture text. Muse is given one synthetic note per syllable so the existing singing bridge exposes its current per-syllable phone sequence. This makes the baseline comparison executable, while the human-reviewed reference remains a separate source of truth.
 
 ## Why this candidate
