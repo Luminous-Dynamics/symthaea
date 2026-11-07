@@ -379,6 +379,37 @@
         "stationary_task_without_regime_shift",
         "held_out_future_batch_leakage_canary"
       ]
+    },
+    {
+      "id": "causal_weight_reading_under_semantic_interventions",
+      "environment": "Matched small-network families with identical architecture and input/output dimensions but different hidden task functions, generated labels, output-action semantics, and temporal behaviours. Include both public-task replicas and held-out procedurally generated tasks. The evaluator receives raw weights plus a frozen, budgeted probe set; task names, dataset names, class order, and training metadata are withheld. Interventions independently permute output labels, permute hidden coordinates, shuffle weights within shape/scale strata, and perturb selected parameter groups. A separate verifier can inspect exact function outputs and intervention outcomes.",
+      "primary_outcomes": [
+        "task_semantics_identification_accuracy",
+        "heldout_function_prediction_accuracy",
+        "label_mapping_recovery_accuracy",
+        "causal_intervention_prediction_accuracy",
+        "semantic_claim_false_positive_rate"
+      ],
+      "diagnostics": [
+        "calibration_brier_score",
+        "selective_accuracy_at_common_coverage",
+        "accuracy_after_output_label_permutation",
+        "accuracy_after_hidden_unit_permutation",
+        "accuracy_on_unseen_task_families",
+        "accuracy_with_architecture_only_context",
+        "functional_probe_budget",
+        "intervention_probe_budget",
+        "semantic_accuracy_vs_parameter_count"
+      ],
+      "negative_controls": [
+        "architecture_only_prior_baseline",
+        "random_weight_shuffle_preserving_marginals",
+        "output_label_permutation_with_hidden_semantics_held_fixed",
+        "randomized_class_names_and_action_names",
+        "unseen_procedural_task_family",
+        "misleading_metadata_decoy",
+        "no_probe_weight_only_interpretation"
+      ]
     }
   ],
   "baselines": [
@@ -605,6 +636,26 @@
     {
       "id": "weight_program_feedback_blind",
       "scope": "The fixed WeightProgram executes with shuffled or withheld measurement feedback, isolating whether gains arise from evidence-conditioned updates"
+    },
+    {
+      "id": "weight_only_llm_semantic_reader",
+      "scope": "LLM prompted with raw weights and architecture only; fixed prompt/editor/tool/token budget, no forward-pass tools"
+    },
+    {
+      "id": "architecture_only_task_prior",
+      "scope": "Task/label prediction from architecture and tensor shapes only, without parameter values"
+    },
+    {
+      "id": "activation_probe_semantic_reader",
+      "scope": "Semantic interpretation using frozen input/output probes and hidden activations, with matched probe budget"
+    },
+    {
+      "id": "intervention_verified_semantic_reader",
+      "scope": "Interpretation with targeted ablation/permutation interventions and independent output verification"
+    },
+    {
+      "id": "function_oracle_semantic_upper_bound",
+      "scope": "Oracle with full held-out function access; verifier-only upper bound, never available to proposer"
     }
   ],
   "seeds": {
@@ -687,7 +738,11 @@
       "endpoint_budget_efficiency",
       "cumulative_decision_regret",
       "multilayer_function_equivalence_error",
-      "multilayer_heldout_function_retention"
+      "multilayer_heldout_function_retention",
+      "task_semantics_identification_accuracy",
+      "heldout_function_prediction_accuracy",
+      "causal_intervention_prediction_accuracy",
+      "semantic_claim_false_positive_rate"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -724,7 +779,10 @@
       "stale_alignment_canonicalization_acceptance_rate",
       "cumulative_parameter_drift_l2",
       "task_retention_after_update",
-      "held_out_future_batch_leakage_rate"
+      "held_out_future_batch_leakage_rate",
+      "weight_reading_accuracy_after_label_permutation",
+      "semantic_accuracy_on_unseen_task_families",
+      "semantic_reader_calibration"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -802,7 +860,10 @@
     "Every sequential edit is bound to the exact model, program, target specification, evidence-batch digest, and verifier receipt; candidates are evaluated on predeclared held-out observations and promoted only through a separate explicit acceptance boundary.",
     "Future measurement batches, hidden endpoints, and held-out assay outcomes are inaccessible to the editor and probe selector; include a leakage canary and report all candidate evaluations, rollbacks, and unsuccessful edits.",
     "Sequential WSP results are compared with no-edit, random matched-norm, feedback-blind, re-prompted WSP, and matched online/gradient baselines under identical evidence batches and endpoint budgets; online-replay author-reported results are not treated as independent replication.",
-    "The multi-layer CfC canonicalizer must use one fresh, fingerprint-bound activation-alignment receipt per layer, validate every layer index exactly once, propagate each layer permutation through the next layer's input columns, and verify full held-out output equivalence on candidate-only materialization. Residual, bidirectional, and backbone topologies remain explicitly unsupported."
+    "The multi-layer CfC canonicalizer must use one fresh, fingerprint-bound activation-alignment receipt per layer, validate every layer index exactly once, propagate each layer permutation through the next layer's input columns, and verify full held-out output equivalence on candidate-only materialization. Residual, bidirectional, and backbone topologies remain explicitly unsupported.",
+    "Weight-space semantic-reading results must include randomized output labels/action names and task families absent from public training corpora; familiar dataset-name recognition alone is not accepted as function understanding.",
+    "At least one intervention must test causal predictions about outputs after a targeted parameter-group or hidden-unit manipulation; unverified verbal interpretations are not scored as correct semantic recovery.",
+    "Report architecture-only, raw-weight-only, probe-assisted, and intervention-assisted semantic-reading baselines separately under matched information, tool, token, and probe budgets."
   ],
   "research_references": [
     {
