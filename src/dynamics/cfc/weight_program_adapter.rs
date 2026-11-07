@@ -1229,8 +1229,7 @@ mod tests {
 
     #[test]
     fn diagnostic_probe_selection_is_deterministic_and_selects_best_margin() {
-        let genesis =
-            symthaea_core::genesis::GenesisSeed::from_phrase("cfc-probe-selection-v1");
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("cfc-probe-selection-v1");
         let config = CfCNetworkConfig {
             input_dim: 2,
             hidden_dim: 4,
@@ -1269,36 +1268,37 @@ mod tests {
             },
         ];
 
-        let selection = select_cfc_disambiguating_probe(
-            &source,
-            &candidate,
-            0,
-            &existing,
-            &candidates,
-        )
-        .expect("select probe");
-        let repeated = select_cfc_disambiguating_probe(
-            &source,
-            &candidate,
-            0,
-            &existing,
-            &candidates,
-        )
-        .expect("repeat probe selection");
+        let selection =
+            select_cfc_disambiguating_probe(&source, &candidate, 0, &existing, &candidates)
+                .expect("select probe");
+        let repeated =
+            select_cfc_disambiguating_probe(&source, &candidate, 0, &existing, &candidates)
+                .expect("repeat probe selection");
 
-        assert_eq!(selection.selected_candidate_index, repeated.selected_candidate_index);
-        assert_eq!(selection.selected_augmented_probe_digest, repeated.selected_augmented_probe_digest);
+        assert_eq!(
+            selection.selected_candidate_index,
+            repeated.selected_candidate_index
+        );
+        assert_eq!(
+            selection.selected_augmented_probe_digest,
+            repeated.selected_augmented_probe_digest
+        );
         assert_eq!(selection.candidate_scores, repeated.candidate_scores);
         assert_eq!(selection.candidate_scores.len(), candidates.len());
         assert!(selection.baseline_assignment_margin.is_some());
-        assert!(selection.selected_assignment_margin >= selection.baseline_assignment_margin.unwrap());
+        assert!(
+            selection.selected_assignment_margin >= selection.baseline_assignment_margin.unwrap()
+        );
         assert_eq!(
             selection.selected_assignment_margin,
             selection.candidate_scores[selection.selected_candidate_index]
                 .assignment_margin
                 .expect("multi-unit assignment margin")
         );
-        assert_eq!(selection.selected_probe, candidates[selection.selected_candidate_index]);
+        assert_eq!(
+            selection.selected_probe,
+            candidates[selection.selected_candidate_index]
+        );
         assert_eq!(
             source.fingerprint().unwrap().model_digest,
             candidate.fingerprint().unwrap().model_digest
@@ -1505,16 +1505,8 @@ mod tests {
 
     #[test]
     fn assignment_margin_accumulates_evidence_without_changing_mean_fit_error() {
-        let source_once = signature_set(
-            vec![vec![0.0], vec![1.0], vec![3.0]],
-            'a',
-            'c',
-        );
-        let candidate_once = signature_set(
-            vec![vec![3.1], vec![0.1], vec![1.1]],
-            'b',
-            'c',
-        );
+        let source_once = signature_set(vec![vec![0.0], vec![1.0], vec![3.0]], 'a', 'c');
+        let candidate_once = signature_set(vec![vec![3.1], vec![0.1], vec![1.1]], 'b', 'c');
         let once =
             align_cfc_hidden_unit_signatures(&source_once, &candidate_once).expect("one probe");
 
@@ -1531,7 +1523,10 @@ mod tests {
         let twice =
             align_cfc_hidden_unit_signatures(&source_twice, &candidate_twice).expect("two probes");
 
-        assert!((twice.mean_squared_activation_error - once.mean_squared_activation_error).abs() < 1e-12);
+        assert!(
+            (twice.mean_squared_activation_error - once.mean_squared_activation_error).abs()
+                < 1e-12
+        );
         let one_margin = once.minimum_assignment_margin.expect("one-probe margin");
         let two_margin = twice.minimum_assignment_margin.expect("two-probe margin");
         assert!((two_margin - 2.0 * one_margin).abs() < 1e-10);
@@ -1702,8 +1697,9 @@ mod tests {
             enable_online_learning: false,
             ..Default::default()
         };
-        let genesis =
-            symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-swi-permutation-equivalence-v1");
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(
+            "symthaea-swi-permutation-equivalence-v1",
+        );
         let original = CfCNetwork::from_genesis(config, &genesis, "permutation-equivalence");
         let snapshot = cfc_weight_model_snapshot(&original, digest('d')).expect("snapshot");
         let permutation = [2usize, 0, 3, 1];
