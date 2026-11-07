@@ -490,6 +490,14 @@ mod tests {
             capabilities.support(SingingControl::PhraseBreathTiming),
             CapabilitySupport::Unsupported
         );
+        SingingRenderPolicy::phrase_expression_comparison()
+            .validate_against(&capabilities)
+            .unwrap();
+        assert!(
+            SingingRenderPolicy::phrase_breath_comparison()
+                .validate_against(&capabilities)
+                .is_err()
+        );
     }
 
     #[test]
