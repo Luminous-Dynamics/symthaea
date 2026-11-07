@@ -531,7 +531,10 @@ fn main() -> Result<()> {
         source_revision,
         voice_id: voice.clone(),
         diffsinger_worker: worker.as_ref().map(|path| path.display().to_string()),
-        diffsinger_worker_blake3: worker.as_ref().map(|path| artifact_digest(path)).transpose()?,
+        diffsinger_worker_blake3: worker
+            .as_ref()
+            .map(|path| artifact_digest(path))
+            .transpose()?,
         case_count: case_receipts.len(),
         cases: case_receipts,
     };
@@ -730,6 +733,5 @@ mod rating_validation_tests {
         assert!(validate_source_revision("0123456789abcdef").is_err());
         assert!(validate_source_revision("z123456789abcdef0123456789abcdef01234567").is_err());
     }
-
 
 }
