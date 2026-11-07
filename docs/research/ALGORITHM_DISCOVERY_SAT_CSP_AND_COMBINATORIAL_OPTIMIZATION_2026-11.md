@@ -429,6 +429,21 @@ This is how we avoid invalid transfers: a decision-preserving reduction is not a
 
 This representation graph should be a first-class Symthaea research capability and a shared transformation registry in the Luminous platform. It is also the right place to store the unique-extension guarantee of the new Tseitin encoder.
 
+### Extension: proof-carrying AND/OR hyperedges
+
+A one-source/one-target edge is not expressive enough for the transformations that matter most in #SAT and combinatorial optimization. Branching creates several subproblems whose solution sets must be combined; disconnected-component decomposition creates multiple subproblems whose counts multiply; projected counting must union visible support with Boolean OR; tensor slicing creates multiple slices with a typed aggregation law.
+
+The registry should therefore evolve into a **proof-carrying AND/OR hypergraph**. A hyperedge binds the source problem, a canonical set of target subproblems, a typed aggregation operator, a partition/decomposition witness, reconstruction semantics, and composed time/space/parameter costs. Initial operators should be deliberately narrow: `BranchSum`, `IndependentProduct`, `ExistentialSupportUnion`, `OptimizationCombine`, and `TensorSliceReduce`.
+
+The aggregation law is part of the theorem, not metadata. For example:
+- `BranchSum` requires an exhaustive, disjoint partition;
+- `IndependentProduct` requires disjoint variable scopes and explicit free-variable handling;
+- `ExistentialSupportUnion` collapses duplicate hidden witnesses with Boolean OR, not arithmetic addition;
+- optimization and tensor operators must name their exact output algebra and prove their combination rule.
+
+This is tracked in [#10868 — proof-carrying AND/OR hyperedges for decomposition](https://github.com/Luminous-Dynamics/symthaea/issues/10868), composing with #10811/#10835, the structural witnesses in ETH-019 #10244, and the typed circuit/proof adapters in ETH-026 #10301 and ETH-027 #10305. It should reuse their schemas and proof artifacts, not introduce a parallel circuit IR or receipt system.
+
+
 ## Architecture proposal
 
 Keep the low-level solver independent of HDC and cognitive-loop code. Add a narrow shared problem/solver interface first; only introduce a new crate after reviewing the workspace's existing math and logic boundaries.
