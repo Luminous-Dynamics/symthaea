@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
+GOLD_COMPLETENESS = "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
+SEQUENTIAL_EVIDENCE = "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
 PREREGISTRATION = "docs/research/CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md"
 CHALLENGE = "docs/research/CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md"
 ADJUDICATION = "docs/research/CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md"
@@ -37,6 +39,7 @@ COMPARATORS = (
     "SecPRBench",
     "CR-Bench-v2",
     "CRBugBench",
+    "CodeReviewBench",
 )
 EXECUTION_GATES = ("#10064", "#10369")
 
@@ -58,6 +61,8 @@ def validate_documents(
     adjudication: str,
     scorecard: str,
     preregistration: str,
+    gold_completeness: str,
+    sequential_evidence: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -155,27 +160,65 @@ def validate_documents(
             errors.append(f"causal-diagnosis preregistration must preserve existing primary metric {metric}")
     if "candidate-specific and appears in both numerator and denominator" not in triangulation:
         errors.append("ReviewBench augmented-recall denominator caveat is missing")
+    if "CodeReviewBench human-flagged bug recall" not in triangulation:
+        errors.append("triangulation must distinguish CodeReviewBench human-flagged-bug recall")
+    if "Gold-Completeness and Open-Set Discovery" not in triangulation:
+        errors.append("triangulation must link the gold-completeness protocol")
+    if "Sequential Evidence Acquisition" not in triangulation:
+        errors.append("triangulation must link the sequential evidence-acquisition protocol")
+
+    for required in (
+        "Frozen target set",
+        "Adjudicated open-set discoveries",
+        "Unobserved defect remainder",
+        "A naïve capture–recapture estimate",
+        "zero-finding PRs",
+        "producer-dependence graph",
+        "does not create a new primary metric",
+        "#10064",
+        "#10369",
+    ):
+        if required not in gold_completeness:
+            errors.append(f"gold-completeness protocol is missing {required}")
+
+    for required in (
+        "Evidence action ladder",
+        "Sequential policy arms",
+        "Matched-budget accounting",
+        "Stopping and escalation policy",
+        "smallest applicable observation",
+        "No activity credit",
+        "#10064",
+        "#10369",
+    ):
+        if required not in sequential_evidence:
+            errors.append(f"sequential evidence protocol is missing {required}")
 
     return errors
 
 
 def self_test() -> list[str]:
-    triangulation = "\n".join((
+    triangulation = "\\n".join((
         *COMPARATORS,
         *PRIMARY_METRICS,
         "https://review-bench.ai/",
         "https://arxiv.org/abs/2610.33509",
         "https://arxiv.org/abs/2611.02566",
         "https://arxiv.org/abs/2610.13668",
-        "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane candidate-specific and appears in both numerator and denominator",
+        "https://www.codereviewbench.com/leaderboard",
+        "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane",
+        "candidate-specific and appears in both numerator and denominator",
+        "CodeReviewBench human-flagged bug recall",
+        "Gold-Completeness and Open-Set Discovery",
+        "Sequential Evidence Acquisition",
         "#10064 #10369",
     ))
-    challenge = "\n\n".join(
-        f"### ERG-S{i:02d} — Synthetic\n\n**Evidence pack:** X\n\n"
-        "**Expected review behavior:** Y\n\n**Invalid behaviors:** Z"
+    challenge = "\\n\\n".join(
+        f"### ERG-S{i:02d} — Synthetic\\n\\n**Evidence pack:** X\\n\\n"
+        "**Expected review behavior:** Y\\n\\n**Invalid behaviors:** Z"
         for i in range(1, 27)
-    ) + "\n#10064 #10369"
-    adjudication = "\n".join((
+    ) + "\\n#10064 #10369"
+    adjudication = "\\n".join((
         *PRIMARY_METRICS,
         *EVIDENCE_CLASSES,
         "Stage 1 — Discovery",
@@ -186,7 +229,11 @@ def self_test() -> list[str]:
         "does not create metrics",
         "#10064 #10369",
     ))
-    scorecard = "3.10 From code location to causal mechanism diagnosis"
+    scorecard = (
+        "3.10 From code location to causal mechanism diagnosis\\n"
+        "3.11 From human-found gold to open-set completeness\\n"
+        "3.12 From tools to sequential evidence acquisition"
+    )
     preregistration = "\\n".join((
         "P — Parent / pre-introduction",
         "I — Introducing",
@@ -201,40 +248,72 @@ def self_test() -> list[str]:
         "same total inference budget no new primary metric lane #10064 #10369 No tasks are admitted by this preregistration",
         *PRIMARY_METRICS,
     ))
+    gold_completeness = "\\n".join((
+        "Frozen target set",
+        "Adjudicated open-set discoveries",
+        "Unobserved defect remainder",
+        "A naïve capture–recapture estimate",
+        "zero-finding PRs",
+        "producer-dependence graph",
+        "does not create a new primary metric",
+        "#10064 #10369",
+    ))
+    sequential_evidence = "\\n".join((
+        "Evidence action ladder",
+        "Sequential policy arms",
+        "Matched-budget accounting",
+        "Stopping and escalation policy",
+        "smallest applicable observation",
+        "No activity credit",
+        "#10064 #10369",
+    ))
 
-    valid = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration)
+    def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str) -> list[str]:
+        return validate_documents(t, ch, a, s, p, g, e)
+
+    valid = run(triangulation, challenge, adjudication, scorecard, preregistration, gold_completeness, sequential_evidence)
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
 
     mutations = (
-        ("duplicate scenario identity", challenge.replace("ERG-S02", "ERG-S01", 1)),
-        ("missing evidence pack", challenge.replace("**Evidence pack:** X", "Missing", 1)),
-        ("missing expected behavior", challenge.replace("**Expected review behavior:** Y", "Expected", 1)),
-        ("missing comparator", triangulation.replace("SecPRBench", "OtherBench")),
-        ("missing evidence authority", adjudication.replace("compiler_resolved", "deleted_class")),
-        ("missing isolation gate", challenge.replace("#10064", "removed_gate")),
-        ("missing primary metric mapping", adjudication.replace("reviewer_burden", "removed_metric")),
-        ("missing counterfactual state", preregistration.replace("M — Minimal causal intervention", "M-state-removed")),
-        ("missing power rule", preregistration.replace("80% power", "unspecified power")),
-        ("missing phase C", preregistration.replace("Phase C — Human complementarity", "phase omitted")),
+        ("duplicate scenario identity", "challenge", challenge.replace("ERG-S02", "ERG-S01", 1)),
+        ("missing evidence pack", "challenge", challenge.replace("**Evidence pack:** X", "Missing", 1)),
+        ("missing expected behavior", "challenge", challenge.replace("**Expected review behavior:** Y", "Expected", 1)),
+        ("missing comparator", "triangulation", triangulation.replace("SecPRBench", "OtherBench")),
+        ("missing CodeReviewBench", "triangulation", triangulation.replace("CodeReviewBench", "OtherBench")),
+        ("missing evidence authority", "adjudication", adjudication.replace("compiler_resolved", "deleted_class")),
+        ("missing isolation gate", "challenge", challenge.replace("#10064", "removed_gate")),
+        ("missing primary metric mapping", "adjudication", adjudication.replace("reviewer_burden", "removed_metric")),
+        ("missing counterfactual state", "preregistration", preregistration.replace("M — Minimal causal intervention", "M-state-removed")),
+        ("missing power rule", "preregistration", preregistration.replace("80% power", "unspecified power")),
+        ("missing phase C", "preregistration", preregistration.replace("Phase C — Human complementarity", "phase omitted")),
+        ("missing frozen target separation", "gold", gold_completeness.replace("Frozen target set", "target missing")),
+        ("missing no-naive-capture warning", "gold", gold_completeness.replace("A naïve capture–recapture estimate", "estimate missing")),
+        ("missing zero-finding audit", "gold", gold_completeness.replace("zero-finding PRs", "no clean sample")),
+        ("missing evidence action ladder", "evidence", sequential_evidence.replace("Evidence action ladder", "ladder missing")),
+        ("missing stop rule", "evidence", sequential_evidence.replace("Stopping and escalation policy", "stop missing")),
+        ("missing cost accounting", "evidence", sequential_evidence.replace("Matched-budget accounting", "budget missing")),
     )
-    for label, mutant in mutations:
-        if label == "duplicate scenario identity":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
-        elif label == "missing evidence pack":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
-        elif label == "missing expected behavior":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
-        elif label == "missing comparator":
-            result = validate_documents(mutant, challenge, adjudication, scorecard, preregistration)
-        elif label == "missing evidence authority":
-            result = validate_documents(triangulation, challenge, mutant, scorecard, preregistration)
-        elif label == "missing isolation gate":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
-        elif label == "missing counterfactual state" or label == "missing power rule" or label == "missing phase C":
-            result = validate_documents(triangulation, challenge, adjudication, scorecard, mutant)
-        else:
-            result = validate_documents(triangulation, challenge, mutant, scorecard, preregistration)
+    for label, target, mutant in mutations:
+        args = {
+            "triangulation": triangulation,
+            "challenge": challenge,
+            "adjudication": adjudication,
+            "scorecard": scorecard,
+            "preregistration": preregistration,
+            "gold": gold_completeness,
+            "evidence": sequential_evidence,
+        }
+        args[target] = mutant
+        result = run(
+            args["triangulation"],
+            args["challenge"],
+            args["adjudication"],
+            args["scorecard"],
+            args["preregistration"],
+            args["gold"],
+            args["evidence"],
+        )
         if not result:
             return [f"negative self-test was accepted: {label}"]
 
@@ -261,7 +340,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 10 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 17 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -269,11 +348,13 @@ def main() -> int:
         adjudication = read_required(args.repo_root, ADJUDICATION)
         scorecard = read_required(args.repo_root, SCORECARD)
         preregistration = read_required(args.repo_root, PREREGISTRATION)
+        gold_completeness = read_required(args.repo_root, GOLD_COMPLETENESS)
+        sequential_evidence = read_required(args.repo_root, SEQUENTIAL_EVIDENCE)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
-    failures = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration)
+    failures = validate_documents(triangulation, challenge, adjudication, scorecard, preregistration, gold_completeness, sequential_evidence)
     if failures:
         for failure in failures:
             print(f"ERROR: {failure}", file=sys.stderr)
@@ -284,7 +365,7 @@ def main() -> int:
         "CEB_REVIEW_RESEARCH_PACK_PASS: "
         f"scenarios={len(ids)} comparators={len(COMPARATORS)} "
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
-        "counterfactual_states=6 experimental_phases=3"
+        "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
