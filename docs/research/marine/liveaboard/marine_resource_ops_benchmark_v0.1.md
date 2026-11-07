@@ -47,7 +47,22 @@ Each service request therefore declares:
 - consequences of deferment, interruption or failure;
 - source, evidence class, revision and exact mission-case binding.
 
-## 4. Decision hierarchy
+## 4. Multi-carrier service accounting (electricity is not the whole habitat)
+
+Recent ship-EMS work extends beyond electrical dispatch:
+- A September 2026 rolling-horizon multi-energy ship study co-optimizes electricity, thermal energy, hydrogen, freshwater, waste-heat recovery, route selection and flexible voyage scheduling: https://doi.org/10.1080/20464177.2026.2728778
+- A 2026 Applied Energy review frames hybrid-ship EMS around source/storage dynamics, lifecycle degradation, transient buffers, DC-grid stability and deployment evidence: https://doi.org/10.1016/j.apenergy.2026.128503
+- A September 2026 hybrid ship prediction study uses a multi-model ensemble for propulsion/load prediction; it reports lower MAE/RMSE than its best single-network comparator on its own study dataset. It is not evidence that the same method will outperform for small-craft hotel loads: https://doi.org/10.1016/j.oceaneng.2026.127503
+
+The service schema now records both `input_requirements[]` and `required_output.carrier`. Examples:
+- A watermaker consumes electrical energy and seawater feed; its delivered output is potable water only after the separate quality acceptance owner has accepted it.
+- Domestic hot water consumes electricity and may consume recoverable heat from a generator/range extender or a thermal store; the useful heat must satisfy the grade/temperature/exchanger constraints.
+- Fuel, electricity, recoverable heat, potable water and other material inputs remain distinct carriers and units. Do not sum kWh_e and kWh_th as if they were the same energy quality or double-count recovered heat already included in the generator/fuel energy balance.
+- Waste heat receives no credit until source temperature, duty, exchanger effectiveness, contamination/isolation, availability, parasitic pump energy and thermal storage losses are declared and measured/validated. It is not assumed to be available at generator idle or during an offline state.
+
+For LOS-18, heat recovery should first target low-risk domestic hot-water / space-heating service if a selected generator and exchanger support it. Do not assume RO feed preheating improves membrane performance or potable-water quality; that requires OEM membrane operating-envelope and water-quality review.
+
+## 5. Decision hierarchy
 
 Use constrained/lexicographic decisions, not a free weighted sum:
 
@@ -70,7 +85,7 @@ Recent weather-routing literature reinforces why route, speed and energy must be
 
 These are research results from different vessel classes and scenarios, not transferable performance claims for LOS-18. They justify matched weather/forecast uncertainty and explicit fuel-versus-delay trade-offs. The marine resource scheduler consumes a frozen route/propulsion demand profile; it does not generate the route or change speed in V0. A future joint study can compose the route owner and service scheduler using exact shared case identities, then compare the full Pareto frontier.
 
-## 5. Benchmark policy baselines
+## 6. Benchmark policy baselines
 
 Compare on identical frozen cases and the same information:
 1. Fixed equipment defaults / static timetable.
@@ -82,7 +97,7 @@ Compare on identical frozen cases and the same information:
 
 Do not compare a forecast-informed policy against a baseline deprived of the same forecast. Freeze compute budgets and replanning intervals.
 
-## 6. Metrics
+## 7. Metrics
 
 Report separately:
 - critical service violations (non-compensable hard fail);
@@ -101,7 +116,7 @@ Report separately:
 
 No one score combines these. Publish the full service and energy ledger plus hard-gate disposition.
 
-## 7. Frozen scenario corpus
+## 8. Frozen scenario corpus
 
 The companion JSON defines four synthetic profiles with critical, hotel, thermal-protection and propulsion load series. Their sum is checked against the aggregate load profile passed to the existing grid-physics harness. Each scenario also declares synthetic generator availability/ramp/start/minimum-run/fuel state, shore-power availability, battery temperature/SoH, sea state/wind/air/sea temperature, solar forecast error bound and RO feed salinity/temperature qualification. These are synthetic contract fields, not vendor- or class-qualified equipment parameters.
 
@@ -113,7 +128,7 @@ The four cases are:
 
 These profiles are deliberately synthetic. Their numbers are contract-test inputs, not recommended vessel sizing or measured operating assumptions.
 
-## 8. Negative controls
+## 9. Negative controls
 
 - Missing or stale battery state must not be treated as reserve headroom.
 - Watermaker feed outside qualified limits must block the production request.
@@ -127,7 +142,7 @@ These profiles are deliberately synthetic. Their numbers are contract-test input
 - Reordered service rows must produce equivalent deterministic output.
 - Loss of network, forecast, Symthaea or Mycelix cannot disable local equipment safety controls.
 
-## 9. Acceptance targets — goals, not results
+## 10. Acceptance targets — goals, not results
 
 - Zero hard-constraint violations in the frozen adversarial corpus.
 - 100% service accounting: completed, postponed, failed, blocked, or indeterminate with reason.
@@ -138,6 +153,6 @@ These profiles are deliberately synthetic. Their numbers are contract-test input
 - Report paired results, tails and worst scenario; no universal kWh saving is predeclared.
 - Use held-out scenario families for policy confirmation; do not split time samples from one synthetic trace into train and test.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 A PASS establishes only that the frozen scheduling contract behaves as specified on the synthetic replay corpus. It does not establish physical energy savings, generator fuel reduction, battery-life improvement, potable-water availability, food safety, habitability, seaworthiness or authority to operate equipment.
