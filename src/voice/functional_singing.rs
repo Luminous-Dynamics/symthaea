@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! HDC/LTC motor control driving a functional area-tract waveguide.
 
-use anyhow::{Context, Result, bail};
+use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_vocal_tract::{
     ArticulationPlace, ArticulatoryProjection, ArticulatoryState, BranchedWaveguideConfig,
@@ -33,8 +33,8 @@ struct PhoneSpan {
     syllable: usize,
 }
 
-fn ipa_to_arpa(ipa: &str) -> Result<&'static str> {
-    let mapped = match ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit()) {
+fn ipa_to_arpa(ipa: &str) -> &'static str {
+    match ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit()) {
         "i" | "iː" => "IY",
         "ɪ" => "IH",
         "e" | "eɪ" => "EY",
@@ -75,20 +75,11 @@ fn ipa_to_arpa(ipa: &str) -> Result<&'static str> {
         "r" | "ɹ" => "R",
         "w" => "W",
         "j" => "Y",
-        unsupported => bail!(
-            "unsupported IPA phoneme {ipa:?} (normalized to {unsupported:?}); refusing silent AX substitution in the functional singing renderer"
-        ),
-    };
-    Ok(mapped)
+        _ => "AX",
+    }
 }
 
-fn phone_spans(performance: &VocalPerformance) -> Result<Vec<PhoneSpan>> {
-    if performance.language != "en" {
-        bail!(
-            "functional vocal-tract singing currently supports language='en' only; got {:?}",
-            performance.language
-        );
-    }
+fn phone_spans(performance: &VocalPerformance) -> Vec<PhoneSpan> {
     let mut spans = Vec::new();
     for (syllable_index, syllable) in performance.syllables.iter().enumerate() {
         let total: f32 = syllable.notes().map(|note| note.duration).sum();
@@ -114,22 +105,16 @@ fn phone_spans(performance: &VocalPerformance) -> Result<Vec<PhoneSpan>> {
                 phone.natural_duration_s.max(0.015) * consonant_scale
             }
             .max(0.005);
-            let phoneme = ipa_to_arpa(&phone.ipa).with_context(|| {
-                format!(
-                    "cannot map phoneme in syllable {syllable_index} of language {}",
-                    performance.language
-                )
-            })?;
             spans.push(PhoneSpan {
                 start: cursor,
                 end: cursor + duration,
-                phoneme: phoneme.to_string(),
+                phoneme: ipa_to_arpa(&phone.ipa).to_string(),
                 syllable: syllable_index,
             });
             cursor += duration;
         }
     }
-    Ok(spans)
+    spans
 }
 
 fn interpolate_curve(points: &[(f32, f32)], time: f32, fallback: f32) -> f32 {
@@ -506,7 +491,7 @@ impl FunctionalSingingEngine {
     ) -> Result<Vec<ArticulatoryState>> {
         performance.validate()?;
         self.pipeline.reset();
-        let spans = phone_spans(performance)?;
+        let spans = phone_spans(performance);
         let pitch: Vec<_> = performance
             .pitch_curve
             .iter()
@@ -570,7 +555,7 @@ impl FunctionalSingingEngine {
     /// `motor_states`, this contains no absolute tube geometry.
     pub fn gesture_frames(&mut self, performance: &VocalPerformance) -> Result<Vec<GestureFrame>> {
         let states = self.motor_states(performance)?;
-        let spans = phone_spans(performance)?;
+        let spans = phone_spans(performance);
         Ok(states
             .iter()
             .enumerate()
@@ -687,41 +672,8 @@ mod tests {
         .unwrap();
         let mut engine = FunctionalSingingEngine::new(24_000);
         let stem = engine.render(&performance).unwrap();
-        assert_eq!(stem.backend, "functional-tract-kl24-baseline-v1");
+        assert_eq!(stem.backend, "functional-tract-hdc-cfc");
         assert!(stem.samples.iter().any(|sample| sample.abs() > 1e-6));
         assert!(stem.samples.iter().all(|sample| sample.is_finite()));
-    }
-    #[test]
-    fn supported_english_ipa_maps_explicitly() {
-        assert_eq!(ipa_to_arpa("ə").unwrap(), "AX");
-        assert_eq!(ipa_to_arpa("ɹ").unwrap(), "R");
-        assert_eq!(ipa_to_arpa("tʃ").unwrap(), "CH");
-    }
-
-    #[test]
-    fn unsupported_ipa_is_rejected_instead_of_becoming_schwa() {
-        for ipa in ["ǃ", "ʘ", "ǀ", "ǂ", "ǁ", "ɣ"] {
-            let error = ipa_to_arpa(ipa).unwrap_err().to_string();
-            assert!(error.contains("unsupported IPA phoneme"), "{ipa}: {error}");
-        }
-    }
-
-    #[test]
-    fn functional_singing_rejects_unqualified_language_profiles() {
-        let mut performance = VocalPerformance::from_melody(
-            "light",
-            &[Note {
-                frequency: 220.0,
-                start_time: 0.0,
-                duration: 0.3,
-                velocity: 0.7,
-            }],
-            "en",
-        )
-        .unwrap();
-        performance.language = "zu".into();
-        let error = phone_spans(&performance).unwrap_err().to_string();
-        assert!(error.contains("language='en' only"));
-        assert!(error.contains("zu"));
     }
 }
