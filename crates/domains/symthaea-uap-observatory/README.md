@@ -21,6 +21,43 @@ object classifier or a theory of UAP propulsion.
 Uncalibrated records are retained and marked as such. They are not deleted,
 silently repaired or converted into anomalous-object claims.
 
+
+## Bearing-only triangulation (new prototype)
+
+The `triangulation` module adds a multi-sensor ECEF bearing solution:
+
+- Sensor origins expressed in ECEF metres.
+- Active sensor-body-to-ECEF quaternion.
+- Azimuth/elevation bearings and per-axis one-sigma angular uncertainty.
+- Least-squares intersection initialization.
+- Uncertainty-weighted Gauss-Newton refinement in angular residual space.
+- Linearized ECEF covariance, chi-square residual, degrees of freedom,
+  angular RMS, geometric condition number and iteration count.
+- Fail-closed rejection of parallel/ill-conditioned geometry, duplicate
+  sensors, invalid quaternions/uncertainties, vertical azimuth singularities,
+  behind-sensor solutions and non-convergence.
+
+Sensor-body convention is +X forward, +Y right, +Z up. Azimuth is measured
+from +X toward +Y; elevation is positive toward +Z. Sensor rotations are active
+body-to-ECEF quaternions.
+
+The covariance is a local linearized approximation to the angular
+least-squares model. It does not yet propagate sensor-pose, clock, refraction,
+boresight drift or correlated calibration covariance. Observations must
+already be synchronized to a common epoch; this module does not perform
+time alignment, platform-motion smoothing, multi-target association or
+radar-range fusion.
+
+### Current independent synthetic reference
+
+A separate Python implementation was tested on a fixed four-sensor geometry
+and 1,000 independently perturbed bearing sets. At nominal per-axis angular
+standard deviations of roughly 80–120 microradians, the 3D position RMSE was
+about 3.1 cm and the local Gaussian 95% covariance ellipsoid covered about
+94.4% of the synthetic target positions. These are reference-design numbers,
+not Rust execution or real-instrument results; the complete protocol and
+limitations are in `docs/research/uap-bearing-triangulation-reference-v0.1.md`.
+
 ## Run
 
 ```bash
