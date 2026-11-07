@@ -2,7 +2,7 @@
 
 **Evidence review date:** 2026-11-07  
 **Status:** Research snapshot; not a benchmark result  
-**Parent work:** #10913, #10942, #10943 and #10944
+**Parent work:** #10913, #10942, #10970 and #10971
 
 This document records what public model cards and provider documentation say today. It is not a substitute for running systems against the same admitted audio. Coverage declarations, model-card scores and vendor claims are kept separate from independently reproduced measurements.
 
@@ -152,7 +152,7 @@ Keep every dimension visible; do not compress them into a single score.
 | Efficiency | RTFx, throughput, CPU/GPU, peak RAM/VRAM, energy and cost per audio hour |
 | Deployment | Offline capability, API region, data retention/residency, price and licence constraints |
 
-WER remains necessary for direct comparability. CER provides a different view, not a complete measure of linguistic preservation. For morphologically rich languages, a native-adjudicated morphology-aware layer is worth researching, but it must never silently replace WER/CER or be applied where segmentation labels are unreliable. See #10944.
+WER remains necessary for direct comparability. CER provides a different view, not a complete measure of linguistic preservation. For morphologically rich languages, a native-adjudicated morphology-aware layer is worth researching, but it must never silently replace WER/CER or be applied where segmentation labels are unreliable. See #10971.
 
 ## 6. Fair experiment protocol
 
@@ -188,8 +188,8 @@ These are research targets, not current Symthaea results.
 - #10913 — South African language/domain/code-switch qualification protocol.
 - #10914 — metadata-only cohort registry.
 - #10942 — fail-closed cohort admission, split-leakage audit and scoring contracts.
-- #10943 — version-pinned external model/provider comparison ledger.
-- #10944 — morphology-aware evaluation research.
+- #10970 — version-pinned external model/provider comparison ledger.
+- #10971 — morphology-aware evaluation research.
 - #10873 — risk-controlled selective recognition and active clarification.
 - #10871 — word/phone alignment and temporal uncertainty.
 - #10890 — acoustic-faithful prosody/vocal-event perception.
