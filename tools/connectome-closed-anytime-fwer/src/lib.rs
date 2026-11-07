@@ -231,9 +231,18 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
         ));
     }
     for (label, digest) in [
-        ("family commitment", family.family_commitment_sha256.as_str()),
-        ("global filtration", family.global_filtration_sha256.as_str()),
-        ("confirmation split", family.confirmation_split_sha256.as_str()),
+        (
+            "family commitment",
+            family.family_commitment_sha256.as_str(),
+        ),
+        (
+            "global filtration",
+            family.global_filtration_sha256.as_str(),
+        ),
+        (
+            "confirmation split",
+            family.confirmation_split_sha256.as_str(),
+        ),
     ] {
         if !valid_digest(digest) {
             return Err(ClosedError(format!("malformed {label} digest")));
@@ -258,7 +267,9 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
         .checked_sub(1)
         .ok_or_else(|| ClosedError("empty e-process path".into()))?;
     if horizon == 0 {
-        return Err(ClosedError("V1 requires at least one evidence update".into()));
+        return Err(ClosedError(
+            "V1 requires at least one evidence update".into(),
+        ));
     }
 
     let mut ids = BTreeSet::new();
@@ -268,9 +279,18 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
         }
         for (label, digest) in [
             ("null specification", claim.null_spec_sha256.as_str()),
-            ("claim global filtration", claim.global_filtration_sha256.as_str()),
-            ("claim confirmation split", claim.confirmation_split_sha256.as_str()),
-            ("component validity receipt", claim.component_validity_receipt_sha256.as_str()),
+            (
+                "claim global filtration",
+                claim.global_filtration_sha256.as_str(),
+            ),
+            (
+                "claim confirmation split",
+                claim.confirmation_split_sha256.as_str(),
+            ),
+            (
+                "component validity receipt",
+                claim.component_validity_receipt_sha256.as_str(),
+            ),
         ] {
             if !valid_digest(digest) {
                 return Err(ClosedError(format!(
@@ -321,8 +341,8 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
         let member_indices: Vec<usize> = (0..claim_count)
             .filter(|index| (mask & (1usize << index)) != 0)
             .collect();
-        let mixture_weight = Rational::one()
-            .checked_div(Rational::new(member_indices.len() as u128, 1)?)?;
+        let mixture_weight =
+            Rational::one().checked_div(Rational::new(member_indices.len() as u128, 1)?)?;
         let mut mixture_path = Vec::with_capacity(horizon + 1);
         let mut running_suprema = Vec::with_capacity(horizon + 1);
         let mut rejection_path = Vec::with_capacity(horizon + 1);
@@ -439,7 +459,11 @@ mod tests {
             alpha: r(1, 5),
             claims: vec![
                 claim("H1-local-reset", 'a', &[r(1, 1), r(5, 1), r(20, 1)]),
-                claim("H2-off-diagonal-transfer", 'b', &[r(1, 1), r(4, 1), r(15, 1)]),
+                claim(
+                    "H2-off-diagonal-transfer",
+                    'b',
+                    &[r(1, 1), r(4, 1), r(15, 1)],
+                ),
                 claim("H3-contact-modulation", 'c', &[r(1, 1), r(3, 2), r(2, 1)]),
             ],
         }
@@ -470,9 +494,18 @@ mod tests {
         assert_eq!(report.elementary[0].first_rejection_stage, Some(2));
         assert_eq!(report.elementary[1].first_rejection_stage, Some(2));
         assert_eq!(report.elementary[2].first_rejection_stage, None);
-        assert_eq!(report.elementary[0].rejection_path, vec![false, false, true]);
-        assert_eq!(report.elementary[1].rejection_path, vec![false, false, true]);
-        assert_eq!(report.elementary[2].rejection_path, vec![false, false, false]);
+        assert_eq!(
+            report.elementary[0].rejection_path,
+            vec![false, false, true]
+        );
+        assert_eq!(
+            report.elementary[1].rejection_path,
+            vec![false, false, true]
+        );
+        assert_eq!(
+            report.elementary[2].rejection_path,
+            vec![false, false, false]
+        );
         assert_eq!(report.family_fwer_bound, r(1, 5));
     }
 
