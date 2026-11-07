@@ -58,6 +58,82 @@ impl From<RationalError> for RationalInferenceError {
     fn from(value: RationalError) -> Self { Self::Arithmetic(value) }
 }
 
+/// First-order expectation-semiring element.
+///
+/// mass stores the ordinary sum-product weight. Each moment stores the
+/// unnormalized weighted sum of one additive feature across assignments.
+/// Multiplication applies the product rule:
+/// (p, u) * (q, v) = (p*q, u*q + v*p).
+///
+/// This carries all unary state-indicator totals through one VE pass. The
+/// vector width is the sum of variable cardinalities, so memory and arithmetic
+/// cost grow with the number of queried state indicators.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RationalExpectationValue {
+    mass: CheckedRational,
+    moments: Vec<CheckedRational>,
+}
+impl RationalExpectationValue {
+    fn zero(dimensions: usize) -> Self {
+        Self {
+            mass: CheckedRational::zero(),
+            moments: vec![CheckedRational::zero(); dimensions],
+        }
+    }
+
+    fn one(dimensions: usize) -> Self {
+        Self {
+            mass: CheckedRational::one(),
+            moments: vec![CheckedRational::zero(); dimensions],
+        }
+    }
+
+    fn constant(mass: CheckedRational, dimensions: usize) -> Self {
+        Self {
+            mass,
+            moments: vec![CheckedRational::zero(); dimensions],
+        }
+    }
+
+    fn check_dimensions(&self, other: &Self) -> Result<(), crate::semiring::SemiringError> {
+        if self.moments.len() != other.moments.len() {
+            return Err(crate::semiring::SemiringError::DimensionMismatch {
+                expected: self.moments.len(),
+                actual: other.moments.len(),
+            });
+        }
+        Ok(())
+    }
+}
+impl crate::semiring::ExactSemiring for RationalExpectationValue {
+    fn checked_add(&self, other: &Self) -> Result<Self, crate::semiring::SemiringError> {
+        self.check_dimensions(other)?;
+        let mass = self.mass.checked_add(other.mass)
+            .map_err(|error| crate::semiring::SemiringError::Domain(error.to_string()))?;
+        let moments = self.moments.iter().zip(&other.moments)
+            .map(|(left, right)| left.checked_add(*right)
+                .map_err(|error| crate::semiring::SemiringError::Domain(error.to_string())))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self { mass, moments })
+    }
+
+    fn checked_mul(&self, other: &Self) -> Result<Self, crate::semiring::SemiringError> {
+        self.check_dimensions(other)?;
+        let mass = self.mass.checked_mul(other.mass)
+            .map_err(|error| crate::semiring::SemiringError::Domain(error.to_string()))?;
+        let mut moments = Vec::with_capacity(self.moments.len());
+        for (left, right) in self.moments.iter().zip(&other.moments) {
+            let left_weighted = left.checked_mul(other.mass)
+                .map_err(|error| crate::semiring::SemiringError::Domain(error.to_string()))?;
+            let right_weighted = right.checked_mul(self.mass)
+                .map_err(|error| crate::semiring::SemiringError::Domain(error.to_string()))?;
+            moments.push(left_weighted.checked_add(right_weighted)
+                .map_err(|error| crate::semiring::SemiringError::Domain(error.to_string()))?);
+        }
+        Ok(Self { mass, moments })
+    }
+}
+
 /// Exact rational posterior over a finite factor graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RationalPosterior {
@@ -145,6 +221,102 @@ pub fn posterior_marginals(
     })
 }
 
+/// Compute all finite unary posterior marginals in one exact VE pass.
+///
+/// This expectation-semiring implementation augments the coefficient value
+/// with one additive statistic per variable state. A unary marker contributes
+/// one to the selected state and zero to every other state. The elimination
+/// result therefore contains both Z and each unnormalized state mass Z(i,s).
+///
+/// This is algebraically equivalent to repeated conditioning but trades
+/// repeated VE runs for a larger coefficient payload of
+/// sum_i cardinality_i rational moments. Benchmark both strategies: the
+/// expectation-semiring route is not guaranteed to be faster for every graph
+/// or query width.
+pub fn posterior_marginals_expectation_semiring(
+    graph: &ExactFactorGraph<CheckedRational>,
+    elimination_order: &[usize],
+) -> Result<RationalPosterior, RationalInferenceError> {
+    for (factor_index, factor) in graph.factors().iter().enumerate() {
+        for value in &factor.values {
+            if value.is_negative() {
+                return Err(RationalInferenceError::NegativePotential {
+                    factor_index,
+                    numerator: value.numerator(),
+                    denominator: value.denominator(),
+                });
+            }
+        }
+    }
+
+    let dimensions = graph.cardinalities().iter().try_fold(0usize, |sum, cardinality| {
+        sum.checked_add(*cardinality)
+    }).ok_or(RationalInferenceError::Arithmetic(RationalError::Overflow))?;
+
+    let mut lifted = ExactFactorGraph::new(
+        graph.cardinalities().to_vec(),
+        RationalExpectationValue::zero(dimensions),
+        RationalExpectationValue::one(dimensions),
+    )?;
+
+    for factor in graph.factors() {
+        let values = factor.values.iter().copied()
+            .map(|mass| RationalExpectationValue::constant(mass, dimensions))
+            .collect();
+        lifted.add_factor(factor.scope.clone(), values)?;
+    }
+
+    let mut offset = 0usize;
+    for (variable_index, &cardinality) in graph.cardinalities().iter().enumerate() {
+        let mut markers = Vec::with_capacity(cardinality);
+        for state in 0..cardinality {
+            let mut moments = vec![CheckedRational::zero(); dimensions];
+            moments[offset + state] = CheckedRational::one();
+            markers.push(RationalExpectationValue {
+                mass: CheckedRational::one(),
+                moments,
+            });
+        }
+        lifted.add_factor(vec![variable_index], markers)?;
+        offset = offset.checked_add(cardinality)
+            .ok_or(RationalInferenceError::Arithmetic(RationalError::Overflow))?;
+    }
+
+    let (aggregate, partition_stats) = lifted.evaluate(elimination_order)?;
+    if aggregate.mass.is_zero() {
+        return Err(RationalInferenceError::ZeroPartitionFunction);
+    }
+
+    let partition_function = aggregate.mass;
+    let mut marginals = Vec::with_capacity(graph.variable_count());
+    let mut offset = 0usize;
+    for (variable_index, &cardinality) in graph.cardinalities().iter().enumerate() {
+        let mut variable_marginal = Vec::with_capacity(cardinality);
+        for state in 0..cardinality {
+            let state_mass = aggregate.moments[offset + state];
+            variable_marginal.push(state_mass.checked_div(partition_function)?);
+        }
+        let marginal_sum = variable_marginal.iter().try_fold(
+            CheckedRational::zero(),
+            |sum, probability| sum.checked_add(*probability),
+        )?;
+        if marginal_sum != CheckedRational::one() {
+            return Err(RationalInferenceError::MarginalNormalizationFailure {
+                variable_index,
+            });
+        }
+        marginals.push(variable_marginal);
+        offset += cardinality;
+    }
+
+    Ok(RationalPosterior {
+        partition_function,
+        marginals,
+        partition_stats,
+        conditioned_eliminations: 0,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -185,6 +357,11 @@ mod tests {
         assert_eq!(posterior.marginals[0], vec![q(1, 3), q(2, 3)]);
         assert_eq!(posterior.marginals[1], vec![q(23, 60), q(37, 60)]);
         assert_eq!(posterior.conditioned_eliminations, 4);
+
+        let one_pass = posterior_marginals_expectation_semiring(&graph, &[0, 1]).unwrap();
+        assert_eq!(one_pass.partition_function, posterior.partition_function);
+        assert_eq!(one_pass.marginals, posterior.marginals);
+        assert_eq!(one_pass.conditioned_eliminations, 0);
     }
 
     #[test]
@@ -338,8 +515,11 @@ mod tests {
                 .map(|states| states.into_iter().map(|mass| mass.checked_div(total).unwrap()).collect::<Vec<_>>())
                 .collect::<Vec<_>>();
             let posterior = posterior_marginals(&graph, &[0, 1, 2]).unwrap();
+            let one_pass = posterior_marginals_expectation_semiring(&graph, &[0, 1, 2]).unwrap();
             assert_eq!(posterior.partition_function, total);
             assert_eq!(posterior.marginals, expected);
+            assert_eq!(one_pass.partition_function, posterior.partition_function);
+            assert_eq!(one_pass.marginals, posterior.marginals);
         }
     }
 
