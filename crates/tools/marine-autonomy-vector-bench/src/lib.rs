@@ -834,6 +834,51 @@ mod tests {
     }
 
     #[test]
+    fn naive_average_can_false_pass_when_two_dimensions_fail() {
+        let mut test_case = case(vec![
+            resource("potable_water", Interval::new(30.0, 30.0), Interval::new(10.0, 10.0)),
+            resource("food_protein", Interval::new(300.0, 300.0), Interval::new(10.0, 10.0)),
+            resource(
+                "blackwater_headroom",
+                Interval::new(50.0, 50.0),
+                Interval::new(10.0, 10.0),
+            ),
+        ]);
+        test_case.profile.target_days = 7.0;
+
+        // Independent naive baseline: averaging 3, 30 and 5 days gives
+        // 12.67 days and would incorrectly approve a 7-day target.
+        let naive_average_days = (3.0_f64 + 30.0 + 5.0) / 3.0;
+        assert!(naive_average_days >= test_case.profile.target_days);
+
+        let report = assess_case(&test_case);
+        assert_eq!(
+            report.disposition,
+            OverallDisposition::AtLeastOneDimensionDoesNotCoverTarget
+        );
+    }
+
+    #[test]
+    fn stale_configuration_binding_does_not_inherit_budget() {
+        let mut test_case = adequate_case();
+        test_case.resources[0].configuration_digest = Some(
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned(),
+        );
+        assert_eq!(assess_case(&test_case).disposition, OverallDisposition::Invalid);
+    }
+
+    #[test]
+    fn missing_evidence_class_preserves_indeterminate_state() {
+        let mut test_case = adequate_case();
+        test_case.resources[0].evidence_class = None;
+        let report = assess_case(&test_case);
+        assert_eq!(report.disposition, OverallDisposition::Indeterminate);
+        assert!(report.findings.contains(&Finding::MissingEvidenceClass {
+            dimension_id: "potable_water".to_owned()
+        }));
+    }
+
+    #[test]
     fn input_permutation_produces_identical_report() {
         let forward = adequate_case();
         let mut reverse = adequate_case();
