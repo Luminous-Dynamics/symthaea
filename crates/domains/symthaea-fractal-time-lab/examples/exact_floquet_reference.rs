@@ -10,10 +10,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fields = vec![-0.31, 0.17, 0.24, -0.22, 0.11, 0.29];
     let pulse_angle = PI + 0.08;
 
-    let mut interacting =
-        KickedIsingFloquet::new(6, couplings, fields.clone(), pulse_angle)?;
-    let mut noninteracting =
-        KickedIsingFloquet::new(6, vec![0.0; 5], fields, pulse_angle)?;
+    let mut interacting = KickedIsingFloquet::new(6, couplings, fields.clone(), pulse_angle)?;
+    let mut noninteracting = KickedIsingFloquet::new(6, vec![0.0; 5], fields, pulse_angle)?;
 
     let periods = 32;
     let interacting_signal = interacting.stroboscopic_magnetization(periods);
@@ -32,7 +30,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             interacting_signal[t], noninteracting_signal[t]
         );
     }
-    println!("interacting_norm_squared={:.15}", interacting.norm_squared());
+    println!(
+        "interacting_norm_squared={:.15}",
+        interacting.norm_squared()
+    );
     println!(
         "noninteracting_norm_squared={:.15}",
         noninteracting.norm_squared()
