@@ -167,6 +167,26 @@ Compare static-first, unconstrained model-selected tools, a transparent evidence
 
 Compare quality at matched all-in budget and cost at non-inferior quality, including model, retrieval, compiler/test, judge, human review and retry costs. This is not a new CEB metric lane or a claim that expected information gain is calibrated. See [CEB Review Sequential Evidence Acquisition V0](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md).
  
+## 3.13 From uptake to verified engineering impact
+
+Code-review evaluation now has a useful split between controlled replay and production workflow evidence.
+
+**Kodus CodeReviewBench** uses 30 merged PRs and 95 human-authored bugs from five production repositories. All systems use one frozen-replay Kodus harness and one Claude Haiku 4.5 judge. DeepSeek V4 Pro reports 43.9 F1 / 43.6% precision / 44.2% recall at approximately $0.30 per PR. The 95% PR-bootstrap interval on recall is 32.3–56.3 over 2,000 resamples. Every model receives one agent pass; model run-to-run variance is not measured. Its gold bugs were already surfaced by human reviewers, so this is a recovery-of-human-found-bugs benchmark, not exhaustive defect discovery. Small-sample ranks should be treated as uncertain. Sources: [leaderboard](https://www.codereviewbench.com/leaderboard), [scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), [method and limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026).
+
+**Martian Code Review Benchmark** analyzes production bot comments and developer response/change timelines. Its dashboard reports a recent-period view across 17,768 scored PRs, but system-specific recent samples differ (e.g., Greptile 1,600; Cubic Dev AI 1,525; Qodo 2,435). Its reported F1/precision/recall reflect an LLM-derived production-review adoption analysis, not fixed-gold causal diagnosis. Sources: [dashboard](https://www.codereviewbenchmark.com/), [alternate dashboard](https://codereview.withmartian.com/?fscore_group=day).
+
+**Do not collapse four states:**
+1. **Truth:** independently verified defect and causal mechanism on the exact reviewed revision.
+2. **Utility:** whether the finding is actionable and useful under the frozen review scope.
+3. **Uptake:** whether the developer accepted, rejected, deferred, discussed or independently reproduced the suggestion.
+4. **Outcome:** whether a later change prevents recurrence, reduces rework, causes regressions or survives subsequent evolution.
+
+Acceptance is not proof of correctness. Rejection is not proof of a false finding. A later code change may be independently motivated or may respond to several comments. Use adoption as observed process evidence, not an oracle. When attributing an outcome to a review comment, record the temporal link, alternative causes and the comparison/assignment design; do not infer causality from a post-review diff alone.
+
+**CEB measurement mapping:** keep the existing CEB-REVIEW primary measures unchanged—`defect_recall_at_5`, `actionable_precision`, and `reviewer_burden`. Human uptake and downstream impact can be recorded as contextual observations under existing CEB-HUMAN / continuity research and human-review protocols; no new primary metric lane or composite score is introduced. Keep non-response, defer, explicit rejection, accepted suggestion and independently reproduced finding as distinct events. Do not infer preferences or correctness from silence.
+
+**Research requirement:** build the human review calibration exercise before using production uptake to compare systems. Independently label truth/actionability first; then analyze uptake. Preserve all four outcomes separately, including false-but-accepted suggestions and correct-but-rejected findings. The current [CEB Review Human Calibration Pack V0](CEB_REVIEW_HUMAN_CALIBRATION_PACK_V0_2026-11-07.md) provides three source-only causal cases and eighteen shuffled variants for dry-run adjudication; it is public development material, not a sealed benchmark.
+
 ## 4. Matched industry comparison design
 
 For every CEB slice, compare:
