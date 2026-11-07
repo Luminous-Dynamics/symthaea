@@ -186,13 +186,17 @@ impl VerificationCheck {
         require_nonempty("verification check name", &self.name)?;
         require_nonempty("verification check notes", &self.notes)?;
         if self.status == VerificationStatus::Passed {
-            if self.source_commit_sha != manifest.source_commit_sha {
-                return Err(ManifestError::StaleHead {
-                    check: self.name.clone(),
-                    expected: manifest.source_commit_sha.clone(),
-                    actual: self.source_commit_sha.clone(),
-                });
-            }
+        }
+        if !is_git_sha(&self.source_commit_sha)
+            || self.source_commit_sha != manifest.source_commit_sha
+        {
+            return Err(ManifestError::StaleHead {
+                check: self.name.clone(),
+                expected: manifest.source_commit_sha.clone(),
+                actual: self.source_commit_sha.clone(),
+            });
+        }
+        if self.status == VerificationStatus::Passed {
             let log = self
                 .log_artifact
                 .as_ref()
@@ -250,6 +254,14 @@ impl RunReceipt {
                 expected: manifest.source_commit_sha.clone(),
                 actual: self.source_commit_sha.clone(),
             });
+        }
+        if self.environment.toolchain != manifest.toolchain
+            || self.environment.platform != manifest.platform
+        {
+            return Err(ManifestError::RunEnvironmentMismatch);
+        }
+        if self.status == VerificationStatus::Passed && !manifest.source_tree_clean {
+            return Err(ManifestError::DirtySourceTreeCannotPass);
         }
         for check in &self.checks {
             check.validate_against(manifest)?;
@@ -309,6 +321,10 @@ pub enum ManifestError {
     PassedRunWithoutOutputs,
     #[error("a run marked passed contains a queued, running, skipped, not-run or failed check")]
     PassedRunWithNonPassingCheck,
+    #[error("run environment toolchain or platform does not match the manifest")]
+    RunEnvironmentMismatch,
+    #[error("a run from a dirty source tree cannot qualify as passed")]
+    DirtySourceTreeCannotPass,
 }
 
 fn require_nonempty(field: &'static str, value: &str) -> Result<(), ManifestError> {
@@ -465,6 +481,25 @@ mod tests {
             assert!(!status.is_passed());
         }
         assert!(VerificationStatus::Passed.is_passed());
+    }
+
+    #[test]
+    fn dirty_tree_and_environment_mismatch_cannot_qualify_as_pass() {
+        let mut manifest = manifest();
+        manifest.source_tree_clean = false;
+        let receipt = passing_receipt(&manifest);
+        assert_eq!(
+            receipt.validate_against(&manifest),
+            Err(ManifestError::DirtySourceTreeCannotPass)
+        );
+
+        let manifest = manifest();
+        let mut receipt = passing_receipt(&manifest);
+        receipt.environment.toolchain = "rustc 1.97.0".to_string();
+        assert_eq!(
+            receipt.validate_against(&manifest),
+            Err(ManifestError::RunEnvironmentMismatch)
+        );
     }
 
     #[test]
