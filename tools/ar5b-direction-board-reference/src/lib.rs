@@ -48,6 +48,9 @@ pub struct Observation {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Direction {
+    /// Actual in-flight allocation from the independently supplied worker snapshot.
+    pub active_evaluations: usize,
+    pub active_cost_units: f64,
     /// Canonical identifier assigned by the independent direction verifier.
     pub direction_id: String,
     /// Verifier-issued fingerprint of capability × solution × construction × scope.
@@ -72,6 +75,9 @@ pub struct Direction {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct NewDirectionOption {
+    /// Actual in-flight verifier-intake allocation from the active worker snapshot.
+    pub active_evaluations: usize,
+    pub active_cost_units: f64,
     /// The option allocates budget to verifier intake, not to a candidate-minted ID.
     pub enabled: bool,
     pub prior_gain_per_cost: f64,
@@ -83,6 +89,9 @@ pub struct NewDirectionOption {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Budget {
+    /// Total campaign envelope before active and new recommendations.
+    pub total_cost_units: f64,
+    /// Uncommitted portion of the total envelope available to this advisory allocation.
     pub available_cost_units: f64,
 }
 
@@ -103,6 +112,8 @@ pub struct Campaign {
     pub campaign_id: String,
     pub budget: Budget,
     pub config: BoardConfig,
+    /// Immutable snapshot reference for actual in-flight work; not minted by this board.
+    pub active_allocation_snapshot_ref: String,
     pub directions: Vec<Direction>,
     pub new_direction_option: NewDirectionOption,
 }
@@ -115,6 +126,8 @@ pub struct ScoreBreakdown {
     pub exploration_bonus: f64,
     pub potential: f64,
     pub completed_evaluations: usize,
+    pub active_evaluations: usize,
+    pub active_cost_units: f64,
     pub valid_paired_observations: usize,
     pub virtual_allocations: usize,
     pub eligible: bool,
@@ -147,6 +160,10 @@ pub struct BoardReport {
     pub schema_version: String,
     pub campaign_id: String,
     pub mode: String,
+    pub total_budget_units: f64,
+    pub active_budget_cost_units: f64,
+    pub reserved_or_unavailable_budget_units: f64,
+    pub active_allocation_snapshot_ref: String,
     pub available_budget_units: f64,
     pub allocated_budget_units: f64,
     pub unallocated_budget_units: f64,
@@ -164,6 +181,8 @@ struct CandidateState {
     max_share_bps: u16,
     local_best_score: Option<f64>,
     completed_evaluations: usize,
+    active_evaluations: usize,
+    active_cost_units: f64,
     valid_paired_observations: usize,
     raw_gain_per_cost: f64,
     shrunk_gain_per_cost: f64,
@@ -180,7 +199,8 @@ impl CandidateState {
         global_virtual_allocations: usize,
         exploration_weight: f64,
     ) -> f64 {
-        let observed = self.completed_evaluations + self.virtual_allocations;
+        let observed =
+            self.completed_evaluations + self.active_evaluations + self.virtual_allocations;
         let total = global_completed_evaluations + global_virtual_allocations;
         let numerator = ((total as f64) + 2.0).ln().max(0.0);
         let denominator = (observed as f64) + 1.0;
@@ -275,8 +295,27 @@ pub fn validate_campaign(campaign: &Campaign) -> Vec<String> {
     if !non_empty(&campaign.campaign_id) {
         issues.push("CAMPAIGN_ID: campaign_id must be non-empty".to_owned());
     }
-    if !positive(campaign.budget.available_cost_units) {
-        issues.push("BUDGET: available_cost_units must be finite and positive".to_owned());
+    if !positive(campaign.budget.total_cost_units) {
+        issues.push("BUDGET: total_cost_units must be finite and positive".to_owned());
+    }
+    if !finite(campaign.budget.available_cost_units) || campaign.budget.available_cost_units < 0.0 {
+        issues.push("BUDGET: available_cost_units must be finite and non-negative".to_owned());
+    }
+    if !non_empty(&campaign.active_allocation_snapshot_ref) {
+        issues.push("ACTIVE_ALLOCATION_SNAPSHOT: an independent snapshot reference is required".to_owned());
+    }
+    let active_cost_from_directions: f64 = campaign
+        .directions
+        .iter()
+        .map(|direction| direction.active_cost_units)
+        .sum();
+    let active_new_cost = campaign.new_direction_option.active_cost_units;
+    let total_active_cost = active_cost_from_directions + active_new_cost;
+    if !finite(total_active_cost)
+        || total_active_cost + campaign.budget.available_cost_units
+            > campaign.budget.total_cost_units + EPSILON
+    {
+        issues.push("BUDGET_DOUBLE_COUNT: active plus available budget exceeds total campaign envelope".to_owned());
     }
     if !finite(campaign.config.exploration_weight) || campaign.config.exploration_weight < 0.0 {
         issues.push("EXPLORATION_WEIGHT: must be finite and non-negative".to_owned());
@@ -354,6 +393,12 @@ pub fn validate_campaign(campaign: &Campaign) -> Vec<String> {
         if !positive(direction.estimated_cost_per_evaluation) {
             issues.push(format!("EVALUATION_COST: invalid cost for {}", direction.direction_id));
         }
+        if !finite(direction.active_cost_units) || direction.active_cost_units < 0.0 {
+            issues.push(format!("ACTIVE_COST: invalid active cost for {}", direction.direction_id));
+        }
+        if (direction.active_evaluations == 0) != (direction.active_cost_units == 0.0) {
+            issues.push(format!("ACTIVE_ALLOCATION_MISMATCH: count/cost mismatch for {}", direction.direction_id));
+        }
         if direction.max_share_bps == 0 || direction.max_share_bps > 10_000 {
             issues.push(format!("MAX_SHARE: invalid basis-point cap for {}", direction.direction_id));
         }
@@ -410,6 +455,15 @@ pub fn validate_campaign(campaign: &Campaign) -> Vec<String> {
     }
 
     let new_option = &campaign.new_direction_option;
+    if !finite(new_option.active_cost_units) || new_option.active_cost_units < 0.0 {
+        issues.push("NEW_ACTIVE_COST: invalid active allocation cost".to_owned());
+    }
+    if (new_option.active_evaluations == 0) != (new_option.active_cost_units == 0.0) {
+        issues.push("NEW_ACTIVE_ALLOCATION_MISMATCH: count/cost mismatch".to_owned());
+    }
+    if !new_option.enabled && new_option.active_evaluations > 0 {
+        issues.push("NEW_ACTIVE_WHEN_DISABLED: disabled NEW option cannot have active evaluations".to_owned());
+    }
     if new_option.enabled {
         if !finite(new_option.prior_gain_per_cost) {
             issues.push("NEW_PRIOR: prior_gain_per_cost must be finite".to_owned());
@@ -448,6 +502,8 @@ fn build_states(campaign: &Campaign, global_prior: f64) -> Vec<CandidateState> {
             max_share_bps: direction.max_share_bps,
             local_best_score: Some(direction.local_best_score),
             completed_evaluations: total_count,
+            active_evaluations: direction.active_evaluations,
+            active_cost_units: direction.active_cost_units,
             valid_paired_observations: valid_count,
             raw_gain_per_cost: raw_rate,
             shrunk_gain_per_cost: shrunk,
@@ -466,6 +522,8 @@ fn build_states(campaign: &Campaign, global_prior: f64) -> Vec<CandidateState> {
             max_share_bps: option.max_share_bps,
             local_best_score: None,
             completed_evaluations: 0,
+            active_evaluations: option.active_evaluations,
+            active_cost_units: option.active_cost_units,
             valid_paired_observations: 0,
             raw_gain_per_cost: option.prior_gain_per_cost,
             shrunk_gain_per_cost: option.prior_gain_per_cost,
@@ -499,6 +557,8 @@ fn make_score(
         exploration_bonus: potential - state.shrunk_gain_per_cost,
         potential,
         completed_evaluations: state.completed_evaluations,
+        active_evaluations: state.active_evaluations,
+        active_cost_units: state.active_cost_units,
         valid_paired_observations: state.valid_paired_observations,
         virtual_allocations: state.virtual_allocations,
         eligible: eligibility.is_ok(),
@@ -516,8 +576,7 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
     let mut states = build_states(campaign, global_prior);
     let global_completed_evaluations: usize = states
         .iter()
-        .filter(|state| state.candidate_id != RESERVED_NEW_ID)
-        .map(|state| state.completed_evaluations)
+        .map(|state| state.completed_evaluations + state.active_evaluations)
         .sum();
 
     let mut remaining = campaign.budget.available_cost_units;
@@ -598,6 +657,8 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
             candidate_id: state.candidate_id.clone(),
             recommended_evaluations: state.virtual_allocations,
             recommended_cost_units: state.allocated_cost,
+            active_evaluations: state.active_evaluations,
+            active_cost_units: state.active_cost_units,
             initial_potential: state.initial_potential.unwrap_or(0.0),
             estimated_cost_per_evaluation: state.estimated_cost_per_evaluation,
             max_share_bps: state.max_share_bps,
@@ -607,6 +668,12 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
     recommendations.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
     let allocated = campaign.budget.available_cost_units - remaining;
+    let active_budget_cost_units = states.iter().map(|state| state.active_cost_units).sum();
+    let reserved_or_unavailable_budget_units =
+        (campaign.budget.total_cost_units
+            - active_budget_cost_units
+            - campaign.budget.available_cost_units)
+            .max(0.0);
     let decision_limit_reached =
         decision_trace.len() == campaign.config.max_allocation_slots && remaining > EPSILON;
 
@@ -614,6 +681,10 @@ pub fn allocate(campaign: &Campaign) -> Result<BoardReport, Vec<String>> {
         schema_version: SCHEMA_VERSION.to_owned(),
         campaign_id: campaign.campaign_id.clone(),
         mode: "advisory_only".to_owned(),
+        total_budget_units: campaign.budget.total_cost_units,
+        active_budget_cost_units,
+        reserved_or_unavailable_budget_units,
+        active_allocation_snapshot_ref: campaign.active_allocation_snapshot_ref.clone(),
         available_budget_units: campaign.budget.available_cost_units,
         allocated_budget_units: allocated,
         unallocated_budget_units: remaining,
@@ -663,6 +734,8 @@ mod tests {
     fn direction(id: &str, digest_char: char) -> Direction {
         let digest = digest_char.to_string().repeat(64);
         Direction {
+            active_evaluations: 0,
+            active_cost_units: 0.0,
             direction_id: id.to_owned(),
             canonical_fingerprint: digest.clone(),
             target_capability_digest: digest.clone(),
