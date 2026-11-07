@@ -26,10 +26,11 @@
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
 use thiserror::Error;
 
-pub const SCIENCE_EVIDENCE_SCHEMA: &str = "symthaea-science-evidence-v1";
+pub const SCIENCE_EVIDENCE_SCHEMA: &str = "symthaea-science-evidence-v2";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ClaimBoundary {
@@ -85,6 +86,16 @@ impl ArtifactDigest {
         }
     }
 
+    /// Recompute both the byte length and BLAKE3 digest against actual bytes.
+    pub fn verify_bytes(&self, bytes: &[u8]) -> Result<(), ManifestError> {
+        self.validate()?;
+        let actual_digest = blake3::hash(bytes).to_hex().to_string();
+        if self.byte_length != bytes.len() as u64 || self.blake3_hex != actual_digest {
+            return Err(ManifestError::ArtifactBytesMismatch(self.path.clone()));
+        }
+        Ok(())
+    }
+
     pub fn validate(&self) -> Result<(), ManifestError> {
         require_nonempty("artifact path", &self.path)?;
         if !is_lower_hex_digest(&self.blake3_hex) {
@@ -124,6 +135,8 @@ pub struct ExperimentManifest {
     /// State the baseline explicitly; "none: analytic identity" is valid.
     pub baseline_description: String,
     pub primary_metrics: Vec<String>,
+    /// Complete, frozen set of checks required for a run to qualify as passed.
+    pub required_checks: Vec<String>,
     /// State the uncertainty method, including explicitly "not applicable".
     pub uncertainty_method: String,
     pub claim_boundary: ClaimBoundary,
@@ -151,10 +164,13 @@ impl ExperimentManifest {
         require_nonempty_list("coordinate_and_unit_conventions", &self.coordinate_and_unit_conventions)?;
         require_nonempty_list("equations_and_assumptions", &self.equations_and_assumptions)?;
         require_nonempty_list("primary_metrics", &self.primary_metrics)?;
+        require_nonempty_list("required_checks", &self.required_checks)?;
+        ensure_unique_strings("required_checks", &self.required_checks)?;
         require_nonempty_list("claims", &self.claims)?;
         require_nonempty_list("non_claims", &self.non_claims)?;
         require_nonempty_list("falsification_conditions", &self.falsification_conditions)?;
 
+        ensure_unique_artifact_paths(&self.input_artifacts)?;
         for artifact in &self.input_artifacts {
             artifact.validate()?;
         }
@@ -261,9 +277,19 @@ impl RunReceipt {
         if self.status == VerificationStatus::Passed && !manifest.source_tree_clean {
             return Err(ManifestError::DirtySourceTreeCannotPass);
         }
+        let mut observed_checks = BTreeSet::new();
         for check in &self.checks {
+            if !observed_checks.insert(check.name.as_str()) {
+                return Err(ManifestError::DuplicateCheck(check.name.clone()));
+            }
             check.validate_against(manifest)?;
         }
+        let required_checks: BTreeSet<&str> =
+            manifest.required_checks.iter().map(String::as_str).collect();
+        if observed_checks != required_checks {
+            return Err(ManifestError::RequiredCheckSetMismatch);
+        }
+        ensure_unique_artifact_paths(&self.output_artifacts)?;
         for artifact in &self.output_artifacts {
             artifact.validate()?;
         }
@@ -303,6 +329,16 @@ pub enum ManifestError {
     InvalidDigest { field: String },
     #[error("artifact {0} is empty")]
     EmptyArtifact(String),
+    #[error("artifact bytes do not match the recorded length/digest: {0}")]
+    ArtifactBytesMismatch(String),
+    #[error("artifact path is duplicated: {0}")]
+    DuplicateArtifactPath(String),
+    #[error("required check name is duplicated: {0}")]
+    DuplicateRequiredCheck(String),
+    #[error("verification check name is duplicated: {0}")]
+    DuplicateCheck(String),
+    #[error("run receipt check set does not exactly match the manifest's required checks")]
+    RequiredCheckSetMismatch,
     #[error("manifest serialization failed: {0}")]
     Serialization(String),
     #[error("run receipt manifest digest does not match its manifest")]
@@ -342,6 +378,30 @@ fn require_nonempty_list(
     } else {
         Ok(())
     }
+}
+
+fn ensure_unique_strings(
+    field: &'static str,
+    values: &[String],
+) -> Result<(), ManifestError> {
+    let mut seen = BTreeSet::new();
+    for value in values {
+        if !seen.insert(value.as_str()) {
+            return Err(ManifestError::DuplicateRequiredCheck(value.clone()));
+        }
+    }
+    let _ = field;
+    Ok(())
+}
+
+fn ensure_unique_artifact_paths(artifacts: &[ArtifactDigest]) -> Result<(), ManifestError> {
+    let mut seen = BTreeSet::new();
+    for artifact in artifacts {
+        if !seen.insert(artifact.path.as_str()) {
+            return Err(ManifestError::DuplicateArtifactPath(artifact.path.clone()));
+        }
+    }
+    Ok(())
 }
 
 fn is_git_sha(value: &str) -> bool {
@@ -384,6 +444,11 @@ mod tests {
             seeds: vec![42],
             baseline_description: "analytic Minkowski ordering-fraction r=0.5".to_string(),
             primary_metrics: vec!["ordering_fraction".to_string(), "MM_dimension".to_string()],
+            required_checks: vec![
+                "unit-tests".to_string(),
+                "analytic-oracle".to_string(),
+                "format-check".to_string(),
+            ],
             uncertainty_method: "multi-seed sample SD and t interval".to_string(),
             claim_boundary: ClaimBoundary::NumericalSimulation,
             claims: vec!["the finite-sample estimator approaches the flat 1+1D reference".to_string()],
@@ -397,13 +462,29 @@ mod tests {
             manifest_blake3_hex: manifest.digest().unwrap(),
             source_commit_sha: manifest.source_commit_sha.clone(),
             status: VerificationStatus::Passed,
-            checks: vec![VerificationCheck {
-                name: "unit-tests".to_string(),
-                status: VerificationStatus::Passed,
-                source_commit_sha: manifest.source_commit_sha.clone(),
-                log_artifact: Some(ArtifactDigest::from_bytes("test.log", b"test result: ok")),
-                notes: "exact-head Rust test run".to_string(),
-            }],
+            checks: vec![
+                VerificationCheck {
+                    name: "unit-tests".to_string(),
+                    status: VerificationStatus::Passed,
+                    source_commit_sha: manifest.source_commit_sha.clone(),
+                    log_artifact: Some(ArtifactDigest::from_bytes("unit-tests.log", b"test result: ok")),
+                    notes: "exact-head Rust test run".to_string(),
+                },
+                VerificationCheck {
+                    name: "analytic-oracle".to_string(),
+                    status: VerificationStatus::Passed,
+                    source_commit_sha: manifest.source_commit_sha.clone(),
+                    log_artifact: Some(ArtifactDigest::from_bytes("oracle.log", b"oracle result: match")),
+                    notes: "independent analytic reference matched".to_string(),
+                },
+                VerificationCheck {
+                    name: "format-check".to_string(),
+                    status: VerificationStatus::Passed,
+                    source_commit_sha: manifest.source_commit_sha.clone(),
+                    log_artifact: Some(ArtifactDigest::from_bytes("format.log", b"format result: clean")),
+                    notes: "format check completed on the exact source head".to_string(),
+                },
+            ],
             output_artifacts: vec![ArtifactDigest::from_bytes("report.json", b"{}")],
             environment: RunEnvironment {
                 toolchain: "rustc 1.96.0".to_string(),
@@ -425,6 +506,41 @@ mod tests {
         changed_input.input_artifacts[0] =
             ArtifactDigest::from_bytes("fixture.json", b"{\"seed\":43}");
         assert_ne!(first_digest, changed_input.digest().unwrap());
+    }
+
+    #[test]
+    fn artifact_digest_recomputes_against_raw_bytes() {
+        let digest = ArtifactDigest::from_bytes("input.bin", b"frozen-input");
+        assert!(digest.verify_bytes(b"frozen-input").is_ok());
+        assert_eq!(
+            digest.verify_bytes(b"tampered-input"),
+            Err(ManifestError::ArtifactBytesMismatch("input.bin".to_string()))
+        );
+    }
+
+    #[test]
+    fn receipt_must_contain_exactly_the_frozen_required_check_set() {
+        let manifest = manifest();
+        let mut missing = passing_receipt(&manifest);
+        missing.checks.pop();
+        assert_eq!(
+            missing.validate_against(&manifest),
+            Err(ManifestError::RequiredCheckSetMismatch)
+        );
+
+        let mut duplicate = passing_receipt(&manifest);
+        duplicate.checks[1].name = duplicate.checks[0].name.clone();
+        assert_eq!(
+            duplicate.validate_against(&manifest),
+            Err(ManifestError::DuplicateCheck("unit-tests".to_string()))
+        );
+
+        let mut unexpected = passing_receipt(&manifest);
+        unexpected.checks[2].name = "unregistered-extra-check".to_string();
+        assert_eq!(
+            unexpected.validate_against(&manifest),
+            Err(ManifestError::RequiredCheckSetMismatch)
+        );
     }
 
     #[test]
@@ -507,7 +623,7 @@ mod tests {
         no_checks.checks.clear();
         assert_eq!(
             no_checks.validate_against(&manifest),
-            Err(ManifestError::PassedRunWithoutChecks)
+            Err(ManifestError::RequiredCheckSetMismatch)
         );
 
         let mut no_outputs = passing_receipt(&manifest);
