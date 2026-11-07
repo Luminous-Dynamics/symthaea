@@ -144,7 +144,10 @@ pub fn score_alignment(
     let frames_to_ms = 1000.0 / f64::from(sample_rate_hz);
     for edit in edits {
         match edit {
-            Edit::Exact { reference: r, predicted: p } => {
+            Edit::Exact {
+                reference: r,
+                predicted: p,
+            } => {
                 counts.exact_matches += 1;
                 exact_prediction_for_reference[r] = Some(p);
                 let expected = &reference[r];
@@ -152,14 +155,12 @@ pub fn score_alignment(
                 onset_errors_ms.push(
                     expected.start_frame.abs_diff(observed.start_frame) as f64 * frames_to_ms,
                 );
-                offset_errors_ms.push(
-                    expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms,
-                );
+                offset_errors_ms
+                    .push(expected.end_frame.abs_diff(observed.end_frame) as f64 * frames_to_ms);
                 let expected_duration = expected.end_frame - expected.start_frame;
                 let observed_duration = observed.end_frame - observed.start_frame;
-                duration_errors_ms.push(
-                    expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms,
-                );
+                duration_errors_ms
+                    .push(expected_duration.abs_diff(observed_duration) as f64 * frames_to_ms);
             }
             Edit::Substitute => counts.substitutions += 1,
             Edit::Delete => counts.deletions += 1,
@@ -171,8 +172,8 @@ pub fn score_alignment(
     let predicted_count = predicted.len();
     let phone_error_rate = counts.errors() as f64 / reference_count as f64;
     let reference_exact_match_fraction = counts.exact_matches as f64 / reference_count as f64;
-    let prediction_exact_precision = (predicted_count > 0)
-        .then(|| counts.exact_matches as f64 / predicted_count as f64);
+    let prediction_exact_precision =
+        (predicted_count > 0).then(|| counts.exact_matches as f64 / predicted_count as f64);
 
     let mut covered_melismas = 0usize;
     for span in melismas {
@@ -252,7 +253,9 @@ fn validate_reference(total_frames: u64, events: &[PhoneEvent]) -> Result<(), St
                 || event.word_index < previous_word
                 || event.syllable_index < previous_syllable)
         {
-            return Err(format!("reference phone {index} is not chronologically ordered"));
+            return Err(format!(
+                "reference phone {index} is not chronologically ordered"
+            ));
         }
         previous_start = event.start_frame;
         previous_word = event.word_index;
@@ -281,7 +284,9 @@ fn validate_predictions(total_frames: u64, events: &[PredictedPhoneEvent]) -> Re
                 || event.word_index < previous_word
                 || event.syllable_index < previous_syllable)
         {
-            return Err(format!("predicted phone {index} is not chronologically ordered"));
+            return Err(format!(
+                "predicted phone {index} is not chronologically ordered"
+            ));
         }
         if let Some(confidence) = event.confidence
             && (!confidence.is_finite() || !(0.0..=1.0).contains(&confidence))
@@ -340,10 +345,7 @@ fn validate_melismas(
     Ok(())
 }
 
-fn align_phone_sequences(
-    reference: &[PhoneEvent],
-    predicted: &[PredictedPhoneEvent],
-) -> Vec<Edit> {
+fn align_phone_sequences(reference: &[PhoneEvent], predicted: &[PredictedPhoneEvent]) -> Vec<Edit> {
     let n = reference.len();
     let m = predicted.len();
     let mut costs = vec![vec![0usize; m + 1]; n + 1];
@@ -425,13 +427,7 @@ fn percentile(values: &[f64], quantile: f64) -> Option<f64> {
 mod tests {
     use super::*;
 
-    fn reference(
-        symbol: &str,
-        syllable: u32,
-        start: u64,
-        end: u64,
-        is_vowel: bool,
-    ) -> PhoneEvent {
+    fn reference(symbol: &str, syllable: u32, start: u64, end: u64, is_vowel: bool) -> PhoneEvent {
         PhoneEvent {
             symbol: symbol.into(),
             word_index: 0,
@@ -543,8 +539,7 @@ mod tests {
             end_frame: 2_300,
             note_count: 4,
         };
-        let result =
-            score_alignment(24_000, 3_000, &reference, &predicted, &[melisma]).unwrap();
+        let result = score_alignment(24_000, 3_000, &reference, &predicted, &[melisma]).unwrap();
         assert_eq!(result.edits.exact_matches, 2);
         assert_eq!(result.edits.insertions, 0);
         assert_eq!(result.melisma.covered_spans, 1);
