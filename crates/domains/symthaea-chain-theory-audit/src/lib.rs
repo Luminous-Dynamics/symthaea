@@ -1,6 +1,3 @@
-pub mod physical_consistency;
-pub use physical_consistency::*;
-
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Independent combinatorial audit of the published Chain Theory alpha count.
@@ -16,6 +13,9 @@ pub use physical_consistency::*;
 //! conjecture, not a theorem of the arithmetic.
 
 #![forbid(unsafe_code)]
+
+pub mod physical_consistency;
+pub use physical_consistency::*;
 
 use std::collections::{BTreeMap, BTreeSet};
 
