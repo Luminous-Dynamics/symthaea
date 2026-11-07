@@ -734,5 +734,4 @@ mod rating_validation_tests {
         assert!(validate_source_revision("0123456789abcdef").is_err());
         assert!(validate_source_revision("z123456789abcdef0123456789abcdef01234567").is_err());
     }
-
 }
