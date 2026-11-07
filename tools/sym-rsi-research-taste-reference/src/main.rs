@@ -11,7 +11,7 @@ fn main() -> ExitCode {
         return ExitCode::from(64);
     };
     let Some(path) = args.next() else {
-        eprintln!("usage: sym-rsi-research-taste-reference <fixtures|evsi> <input.json>");
+        eprintln!("usage: sym-rsi-research-taste-reference <fixtures|pivotal|decision|evsi> <input.json>");
         return ExitCode::from(64);
     };
 
