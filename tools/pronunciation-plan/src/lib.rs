@@ -483,8 +483,7 @@ impl VocalScoreAlignment {
 
         // Collect every sub-interval assigned within each score event. The
         // final coverage pass proves that intervals partition each sung note.
-        let mut event_coverage: Vec<Vec<(f32, f32, usize)>> =
-            vec![Vec::new(); self.events.len()];
+        let mut event_coverage: Vec<Vec<(f32, f32, usize)>> = vec![Vec::new(); self.events.len()];
         let mut previous_binding_end_s: Option<f32> = None;
 
         for (binding_index, (binding, expected)) in self
@@ -500,7 +499,9 @@ impl VocalScoreAlignment {
                 ));
             }
             if binding.spans.is_empty() {
-                return Err(format!("syllable binding {binding_index} has no score spans"));
+                return Err(format!(
+                    "syllable binding {binding_index} has no score spans"
+                ));
             }
 
             let mut previous_span: Option<&ScoreEventSpan> = None;
