@@ -20,7 +20,7 @@ This patch:
 - sustains the last explicitly marked vowel across melisma; consonant-only syllables cannot acquire an implicit schwa;
 - requires the voicebank's silence token explicitly;
 - rejects a non-English performance language in the current English-only DiffSinger worker;
-- hardens `VocalPerformance` construction and validation (language mismatch, unsupported orthography, unpronounceable tokens, lyric/syllable mismatch, dropped lyric syllables, invalid note/phoneme/expression values, overlapping melismas and malformed timelines);
+- hardens `VocalPerformance` construction and validation (language mismatch, unsupported orthography, unpronounceable tokens, lyric/syllable mismatch, dropped lyric syllables, invalid note/phoneme/expression values, overlapping melismas, explicit melisma rests, and malformed timelines);
 - adds a Muse G2P phone-inventory fixture so new source phones cannot silently lack a DiffSinger mapping;
 - removes the unintegrated physical singer from the comparative release gate;
 - adds exact per-case melody/performance receipts and BLAKE3 digests for serialized performance inputs and rendered WAV artifacts;
