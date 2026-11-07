@@ -280,15 +280,15 @@
           },
           {
             "dimension_id": "food_energy",
-            "quantity_unit": "kcal-thousand",
-            "rate_unit": "kcal-thousand/day",
+            "quantity_unit": "J",
+            "rate_unit": "J/day",
             "usable_stock": [
-              300,
-              300
+              1260000000,
+              1260000000
             ],
             "net_depletion_per_day": [
-              10,
-              10
+              42000000,
+              42000000
             ],
             "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "operating_case_id": "frozen-offshore-case-v1",
@@ -316,15 +316,15 @@
           },
           {
             "dimension_id": "food_micronutrients",
-            "quantity_unit": "g",
-            "rate_unit": "g/day",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
             "usable_stock": [
-              20,
-              20
+              0.02,
+              0.02
             ],
             "net_depletion_per_day": [
-              10,
-              10
+              0.01,
+              0.01
             ],
             "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "operating_case_id": "frozen-offshore-case-v1",
