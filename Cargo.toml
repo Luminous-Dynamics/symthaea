@@ -25,6 +25,11 @@ exclude = [
     # Placeholder directory contains only examples/unused.rs and no crate manifest.
     # Exclude it from the crates/core/* workspace glob until it becomes a real crate.
     "crates/core/symthaea",
+    "crates/domains/symthaea-rea-evidence-verifier",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/core/symthaea-observation-attestation",
+    "crates/core/symthaea-iit",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
