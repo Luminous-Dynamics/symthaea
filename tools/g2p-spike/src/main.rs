@@ -59,7 +59,8 @@ mod tests {
 
     #[test]
     fn english_phonemizer_initializes_and_produces_tokens() {
-        let phonemizer = EnglishPhonemizer::new_bundled();
+        let phonemizer = EnglishPhonemizer::new_bundled()
+            .expect("bundled English phonemizer must initialize");
         let (tokens, _prosody) = phonemizer
             .phonemize_with_prosody("hello world")
             .expect("known words should produce an output");
