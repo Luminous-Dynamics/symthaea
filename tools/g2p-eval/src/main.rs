@@ -80,7 +80,7 @@ struct CaseScore {
     candidate_phone_count: usize,
     edits: EditCounts,
     phone_error_rate: Option<f64>,
-    exact_pronunciation: bool,
+    exact_pronunciation: Option<bool>,
     syllable_count_reference: usize,
     syllable_count_candidate: usize,
     boundaries: BoundaryCounts,
@@ -101,6 +101,7 @@ struct AggregateMetrics {
     reference_phone_count: usize,
     phone_edits: usize,
     phone_error_rate: Option<f64>,
+    in_vocabulary_cases: usize,
     exact_pronunciation_cases: usize,
     exact_pronunciation_rate: Option<f64>,
     boundary_true_positive: usize,
@@ -241,7 +242,7 @@ fn align(reference: &[String], candidate: &[String]) -> (EditCounts, usize) {
     }
     for i in 1..=n {
         for j in 1..=m {
-            let substitution = usize::from(reference[i - 1] != candidate[j - 1]);
+            let substitution = if reference[i - 1] != candidate[j - 1] { 1 } else { 0 };
             cost[i][j] = (cost[i - 1][j - 1] + substitution)
                 .min(cost[i - 1][j] + 1)
                 .min(cost[i][j - 1] + 1);
@@ -257,7 +258,7 @@ fn align(reference: &[String], candidate: &[String]) -> (EditCounts, usize) {
     while i > 0 || j > 0 {
         // Deterministic tie-break: diagonal, deletion, insertion.
         if i > 0 && j > 0 {
-            let substitution = usize::from(reference[i - 1] != candidate[j - 1]);
+            let substitution = if reference[i - 1] != candidate[j - 1] { 1 } else { 0 };
             if cost[i][j] == cost[i - 1][j - 1] + substitution {
                 edits.substitutions += substitution;
                 i -= 1;
@@ -276,7 +277,6 @@ fn align(reference: &[String], candidate: &[String]) -> (EditCounts, usize) {
     (edits, cost[n][m])
 }
 
-#[derive(Clone)]
 struct VariantScore<'a> {
     variant: &'a ReferenceVariant,
     edits: EditCounts,
@@ -366,6 +366,12 @@ fn validate_inputs(
             ));
         }
         for variant in &reference.accepted_variants {
+            if variant.phones.is_empty() {
+                return Err(format!(
+                    "in-vocabulary reference {} variant {} must contain phones",
+                    reference.case_id, variant.variant_id
+                ));
+            }
             validate_phone_sequence(
                 &variant.phones,
                 &variant.syllable_boundaries,
@@ -411,6 +417,12 @@ fn validate_inputs(
                 ));
             }
         } else {
+            if prediction.phones.is_empty() {
+                return Err(format!(
+                    "in-vocabulary prediction {} must contain phones",
+                    prediction.case_id
+                ));
+            }
             validate_phone_sequence(
                 &prediction.phones,
                 &prediction.syllable_boundaries,
@@ -465,6 +477,7 @@ fn evaluate(
     let mut cases = Vec::with_capacity(references.len());
     let mut total_reference_phones = 0usize;
     let mut total_edits = 0usize;
+    let mut in_vocabulary_cases = 0usize;
     let mut exact_cases = 0usize;
     let mut boundary_tp = 0usize;
     let mut boundary_fp = 0usize;
@@ -481,10 +494,11 @@ fn evaluate(
     for reference in references {
         let candidate = prediction_by_id[reference.case_id.as_str()];
         let selected = choose_variant(&reference.accepted_variants, candidate);
-        let (reference_phones, edits, distance, boundaries, stress_correct, stress_compared, variant_id) =
+        let (reference_phones, reference_syllables, edits, distance, boundaries, stress_correct, stress_compared, variant_id) =
             if let Some(score) = selected {
                 (
                     score.variant.phones.len(),
+                    score.variant.syllable_boundaries.len(),
                     score.edits,
                     score.distance,
                     score.boundaries,
@@ -494,6 +508,7 @@ fn evaluate(
                 )
             } else {
                 (
+                    0,
                     0,
                     EditCounts {
                         substitutions: 0,
@@ -514,12 +529,18 @@ fn evaluate(
                     None,
                 )
             };
-        let exact = !reference.expected_oov && distance == 0 && !candidate.detected_oov;
+        let exact = (!reference.expected_oov)
+            .then_some(distance == 0 && !candidate.detected_oov);
         let candidate_phone_count = candidate.phones.len();
         let per = (reference_phones > 0).then(|| distance as f64 / reference_phones as f64);
         total_reference_phones += reference_phones;
         total_edits += edits.total();
-        exact_cases += usize::from(exact);
+        if let Some(exact) = exact {
+            in_vocabulary_cases += 1;
+            if exact {
+                exact_cases += 1;
+            }
+        }
         boundary_tp += boundaries.true_positive;
         boundary_fp += boundaries.false_positive;
         boundary_fn += boundaries.false_negative;
@@ -527,12 +548,12 @@ fn evaluate(
             stress_correct_total += correct;
             stress_compared_total += compared;
         }
-        oov_tp += usize::from(reference.expected_oov && candidate.detected_oov);
-        oov_fp += usize::from(!reference.expected_oov && candidate.detected_oov);
-        oov_fn += usize::from(reference.expected_oov && !candidate.detected_oov);
-        oov_correct += usize::from(reference.expected_oov == candidate.detected_oov);
-        if let Some(confidence) = candidate.confidence_exact {
-            let observed = f64::from(exact);
+        oov_tp += if reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
+        oov_fp += if !reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
+        oov_fn += if reference.expected_oov && !candidate.detected_oov { 1 } else { 0 };
+        oov_correct += if reference.expected_oov == candidate.detected_oov { 1 } else { 0 };
+        if let (Some(confidence), Some(exact)) = (candidate.confidence_exact, exact) {
+            let observed = if exact { 1.0 } else { 0.0 };
             confidence_squared_error += (confidence - observed).powi(2);
             confidence_count += 1;
         }
@@ -544,11 +565,7 @@ fn evaluate(
             edits,
             phone_error_rate: per,
             exact_pronunciation: exact,
-            syllable_count_reference: reference
-                .accepted_variants
-                .first()
-                .map(|variant| variant.syllable_boundaries.len())
-                .unwrap_or(0),
+            syllable_count_reference: reference_syllables,
             syllable_count_candidate: candidate.syllable_boundaries.len(),
             boundaries,
             stress_correct,
@@ -576,8 +593,9 @@ fn evaluate(
             reference_phone_count: total_reference_phones,
             phone_edits: total_edits,
             phone_error_rate: ratio(total_edits, total_reference_phones),
+            in_vocabulary_cases,
             exact_pronunciation_cases: exact_cases,
-            exact_pronunciation_rate: ratio(exact_cases, cases.len()),
+            exact_pronunciation_rate: ratio(exact_cases, in_vocabulary_cases),
             boundary_true_positive: boundary_tp,
             boundary_false_positive: boundary_fp,
             boundary_false_negative: boundary_fn,
