@@ -17,7 +17,7 @@
 //!                  └───────── Feedback Loop ───────────┘
 //! ```
 
-use crate::audio::{AudioConfig, AudioFrontend};
+use crate::audio::{AudioConfig, AudioFrontend, AudioProjector};
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
 use crate::phoneme::PhonemeResonator;
@@ -213,9 +213,10 @@ pub struct StreamProcessor {
     ltc: LtcCell,
     /// Previous LTC state (for salience)
     prev_state: Vec<f32>,
-    /// Audio frontend for feature extraction (reserved for mel-spectrogram processing)
-    #[allow(dead_code)]
+    /// Shared mel frontend used by the offline and streaming acoustic encoders.
     frontend: AudioFrontend,
+    /// Previous mel frame for the shared rise/fall delta encoding.
+    prev_mel_features: Option<Vec<f32>>,
     /// Phoneme resonator for decoding
     resonator: PhonemeResonator,
     /// Frame counter
@@ -268,6 +269,7 @@ impl StreamProcessor {
             ltc,
             prev_state: vec![0.0; 64],
             frontend,
+            prev_mel_features: None,
             resonator: PhonemeResonator::new(),
             frame_count: 0,
             samples_per_frame,
@@ -310,6 +312,7 @@ impl StreamProcessor {
                 self.pending_dropped_samples.saturating_add(skipped);
             self.ltc.reset();
             self.prev_state = vec![0.0; 64];
+            self.prev_mel_features = None;
             self.recent_frames.clear();
         }
 
@@ -335,18 +338,26 @@ impl StreamProcessor {
             .buffer
             .read_frame(self.next_sample, self.samples_per_frame)?;
 
-        // Extract features (simplified - would use mel spectrogram)
-        let features = self.extract_simple_features(&audio);
-
-        // Process through LTC
+        // Keep LTC dynamics as a separate temporal-change/salience signal.
+        // Prototype-compatible HDC values must come from the same mel feature
+        // and direct_mel_hv encoder used by AudioProjector::project_raw.
+        let temporal_features = self.extract_simple_features(&audio);
         let state = self
             .ltc
-            .forward(&features, self.config.hop_duration)
+            .forward(&temporal_features, self.config.hop_duration)
             .to_vec();
         let salience = self.ltc.compute_salience(&self.prev_state);
 
-        // Convert state to hypervector
-        let hv = Self::state_to_hv(&state);
+        // The input slice is exactly one configured analysis frame, so the
+        // shared frontend must yield exactly one mel-feature vector. This
+        // makes chunking boundaries irrelevant and matches the batch path.
+        let mel_frames = self.frontend.extract_features(&audio);
+        let mel_features = mel_frames.first()?;
+        let hv = AudioProjector::direct_mel_hv(
+            mel_features,
+            self.prev_mel_features.as_deref(),
+        );
+        self.prev_mel_features = Some(mel_features.clone());
 
         // Decode phoneme
         let (phoneme, confidence) = if !self.resonator.is_empty() {
@@ -426,21 +437,6 @@ impl StreamProcessor {
         features
     }
 
-    /// Convert state to hypervector
-    fn state_to_hv(state: &[f32]) -> HV16 {
-        let mut data = Vec::with_capacity(state.len() * 4);
-        for &s in state {
-            data.extend_from_slice(&s.to_le_bytes());
-        }
-
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&data);
-        let mut output = [0u8; 256];
-        hasher.finalize_xof().fill(&mut output);
-
-        HV16::from_bytes(&output)
-    }
-
     /// Get smoothed phoneme output
     pub fn get_smoothed_phoneme(&self) -> Option<String> {
         if self.recent_frames.len() < self.config.min_frames {
@@ -488,6 +484,7 @@ impl StreamProcessor {
         self.buffer.clear();
         self.ltc.reset();
         self.prev_state = vec![0.0; 64];
+        self.prev_mel_features = None;
         self.frame_count = 0;
         self.next_sample = 0;
         self.pending_discontinuity = false;
