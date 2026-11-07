@@ -48,6 +48,30 @@ already be synchronized to a common epoch; this module does not perform
 time alignment, platform-motion smoothing, multi-target association or
 radar-range fusion.
 
+## Fisher-information sensor placement (new prototype)
+
+The triangulation module now exposes:
+
+- `bearing_fisher_information`: local 3x3 position Fisher-information
+  matrix at an assumed target point.
+- `rank_sensor_placements`: scores candidate sensor origins/orientations
+  by D-optimal log(det(FIM)), A-optimal covariance trace, condition number
+  and the local Cramer-Rao covariance lower bound.
+- Candidate observations are predicted using the candidate's active
+  sensor-body-to-ECEF quaternion and declared per-axis angular uncertainty.
+
+This turns triangulation into a sensor-design question: given an assumed
+target region and current observations, which sensor placement is expected
+to add the most independent geometric information?
+
+This is a local design calculation at one assumed target point, not a global
+optimal deployment solution. It currently treats the target point and
+candidate angular noise as known. It omits uncertainty over target location,
+pose/boresight, clock synchronization, visibility, terrain/occlusion,
+atmospheric propagation, weather, cost, and platform constraints. It must
+not recommend real sensor placement without those constraints and an
+independent geometric reference.
+
 ### Current independent synthetic reference
 
 A separate Python implementation was tested on a fixed four-sensor geometry
