@@ -135,12 +135,26 @@ pub enum Ospa2Error {
     InvalidOrder,
     InvalidWindowSumOrder,
     InvalidWindowLength,
-    WindowTooLong { count: usize, maximum: usize },
-    WindowWeightCount { expected: usize, actual: usize },
-    InvalidWindowWeight { index: usize },
+    WindowTooLong {
+        count: usize,
+        maximum: usize,
+    },
+    WindowWeightCount {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidWindowWeight {
+        index: usize,
+    },
     ZeroWindowWeightSum,
-    EmptyTrackId { side: &'static str, index: usize },
-    DuplicateTrackId { side: &'static str, track_id: String },
+    EmptyTrackId {
+        side: &'static str,
+        index: usize,
+    },
+    DuplicateTrackId {
+        side: &'static str,
+        track_id: String,
+    },
     TrackWindowLength {
         side: &'static str,
         track_index: usize,
@@ -152,7 +166,10 @@ pub enum Ospa2Error {
         track_index: usize,
         frame_index: usize,
     },
-    AssignmentSideTooLarge { count: usize, maximum: usize },
+    AssignmentSideTooLarge {
+        count: usize,
+        maximum: usize,
+    },
 }
 
 impl fmt::Display for Ospa2Error {
@@ -169,7 +186,10 @@ impl fmt::Display for Ospa2Error {
                 "OSPA(2) window has {count} frames; maximum supported is {maximum}"
             ),
             Self::WindowWeightCount { expected, actual } => {
-                write!(f, "OSPA(2) has {actual} window weights; expected {expected}")
+                write!(
+                    f,
+                    "OSPA(2) has {actual} window weights; expected {expected}"
+                )
             }
             Self::InvalidWindowWeight { index } => {
                 write!(f, "OSPA(2) window weight {index} is negative or non-finite")
@@ -259,9 +279,10 @@ fn track_pair_distance_with_weights(
     let mut weighted_sum = 0.0;
     for frame in 0..config.window_length {
         let frame_distance = match (truth.states[frame], estimate.states[frame]) {
-            (Some(truth_position), Some(estimate_position)) => {
-                truth_position.subtract(estimate_position).norm().min(config.cutoff_m)
-            }
+            (Some(truth_position), Some(estimate_position)) => truth_position
+                .subtract(estimate_position)
+                .norm()
+                .min(config.cutoff_m),
             (Some(_), None) | (None, Some(_)) => config.cutoff_m,
             (None, None) => 0.0,
         };
@@ -344,8 +365,7 @@ pub fn ospa2_track_sets(
                 if mask & bit != 0 {
                     continue;
                 }
-                let distance =
-                    track_pair_distance_with_weights(row, column, config, &weights);
+                let distance = track_pair_distance_with_weights(row, column, config, &weights);
                 let candidate = base + distance.powf(config.order);
                 let next_mask = mask | bit;
                 if candidate < next[next_mask] {
@@ -369,8 +389,7 @@ pub fn ospa2_track_sets(
     let denominator = maximum_count as f64;
     let localization_cost_m_p = matched_cost / denominator;
     let cardinality_cost_m_p = cardinality_cost / denominator;
-    let distance_m =
-        (localization_cost_m_p + cardinality_cost_m_p).powf(1.0 / config.order);
+    let distance_m = (localization_cost_m_p + cardinality_cost_m_p).powf(1.0 / config.order);
 
     Ok(Ospa2Breakdown {
         distance_m,
@@ -461,14 +480,8 @@ mod tests {
             &[Some(0.0), Some(1.0), Some(2.0), Some(3.0)],
         )];
         let fragmented = vec![
-            track(
-                "estimate-first-half",
-                &[Some(0.0), Some(1.0), None, None],
-            ),
-            track(
-                "estimate-second-half",
-                &[None, None, Some(2.0), Some(3.0)],
-            ),
+            track("estimate-first-half", &[Some(0.0), Some(1.0), None, None]),
+            track("estimate-second-half", &[None, None, Some(2.0), Some(3.0)]),
         ];
         let good = ospa2_track_sets(&truth, &continuous, &config(4)).unwrap();
         let split = ospa2_track_sets(&truth, &fragmented, &config(4)).unwrap();
@@ -485,9 +498,12 @@ mod tests {
         let result = ospa2_track_distance(&absent, &present, &config(3)).unwrap();
         assert!((result - 10.0 / 3.0_f64.sqrt()).abs() < 1.0e-12);
 
-        let both_absent =
-            ospa2_track_distance(&absent, &track("also-absent", &[None, None, None]), &config(3))
-                .unwrap();
+        let both_absent = ospa2_track_distance(
+            &absent,
+            &track("also-absent", &[None, None, None]),
+            &config(3),
+        )
+        .unwrap();
         assert_eq!(both_absent, 0.0);
     }
 
@@ -544,12 +560,7 @@ mod tests {
 
     #[test]
     fn oversized_window_is_rejected_before_uniform_weight_allocation() {
-        let config = Ospa2Config::uniform(
-            10.0,
-            2.0,
-            2.0,
-            MAX_OSPA2_WINDOW_LENGTH + 1,
-        );
+        let config = Ospa2Config::uniform(10.0, 2.0, 2.0, MAX_OSPA2_WINDOW_LENGTH + 1);
         assert_eq!(
             ospa2_track_sets(&[], &[], &config),
             Err(Ospa2Error::WindowTooLong {
