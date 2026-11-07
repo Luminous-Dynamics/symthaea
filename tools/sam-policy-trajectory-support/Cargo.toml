@@ -1,0 +1,11 @@
+[package]
+name = "sam-policy-trajectory-support"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+description = "Exact finite fixtures for sequential and joint-scene counterfactual support."
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

@@ -1,0 +1,28 @@
+name: SAM Policy Trajectory Support Fixtures
+
+on:
+  pull_request:
+    paths:
+      - "tools/sam-policy-trajectory-support/**"
+      - ".github/workflows/sam-policy-trajectory-support.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/sam-policy-trajectory-support/**"
+      - ".github/workflows/sam-policy-trajectory-support.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  trajectory-support:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/sam-policy-trajectory-support/Cargo.toml -- --check
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/sam-policy-trajectory-support/Cargo.toml --all-targets -- -D warnings
+      - name: Run tests
+        run: cargo test --locked --manifest-path tools/sam-policy-trajectory-support/Cargo.toml
