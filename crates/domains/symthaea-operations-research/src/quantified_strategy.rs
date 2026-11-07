@@ -177,6 +177,9 @@ pub enum QuantifiedStrategyError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct QuantifiedSearchStats {
     pub quantifier_node_visits: u128,
+    pub partial_matrix_checks: u128,
+    pub early_true_prunes: u128,
+    pub early_false_prunes: u128,
     pub matrix_evaluations: u128,
 }
 
@@ -369,6 +372,127 @@ fn matrix_satisfied(problem: &CnfProblem, assignment: &[bool]) -> bool {
     })
 }
 
+/// Return a decisive matrix value when a partial prefix assignment already
+/// satisfies every clause or permanently falsifies one clause. None means
+/// that some clause still has an unassigned literal and no clause is false.
+fn partial_matrix_value(
+    problem: &CnfProblem,
+    assignment: &[bool],
+    variable_positions: &[usize],
+    assigned_prefix_len: usize,
+) -> Option<bool> {
+    let mut every_clause_satisfied = true;
+    for clause in &problem.clauses {
+        let mut clause_satisfied = false;
+        let mut has_unassigned_literal = false;
+        for literal in clause {
+            if variable_positions[literal.variable] >= assigned_prefix_len {
+                has_unassigned_literal = true;
+                continue;
+            }
+            if assignment[literal.variable] == literal.positive {
+                clause_satisfied = true;
+                break;
+            }
+        }
+        if clause_satisfied {
+            continue;
+        }
+        if !has_unassigned_literal {
+            return Some(false);
+        }
+        every_clause_satisfied = false;
+    }
+    every_clause_satisfied.then_some(true)
+}
+
+/// Build a constant strategy table for a suffix variable, but populate only
+/// rows consistent with the opponent assignments already fixed on this search
+/// path. Unassigned dependencies are expanded across both values, allowing
+/// sibling branches to merge into a total table without overlapping rows.
+fn constant_suffix_function(
+    variable: usize,
+    dependencies: Vec<usize>,
+    assignment: &[bool],
+    variable_positions: &[usize],
+    assigned_prefix_len: usize,
+    value: bool,
+    budget: QuantifiedEvaluationBudget,
+) -> Result<BooleanStrategyFunction, QuantifiedStrategyError> {
+    let free_dependency_positions: Vec<usize> = dependencies
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &dependency)| {
+            (variable_positions[dependency] >= assigned_prefix_len).then_some(index)
+        })
+        .collect();
+    let row_count = checked_power_of_two(free_dependency_positions.len())?;
+    if row_count > budget.max_strategy_table_entries {
+        return Err(QuantifiedStrategyError::StrategyTableBudgetExceeded {
+            required: row_count,
+            limit: budget.max_strategy_table_entries,
+        });
+    }
+
+    let mut table = BTreeMap::new();
+    for mask in 0..row_count {
+        let mut key = vec![false; dependencies.len()];
+        for (dependency_index, &dependency) in dependencies.iter().enumerate() {
+            if variable_positions[dependency] < assigned_prefix_len {
+                key[dependency_index] = assignment[dependency];
+            }
+        }
+        for (free_index, &dependency_index) in
+            free_dependency_positions.iter().enumerate()
+        {
+            key[dependency_index] = ((mask >> free_index) & 1) != 0;
+        }
+        table.insert(key, value);
+    }
+
+    Ok(BooleanStrategyFunction {
+        variable,
+        dependencies,
+        table,
+    })
+}
+
+/// Fill the winning player's strategy functions for a suffix whose remaining
+/// matrix value is already fixed by the current partial assignment.
+fn constant_strategy_for_suffix(
+    position: usize,
+    order: &[(Quantifier, usize)],
+    prefix: &ValidatedQuantifierPrefix,
+    owner: StrategyOwner,
+    assignment: &[bool],
+    variable_positions: &[usize],
+    value: bool,
+    budget: QuantifiedEvaluationBudget,
+) -> Result<BTreeMap<usize, BooleanStrategyFunction>, QuantifiedStrategyError> {
+    let mut functions = BTreeMap::new();
+    for &(quantifier, variable) in order.iter().skip(position) {
+        if quantifier != owner.quantifier() {
+            continue;
+        }
+        let dependencies = match owner {
+            StrategyOwner::Existential => prefix.existential_dependencies(variable),
+            StrategyOwner::Universal => prefix.universal_dependencies(variable),
+        }
+        .map_err(QuantifiedStrategyError::InvalidStrategyScope)?;
+        let function = constant_suffix_function(
+            variable,
+            dependencies,
+            assignment,
+            variable_positions,
+            position,
+            value,
+            budget,
+        )?;
+        functions.insert(variable, function);
+    }
+    Ok(functions)
+}
+
 fn dependency_key(dependencies: &[usize], assignment: &[bool]) -> Vec<bool> {
     dependencies
         .iter()
@@ -437,6 +561,7 @@ fn search(
     problem: &CnfProblem,
     prefix: &ValidatedQuantifierPrefix,
     assignment: &mut [bool],
+    variable_positions: &[usize],
     budget: QuantifiedEvaluationBudget,
     stats: &mut QuantifiedSearchStats,
 ) -> Result<PartialEvaluation, QuantifiedStrategyError> {
@@ -449,6 +574,58 @@ fn search(
             required: stats.quantifier_node_visits,
             limit: budget.max_quantifier_node_visits,
         });
+    }
+
+    if position < order.len() {
+        stats.partial_matrix_checks = stats
+            .partial_matrix_checks
+            .checked_add(1)
+            .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)?;
+        if let Some(value) =
+            partial_matrix_value(problem, assignment, variable_positions, position)
+        {
+            if value {
+                stats.early_true_prunes = stats
+                    .early_true_prunes
+                    .checked_add(1)
+                    .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)?;
+                let existential_functions = constant_strategy_for_suffix(
+                    position,
+                    order,
+                    prefix,
+                    StrategyOwner::Existential,
+                    assignment,
+                    variable_positions,
+                    false,
+                    budget,
+                )?;
+                return Ok(PartialEvaluation {
+                    value: true,
+                    existential_functions,
+                    universal_functions: BTreeMap::new(),
+                });
+            }
+
+            stats.early_false_prunes = stats
+                .early_false_prunes
+                .checked_add(1)
+                .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)?;
+            let universal_functions = constant_strategy_for_suffix(
+                position,
+                order,
+                prefix,
+                StrategyOwner::Universal,
+                assignment,
+                variable_positions,
+                false,
+                budget,
+            )?;
+            return Ok(PartialEvaluation {
+                value: false,
+                existential_functions: BTreeMap::new(),
+                universal_functions,
+            });
+        }
     }
 
     if position == order.len() {
@@ -473,6 +650,7 @@ fn search(
                 problem,
                 prefix,
                 assignment,
+                variable_positions,
                 budget,
                 stats,
             )?;
@@ -596,6 +774,17 @@ fn ordered_prefix(prefix: &ValidatedQuantifierPrefix) -> Vec<(Quantifier, usize)
         .collect()
 }
 
+fn variable_positions(
+    variable_count: usize,
+    order: &[(Quantifier, usize)],
+) -> Vec<usize> {
+    let mut positions = vec![usize::MAX; variable_count];
+    for (position, &(_, variable)) in order.iter().enumerate() {
+        positions[variable] = position;
+    }
+    positions
+}
+
 /// Evaluate a bounded prenex QBF and extract an explicit winning strategy.
 ///
 /// Search uses recursive finite-game semantics. Before returning, this
@@ -609,6 +798,7 @@ pub fn evaluate_qbf_with_strategy(
 ) -> Result<QbfEvaluationResult, QuantifiedStrategyError> {
     preflight(problem, prefix, budget)?;
     let order = ordered_prefix(prefix);
+    let positions = variable_positions(problem.variables.len(), &order);
     let mut assignment = vec![false; problem.variables.len()];
     let mut search_stats = QuantifiedSearchStats::default();
 
@@ -618,6 +808,7 @@ pub fn evaluate_qbf_with_strategy(
         problem,
         prefix,
         &mut assignment,
+        &positions,
         budget,
         &mut search_stats,
     )?;
@@ -961,6 +1152,53 @@ mod tests {
             }
         }
         formulas
+    }
+
+    #[test]
+    fn partial_matrix_pruning_extracts_total_suffix_strategy_tables() {
+        let problem = CnfProblem {
+            variables: vec!["u".into(), "x".into(), "v".into(), "z".into()],
+            clauses: vec![vec![Literal::positive(1)]],
+        };
+        let prefix = make_prefix(
+            vec![
+                block(Quantifier::ForAll, &[0]),
+                block(Quantifier::Exists, &[1]),
+                block(Quantifier::ForAll, &[2]),
+                block(Quantifier::Exists, &[3]),
+            ],
+            4,
+        );
+        let result = evaluate_qbf_with_strategy(&problem, &prefix, budget()).unwrap();
+        assert!(result.value);
+        assert_eq!(result.search.early_true_prunes, 2);
+        assert_eq!(result.search.early_false_prunes, 2);
+        assert!(result.search.quantifier_node_visits < 31);
+        let x = result
+            .strategy
+            .functions
+            .iter()
+            .find(|function| function.variable == 1)
+            .unwrap();
+        let z = result
+            .strategy
+            .functions
+            .iter()
+            .find(|function| function.variable == 3)
+            .unwrap();
+        assert_eq!(x.dependencies, vec![0]);
+        assert_eq!(x.table, BTreeMap::from([(vec![false], true), (vec![true], true)]));
+        assert_eq!(z.dependencies, vec![0, 2]);
+        assert_eq!(
+            z.table,
+            BTreeMap::from([
+                (vec![false, false], false),
+                (vec![false, true], false),
+                (vec![true, false], false),
+                (vec![true, true], false),
+            ])
+        );
+        assert_eq!(result.verification.opponent_assignments_checked, 4);
     }
 
     #[test]
