@@ -124,8 +124,14 @@ pub enum DecompositionError {
     },
     DuplicateProjectionVariable(usize),
     EmptyProjectionFragments,
-    ProjectionFragmentBudgetExceeded { required: usize, limit: usize },
-    ProjectionSupportEntryBudgetExceeded { required: usize, limit: usize },
+    ProjectionFragmentBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ProjectionSupportEntryBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
     ProjectionScopeMismatch {
         expected: Vec<String>,
         actual: Vec<String>,
@@ -141,8 +147,14 @@ pub enum DecompositionError {
     EmptyComponent {
         component: usize,
     },
-    ComponentCountExceedsVariableCount { component_count: usize, variable_count: usize },
-    PartitionEntryCountMismatch { expected: usize, actual: usize },
+    ComponentCountExceedsVariableCount {
+        component_count: usize,
+        variable_count: usize,
+    },
+    PartitionEntryCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     ComponentVariableOutOfRange {
         component: usize,
         variable: usize,
@@ -927,9 +939,7 @@ mod tests {
                 literals
                     .iter()
                     .enumerate()
-                    .filter_map(|(index, literal)| {
-                        (((mask >> index) & 1) != 0).then_some(*literal)
-                    })
+                    .filter_map(|(index, literal)| (((mask >> index) & 1) != 0).then_some(*literal))
                     .collect()
             })
             .collect()
@@ -1153,13 +1163,8 @@ mod tests {
     #[test]
     fn independent_product_rejects_partition_entry_count_before_allocation() {
         let problem = independent_fixture();
-        let error = verify_independent_product(
-            &problem,
-            &[vec![0, 1, 2, 3]],
-            &[4, 4],
-            budget(),
-        )
-        .unwrap_err();
+        let error = verify_independent_product(&problem, &[vec![0, 1, 2, 3]], &[4, 4], budget())
+            .unwrap_err();
         assert_eq!(
             error,
             DecompositionError::PartitionEntryCountMismatch {
@@ -1175,13 +1180,8 @@ mod tests {
             variables: vec!["x".into()],
             clauses: vec![],
         };
-        let error = verify_independent_product(
-            &problem,
-            &[vec![0], vec![]],
-            &[],
-            budget(),
-        )
-        .unwrap_err();
+        let error =
+            verify_independent_product(&problem, &[vec![0], vec![]], &[], budget()).unwrap_err();
         assert_eq!(
             error,
             DecompositionError::ComponentCountExceedsVariableCount {
@@ -1426,8 +1426,7 @@ mod tests {
             );
 
             for split_variable in 0..2 {
-                let report =
-                    verify_branch_sum(&problem, split_variable, budget()).unwrap();
+                let report = verify_branch_sum(&problem, split_variable, budget()).unwrap();
                 let false_count = (0..4usize)
                     .filter(|mask| {
                         ((mask >> split_variable) & 1) == 0
@@ -1489,14 +1488,12 @@ mod tests {
                 clauses,
             };
             let expected = independent_model_count(&problem);
-            let report = verify_independent_product(
-                &problem,
-                &[vec![0], vec![1]],
-                &[2],
-                budget(),
-            )
-            .unwrap();
-            assert_eq!(report.direct_source_count, expected, "unit clause mask {mask}");
+            let report =
+                verify_independent_product(&problem, &[vec![0], vec![1]], &[2], budget()).unwrap();
+            assert_eq!(
+                report.direct_source_count, expected,
+                "unit clause mask {mask}"
+            );
             assert_eq!(report.aggregate_count, expected, "unit clause mask {mask}");
         }
     }
