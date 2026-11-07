@@ -532,3 +532,16 @@ This motivates HME's near-data and storage-layout research, but the first HME mi
 - No consciousness claim follows from an HME implementation or a large-dimensional holographic representation.
 
 The programme succeeds if it identifies the smallest reproducible memory substrate that improves Symthaea's actual associative/dynamical workloads without weakening state continuity, exactness, recovery or evidence boundaries.
+
+## 8A. Exact similarity semantics must be build- and stride-invariant
+
+A source audit identified a correctness hazard in the current `ContinuousHV::similarity()` API:
+
+- With the `simd` feature, it dispatches to `similarity_simd()` over the full vector.
+- Without the `simd` feature, it reads the global cognitive `STRIDE`; when stride is not 1, it accumulates dot products and norms only at indices selected by `step_by(stride)`.
+
+Therefore, an API named `similarity()` is not necessarily a full-dimensional exact oracle in every build/runtime configuration. The HME must not silently use the adaptive/stride path to qualify exact stored-memory retrieval.
+
+The exact query contract must use a scalar full-dimension reference over every coordinate, with independently checked SIMD kernels as implementations of that same contract. A stride-based or otherwise sampled similarity path may remain useful for adaptive cognitive operation, but it must be explicitly typed as approximate, have its own quality/recall curve, and must never emit an Exact qualification status. Exact retrieval semantics must not depend on a global runtime stride or compile-time feature selection.
+
+Also reuse [#7955 — metadata-first scans and payload cache residency](https://github.com/Luminous-Dynamics/symthaea/issues/7955), plus #7934/#7922. HME should compare metadata-first SoA and interleaved layouts using the existing cold-open methodology rather than create a duplicate layout/residency experiment.
