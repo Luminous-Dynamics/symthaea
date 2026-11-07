@@ -348,4 +348,13 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Martian, [Code Review Benchmark production-adoption dashboard](https://www.codereviewbenchmark.com/), accessed November 7, 2026.
 - Kodus, [State of AI Code Review 2026](https://kodus.io/data), production pipeline snapshot through June 8, 2026; accessed November 7, 2026.
 
+- Sun et al., [SDRCA: software defect root-cause analysis with causal graphs and interventions](https://doi.org/10.1016/j.jss.2026.112931), Journal of Systems and Software, 2026.
+- UniVal authors, [Improving Fault Localization by Integrating Value- and Predicate-Based Causal Inference Techniques](https://arxiv.org/abs/2102.06292), ICSE 2021 Distinguished Paper.
+- Alibaba, [AACR-Bench](https://arxiv.org/abs/2601.19494) and [benchmark artifacts](https://github.com/alibaba/aacr-bench), 2026.
+- Navaratnarajah et al., [Causality-Based Fault Localization / SoftReX](https://arxiv.org/abs/2611.01292), submitted October 31, 2026.
+- Wu et al., [CausalRepair: Bridging the Causality Gap in LLM-Based APR via Dual-Slicing](https://arxiv.org/abs/2608.10613), submitted August 11, 2026; [ISSTA 2026 research-program entry](https://conf.researchr.org/details/issta-2026/issta-2026-research-papers/134/CausalRepair-Bridging-the-Causality-Gap-in-Large-Language-Model-based-Automated-Prog).
+- Orujlu et al., [Partially Observed Structural Causal Models](https://proceedings.mlr.press/v337/orujlu26a.html), UAI 2026, PMLR 337.
+- Yuan et al., [CGARF: a causality-guided framework for reliable automated program repair](https://doi.org/10.1007/s10664-026-10940-1), published August 22, 2026.
+- Shen et al., [SecRepoBench](https://research.google/pubs/secrepobench-benchmarking-code-agents-for-secure-code-completion-in-real-world-repositories/), 2025; [leaderboard and methodology](https://secrepobench.github.io/), accessed November 7, 2026.
+
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
