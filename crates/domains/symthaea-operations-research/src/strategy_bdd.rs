@@ -513,11 +513,7 @@ pub fn sift_strategy_function_robdd(
                 }
                 evaluations = required;
 
-                match compile_strategy_function_to_robdd_with_order(
-                    function,
-                    &candidate,
-                    budget,
-                ) {
+                match compile_strategy_function_to_robdd_with_order(function, &candidate, budget) {
                     Ok(candidate_bdd) => {
                         let candidate_nodes = candidate_bdd.nodes.len();
                         let best_nodes = best_bdd.nodes.len();
@@ -751,8 +747,7 @@ mod tests {
             &[false, true, false, true, false, false, true, true],
         );
         let order = [2, 0, 1];
-        let bdd =
-            compile_strategy_function_to_robdd_with_order(&source, &order, budget()).unwrap();
+        let bdd = compile_strategy_function_to_robdd_with_order(&source, &order, budget()).unwrap();
         assert_eq!(bdd.variable_order, order);
         verify_robdd_matches_strategy_function(&bdd, &source, budget()).unwrap();
     }
@@ -791,7 +786,10 @@ mod tests {
 
     #[test]
     fn validator_rejects_unreachable_padding_nodes() {
-        let source = function(&[0, 1, 2], &[false, true, false, true, false, true, false, true]);
+        let source = function(
+            &[0, 1, 2],
+            &[false, true, false, true, false, true, false, true],
+        );
         let mut bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
         bdd.nodes.push(BddNode {
             dependency_index: 2,
