@@ -52,6 +52,10 @@ This package does not:
 
 Evidence classes are preserved, not graded. A Measured label does not establish measurement accuracy. Digests are identity strings, not source authentication.
 
+## Frozen fixture corpus
+
+The fixtures directory contains an eight-case synthetic campaign: adequate coverage, water-limited coverage, a scalar-average false pass, food-nutrient bottleneck, missing required dimension, zero depletion, stale condition binding and inverted stock interval. These records are review fixtures; they are not physical data and are not automatically promoted to measured evidence.
+
 ## Benchmarks
 
 Contract targets:
