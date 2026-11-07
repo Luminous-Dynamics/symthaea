@@ -271,7 +271,10 @@
         "cumulative_assignment_margin_by_probe_count",
         "functional_probe_candidate_evaluations",
         "held_out_activation_signature_error",
-        "probe_selection_to_held_out_margin_transfer"
+        "probe_selection_to_held_out_margin_transfer",
+        "symmetry_canonicalization_recovery_success",
+        "candidate_function_preservation_after_canonicalization",
+        "stale_alignment_canonicalization_rejection_rate"
       ],
       "negative_controls": [
         "function_preserving_hidden_unit_permutation",
@@ -532,6 +535,10 @@
     {
       "id": "deep_align_learned_weight_alignment",
       "scope": "Navon et al. ICML 2024 Deep-Align when exact layer shapes and architecture families are supported; report unsupported cases"
+    },
+    {
+      "id": "activation_alignment_then_candidate_only_wsp_canonicalization",
+      "scope": "Probe-aligned function-preserving coordinate canonicalization via typed WeightProgram and native SWI candidate transaction; initially restricted to a one-layer, non-residual, no-backbone CfC network"
     }
   ],
   "seeds": {
@@ -640,7 +647,9 @@
       "source_rule_hypothesis_count",
       "source_semantic_unique_likelihood_tensor_count",
       "paper_reported_unique_rule_count",
-      "model_space_count_discrepancy"
+      "model_space_count_discrepancy",
+      "symmetry_canonicalization_function_drift",
+      "stale_alignment_canonicalization_acceptance_rate"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -655,7 +664,9 @@
       "permutation_alignment_operations",
       "probe_candidate_forward_passes",
       "alignment_runtime_ns",
-      "assignment_margin_evidence_per_probe"
+      "assignment_margin_evidence_per_probe",
+      "canonicalization_changed_parameter_count",
+      "canonicalization_candidate_evaluations"
     ],
     "energy": "Report only when device, power instrumentation, limits, and aggregation protocol are documented and reproducible."
   },
@@ -708,7 +719,8 @@
     "Adaptive functional-probe selection must report the full frozen candidate pool, selected probe, per-candidate accumulated assignment margin and mean activation error, source/candidate/architecture/manifest digests, and the final ordered probe-set digest. It must be deterministic and must not mutate either model.",
     "Probe selection and alignment fitting must use a declared selection-probe pool; final functional-equivalence and acceptance metrics must use a disjoint held-out probe sequence not used for selection, threshold tuning, or assignment fitting.",
     "Accumulated assignment margin is computed from summed squared activation differences across probes, while the reported fit error remains mean-squared activation error; the same mapping repeated across independent probes must increase the margin in proportion to probe count without changing mean fit error.",
-    "The three-ball source audit preserves the 81 labelled SPM hypotheses and equal 1/81 prior mass. It independently canonicalizes the exact full feedback likelihood tensors and records the current public-generator result of 75 semantic classes (three triplicate constant mappings) against the paper-reported 79. The exact-reproduction status remains blocked until this discrepancy is reconciled against the paper's archived code/uniqueness criterion; neither model labels nor priors may be silently deduplicated."
+    "The three-ball source audit preserves the 81 labelled SPM hypotheses and equal 1/81 prior mass. It independently canonicalizes the exact full feedback likelihood tensors and records the current public-generator result of 75 semantic classes (three triplicate constant mappings) against the paper-reported 79. The exact-reproduction status remains blocked until this discrepancy is reconciled against the paper's archived code/uniqueness criterion; neither model labels nor priors may be silently deduplicated.",
+    "CfC symmetry canonicalization must bind to the current source and candidate native model digests, shared architecture/manifest digests, and accepted alignment receipt; it must only target the registered one-layer, non-residual, no-backbone topology, use the coupled five-group permutation, materialize on a candidate clone, recover the canonical fixture digest, and preserve the candidate's function on disjoint held-out input sequences."
   ],
   "research_references": [
     {
