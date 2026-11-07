@@ -1,18 +1,29 @@
 # Autonomous Science Bench compatibility reference
 
-This standalone offline Rust crate validates the checked-in, pinned AS-Bench compatibility manifest:
+This standalone offline Rust crate validates the pinned AS-Bench v0.1 compatibility manifest and public Lab API v1 contracts.
 
-`docs/research/adapters/SYM_RSI_ASB_COMPATIBILITY_MANIFEST_V0_2026-11-07.json`
+## What it checks
 
-It checks the upstream repository/commit/API/schema pin, ten Git blob identities, exact v0 campaign identities, round × batch budget arithmetic, discovery and held-out-learning gate mappings, upstream reference-result labels, the provenance distinction between replay and digital-twin outputs, typed Lab API v1 campaign/status/catalog/job payloads, and strict campaign request preflight.
+- Upstream repository and exact commit pin.
+- Ten Git blob identities, including the two private lab campaign-rule files whose public-card projections are checked in as fixtures.
+- Exact replay and digital-twin campaign identities, task paths, round/batch arithmetic, discovery and held-out-learning thresholds, reference-result labels, licenses and measurement provenance.
+- Public campaign card, campaign status, catalog, submission preflight and experiment-job response contracts.
+- Strict separation of agent-visible public campaign metadata from lab-private configuration. In particular, public campaign cards must not contain the private `backend` field.
+- Status consistency: completed/active stage progression, active job and budget accounting.
+- Catalog design-ID presence, uniqueness, requested stage and pool size; local fail-fast checks for duplicate, ineligible, previously measured and over-budget selections.
+- Job lifecycle: `queued` and `running` are pending; `failed` never advances a stage; only a completed job with a complete result batch and matching result-design identities advances a stage.
+- A small offline end-to-end fixture path through campaign, status, catalog, batch preflight and completed-job checks.
 
-It is deliberately **not** a campaign runner, metric evaluator, oracle, receipt/authentication service, scheduler, memory service or promotion authority. A valid manifest proves only that the local compatibility declaration matches this crate's frozen contract.
+The canonical API implementation is `src/api_contract.rs`; job status and result-row lifecycle are shared with `src/job_lifecycle.rs`. There is one API contract owner, not parallel validators. The code is transport-independent and makes no HTTP requests.
 
-The `api_v1` module defines transport-independent types for the public campaign card, status, catalogs, experiment requests/responses, job list summaries, deliverables and API errors. It rejects a public campaign card that contains the private `backend` field, checks stage/budget consistency, validates catalog design IDs and duplicate selections, and checks deliverable kind/version/size. The `job_lifecycle` module ensures only a completed job with one result row per requested design can advance a stage. The lab remains authoritative for every server-side rule.
+## Pinned campaign fixtures
 
-The `job_lifecycle` module models the pinned API v1 statuses `queued`, `running`, `completed` and `failed`. It only exposes usable measurement rows when a job is completed and the result-row count matches the requested design count. Pending and failed jobs never advance a campaign stage. It does not submit requests or decide whether a source measurement is scientifically valid.
+Two exact public-card projections are generated from the pinned upstream campaigns:
 
-The `api_contract` module parses fixture-driven public API payloads and validates campaign identity, schema version, contiguous stages, batch/budget arithmetic, status budget reconciliation, catalog eligibility, duplicate/repeated design controls and result-row identity. Its checks are local preflight; the upstream lab remains authoritative. `--api-fixtures` runs the checked-in public contract examples without network access.
+- `fixtures/asb_lab_v1/nuclease_campaign_card.json` — replay, 4 × 96 = 384 measurements.
+- `fixtures/asb_lab_v1/propylene_campaign_card.json` — twin, 3 × 20 = 60 measurements.
+
+The source task configurations are pinned by their Git blob identities in the compatibility manifest. The twin fixture's provenance remains distinct: the upstream task says its results comprise exact published measurements plus surrogate-model outputs, not live laboratory measurements.
 
 ## Run
 
@@ -24,11 +35,16 @@ cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- docs
 cargo run --manifest-path tools/sym-rsi-asb-adapter-reference/Cargo.toml -- --api-fixtures
 ```
 
-## Claim boundary
+There are 33 authored Rust tests: 19 public API contract tests, nine job-lifecycle tests and five manifest tests. They have not been executed in the current environment.
 
-- The upstream pin is a reproducibility anchor, not a claim that it is the latest upstream revision.
-- The upstream reference scores in the manifest are not Symthaea results.
-- Replay results are published measurements; twin results are model-mediated and are not live laboratory results.
-- The checker does not fetch upstream content or cryptographically attest the source. File identities are recorded Git blob SHA-1 identifiers from the pinned commit; they do not authenticate a run or establish truth.
-- The JSON Schemas are structural. This crate adds semantic checks for cross-field relationships, the two exact campaign contracts, job lifecycle and public API response/request rules. It now has 31 authored Rust tests; they remain unexecuted.
-- No Rust compilation, formatting, Clippy, test or CI result is claimed until those commands execute on an available toolchain.
+## Authority and claim boundaries
+
+- The remote AS-Bench lab remains authoritative for stage order, eligibility, duplicate prevention, accepted batches, budgets, asynchronous status and the ledger.
+- The upstream verifier remains authoritative for hidden truth and scoring. This crate never receives verifier truth.
+- Client-side catalog and submission validation are fail-fast checks, not a replacement for server validation.
+- The manifest checker validates local compatibility declarations. It does not fetch upstream content or authenticate Git history, execution, task custody or scientific truth.
+- Upstream reference scores are not Symthaea results.
+- Replay values are published measurements. Twin values are model-mediated; neither is a live-lab result.
+- No campaign is run, no benchmark is submitted, and no scientific-discovery or R4 claim is made by these tools.
+- The crate is intentionally outside the production Cargo workspace. It introduces no production network client, evaluator, receipt/signing service, scheduler, memory service or promotion authority.
+- No Rust compilation, formatting, Clippy, unit-test or CI pass is claimed until those commands execute on a Rust toolchain.
