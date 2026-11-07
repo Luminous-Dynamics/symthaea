@@ -549,3 +549,58 @@ The moat is not another implementation of sum-product. It is end-to-end, evidenc
 ### Proof-carrying follow-up
 
 Issue https://github.com/Luminous-Dynamics/symthaea/issues/10935 proposes exact rational posterior certificates by reusing the independent elimination replay framework in ETH-017 (#10203). This is a design/issue only; no rational posterior certificate or independent checker has been implemented yet.
+
+
+## 15. Evidence-qualified factor and result contracts
+
+A factor graph is only as trustworthy as its factor semantics. A shared engine must not accept an untyped list of arrays and imply that it knows whether entries are probabilities, likelihoods, constraints, utilities or duplicated observations.
+
+### Typed factor contract
+
+The eventual versioned interop schema should separate:
+
+- **Identity:** factor ID, schema version, variable IDs and sorted scope.
+- **Mathematics:** cardinalities, table ordering, coefficient domain, support/zero semantics, normalization claim (if any), and whether values are probabilities, likelihood potentials, deterministic constraints or utilities.
+- **Conditioning:** explicit conditioning variables and event scope; no implicit assumptions of independence.
+- **Provenance:** source/event IDs, artifact digests, producer/version, calibration receipt and rights/authority boundary.
+- **Dependence:** dependence-group IDs, shared latent-cause references, batch/instrument/site/temporal covariance or explicit joint-kernel ID.
+- **Time and validity:** event time, model version, validity interval, temporal ordering and source snapshot.
+- **Model adequacy:** declared mechanism family, discrepancy hypotheses, OOD / unsupported-domain state and abstention conditions.
+
+A conditional factor `P(B|A)` is not interchangeable with a joint factor `P(A,B)`. A composite process likelihood is not to be multiplied again by its already included component likelihoods. If a factor is only a likelihood up to proportionality, do not report it as a normalized probability without a partition calculation.
+
+### Typed inference-result contract
+
+Every result should declare:
+- query semantics: PR / MAR / MPE / MAP / MMAP / conditional / intervention / EIG / EVSI / decision;
+- method and coefficient domain;
+- exactness level: exhaustive finite, exact elimination, exact tree-message passing, numerical exact under stated tolerance, or approximate;
+- approximation diagnostics: residual, non-convergence, particle ESS/degeneracy/MCSE, variational bound/gap, or missing diagnostic;
+- normalization/evidence mass and support status;
+- model adequacy and discrepancy status;
+- provenance/input digest, code/build identity and replay/checker receipt;
+- abstention or unsupported-domain reason.
+
+A method that has no valid diagnostic for a required field must return `not_available` or abstain. It must not fill missing uncertainty with zero or a confidence-like scalar.
+
+### Cross-project ownership
+
+- **Symthaea:** mathematical inference engines, exact/approximate algorithm registry, exactness types, bounded references, numerical diagnostics and algorithm compatibility.
+- **Mycelix:** signed source/evidence provenance, actor/organization lineage, dependence metadata, uncertainty decomposition, covariance, discrepancy, SBC and calibration evidence.
+- **Symtropy:** dynamic physical state, sensor state, transition kernels, risk/cost/horizon, intervention and policy evaluation.
+- **Sol-Atlas:** spatial/event observation domains, CRS and geometry, factor conditioning scopes, event-graph likelihood composition, hazard/resource decisions and operational evidence.
+
+Use small versioned adapters with explicit information loss. The frontend/rendering layer must not run inference. No project should copy a second Bayesian engine or reinterpret another project's factor tables silently.
+
+### Consequence for benchmark design
+
+Benchmark not only the numeric posterior but also semantic integrity:
+- source/factor provenance completeness;
+- dependence-group and conditioning-scope preservation;
+- double-counting negative controls;
+- model-misspecification and inference-approximation factorial controls;
+- time-order and stale-evidence rejection;
+- exact/approximate/unsupported classification correctness;
+- replayable input/result digests and abstention.
+
+This extends standard PGM numerical benchmarks into evidence-qualified decision benchmarks, without claiming that a correct posterior proves true source data or an adequate causal/physical model.
