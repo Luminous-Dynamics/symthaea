@@ -202,34 +202,72 @@ A single “accuracy” metric cannot compare these classes. The type of guarant
 
 ## Measured industry/research baseline snapshot (SAT Competition 2026)
 
-Use the dated SAT Competition 2026 results presentation (July 23, 2026) as the source for the 2026 Main Track table:
+### Authoritative per-instance source
 
-| Main Track entry | PAR-2 | Solved |
-|---|---:|---:|
-| `satsuma-iter+kissat` | 3647.02 | 276 |
-| `Kissat-MAB-HyPre` | 3996.29 | 255 |
-| `EDA-Kissat-v2` | 4469.34 | 240 |
+Use the organizers' [current instance-wise `scores.csv`](https://github.com/satcompetition/2026/blob/main/downloads/scores.csv), not the repository's stale `results.html` summary or the earlier July slide snapshot.
 
-The 2026 subtrack results must remain separate:
+Pinned source identity observed 2026-11-07:
+- Repository head commit: `3e2dee7cf5aa643c77bf946280a3c1c520756ef9` (2026-08-25).
+- CSV Git blob SHA: `9c926b2bd35ac0fb4f3d0cf8f58c97178d43faef`.
+- File size: 1,262,695 bytes.
+- Header: `solverid,instanceid,runtime,status,score,vresult`.
+- 13,200 records: 33 solver IDs × 400 instances. The relevant Main Track groups contain 19 `[main]` solvers and 12 `[main-ai]` solvers; `[exp-ai]` entries are kept outside these Main Track comparisons.
+- The organizers' index records an August 10, 2026 update adding two solvers omitted by manual intake and publishing updated scores, slides and sources: [official competition index](https://github.com/satcompetition/2026/).
 
-| Subtrack | Solver | PAR-2 | Solved |
-|---|---|---:|---:|
-| Main Track SAT (AI) | `Lymphosat` | 2813.50 | 146 |
-| Main Track SAT (rank 1) | `satsuma-iter+ae-kissat-mab` | 3430.95 | 136 |
-| Main Track UNSAT (rank 1) | `satsuma-iter+kissat` | 1743.84 | 149 |
+### Updated Main Track results
 
-Source: [official SAT Competition 2026 results presentation](https://satcompetition.github.io/2026/downloads/satcomp26slides.pdf), slides 13, 16 and 18 (presentation dated July 23, 2026).
+Recomputed from the pinned CSV; PAR-2 is the sum of the 400 per-instance score fields divided by 400.
 
-**Data-integrity warning:** the file at [the 2026 repository's `results.html`](https://github.com/satcompetition/2026/blob/main/results.html) currently contains the older rows `VBS=347` and `kissat-sc2024=306`. Those values match the [official SAT Competition 2024 results](https://satcompetition.github.io/2024/results.html), not the 2026 results presentation. Do not cite that HTML table as a 2026 result. The 2026 presentation contains per-solver result tables and plots a virtual-best curve, but the slides do not publish an exact VBS solved-count table. Keep the 2026 VBS count unset until it is recomputed from the official per-instance result data and independently checked.
+| Main Track solver | Solved | SAT verified | UNSAT verified | PAR-2 |
+|---|---:|---:|---:|---:|
+| `anders_satsuma-iter-kissat[main]` | 276 | 127 | 149 | 3647.019675 |
+| `anders_satsuma-iter-ae-kissat-mab[main]` | 269 | 136 | 133 | 3696.843000 |
+| `zheng_kissat-mab-hypre[main]` | 255 | 134 | 121 | 3996.293425 |
+| `zheng_kissat-mab-hypre-v2[main]` | 255 | 134 | 121 | 3997.276200 |
+| `oertel_satsuma-lex-kissat[main]` | 249 | 125 | 124 | 4279.583500 |
 
-Interpretation:
-- The 2026 overall Main Track winner solved 276 instances. This is the fixed reference for initial reproduction and improvement targets; it is not directly comparable to the 2024 `kissat-sc2024` result.
-- The 2026 AI SAT subtrack result for `Lymphosat` (146 SAT instances) is a separate comparator, not an overall Main Track total. The SAT and UNSAT subtrack rows have different solver configurations and must not be added together.
-- The competition presentation reports that Lymphosat uses more than 100 family-specific LLM-generated solvers, primarily with specialized preprocessing, and highlights generalization beyond its training database as a key evaluation question. This makes family-held-out transfer and leakage-resistant evaluation essential.
-- Main Track results require independently checked UNSAT proof certificates. SAT and UNSAT outcomes must be reported separately.
-- These are competition-specific results, not a universal ranking across every SAT distribution or industrial workload.
+These counts use accepted statuses `sat-verified` and `unsat-verified`. Raw `unsat`, `unknown`, timeout, crash and checker-failure statuses are not accepted as verified solutions.
 
-A serious Symthaea result should first reproduce the exact official corpus and resource setup, then beat the 2026 winner or a deployable portfolio on held-out families. Report per-instance receipts, SAT/UNSAT subtotals, PAR-2, selector overhead and out-of-distribution performance. Never substitute a hindsight VBS for a deployable baseline.
+The AI SAT subtrack's Lymphosat result remains a separate metric: **146 SAT instances**. The full `green_lymphosat[main-ai]` row in the instance-wise file has 251 verified results (146 SAT and 105 UNSAT), while `green_lymphosat-verified[main-ai]` is the SAT-only 146-result row used for the AI SAT subtrack comparison. Do not conflate the SAT-only recognition result with total Main Track solves.
+
+### Recomputed virtual-best diagnostics
+
+The CSV does not provide a trusted explicit VBS row, so the following are **our derived per-instance oracles**, not official competition leaderboard rows.
+
+Method:
+1. Partition solvers by the `[main]` or `[main-ai]` suffix.
+2. For each of the 400 instance IDs, admit only `sat-verified` and `unsat-verified` outcomes.
+3. Select the lowest `score` among admitted outcomes.
+4. If no solver has an admitted result, assign the 10,000 PAR-2 timeout penalty (2 × 5,000 seconds).
+5. Sum all 400 selected scores and divide by 400. Count SAT and UNSAT from the selected verified outcomes separately.
+
+| Derived oracle universe | Solvers | Solved | SAT | UNSAT | PAR-2 |
+|---|---:|---:|---:|---:|---:|
+| Main-only VBS | 19 | 324 / 400 | 161 | 163 | 2261.119825 |
+| Main + Main-AI VBS | 31 | 344 / 400 | 181 | 163 | 1723.650175 |
+
+The Main-only VBS gap to the best single `[main]` solver is **48 instances** (324 − 276). The combined Main + Main-AI diagnostic closes 68 instances beyond that best single solver, but mixes the AI subtrack and must not be called the conventional Main-only VBS. Neither oracle is a deployable solver: each selects with hindsight after seeing all solver outcomes.
+
+### Stale-summary warning
+
+The currently checked-in [`results.html`](https://github.com/satcompetition/2026/blob/main/results.html) still shows `VBS=347` and `kissat-sc2024=306`. Those are the older SAT Competition 2025/2024-era rows, not the pinned 2026 instance-wise source. The official index says the updated per-instance scores were published on August 10, 2026. For Symthaea research, pin and aggregate `scores.csv`; do not use the stale HTML rows.
+
+### Competitive targets
+
+Use the current 2026 single-solver baseline and the derived Main-only VBS diagnostic:
+
+| Stage | Target | Meaning |
+|---|---|---|
+| T0 | 100% small-instance semantic agreement; zero invalid accepted models/proofs | Correctness prerequisite |
+| T1 | Reproduce pinned 2026 baselines within 1% PAR-2 with identical per-instance outcomes | Baseline integrity |
+| T2 | On sealed held-out families, beat the best component by ≥3 solved instances or ≥5% PAR-2, selector overhead ≤5% | First deployable portfolio utility |
+| T3 | ≥280 Main Track instances | +4 over 276 winner |
+| T4 | ≥290 Main Track instances | +14; close about 29% of the 48-instance Main-only oracle gap |
+| T4-stretch | ≥300 Main Track instances | +24; close half of the Main-only oracle gap |
+| AI-SAT | ≥150, then ≥160 SAT instances on the same AI SAT subtrack contract | Separate SAT-only objective; do not add UNSAT subtrack counts |
+| T5 | A new worst-case/FPT/approximation theorem with complete proof | A theoretical breakthrough, not a runtime claim |
+
+These remain prospective targets. Report PAR-2, solved count, SAT/UNSAT split, per-instance receipts and family-held-out performance. Keep oracle metrics strictly diagnostic.
 
 ## Model-counting specialist baselines and task separation
 
