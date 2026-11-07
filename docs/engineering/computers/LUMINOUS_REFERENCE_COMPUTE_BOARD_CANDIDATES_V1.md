@@ -197,3 +197,21 @@ Compose existing owners: #5796, #5804, #5808, #5818, #5800, #8459, #7905, #7919,
 This proposal does not establish a custom CPU/GPU, custom memory cells, a CXL endpoint, a UCIe chiplet, a fabricated Luminous board, regulatory certification, SI/PI/EMC signoff, reliability, or semiconductor-fab independence.
 
 A custom carrier using an imported SoM is a locally designed board with imported compute silicon. Board assembly, chip design, external fabrication and local wafer fabrication remain separate capabilities.
+
+
+## 10. Carrier-card design gate and evaluation-kit caveat (2026-11-07)
+
+AMD published Kria SOM Carrier Card Design Guide UG1091 revision 1.7 on 2026-07-28. This is the mandatory electrical/mechanical design reference before a custom K26 carrier schematic is frozen:
+- https://docs.amd.com/r/en-US/ug1091-carrier-card-design
+- https://docs.amd.com/r/en-US/ug1091-carrier-card-design/SOM-Connector-Overview
+- https://docs.amd.com/r/en-US/ug1091-carrier-card-design/SOM-Power-Integrity
+
+The guide covers connector pinout, supported I/O standards, signal-routing guidance, PS-GTR and K26-only GTH routing, reference clocks, timing models, configuration/control signals, power management, connector assembly and mechanical details. The K26 uses two 240-pin SOM connectors. The carrier must provide the main 5 V SOM rail and the required PL I/O bank rails; supply sequencing and per-bank voltages must follow the guide and exact datasheet. A carrier is not just a passive socket breakout.
+
+**Critical SKU distinction:** AMD's KV260 Vision AI Starter Kit is a useful existing evaluation platform, but its datasheet says the kit uses a non-production K26 SOM that does not populate the 16 GB eMMC. Its documented boot path is 512 Mb QSPI primary boot and microSD secondary boot. The commercial K26C product specification, by contrast, lists 16 GB eMMC. Do not transfer the commercial SOM's storage claim to the KV260 evaluation assembly.
+- KV260 data sheet: https://docs.amd.com/r/en-US/ds986-kv260-starter-kit/Product-Details
+- KV260 user guide: https://docs.amd.com/r/en-US/ug1089-kv260-starter-kit
+
+**Execution refinement:** first qualify the HDC accelerator on a known evaluation platform (KV260 or another exact K26 carrier) and treat its exact SOM SKU, boot storage, firmware, cooling and board revision as part of the result identity. Only then design a custom carrier. The first custom carrier should be justified by a measured need for instrumentation, serviceability, power/thermal telemetry, or required I/O that the evaluation board cannot satisfy—not by the desire to have a custom PCB.
+
+No claim of PCIe, SATA, GTH or other simultaneous connectivity is valid until the selected topology is checked against the exact SOM revision, connector pins, power domains and transceiver allocation.
