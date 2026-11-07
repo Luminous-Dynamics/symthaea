@@ -80,6 +80,20 @@ No lower-level result may be silently promoted to a higher one. In particular, a
 - exact-oracle discrepancy;
 - wall time, peak memory and system-size scaling.
 
+## Executable finite-sweep frequency diagnostic
+
+The crate now contains `symthaea_fractal_time_lab::frequency_locking`:
+- `estimate_subharmonic_peak` estimates a spectral peak in a declared band after mean removal and Hann windowing.
+- `assess_frequency_locking` evaluates an ordered pulse-detuning sweep and reports per-point frequency, FFT-grid spacing, observation-limited frequency scale, amplitude, spectral prominence and demodulated sign coherence.
+- The sweep report exposes locked-point count, longest contiguous locked run and the observed sampled detuning span.
+- The measurement result is deliberately called **frequency locking**, not a DTC phase result.
+
+The implementation reports both FFT bin spacing (which zero-padding reduces) and the observation-limited frequency scale (approximately inverse observation-window duration). Zero padding improves peak-grid interpolation; it does not add observation time or improve the fundamental frequency resolution.
+
+A perfect-pi-pulse noninteracting trace can satisfy the finite-sweep frequency-locking threshold. This is an intentional negative-control result: the frequency metric measures frequency rigidity, while the phase evaluator must still require interaction stabilization, initial-state/perturbation robustness, finite-size/lifetime analysis and separation from the trivial pulse control.
+
+The UAP Observatory's new `observability::analyze_jacobian` follows the same epistemic rule in another domain: return data-only rank/null directions before priors are considered. Neither module is itself a physical discovery claim.
+
 ## Baselines
 
 1. finite-window FFT maximum only;
