@@ -331,6 +331,9 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
     }
 
     let threshold = Rational::one().checked_div(family.alpha)?;
+    let mut ordered_claims: Vec<&ElementaryClaim> = family.claims.iter().collect();
+    ordered_claims.sort_by(|left, right| left.claim_id.cmp(&right.claim_id));
+
     let intersection_count = (1usize << claim_count) - 1;
     let mut intersections = Vec::with_capacity(intersection_count);
     let mut rejection_by_mask = vec![Vec::new(); intersection_count + 1];
@@ -353,7 +356,7 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
             let mut mixture_value = Rational::zero();
             for index in &member_indices {
                 mixture_value = mixture_value.checked_add(
-                    family.claims[*index].e_process_values[stage].checked_mul(mixture_weight)?,
+                    ordered_claims[*index].e_process_values[stage].checked_mul(mixture_weight)?,
                 )?;
             }
             mixture_path.push(mixture_value);
@@ -371,7 +374,7 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
         rejection_by_mask[mask] = rejection_path.clone();
         let claim_ids = member_indices
             .iter()
-            .map(|index| family.claims[*index].claim_id.clone())
+            .map(|index| ordered_claims[*index].claim_id.clone())
             .collect();
         intersections.push(IntersectionAudit {
             claim_ids,
@@ -401,7 +404,7 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
             }
         }
         elementary.push(ElementaryAudit {
-            claim_id: family.claims[index].claim_id.clone(),
+            claim_id: ordered_claims[index].claim_id.clone(),
             required_intersection_count: required_masks.len(),
             first_rejection_stage,
             rejection_path,
@@ -507,6 +510,29 @@ mod tests {
             vec![false, false, false]
         );
         assert_eq!(report.family_fwer_bound, r(1, 5));
+    }
+
+    #[test]
+    fn canonical_subset_keys_are_invariant_to_input_order() {
+        let mut family = fixture();
+        family.claims.reverse();
+        let report = audit_closed_family(&family).unwrap();
+        let triplet = report
+            .intersections
+            .iter()
+            .find(|row| row.claim_ids.len() == 3)
+            .unwrap();
+        assert_eq!(
+            triplet.claim_ids,
+            vec![
+                "H1-local-reset".to_string(),
+                "H2-off-diagonal-transfer".to_string(),
+                "H3-contact-modulation".to_string()
+            ]
+        );
+        assert_eq!(report.elementary[0].claim_id, "H1-local-reset");
+        assert_eq!(report.elementary[1].claim_id, "H2-off-diagonal-transfer");
+        assert_eq!(report.elementary[2].claim_id, "H3-contact-modulation");
     }
 
     #[test]
