@@ -288,8 +288,8 @@ impl SensorCalibration {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObservationRecord {
     pub sensor_id: String,
-    /// TAI nanoseconds, not UTC or local wall-clock time.
-    pub timestamp_tai_ns: i64,
+    /// Recorded TAI nanoseconds before applying the calibrated clock offset.
+    pub recorded_timestamp_tai_ns: i64,
     pub sequence_number: u64,
     pub modality: SensorModality,
     pub coordinate_frame: CoordinateFrame,
@@ -341,7 +341,7 @@ pub enum EvidenceError {
     DuplicateObservation { sensor_id: String, sequence_number: u64 },
     CalibrationModalityMismatch { sensor_id: String },
     CalibrationFrameMismatch { sensor_id: String },
-    CalibrationNotValidAtObservation { sensor_id: String, timestamp_tai_ns: i64 },
+    CalibrationNotValidAtObservation { sensor_id: String, corrected_timestamp_tai_ns: i64 },
     MeasurementModalityMismatch { sensor_id: String },
     FrameMismatch { sensor_id: String, expected: CoordinateFrame, actual: CoordinateFrame },
     TimestampOverflow { sensor_id: String },
@@ -363,7 +363,7 @@ impl fmt::Display for EvidenceError {
             Self::DuplicateObservation { sensor_id, sequence_number } => write!(f, "duplicate observation {sensor_id}:{sequence_number}"),
             Self::CalibrationModalityMismatch { sensor_id } => write!(f, "calibration modality mismatch for sensor {sensor_id}"),
             Self::CalibrationFrameMismatch { sensor_id } => write!(f, "calibration frame mismatch for sensor {sensor_id}"),
-            Self::CalibrationNotValidAtObservation { sensor_id, timestamp_tai_ns } => write!(f, "calibration for sensor {sensor_id} is not valid at TAI timestamp {timestamp_tai_ns}"),
+            Self::CalibrationNotValidAtObservation { sensor_id, corrected_timestamp_tai_ns } => write!(f, "calibration for sensor {sensor_id} is not valid at corrected TAI timestamp {corrected_timestamp_tai_ns}"),
             Self::MeasurementModalityMismatch { sensor_id } => write!(f, "measurement is incompatible with sensor modality for {sensor_id}"),
             Self::FrameMismatch { sensor_id, expected, actual } => write!(f, "sensor {sensor_id} frame mismatch: expected {expected:?}, got {actual:?}"),
             Self::TimestampOverflow { sensor_id } => write!(f, "clock correction overflows TAI timestamp for {sensor_id}"),
@@ -451,10 +451,12 @@ impl EvidenceBundle {
                         sensor_id: observation.sensor_id.clone(),
                     });
                 }
-                if !calibration.valid_at(observation.timestamp_tai_ns) {
+                let corrected_timestamp = calibration
+                    .corrected_timestamp_tai_ns(observation.recorded_timestamp_tai_ns)?;
+                if !calibration.valid_at(corrected_timestamp) {
                     return Err(EvidenceError::CalibrationNotValidAtObservation {
                         sensor_id: observation.sensor_id.clone(),
-                        timestamp_tai_ns: observation.timestamp_tai_ns,
+                        corrected_timestamp_tai_ns: corrected_timestamp,
                     });
                 }
             }
@@ -595,7 +597,7 @@ mod tests {
     ) -> ObservationRecord {
         ObservationRecord {
             sensor_id: sensor_id.to_string(),
-            timestamp_tai_ns,
+            recorded_timestamp_tai_ns: timestamp_tai_ns,
             sequence_number,
             modality,
             coordinate_frame: CoordinateFrame::SensorBody,
