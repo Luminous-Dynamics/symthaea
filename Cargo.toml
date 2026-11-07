@@ -19,7 +19,11 @@ exclude = [
     # They have no Cargo.toml, so keep their source untouched but exclude them
     # from workspace package discovery until the manifests and APIs are complete.
     "crates/core/symthaea",
+    "crates/core/symthaea-iit",
     "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
