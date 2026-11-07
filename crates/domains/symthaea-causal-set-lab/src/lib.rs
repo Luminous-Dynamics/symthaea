@@ -352,6 +352,24 @@ impl CausalSet2D {
         })
     }
 
+    /// Dimensionless two-dimensional Benincasa-Dowker action bracket.
+    ///
+    /// For a 1+1D causal set:
+    ///     S / hbar = 2 N - 4 N_0 + 8 N_1 - 4 N_2,
+    /// where N_k counts causally related endpoint pairs with exactly k
+    /// elements strictly inside the open order interval. This returns only
+    /// the integer combinatorial bracket, not a physical action with units.
+    /// The continuum Einstein-Hilbert interpretation requires manifold-like
+    /// Poisson-sprinkling assumptions and separate continuum-limit checks.
+    pub fn bdg_action_2d_dimensionless_bracket(&self) -> i128 {
+        let abundance = self.interval_size_histogram();
+        let n = self.events.len() as i128;
+        let n0 = i128::from(abundance.first().copied().unwrap_or(0));
+        let n1 = i128::from(abundance.get(1).copied().unwrap_or(0));
+        let n2 = i128::from(abundance.get(2).copied().unwrap_or(0));
+        2 * n - 4 * n0 + 8 * n1 - 4 * n2
+    }
+
     /// Myrheim ordering fraction r = R / binom(N,2), where R counts
     /// unordered related pairs. Returns None for fewer than two events.
     pub fn ordering_fraction(&self) -> Option<f64> {
@@ -720,6 +738,31 @@ mod tests {
             .collect();
         let causet = CausalSet2D::new(events, 4.0, 4.0).unwrap();
         assert_eq!(causet.interval_size_histogram(), vec![3, 2, 1]);
+    }
+
+    #[test]
+    fn two_dimensional_bdg_action_matches_hand_counted_chain_and_antichain() {
+        let chain_events = (0..5)
+            .map(|id| Event2D {
+                id,
+                u: id as f64,
+                v: id as f64,
+            })
+            .collect();
+        let chain = CausalSet2D::new(chain_events, 5.0, 5.0).unwrap();
+        assert_eq!(chain.interval_size_histogram(), vec![4, 3, 2, 1]);
+        assert_eq!(chain.bdg_action_2d_dimensionless_bracket(), 10);
+
+        let antichain_events = (0..5)
+            .map(|id| Event2D {
+                id,
+                u: id as f64,
+                v: (4 - id) as f64,
+            })
+            .collect();
+        let antichain = CausalSet2D::new(antichain_events, 5.0, 5.0).unwrap();
+        assert_eq!(antichain.interval_size_histogram(), vec![0, 0, 0, 0]);
+        assert_eq!(antichain.bdg_action_2d_dimensionless_bracket(), 10);
     }
 
     #[test]
