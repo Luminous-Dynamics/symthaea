@@ -87,12 +87,7 @@ impl DiffSingerEngine {
     }
 }
 
-impl SingingVoiceEngine for DiffSingerEngine {
-    fn id(&self) -> &str {
-        &self.provider_id
-    }
-
-    pub fn capability_manifest() -> SingingBackendCapabilities {
+fn diffsinger_capability_manifest() -> SingingBackendCapabilities {
         use CapabilitySupport::{Approximated, Conditional, Native, Unsupported};
         let control = |control, support, rationale: &str| ControlCapability {
             control,
@@ -100,7 +95,7 @@ impl SingingVoiceEngine for DiffSingerEngine {
             rationale: rationale.to_string(),
         };
         SingingBackendCapabilities::new(
-            self.id(),
+            "diffsinger-local",
             vec![
                 control(SingingControl::LyricText, Unsupported, "the worker receives phonemes and score events; raw lyric text is not a model input"),
                 control(SingingControl::Language, Conditional, "the current worker accepts English only and requires an explicit voicebank language ID"),
@@ -127,8 +122,15 @@ impl SingingVoiceEngine for DiffSingerEngine {
     }
 
 
+impl SingingVoiceEngine for DiffSingerEngine {
+    fn id(&self) -> &str {
+        &self.provider_id
+    }
+
+
+
     fn capabilities(&self) -> SingingBackendCapabilities {
-        Self::capability_manifest()
+        diffsinger_capability_manifest()
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
@@ -195,7 +197,7 @@ mod capability_manifest_tests {
 
     #[test]
     fn static_backend_capability_manifest_is_complete_and_valid() {
-        let manifest = DiffSingerEngine::capability_manifest();
+        let manifest = diffsinger_capability_manifest();
         manifest.validate().unwrap();
         assert_eq!(manifest.controls.len(), SingingControl::ALL.len());
         assert!(manifest.controls.iter().any(|entry| entry.control == SingingControl::ConsonantAnticipation));
