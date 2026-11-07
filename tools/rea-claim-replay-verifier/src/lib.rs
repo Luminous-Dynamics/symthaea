@@ -172,6 +172,7 @@ pub struct ReplayReceipt {
     pub reported_derivation_sha256: String,
     pub evidence_count: usize,
     pub missing_evidence_count: usize,
+    pub numeric_precision_warnings: Vec<ClaimPrecisionWarning>,
     pub rule_id: String,
 }
 
@@ -730,6 +731,7 @@ pub fn replay_claim_evaluation(
         reported_derivation_sha256: reported.derivation_sha256,
         evidence_count: evidence_by_id.len(),
         missing_evidence_count: expected.missing_evidence_ids.len(),
+        numeric_precision_warnings: expected.numeric_precision_warnings.clone(),
         rule_id: expected.rule_id,
     })
 }
