@@ -10,7 +10,8 @@
     "source_build_lineage": "#10569",
     "canonical_receipts": "#10314/#10370/#10533",
     "statistical_inference": "#8438/#9433/#10513",
-    "evidence_continuity": "#10630"
+    "evidence_continuity": "#10630",
+    "state_routing": "#10844"
   },
   "experiment": {
     "experiment_id": "__REQUIRED_BEFORE_PREREGISTRATION__",
@@ -338,14 +339,47 @@
       "no_state",
       "untyped_history",
       "shuffled_verified_state",
-      "accepted_findings_only"
+      "accepted_findings_only",
+      "fixed_mechanism_scope_routed_clusters",
+      "adaptive_mechanism_scope_routed_clusters",
+      "shuffled_scope_routing",
+      "oracle_scope_assignment"
     ],
     "metrics": [
       "provenance_complete_record_recovery",
       "false_currentness_rate",
       "evidence_revalidation_precision_recall",
       "duplicated_experiment_rate",
-      "fresh_family_confirmed_yield"
-    ]
+      "fresh_family_confirmed_yield",
+      "false_cross_scope_sharing_rate",
+      "false_scope_fragmentation_rate",
+      "negative_transfer_by_task_family",
+      "clustered_rollout_utility"
+    ],
+    "scope_routing": {
+      "scope_descriptor_schema_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "router_policy_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "route_decision_log_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "cluster_scope_manifest_digest": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "router_access_audit_ref": "__REQUIRED_BEFORE_PREREGISTRATION__",
+      "sharing_policy": "Each cluster has an immutable scope descriptor covering task/capability/family scope, permitted evidence classes, validity boundary and sharing rules. The router sees only visible task input, approved scope descriptors and cluster summaries; it does not inspect raw cluster contents, hidden labels, reward or future task IDs.",
+      "router_cannot_read_cluster_contents": true,
+      "router_cannot_access_sealed_labels": true,
+      "route_fixed_per_task_instance": true,
+      "cross_cluster_transfer_requires_receipt": true,
+      "required_ablation_arms": [
+        "global_verified_state",
+        "fixed_mechanism_scope_routed_clusters",
+        "adaptive_mechanism_scope_routed_clusters",
+        "shuffled_scope_routing",
+        "oracle_scope_assignment"
+      ],
+      "prohibited_failure_modes": [
+        "cross_scope_evidence_leakage",
+        "stale_evidence_currentness_inheritance",
+        "unreceipted_cross_cluster_transfer",
+        "hidden_task_label_routing"
+      ]
+    }
   }
 }
