@@ -10,6 +10,10 @@ on:
       - "scripts/diffsinger_worker.py"
       - "scripts/diffsinger_phonemes.py"
       - "scripts/test_diffsinger_phonemes.py"
+      - "docs/FUNCTIONAL_VOCAL_TRACT.md"
+      - "docs/VOCAL_PHYSIOLOGY_ARCHITECTURE.md"
+      - "docs/research/VOCAL_PHONEME_COVERAGE_AND_SA_SINGING_2026-11-07.md"
+      - "docs/research/VOCAL_CONTROL_AND_EVALUATION_BENCHMARK_V1.md"
       - ".github/workflows/strict-vocal-phoneme-contract.yml"
   workflow_dispatch:
 
