@@ -379,3 +379,54 @@ Do not set a numeric solved-count target until the exact QBFGallery results arti
 Prenex QBF dependencies are determined by quantifier order. DQBF instead supplies explicit, potentially non-prenex dependency sets and cannot be represented by the standard prefix rule alone. Keep DQBF behind a different typed task/dependency contract. Likewise, do not treat #QBF (count of winning strategies) as ordinary #SAT or as a QBF decision result.
 
 The bounded implementation in #10991 is an exhaustive reference producer/checker over CNF matrices. Its truth-table strategies are a correctness oracle, not the target representation for scalable synthesis. Production strategy discovery should explore AIG/BDD/circuit representations and proof-derived intermediate game values, and optimize verified output size plus checking cost.
+
+
+## 13. Strategy-function representation and search optimization
+
+QBF strategy evaluation must measure the complete artifact, not only whether a formula was decided.
+
+### Representation pipeline
+
+For every independently verified source strategy:
+
+1. **Semantic support reduction.** Prove which declared dependencies actually influence each Boolean strategy function. Remove only inessential variables, retain prefix order, and exhaustively verify equivalence over the original dependency universe.
+2. **Canonical ROBDD construction.** Compile the reduced truth table with a separate BDD decision order. The BDD decision order is a permutation of the support indices; it must never rewrite or broaden the semantic dependency scope.
+3. **Order optimization.** Use exact permutation search as a small-scope oracle when (n!) is inside the explicit evaluation budget. Use deterministic bounded sifting above that range. Record initial and final node counts, order evaluations and the selected order.
+4. **Independent checking.** Check BDD topology, reachability, unique/reduced nodes, order constraints, declared support, and every truth-table row. The original QBF strategy must still be independently checked against the original matrix and prefix.
+
+### Research context
+
+- The 2026 frontier-aware OBDD work links prefix-frontier width with pathwidth for CNF compilation and reports substantial reductions from bounded-insertion ordering refinement. Its results are for feature-interaction graphs and CNF OBDD compilation; they are a candidate structural seed for strategy BDDs, not direct performance evidence for Symthaea: https://www.nature.com/articles/s41598-026-74296-8.
+- The January 2026 feature-model BDD study combines SAT preprocessing, variable ordering, clause ordering and alternative/multithreaded construction methods; it reports compilation of previously infeasible eCos feature models: https://doi.org/10.1016/j.jss.2025.112566.
+- The SAT 2026 QBF synthesis proof-system work provides a stronger long-term destination: a proof representation from which Skolem/Herbrand functions and intermediate game values can be extracted in polynomial time: https://doi.org/10.4230/LIPIcs.SAT.2026.3.
+
+### Required measurements
+
+| Layer | Measure |
+|---|---|
+| Source scope | Original dependencies per function |
+| Semantic support | Essential dependencies, removed dependencies, pair checks |
+| Truth table | Original and reduced entries, bytes, build time |
+| ROBDD | Reachable node count, edge count, decision order |
+| Ordering | Exact minimum where budgeted, sifting result, order evaluations |
+| Build | Peak nodes, peak memory, time-to-first-valid BDD |
+| Verification | Structural check time, assignments checked, checker memory |
+| QBF search | Quantifier-node visits, partial-matrix checks, early-TRUE/FALSE prunes, matrix leaf evaluations |
+| End-to-end | Time and memory to independently verified strategy plus compact representation |
+
+### Fair comparisons
+
+- Compare natural prefix order, reverse order, exact optimum (small scopes), bounded sifting and future graph-derived seeds.
+- Do not compare a strategy BDD with a source truth table as if the row count and node count were equivalent units.
+- Report both original and minimized support; a smaller BDD caused by dropping an unused dependency is valid only when support equivalence is checked.
+- Report decision time separately from strategy synthesis, support reduction, ordering search and independent verification.
+- For larger functions, include construction peak size, not just final BDD size; a small final diagram can still require an impractical peak intermediate.
+- Keep a hidden held-out set and record the function family. Boolean-function micro-corpora are correctness/heuristic tests, not substitutes for application-derived QBF strategies.
+
+### Near-term finite qualification
+
+The current finite research lane uses exhaustive small QBF oracles, generated multi-alternation QBF instances, exhaustive three-input Boolean-function support/BDD equivalence, exact order search, and node/tampering/resource negative controls. These establish bounded semantics and heuristic behavior only. They do not establish scalable solver superiority.
+
+### Candidate next paradigm: frontier-seeded multi-start ordering
+
+Use the Boolean function's interaction graph (pairwise non-zero mixed Boolean derivatives) to create deterministic min-fill/frontier-style seed orders. Run the same bounded sifting from several seeds and retain the smallest independently verified ROBDD. Compare this against natural-order sifting and exact optima on small functions. Do not assume pairwise interaction graphs capture every high-order dependency; retain exact small-scope results as the oracle and test the seeds on held-out functions.
