@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn high_level_strategy_compiler_uses_sifting_when_exact_order_exceeds_budget() {
-        let values: Vec<bool> = (0..64).map(|mask| mask.count_ones() % 2 == 1).collect();
+        let values: Vec<bool> = (0usize..64).map(|mask| mask.count_ones() % 2 == 1).collect();
         let source = function(&[0, 1, 2, 3, 4, 5], &values);
         let strategy = WinningStrategy {
             owner: StrategyOwner::Universal,
