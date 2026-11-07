@@ -118,6 +118,9 @@ The companion vessel_benchmark_register.csv keeps each source/configuration sepa
 - Existing marine-bench owners: catamaran candidates, energy budget, voyage traces, matched trials, operating-envelope completeness, validation and uncertainty.
 - Symtropy: spatial configuration, interior/access/service clearances, assembly/resource scheduling and deterministic scenario replay; not a substitute for validated CFD or structural FEA.
 - [MARINE-AUTONOMY-VECTOR-001 #10956](https://github.com/Luminous-Dynamics/symthaea/issues/10956): per-resource mission endurance (water, food, waste, consumables, spares) using upstream stock/depletion evidence; no scalar autonomy shortcut.
+- [MARINE-LIVEABOARD-EVIDENCE-JOIN-001 #10988](https://github.com/Luminous-Dynamics/symthaea/issues/10988): exact subject/case join across independent energy, resource, habitability, route, structural, safety and serviceability owner reports.
+- [MARINE-WATERMAKER-BENCH-001 #10994](https://github.com/Luminous-Dynamics/symthaea/issues/10994): installed RO service test protocol and measured qualified-water output/energy; composes WATER-MFG #5966 and ISO 25175 membrane-element testing without creating a new water-treatment solver.
+- [MARINE-RESOURCE-OPS-001 #11008](https://github.com/Luminous-Dynamics/symthaea/issues/11008): mission-bound onboard service scheduling over existing grid physics and habitat metabolism; no duplicate battery model, route optimizer or direct actuation.
 - [MARINE-HABITABILITY-SEAKEEPING-001 #10966](https://github.com/Luminous-Dynamics/symthaea/issues/10966): task/location/posture-specific motion comfort and workability; composes validated seakeeping outputs and human-factor methods rather than creating a new motion solver.
 - Mycelix: component provenance, custody, manufacturing and inspection records; not engineering approval.
 - Sol-Atlas: source-aware route, site, climate, solar and port infrastructure projections.
