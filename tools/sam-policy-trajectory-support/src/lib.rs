@@ -67,6 +67,32 @@ pub struct Assessment {
     pub matched_finite_path: bool,
 }
 
+pub struct AssessmentReceipt {
+    // Private fields make assess_with_receipt the supported construction path.
+    support_manifest_bytes: Vec<u8>,
+    query_bytes: Vec<u8>,
+    assessment: Assessment,
+}
+
+impl AssessmentReceipt {
+    /// The assessment that was computed from the retained canonical inputs.
+    pub fn assessment(&self) -> Assessment {
+        self.assessment
+    }
+
+    /// One canonical artifact binding the exact support manifest, query and result.
+    /// This is a content receipt, not authentication or a signature.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"sam.policy-trajectory-support.assessment-receipt.v0.1\0");
+        push_bytes(&mut out, &self.support_manifest_bytes);
+        push_bytes(&mut out, &self.query_bytes);
+        push_bytes(&mut out, &self.assessment.canonical_bytes());
+        out
+    }
+}
+
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrajectoryQuery {
     pub target_policy_digest: String,
@@ -180,6 +206,23 @@ impl Assessment {
     }
 }
 
+/// Run the finite path assessment and retain the exact canonical inputs that
+/// produced it. Consumers can export one artifact instead of independently
+/// pairing three potentially stale byte strings.
+pub fn assess_with_receipt(
+    manifest: &SupportManifest,
+    query: &TrajectoryQuery,
+) -> Result<AssessmentReceipt, SupportError> {
+    let support_manifest_bytes = manifest.canonical_bytes();
+    let query_bytes = query.canonical_bytes();
+    let assessment = assess(manifest, query)?;
+    Ok(AssessmentReceipt {
+        support_manifest_bytes,
+        query_bytes,
+        assessment,
+    })
+}
+
 pub fn assess(
     manifest: &SupportManifest,
     query: &TrajectoryQuery,
@@ -267,6 +310,12 @@ fn canonicalize_path(steps: &[DecisionStep]) -> Result<CanonicalPath, SupportErr
 fn push_len(out: &mut Vec<u8>, length: usize) {
     let length = u64::try_from(length).expect("collection length fits u64");
     out.extend_from_slice(&length.to_le_bytes());
+}
+
+fn push_bytes(out: &mut Vec<u8>, value: &[u8]) {
+    let length = u64::try_from(value.len()).expect("byte length fits u64");
+    out.extend_from_slice(&length.to_le_bytes());
+    out.extend_from_slice(value);
 }
 
 fn push_string(out: &mut Vec<u8>, value: &str) {
@@ -524,6 +573,13 @@ mod tests {
         assert_eq!(
             bytes_to_hex(&assessment.canonical_bytes()),
             canonical_vector("assessment")
+        );
+
+        let receipt = assess_with_receipt(&support, &query).unwrap();
+        assert_eq!(receipt.assessment(), assessment);
+        assert_eq!(
+            bytes_to_hex(&receipt.canonical_bytes()),
+            canonical_vector("assessment_receipt")
         );
     }
 

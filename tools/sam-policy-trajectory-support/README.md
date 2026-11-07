@@ -41,3 +41,10 @@ The support crate now exposes deterministic content bytes for three exact artifa
 These are canonical **content exports**, not hashes or signatures. Consumers choose and apply their digest algorithm to the returned bytes. The format is domain-separated and length-prefixed; a later schema/version change must use a new domain/version. The exports do not authenticate the SAM executable or the source manifest and do not validate the truth of caller-provided evidence.
 
 Tests check joint-action order normalization, query completeness/partial-query sensitivity, deterministic finite manifest content export, and byte-for-byte golden vectors shared with Symtropy's reciprocal decision-evidence adapter.
+
+
+## Source-bound assessment receipt
+
+The SAM crate also exposes `assess_with_receipt`. It computes the normal finite assessment and retains the exact canonical `SupportManifest` and `TrajectoryQuery` bytes used for that call. `AssessmentReceipt::canonical_bytes()` emits one domain-separated, length-prefixed artifact containing those two canonical inputs and the exact `Assessment::canonical_bytes()` result.
+
+A downstream adapter can now reject a stale or cross-wired assessment: its receipt must reproduce from the exact support-manifest bytes, exact query bytes and recorded disposition. This is still an unkeyed content commitment, not proof that the SAM binary produced it or that the input evidence is truthful; build provenance must be anchored independently when authenticity is required.
