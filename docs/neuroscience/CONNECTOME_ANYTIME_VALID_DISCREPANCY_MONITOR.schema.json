@@ -317,7 +317,7 @@
       "required": [
         "challenger_predictive_by_history",
         "e_factors_by_history",
-        "crossing_path",
+        "crossing_paths",
         "observed_e_value",
         "false_alarm_probability_by_null",
         "expected_status"
@@ -339,15 +339,19 @@
             "$ref": "#/$defs/e_factor_row"
           }
         },
-        "crossing_path": {
+        "crossing_paths": {
           "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
+          "minItems": 1,
           "items": {
-            "enum": [
-              "H",
-              "L"
-            ]
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "enum": [
+                "H",
+                "L"
+              ]
+            }
           }
         },
         "observed_e_value": {
