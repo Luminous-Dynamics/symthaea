@@ -458,6 +458,102 @@ pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
     Ok(())
 }
 
+/// Deterministically sift each dependency through every BDD order position.
+///
+/// The semantic dependency list and truth table are not modified. Sifting only
+/// chooses the variable test order inside the ROBDD. For each variable, the
+/// best insertion position is selected by node count, with lexicographic order
+/// as a deterministic tie-break. Candidate orders that exceed the node budget
+/// are discarded; exhausting the order-evaluation budget returns an error.
+pub fn sift_strategy_function_robdd(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddSiftingReport, StrategyBddError> {
+    validate_truth_table(function, budget)?;
+    let dependency_count = function.dependencies.len();
+    let mut order: Vec<usize> = (0..dependency_count).collect();
+    let mut bdd = compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
+    let initial_variable_order = order.clone();
+    let initial_node_count = bdd.nodes.len();
+    let mut evaluations = 1usize;
+
+    for _ in 0..budget.max_sifting_passes {
+        let mut pass_improved = false;
+        for dependency_index in 0..dependency_count {
+            let mut remainder = order.clone();
+            let Some(current_position) = remainder
+                .iter()
+                .position(|candidate| *candidate == dependency_index)
+            else {
+                return Err(StrategyBddError::VariableOrderEntryOutOfRange {
+                    position: dependency_index,
+                    dependency_index,
+                    dependency_count,
+                });
+            };
+            remainder.remove(current_position);
+
+            let mut best_order = order.clone();
+            let mut best_bdd = bdd.clone();
+            for insertion_position in 0..dependency_count {
+                let mut candidate = remainder.clone();
+                candidate.insert(insertion_position, dependency_index);
+                if candidate == order {
+                    continue;
+                }
+
+                let required = evaluations
+                    .checked_add(1)
+                    .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+                if required > budget.max_variable_order_evaluations {
+                    return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+                        required,
+                        limit: budget.max_variable_order_evaluations,
+                    });
+                }
+                evaluations = required;
+
+                match compile_strategy_function_to_robdd_with_order(
+                    function,
+                    &candidate,
+                    budget,
+                ) {
+                    Ok(candidate_bdd) => {
+                        let candidate_nodes = candidate_bdd.nodes.len();
+                        let best_nodes = best_bdd.nodes.len();
+                        if candidate_nodes < best_nodes
+                            || (candidate_nodes == best_nodes && candidate < best_order)
+                        {
+                            best_order = candidate;
+                            best_bdd = candidate_bdd;
+                        }
+                    }
+                    Err(StrategyBddError::NodeBudgetExceeded { .. }) => {}
+                    Err(error) => return Err(error),
+                }
+            }
+
+            if best_order != order {
+                order = best_order;
+                bdd = best_bdd;
+                pass_improved = true;
+            }
+        }
+        if !pass_improved {
+            break;
+        }
+    }
+
+    Ok(StrategyBddSiftingReport {
+        initial_variable_order,
+        optimized_variable_order: order,
+        initial_node_count,
+        optimized_node_count: bdd.nodes.len(),
+        order_evaluations: evaluations,
+        bdd,
+    })
+}
+
 /// Evaluate an ROBDD for one assignment in dependency-list order.
 pub fn evaluate_robdd(
     bdd: &ReducedOrderedBdd,
@@ -548,6 +644,8 @@ mod tests {
             max_dependency_variables: 8,
             max_table_entries: 1 << 8,
             max_bdd_nodes: 1 << 8,
+            max_variable_order_evaluations: 128,
+            max_sifting_passes: 2,
         }
     }
 
@@ -643,6 +741,88 @@ mod tests {
         assert!(matches!(
             validate_robdd(&bdd),
             Err(StrategyBddError::UnreducedNode { node: 0 })
+        ));
+    }
+
+    #[test]
+    fn custom_bdd_order_preserves_the_same_semantics() {
+        let source = function(
+            &[10, 11, 12],
+            &[false, true, false, true, false, false, true, true],
+        );
+        let order = [2, 0, 1];
+        let bdd =
+            compile_strategy_function_to_robdd_with_order(&source, &order, budget()).unwrap();
+        assert_eq!(bdd.variable_order, order);
+        verify_robdd_matches_strategy_function(&bdd, &source, budget()).unwrap();
+    }
+
+    #[test]
+    fn variable_order_sifting_reduces_mux_strategy_size() {
+        // Dependencies are [b, c, a], while f = a ? c : b.
+        let source = function(
+            &[11, 12, 10],
+            &[false, true, false, true, false, false, true, true],
+        );
+        let initial = compile_strategy_function_to_robdd(&source, budget()).unwrap();
+        let report = sift_strategy_function_robdd(&source, budget()).unwrap();
+        assert_eq!(initial.nodes.len(), 5);
+        assert_eq!(report.initial_node_count, 5);
+        assert_eq!(report.optimized_node_count, 3);
+        assert!(report.optimized_node_count <= report.initial_node_count);
+        verify_robdd_matches_strategy_function(&report.bdd, &source, budget()).unwrap();
+    }
+
+    #[test]
+    fn variable_order_sifting_budget_is_fail_closed() {
+        let source = function(
+            &[11, 12, 10],
+            &[false, true, false, true, false, false, true, true],
+        );
+        let tight = StrategyBddBudget {
+            max_variable_order_evaluations: 1,
+            ..budget()
+        };
+        assert!(matches!(
+            sift_strategy_function_robdd(&source, tight),
+            Err(StrategyBddError::VariableOrderSearchBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn validator_rejects_unreachable_padding_nodes() {
+        let source = function(&[0, 1, 2], &[false, true, false, true, false, true, false, true]);
+        let mut bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
+        bdd.nodes.push(BddNode {
+            dependency_index: 2,
+            low: BddRef::False,
+            high: BddRef::True,
+        });
+        assert!(matches!(
+            validate_robdd(&bdd),
+            Err(StrategyBddError::UnreachableNode { .. })
+        ));
+    }
+
+    #[test]
+    fn validator_rejects_non_permutation_variable_order() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let mut bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
+        bdd.variable_order = vec![0, 0];
+        assert!(matches!(
+            validate_robdd(&bdd),
+            Err(StrategyBddError::DuplicateVariableOrderEntry { .. })
+        ));
+    }
+
+    #[test]
+    fn validator_rejects_duplicate_semantic_dependencies() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let mut bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
+        bdd.dependencies = vec![0, 0];
+        assert!(matches!(
+            validate_robdd(&bdd),
+            Err(StrategyBddError::DuplicateDependencyVariable { variable: 0 })
         ));
     }
 
