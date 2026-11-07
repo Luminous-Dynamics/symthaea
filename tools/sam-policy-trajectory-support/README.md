@@ -45,6 +45,6 @@ Tests check joint-action order normalization, query completeness/partial-query s
 
 ## Source-bound assessment receipt
 
-The SAM crate also exposes `assess_with_receipt`. It computes the normal finite assessment and retains the exact canonical `SupportManifest` and `TrajectoryQuery` bytes used for that call. `AssessmentReceipt::canonical_bytes()` emits one domain-separated, length-prefixed artifact containing those two canonical inputs and the exact `Assessment::canonical_bytes()` result.
+The SAM crate also exposes `assess_with_receipt`. It computes the normal finite assessment and retains the exact canonical `SupportManifest` and `TrajectoryQuery` bytes used for that call. `AssessmentReceipt::canonical_bytes()` emits one domain-separated, length-prefixed artifact containing those two canonical inputs, the source-derived evidence-manifest/policy/context/exhaustiveness metadata, the query policy/context/completeness/decision-point metadata, and the exact `Assessment::canonical_bytes()` result.
 
 A downstream adapter can now reject a stale or cross-wired assessment: its receipt must reproduce from the exact support-manifest bytes, exact query bytes and recorded disposition. This is still an unkeyed content commitment, not proof that the SAM binary produced it or that the input evidence is truthful; build provenance must be anchored independently when authenticity is required.

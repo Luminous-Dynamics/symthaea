@@ -71,6 +71,14 @@ pub struct AssessmentReceipt {
     // Private fields make assess_with_receipt the supported construction path.
     support_manifest_bytes: Vec<u8>,
     query_bytes: Vec<u8>,
+    evidence_manifest_id: String,
+    support_target_policy_digest: String,
+    support_context_digest: String,
+    path_universe_exhaustive: bool,
+    query_target_policy_digest: String,
+    query_context_digest: String,
+    query_complete: bool,
+    query_decision_points: usize,
     assessment: Assessment,
 }
 
@@ -87,6 +95,14 @@ impl AssessmentReceipt {
         out.extend_from_slice(b"sam.policy-trajectory-support.assessment-receipt.v0.1\0");
         push_bytes(&mut out, &self.support_manifest_bytes);
         push_bytes(&mut out, &self.query_bytes);
+        push_string(&mut out, &self.evidence_manifest_id);
+        push_string(&mut out, &self.support_target_policy_digest);
+        push_string(&mut out, &self.support_context_digest);
+        out.push(u8::from(self.path_universe_exhaustive));
+        push_string(&mut out, &self.query_target_policy_digest);
+        push_string(&mut out, &self.query_context_digest);
+        out.push(u8::from(self.query_complete));
+        push_len(&mut out, self.query_decision_points);
         push_bytes(&mut out, &self.assessment.canonical_bytes());
         out
     }
@@ -218,6 +234,14 @@ pub fn assess_with_receipt(
     Ok(AssessmentReceipt {
         support_manifest_bytes,
         query_bytes,
+        evidence_manifest_id: manifest.evidence_manifest_digest.clone(),
+        support_target_policy_digest: manifest.target_policy_digest.clone(),
+        support_context_digest: manifest.context_digest.clone(),
+        path_universe_exhaustive: manifest.path_universe_exhaustive,
+        query_target_policy_digest: query.target_policy_digest.clone(),
+        query_context_digest: query.context_digest.clone(),
+        query_complete: query.complete,
+        query_decision_points: query.steps.len(),
         assessment,
     })
 }
