@@ -1299,7 +1299,10 @@ mod tests {
                 .expect("multi-unit assignment margin")
         );
         assert_eq!(selection.selected_probe, candidates[selection.selected_candidate_index]);
-        assert_ne!(source.fingerprint().unwrap().model_digest, ""); 
+        assert_eq!(
+            source.fingerprint().unwrap().model_digest,
+            candidate.fingerprint().unwrap().model_digest
+        );
     }
 
     #[test]
