@@ -1272,13 +1272,21 @@ mod tests {
             model_id: "direct-central-coupling".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: apparent_transfer,
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
         };
         let common_drive = ModelSignature {
             model_id: "latent-shared-input".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: apparent_transfer,
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
         };
         assert_eq!(
             minimum_campaign_separation(&[central_path, common_drive]).unwrap(),
@@ -1365,10 +1373,14 @@ mod tests {
         let mut perturbed = zero_samples();
         perturbed[0] = PhaseSample::from_unwrapped_microturns(1_000_000);
         perturbed[2] = PhaseSample::from_unwrapped_microturns(1_100_000);
-        let surface = PhaseResponseSurface::new(test_source_binding(), vec![TransferRow {
-            key: probe,
-            outcome: RowOutcome::Measured { control, perturbed },
-        }]).unwrap();
+        let surface = PhaseResponseSurface::new(
+            test_source_binding(),
+            vec![TransferRow {
+                key: probe,
+                outcome: RowOutcome::Measured { control, perturbed },
+            }],
+        )
+        .unwrap();
 
         let response = surface.phase_reset(&probe).unwrap();
         assert_eq!(response.by_leg[0].microturns(), 0);
@@ -1432,5 +1444,4 @@ mod tests {
             1
         );
     }
-
 }
