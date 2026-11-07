@@ -21,6 +21,10 @@ finite-sample validation in 1+1D, 2+1D and 3+1D flat Minkowski spacetime.
   relations, Myrheim–Meyer dimension estimation and boost tests.
 - The 1+1D pair counter and chain reconstruction are O(N log N); the generic
   higher-dimensional reference observables are O(N²).
+- A dimensionless 4D BDG action bracket built from the first four
+  exclusive interval-abundance bins: n - N0 + 9 N1 - 16 N2 + 8 N3.
+  The method returns the integer combinatorial bracket only; the standard
+  physical prefactor is 4 sqrt(6) (ell/ell_p)^2.
 - Deterministic seeds and bounded-input validation.
 - Open-interval cardinality histogram: for each related endpoint pair,
   count the number of events strictly between them. A successor/predecessor
