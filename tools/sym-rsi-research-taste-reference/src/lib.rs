@@ -401,7 +401,7 @@ pub fn calculate_evsi(problem: &EvsiProblem) -> Result<EvsiReport, EvsiError> {
             .map(|(prior, likelihood)| prior * likelihood)
             .sum();
 
-        if predictive_probability <= PROBABILITY_TOLERANCE {
+        if predictive_probability <= 0.0 {
             outcomes.push(OutcomeDecision {
                 outcome_id: outcome.outcome_id.clone(),
                 predictive_probability,
