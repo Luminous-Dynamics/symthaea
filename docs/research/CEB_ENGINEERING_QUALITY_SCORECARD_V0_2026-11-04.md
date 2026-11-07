@@ -296,3 +296,22 @@ These targets must be accompanied by confidence intervals, task counts, scenario
 - NeurIPS Agentic Benchmark Checklist: https://proceedings.neurips.cc/paper_files/paper/2025/hash/f316275b44ee2de533102913828a8107-Abstract-Datasets_and_Benchmarks_Track.html
 
 All leaderboard values are snapshots of specific tasks, dates, model configurations and harnesses. Re-fetch before public comparisons. CEB claims must never be presented as directly comparable unless task contracts, budgets, graders and coverage are matched.
+
+
+## 3.16 From observed uptake to causally attributed engineering impact
+
+Kodus and Martian show why production review requires more than fixed-gold replay. Kodus reports 180,739 suggestions with 33% implemented/adapted, but its report also notes right-censoring, team-composition effects and that 71.8% of flagged merged PRs had at least one flag open (including false positives and accepted risk). Martian links review suggestions with developer responses, follow-up diffs and thread status, but chronology or LLM matching does not prove a comment caused the change. These datasets are valuable workflow observations, not independent truth or randomized treatment effects. [Kodus State of AI Code Review 2026](https://kodus.io/data) · [Martian Code Review Benchmark](https://www.codereviewbenchmark.com/).
+
+**Paradigm shift:** separate four states:
+1. **Truth** — blinded, revision-bound factual/causal correctness.
+2. **Utility** — actionable value under the frozen scope.
+3. **Uptake** — explicit accept/adapt/reject/defer/discuss/independently reproduce/no observable response.
+4. **Outcome** — verified remediation, regression, recurrence, rollback/rework and survival across later revisions.
+
+Acceptance is not truth; rejection is not falsity; no-response is not rejection; a later diff is not proof of attribution. A false finding can be accepted and implemented. A correct finding can be rejected for scope/timing. A repair can remove the target and introduce a different regression.
+
+**Recommended production study:** cluster-randomize a structured evidence presentation versus the current standard presentation only for low/medium-risk, non-urgent findings where both arms satisfy existing policy. Keep the finding, severity and evidence identical. Independently adjudicate truth/actionability *before* treatment and blind the adjudicators to uptake. Estimate the intention-to-treat effect at the PR/team assignment unit; stratify by severity, repository/team, language and PR size. Keep no-response/censored, defer, explicit rejection and accepted/adapted distinct.
+
+**Non-negotiable safety rule:** never randomize withholding, delay or suppression of critical security, safety, privacy, compliance or incident findings. These remain immediately visible in every arm. If organizational consent, privacy review or a defensible safe boundary is absent, use retrospective descriptive analysis only and make no causal claim.
+
+**CEB metric boundary:** retain existing CEB-REVIEW primaries—`defect_recall_at_5`, `actionable_precision`, `reviewer_burden`—and existing CEB-HUMAN / CEB-CONTINUITY ownership for review process and downstream survival. Do not add a suggestion-acceptance score, production-impact lane, or composite. See [CEB Review Production-Impact Protocol V0](CEB_REVIEW_PRODUCTION_IMPACT_PROTOCOL_V0_2026-11-07.md) for assignment, event taxonomy, verified remediation, causal analysis, ethical safeguards and claim limits.
