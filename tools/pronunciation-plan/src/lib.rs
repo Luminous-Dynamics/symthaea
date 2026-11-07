@@ -104,6 +104,13 @@ pub struct SelectionReceipt {
     /// Non-empty reference to a review/override record; avoid storing personal
     /// reviewer identity in the pronunciation artifact itself.
     pub evidence_reference: String,
+    /// BLAKE3 digest of the exact serialized pronunciation candidate that was
+    /// selected. This detects later edits to phones, syllables, scores, or
+    /// provenance while retaining an otherwise unchanged receipt.
+    pub candidate_digest: String,
+    /// BLAKE3 digest binding the selected candidate to the exact source text,
+    /// language, lexical byte span, and schema version.
+    pub selection_digest: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,6 +120,91 @@ pub enum SelectionAuthority {
     User,
     CommunityReview,
     ApprovedPolicy,
+}
+
+#[derive(Serialize)]
+struct CandidateDigestPayload<'a> {
+    domain: &'static str,
+    candidate: &'a PronunciationCandidate,
+}
+
+#[derive(Serialize)]
+struct SelectionDigestPayload<'a> {
+    domain: &'static str,
+    schema_version: u32,
+    language: &'a str,
+    source_text: &'a str,
+    start_byte: usize,
+    end_byte: usize,
+    surface: &'a str,
+    selected_candidate_id: &'a str,
+    candidate_digest: &'a str,
+}
+
+fn candidate_digest(candidate: &PronunciationCandidate) -> Result<String, String> {
+    let payload = CandidateDigestPayload {
+        domain: "luminous-dynamics/pronunciation-candidate/v1",
+        candidate,
+    };
+    let bytes = serde_json::to_vec(&payload)
+        .map_err(|error| format!("cannot serialize pronunciation candidate: {error}"))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+fn selection_digest(
+    schema_version: u32,
+    language: &str,
+    source_text: &str,
+    word: &WordPronunciation,
+    selected_candidate_id: &str,
+    candidate_digest: &str,
+) -> Result<String, String> {
+    let payload = SelectionDigestPayload {
+        domain: "luminous-dynamics/pronunciation-selection/v1",
+        schema_version,
+        language,
+        source_text,
+        start_byte: word.start_byte,
+        end_byte: word.end_byte,
+        surface: &word.surface,
+        selected_candidate_id,
+        candidate_digest,
+    };
+    let bytes = serde_json::to_vec(&payload)
+        .map_err(|error| format!("cannot serialize pronunciation selection binding: {error}"))?;
+    Ok(format!("blake3:{}", blake3::hash(&bytes).to_hex()))
+}
+
+impl SelectionReceipt {
+    /// Create an integrity-bound receipt after choosing a candidate. The
+    /// authority and evidence reference still require an independently
+    /// verifiable review/override record; these digests bind that record to
+    /// the exact candidate and lexical context in this plan.
+    pub fn bind(
+        authority: SelectionAuthority,
+        evidence_reference: impl Into<String>,
+        schema_version: u32,
+        language: &str,
+        source_text: &str,
+        word: &WordPronunciation,
+        candidate: &PronunciationCandidate,
+    ) -> Result<Self, String> {
+        let candidate_digest = candidate_digest(candidate)?;
+        let selection_digest = selection_digest(
+            schema_version,
+            language,
+            source_text,
+            word,
+            &candidate.candidate_id,
+            &candidate_digest,
+        )?;
+        Ok(Self {
+            authority,
+            evidence_reference: evidence_reference.into(),
+            candidate_digest,
+            selection_digest,
+        })
+    }
 }
 
 impl PronunciationPlan {
@@ -158,7 +250,13 @@ impl PronunciationPlan {
                     "word {word_index} span contains whitespace; each pronunciation span must contain one lexical token"
                 ));
             }
-            validate_word_state(word_index, word)?;
+            validate_word_state(
+                word_index,
+                word,
+                self.schema_version,
+                &self.language,
+                &self.source_text,
+            )?;
 
             previous_end = word.end_byte;
         }
@@ -215,7 +313,13 @@ fn valid_source_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
-fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), String> {
+fn validate_word_state(
+    index: usize,
+    word: &WordPronunciation,
+    schema_version: u32,
+    language: &str,
+    source_text: &str,
+) -> Result<(), String> {
     let mut ids = std::collections::BTreeSet::new();
     for candidate in &word.candidates {
         if candidate.candidate_id.trim().is_empty() || !ids.insert(candidate.candidate_id.as_str())
@@ -307,6 +411,30 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
             if receipt.evidence_reference.trim().is_empty() {
                 return Err(format!(
                     "word {index} selection evidence reference is empty"
+                ));
+            }
+            let selected_candidate = word
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == selected)
+                .expect("selected candidate ID was checked above");
+            let expected_candidate_digest = candidate_digest(selected_candidate)?;
+            if receipt.candidate_digest != expected_candidate_digest {
+                return Err(format!(
+                    "word {index} selection receipt does not bind the exact selected pronunciation candidate"
+                ));
+            }
+            let expected_selection_digest = selection_digest(
+                schema_version,
+                language,
+                source_text,
+                word,
+                selected,
+                &expected_candidate_digest,
+            )?;
+            if receipt.selection_digest != expected_selection_digest {
+                return Err(format!(
+                    "word {index} selection receipt does not bind the exact language/text/span context"
                 ));
             }
         }
