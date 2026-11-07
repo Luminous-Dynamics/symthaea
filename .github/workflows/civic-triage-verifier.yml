@@ -1,0 +1,30 @@
+name: Civic triage fixture verifier
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/civic-triage/**"
+      - "tools/civic-triage-verifier/**"
+      - ".github/workflows/civic-triage-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: civic-triage-verifier-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  strict-fixture-verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Test independent verifier
+        run: cargo test --manifest-path tools/civic-triage-verifier/Cargo.toml
+      - name: Verify committed corpus
+        run: cargo run --manifest-path tools/civic-triage-verifier/Cargo.toml -- docs/research/civic-triage/CIVIC_TRIAGE_CASES_V0_1.json
