@@ -285,3 +285,12 @@ The HME architecture now has a dedicated checkpoint-completeness work package, [
 The HDC-LTC checkpoint contract has a source-derived field inventory:
 [hme_dyn_checkpoint_field_matrix_v0.json](fixtures/hme_dyn_checkpoint_field_matrix_v0.json).
 It captures the distinction between an EvolutionSnapshot (dynamic state + outputs + clocks) and a LearnerCheckpoint (parameters, optimizer state, mutable statistics, config, bindings and dynamic state), plus ReplayCheckpoint and WeightsOnlyArtifact.
+
+
+## 13. Bridge projection footprint and low-rank update comparison
+
+New research child [#10981](https://github.com/Luminous-Dynamics/symthaea/issues/10981) investigates structured/regenerated projection bases and rank-one output-projection update factors. This matters directly to HME's 2K–256K resource profile: at D=256K with 256-wide input and output, current dense bridge projections account for 512 MiB of logical f32 payload.
+
+Machine-readable arithmetic fixture:
+[hme_bridge_projection_footprint_v0.json](fixtures/hme_bridge_projection_footprint_v0.json).
+It includes the dense pair, theoretical multiply-accumulate counts, and exact factor-log size across rank values. These are analytical byte/op counts, not RSS or runtime results.
