@@ -713,8 +713,8 @@ fn paired_policy_metric_deltas(
             .iter()
             .zip(candidate)
             .map(|(left, right)| {
-                f64::from(right.trials_to_correct_rule_commitment.is_some())
-                    - f64::from(left.trials_to_correct_rule_commitment.is_some())
+                (if right.trials_to_correct_rule_commitment.is_some() { 1.0 } else { 0.0 })
+                    - (if left.trials_to_correct_rule_commitment.is_some() { 1.0 } else { 0.0 })
             })
             .collect(),
         reward: reference
