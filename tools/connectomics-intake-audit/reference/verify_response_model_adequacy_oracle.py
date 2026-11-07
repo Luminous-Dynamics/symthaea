@@ -92,13 +92,20 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     unique([c["challenge_id"] for c in challenges], "challenge identity")
     require(all(w["biological_disposition"] == "ADMISSIBLE" for w in worlds),
             "non-admissible world cannot enter probability envelope")
+    for world in worlds:
+        require(valid_sha(world["graph_sha256"]) and valid_sha(world["source_evidence_sha256"]),
+                f"malformed source digest for world {world['world_id']}")
     require(all(math.isfinite(w["prior_probability"]) and 0 <= w["prior_probability"] <= 1 for w in worlds),
             "invalid world prior")
     require(abs(sum(w["prior_probability"] for w in worlds) - 1.0) <= 1e-12,
             "world priors must sum to one")
     for field in ("query_spec_sha256", "decision_rule_sha256"):
         require(valid_sha(query[field]), f"malformed query digest: {field}")
-    require(query["loss_false_true"] >= 0 and query["loss_true_false"] >= 0, "negative query loss")
+    require(
+        math.isfinite(query["loss_false_true"]) and math.isfinite(query["loss_true_false"])
+        and query["loss_false_true"] >= 0 and query["loss_true_false"] >= 0,
+        "query losses must be finite and non-negative",
+    )
 
     prior_loss, prior_decision = baseline_risk(worlds, query)
     require(prior_decision == query["baseline_decision"], "declared baseline decision is not the Bayes decision")
@@ -132,6 +139,12 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
                 "unknown challenge disposition")
         require(challenge["model_id"] is None or challenge["model_id"] in model_index,
                 "challenge references an unknown model")
+        if challenge["model_id"] is not None:
+            linked_model = model_index[challenge["model_id"]]
+            require(linked_model["role"] == "CHALLENGER",
+                    "challenge must reference a challenger model, not the baseline")
+            require(linked_model["challenge_id"] == challenge["challenge_id"],
+                    "challenge/model reverse linkage mismatch")
         require(set(challenge["challenge_unit_ids"]).issubset(challenge_units),
                 "challenge unit is outside the frozen challenge partition")
         for field in ("raw_evidence_sha256", "challenge_report_sha256", "adjudication_receipt_sha256"):
