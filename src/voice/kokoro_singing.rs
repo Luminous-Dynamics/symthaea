@@ -46,7 +46,7 @@ impl SingingVoiceEngine for KokoroSingingEngine {
         "kokoro-v2"
     }
 
-    fn capabilities(&self) -> SingingBackendCapabilities {
+    pub fn capability_manifest() -> SingingBackendCapabilities {
         use CapabilitySupport::{Approximated, Conditional, Native, Unsupported};
         let control = |control, support, rationale: &str| ControlCapability {
             control,
@@ -63,6 +63,7 @@ impl SingingVoiceEngine for KokoroSingingEngine {
                 control(SingingControl::NotePitch, Approximated, "vowel segments are pitch-retuned toward each note frequency"),
                 control(SingingControl::NoteDuration, Approximated, "syllable/note segments are time-stretched to target durations"),
                 control(SingingControl::AbsoluteOnsetAndRests, Native, "syllable stems are placed at absolute note onsets in a zero-initialized timeline"),
+                control(SingingControl::ConsonantAnticipation, Approximated, "the syllable stem is placed before the note onset by the configured advance, without independent phone-boundary control"),
                 control(SingingControl::Melisma, Approximated, "vowel source segments are redistributed across melisma notes"),
                 control(SingingControl::ContinuousPitchCurve, Unsupported, "the renderer follows discrete note frequencies, not the VocalPerformance pitch_curve"),
                 control(SingingControl::PhraseExpressionCurve, Unsupported, "the phrase-level expression curve is not consumed"),
@@ -77,6 +78,11 @@ impl SingingVoiceEngine for KokoroSingingEngine {
             ],
         )
         .expect("static Kokoro capability manifest is complete")
+    }
+
+
+    fn capabilities(&self) -> SingingBackendCapabilities {
+        Self::capability_manifest()
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
@@ -726,4 +732,17 @@ mod tests {
             assert!(output.iter().all(|x| x.is_finite()));
         }
     }
+#[cfg(test)]
+mod capability_manifest_tests {
+    use super::*;
+
+    #[test]
+    fn static_backend_capability_manifest_is_complete_and_valid() {
+        let manifest = KokoroSingingEngine::capability_manifest();
+        manifest.validate().unwrap();
+        assert_eq!(manifest.controls.len(), SingingControl::ALL.len());
+        assert!(manifest.controls.iter().any(|entry| entry.control == SingingControl::ConsonantAnticipation));
+    }
+}
+
 }
