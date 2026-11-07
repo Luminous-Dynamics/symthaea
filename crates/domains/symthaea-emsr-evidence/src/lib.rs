@@ -404,7 +404,7 @@ pub struct SplitSummary {
     pub held_out_dimensions: Vec<SplitDimension>,
 }
 
-fn dimension_value<'a>(record: &'a SplitRecord, dimension: SplitDimension) -> Option<&'a str> {
+fn dimension_value(record: &SplitRecord, dimension: SplitDimension) -> Option<&str> {
     match dimension {
         SplitDimension::EventGroup => Some(&record.event_group),
         SplitDimension::RecordingGroup => Some(&record.recording_group),
