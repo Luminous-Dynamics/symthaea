@@ -988,7 +988,7 @@ impl SemanticSpace {
         let mut result = vectors[0].clone();
 
         for vec in &vectors[1..] {
-            result = circular_convolution(&result, vec);
+            result = circular_convolution_f32(&result, vec);
         }
 
         Ok(result)
@@ -1100,7 +1100,7 @@ impl SemanticSpace {
 
 use crate::math::cosine_similarity_f32 as cosine_similarity;
 
-fn circular_convolution(a: &[f32], b: &[f32]) -> Vec<f32> {
+fn circular_convolution_f32(a: &[f32], b: &[f32]) -> Vec<f32> {
     let n = a.len();
     let mut result = vec![0.0; n];
 
