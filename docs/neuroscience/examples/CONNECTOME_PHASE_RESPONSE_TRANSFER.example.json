@@ -30,7 +30,8 @@
         "probe_class": "LOCAL_PHASE_KICK",
         "source_leg_id": "left_fore",
         "phase_bin": 2,
-        "delay_index": 1
+        "delay_index": 1,
+        "descending_neuron_id": null
       },
       "outcome": {
         "status": "MEASURED",
@@ -94,7 +95,8 @@
         "probe_class": "LOCAL_PHASE_KICK",
         "source_leg_id": "left_middle",
         "phase_bin": 4,
-        "delay_index": 2
+        "delay_index": 2,
+        "descending_neuron_id": null
       },
       "outcome": {
         "status": "MEASURED",
@@ -158,10 +160,37 @@
         "probe_class": "LOCAL_PHASE_KICK",
         "source_leg_id": "left_fore",
         "phase_bin": 2,
-        "delay_index": 1
+        "delay_index": 1,
+        "descending_neuron_id": null
       },
       "outcome": {
         "status": "NO_RESPONSE"
+      }
+    },
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "DESCENDING_COMMAND",
+        "source_leg_id": null,
+        "descending_neuron_id": "DNg100",
+        "phase_bin": 2,
+        "delay_index": 1
+      },
+      "outcome": {
+        "status": "NOT_ASSESSED"
+      }
+    },
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "DESCENDING_COMMAND",
+        "source_leg_id": null,
+        "descending_neuron_id": "DNg97",
+        "phase_bin": 2,
+        "delay_index": 1
+      },
+      "outcome": {
+        "status": "NOT_ASSESSED"
       }
     }
   ],
