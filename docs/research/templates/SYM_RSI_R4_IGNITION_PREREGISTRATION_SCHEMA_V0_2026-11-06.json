@@ -40,6 +40,10 @@
         "evidence_continuity": {
           "type": "string",
           "minLength": 1
+        },
+        "state_routing": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -50,7 +54,8 @@
         "source_build_lineage",
         "canonical_receipts",
         "statistical_inference",
-        "evidence_continuity"
+        "evidence_continuity",
+        "state_routing"
       ],
       "additionalProperties": false
     },
@@ -1185,7 +1190,7 @@
         },
         "ablation_arms": {
           "type": "array",
-          "minItems": 5,
+          "minItems": 9,
           "items": {
             "type": "string",
             "minLength": 1,
@@ -1194,13 +1199,17 @@
               "no_state",
               "untyped_history",
               "shuffled_verified_state",
-              "accepted_findings_only"
+              "accepted_findings_only",
+              "fixed_mechanism_scope_routed_clusters",
+              "adaptive_mechanism_scope_routed_clusters",
+              "shuffled_scope_routing",
+              "oracle_scope_assignment"
             ]
           }
         },
         "metrics": {
           "type": "array",
-          "minItems": 5,
+          "minItems": 9,
           "items": {
             "type": "string",
             "minLength": 1,
@@ -1209,9 +1218,124 @@
               "false_currentness_rate",
               "evidence_revalidation_precision_recall",
               "duplicated_experiment_rate",
-              "fresh_family_confirmed_yield"
+              "fresh_family_confirmed_yield",
+              "false_cross_scope_sharing_rate",
+              "false_scope_fragmentation_rate",
+              "negative_transfer_by_task_family",
+              "clustered_rollout_utility"
             ]
           }
+        },
+        "scope_routing": {
+          "type": "object",
+          "properties": {
+            "scope_descriptor_schema_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "router_policy_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "route_decision_log_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "cluster_scope_manifest_digest": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "const": "__REQUIRED_BEFORE_PREREGISTRATION__"
+                }
+              ]
+            },
+            "router_access_audit_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sharing_policy": {
+              "type": "string",
+              "minLength": 1
+            },
+            "router_cannot_read_cluster_contents": {
+              "const": true
+            },
+            "router_cannot_access_sealed_labels": {
+              "const": true
+            },
+            "route_fixed_per_task_instance": {
+              "const": true
+            },
+            "cross_cluster_transfer_requires_receipt": {
+              "const": true
+            },
+            "required_ablation_arms": {
+              "type": "array",
+              "minItems": 5,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "global_verified_state",
+                  "fixed_mechanism_scope_routed_clusters",
+                  "adaptive_mechanism_scope_routed_clusters",
+                  "shuffled_scope_routing",
+                  "oracle_scope_assignment"
+                ]
+              }
+            },
+            "prohibited_failure_modes": {
+              "type": "array",
+              "minItems": 4,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "cross_scope_evidence_leakage",
+                  "stale_evidence_currentness_inheritance",
+                  "unreceipted_cross_cluster_transfer",
+                  "hidden_task_label_routing"
+                ]
+              }
+            }
+          },
+          "required": [
+            "scope_descriptor_schema_digest",
+            "router_policy_digest",
+            "route_decision_log_digest",
+            "cluster_scope_manifest_digest",
+            "router_access_audit_ref",
+            "sharing_policy",
+            "router_cannot_read_cluster_contents",
+            "router_cannot_access_sealed_labels",
+            "route_fixed_per_task_instance",
+            "cross_cluster_transfer_requires_receipt",
+            "required_ablation_arms",
+            "prohibited_failure_modes"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [
@@ -1224,7 +1348,8 @@
         "successor_migration_test_ref",
         "independent_recovery_audit_ref",
         "ablation_arms",
-        "metrics"
+        "metrics",
+        "scope_routing"
       ],
       "additionalProperties": false
     }
