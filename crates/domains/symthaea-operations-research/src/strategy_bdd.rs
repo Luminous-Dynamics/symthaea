@@ -1052,9 +1052,7 @@ pub fn interaction_graph_min_fill_order(graph: &[BTreeSet<usize>]) -> Vec<usize>
 
 /// Validate a simple, undirected interaction graph whose vertex IDs are
 /// indices into the strategy function's dependency list.
-fn validate_interaction_graph(
-    graph: &[BTreeSet<usize>],
-) -> Result<(), StrategyBddError> {
+fn validate_interaction_graph(graph: &[BTreeSet<usize>]) -> Result<(), StrategyBddError> {
     for (vertex, neighbors) in graph.iter().enumerate() {
         for &neighbor in neighbors {
             if neighbor >= graph.len() {
@@ -1068,10 +1066,7 @@ fn validate_interaction_graph(
                 return Err(StrategyBddError::InteractionGraphSelfEdge { vertex });
             }
             if !graph[neighbor].contains(&vertex) {
-                return Err(StrategyBddError::InteractionGraphAsymmetricEdge {
-                    vertex,
-                    neighbor,
-                });
+                return Err(StrategyBddError::InteractionGraphAsymmetricEdge { vertex, neighbor });
             }
         }
     }
@@ -2046,8 +2041,10 @@ mod tests {
         let report = refine_interaction_order_by_frontier(&graph, &min_fill, budget()).unwrap();
         assert_eq!(report.initial_frontier_profile, vec![0, 1, 2, 3]);
         assert_eq!(report.refined_frontier_profile, vec![0, 1, 2, 1]);
-        assert!(report.refined_frontier_profile.iter().max()
-            <= report.initial_frontier_profile.iter().max());
+        assert!(
+            report.refined_frontier_profile.iter().max()
+                <= report.initial_frontier_profile.iter().max()
+        );
         assert!(report.order_evaluations > 0);
     }
 
@@ -2081,7 +2078,8 @@ mod tests {
     }
 
     #[test]
-    fn interaction_graph_matches_independent_mixed_derivative_oracle_for_all_three_variable_functions() {
+    fn interaction_graph_matches_independent_mixed_derivative_oracle_for_all_three_variable_functions()
+    {
         for function_mask in 0..256usize {
             let values: Vec<bool> = (0..8)
                 .map(|assignment| ((function_mask >> assignment) & 1) != 0)
