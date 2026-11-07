@@ -17,27 +17,37 @@
       "ceb_metric_definition": "Fraction of qualified tasks satisfying issue-specific fail-to-pass and existing pass-to-pass requirements.",
       "target_statement": "Directly exceed the best matched same-version baseline with paired uncertainty; no universal numeric target inferred from public saturation.",
       "target_intent": "quality_goal",
-      "correspondence_class": "close_semantics",
-      "comparison_use": "replication_candidate",
+      "correspondence_class": "related_but_distinct",
+      "comparison_use": "context_only",
       "external_observation_ids": [
         "swepro-full-opus-resolve",
         "swepro-full-gemini-resolve",
         "swepro-full-fable-resolve",
         "swepro-hard-opus-resolve",
         "swepro-hard-fable-resolve",
-        "swepro-hard-gemini-resolve"
+        "swepro-hard-gemini-resolve",
+        "swe-sweep-sol56-paper-bugs-resolved",
+        "swe-sweep-astra6-live-bugs-resolved",
+        "loopcontrol-gpt5mini-certified-task-rate"
       ],
-      "rationale": "Both are issue-resolution rates, but task sets, harnesses, models, split semantics and graders are not matched.",
+      "rationale": "SWE-Bench Pro remains the closest issue-conditioned resolution comparator. SWE-sweep adds open-world multi-bug repository discovery with a bug-count denominator, while LoopControlBench uses a one-shot deterministic fail-to-pass gate on a narrow certified Python task pool. These are related to successful repair but differ materially from CEB's qualified issue-specific task unit and grader contract.",
       "blockers": [
         "task set and split differ",
         "model/harness budgets differ",
-        "grader and environment are not matched"
+        "grader and environment are not matched",
+        "SWE-sweep's unit is concurrent bugs in an unprompted repository sweep, not issue-specific tasks",
+        "SWE-sweep paper and live leaderboard are separate model/harness snapshots",
+        "LoopControlBench is a one-shot Python-only certified pool; its 70-task score cannot be transferred to the later 89-task pool or generalized",
+        "No identical CEB task set, harness, model budget or independent regrade is shared"
       ],
       "normalization_requirements": [
         "replicate the exact external split",
         "pin source, harness and budget",
         "preregister paired task-level comparison",
-        "pristine independently regrade both arms"
+        "pristine independently regrade both arms",
+        "keep open-world repository sweeps, issue-conditioned repair and deterministic one-shot task pools in separate strata",
+        "pin exact task pool, task unit, hidden-test contract, source snapshot, model/harness, budget and scoring image before matched replication",
+        "independently regrade the same retained artifacts under CEB's trust and custody rules"
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
