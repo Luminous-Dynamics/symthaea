@@ -254,3 +254,8 @@ The bounded-query contract also has a structural artifact:
 - [hme_query_receipt_states_v0.json](fixtures/hme_query_receipt_states_v0.json)
 
 The synthetic receipts distinguish exact full scan, exact safe pruning, approximate candidate completion, budget-exhausted incomplete search and invalid generation. The schema is structural; exact candidate-accounting arithmetic and mathematical bounds require an independent verifier.
+
+
+Certified-compression research also includes a blockwise residual-bound fixture:
+[hme_certified_compression_block_bounds_v0.json](fixtures/hme_certified_compression_block_bounds_v0.json).
+It shows a synthetic query-weighted block residual dot bound of 2.0 versus 10.1 for a global residual-radius bound. The corresponding cosine upper bounds are 0.01048 versus 0.05291 in real arithmetic. This motivates measuring blockwise certificate metadata overhead against saved full-payload reads; it is not a measured query-speed improvement.
