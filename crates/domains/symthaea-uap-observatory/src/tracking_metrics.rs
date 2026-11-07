@@ -197,8 +197,7 @@ pub fn gospa_frame(
         let unmatched_rows = n - matched;
         let unmatched_columns = m - matched;
         let cardinality_cost = miss_penalty * (unmatched_rows + unmatched_columns) as f64;
-        let total = accumulated - miss_penalty * unmatched_rows as f64
-            + cardinality_cost;
+        let total = accumulated - miss_penalty * unmatched_rows as f64 + cardinality_cost;
         if total < best_total {
             best_total = total;
             best_matches = matched;
@@ -279,7 +278,12 @@ mod tests {
         // 10->-5 (cost 241); the global optimum is 0->-5 and 10->4 (cost 61).
         let estimate = [p(4.0, 0.0, 0.0), p(-5.0, 0.0, 0.0)];
         let forward = gospa_frame(&truth, &estimate, config).unwrap();
-        let reversed = gospa_frame(&truth, &estimate.iter().copied().rev().collect::<Vec<_>>(), config).unwrap();
+        let reversed = gospa_frame(
+            &truth,
+            &estimate.iter().copied().rev().collect::<Vec<_>>(),
+            config,
+        )
+        .unwrap();
         assert!((forward.distance_m - reversed.distance_m).abs() < 1.0e-12);
         assert_eq!(forward.matched_targets, 2);
         assert!((forward.localization_cost_m_p - 61.0).abs() < 1.0e-12);
