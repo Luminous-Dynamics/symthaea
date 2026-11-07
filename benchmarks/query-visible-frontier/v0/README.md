@@ -32,6 +32,7 @@ Missing visibility evidence means Unknown, not visible and not not-visible. An i
 
 - qvf-r-case.schema.json — closed Draft 2020-12 schema for a synthetic replay case.
 - synthetic-cases.jsonl — deterministic examples. All timestamps and references are synthetic test data.
+- EVALUATION_PROTOCOL.md — preregistered benchmark tracks, metric denominators, ablations, SOTA targets, statistical design and anti-contamination rules.
 - This README — semantics, ownership and claim ceiling.
 
 ## Proposition-version and source-span controls
