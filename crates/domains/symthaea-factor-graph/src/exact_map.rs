@@ -405,10 +405,8 @@ mod tests {
     #[test]
     fn product_underflow_does_not_destroy_the_map_ordering() {
         let mut graph = FactorGraph::new();
-        let mut variable_ids = Vec::new();
         for index in 0..20 {
             let variable = graph.add_variable(&format!("X{index}"), 2);
-            variable_ids.push(variable);
             graph.add_factor(&[variable], vec![1.0e-200, 2.0e-200]);
         }
 
