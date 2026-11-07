@@ -258,7 +258,7 @@
     "query_value_per_cost": {
       "A-query-resolve": 0.5,
       "B-model-probe": 0,
-      "C-disallowed-perfect": 0.5
+      "C-disallowed-perfect": 5
     },
     "discrepancy_tv_per_cost": {
       "A-query-resolve": 0,
