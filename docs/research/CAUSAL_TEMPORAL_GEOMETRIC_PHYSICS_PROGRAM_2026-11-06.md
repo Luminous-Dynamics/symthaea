@@ -167,6 +167,19 @@ not Rust execution or real sensor performance. Pose/clock covariance,
 asynchronous fusion, atmospheric effects, multi-target tracking and blind
 known-object tests remain open. No object classification is performed.
 
+### UAP sensor-placement design
+
+The triangulation primitive now exposes a local Fisher-information matrix
+and ranks candidate sensor placements using D-optimal log(det(FIM)),
+A-optimal covariance trace and the information condition number. Candidate
+bearings are predicted from declared sensor origin and body-to-ECEF
+orientation. An independent Python reference on a fixed synthetic geometry
+produced a highest-ranked candidate with log(det(FIM)) 28.7783 and local
+CRLB covariance trace 5.54e-4 m^2. It does not account for target-region
+uncertainty, sensor pose/boresight covariance, clock drift, visibility,
+terrain, atmosphere or deployment cost. The next benchmark is robust
+placement under these nuisance parameters and known-object trajectories.
+
 ### Broader physics-module audit
 
 A read-through of the existing physics modules found a consistent boundary that
@@ -340,7 +353,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, signature, Christoffel, Riemann/Ricci and geodesic reference kernel (prototype added) | Rust tests + independent curvature, conserved quantities and weak-field regression; ADM constraints remain future work |
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
-| CTGP-11 | UAP evidence pipeline | Calibration/provenance plus bearing-only triangulation and local covariance prototype added | Rust tests + pose/time covariance, Monte Carlo coverage and blind known-object challenge |
+| CTGP-11 | UAP evidence pipeline | Calibration/provenance, bearing-only triangulation, local covariance and Fisher-information sensor-placement prototypes added | Rust tests + pose/time covariance, region-robust design, Monte Carlo coverage and blind known-object challenge |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
 | CTGP-13 | Scientific evidence plane | Shared exact-head BLAKE3 manifest/receipt contract (prototype added) | Unit tests; reject dirty trees, stale heads, queued/skipped checks and missing log/output digests |
 
@@ -472,7 +485,7 @@ physical fidelity only count after matched benchmarks.
 | Chain Theory | Independent 172-row algebraic enumerator | Author's Python/Lean source and third-party audit | Full CSV byte diff, pinned Lean build and assumption audit | Formalize alternative grammars and falsify/derive the physical bridge |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
 | GR / GravCraft | Minkowski/Schwarzschild metric, connection, curvature and geodesic kernel | Einstein Toolkit, SpECTRE, analytic GR references | Curvature, invariants, convergence and coordinate checks | Constraint-consistent 3+1 evolution and stress-energy/energy-condition audit |
-| UAP | Typed calibration/provenance plus bearing-only triangulation and local covariance prototype | NASA-recommended calibrated multi-sensor methodology; sensor-fusion toolchains | Synthetic 93–97% 95%-ellipsoid coverage, then independent Rust/Python checks and blind known-object calibration | Low false-positive track reconstruction on sealed data with pose/time covariance |
+| UAP | Calibration/provenance, bearing triangulation, local covariance and FIM-based placement prototype | NASA-recommended calibrated multi-sensor methodology; sensor-fusion toolchains and CRLB optimal-design literature | Synthetic 93–97% ellipsoid coverage, exact Rust/Python agreement, region-robust placement and blind known-object calibration | Low false-positive track reconstruction on sealed data with pose/time covariance and cost-aware sensor placement |
 | Evidence plane | Exact-head BLAKE3 manifest and receipt prototype | Reproducible-build, SBOM and scientific workflow provenance systems | Tamper/stale-head/skip/dirty-tree negative controls | Reusable proof-carrying experiments across Symthaea, Mycelix and Sol-Atlas |
 
 ### Measurable targets
