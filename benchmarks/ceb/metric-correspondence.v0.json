@@ -435,20 +435,25 @@
       "correspondence_class": "close_semantics",
       "comparison_use": "replication_candidate",
       "external_observation_ids": [
-        "crbug-opus-recall5"
+        "crbug-opus-recall5",
+        "codereviewbench-deepseek-v4-pro-recall"
       ],
-      "rationale": "CRBugBench top-five-comment bug detection is the closest current external construct, but its review comment protocol and task population differ. ReviewBench grounded recall is not top-five constrained; SecPRBench target recall scores all findings on security-introducing changes; CR-Bench-v2 KDDR uses one known defect per PR. Keep these additional results contextual rather than treating them as exact equivalents.",
+      "rationale": "CRBugBench is the closest existing top-five comment comparator. ReviewBench grounded recall, SecPRBench target-mechanism recall, CR-Bench-v2 KDDR and CodeReviewBench human-flagged bug recall are all useful context but have different output cutoffs, defect populations, judges and denominators; do not label them exact CEB Recall@5 equivalents.",
       "blockers": [
         "review comment ranking differs from CEB finding ranking",
         "repository/task sets differ",
         "ReviewBench grounded recall is not top-five constrained and is high-severity only",
         "SecPRBench target recall is all-finding security diagnosis, not Recall@5",
-        "CR-Bench-v2 KDDR is one known target per task and not top-five constrained"
+        "CR-Bench-v2 KDDR is one known target per task and not top-five constrained",
+        "CodeReviewBench recovers pre-existing human review findings and cannot credit bugs humans never found",
+        "CodeReviewBench is 30 PRs / 95 bugs, one Kodus harness and Claude Haiku 4.5 judge; CEB uses a different task and finding contract",
+        "ReviewBench and SecPRBench are not top-five constrained; CR-Bench-v2 KDDR uses a single labeled target per PR"
       ],
       "normalization_requirements": [
         "same changes and adjudicated defects",
         "same top-five output format and blinded review",
-        "match identical frozen PRs, target labels, top-five output and finding-level adjudication before using any of these newer references as a matched test"
+        "match identical frozen PRs, target labels, top-five output and finding-level adjudication before using any of these newer references as a matched test",
+        "use identical frozen PRs and exact top-five finding cap with independent defect provenance that includes a blind audit for defects missed by original human reviewers"
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
@@ -463,18 +468,22 @@
       "comparison_use": "context_only",
       "external_observation_ids": [
         "reviewbench-ohmybug-grounded-precision",
-        "crbench-gpt52-reflexion-usefulness"
+        "crbench-gpt52-reflexion-usefulness",
+        "codereviewbench-deepseek-v4-pro-precision"
       ],
-      "rationale": "ReviewBench grounded precision is based on a fixed gold set and classifier/matcher; CR-Bench-v2 Usefulness Rate accepts Bug Hit or Valid Suggestion comments. Both are informative but differ from CEB blinded actionability adjudication and are not interchangeable with each other.",
+      "rationale": "ReviewBench grounded precision, CR-Bench-v2 usefulness and CodeReviewBench precision each supply contextual review-quality evidence. Their matchers/judges, denominators, output protocols and definitions differ from CEB's blinded actionable finding adjudication.",
       "blockers": [
         "ReviewBench's high-severity classifier/matcher and scope differ from CEB blinded actionable-precision adjudication",
         "CR-Bench-v2 Usefulness Rate includes valid suggestions and uses a one-known-defect task design; judge calibration differs",
-        "Neither external result is a matched CEB finding set"
+        "Neither external result is a matched CEB finding set",
+        "CodeReviewBench uses Kodus extraction and Claude Haiku 4.5, with a small human-reported-bug corpus",
+        "ReviewBench and CR-Bench-v2 use distinct classifiers/rubrics and task definitions"
       ],
       "normalization_requirements": [
         "apply one frozen CEB actionable rubric to identical PRs and findings",
         "independently human-adjudicate unmatched discoveries and false positives",
-        "retain target-hit status separately from non-target actionable findings"
+        "retain target-hit status separately from non-target actionable findings",
+        "re-adjudicate all candidate findings with one frozen CEB human rubric on identical PRs and preserve target and non-target actionable labels separately"
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
