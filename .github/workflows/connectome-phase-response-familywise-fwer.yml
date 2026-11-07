@@ -63,8 +63,7 @@ jobs:
               assert (threshold, first_crossing) == expected[claim["claim_id"]]
           print("phase-response familywise schema/fixture: PASS")
           PY
-      - name: Run standalone exact-rational Rust audit
-        working-directory: tools/connectome-phase-response-family
-        run: |
-          cargo fmt --all -- --check
-          cargo test --locked
+      - name: Format standalone crate
+        run: cargo fmt --manifest-path tools/connectome-phase-response-family/Cargo.toml -- --check
+      - name: Test standalone exact-rational Rust audit
+        run: cargo test --manifest-path tools/connectome-phase-response-family/Cargo.toml --locked
