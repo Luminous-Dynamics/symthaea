@@ -56,28 +56,75 @@ impl Default for StrategyBddBudget {
 /// Structural, budget and semantic failures for strategy BDDs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StrategyBddError {
-    DependencyBudgetExceeded { required: usize, limit: usize },
-    TableEntryBudgetExceeded { required: u128, limit: u128 },
-    NodeBudgetExceeded { required: usize, limit: usize },
-    AssignmentSpaceOverflow { dependency_count: usize },
-    FunctionTableEntryCountMismatch { expected: u128, actual: usize },
-    FunctionTableKeyWidthMismatch { expected: usize, actual: usize },
-    MissingTruthTableRow { key: Vec<bool> },
-    DependencyScopeMismatch { expected: Vec<usize>, actual: Vec<usize> },
-    RootNodeOutOfRange { node: usize, node_count: usize },
-    ChildNodeOutOfRange { parent: usize, child: usize, node_count: usize },
-    NonTopologicalEdge { parent: usize, child: usize },
+    DependencyBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    TableEntryBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    NodeBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    AssignmentSpaceOverflow {
+        dependency_count: usize,
+    },
+    FunctionTableEntryCountMismatch {
+        expected: u128,
+        actual: usize,
+    },
+    FunctionTableKeyWidthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    MissingTruthTableRow {
+        key: Vec<bool>,
+    },
+    DependencyScopeMismatch {
+        expected: Vec<usize>,
+        actual: Vec<usize>,
+    },
+    RootNodeOutOfRange {
+        node: usize,
+        node_count: usize,
+    },
+    ChildNodeOutOfRange {
+        parent: usize,
+        child: usize,
+        node_count: usize,
+    },
+    NonTopologicalEdge {
+        parent: usize,
+        child: usize,
+    },
     DependencyOrderViolation {
         parent: usize,
         child: usize,
         parent_dependency: usize,
         child_dependency: usize,
     },
-    UnreducedNode { node: usize },
-    DuplicateNode { node: usize, earlier: usize },
-    EvaluationAssignmentWidthMismatch { expected: usize, actual: usize },
-    EvaluationStepBudgetExceeded { required: usize, limit: usize },
-    SemanticMismatch { assignment: Vec<bool>, table_value: bool, bdd_value: bool },
+    UnreducedNode {
+        node: usize,
+    },
+    DuplicateNode {
+        node: usize,
+        earlier: usize,
+    },
+    EvaluationAssignmentWidthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    EvaluationStepBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    SemanticMismatch {
+        assignment: Vec<bool>,
+        table_value: bool,
+        bdd_value: bool,
+    },
     ResourceAccountingOverflow,
 }
 
@@ -91,10 +138,9 @@ pub struct StrategyBddReport {
 }
 
 fn checked_power_of_two(exponent: usize) -> Result<u128, StrategyBddError> {
-    let shift = u32::try_from(exponent)
-        .map_err(|_| StrategyBddError::AssignmentSpaceOverflow {
-            dependency_count: exponent,
-        })?;
+    let shift = u32::try_from(exponent).map_err(|_| StrategyBddError::AssignmentSpaceOverflow {
+        dependency_count: exponent,
+    })?;
     1u128
         .checked_shl(shift)
         .ok_or(StrategyBddError::AssignmentSpaceOverflow {
@@ -156,13 +202,25 @@ fn build_level(
 
     prefix.push(false);
     let low = build_level(
-        level + 1, dependencies, table, prefix, nodes, unique, budget,
+        level + 1,
+        dependencies,
+        table,
+        prefix,
+        nodes,
+        unique,
+        budget,
     )?;
     prefix.pop();
 
     prefix.push(true);
     let high = build_level(
-        level + 1, dependencies, table, prefix, nodes, unique, budget,
+        level + 1,
+        dependencies,
+        table,
+        prefix,
+        nodes,
+        unique,
+        budget,
     )?;
     prefix.pop();
 
@@ -341,9 +399,7 @@ pub fn verify_robdd_matches_strategy_function(
             .map(|index| ((mask >> index) & 1) == 1)
             .collect();
         let Some(&table_value) = function.table.get(&assignment) else {
-            return Err(StrategyBddError::MissingTruthTableRow {
-                key: assignment,
-            });
+            return Err(StrategyBddError::MissingTruthTableRow { key: assignment });
         };
         let bdd_value = evaluate_robdd(bdd, &assignment)?;
         if table_value != bdd_value {
