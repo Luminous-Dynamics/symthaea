@@ -2,7 +2,8 @@
   "schema_version": "ar5b-direction-board-campaign-v0",
   "campaign_id": "ar5b-synthetic-delayed-payoff-and-new-option-v0",
   "budget": {
-    "available_cost_units": 100
+    "available_cost_units": 100,
+    "total_cost_units": 150
   },
   "config": {
     "exploration_weight": 0.25,
@@ -47,7 +48,9 @@
           "delta_vs_local_best": 0,
           "cost_units": 8
         }
-      ]
+      ],
+      "active_evaluations": 1,
+      "active_cost_units": 8
     },
     {
       "direction_id": "direction-beta",
@@ -92,7 +95,9 @@
           "delta_vs_local_best": 0,
           "cost_units": 10
         }
-      ]
+      ],
+      "active_evaluations": 0,
+      "active_cost_units": 0
     },
     {
       "direction_id": "direction-gamma",
@@ -108,7 +113,9 @@
       "local_best_score": 0.66,
       "estimated_cost_per_evaluation": 12,
       "max_share_bps": 3000,
-      "history": []
+      "history": [],
+      "active_evaluations": 1,
+      "active_cost_units": 12
     }
   ],
   "new_direction_option": {
@@ -116,6 +123,9 @@
     "prior_gain_per_cost": 0.003,
     "estimated_cost_per_evaluation": 14,
     "max_share_bps": 2000,
-    "verifier_intake_ref": "verifier://synthetic/new-direction-intake"
-  }
+    "verifier_intake_ref": "verifier://synthetic/new-direction-intake",
+    "active_evaluations": 0,
+    "active_cost_units": 0
+  },
+  "active_allocation_snapshot_ref": "allocation-registry://synthetic/active-snapshot-0001"
 }
