@@ -36,6 +36,7 @@ Given stock [S_low, S_high] and non-negative depletion rate [r_low, r_high]:
 - maximum endurance = S_high / r_low, if r_low > 0;
 - zero upper depletion rate yields no finite lower-endurance bound in this static interval model;
 - zero lower depletion rate yields no finite upper-endurance bound.
+- zero stock combined with zero upper depletion is ambiguous for a required dimension and returns Indeterminate; the model does not infer sufficiency from an empty store.
 
 A dimension is sufficient only when its conservative minimum endurance meets the target. It is insufficient only when even its maximum endurance falls short. Otherwise it is indeterminate.
 
