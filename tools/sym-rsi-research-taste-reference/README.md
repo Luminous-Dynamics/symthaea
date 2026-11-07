@@ -3,7 +3,8 @@
 A standalone offline Rust crate with two narrow responsibilities:
 
 1. Validate the checked-in synthetic research-taste decision fixture pack against its canonical 16-case contract.
-2. Compute finite-state expected value of sample information (EVSI), keeping direct experiment cost, foregone-alternative opportunity cost and outcome-conditioned downside risk as separate inputs and outputs.
+2. Validate a separate nine-case synthetic pivotal-correction pack for project-context sensitivity, irrelevant-context invariance, evidence-based correction rejection, abstention, value-aware stopping and analysis-integrity failures.
+3. Compute finite-state expected value of sample information (EVSI), keeping direct experiment cost, foregone-alternative opportunity cost and outcome-conditioned downside risk as separate inputs and outputs.
 
 The fixture validator does not score natural-language agent responses. The EVSI calculator does not estimate priors, likelihoods or utilities for the researcher. Those are inputs that must be independently justified and preregistered.
 
@@ -13,6 +14,7 @@ cargo fmt --manifest-path tools/sym-rsi-research-taste-reference/Cargo.toml -- -
 cargo clippy --manifest-path tools/sym-rsi-research-taste-reference/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path tools/sym-rsi-research-taste-reference/Cargo.toml
 cargo run --manifest-path tools/sym-rsi-research-taste-reference/Cargo.toml -- fixtures docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_DECISION_FIXTURES_V0_2026-11-07.json
+cargo run --manifest-path tools/sym-rsi-research-taste-reference/Cargo.toml -- pivotal docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_PIVOTAL_CORRECTION_FIXTURES_V0_2026-11-07.json
 cargo run --manifest-path tools/sym-rsi-research-taste-reference/Cargo.toml -- evsi docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_EXAMPLE_V0_2026-11-07.json
 
 ## EVSI contract
@@ -32,4 +34,11 @@ Information gain and EVSI differ. An observation may be informative while never 
 
 The crate is research tooling, not an evaluator authority, receipt service, scientific oracle or promotion service. It is intentionally outside the root production Cargo workspace.
 
-The EVSI input's structural contract is also published at `docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_SCHEMA_V0_2026-11-07.json`. The Rust semantic validator additionally checks cross-array dimensions and probability mass. The JSON Schema and semantic checks are separate; neither authenticates the source estimates or proves the model complete.
+The EVSI input's structural contract is also published at `docs/research/fixtures/SYM_RSI_RESEARCH_TASTE_EVSI_SCHEMA_V0_2026-11-07.json`. The Rust semantic validator additionally checks cross-array dimensions and probability mass. The JSON Schema and semantic checks are separate; neither authenticates the source estimates or proves the model complete. The crate now has 25 authored Rust tests, including six tests for the pivotal-correction pack; all remain unexecuted in the current environment.
+
+
+## Pivotal correction contract
+
+The `pivotal` CLI validates nine synthetic policy cases across three context behaviors: six require a decision change when decision-relevant evidence changes, one requires invariance to irrelevant context, and two require principled abstention when evidence is non-identifying or qualified reviewers conflict. Cases also cover unsupported corrections, sunk-cost anchoring, negative net EVSI, downside-risk veto and analysis-integrity failure.
+
+These are deliberately **not** SciΠvot's 248 real project-correction cases and are not expert gold. They test fixture semantics and the intended context-sensitivity/invariance contract. Any real correction dataset requires access/licence review, independent expert adjudication and selection-bias analysis. The named human correction remains a candidate, not an automatic oracle.
