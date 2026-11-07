@@ -603,10 +603,16 @@ mod tests {
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     fn resource(id: &str, stock: Interval, rate: Interval) -> ResourceBudget {
+        let unit = match id {
+            "food_protein" => "kg",
+            "food_energy" => "kcal",
+            "food_micronutrients" => "g",
+            _ => "L",
+        };
         ResourceBudget {
             dimension_id: id.to_owned(),
-            quantity_unit: Some("L".to_owned()),
-            rate_unit: Some("L/day".to_owned()),
+            quantity_unit: Some(unit.to_owned()),
+            rate_unit: Some(format!("{unit}/day")),
             usable_stock: Some(stock),
             net_depletion_per_day: Some(rate),
             configuration_digest: Some(CONFIG_DIGEST.to_owned()),
