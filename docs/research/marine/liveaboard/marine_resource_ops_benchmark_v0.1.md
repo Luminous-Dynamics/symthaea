@@ -58,6 +58,19 @@ Recent ship-EMS work extends beyond electrical dispatch:
 - Kotsampopoulos, *Testing Ship Electric Propulsion and Shipboard Microgrids: Standards, Techniques and New Trends*, Energies 19(9), published 22 Apr 2026, DOI https://doi.org/10.3390/en19092016. Supports staged holistic CHIL/PHIL validation rather than relying only on offline simulation.
 - A 2026 field-validated shipboard microgrid paper reports 360 half-hour records across 12 event classes at 4 s sampling. Useful for supervisory diagnostics and fault-aware energy reconfiguration; its primary telemetry is operator-confidential and its sample rate is not fast-transient evidence: https://doi.org/10.3390/en19174074.
 
+### Forecast-quality benchmark (separate from dispatch-policy scoring)
+
+The forecast feeding a scheduler is itself a model and must be benchmarked independently:
+- **Persistence / last-value / seasonal baseline:** simple, transparent floor.
+- **Physics / operating-point baseline:** speed, draft, propeller/RPM, resistance/added resistance and declared weather where the required model is validated.
+- **Single learned predictor:** one predeclared architecture, no test-case tuning.
+- **Multi-model / ensemble predictor:** include a literature comparator such as Bao et al.'s EMTOA-DW multi-network study, but do not transfer its reported results to LOS.
+- **Symthaea forecast/advisory:** only after its model, inputs, calibration and compute budget are frozen.
+
+For every model report MAE, RMSE, signed bias, p95 / worst-stratum absolute error, forecast interval coverage and width, calibration error where valid, OOD/abstention rate, lead time, runtime and missing/stale input behavior. Report propulsion shaft-power prediction separately from auxiliary electrical / hotel-load prediction; never use one as a proxy for the other. Hold out complete voyages/vessels/time periods or operational regimes, not random adjacent minute/hour rows. Scheduler comparisons must give every policy the same forecast information and forecast horizon.
+
+**Candidate restricted propulsion dataset:** Shifts 2.0 Vessel Power Estimation / Shifts Marine Cargo Vessel Power Consumption Prediction Dataset, Zenodo v2.0 (DOI 10.5281/zenodo.7684813). The Shifts project describes four years of merchant-vessel minute-level data with 10 features, a main-engine shaft-power target, real and synthetic partitions, and canonical in-domain/shifted splits along wind/time (to capture weather regime, fouling and sensor drift). Shifts lists CC BY-NC-SA 4.0, while the current Zenodo Rights field is not populated; rights intake remains pending through MARINE-REF #8146. It is a non-commercial research candidate only until exact rights are confirmed; do not use it in commercial Luminous training, distribution or product claims without permission. It is not an onboard electrical/hotel-load dataset and not a small-craft validation set. Sources: https://shifts.ai/dataset ; https://zenodo.org/records/7684813
+
 The service schema now records both `input_requirements[]` and `required_output.carrier`. Examples:
 - A watermaker consumes electrical energy and seawater feed; its delivered output is potable water only after the separate quality acceptance owner has accepted it.
 - Domestic hot water consumes electricity and may consume recoverable heat from a generator/range extender or a thermal store; the useful heat must satisfy the grade/temperature/exchanger constraints.
