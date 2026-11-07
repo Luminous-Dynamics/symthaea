@@ -51,25 +51,29 @@ Sources:
 
 ### AgentRE-Bench — long-horizon binary behavior reconstruction
 
-**Official snapshot:** Version 3.1, October 2026.
+**Official snapshot:** Version 3.1, updated November 5, 2026.
 
-The public benchmark describes 33 distinct binary challenges across Linux and Windows. Its V3.1 Windows PE evaluation contains 10 programs, each with symbols and stripped variants; five models, five attempts per artifact, and 500 total episodes. Each attempt uses a fixed static-analysis toolset and a 25-call budget.
+The v3.1 Windows PE evaluation covers 10 programs and 20 stripped/unstripped binaries. Six models completed five attempts per artifact: 600 episodes. Each attempt had up to 64 model turns and 25 tool attempts (including rejected calls and final submission). Overall is 90% Main and 10% Bonus; refusals and budget exits score zero.
 
-| Model | Overall / 100 | Main / 100 | Bonus / 100 | Valid answers | Reported 95% interval |
+| Model | Overall / 100 | Main / 100 | Bonus / 100 | Valid answers | Individual 95% interval |
 |---|---:|---:|---:|---:|---:|
 | Muse Wonder | 87.37 | 87.37 | 87.37 | 100/100 | 85.18–89.56 |
 | GPT-6 Astra | 87.04 | 86.40 | 92.82 | 100/100 | 85.80–88.29 |
 | Grok 4.7 | 79.62 | 81.02 | 67.04 | 96/100 | 76.59–82.65 |
+| DeepSeek V4.1 Flash | 78.31 | 78.43 | 77.25 | 98/100 | 75.01–81.60 |
 | Claude Opus 5.5 | 69.66 | 68.84 | 77.03 | 78/100 | 62.57–76.74 |
+| Gemini 4 Argon | 31.20 | 29.53 | 46.23 | 36/100 | 13.30–49.10 |
 
-The benchmark's overall score weights Main at 90% and Bonus at 10%; averages are over five attempts per binary, and unanswered attempts count as zero.
+Muse's recorded lead over GPT-6 Astra is only 0.3243 points. The simultaneous 95% interval for the difference is −3.8203 to +4.4689 and includes zero; this run does not establish repeat-run superiority or practical equivalence. The interval is based on five full-suite repetition means, not 100 independent tasks. Conditional answer quality excludes nonanswers and averages over different answered subsets, so it is diagnostic rather than a full-suite ranking.
 
-**Interpretation:** AgentRE evaluates detailed static tool use, multi-step reconstruction and structured answer correctness. It does not establish that an agent can acquire arbitrary firmware or reconstruct a live service environment from a CVE ID.
+The November 5 review applied a versioned exact-claim/wording pass to all 600 saved answers. The report says no episode earned full rubric credit and independent human adjudication remains outstanding. It distinguishes factual misses from field-placement and allowed-fact/rubric effects; a correct detail in the wrong output field is not the same failure mode as an invented behavior. The report also highlights actual semantic errors, including a claim that an unregistered TLS routine executes before entry point and an incorrect cipher round constant.
 
-**Luminous evaluation plan:** use its fixed call budget and structured output as a separate binary analysis cohort. Preserve its version, artifact set, symbols/stripped split, attempt count, tool-call budget, and deterministic grader. Do not pool scores with SRE-Bench.
+**Interpretation:** AgentRE evaluates detailed static-tool use, multi-step binary reconstruction and structured answer correctness on a small fixed Windows PE suite. It does not establish arbitrary-firmware acquisition, target rehosting, independent reproduction of claims, or generalization to unseen programs.
+
+**Luminous evaluation plan:** preserve the v3.1 artifacts, version, attempt count, tool-call/turn budgets, output schema, scorer and denominator. Report factual accuracy, schema/field-placement accuracy, valid-answer coverage, refusals, budget exits, full-suite Overall, conditional answer quality, and adjudicator agreement separately. Add an independent hidden-behavior oracle and replayable evidence trace as separate metrics; never rename those derived metrics as the official AgentRE score. Do not pool scores with SRE-Bench.
 
 Sources:
-- https://www.agentre-bench.ai/
+- https://www.agentre-bench.ai/results/v3-1/
 - https://github.com/agentrebench/AgentRE-Bench
 
 ### Decompile-Bench — function-level reconstruction
