@@ -267,8 +267,7 @@ impl SensorCalibration {
     }
 
     pub fn valid_at(&self, timestamp_tai_ns: i64) -> bool {
-        timestamp_tai_ns >= self.valid_from_tai_ns
-            && timestamp_tai_ns < self.valid_until_tai_ns
+        timestamp_tai_ns >= self.valid_from_tai_ns && timestamp_tai_ns < self.valid_until_tai_ns
     }
 
     pub fn corrected_timestamp_tai_ns(
@@ -334,17 +333,44 @@ pub enum EvidenceError {
     NegativeValue(&'static str),
     OutOfBounds(&'static str),
     InvalidMetadata(&'static str),
-    InvalidCalibrationWindow { sensor_id: String },
-    MissingCalibrationDigest { sensor_id: String },
-    MissingRawDigest { sensor_id: String, sequence_number: u64 },
-    DuplicateCalibration { sensor_id: String },
-    DuplicateObservation { sensor_id: String, sequence_number: u64 },
-    CalibrationModalityMismatch { sensor_id: String },
-    CalibrationFrameMismatch { sensor_id: String },
-    CalibrationNotValidAtObservation { sensor_id: String, corrected_timestamp_tai_ns: i64 },
-    MeasurementModalityMismatch { sensor_id: String },
-    FrameMismatch { sensor_id: String, expected: CoordinateFrame, actual: CoordinateFrame },
-    TimestampOverflow { sensor_id: String },
+    InvalidCalibrationWindow {
+        sensor_id: String,
+    },
+    MissingCalibrationDigest {
+        sensor_id: String,
+    },
+    MissingRawDigest {
+        sensor_id: String,
+        sequence_number: u64,
+    },
+    DuplicateCalibration {
+        sensor_id: String,
+    },
+    DuplicateObservation {
+        sensor_id: String,
+        sequence_number: u64,
+    },
+    CalibrationModalityMismatch {
+        sensor_id: String,
+    },
+    CalibrationFrameMismatch {
+        sensor_id: String,
+    },
+    CalibrationNotValidAtObservation {
+        sensor_id: String,
+        corrected_timestamp_tai_ns: i64,
+    },
+    MeasurementModalityMismatch {
+        sensor_id: String,
+    },
+    FrameMismatch {
+        sensor_id: String,
+        expected: CoordinateFrame,
+        actual: CoordinateFrame,
+    },
+    TimestampOverflow {
+        sensor_id: String,
+    },
 }
 
 impl fmt::Display for EvidenceError {
@@ -356,17 +382,55 @@ impl fmt::Display for EvidenceError {
             Self::NegativeValue(field) => write!(f, "{field} must be nonnegative"),
             Self::OutOfBounds(field) => write!(f, "{field} is outside its physical bounds"),
             Self::InvalidMetadata(message) => write!(f, "{message}"),
-            Self::InvalidCalibrationWindow { sensor_id } => write!(f, "invalid calibration window for sensor {sensor_id}"),
-            Self::MissingCalibrationDigest { sensor_id } => write!(f, "sensor {sensor_id} calibration digest is missing"),
-            Self::MissingRawDigest { sensor_id, sequence_number } => write!(f, "sensor {sensor_id} observation {sequence_number} has no raw digest"),
-            Self::DuplicateCalibration { sensor_id } => write!(f, "duplicate calibration for sensor {sensor_id}"),
-            Self::DuplicateObservation { sensor_id, sequence_number } => write!(f, "duplicate observation {sensor_id}:{sequence_number}"),
-            Self::CalibrationModalityMismatch { sensor_id } => write!(f, "calibration modality mismatch for sensor {sensor_id}"),
-            Self::CalibrationFrameMismatch { sensor_id } => write!(f, "calibration frame mismatch for sensor {sensor_id}"),
-            Self::CalibrationNotValidAtObservation { sensor_id, corrected_timestamp_tai_ns } => write!(f, "calibration for sensor {sensor_id} is not valid at corrected TAI timestamp {corrected_timestamp_tai_ns}"),
-            Self::MeasurementModalityMismatch { sensor_id } => write!(f, "measurement is incompatible with sensor modality for {sensor_id}"),
-            Self::FrameMismatch { sensor_id, expected, actual } => write!(f, "sensor {sensor_id} frame mismatch: expected {expected:?}, got {actual:?}"),
-            Self::TimestampOverflow { sensor_id } => write!(f, "clock correction overflows TAI timestamp for {sensor_id}"),
+            Self::InvalidCalibrationWindow { sensor_id } => {
+                write!(f, "invalid calibration window for sensor {sensor_id}")
+            }
+            Self::MissingCalibrationDigest { sensor_id } => {
+                write!(f, "sensor {sensor_id} calibration digest is missing")
+            }
+            Self::MissingRawDigest {
+                sensor_id,
+                sequence_number,
+            } => write!(
+                f,
+                "sensor {sensor_id} observation {sequence_number} has no raw digest"
+            ),
+            Self::DuplicateCalibration { sensor_id } => {
+                write!(f, "duplicate calibration for sensor {sensor_id}")
+            }
+            Self::DuplicateObservation {
+                sensor_id,
+                sequence_number,
+            } => write!(f, "duplicate observation {sensor_id}:{sequence_number}"),
+            Self::CalibrationModalityMismatch { sensor_id } => {
+                write!(f, "calibration modality mismatch for sensor {sensor_id}")
+            }
+            Self::CalibrationFrameMismatch { sensor_id } => {
+                write!(f, "calibration frame mismatch for sensor {sensor_id}")
+            }
+            Self::CalibrationNotValidAtObservation {
+                sensor_id,
+                corrected_timestamp_tai_ns,
+            } => write!(
+                f,
+                "calibration for sensor {sensor_id} is not valid at corrected TAI timestamp {corrected_timestamp_tai_ns}"
+            ),
+            Self::MeasurementModalityMismatch { sensor_id } => write!(
+                f,
+                "measurement is incompatible with sensor modality for {sensor_id}"
+            ),
+            Self::FrameMismatch {
+                sensor_id,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "sensor {sensor_id} frame mismatch: expected {expected:?}, got {actual:?}"
+            ),
+            Self::TimestampOverflow { sensor_id } => write!(
+                f,
+                "clock correction overflows TAI timestamp for {sensor_id}"
+            ),
         }
     }
 }
@@ -397,9 +461,8 @@ pub struct EvidenceQuality {
 
 impl EvidenceQuality {
     pub fn metadata_completeness(&self) -> Option<f64> {
-        (self.metadata_fields_total > 0).then(|| {
-            self.metadata_fields_present as f64 / self.metadata_fields_total as f64
-        })
+        (self.metadata_fields_total > 0)
+            .then(|| self.metadata_fields_present as f64 / self.metadata_fields_total as f64)
     }
 }
 
@@ -431,10 +494,9 @@ impl EvidenceBundle {
         let mut observation_keys = BTreeSet::new();
         for observation in &self.observations {
             observation.validate()?;
-            if !observation_keys.insert((
-                observation.sensor_id.as_str(),
-                observation.sequence_number,
-            )) {
+            if !observation_keys
+                .insert((observation.sensor_id.as_str(), observation.sequence_number))
+            {
                 return Err(EvidenceError::DuplicateObservation {
                     sensor_id: observation.sensor_id.clone(),
                     sequence_number: observation.sequence_number,
@@ -726,16 +788,8 @@ mod tests {
 pub mod triangulation;
 
 pub use triangulation::{
-    Quaternion as SensorToEcefQuaternion,
-    RayObservation,
-    SensorPlacementCandidate,
-    SensorPlacementScore,
-    TriangulatedPosition,
-    TriangulationConfig,
-    TriangulationError,
-    Vector3 as EcefVector3,
-    bearing_fisher_information,
-    rank_sensor_placements,
-    triangulate_bearings,
-    triangulate_bearings_with_config,
+    Quaternion as SensorToEcefQuaternion, RayObservation, SensorPlacementCandidate,
+    SensorPlacementScore, TriangulatedPosition, TriangulationConfig, TriangulationError,
+    Vector3 as EcefVector3, bearing_fisher_information, rank_sensor_placements,
+    triangulate_bearings, triangulate_bearings_with_config,
 };
