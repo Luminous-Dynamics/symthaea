@@ -58,6 +58,18 @@ Source: https://doi.org/10.1016/j.asr.2026.07.097
 
 **Benchmark implication:** Treat this as a maritime-specific research comparator after verifying the full method, data, baselines and reproducibility. Compare it with conventional RAIM residual monitoring and receiver-native integrity outputs. A learned RAIM weight matrix must not be assumed to satisfy a certified aviation or maritime integrity risk without independent qualification.
 
+### 2.2.4 Open-set semi-supervised RF spectrum sensing
+
+Cai et al., *Reliability-Gated RF Consistency Learning for Open-Set Spectrum Sensing* (Physical Communication, available online 2 September 2026), proposes RF-RPL. It combines RF-consistency representation learning, an EMA teacher across RF-preserving transformations, confidence/stability/energy-based knownness gating, pseudo-label routing and structure learning for rejected windows.
+
+On RadioML2016.10A/10B and a simulated electromagnetic-monitoring benchmark, the paper reports 72.1% accuracy, 70.3% macro-F1, AUROC 0.894, FPR95 0.286 and 5.9% unknown pseudo-label contamination at 5% label availability.
+
+Source: https://doi.org/10.1016/j.phycom.2026.103352
+
+**Benchmark implication:** Add RF-RPL as a separate open-set signal-awareness comparator. Reproduce its scarce-label and unknown-contamination evaluations before extending it to new datasets. Evaluate confidence-only, transform-stability-only, knownness-only and full-gate ablations. Report unknown pseudo-label contamination and FPR at fixed known-class recall. Do not compare these RadioML/simulated results directly with GNSS campaign results. An unknown signal is not an attribution or malicious-emitter label.
+
+This work is tracked separately in Symthaea #10893. It is adjacent to EMSR/PNT but does not establish navigation integrity.
+
 ### 2.3 Collaborative integrity
 
 *Multicriteria Collaborative GNSS Integrity Monitoring*, IEEE Journal of Indoor and Seamless Positioning and Navigation (4 May 2026), combines PVT residuals and carrier-to-noise observations across receivers. It reports real jamming data and simulated spoofing data.
@@ -113,6 +125,19 @@ Luminous should not claim to outperform receiver firmware, antenna arrays, CRPA 
 NIST IR 8323 Rev. 2 initial public draft (6 May 2026) is a useful PNT risk-management mapping reference aligned to CSF 2.0; it is a draft, not a final normative standard:
 https://csrc.nist.gov/pubs/ir/8323/r2/ipd
 
+## 3.2 Edge AI and ESP32 deployment boundary
+
+The Luminous Platform edge-node profile (#300) is the owner for exact-board embedded inference and auxiliary sensor qualification. ESP32-class devices may contribute equipment-health telemetry, low-rate feature processing, buffering and bounded local inference where matched hardware tests justify it. They are not presumed to be wideband GNSS raw-IF/IQ acquisition front ends or PNT integrity authorities.
+
+For any edge model, pin the board/SoC/module revision, sensor and calibration, firmware, SDK/runtime, model digest, quantization/operator map, compiler configuration and power/thermal state. Benchmark the same frozen windows on a host reference and the exact edge board. Report macro/per-class detection, open-set rejection, calibration, false alerts per operating day, sample loss, P50/P95/P99 latency, memory, energy per decision and offline behavior.
+
+The acronym ESP is ambiguous in this programme:
+- **ESP32** means Espressif embedded hardware, relevant to the edge-node track.
+- **ESP (extrasensory perception)** is a separate unestablished research hypothesis, tracked as anomalous-information acquisition in Symthaea #10843.
+- Neither is a synonym for RF signal processing. RF acquisition requires a separately qualified receiver/front end, sampling clock, antenna, calibration and data chain.
+
+No ESP/AIA result may be used as an EMSR sensor input, PNT evidence, safety claim or operational authority. The AIA investigation remains a blinded, preregistered research experiment only.
+
 ## 3.1 Ground-truth and oracle independence
 
 A benchmark cannot claim independent detection evidence if its labels, event times, receiver telemetry and adjudication all derive from the same source or campaign assumption.
@@ -128,6 +153,17 @@ For each evaluation set, preserve:
 The evaluator must distinguish physical-event truth, receiver-integrity truth, and service-level consequence. A recorded interference event is not automatically proof that the navigation solution was invalid; a navigation residual is not automatically proof of an interference event.
 
 Where truth provenance is insufficient, report the case as ambiguous/indeterminate or place it in a separate exploratory stratum. Do not silently turn model-derived labels into oracle ground truth. The benchmark receipt should bind the adjudication manifest and its exact digest.
+
+## 3.3 Industry platform comparators
+
+In addition to receiver vendors, compare against existing PNT monitoring/integrity platforms and software libraries:
+
+- **SESAR real-time GNSS monitoring/interference solutions:** area/route-level monitoring, sentinel/receiver data streams, GNSS performance indicators, A-RAIM protection-level estimates, APIs and SWIM interfaces. This is a direct platform-level comparator for monitoring feeds and service APIs: https://sesarju.paddlecms.net/sesar-solutions/real-time-gnss-monitoring-and-interference
+- **CISA PNT Integrity Library:** a modular framework for GNSS-based PNT manipulation detection intended for integration by receiver and timing-server OEMs: https://github.com/cisagov/PNT-Integrity
+- **PNTMAP:** an event/intelligence API and alert/webhook service. Its published capability status distinguishes currently live ADS-B-derived monitoring from direct-RF sensing/validation that has not yet been demonstrated in its described deployment: https://pntmap.co.uk/api-access
+- **Receiver-native vendor status and protection outputs:** remain first-class operational baselines wherever exact hardware is available.
+
+The Luminous differentiation hypothesis is not “we have a map/API too.” It is vendor-neutral evidence qualification across source identity, calibration, time, shared dependencies, oracle independence, downstream service consequence, approved degradation and recovery. This must be demonstrated head-to-head on matched data and scenarios. The cited platforms are capability comparators, not claims that Luminous already surpasses them.
 
 ## 4. Paradigm shifts
 
@@ -207,6 +243,7 @@ For aviation and other safety-critical domains, time-to-alert, protection levels
 13. No-provenance / no-common-mode analysis ablations.
 14. Symthaea uncertainty-aware assessment.
 15. Integrated evidence-qualified service-continuity workflow.
+16. Open-set RF-RPL-style semi-supervised signal-awareness comparator, under the separate #10893 track and only on compatible recorded RF datasets.
 
 Use matched data, splits, receiver inputs, labels, time basis and false-alarm budgets. Reproducing a paper's abstract-level headline is not reproduction.
 
