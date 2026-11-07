@@ -202,26 +202,34 @@ A single “accuracy” metric cannot compare these classes. The type of guarant
 
 ## Measured industry/research baseline snapshot (SAT Competition 2026)
 
-The published Main Track table currently reports:
+Use the dated SAT Competition 2026 results presentation (July 23, 2026) as the source for the 2026 Main Track table:
 
-| Main Track entry | PAR-2-style score shown | Solved | SAT solved | UNSAT solved |
-|---|---:|---:|---:|---:|
-| Virtual-best-solver (VBS) | 1681.30 | 347 | 168 | 179 |
-| `kissat-sc2024` | 2788.13 | 306 | 153 | 153 |
-| `Kissat_MAB-DC` | 3435.23 | 290 | 146 | 144 |
-| `hKis-bva` | 3461.15 | 285 | 143 | 142 |
-| `CaDiCaL` | 3494.11 | 284 | 142 | 142 |
-| `AMSAT_RGC` | 3631.69 | 279 | 139 | 140 |
+| Main Track entry | PAR-2 | Solved |
+|---|---:|---:|
+| `satsuma-iter+kissat` | 3647.02 | 276 |
+| `Kissat-MAB-HyPre` | 3996.29 | 255 |
+| `EDA-Kissat-v2` | 4469.34 | 240 |
 
-Source: [official SAT Competition 2026 results](https://github.com/satcompetition/2026/blob/main/results.html).
+The 2026 subtrack results must remain separate:
+
+| Subtrack | Solver | PAR-2 | Solved |
+|---|---|---:|---:|
+| Main Track SAT (AI) | `Lymphosat` | 2813.50 | 146 |
+| Main Track SAT (rank 1) | `satsuma-iter+ae-kissat-mab` | 3430.95 | 136 |
+| Main Track UNSAT (rank 1) | `satsuma-iter+kissat` | 1743.84 | 149 |
+
+Source: [official SAT Competition 2026 results presentation](https://satcompetition.github.io/2026/downloads/satcomp26slides.pdf), slides 13, 16 and 18 (presentation dated July 23, 2026).
+
+**Data-integrity warning:** the file at [the 2026 repository's `results.html`](https://github.com/satcompetition/2026/blob/main/results.html) currently contains the older rows `VBS=347` and `kissat-sc2024=306`. Those values match the [official SAT Competition 2024 results](https://satcompetition.github.io/2024/results.html), not the 2026 results presentation. Do not cite that HTML table as a 2026 result. The 2026 presentation contains per-solver result tables and plots a virtual-best curve, but the slides do not publish an exact VBS solved-count table. Keep the 2026 VBS count unset until it is recomputed from the official per-instance result data and independently checked.
 
 Interpretation:
-- The VBS score is an oracle that selects the best solver for each instance with hindsight. It is not a deployable solver and should not be presented as one.
-- The 41-instance gap between VBS and the best listed individual solver is a concrete target for an **online, feature-based portfolio selector**. The selector must choose before knowing the answer and under a real resource budget; it cannot use oracle knowledge.
-- SAT and UNSAT cases must be reported separately. Main Track UNSAT results additionally require independently checked proof certificates.
+- The 2026 overall Main Track winner solved 276 instances. This is the fixed reference for initial reproduction and improvement targets; it is not directly comparable to the 2024 `kissat-sc2024` result.
+- The 2026 AI SAT subtrack result for `Lymphosat` (146 SAT instances) is a separate comparator, not an overall Main Track total. The SAT and UNSAT subtrack rows have different solver configurations and must not be added together.
+- The competition presentation reports that Lymphosat uses more than 100 family-specific LLM-generated solvers, primarily with specialized preprocessing, and highlights generalization beyond its training database as a key evaluation question. This makes family-held-out transfer and leakage-resistant evaluation essential.
+- Main Track results require independently checked UNSAT proof certificates. SAT and UNSAT outcomes must be reported separately.
 - These are competition-specific results, not a universal ranking across every SAT distribution or industrial workload.
 
-A serious Symthaea result should first reproduce a comparable fixed corpus and resource setup, then beat a pinned individual solver or a deployable portfolio on held-out families. We should report the delta from the single-best solver and from a learned/feature-based portfolio separately, with no VBS leakage.
+A serious Symthaea result should first reproduce the exact official corpus and resource setup, then beat the 2026 winner or a deployable portfolio on held-out families. Report per-instance receipts, SAT/UNSAT subtotals, PAR-2, selector overhead and out-of-distribution performance. Never substitute a hindsight VBS for a deployable baseline.
 
 ## Model-counting specialist baselines and task separation
 
@@ -443,17 +451,17 @@ Use TSPLIB for TSP, CO-Bench for broad CO coverage, and public scheduling/VRP/gr
 
 ## Quantified targets: how to beat SOTA without benchmark theatre
 
-The SAT Competition 2026 Main Track provides a useful fixed reference: the best listed single solver, `kissat-sc2024`, solved 306 instances; the per-instance virtual-best-solver oracle solved 347. We should use the 41-instance difference as a **portfolio opportunity estimate**, not as a claim that an online selector can automatically attain it.
+The 2026 Main Track winner solved 276 instances. Use this result—not the stale 2026 HTML table's 2024 figures—as the initial fixed reference. Do not set a VBS-gap target until the official 2026 per-instance data has been independently reprocessed.
 
 Set staged targets:
 
 | Stage | Target | Admission rule |
 |---|---|---|
 | T0: semantic trust | 100% agreement on exhaustive small formula/graph corpora; zero invalid SAT models | Any false SAT/UNSAT or invalid witness blocks promotion |
-| T1: baseline reproduction | Reproduce pinned Kissat/CaDiCaL and selected model-counter results within 1% on repeated same-machine runs | Compare exact binaries, flags, benchmark manifests and resource limits |
+| T1: baseline reproduction | Reproduce pinned 2026 winner/baselines and selected model-counter results within 1% PAR-2 on repeated same-machine runs, with identical per-instance outcomes | Compare exact binaries, flags, benchmark manifests and resource limits |
 | T2: selector utility | On held-out families, beat the best individual portfolio component by at least 3 additional solved instances **or** 5% PAR-2, with selector overhead <=5% | No held-out family may have a statistically/materially significant catastrophic regression hidden by aggregate score |
-| T3: first competition-grade SAT target | Reach >=316 solved in the same 2026 Main Track corpus/resource setup (close at least 10 of the 41-instance VBS gap), while maintaining valid models and Main Track UNSAT proofs | This is an aspirational threshold, not a result or guarantee; report SAT/UNSAT subtotals and per-instance receipts |
-| T4: strong portfolio target | Reach >=330 solved in that same corpus without hindsight oracle information | Requires robust OOD performance and fair, deployable pre-run selection |
+| T3: first competition-grade SAT target | Reach >=280 solved on the exact 2026 Main Track corpus and resource setup, with valid SAT models and independently checked Main Track UNSAT proofs | Aspirational target (+4 vs the published winner), not a result; report per-instance receipts and SAT/UNSAT subtotals |
+| T4: strong portfolio target | Reach >=290 solved on that same corpus without hindsight oracle information | Aspirational target (+14 vs the published winner); require robust family-held-out and distribution-shift performance |
 | T5: theory breakthrough | Publish an improved worst-case upper bound, FPT result or approximation guarantee with a complete proof and exact assumptions | Benchmarks are supporting evidence, never a substitute for proof |
 
 For AutoModSAT reproduction, do not target its paper's reported 30% speedup as a universal expected outcome. First reproduce its 11-family setup, then use an entirely held-out family split. Report which families win and lose; its authors explicitly report a case where parameter-tuned Kissat beats AutoModSAT and note the human-in-the-loop baseline preparation.
