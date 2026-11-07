@@ -552,6 +552,7 @@ mod tests {
 
     fn feedback_action_prediction(
         space: &ThreeBallRuleSpace,
+        models: &[ReducedDirichletModelHypothesis],
         ball_colours: [ThreeBallColour; 3],
         gaze: Option<ThreeBallLocation>,
         choice: Option<ThreeBallColour>,
@@ -583,6 +584,15 @@ mod tests {
                         _ => unreachable!("exactly three feedback outcomes"),
                     }),
                     full_model_predictive_probability: probability,
+                    model_predictive_probabilities: models
+                        .iter()
+                        .map(|model| {
+                            (
+                                model.model_id.clone(),
+                                model.parameter_prior.columns[column_index][outcome_index],
+                            )
+                        })
+                        .collect(),
                     posterior_count_increment,
                 }
             })
@@ -615,8 +625,16 @@ mod tests {
         let mut labelled_eig = Vec::with_capacity(choices.len());
         let mut quotient_eig = Vec::with_capacity(choices.len());
         for choice in choices {
-            let action = feedback_action_prediction(
+            let labelled_action = feedback_action_prediction(
                 &space,
+                &labelled_models,
+                ball_colours,
+                Some(ThreeBallLocation::Centre),
+                choice,
+            );
+            let quotient_action = feedback_action_prediction(
+                &space,
+                &quotient_models,
                 ball_colours,
                 Some(ThreeBallLocation::Centre),
                 choice,
@@ -625,14 +643,14 @@ mod tests {
                 full_prior,
                 full_prior,
                 &labelled_models,
-                &action,
+                &labelled_action,
             )
             .expect("source-labelled action EIG");
             let quotient_result = evaluate_dirichlet_model_information_gain(
                 full_prior,
                 full_prior,
                 &quotient_models,
-                &action,
+                &quotient_action,
             )
             .expect("semantic quotient action EIG");
 
@@ -652,7 +670,7 @@ mod tests {
                     .abs()
                     < 1e-10,
                 "model EIG changed for action {}",
-                action.action_id
+                labelled_action.action_id
             );
 
             for (source_outcome, quotient_outcome) in source_result
