@@ -91,18 +91,42 @@ pub struct VocalPerformance {
 }
 
 impl VocalPerformance {
-    /// Bind lyrics to a performed Muse melody and derive restrained expression.
+    /// Bind English lyrics to a performed Muse melody and derive restrained expression.
+    ///
+    /// This constructor uses the current English-only Muse G2P frontend. It
+    /// refuses non-English language tags and insufficient note counts rather
+    /// than attaching English phones to another language or silently dropping
+    /// trailing lyric syllables. Surplus notes are represented as melisma.
     pub fn from_melody(lyrics: &str, melody: &[Note], language: impl Into<String>) -> Result<Self> {
-        let sung = symthaea_muse::singing_bridge::sing(lyrics, melody);
-        if lyrics.trim().is_empty() || sung.is_empty() {
+        let language = language.into();
+        if language != "en" {
+            bail!(
+                "VocalPerformance::from_melody currently supports language='en' only; got {language:?}"
+            );
+        }
+        if lyrics.trim().is_empty() || melody.is_empty() {
             bail!("a vocal performance requires lyrics and at least one aligned note");
+        }
+        let lexical_syllables = symthaea_muse::singing_bridge::syllable_count(lyrics);
+        if lexical_syllables == 0 {
+            bail!("the lyric frontend did not produce any pronounceable syllables");
+        }
+        if lexical_syllables > melody.len() {
+            bail!(
+                "insufficient melody notes: {lexical_syllables} lyric syllables require at least that many notes, got {}",
+                melody.len()
+            );
+        }
+        let sung = symthaea_muse::singing_bridge::sing(lyrics, melody);
+        if sung.len() < lexical_syllables {
+            bail!(
+                "lyric frontend produced {lexical_syllables} syllables but singing bridge aligned only {}",
+                sung.len()
+            );
         }
 
         // `sing` sustains the last vowel across surplus notes. Collapse those
         // notes back into one syllable with an explicit melisma representation.
-        let lexical_syllables = symthaea_muse::singing_bridge::syllable_count(lyrics)
-            .min(sung.len())
-            .max(1);
         let syllables: Vec<VocalSyllable> = sung
             .into_iter()
             .take(lexical_syllables)
@@ -219,7 +243,7 @@ impl VocalPerformance {
         let performance = Self {
             version: VOCAL_PERFORMANCE_VERSION,
             lyrics: lyrics.trim().to_string(),
-            language: language.into(),
+            language,
             syllables,
             phrases,
             pitch_curve,
