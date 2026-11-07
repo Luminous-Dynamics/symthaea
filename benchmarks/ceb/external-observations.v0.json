@@ -388,6 +388,39 @@
         "CEB-REVIEW",
         "CEB-REPO"
       ]
+    },
+    {
+      "source_id": "cbfl-softrex-paper",
+      "source_url": "https://arxiv.org/abs/2611.01292",
+      "title": "Causality-Based Fault Localization / SoftReX",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-10-31",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "causalrepair-paper",
+      "source_url": "https://arxiv.org/abs/2608.10613",
+      "title": "CausalRepair dual-slicing automated program repair",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-06-25",
+      "supports": [
+        "CEB-DEBUG"
+      ]
+    },
+    {
+      "source_id": "poscm-uai2026-paper",
+      "source_url": "https://proceedings.mlr.press/v337/orujlu26a.html",
+      "title": "Partially Observed Structural Causal Models",
+      "source_type": "paper",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-DEBUG"
+      ]
     }
   ],
   "comparators": [
@@ -1194,6 +1227,92 @@
         "The reported 285% increase is annotation defect-coverage expansion against a prior comparison baseline, not model performance improvement.",
         "Does not directly establish P/I/F/N/M/IRR counterfactual diagnosis, causal topology correctness or residual-path detection.",
         "Map its annotation and review metrics to CEB only after task-unit, denominator, judge and rubric harmonization."
+      ]
+    },
+    {
+      "comparator_id": "cbfl-softrex-defects4j",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "Causality-Based Fault Localization / SoftReX",
+      "benchmark_version": "arXiv:2611.01292; 2026-10-31",
+      "split": "Defects4J experiment 1; 17 Java projects; 27 OOM/timeout cases excluded",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 827,
+        "unit": "bugs"
+      },
+      "source_id": "cbfl-softrex-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Actual-causality / responsibility formulation with mutation interventions; evaluated as execution-grounded fault localization.",
+        "The 827-bug denominator is after 27 OOM/timeout exclusions from the source evaluation population.",
+        "Top-1/Top-10 are source-location ranking metrics, not CEB defect Recall@5 over review findings.",
+        "The same paper's guided mutation-generation experiment uses a different matched subset; do not combine its mutant counts with the 827-bug denominator.",
+        "Defects4J Java test/oracle population is not pre-merge multi-language PR review."
+      ]
+    },
+    {
+      "comparator_id": "causalrepair-defects4j",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "CausalRepair",
+      "benchmark_version": "PACMSE / ISSTA 2026; arXiv:2608.10613",
+      "split": "Defects4J V1.2 + V2.0 combined",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 829,
+        "unit": "bugs"
+      },
+      "source_id": "causalrepair-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Dual-slicing combines test-semantic static slicing and runtime execution-trace dynamic slicing to form minimal causal context for automated repair.",
+        "Defects4J V1.2 contributes 391 bugs and V2.0 contributes 438; the combined population is 829.",
+        "Reported correct-patch count is a repair outcome, not CEB causal-diagnosis accuracy or code-review precision.",
+        "Uses DeepSeek-V3 for the principal comparison; the paper also reports a GPT-4o configuration.",
+        "Correctness assessment includes two independent Java researchers and a third reviewer for disagreements; retain this specific adjudication contract."
+      ]
+    },
+    {
+      "comparator_id": "causalrepair-defects4j-trans",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "CausalRepair",
+      "benchmark_version": "PACMSE / ISSTA 2026; arXiv:2608.10613",
+      "split": "Defects4J-Trans",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 483,
+        "unit": "transformed_bugs"
+      },
+      "source_id": "causalrepair-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Defects4J-Trans contains 483 semantically transformed single-function bugs and is used as a contamination-reduced evaluation.",
+        "Reported CausalRepair correct-patch count is not a source-only review or causal-identifiability score.",
+        "This transformed benchmark population is distinct from original Defects4J V1.2/V2.0 and must retain its own denominator.",
+        "Uses executable test/trace context; it does not test how to state non-identifiability when traces are missing."
+      ]
+    },
+    {
+      "comparator_id": "poscm-uai2026",
+      "lane_id": "CEB-DEBUG",
+      "benchmark_name": "Partially Observed Structural Causal Models",
+      "benchmark_version": "UAI 2026; PMLR volume 337",
+      "split": "Two external simulator validation settings",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 2,
+        "unit": "external_simulators"
+      },
+      "source_id": "poscm-uai2026-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "methodological_reference",
+      "caveats": [
+        "Formal causal-modeling research on latent context that co-determines graph structure and downstream mechanisms.",
+        "Provides node- and edge-level intervention hierarchy and identifiability theory; empirical validation uses two external simulators.",
+        "The two-simulator count is experimental scope, not a model-performance metric.",
+        "This is not a software-engineering benchmark or code-review evaluation."
       ]
     }
   ],
@@ -4733,6 +4852,326 @@
         "Paper reports 1,505 final annotated review comments; do not reinterpret this as a 285% model-score gain.",
         "Annotation construction uses LLM-generated candidates followed by expert verification; preserve provenance and judge dependence caveats."
       ]
+    },
+    {
+      "observation_id": "cbfl-softrex-top1",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "softrex-cbfl",
+        "model": "SoftReX",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_1_localizations",
+        "label": "Top-1 correct localizations",
+        "definition": "Number of buggy program versions whose true fault is ranked first.",
+        "value": 103,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "103",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_1_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-softrex-top10",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "softrex-cbfl",
+        "model": "SoftReX",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_10_localizations",
+        "label": "Top-10 correct localizations",
+        "definition": "Number of buggy program versions whose true fault appears within the top ten ranked locations.",
+        "value": 301,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "301",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_10_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-softrex-mrr",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "softrex-cbfl",
+        "model": "SoftReX",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "mean_reciprocal_rank",
+        "label": "Mean reciprocal rank",
+        "definition": "Mean reciprocal rank of the true faulty program element in the evaluated test set.",
+        "value": 0.349,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "MRR",
+        "direction": "maximize",
+        "raw_display": "0.349",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_reciprocal_rank",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-blmu-top1",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "blmu-cbfl",
+        "model": "BLMu",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_1_localizations",
+        "label": "Top-1 correct localizations",
+        "definition": "Number of buggy program versions whose true fault is ranked first.",
+        "value": 89,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "89",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_1_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-blmu-top10",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "blmu-cbfl",
+        "model": "BLMu",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "top_10_localizations",
+        "label": "Top-10 correct localizations",
+        "definition": "Number of buggy program versions whose true fault appears within the top ten ranked locations.",
+        "value": 270,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "270",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "top_10_localizations",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "cbfl-blmu-mrr",
+      "comparator_id": "cbfl-softrex-defects4j",
+      "source_locator": "SoftReX / Causality-Based Fault Localization arXiv:2611.01292, main Defects4J Experiment 1, Table 5; 827 bugs after exclusions",
+      "system": {
+        "system_id": "blmu-cbfl",
+        "model": "BLMu",
+        "harness": "SoftReX / matched MBFL comparison",
+        "configuration": "Defects4J experiment 1; same 827 bugs; actual-causality/MBFL comparison"
+      },
+      "metric": {
+        "metric_id": "mean_reciprocal_rank",
+        "label": "Mean reciprocal rank",
+        "definition": "Mean reciprocal rank of the true faulty program element in the evaluated test set.",
+        "value": 0.301,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "MRR",
+        "direction": "maximize",
+        "raw_display": "0.301",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_reciprocal_rank",
+          "applies_to_task_count": 827
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "causalrepair-d4j-correct-fixes",
+      "comparator_id": "causalrepair-defects4j",
+      "source_locator": "CausalRepair arXiv:2608.10613, Defects4J V1.2 + V2.0, principal DeepSeek-V3 configuration",
+      "system": {
+        "system_id": "causalrepair-deepseek-v3",
+        "model": "CausalRepair",
+        "harness": "dual-slicing LLM repair harness",
+        "configuration": "DeepSeek-V3; V1.2 + V2.0 combined; 829 bugs"
+      },
+      "metric": {
+        "metric_id": "correct_patches",
+        "label": "Correct patches",
+        "definition": "Number of Defects4J bugs for which the generated patch was judged semantically correct.",
+        "value": 313,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "313 correct patches",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "correct_patches",
+          "applies_to_task_count": 829
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "reinfix-d4j-correct-fixes",
+      "comparator_id": "causalrepair-defects4j",
+      "source_locator": "CausalRepair arXiv:2608.10613, same Defects4J V1.2 + V2.0 comparison setting",
+      "system": {
+        "system_id": "reinfix-deepseek-v3",
+        "model": "ReinFix",
+        "harness": "unified LLM-based repair comparison",
+        "configuration": "DeepSeek-V3; V1.2 + V2.0 combined; 829 bugs"
+      },
+      "metric": {
+        "metric_id": "correct_patches",
+        "label": "Correct patches",
+        "definition": "Number of Defects4J bugs for which the generated patch was judged semantically correct.",
+        "value": 236,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "236 correct patches",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "correct_patches",
+          "applies_to_task_count": 829
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "causalrepair-d4j-trans-correct-fixes",
+      "comparator_id": "causalrepair-defects4j-trans",
+      "source_locator": "CausalRepair arXiv:2608.10613, Defects4J-Trans transformed-bug experiment",
+      "system": {
+        "system_id": "causalrepair-deepseek-v3-trans",
+        "model": "CausalRepair",
+        "harness": "dual-slicing LLM repair harness",
+        "configuration": "DeepSeek-V3; Defects4J-Trans; 483 transformed bugs"
+      },
+      "metric": {
+        "metric_id": "correct_patches",
+        "label": "Correct patches",
+        "definition": "Number of Defects4J-Trans bugs for which the generated patch was judged semantically correct.",
+        "value": 289,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "bugs",
+        "direction": "maximize",
+        "raw_display": "289 correct patches",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "correct_patches",
+          "applies_to_task_count": 483
+        }
+      },
+      "notes": []
+    },
+    {
+      "observation_id": "poscm-uai26-simulators",
+      "comparator_id": "poscm-uai2026",
+      "source_locator": "PMLR 337:5111-5137, Partially Observed Structural Causal Models, empirical validation description",
+      "system": {
+        "system_id": "poscm-uai2026-authors",
+        "model": "POSCM",
+        "harness": "structural causal model / simulator validation",
+        "configuration": "Two external simulators: virtual retina and gene-regulatory analogue"
+      },
+      "metric": {
+        "metric_id": "external_simulator_count",
+        "label": "External simulator count",
+        "definition": "Number of distinct external simulators named for empirical validation; not a model-performance metric.",
+        "value": 2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "simulators",
+        "direction": "not_applicable",
+        "raw_display": "2 simulators",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "external_simulator_count",
+          "applies_to_task_count": 2
+        }
+      },
+      "notes": []
     }
   ]
 }
