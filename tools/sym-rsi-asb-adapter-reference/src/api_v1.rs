@@ -178,6 +178,7 @@ pub enum ApiContractError {
     CampaignStatusMismatch(&'static str),
     BudgetAccountingMismatch,
     StageMismatch { expected: u32, actual: u32 },
+    UnknownStage(u32),
     CatalogSizeMismatch { expected: u64, actual: usize },
     MissingDesignIdField(String),
     DuplicateCatalogDesign(String),
@@ -186,6 +187,7 @@ pub enum ApiContractError {
     DesignAlreadyMeasured(String),
     WrongDeliverableKind,
     WrongDeliverableVersion,
+    DeliverableContentMismatch,
     EmptyDeliverable,
     DeliverableTooLarge { max_bytes: u64, actual_bytes: usize },
     InvalidDeliverableEncoding,
@@ -258,10 +260,18 @@ impl CampaignCard {
         if total != self.budget.total {
             return Err(ApiContractError::BudgetDoesNotMatchStages);
         }
+        if !non_empty(&self.source) || !non_empty(&self.objective) {
+            return Err(ApiContractError::EmptyIdentifier("source/objective"));
+        }
+        if self.measurements.iter().any(|measurement| !non_empty(&measurement.name)) {
+            return Err(ApiContractError::EmptyIdentifier("measurement.name"));
+        }
         if !non_empty(&self.budget.unit)
             || !non_empty(&self.deliverable.kind)
+            || !non_empty(&self.deliverable.requires)
             || self.deliverable.format_version == 0
             || self.deliverable.max_bytes == 0
+            || self.deliverable.content.as_deref().is_some_and(|value| value != "binary")
         {
             return Err(ApiContractError::EmptyIdentifier("budget/deliverable"));
         }
@@ -318,9 +328,6 @@ impl CampaignStatus {
         if self.active_job.as_ref().is_some_and(|job| !non_empty(job)) {
             return Err(ApiContractError::EmptyIdentifier("active_job"));
         }
-        if self.deliverable_submitted && self.stages_completed == 0 {
-            return Err(ApiContractError::CampaignStatusMismatch("premature_deliverable"));
-        }
         Ok(())
     }
 }
@@ -343,7 +350,7 @@ impl CatalogResponse {
         }
         let stage = campaign
             .stage(stage_number)
-            .ok_or(ApiContractError::StageMismatch { expected: 1, actual: stage_number })?;
+            .ok_or(ApiContractError::UnknownStage(stage_number))?;
         if let Some(expected) = stage.catalog_size {
             if expected != self.designs.len() as u64 {
                 return Err(ApiContractError::CatalogSizeMismatch {
@@ -382,7 +389,24 @@ impl SubmitExperimentRequest {
         if self.designs.len() as u64 != stage.batch_size {
             return Err(ApiContractError::InvalidBatchSize);
         }
-        let allowed: BTreeSet<&str> = catalog.design_ids(design_id_field).collect();
+        if !catalog.ok {
+            return Err(ApiContractError::ApiNotOk);
+        }
+        if catalog.stage != stage.stage {
+            return Err(ApiContractError::StageMismatch {
+                expected: stage.stage,
+                actual: catalog.stage,
+            });
+        }
+        let mut allowed = BTreeSet::new();
+        for design_id in catalog.design_ids(design_id_field) {
+            if !non_empty(design_id) {
+                return Err(ApiContractError::MissingDesignIdField(design_id_field.to_owned()));
+            }
+            if !allowed.insert(design_id) {
+                return Err(ApiContractError::DuplicateCatalogDesign(design_id.to_owned()));
+            }
+        }
         let mut selected = BTreeSet::new();
         for design in &self.designs {
             if !non_empty(design) {
@@ -434,6 +458,9 @@ impl DeliverableRequest {
     pub fn validate_against(&self, spec: &PublicDeliverable) -> Result<(), ApiContractError> {
         match self {
             Self::Text(request) => {
+                if spec.content.as_deref() == Some("binary") {
+                    return Err(ApiContractError::DeliverableContentMismatch);
+                }
                 if request.kind != spec.kind {
                     return Err(ApiContractError::WrongDeliverableKind);
                 }
@@ -451,6 +478,9 @@ impl DeliverableRequest {
                 }
             }
             Self::Binary(request) => {
+                if spec.content.as_deref() != Some("binary") {
+                    return Err(ApiContractError::DeliverableContentMismatch);
+                }
                 if request.kind != spec.kind {
                     return Err(ApiContractError::WrongDeliverableKind);
                 }
