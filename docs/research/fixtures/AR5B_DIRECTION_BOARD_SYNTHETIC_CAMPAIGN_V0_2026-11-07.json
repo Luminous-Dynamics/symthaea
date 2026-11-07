@@ -115,7 +115,7 @@
     "enabled": true,
     "prior_gain_per_cost": 0.003,
     "estimated_cost_per_evaluation": 14,
-    "max_share_bps": 1000,
+    "max_share_bps": 2000,
     "verifier_intake_ref": "verifier://synthetic/new-direction-intake"
   }
 }
