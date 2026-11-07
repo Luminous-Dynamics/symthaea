@@ -532,9 +532,22 @@ Primary metrics: cumulative ranking utility, final discovery utility, held-out p
 
 **Required comparison:** fixed editor reuse must be measured against the full per-batch editor cost, not just final model quality. Report total LLM calls, tokens, inference and candidate-evaluation compute, assay/query count, latency, parameter drift and final held-out utility. A fixed edit program that improves one endpoint while damaging prior tasks is not successful continual adaptation.
 
+### Executable sequential session contract now present
+
+The branch now includes `crates/core/symthaea-core/src/sequential_weight_program.rs`. It separates a frozen edit template from one-step programs bound to individual evidence batches:
+
+1. `begin_sequential_edit_session` binds the template to exact architecture, manifest, task, session, and initial native model digests.
+2. `prepare_sequential_candidate` requires the next in-order batch, the latest accepted native candidate digest, a unique evidence-batch digest, and an observation-manifest digest. It rebinds the frozen operations into an ordinary digest-bound `WeightProgram` and returns a detached `ValidatedWeightCandidate`. Preparing does not advance the session.
+3. A model-specific SWI adapter must materialize the candidate on a clone, recompute its native fingerprint, and evaluate held-out task behaviour, retention, and negative controls.
+4. `accept_verified_sequential_candidate` advances only when the caller supplies the native candidate digest, verifier receipt digest, and a positive verifier result. It checks that the prepared candidate is still bound to the current session state, rejects replay/out-of-order/stale batches, enforces cumulative L2-path and parameter-change-event budgets, and appends a hash-linked step receipt.
+
+**Trust boundary:** the session module records a verifier attestation; it does not cryptographically authenticate an external verifier. The verifier receipt digest must be checked by the caller against the actual verifier artifact/signature, and the adapter must bind it to the exact native candidate fingerprint and evaluation results. The module does not promote the live model. A separate deployment-controlled promotion/rollback boundary remains necessary.
+
+Targeted unit tests cover template freezing, prepare-without-advance, verifier rejection, successful sequential advancement, stale parent, out-of-order batch, tampered prepared candidate, and cumulative edit-path budget enforcement. The exact-head Rust workflow is responsible for compiling and executing these tests; do not infer their pass status from the design.
+
 ### Claim boundary
 
-The present branch has a typed WeightProgram foundation and candidate-only CfC/HDC-LTC adapters. It does **not** yet contain a WSP proposer that authors reusable programs from task descriptions, nor a persistent evidence-batch executor or production promotion controller. The sequential WeightLoop task is therefore a registered benchmark and architecture target, not an implemented WeightLoop reproduction. Do not label the current SWI work as recursive self-improvement.
+The present branch has a typed WeightProgram foundation, candidate-only CfC/HDC-LTC adapters, and a generic sequential evidence-batch session contract. It does **not** yet contain a WSP proposer that authors reusable programs from task descriptions, production FEP diagnostic/outcome-model adapters, a trust-authenticated verifier integration, or a production promotion/rollback controller. The sequential module is a generic candidate-session and receipt-chain primitive, not an implemented WeightLoop reproduction or autonomous continual-learning agent. Do not label the current SWI work as recursive self-improvement.
 
 ## 7. Metrics and hard acceptance gates
 
@@ -627,6 +640,10 @@ A single synthetic fixture, one seed, one successful PR workflow, or an aggregat
 - Convert only a small set of operation kinds into SWI transactional edit batches.
 - Add candidate-only cloning, manifest/base-digest checks, edit budgets, rollback, and independent preservation tests.
 - Compare weights-only and trace-assisted WSP.
+
+### Stage 2.1 — Sequential evidence-feedback contract
+
+The generic sequential session module is implemented and receives focused tests. The remaining integration task is to connect a concrete native adapter and independent verifier so that the verifier receipt is not merely passed as an opaque digest and boolean. The first experiment should use a small CfC task with planted tau/gate fault batches, plus shuffled/delayed-feedback and future-batch leakage controls. Measure cumulative utility, prediction loss, parameter drift path, held-out retention, query cost, candidate count, and editor-call amortization.
 
 ### Stage 3 — connect HDC/HLB
 - Use HDC/HRR only where role/filler compositionality and associative retrieval improve measured task performance.
