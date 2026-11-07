@@ -3,7 +3,7 @@
 **Status:** Public research design and preregistration template. No candidate evaluation, task admission, sealed holdout or model-performance result is claimed.  
 **Program owner:** Existing CEB-REVIEW / CEB-HUMAN / causal-diagnosis work; [#10723](https://github.com/Luminous-Dynamics/symthaea/issues/10723), [#10419](https://github.com/Luminous-Dynamics/symthaea/issues/10419), [#10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367).  
 **Primary CEB contract:** 14 measurement lanes / 56 primary metrics. CEB-REVIEW remains exactly three primary measures: `defect_recall_at_5`, `actionable_precision`, `reviewer_burden`.  
-**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), and [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md).
+**Related artifacts:** [benchmark triangulation](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md), [32-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), [dual-annotator calibration and reliability pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md), and [causal-topology protocol](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) with its [six-case public development challenge](CEB_REVIEW_CAUSAL_TOPOLOGY_CHALLENGE_V0_2026-11-07.md).
 
 ## 1. Research question
 
@@ -333,6 +333,9 @@ Use [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHO
 
 This adds no metric, task schema, receipt or execution permission and does not change the existing Phase A/B/C preregistered primary hypotheses.
 
+## 12.5 Causal-topology extension
+
+Use [CEB Review Causal-Topology Protocol V0](CEB_REVIEW_CAUSAL_TOPOLOGY_PROTOCOL_V0_2026-11-07.md) and its six-case public development challenge to test whether reviewers can reconstruct alternative sufficient paths, conjunctive conditions, temporal ordering, multi-factor interactions and residual routes after repair. This is a source-only development ablation between the existing five-link diagnosis and a typed causal-topology representation; it does not change the existing Phase A/B/C primary hypotheses, add a metric lane, or authorize execution. The six challenge anchors and 36 P/I/F/N/M/IRR variants are public and are not independent task samples or sealed holdouts. Use the [dual-annotator calibration pack](CEB_REVIEW_DUAL_ANNOTATOR_CALIBRATION_AND_RELIABILITY_PACK_V0_2026-11-07.md) for independent first-pass labels and disagreement adjudication.
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
