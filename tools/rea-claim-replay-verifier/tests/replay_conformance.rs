@@ -1512,3 +1512,50 @@ fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
             .any(|line| line.as_str().unwrap().contains("does not prove the underlying real-world proposition"))
     );
 }
+
+#[test]
+fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let mut value = original.value.clone();
+    value["normalized_result"]["large_count"] = json!(9_007_199_254_740_993_u64);
+    value["parameters"]["large_offset"] = json!(18_446_744_073_709_551_615_u64);
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+    let mut claim = provider_claim(evidence.evidence_id.clone());
+    claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::SupportedWithinScope);
+
+    let mut result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    let warnings = result["numeric_precision_warnings"]
+        .as_array()
+        .expect("numeric precision warnings are a required result field");
+    assert_eq!(warnings.len(), 3);
+    assert_eq!(warnings[0]["source"], json!("asserted_value"));
+    assert_eq!(warnings[0]["integer_value"], json!("9007199254740993"));
+    assert_eq!(warnings[1]["source"], json!("evidence_record"));
+    assert_eq!(
+        warnings[1]["json_pointer"],
+        json!("/normalized_result/large_count")
+    );
+    assert_eq!(
+        warnings[2]["integer_value"],
+        json!("18446744073709551615")
+    );
+
+    // A precision warning is part of the complete derivation, not a UI-only
+    // annotation. Removing or changing it must fail independent replay.
+    result["numeric_precision_warnings"][0]["integer_value"] =
+        json!("9007199254740992");
+    let changed = serde_json::to_vec(&result).unwrap();
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &changed).unwrap();
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMismatch);
+}
+
