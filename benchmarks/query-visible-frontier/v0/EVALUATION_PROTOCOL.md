@@ -157,7 +157,7 @@ These targets are not interchangeable. In particular, the TEMPO ranking target m
    - ProStruct-RAG/Asteria is described as fictional/contamination-resistant, but its dataset reuse terms still require direct repository/license review before redistribution or commercial use: https://aclanthology.org/2026.emnlp-main.294/
 10. Publish all failed, abstained, truncated, Unknown and invalidated cases. A run with unavailable evidence is not silently dropped from the denominator.
 11. Preserve exact-head source, artifact digests and validator outputs. A rebase or fixture mutation invalidates earlier qualification until rerun.
-11. For evidence-use/reader-format experiments, inject byte-identical gold evidence, randomize arm order, isolate session/cache state and bind the exact reader input. A clean-format recovery cannot be counted as a retrieval recall gain.
+12. For evidence-use/reader-format experiments, inject byte-identical gold evidence, randomize arm order, isolate session/cache state and bind the exact reader input. A clean-format recovery cannot be counted as a retrieval recall gain.
 
 ## Required result packet
 
