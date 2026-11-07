@@ -370,8 +370,8 @@ impl SingingVoiceEngine for FormantSingingEngine {
                 ),
                 capability(
                     SingingControl::PhraseExpressionCurve,
-                    CapabilitySupport::Unsupported,
-                    "phrase expression points are not mapped into formant-frame controls",
+                    CapabilitySupport::Approximated,
+                    "energy scales frame amplitude, breathiness lowers periodic voicing and widens resonances, and tension narrows resonator bandwidths; no separate glottal-Rd or breath-event model is applied",
                 ),
                 capability(
                     SingingControl::PhraseBreathTiming,
@@ -380,8 +380,8 @@ impl SingingVoiceEngine for FormantSingingEngine {
                 ),
                 capability(
                     SingingControl::Breathiness,
-                    CapabilitySupport::Unsupported,
-                    "per-syllable breathiness is not represented by the legacy FormantFrame contract",
+                    CapabilitySupport::Approximated,
+                    "phrase breathiness reduces periodic voicing and widens formant bandwidths; aspiration level itself is not independently controlled",
                 ),
                 capability(
                     SingingControl::Energy,
@@ -390,8 +390,8 @@ impl SingingVoiceEngine for FormantSingingEngine {
                 ),
                 capability(
                     SingingControl::Tension,
-                    CapabilitySupport::Unsupported,
-                    "tension controls are not consumed by the legacy formant renderer",
+                    CapabilitySupport::Approximated,
+                    "phrase tension narrows formant bandwidths; vocal-fold tension and glottal source shape are not modeled",
                 ),
                 capability(
                     SingingControl::Vibrato,
@@ -474,6 +474,64 @@ mod tests {
             capabilities.support(SingingControl::VoiceIdentity),
             CapabilitySupport::Unsupported
         );
+        assert_eq!(
+            capabilities.support(SingingControl::PhraseExpressionCurve),
+            CapabilitySupport::Approximated
+        );
+        assert_eq!(
+            capabilities.support(SingingControl::Breathiness),
+            CapabilitySupport::Approximated
+        );
+        assert_eq!(
+            capabilities.support(SingingControl::Tension),
+            CapabilitySupport::Approximated
+        );
+        assert_eq!(
+            capabilities.support(SingingControl::PhraseBreathTiming),
+            CapabilitySupport::Unsupported
+        );
+    }
+
+    #[test]
+    fn phrase_expression_modulates_formant_energy_voicing_and_bandwidth() {
+        let note = note(0.0, 0.5, 220.0);
+        let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        performance.phrases[0].expression_curve = vec![
+            ExpressionPoint {
+                time_s: 0.0,
+                energy: 0.35,
+                breathiness: 0.8,
+                tension: 0.9,
+            },
+            ExpressionPoint {
+                time_s: 0.5,
+                energy: 0.35,
+                breathiness: 0.8,
+                tension: 0.9,
+            },
+        ];
+        let mut frames = vec![FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 220.0,
+            energy: 0.8,
+            voicing: 0.9,
+            time: 0.25,
+            source_type: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
+        }];
+
+        apply_phrase_expression(&mut frames, &performance);
+        assert!((frames[0].energy - 0.4).abs() < 1e-5);
+        assert!((frames[0].voicing - 0.72).abs() < 1e-5);
+        let bandwidth_scale = (1.0 + 0.08 * 0.8) * (1.2 - 0.4 * 0.9);
+        assert!((frames[0].b1 - 60.0 * bandwidth_scale).abs() < 1e-4);
+        assert!((frames[0].b2 - 90.0 * bandwidth_scale).abs() < 1e-4);
     }
 
     #[test]
