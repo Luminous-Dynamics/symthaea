@@ -91,6 +91,7 @@
 //!   Propagation and Active Inference. *Network Neuroscience*, 1(4).
 
 pub mod exact_map;
+pub mod exact_marginals;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
