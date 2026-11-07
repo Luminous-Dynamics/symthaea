@@ -53,6 +53,23 @@ Compare synchronous barrier and asynchronous steady-state traces under the same 
 
 Compare a fixed one-shot operator against a bounded multi-turn inspect → hypothesize → execute → observe → revise → submit operator. Keep subagent count as a separate factor. Preserve each tool action, permissions, runtime, cost, failure, retry and final disposition. Use the fixed Coder boundary in #10877 where researcher quality must be isolated from coding skill.
 
+## Bounded interactive operator trace
+
+A fixed one-shot operator is not equivalent to a researcher that can inspect an artifact, form a hypothesis, execute a tool, observe failure, revise a plan and recover. The standalone reference now validates this as its own trace construct rather than inferring it from final success.
+
+Each trace binds:
+- mode (fixed one-shot or interactive ReAct);
+- candidate identity and bounded step, tool-call, wall-clock and cumulative-cost budgets;
+- an allowlist mapping each tool ID to its exact permission ID;
+- ordered inspect / hypothesize / execute / observe / revise / submit actions;
+- per-action dispositions, timing, cost and input/output digests.
+
+The state machine rejects unallowlisted tools, wrong permission IDs, missing permission declarations, unbounded or non-monotonic actions, tool calls over budget, execution without a hypothesis, execution without observing the result, and failed/denied execution without an explicit observation and revision before retry or submission.
+
+Digest linkage is also required: inspection output → hypothesis input; hypothesis output → execution input; failed-execution observation → revision input; revision output → retry input; and successful final observation → submission input. This is artifact linkage only. It does not authenticate execution, tool identity or scientific truth.
+
+A synthetic fixture contains one failed execution, an observation, a revision, a successful retry and submission. It is not a model run or operator-performance result. The operator trace validator has 14 authored Rust tests; together with 12 HCE/worker-trace tests, the standalone crate now contains 26 authored tests. None has been executed here.
+
 ## Current implementation
 
 `tools/sym-rsi-hce-reference/` contains:
