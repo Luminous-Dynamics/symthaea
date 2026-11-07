@@ -390,3 +390,8 @@ Implications for HME:
 - Do not mistake an empirical or statistical certificate for the deterministic worst-case residual upper bound required by ExactComplete.
 
 The paper reports 10.1% ranking flips for scalar int4 on its hardest fifth of margins in one inspected configuration, despite strong aggregate fidelity. This is an external paper result, not an HME measurement. <Cite refs={["turn684205view0","turn443733view0"]}/>
+
+
+Machine-readable decision-margin example:
+[hme_quantized_decision_margins_v0.json](fixtures/hme_quantized_decision_margins_v0.json).
+It demonstrates large- versus small-margin ranking stability and shared-query residual cancellation versus anti-correlation. This is a synthetic arithmetic fixture, not an empirical quantizer result.
