@@ -437,14 +437,18 @@
       "external_observation_ids": [
         "crbug-opus-recall5"
       ],
-      "rationale": "CRBugBench top-five-comment bug detection is close to top-five defect finding, but its review comment protocol and task population differ.",
+      "rationale": "CRBugBench top-five-comment bug detection is the closest current external construct, but its review comment protocol and task population differ. ReviewBench grounded recall is not top-five constrained; SecPRBench target recall scores all findings on security-introducing changes; CR-Bench-v2 KDDR uses one known defect per PR. Keep these additional results contextual rather than treating them as exact equivalents.",
       "blockers": [
         "review comment ranking differs from CEB finding ranking",
-        "repository/task sets differ"
+        "repository/task sets differ",
+        "ReviewBench grounded recall is not top-five constrained and is high-severity only",
+        "SecPRBench target recall is all-finding security diagnosis, not Recall@5",
+        "CR-Bench-v2 KDDR is one known target per task and not top-five constrained"
       ],
       "normalization_requirements": [
         "same changes and adjudicated defects",
-        "same top-five output format and blinded review"
+        "same top-five output format and blinded review",
+        "match identical frozen PRs, target labels, top-five output and finding-level adjudication before using any of these newer references as a matched test"
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
@@ -458,14 +462,19 @@
       "correspondence_class": "related_but_distinct",
       "comparison_use": "context_only",
       "external_observation_ids": [
-        "crbug-opus-recall5"
+        "reviewbench-ohmybug-grounded-precision",
+        "crbench-gpt52-reflexion-usefulness"
       ],
-      "rationale": "CRBugBench top-five recall is not actionable finding precision.",
+      "rationale": "ReviewBench grounded precision is based on a fixed gold set and classifier/matcher; CR-Bench-v2 Usefulness Rate accepts Bug Hit or Valid Suggestion comments. Both are informative but differ from CEB blinded actionability adjudication and are not interchangeable with each other.",
       "blockers": [
-        "no precision observation for the same output set"
+        "ReviewBench's high-severity classifier/matcher and scope differ from CEB blinded actionable-precision adjudication",
+        "CR-Bench-v2 Usefulness Rate includes valid suggestions and uses a one-known-defect task design; judge calibration differs",
+        "Neither external result is a matched CEB finding set"
       ],
       "normalization_requirements": [
-        "retain false-positive and actionable-positive review labels"
+        "apply one frozen CEB actionable rubric to identical PRs and findings",
+        "independently human-adjudicate unmatched discoveries and false positives",
+        "retain target-hit status separately from non-target actionable findings"
       ],
       "metric_semantics_eligible_for_matched_test": false,
       "direct_superiority_claim_allowed": false
