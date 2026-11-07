@@ -29,3 +29,15 @@ The chain-rule helper accepts probabilities only when each input is already the 
 ## Claim boundary
 
 Passing the finite fixtures establishes correct bookkeeping for these declared finite cases. It does not establish practical support in an empirical dataset, valid propensities, causal identification, human-driver behavior, simulator fidelity, collision-risk calibration, vehicle safety, or SAE Level 4/5 capability.
+
+## Canonical artifact export
+
+The support crate now exposes deterministic content bytes for three exact artifacts:
+
+- `SupportManifest::canonical_bytes()`: evidence-manifest identifier, target policy, context, finite-universe exhaustiveness and the complete canonical supported-path set.
+- `TrajectoryQuery::canonical_bytes()`: target policy, context, query completeness and every ordered decision step; joint action ordering is normalized the same way as path membership.
+- `Assessment::canonical_bytes()`: versioned disposition, decision-point count and finite-path-membership flag.
+
+These are canonical **content exports**, not hashes or signatures. Consumers choose and apply their digest algorithm to the returned bytes. The format is domain-separated and length-prefixed; a later schema/version change must use a new domain/version. The exports do not authenticate the SAM executable or the source manifest and do not validate the truth of caller-provided evidence.
+
+Tests check joint-action order normalization, query completeness/partial-query sensitivity, and deterministic finite manifest content export.

@@ -87,6 +87,25 @@ pub struct SupportManifest {
 }
 
 impl SupportManifest {
+    /// Canonical content bytes for the exact finite support ledger.
+    /// Hash these bytes externally with the consumer's chosen digest algorithm.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"sam.policy-trajectory-support.manifest.v0.1\0");
+        push_string(&mut out, &self.evidence_manifest_digest);
+        push_string(&mut out, &self.target_policy_digest);
+        push_string(&mut out, &self.context_digest);
+        out.push(u8::from(self.path_universe_exhaustive));
+        push_len(&mut out, self.supported_paths.len());
+        for path in &self.supported_paths {
+            push_len(&mut out, path.0.len());
+            for step in &path.0 {
+                push_step(&mut out, step);
+            }
+        }
+        out
+    }
+
     pub fn new(
         evidence_manifest_digest: impl Into<String>,
         target_policy_digest: impl Into<String>,
@@ -120,6 +139,47 @@ impl SupportManifest {
 ///
 /// A missing path is UnsupportedSequence only when the declared finite
 /// support universe is exhaustive. Otherwise the correct result is unknown.
+impl TrajectoryQuery {
+    /// Canonical content bytes for the exact query, including incomplete
+    /// queries. Joint action order is normalized exactly as in path matching.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"sam.policy-trajectory-support.query.v0.1\0");
+        push_string(&mut out, &self.target_policy_digest);
+        push_string(&mut out, &self.context_digest);
+        out.push(u8::from(self.complete));
+        push_len(&mut out, self.steps.len());
+        for step in &self.steps {
+            let mut canonical = CanonicalStep {
+                tick: step.tick,
+                history_digest: step.history_digest.clone(),
+                joint_actions: step.joint_actions.clone(),
+            };
+            canonical.joint_actions.sort();
+            push_step(&mut out, &canonical);
+        }
+        out
+    }
+}
+
+impl Assessment {
+    /// Canonical content bytes for the exact finite membership result.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(b"sam.policy-trajectory-support.assessment.v0.1\0");
+        out.push(match self.disposition {
+            Disposition::TrajectorySupported => 1,
+            Disposition::UnsupportedSequence => 2,
+            Disposition::SupportUnknown => 3,
+            Disposition::Incomplete => 4,
+            Disposition::OutOfScope => 5,
+        });
+        push_len(&mut out, self.decision_points);
+        out.push(u8::from(self.matched_finite_path));
+        out
+    }
+}
+
 pub fn assess(
     manifest: &SupportManifest,
     query: &TrajectoryQuery,
@@ -202,6 +262,28 @@ fn canonicalize_path(steps: &[DecisionStep]) -> Result<CanonicalPath, SupportErr
         });
     }
     Ok(CanonicalPath(canonical))
+}
+
+fn push_len(out: &mut Vec<u8>, length: usize) {
+    let length = u64::try_from(length).expect("collection length fits u64");
+    out.extend_from_slice(&length.to_le_bytes());
+}
+
+fn push_string(out: &mut Vec<u8>, value: &str) {
+    let length = u64::try_from(value.len()).expect("string length fits u64");
+    out.extend_from_slice(&length.to_le_bytes());
+    out.extend_from_slice(value.as_bytes());
+}
+
+fn push_step(out: &mut Vec<u8>, step: &CanonicalStep) {
+    out.extend_from_slice(&step.tick.to_le_bytes());
+    push_string(out, &step.history_digest);
+    push_len(out, step.joint_actions.len());
+    for action in &step.joint_actions {
+        push_string(out, &action.actor_id);
+        push_string(out, &action.action_id);
+        push_string(out, &action.payload_digest);
+    }
 }
 
 fn require_identity(value: &str, field: &'static str) -> Result<(), SupportError> {
@@ -322,6 +404,57 @@ mod tests {
     fn manifest(paths: Vec<Vec<DecisionStep>>, exhaustive: bool) -> SupportManifest {
         SupportManifest::new("evidence-v1", "policy-v1", "context-v1", exhaustive, paths)
             .expect("valid manifest")
+    }
+
+    #[test]
+    fn support_manifest_canonical_bytes_are_order_independent() {
+        let path_a = vec![step(
+            0,
+            "history",
+            vec![action("ego", "continue"), action("actor-1", "yield")],
+        )];
+        let path_b = vec![step(
+            0,
+            "history",
+            vec![action("actor-1", "yield"), action("ego", "continue")],
+        )];
+        let a = SupportManifest::new("evidence-v1", "policy-v1", "context-v1", true, vec![path_a]).unwrap();
+        let b = SupportManifest::new("evidence-v1", "policy-v1", "context-v1", true, vec![path_b]).unwrap();
+        assert_eq!(a.canonical_bytes(), b.canonical_bytes());
+    }
+
+    #[test]
+    fn query_and_assessment_have_canonical_content_exports() {
+        let first = query(
+            "policy-v1",
+            "context-v1",
+            vec![step(0, "history", vec![action("ego", "continue"), action("actor-1", "yield")])],
+        );
+        let second = query(
+            "policy-v1",
+            "context-v1",
+            vec![step(0, "history", vec![action("actor-1", "yield"), action("ego", "continue")])],
+        );
+        assert_eq!(first.canonical_bytes(), second.canonical_bytes());
+
+        let result = assess(
+            &manifest(vec![first.steps.clone()], true),
+            &first,
+        ).unwrap();
+        assert_eq!(result.canonical_bytes().len(), 8 + "sam.policy-trajectory-support.assessment.v0.1".len() + 1 + 8 + 1);
+    }
+
+    #[test]
+    fn incomplete_query_canonical_bytes_preserve_completeness_and_partial_steps() {
+        let mut complete = query("policy-v1", "context-v1", path(&["continue"]));
+        let mut incomplete = complete.clone();
+        incomplete.complete = false;
+        assert_ne!(complete.canonical_bytes(), incomplete.canonical_bytes());
+        incomplete.steps.clear();
+        assert_ne!(complete.canonical_bytes(), incomplete.canonical_bytes());
+        let mut mutated = complete.clone();
+        mutated.steps[0].history_digest = "mutated-history".to_owned();
+        assert_ne!(complete.canonical_bytes(), mutated.canonical_bytes());
     }
 
     #[test]
