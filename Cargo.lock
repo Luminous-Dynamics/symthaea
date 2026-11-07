@@ -18395,6 +18395,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-causal-set-lab"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-cell-foundry"
 version = "0.1.0"
 dependencies = [
@@ -18410,6 +18414,10 @@ dependencies = [
  "symtropy-math 0.2.1",
  "symtropy-physics 0.2.1",
 ]
+
+[[package]]
+name = "symthaea-chain-theory-audit"
+version = "0.1.0"
 
 [[package]]
 name = "symthaea-chronicle"
@@ -19287,6 +19295,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-metric-geometry-lab"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-modal"
 version = "0.1.0"
 
@@ -19850,6 +19862,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-science-evidence"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "symthaea-sensors"
 version = "0.1.0"
 dependencies = [
@@ -20137,6 +20159,10 @@ dependencies = [
  "serde_json",
  "tracing",
 ]
+
+[[package]]
+name = "symthaea-uap-observatory"
+version = "0.1.0"
 
 [[package]]
 name = "symthaea-ui"
