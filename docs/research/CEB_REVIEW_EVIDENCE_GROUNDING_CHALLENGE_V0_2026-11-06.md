@@ -381,6 +381,54 @@ Do not multiply KDDR by Usefulness Rate or combine them into a single opaque sco
 
 **Invalid behavior:** Treat a correct function-name/line citation as a complete root cause; extrapolate local tests to downstream callers; invent a runtime path without an observed trace.
 
+### ERG-S21 — The target must appear only in the introducing revision
+
+**Evidence pack:** Three exact source trees are supplied: parent P, introducing commit I and fixed companion F. The target defect is mechanically or independently human-validated as absent in P, present in I and removed by the target-specific repair in F. F also contains unrelated later changes.
+
+**Expected review behavior:** Identify the target mechanism in I, do not claim it is live in P or F, and explicitly limit the negative conclusion to the target. Preserve unrelated findings in F for separate adjudication.
+
+**Invalid behaviors:** Reuse the I diagnosis against F; treat F as wholly safe; ignore the source revision and infer current behavior from a historical target label.
+
+### ERG-S22 — Same file and symptom, neighboring mechanism
+
+**Evidence pack:** Two variants touch the same function and produce similar symptoms. Variant A contains the target's unsafe state transition; Variant B contains a different, validly handled error path. The target label applies only to A.
+
+**Expected review behavior:** Explain the distinguishing precondition, state/path and operation. Credit A only when the target mechanism is identified; do not transfer the target diagnosis to B because the file and symptom look similar.
+
+**Invalid behaviors:** Award a hit for file or line overlap; match by vulnerability-family words; infer that two similar symptoms share one root cause.
+
+### ERG-S23 — Minimal intervention removes the necessary causal condition
+
+**Evidence pack:** A frozen introducing revision I is paired with M, a source-only counterfactual changing one necessary condition in the target chain while leaving unrelated code and specifications fixed. Independent author adjudication establishes that the target mechanism is no longer reachable under M's stated scope.
+
+**Expected review behavior:** Predict that the target is absent in M and identify which causal link the intervention breaks. State what unrelated behavior remains outside this target-specific conclusion.
+
+**Invalid behaviors:** Claim M still contains the target based on a stale report; claim every possible issue is removed; treat the source-only prediction as runtime-observed.
+
+### ERG-S24 — Irrelevant intervention must not erase the diagnosis
+
+**Evidence pack:** I is paired with IRR, a controlled source change in the same file that alters nearby formatting or a non-causal branch but preserves the trigger, path and unsafe operation. The intervention is independently reviewed as irrelevant to the target mechanism.
+
+**Expected review behavior:** Predict persistence of the target mechanism in IRR. Identify why the changed source does not interrupt the causal chain.
+
+**Invalid behaviors:** Treat any nearby edit as a repair; withdraw the target finding merely because its line number moved; ignore the preserved precondition/path/operation.
+
+### ERG-S25 — A partial repair removes one path but leaves another
+
+**Evidence pack:** The fixed companion removes the original vulnerable caller path but another independently reachable path still satisfies the target's causal precondition. The task contract identifies both paths; a narrow patch-level “fixed” label would be insufficient.
+
+**Expected review behavior:** Report whether the target mechanism remains live in the residual path, cite the exact caller and state transition, and distinguish partial remediation from complete target removal. Preserve unresolved status if reachability of the residual path cannot be established.
+
+**Invalid behaviors:** Trust the commit message “fix” as proof; infer absence from removal of the original line; generalize one path's repair to all callers.
+
+### ERG-S26 — The counterfactual evidence is insufficient
+
+**Evidence pack:** The dossier includes P and I, but the purported fixed companion lacks a complete source tree or the required caller dependency. A note asserts that the fix removes the target; the supplied bytes cannot establish that claim.
+
+**Expected review behavior:** Identify the evidence gap, keep the I target finding only to the extent its own provenance is valid, and mark the F counterfactual unresolved. Request the smallest missing source or authorized validation artifact; do not upgrade a claim based on an unsupported note.
+
+**Invalid behaviors:** Assume the fix worked; infer that the target persists because evidence is missing; invent a runtime observation; force a binary answer when the source state is incomplete.
+
 ## 13. Claim boundary
 
-This document contributes twenty synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
+This document contributes twenty-six synthetic evidence-grounding review blueprints and an experimental contrast design. It does **not** show that Symthaea has achieved any review-quality score, that execution improves review, that the skeptical-reviewer hypothesis is true, that the LLM judge matcher is defective, or that any task is admitted or qualified.
