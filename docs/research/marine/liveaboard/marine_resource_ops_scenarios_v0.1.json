@@ -150,6 +150,15 @@
               "availability_ref": "synthetic:seawater-intake-stock",
               "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
             }
+          ],
+          "process_residuals": [
+            {
+              "carrier": "brine_concentrate",
+              "expected_quantity": 14.4,
+              "unit": "L",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "quality_constraint_ref": "synthetic:concentrate-salinity-characterization"
+            }
           ]
         },
         {
@@ -223,7 +232,8 @@
               "availability_ref": "synthetic:generator-recovered-heat-or-store",
               "quality_constraint_ref": "synthetic:usable-heat-grade-and-exchanger-envelope"
             }
-          ]
+          ],
+          "process_residuals": []
         },
         {
           "service_id": "workshop_charge",
@@ -289,7 +299,8 @@
               "availability_ref": "synthetic:electrical-energy-budget",
               "quality_constraint_ref": "synthetic:bus-operating-envelope"
             }
-          ]
+          ],
+          "process_residuals": []
         }
       ],
       "hard_constraints": [
@@ -561,6 +572,15 @@
               "availability_ref": "synthetic:seawater-intake-stock",
               "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
             }
+          ],
+          "process_residuals": [
+            {
+              "carrier": "brine_concentrate",
+              "expected_quantity": 10.8,
+              "unit": "L",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "quality_constraint_ref": "synthetic:concentrate-salinity-characterization"
+            }
           ]
         },
         {
@@ -634,7 +654,8 @@
               "availability_ref": "synthetic:generator-recovered-heat-or-store",
               "quality_constraint_ref": "synthetic:usable-heat-grade-and-exchanger-envelope"
             }
-          ]
+          ],
+          "process_residuals": []
         }
       ],
       "hard_constraints": [
@@ -878,6 +899,15 @@
               "availability_ref": "synthetic:seawater-intake-stock",
               "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
             }
+          ],
+          "process_residuals": [
+            {
+              "carrier": "brine_concentrate",
+              "expected_quantity": 18,
+              "unit": "L",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "quality_constraint_ref": "synthetic:concentrate-salinity-characterization"
+            }
           ]
         },
         {
@@ -951,7 +981,8 @@
               "availability_ref": "synthetic:generator-recovered-heat-or-store",
               "quality_constraint_ref": "synthetic:usable-heat-grade-and-exchanger-envelope"
             }
-          ]
+          ],
+          "process_residuals": []
         }
       ],
       "hard_constraints": [
@@ -1221,6 +1252,15 @@
               "unit": "L",
               "availability_ref": "synthetic:seawater-intake-stock",
               "quality_constraint_ref": "synthetic:ro-feed-qualified-envelope"
+            }
+          ],
+          "process_residuals": [
+            {
+              "carrier": "brine_concentrate",
+              "expected_quantity": 18,
+              "unit": "L",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "quality_constraint_ref": "synthetic:concentrate-salinity-characterization"
             }
           ]
         }
