@@ -51,9 +51,7 @@ pub use gradients::{AdamState, CfCCellCache, CfCGradients, OutputAdamState};
 // Network
 pub use network::{
     CfCNetwork, CfCNetworkConfig, CfCNetworkFingerprint, CfCParameterGroup, CfCParameterGroupId,
-    CfCParameterGroupReplacement, CfCParameterManifest,
-    CfCParameterRole,
-    CfCWeightLoadError,
+    CfCParameterGroupReplacement, CfCParameterManifest, CfCParameterRole, CfCWeightLoadError,
 };
 
 // Weight-space programming
@@ -62,8 +60,8 @@ pub use weight_program_adapter::{
     CfCFunctionalProbe, CfCHiddenUnitAlignment, CfCPermutationAlignmentError,
     CfCProbeCandidateScore, CfCWeightProgramAdapterError, CfCWeightProgramCandidate,
     align_cfc_hidden_unit_signatures, cfc_hidden_unit_activation_signatures,
-    cfc_weight_model_snapshot, materialize_cfc_weight_program,
-    select_cfc_disambiguating_probe, validate_cfc_alignment_for_parameter_transfer,
+    cfc_weight_model_snapshot, materialize_cfc_weight_program, select_cfc_disambiguating_probe,
+    validate_cfc_alignment_for_parameter_transfer,
 };
 
 // Phi-gated attention
