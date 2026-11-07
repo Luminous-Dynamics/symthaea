@@ -1,0 +1,55 @@
+name: Connectome active model-discrepancy probe contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "docs/neuroscience/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE_V1.md"
+      - "docs/neuroscience/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_connectome_active_model_discrepancy_probe.py"
+      - ".github/workflows/connectome-active-model-discrepancy-probe.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "docs/neuroscience/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE_V1.md"
+      - "docs/neuroscience/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.example.json"
+      - "tools/connectomics-intake-audit/reference/verify_connectome_active_model_discrepancy_probe.py"
+      - ".github/workflows/connectome-active-model-discrepancy-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-active-discrepancy-probe:
+    name: Validate query-value / model-discrimination frontier
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned JSON Schema validator
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Validate Draft 2020-12 schema and fixture
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert fixture["oracle_expectations"]["query_only_action_id"] != fixture["oracle_expectations"]["discrepancy_only_action_id"]
+          print("active discrepancy probe schema/fixture: PASS")
+          PY
+      - name: Run independent finite probe oracle
+        run: |
+          python3 -m py_compile tools/connectomics-intake-audit/reference/verify_connectome_active_model_discrepancy_probe.py
+          python3 tools/connectomics-intake-audit/reference/verify_connectome_active_model_discrepancy_probe.py --self-test
+          python3 tools/connectomics-intake-audit/reference/verify_connectome_active_model_discrepancy_probe.py \
+            docs/neuroscience/examples/CONNECTOME_ACTIVE_MODEL_DISCREPANCY_PROBE.example.json
