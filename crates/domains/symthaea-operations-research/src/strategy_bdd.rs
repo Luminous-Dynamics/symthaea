@@ -203,7 +203,7 @@ pub struct StrategyBddSiftingReport {
 }
 
 /// Deterministic sources of a ROBDD variable-order starting point.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum StrategyBddOrderSeed {
     Natural,
     Reverse,
