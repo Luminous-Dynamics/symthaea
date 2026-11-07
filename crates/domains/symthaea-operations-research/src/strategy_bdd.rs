@@ -30,7 +30,10 @@ pub struct BddNode {
 /// A reduced ordered BDD bound to an explicit dependency-variable order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReducedOrderedBdd {
+    /// Semantic dependency variables in prefix-derived order.
     pub dependencies: Vec<usize>,
+    /// A permutation of dependency indices specifying the BDD decision order.
+    pub variable_order: Vec<usize>,
     pub nodes: Vec<BddNode>,
     pub root: BddRef,
 }
@@ -41,6 +44,8 @@ pub struct StrategyBddBudget {
     pub max_dependency_variables: usize,
     pub max_table_entries: u128,
     pub max_bdd_nodes: usize,
+    pub max_variable_order_evaluations: usize,
+    pub max_sifting_passes: usize,
 }
 
 impl Default for StrategyBddBudget {
@@ -49,6 +54,8 @@ impl Default for StrategyBddBudget {
             max_dependency_variables: 20,
             max_table_entries: 1 << 20,
             max_bdd_nodes: 1 << 20,
+            max_variable_order_evaluations: 512,
+            max_sifting_passes: 2,
         }
     }
 }
@@ -85,6 +92,28 @@ pub enum StrategyBddError {
     DependencyScopeMismatch {
         expected: Vec<usize>,
         actual: Vec<usize>,
+    },
+    VariableOrderLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    VariableOrderEntryOutOfRange {
+        position: usize,
+        dependency_index: usize,
+        dependency_count: usize,
+    },
+    DuplicateVariableOrderEntry {
+        dependency_index: usize,
+    },
+    DuplicateDependencyVariable {
+        variable: usize,
+    },
+    UnreachableNode {
+        node: usize,
+    },
+    VariableOrderSearchBudgetExceeded {
+        required: usize,
+        limit: usize,
     },
     RootNodeOutOfRange {
         node: usize,
@@ -184,14 +213,14 @@ fn validate_truth_table(
 
 fn build_level(
     level: usize,
-    dependencies: &[usize],
+    variable_order: &[usize],
     table: &BTreeMap<Vec<bool>, bool>,
     prefix: &mut Vec<bool>,
     nodes: &mut Vec<BddNode>,
     unique: &mut BTreeMap<(usize, BddRef, BddRef), usize>,
     budget: StrategyBddBudget,
 ) -> Result<BddRef, StrategyBddError> {
-    if level == dependencies.len() {
+    if level == variable_order.len() {
         let Some(&value) = table.get(prefix) else {
             return Err(StrategyBddError::MissingTruthTableRow {
                 key: prefix.clone(),
@@ -200,29 +229,28 @@ fn build_level(
         return Ok(if value { BddRef::True } else { BddRef::False });
     }
 
-    prefix.push(false);
+    let dependency_index = variable_order[level];
+    prefix[dependency_index] = false;
     let low = build_level(
         level + 1,
-        dependencies,
+        variable_order,
         table,
         prefix,
         nodes,
         unique,
         budget,
     )?;
-    prefix.pop();
 
-    prefix.push(true);
+    prefix[dependency_index] = true;
     let high = build_level(
         level + 1,
-        dependencies,
+        variable_order,
         table,
         prefix,
         nodes,
         unique,
         budget,
     )?;
-    prefix.pop();
 
     // Eliminate a test whose two branches are identical.
     if low == high {
@@ -230,7 +258,7 @@ fn build_level(
     }
 
     // Merge structurally identical nodes.
-    let key = (level, low, high);
+    let key = (dependency_index, low, high);
     if let Some(&existing) = unique.get(&key) {
         return Ok(BddRef::Node(existing));
     }
@@ -243,7 +271,7 @@ fn build_level(
 
     let index = nodes.len();
     nodes.push(BddNode {
-        dependency_index: level,
+        dependency_index,
         low,
         high,
     });
