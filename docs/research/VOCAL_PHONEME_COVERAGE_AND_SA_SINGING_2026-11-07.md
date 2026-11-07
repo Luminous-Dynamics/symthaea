@@ -7,20 +7,23 @@
 
 The shared VocalPerformance constructor now explicitly reflects the current English-only Muse G2P frontend. It rejects non-English language tags and rejects a melody with fewer notes than the lyric syllable count rather than silently dropping trailing lyrics. Surplus melody notes continue to be represented as melisma.
 
-The functional tract singer existed in src/voice/functional_singing.rs but was not declared by src/voice/mod.rs. Production examples import it as symthaea::voice::functional_singing, so it was not actually part of the compiled voice module graph.
+The physical-tract singing prototype in `src/voice/functional_singing.rs` was not declared by `src/voice/mod.rs`. I temporarily exposed it behind the `singing` feature to test its actual integration contract. Exact-head compilation then showed that it references a set of physical renderer types and controller methods absent from the current `symthaea-vocal-tract` crate API (including `GesturePlanner`, `BranchedWaveguideV2`, `PhysicalTractFrame`, `phoneme_latent`, and `latent_output`). The module was therefore removed from the compiled module graph again, and the prototype file was restored unchanged. It is not a working or production-integrated backend in the current tree.
 
-The same source mapper used a default-to-AX rule for unknown IPA. That silently transformed unsupported phones into schwa. The in-tree DiffSinger worker independently defaulted unknown IPA to ax, defaulted absent language IDs to zero, duplicated source-phone duration for composite mappings, and could carry the final consonant across melisma.
+The mismatch is substantive: `docs/VOCAL_PHYSIOLOGY_ARCHITECTURE.md` and `docs/FUNCTIONAL_VOCAL_TRACT.md` describe an intended / experimental physical pipeline, while the checked-in crate root currently exports the HDC encoder/controller/FEP pipeline, formant frames, and speech G2P. The separate cognitive-physical-voice example also imports APIs that are not exported by the crate root. This needs its own API reconciliation and exact-head compile work; this PR will not introduce compatibility stubs or imply that the waveguide implementation is integrated.
+
+The remaining active DiffSinger worker had a separate and real input-contract defect: it defaulted unknown IPA to `ax`, defaulted missing language IDs to zero, duplicated source-phone duration for composite mappings, and could carry the final consonant across melisma.
 
 This patch:
-- exposes the functional tract singer behind the existing singing feature;
-- rejects unsupported IPA in the Rust functional singer;
-- rejects non-English functional-singer language profiles until a reviewed profile exists;
 - moves the DiffSinger IPA map into a dependency-light helper module;
 - rejects unsupported IPA and missing language IDs instead of inventing defaults;
 - preserves ordered multi-token mappings and divides source-phone duration across mapped tokens;
 - sustains the last explicitly marked vowel across melisma; consonant-only syllables cannot acquire an implicit schwa;
-- requires the voicebank's silence token explicitly.
+- requires the voicebank's silence token explicitly;
+- rejects a non-English performance language in the current English-only DiffSinger worker;
+- hardens `VocalPerformance` construction and validation (language mismatch, dropped lyric syllables, invalid note/phoneme/expression values, overlapping melismas and malformed timelines);
+- records and repairs six source-only workspace paths and a stale `sha2` lockfile entry needed for a truthful feature compile.
 
+No claim is made that the physical waveguide singer is exposed or buildable by this patch.
 ## Research framing: benchmark different tasks separately
 
 There is no single leaderboard that answers whether a system is a good singer under a prescribed score.
@@ -115,7 +118,7 @@ Build the language capability registry by task, not by language-count marketing.
 
 ## Next experiments
 
-1. Compile and run the newly exposed functional singer on the exact singing feature head after the repository workspace blocker is resolved.
+1. Reconcile the unintegrated physical-tract prototype with the actual `symthaea-vocal-tract` API; create one canonical module graph and compile its example/renderer before exposing it.
 2. Run the dependency-free DiffSinger phone-contract tests and pinned Rust formatting checks.
 3. Render identical English score/lyric cases through Kokoro, DiffSinger, and the physical tract backend; do not assume comparable quality before the outputs are measured.
 4. Run SoulX-Singer on a small, rights-compatible subset of the same score-conditioned benchmark.
