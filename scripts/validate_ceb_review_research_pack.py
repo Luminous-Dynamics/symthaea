@@ -62,13 +62,13 @@ def validate_documents(
     errors: list[str] = []
 
     ids, blocks = scenario_blocks(challenge)
-    expected_ids = list(range(1, 21))
+    expected_ids = list(range(1, 27))
     if ids != expected_ids:
         errors.append(
-            f"evidence challenge must contain ERG-S01..ERG-S20 exactly once and in order; got {ids}"
+            f"evidence challenge must contain ERG-S01..ERG-S26 exactly once and in order; got {ids}"
         )
-    if len(blocks) != 20:
-        errors.append(f"evidence challenge must contain 20 scenario blocks; got {len(blocks)}")
+    if len(blocks) != 26:
+        errors.append(f"evidence challenge must contain 26 scenario blocks; got {len(blocks)}")
     for scenario_id, block in zip(ids, blocks):
         label = f"ERG-S{scenario_id:02d}"
         if "**Evidence pack:**" not in block:
@@ -173,7 +173,7 @@ def self_test() -> list[str]:
     challenge = "\n\n".join(
         f"### ERG-S{i:02d} — Synthetic\n\n**Evidence pack:** X\n\n"
         "**Expected review behavior:** Y\n\n**Invalid behaviors:** Z"
-        for i in range(1, 21)
+        for i in range(1, 27)
     ) + "\n#10064 #10369"
     adjudication = "\n".join((
         *PRIMARY_METRICS,
