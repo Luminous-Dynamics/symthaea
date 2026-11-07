@@ -1043,6 +1043,78 @@ mod tests {
     }
 
     #[test]
+    fn public_generator_duplicates_are_exactly_the_three_constant_criterion_mappings() {
+        let space = build_three_ball_rule_space();
+        assert_eq!(space.semantic_duplicate_groups.len(), 3);
+
+        let mut duplicated_criterion_locations = std::collections::BTreeSet::new();
+        for group in &space.semantic_duplicate_groups {
+            assert_eq!(group.len(), 3);
+            let rules = group
+                .iter()
+                .map(|one_based_index| &space.rules[one_based_index - 1])
+                .collect::<Vec<_>>();
+
+            let criterion_locations = rules[0].criterion_by_context_colour;
+            assert!(
+                criterion_locations
+                    .iter()
+                    .all(|location| *location == criterion_locations[0]),
+                "only a context-independent criterion mapping may be a duplicate group"
+            );
+            assert!(duplicated_criterion_locations.insert(criterion_locations[0]));
+            assert_eq!(
+                rules
+                    .iter()
+                    .map(|rule| rule.context_factor)
+                    .collect::<std::collections::BTreeSet<_>>()
+                    .len(),
+                3,
+                "the same constant mapping must appear under each context factor"
+            );
+            assert!(rules.iter().all(|rule| {
+                rule.criterion_by_context_colour == criterion_locations
+                    && rule
+                        .parameter_prior
+                        .columns
+                        .iter()
+                        .zip(rules[0].parameter_prior.columns.iter())
+                        .all(|(left, right)| left == right)
+            }));
+        }
+
+        assert_eq!(duplicated_criterion_locations.len(), 3);
+        assert_eq!(
+            duplicated_criterion_locations,
+            [
+                ThreeBallLocation::Left,
+                ThreeBallLocation::Centre,
+                ThreeBallLocation::Right,
+            ]
+            .into_iter()
+            .collect()
+        );
+
+        for rule in &space.rules {
+            let constant_mapping = rule
+                .criterion_by_context_colour
+                .iter()
+                .all(|location| *location == rule.criterion_by_context_colour[0]);
+            if !constant_mapping {
+                assert!(
+                    rule.duplicate_of_one_based_index.is_none(),
+                    "non-constant mapping {} must have a distinct feedback tensor",
+                    rule.one_based_index
+                );
+            }
+        }
+        assert_eq!(
+            space.rules.len() - space.semantic_duplicate_count(),
+            THREE_BALL_PUBLIC_GENERATOR_UNIQUE_TENSOR_COUNT
+        );
+    }
+
+    #[test]
     fn semantic_quotient_preserves_the_model_average_prior() {
         let space = build_three_ball_rule_space();
         let compressed = space.semantic_unique_model_hypotheses();
