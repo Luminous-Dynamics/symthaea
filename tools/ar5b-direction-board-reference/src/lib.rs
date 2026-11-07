@@ -823,8 +823,8 @@ mod tests {
         let mut campaign = fixture_campaign();
         campaign.directions.clear();
         campaign.new_direction_option.enabled = false;
-        let mut first = direction("direction-z", "1");
-        let mut second = direction("direction-a", "2");
+        let mut first = direction("direction-z", '1');
+        let mut second = direction("direction-a", '2');
         first.max_share_bps = 10_000;
         second.max_share_bps = 10_000;
         first.estimated_cost_per_evaluation = 10.0;
