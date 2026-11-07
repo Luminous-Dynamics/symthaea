@@ -947,7 +947,7 @@ fn grouped_metric_coverage(
                     preprocessing_sha256,
                     phase_estimator_sha256,
                     measured,
-                required,
+                    required,
                     state: coverage_state(measured, required),
                 }
             },
@@ -1504,6 +1504,95 @@ mod tests {
     }
 
     #[test]
+    fn matching_pairs_with_different_phase_estimators_do_not_form_complete_coverage() {
+        let mut packet = base_packet();
+        let pairs = [
+            (LegId::LeftFore, LegId::LeftMiddle),
+            (LegId::LeftFore, LegId::LeftHind),
+        ];
+        for (index, pair) in pairs.into_iter().enumerate() {
+            let mut row = measurement(
+                &format!("pair-estimator-{index}"),
+                EndpointKind::PairwiseInterlegCoupling,
+                MetricId::GenericPhaseVectorStrength,
+                Unit::PhaseVectorStrength,
+                0.7,
+            );
+            row.pair = Some(LegPair::new(pair.0, pair.1).unwrap());
+            row.preprocessing_sha256 = Some(digest('1'));
+            row.phase_estimator_sha256 = Some(digest(if index == 0 { '2' } else { '3' }));
+            packet.measurements.push(row);
+        }
+        let report = audit_packet(&packet).unwrap();
+        assert_eq!(report.pairwise_coverage.len(), 2);
+        assert!(report.pairwise_coverage.iter().all(|row| row.measured == 1));
+        assert!(report
+            .pairwise_coverage
+            .iter()
+            .all(|row| row.state == CoverageState::Partial));
+    }
+
+    #[test]
+    fn phase_and_cycle_slip_outputs_from_different_estimators_do_not_complete_probe() {
+        let mut packet = base_packet();
+        let key = TransferProbeKey {
+            sender: Some(LegId::LeftFore),
+            probe_class: ProbeClass::LocalPhaseKick,
+            recipient: LegId::RightFore,
+            phase_bin: 1,
+            magnitude_bin: 0,
+            delay_index: 1,
+        };
+        let mut phase = measurement(
+            "phase-estimator-a",
+            EndpointKind::PhaseResetTransfer,
+            MetricId::PhaseResetFractionalMicroturnsV1,
+            Unit::Microturns,
+            10.0,
+        );
+        phase.transfer_probe = Some(key);
+        phase.preprocessing_sha256 = Some(digest('1'));
+        phase.phase_estimator_sha256 = Some(digest('2'));
+        let mut slips = measurement(
+            "cycle-estimator-b",
+            EndpointKind::PhaseResetTransfer,
+            MetricId::PhaseResetCycleSlipsV1,
+            Unit::CycleSlips,
+            0.0,
+        );
+        slips.transfer_probe = Some(key);
+        slips.preprocessing_sha256 = Some(digest('1'));
+        slips.phase_estimator_sha256 = Some(digest('3'));
+        packet.measurements.extend([phase, slips]);
+        let report = audit_packet(&packet).unwrap();
+        assert_eq!(report.phase_reset_measured_probe_cells, 0);
+        assert_eq!(report.phase_reset_state, CoverageState::NoneMeasured);
+    }
+
+    #[test]
+    fn not_estimable_zero_denominator_tcs_is_preserved_without_zero_imputation() {
+        let mut packet = base_packet();
+        let mut row = measurement(
+            "tcs-not-estimable",
+            EndpointKind::TripodCoordination,
+            MetricId::TcsSapkal2026V2,
+            Unit::Ratio,
+            0.0,
+        );
+        row.availability = Availability::NotEstimable;
+        row.value = None;
+        row.tripod_group = Some(TripodGroup::LeftForeRightMiddleLeftHind);
+        row.numerator_ticks = Some(0);
+        row.denominator_ticks = Some(0);
+        row.preprocessing_sha256 = Some(digest('1'));
+        row.phase_estimator_sha256 = None;
+        packet.measurements.push(row);
+        let report = audit_packet(&packet).unwrap();
+        assert!(report.tripod_coverage.is_empty());
+        assert_eq!(report.summary, SummaryState::NoRhythmOrInterlegData);
+    }
+
+    #[test]
     fn two_tripod_groups_are_required_for_complete_metric_coverage() {
         let mut packet = base_packet();
         for group in TripodGroup::ALL {
@@ -1542,7 +1631,7 @@ mod tests {
             row.tripod_group = Some(TripodGroup::LeftForeRightMiddleLeftHind);
             row.numerator_ticks = Some(1);
             row.denominator_ticks = Some(2);
-            row.preprocessing_sha256 = None;
+            row.preprocessing_sha256 = Some(digest('1'));
             row.phase_estimator_sha256 = None;
             packet.measurements.push(row);
         }
@@ -1582,7 +1671,7 @@ mod tests {
         row.tripod_group = Some(TripodGroup::LeftForeRightMiddleLeftHind);
         row.numerator_ticks = Some(5);
         row.denominator_ticks = Some(10);
-        row.preprocessing_sha256 = None;
+        row.preprocessing_sha256 = Some(digest('1'));
         row.phase_estimator_sha256 = None;
         packet.measurements.push(row);
         let report = audit_packet(&packet).unwrap();
