@@ -57,7 +57,6 @@ jobs:
           mkdir -p "$pkg/src" "$root/docs/research/emsr-v0.1"
           cp crates/domains/symthaea-emsr-evidence/src/lib.rs "$pkg/src/lib.rs"
           cp docs/research/emsr-v0.1/*.json "$root/docs/research/emsr-v0.1/"
-          cp Cargo.lock "$pkg/Cargo.lock"
           cat > "$pkg/Cargo.toml" <<'EOF'
           [package]
           name = "symthaea-emsr-evidence"
@@ -72,6 +71,11 @@ jobs:
           sha2 = { version = "0.10", features = ["oid"] }
           EOF
           echo "EMSR_ISOLATED_MANIFEST=$pkg/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Resolve isolated package lockfile
+        run: |
+          cargo generate-lockfile --manifest-path "$EMSR_ISOLATED_MANIFEST"
+          sha256sum "$(dirname "$EMSR_ISOLATED_MANIFEST")/Cargo.lock"
 
       - name: Run validator tests
         run: cargo test --manifest-path "$EMSR_ISOLATED_MANIFEST" --locked
