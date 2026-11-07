@@ -41,12 +41,7 @@ impl KokoroSingingEngine {
     }
 }
 
-impl SingingVoiceEngine for KokoroSingingEngine {
-    fn id(&self) -> &str {
-        "kokoro-v2"
-    }
-
-    pub fn capability_manifest() -> SingingBackendCapabilities {
+fn kokoro_capability_manifest() -> SingingBackendCapabilities {
         use CapabilitySupport::{Approximated, Conditional, Native, Unsupported};
         let control = |control, support, rationale: &str| ControlCapability {
             control,
@@ -54,7 +49,7 @@ impl SingingVoiceEngine for KokoroSingingEngine {
             rationale: rationale.to_string(),
         };
         SingingBackendCapabilities::new(
-            self.id(),
+            "kokoro-v2",
             vec![
                 control(SingingControl::LyricText, Native, "Kokoro synthesizes the supplied lyric phrase directly"),
                 control(SingingControl::Language, Conditional, "v2 accepts English only; pronunciation quality depends on the selected Kokoro voice/model"),
@@ -81,8 +76,15 @@ impl SingingVoiceEngine for KokoroSingingEngine {
     }
 
 
+impl SingingVoiceEngine for KokoroSingingEngine {
+    fn id(&self) -> &str {
+        "kokoro-v2"
+    }
+
+
+
     fn capabilities(&self) -> SingingBackendCapabilities {
-        Self::capability_manifest()
+        kokoro_capability_manifest()
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
@@ -738,7 +740,7 @@ mod capability_manifest_tests {
 
     #[test]
     fn static_backend_capability_manifest_is_complete_and_valid() {
-        let manifest = KokoroSingingEngine::capability_manifest();
+        let manifest = kokoro_capability_manifest();
         manifest.validate().unwrap();
         assert_eq!(manifest.controls.len(), SingingControl::ALL.len());
         assert!(manifest.controls.iter().any(|entry| entry.control == SingingControl::ConsonantAnticipation));
