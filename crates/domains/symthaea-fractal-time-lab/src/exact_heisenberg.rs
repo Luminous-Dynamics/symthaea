@@ -339,7 +339,11 @@ impl KickedHeisenbergFloquet {
         if duration == 0.0 {
             return;
         }
-        for &edge_index in &self.edge_colors[color_index] {
+        // Copy the small edge-index schedule before mutating amplitudes.
+        // This preserves the graph-color order while ending the immutable
+        // borrow of self.edge_colors before apply_xyz_edge borrows self mutably.
+        let edge_indices = self.edge_colors[color_index].clone();
+        for edge_index in edge_indices {
             self.apply_xyz_edge(self.edges[edge_index], duration);
         }
     }
