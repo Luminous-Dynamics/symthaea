@@ -3,7 +3,7 @@
   "candidate_id": "candidate-react-01",
   "mode": "interactive_react",
   "max_steps": 8,
-  "max_tool_calls": 2,
+  "max_tool_calls": 3,
   "wall_clock_budget_ms": 10000,
   "max_resource_cost_units": 10,
   "allowed_tools": [
