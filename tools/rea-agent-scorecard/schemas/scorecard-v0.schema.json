@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/rea-agent-scorecard/schemas/scorecard-v0.schema.json",
+  "title": "REA agent scorecard result v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "suite_id", "task_count", "overall", "by_fault_family", "pairs", "task_results"],
+  "properties": {
+    "schema": { "const": "luminous.rea.agent-scorecard.v0" },
+    "suite_id": { "type": "string" },
+    "task_count": { "type": "integer", "minimum": 0 },
+    "overall": { "$ref": "#/$defs/metrics" },
+    "by_fault_family": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/metrics" }
+    },
+    "pairs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relevant_mutation_pairs",
+        "relevant_mutation_sensitive",
+        "relevant_mutation_sensitivity",
+        "relevant_mutation_both_grounded",
+        "irrelevant_mutation_pairs",
+        "irrelevant_mutation_invariant",
+        "irrelevant_mutation_invariance",
+        "irrelevant_mutation_both_grounded",
+        "pair_details"
+      ],
+      "properties": {
+        "relevant_mutation_pairs": { "type": "integer", "minimum": 0 },
+        "relevant_mutation_sensitive": { "type": "integer", "minimum": 0 },
+        "relevant_mutation_sensitivity": { "$ref": "#/$defs/ratio" },
+        "relevant_mutation_both_grounded": { "type": "integer", "minimum": 0 },
+        "irrelevant_mutation_pairs": { "type": "integer", "minimum": 0 },
+        "irrelevant_mutation_invariant": { "type": "integer", "minimum": 0 },
+        "irrelevant_mutation_invariance": { "$ref": "#/$defs/ratio" },
+        "irrelevant_mutation_both_grounded": { "type": "integer", "minimum": 0 },
+        "pair_details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pair_id", "kind", "baseline_task_id", "mutated_task_id", "answer_relation_satisfied", "both_evidence_grounded"],
+            "properties": {
+              "pair_id": { "type": "string" },
+              "kind": { "enum": ["relevant_mutation", "irrelevant_mutation"] },
+              "baseline_task_id": { "type": "string" },
+              "mutated_task_id": { "type": "string" },
+              "answer_relation_satisfied": { "type": "boolean" },
+              "both_evidence_grounded": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "task_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "fault_family",
+          "submitted",
+          "answered",
+          "abstained",
+          "raw_correct",
+          "claimed_supported",
+          "replay_status",
+          "claim_scope_exact",
+          "occurrence_exact",
+          "evidence_grounded",
+          "false_supported",
+          "answer_commitment_sha256"
+        ],
+        "properties": {
+          "task_id": { "type": "string" },
+          "fault_family": { "type": "string" },
+          "submitted": { "type": "boolean" },
+          "answered": { "type": "boolean" },
+          "abstained": { "type": "boolean" },
+          "raw_correct": { "type": "boolean" },
+          "claimed_supported": { "type": "boolean" },
+          "replay_status": { "enum": ["not_attempted", "match", "mismatch", "invalid"] },
+          "claim_scope_exact": { "type": "boolean" },
+          "occurrence_exact": { "type": "boolean" },
+          "evidence_grounded": { "type": "boolean" },
+          "false_supported": { "type": "boolean" },
+          "answer_commitment_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ratio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["numerator", "denominator", "rate"],
+      "properties": {
+        "numerator": { "type": "integer", "minimum": 0 },
+        "denominator": { "type": "integer", "minimum": 0 },
+        "rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eligible",
+        "submitted",
+        "answered",
+        "abstained",
+        "raw_correct",
+        "correct_but_ungrounded",
+        "evidence_grounded_correct",
+        "claimed_supported",
+        "false_supported",
+        "replay_attempted",
+        "replay_matches",
+        "replay_mismatches",
+        "replay_invalid"
+      ],
+      "properties": {
+        "eligible": { "type": "integer", "minimum": 0 },
+        "submitted": { "type": "integer", "minimum": 0 },
+        "answered": { "type": "integer", "minimum": 0 },
+        "abstained": { "type": "integer", "minimum": 0 },
+        "raw_correct": { "type": "integer", "minimum": 0 },
+        "correct_but_ungrounded": { "type": "integer", "minimum": 0 },
+        "evidence_grounded_correct": { "type": "integer", "minimum": 0 },
+        "claimed_supported": { "type": "integer", "minimum": 0 },
+        "false_supported": { "type": "integer", "minimum": 0 },
+        "replay_attempted": { "type": "integer", "minimum": 0 },
+        "replay_matches": { "type": "integer", "minimum": 0 },
+        "replay_mismatches": { "type": "integer", "minimum": 0 },
+        "replay_invalid": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "counts",
+        "answer_coverage",
+        "abstention_rate",
+        "raw_full_suite_accuracy",
+        "conditional_answer_accuracy",
+        "evidence_grounded_full_suite_accuracy",
+        "parametric_leakage_rate",
+        "false_supported_rate",
+        "replay_coverage",
+        "replay_match_rate"
+      ],
+      "properties": {
+        "counts": { "$ref": "#/$defs/counts" },
+        "answer_coverage": { "$ref": "#/$defs/ratio" },
+        "abstention_rate": { "$ref": "#/$defs/ratio" },
+        "raw_full_suite_accuracy": { "$ref": "#/$defs/ratio" },
+        "conditional_answer_accuracy": { "$ref": "#/$defs/ratio" },
+        "evidence_grounded_full_suite_accuracy": { "$ref": "#/$defs/ratio" },
+        "parametric_leakage_rate": { "$ref": "#/$defs/ratio" },
+        "false_supported_rate": { "$ref": "#/$defs/ratio" },
+        "replay_coverage": { "$ref": "#/$defs/ratio" },
+        "replay_match_rate": { "$ref": "#/$defs/ratio" }
+      }
+    }
+  }
+}
