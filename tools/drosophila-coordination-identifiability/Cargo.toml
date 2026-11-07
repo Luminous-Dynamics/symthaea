@@ -1,0 +1,13 @@
+[package]
+name = "drosophila-coordination-identifiability"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Synthetic mechanism-equivalence auditor for six-leg coordination benchmarks"
+
+[lib]
+path = "src/lib.rs"
+
+# Standalone qualification crate: intentionally outside the root workspace.
+[workspace]
