@@ -216,6 +216,7 @@ Use this addendum for the six cases in [Causal-Identifiability Development Chall
 | Field | Reviewer response |
 |---|---|
 | Exact claim/query | |
+| Claim kind | source possibility / build selection / execution realization / actual-cause attribution / interventional-effect identifiability / incident attribution |
 | Evidence and authority class | |
 | Explicit assumptions / scope boundary | |
 | Candidate model | |
