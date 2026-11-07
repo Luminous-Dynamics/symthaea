@@ -8,3 +8,6 @@ description = "Exact phase-response transfer algebra for six-leg connectome expe
 
 [lib]
 path = "src/lib.rs"
+
+# Keep this tool's Cargo graph independent of the root workspace.
+[workspace]
