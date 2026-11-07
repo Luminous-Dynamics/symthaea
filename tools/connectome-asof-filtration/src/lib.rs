@@ -159,7 +159,9 @@ pub struct LedgerAudit {
 /// are intentionally ignored for ordering and lookahead decisions.
 pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
     if ledger.campaign_id.is_empty() || ledger.global_filtration_id.is_empty() {
-        return Err(AuditError("campaign and global filtration IDs are required".into()));
+        return Err(AuditError(
+            "campaign and global filtration IDs are required".into(),
+        ));
     }
     if !valid_sha256(&ledger.global_filtration_sha256) {
         return Err(AuditError("malformed global filtration digest".into()));
@@ -235,12 +237,13 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                 match (&event.supersedes_event_id, event.revision) {
                     (None, 0) => {}
                     (Some(previous_id), revision) if revision > 0 => {
-                        let (previous_sequence, previous) = evidence
-                            .get(previous_id)
-                            .ok_or_else(|| AuditError(format!(
-                                "{} supersedes an unknown or future event {previous_id}",
-                                event.event_id
-                            )))?;
+                        let (previous_sequence, previous) =
+                            evidence.get(previous_id).ok_or_else(|| {
+                                AuditError(format!(
+                                    "{} supersedes an unknown or future event {previous_id}",
+                                    event.event_id
+                                ))
+                            })?;
                         if *previous_sequence >= entry.sequence
                             || previous.evidence_family_id != event.evidence_family_id
                             || previous.revision.checked_add(1) != Some(revision)
@@ -318,7 +321,8 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                         }
                         DecisionKind::Confirmation => {
                             if event.split == EvidenceSplit::Confirmation {
-                                let Some(family_id) = decision.confirmatory_family_id.as_ref() else {
+                                let Some(family_id) = decision.confirmatory_family_id.as_ref()
+                                else {
                                     status = DecisionAuditStatus::LockboxLeakage;
                                     continue;
                                 };
@@ -426,10 +430,7 @@ pub struct AdmissionAudit {
 /// Structural gate only. Admission means that a matching external proof
 /// receipt is present and bound to these exact artifacts; it is not a claim
 /// that this crate proved the supermartingale/adjuster theorem.
-pub fn audit_admission(
-    ledger: &GlobalLedger,
-    admission: &FiltrationAdmission,
-) -> AdmissionAudit {
+pub fn audit_admission(ledger: &GlobalLedger, admission: &FiltrationAdmission) -> AdmissionAudit {
     let invalid = |reason_status| AdmissionAudit {
         process_id: admission.process_id.clone(),
         status: reason_status,
@@ -479,8 +480,14 @@ pub fn audit_admission(
         AdmissionMode::DirectGlobalSupermartingale => {
             if admission.source_filtration_id != ledger.global_filtration_id
                 || admission.source_filtration_sha256 != ledger.global_filtration_sha256
-                || admission.proof_receipt_sha256.as_deref().is_none_or(|d| !valid_sha256(d))
-                || admission.assumption_sha256.as_deref().is_none_or(|d| !valid_sha256(d))
+                || admission
+                    .proof_receipt_sha256
+                    .as_deref()
+                    .is_none_or(|d| !valid_sha256(d))
+                || admission
+                    .assumption_sha256
+                    .as_deref()
+                    .is_none_or(|d| !valid_sha256(d))
                 || admission.adjuster.is_some()
             {
                 return invalid(AdmissionStatus::InvalidReceipt);
@@ -518,21 +525,23 @@ pub fn audit_admission(
             }
         }
         AdmissionMode::LocalOnly => invalid(AdmissionStatus::NotCombinableLocalOnly),
-        AdmissionMode::IncomparableOrUnknown => {
-            invalid(AdmissionStatus::NotCombinableIncomparable)
-        }
+        AdmissionMode::IncomparableOrUnknown => invalid(AdmissionStatus::NotCombinableIncomparable),
     }
 }
 
 /// Replayable as-of snapshots for prefix-invariance metamorphic tests.
-pub fn decision_prefixes(ledger: &GlobalLedger) -> Result<Vec<(String, Vec<String>, String)>, AuditError> {
+pub fn decision_prefixes(
+    ledger: &GlobalLedger,
+) -> Result<Vec<(String, Vec<String>, String)>, AuditError> {
     let audit = audit_ledger(ledger)?;
     if audit
         .decisions
         .iter()
         .any(|decision| decision.status != DecisionAuditStatus::Accepted)
     {
-        return Err(AuditError("cannot produce prefixes from an invalid decision ledger".into()));
+        return Err(AuditError(
+            "cannot produce prefixes from an invalid decision ledger".into(),
+        ));
     }
     Ok(audit
         .decisions
@@ -567,7 +576,13 @@ mod tests {
         std::iter::repeat_n(ch, 64).collect()
     }
 
-    fn event(id: &str, family: &str, event_time: i64, state: AvailabilityState, split: EvidenceSplit) -> LedgerPayload {
+    fn event(
+        id: &str,
+        family: &str,
+        event_time: i64,
+        state: AvailabilityState,
+        split: EvidenceSplit,
+    ) -> LedgerPayload {
         LedgerPayload::Evidence(EvidenceEvent {
             event_id: id.into(),
             evidence_family_id: family.into(),
@@ -622,11 +637,50 @@ mod tests {
             global_filtration_id: "connectome-global-v1".into(),
             global_filtration_sha256: d('8'),
             entries: vec![
-                entry(1, event("S1", "structural", 100, AvailabilityState::Approved, EvidenceSplit::Fit)),
-                entry(2, decision("D1", &["S1"], &["S1"], DecisionKind::Discovery, None)),
-                entry(3, event("T7", "behaviour-trial-7", 90, AvailabilityState::Approved, EvidenceSplit::Exploration)),
-                entry(4, decision("D2", &["S1", "T7"], &["S1", "T7"], DecisionKind::Discovery, None)),
-                entry(5, event("T8-failed", "behaviour-trial-8", 105, AvailabilityState::Failed, EvidenceSplit::Exploration)),
+                entry(
+                    1,
+                    event(
+                        "S1",
+                        "structural",
+                        100,
+                        AvailabilityState::Approved,
+                        EvidenceSplit::Fit,
+                    ),
+                ),
+                entry(
+                    2,
+                    decision("D1", &["S1"], &["S1"], DecisionKind::Discovery, None),
+                ),
+                entry(
+                    3,
+                    event(
+                        "T7",
+                        "behaviour-trial-7",
+                        90,
+                        AvailabilityState::Approved,
+                        EvidenceSplit::Exploration,
+                    ),
+                ),
+                entry(
+                    4,
+                    decision(
+                        "D2",
+                        &["S1", "T7"],
+                        &["S1", "T7"],
+                        DecisionKind::Discovery,
+                        None,
+                    ),
+                ),
+                entry(
+                    5,
+                    event(
+                        "T8-failed",
+                        "behaviour-trial-8",
+                        105,
+                        AvailabilityState::Failed,
+                        EvidenceSplit::Exploration,
+                    ),
+                ),
             ],
         }
     }
@@ -683,7 +737,13 @@ mod tests {
         let mut ledger = fixture();
         ledger.entries[1] = entry(
             2,
-            decision("D1", &["S1", "T7"], &["S1", "T7"], DecisionKind::Discovery, None),
+            decision(
+                "D1",
+                &["S1", "T7"],
+                &["S1", "T7"],
+                DecisionKind::Discovery,
+                None,
+            ),
         );
         // T7 has not yet been delivered at sequence 2.
         let audit = audit_ledger(&ledger).unwrap();
@@ -693,9 +753,21 @@ mod tests {
     #[test]
     fn rejects_provisional_and_disputed_inputs() {
         let mut ledger = fixture();
-        ledger.entries[0] = entry(1, event("S1", "structural", 100, AvailabilityState::Provisional, EvidenceSplit::Fit));
+        ledger.entries[0] = entry(
+            1,
+            event(
+                "S1",
+                "structural",
+                100,
+                AvailabilityState::Provisional,
+                EvidenceSplit::Fit,
+            ),
+        );
         let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::InvalidReceipt);
+        assert_eq!(
+            audit.decisions[0].status,
+            DecisionAuditStatus::InvalidReceipt
+        );
     }
 
     #[test]
@@ -708,7 +780,16 @@ mod tests {
     #[test]
     fn rejects_duplicate_event_ids_and_in_place_rewrites() {
         let mut ledger = fixture();
-        ledger.entries.push(entry(6, event("S1", "structural", 101, AvailabilityState::Approved, EvidenceSplit::Fit)));
+        ledger.entries.push(entry(
+            6,
+            event(
+                "S1",
+                "structural",
+                101,
+                AvailabilityState::Approved,
+                EvidenceSplit::Fit,
+            ),
+        ));
         assert!(audit_ledger(&ledger).is_err());
     }
 
@@ -729,15 +810,26 @@ mod tests {
             availability_state: AvailabilityState::Approved,
             split: EvidenceSplit::Exploration,
         };
-        ledger.entries.push(entry(6, LedgerPayload::Evidence(revised)));
+        ledger
+            .entries
+            .push(entry(6, LedgerPayload::Evidence(revised)));
         assert!(audit_ledger(&ledger).is_ok());
     }
 
     #[test]
     fn rejects_discovery_consuming_confirmation_lockbox_data() {
         let mut ledger = fixture();
-        ledger.entries[2] = entry(3, event("T7", "behaviour-trial-7", 90, AvailabilityState::Approved, EvidenceSplit::Confirmation));
-        ledger.entries[3] = entry(4, decision("D2", &["S1", "T7"], &["S1", "T7"], DecisionKind::Discovery, None));
+        ledger.entries[2] = entry(3, confirmation_event());
+        ledger.entries[3] = entry(
+            4,
+            decision(
+                "D2",
+                &["S1", "T7"],
+                &["S1", "T7"],
+                DecisionKind::Discovery,
+                None,
+            ),
+        );
         let audit = audit_ledger(&ledger).unwrap();
         assert_eq!(audit.decisions[1].status, DecisionAuditStatus::LockboxLeakage);
     }
@@ -745,14 +837,32 @@ mod tests {
     #[test]
     fn confirmation_requires_a_prior_freeze_and_postfreeze_lockbox_data() {
         let mut ledger = fixture();
-        ledger.entries.insert(1, entry(2, LedgerPayload::FamilyFreeze(FamilyFreeze {
-            family_id: "family-1".into(),
-            family_commitment_sha256: d('7'),
-            confirmation_lockbox_closed: true,
-        })));
-        ledger.entries[2] = entry(3, decision("D1", &["S1"], &["S1"], DecisionKind::Discovery, None));
-        ledger.entries[3] = entry(4, event("T7", "behaviour-trial-7", 90, AvailabilityState::Approved, EvidenceSplit::Confirmation));
-        ledger.entries[4] = entry(5, decision("D2", &["S1", "T7"], &["S1", "T7"], DecisionKind::Confirmation, Some("family-1")));
+        ledger.entries.insert(
+            1,
+            entry(
+                2,
+                LedgerPayload::FamilyFreeze(FamilyFreeze {
+                    family_id: "family-1".into(),
+                    family_commitment_sha256: d('7'),
+                    confirmation_lockbox_closed: true,
+                }),
+            ),
+        );
+        ledger.entries[2] = entry(
+            3,
+            decision("D1", &["S1"], &["S1"], DecisionKind::Discovery, None),
+        );
+        ledger.entries[3] = entry(4, confirmation_event());
+        ledger.entries[4] = entry(
+            5,
+            decision(
+                "D2",
+                &["S1", "T7"],
+                &["S1", "T7"],
+                DecisionKind::Confirmation,
+                Some("family-1"),
+            ),
+        );
         for (idx, e) in ledger.entries.iter_mut().enumerate() {
             e.sequence = idx as u64 + 1;
         }
@@ -763,13 +873,28 @@ mod tests {
     #[test]
     fn rejects_confirmation_event_that_predates_family_freeze() {
         let mut ledger = fixture();
-        ledger.entries.insert(1, entry(2, LedgerPayload::FamilyFreeze(FamilyFreeze {
-            family_id: "family-1".into(),
-            family_commitment_sha256: d('7'),
-            confirmation_lockbox_closed: true,
-        })));
-        ledger.entries[2] = entry(3, event("T7", "behaviour-trial-7", 90, AvailabilityState::Approved, EvidenceSplit::Confirmation));
-        ledger.entries[3] = entry(4, decision("D2", &["S1", "T7"], &["S1", "T7"], DecisionKind::Confirmation, Some("family-1")));
+        ledger.entries.insert(
+            1,
+            entry(
+                2,
+                LedgerPayload::FamilyFreeze(FamilyFreeze {
+                    family_id: "family-1".into(),
+                    family_commitment_sha256: d('7'),
+                    confirmation_lockbox_closed: true,
+                }),
+            ),
+        );
+        ledger.entries[2] = entry(3, confirmation_event());
+        ledger.entries[3] = entry(
+            4,
+            decision(
+                "D2",
+                &["S1", "T7"],
+                &["S1", "T7"],
+                DecisionKind::Confirmation,
+                Some("family-1"),
+            ),
+        );
         for (idx, e) in ledger.entries.iter_mut().enumerate() {
             e.sequence = idx as u64 + 1;
         }
@@ -780,7 +905,10 @@ mod tests {
     #[test]
     fn direct_global_admission_requires_exact_global_filtration_and_review_receipt() {
         let ledger = fixture();
-        let report = audit_admission(&ledger, &admission(AdmissionMode::DirectGlobalSupermartingale));
+        let report = audit_admission(
+            &ledger,
+            &admission(AdmissionMode::DirectGlobalSupermartingale),
+        );
         assert_eq!(report.status, AdmissionStatus::AdmittedDirectGlobal);
     }
 
@@ -842,7 +970,13 @@ mod tests {
         let mut extended = fixture();
         extended.entries.push(entry(
             6,
-            event("future-track", "later-trial", -999, AvailabilityState::Approved, EvidenceSplit::Exploration),
+            event(
+                "future-track",
+                "later-trial",
+                -999,
+                AvailabilityState::Approved,
+                EvidenceSplit::Exploration,
+            ),
         ));
         let after = decision_prefixes(&extended).unwrap();
         assert_eq!(before, after);
@@ -851,7 +985,16 @@ mod tests {
     #[test]
     fn typed_failed_and_out_of_support_events_are_not_zero_filled() {
         let mut ledger = fixture();
-        ledger.entries[4] = entry(5, event("T8-failed", "behaviour-trial-8", 105, AvailabilityState::OutOfSupport, EvidenceSplit::Exploration));
+        ledger.entries[4] = entry(
+            5,
+            event(
+                "T8-failed",
+                "behaviour-trial-8",
+                105,
+                AvailabilityState::OutOfSupport,
+                EvidenceSplit::Exploration,
+            ),
+        );
         let report = audit_ledger(&ledger).unwrap();
         assert_eq!(report.evidence_ids.last().unwrap(), "T8-failed");
     }
