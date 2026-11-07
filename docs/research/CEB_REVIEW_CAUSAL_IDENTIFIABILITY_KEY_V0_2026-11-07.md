@@ -8,7 +8,7 @@
 
 Do not demand one exact graph. Accept a different model decomposition if it preserves the evidence-compatible alternatives, their different predictions, the appropriate claim disposition and a genuinely discriminating minimum evidence request.
 
-A plausible single model is not identified merely because it is simpler, more common or preferred by the reviewer. Conversely, do not reward unbounded “anything is possible” skepticism: material alternatives must be consistent with the supplied source/evidence and differ on the actual query.
+A plausible single model is not identified merely because it is simpler, more common or preferred by the reviewer. Conversely, do not reward unbounded “anything is possible” skepticism: material alternatives must be consistent with the supplied source/evidence and differ on the actual query. One valid evidence-compatible pair with different query predictions is sufficient to refute point-identifiability. Failing to discover a competing model is not proof of identifiability: a positive identified disposition requires a defensible model-set completeness argument and explicit open-world remainder.
 
 ## 2. CID-S01 — omitted authorization helper
 
