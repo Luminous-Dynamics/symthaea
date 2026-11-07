@@ -19,7 +19,7 @@ A renderer should receive a frozen, validated pronunciation plan and syllable-to
 
 The library checks schema version 2, language presence, exact source-text spans, full non-whitespace coverage, duplicate candidate IDs, source provenance, finite raw scores, stress ranges, syllabic nuclei, normalized IPA tokens, explicit selection receipts, candidate/context digest integrity, and OOV/unsupported state constraints.
 
-Synthetic tests cover contextual heteronyms, user/human selection receipts, stale-receipt rejection after candidate-phone mutation, stale-receipt rejection after language-context mutation, OOV without guessed phones, missing source coverage, UTF-8 span errors, unknown candidate selection, stress/length markers mixed into phone tokens, consonant-only syllables, non-finite scores, and missing provenance.
+Synthetic tests cover contextual heteronyms, user/human selection receipts, stale-receipt rejection after candidate-phone mutation, stale-receipt rejection after language-context, authority, or evidence-reference mutation, OOV without guessed phones, missing source coverage, UTF-8 span errors, unknown candidate selection, stress/length markers mixed into phone tokens, consonant-only syllables, non-finite scores, and missing provenance.
 
 ## Score alignment contract
 
