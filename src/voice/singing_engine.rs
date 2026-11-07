@@ -447,11 +447,14 @@ impl VocalPerformance {
                     melisma,
                     &format!("melisma note {melisma_index} in vocal syllable {syllable_index}"),
                 )?;
-                if (melisma.start_time - previous_note_end).abs() > 0.000_01 {
+                if melisma.start_time < previous_note_end - 0.000_01 {
                     bail!(
-                        "melisma notes must be contiguous; represent rests outside the melisma in vocal syllable {syllable_index}"
+                        "melisma note {melisma_index} overlaps the preceding note in vocal syllable {syllable_index}"
                     );
                 }
+                // A positive gap is an intentional rest. DiffSinger emits it
+                // as an SP event; Kokoro preserves it in the absolute note
+                // timeline. Do not compress it or reinterpret it as vowel.
                 previous_note_end = melisma_end;
             }
             previous_syllable_end = previous_note_end;
@@ -1045,11 +1048,18 @@ mod tests {
     }
 
     #[test]
-    fn melisma_gaps_are_rejected_until_rest_events_are_explicit() {
+    fn explicit_melisma_gaps_are_preserved_as_rests() {
         let mut performance = performance_with_melisma();
         performance.syllables[0].melisma_notes[0].start_time += 0.03;
-        let error = performance.validate().unwrap_err().to_string();
-        assert!(error.contains("must be contiguous"), "{error}");
+        performance.validate().unwrap();
+        assert!(
+            (performance.syllables[0].melisma_notes[0].start_time
+                - performance.syllables[0].note.start_time
+                - performance.syllables[0].note.duration
+                - 0.03)
+                .abs()
+                < 1e-5
+        );
     }
 
     #[test]
