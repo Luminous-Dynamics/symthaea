@@ -115,7 +115,12 @@ class DiffSingerModel:
         durations_ms = []
         target_hz = []
 
-        english_language_id = self.language_id("en")
+        language = performance.get("language")
+        if language != "en":
+            raise ValueError(
+                f"DiffSinger worker currently supports language='en' only; got {language!r}"
+            )
+        language_id = self.language_id(language)
         for syllable_index, syllable in enumerate(performance["syllables"]):
             phonemes = syllable["phonemes"]
             mapped_groups, last_vowel = map_syllable_phones(phonemes, syllable_index)
@@ -150,7 +155,7 @@ class DiffSingerModel:
             if token is None:
                 raise ValueError(f"voicebank phonemes.json has no entry for '{namespaced}'")
             tokens.append(token)
-            languages.append(english_language_id)
+            languages.append(language_id)
         tokens.append(silence_token)
         languages.append(0)
 
