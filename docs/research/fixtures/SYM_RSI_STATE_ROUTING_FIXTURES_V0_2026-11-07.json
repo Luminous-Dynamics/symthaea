@@ -23,7 +23,8 @@
         "route_input_digest",
         "selected_cluster_id",
         "sharing_rationale"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N02",
@@ -38,7 +39,8 @@
         "source_record_digest",
         "transfer_receipt_ref",
         "scope_compatibility_result"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N03",
@@ -53,7 +55,8 @@
         "validity_state",
         "revalidation_ref",
         "claim_scope"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N04",
@@ -67,7 +70,8 @@
         "visible_metadata_allowlist",
         "sealed_access_audit",
         "future_identifier_canary"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N05",
@@ -82,7 +86,8 @@
         "required_actions",
         "available_actions",
         "adapter_or_refusal"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N06",
@@ -97,7 +102,8 @@
         "cross_family_relevance_audit",
         "negative_transfer_outcomes",
         "api_and_context_cost"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N07",
@@ -112,7 +118,8 @@
         "duplicate_experiment_count",
         "reuse_opportunities",
         "storage_and_retrieval_cost"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N08",
@@ -127,7 +134,8 @@
         "valid_time_and_as_known_time",
         "contradiction_relation",
         "resolution_or_unresolved_state"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N09",
@@ -141,7 +149,8 @@
         "reward_visibility_policy",
         "evaluator_only_fields",
         "route_decision_trace"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-N10",
@@ -155,7 +164,8 @@
         "evidence_anchor",
         "mechanism_transfer_receipt",
         "independent_verifier_ref"
-      ]
+      ],
+      "fixture_class": "adversarial_negative_control"
     },
     {
       "fixture_id": "SR-P01",
@@ -170,7 +180,8 @@
         "scope_digest",
         "route_decision_digest"
       ],
-      "note": "Synthetic positive control; eligibility still depends on the real evidence and independent scope manifest."
+      "note": "Synthetic positive control; eligibility still depends on the real evidence and independent scope manifest.",
+      "fixture_class": "positive_control"
     },
     {
       "fixture_id": "SR-P02",
@@ -185,7 +196,8 @@
         "transfer_probe_ref",
         "transfer_receipt_digest"
       ],
-      "note": "Synthetic positive control; no automatic generalization from lexical or task similarity."
+      "note": "Synthetic positive control; no automatic generalization from lexical or task similarity.",
+      "fixture_class": "positive_control"
     },
     {
       "fixture_id": "SR-P03",
@@ -200,7 +212,8 @@
         "revalidation_requirement",
         "route_explanation"
       ],
-      "note": "Correct handling of stale evidence preserves history without granting current authority."
+      "note": "Correct handling of stale evidence preserves history without granting current authority.",
+      "fixture_class": "positive_control"
     },
     {
       "fixture_id": "SR-P04",
@@ -216,7 +229,8 @@
         "contradiction_edge",
         "authorized_visibility"
       ],
-      "note": "Preserving a scoped contradiction is preferable to manufacturing consensus."
+      "note": "Preserving a scoped contradiction is preferable to manufacturing consensus.",
+      "fixture_class": "positive_control"
     },
     {
       "fixture_id": "SR-A01",
@@ -231,7 +245,8 @@
         "abstention_reason",
         "human_resolution_ref"
       ],
-      "note": "Abstention is the correct result when scope is not identifiable."
+      "note": "Abstention is the correct result when scope is not identifiable.",
+      "fixture_class": "abstention_control"
     },
     {
       "fixture_id": "SR-A02",
@@ -246,7 +261,8 @@
         "evidence_status",
         "abstention_reason"
       ],
-      "note": "Do not share state until provenance and applicability can be checked."
+      "note": "Do not share state until provenance and applicability can be checked.",
+      "fixture_class": "abstention_control"
     }
   ],
   "scoring_policy": {
