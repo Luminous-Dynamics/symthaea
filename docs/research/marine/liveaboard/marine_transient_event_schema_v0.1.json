@@ -1,0 +1,349 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-transient-event:v0.1",
+  "title": "Marine transient event evidence v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_class",
+    "mission_binding",
+    "equipment",
+    "event_timing",
+    "waveform",
+    "initial_state",
+    "acceptance",
+    "evidence"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_class": {
+      "enum": [
+        "motor_start",
+        "constant_power_step",
+        "inductive_load_step",
+        "thruster_pulse",
+        "propulsion_inverter_step",
+        "source_trip",
+        "shore_power_loss",
+        "coincident_load_start",
+        "converter_trip_reconnect",
+        "regenerative_event",
+        "fault_test"
+      ]
+    },
+    "mission_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "equipment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_id",
+        "equipment_ref",
+        "revision",
+        "power_system_kind"
+      ],
+      "properties": {
+        "owner_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "equipment_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "power_system_kind": {
+          "enum": [
+            "ac",
+            "dc",
+            "hybrid_ac_dc",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "event_timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duration_ms",
+        "rise_time_ms",
+        "fall_time_ms",
+        "repeat_interval_ms",
+        "coincidence_group"
+      ],
+      "properties": {
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rise_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fall_time_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repeat_interval_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "coincidence_group": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "waveform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "baseline_power_kw",
+        "segments",
+        "requested_sample_rate_hz"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "piecewise_constant_synthetic",
+            "measured_trace_reference"
+          ]
+        },
+        "baseline_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start_ms",
+              "end_ms",
+              "delta_power_kw"
+            ],
+            "properties": {
+              "start_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "end_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "delta_power_kw": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "requested_sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "raw_trace_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "initial_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "battery_soc_fraction",
+        "battery_soh_fraction",
+        "battery_temperature_c",
+        "generator_state",
+        "shore_power_state"
+      ],
+      "properties": {
+        "battery_soc_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "battery_soh_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "battery_temperature_c": {
+          "type": "number"
+        },
+        "generator_state": {
+          "enum": [
+            "online",
+            "starting",
+            "offline",
+            "faulted",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "shore_power_state": {
+          "enum": [
+            "connected",
+            "disconnected",
+            "not_applicable",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "limit_owner_ref",
+        "voltage_limits_pu",
+        "max_excursion_duration_ms",
+        "local_fallback_ref"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "unqualified",
+            "owner_supplied_pending_review",
+            "reviewed_applicable"
+          ]
+        },
+        "limit_owner_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "voltage_limits_pu": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "max_excursion_duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "local_fallback_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_class",
+        "source_ref",
+        "measurement_status",
+        "time_sync_uncertainty_us",
+        "missing_sample_count",
+        "calibration_ref"
+      ],
+      "properties": {
+        "evidence_class": {
+          "enum": [
+            "synthetic",
+            "assumed",
+            "model_estimate",
+            "external_source",
+            "measured",
+            "hil",
+            "phil"
+          ]
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_status": {
+          "enum": [
+            "not_measured",
+            "measured",
+            "replayed",
+            "simulated"
+          ]
+        },
+        "time_sync_uncertainty_us": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "missing_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "calibration_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  }
+}
