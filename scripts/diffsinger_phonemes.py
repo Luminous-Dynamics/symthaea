@@ -69,6 +69,16 @@ def map_syllable_phones(
                 f"phoneme {phone_index} in syllable {syllable_index} "
                 "requires boolean is_vowel"
             )
+        natural_duration_s = phoneme.get("natural_duration_s")
+        if (
+            type(natural_duration_s) not in (int, float)
+            or not math.isfinite(natural_duration_s)
+            or natural_duration_s <= 0.0
+        ):
+            raise ValueError(
+                f"phoneme {phone_index} in syllable {syllable_index} "
+                "requires finite positive natural_duration_s"
+            )
         mapped = ipa_to_arpabet(ipa)
         mapped_groups.append(mapped)
         if is_vowel:
