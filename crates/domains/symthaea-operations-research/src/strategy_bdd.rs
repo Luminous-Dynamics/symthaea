@@ -347,10 +347,7 @@ pub struct VerifiedCompiledQbfStrategy {
 /// compilation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifiedStrategyCompilationError {
-    ResultOwnerMismatch {
-        value: bool,
-        owner: StrategyOwner,
-    },
+    ResultOwnerMismatch { value: bool, owner: StrategyOwner },
     SourceStrategyInvalid(QuantifiedStrategyError),
     RepresentationInvalid(StrategyBddError),
 }
@@ -2080,13 +2077,12 @@ mod tests {
     #[test]
     fn end_to_end_compiler_rechecks_source_strategy_and_compiles_verified_bdd() {
         let (problem, prefix) = equality_qbf_problem();
-        let candidate =
-            super::super::quantified_strategy::evaluate_qbf_with_strategy(
-                &problem,
-                &prefix,
-                QuantifiedEvaluationBudget::default(),
-            )
-            .unwrap();
+        let candidate = super::super::quantified_strategy::evaluate_qbf_with_strategy(
+            &problem,
+            &prefix,
+            QuantifiedEvaluationBudget::default(),
+        )
+        .unwrap();
         let mut untrusted = candidate.clone();
         // A producer-supplied report is not authoritative and is recomputed.
         untrusted.verification.opponent_assignments_checked = 0;
@@ -2102,7 +2098,9 @@ mod tests {
 
         assert!(verified.value);
         assert_eq!(
-            verified.source_strategy_verification.opponent_assignments_checked,
+            verified
+                .source_strategy_verification
+                .opponent_assignments_checked,
             2
         );
         assert_eq!(verified.representation.owner, StrategyOwner::Existential);
@@ -2117,13 +2115,12 @@ mod tests {
     #[test]
     fn end_to_end_compiler_rejects_tampered_source_strategy_before_bdd_compile() {
         let (problem, prefix) = equality_qbf_problem();
-        let mut candidate =
-            super::super::quantified_strategy::evaluate_qbf_with_strategy(
-                &problem,
-                &prefix,
-                QuantifiedEvaluationBudget::default(),
-            )
-            .unwrap();
+        let mut candidate = super::super::quantified_strategy::evaluate_qbf_with_strategy(
+            &problem,
+            &prefix,
+            QuantifiedEvaluationBudget::default(),
+        )
+        .unwrap();
         let function = candidate
             .strategy
             .functions
@@ -2299,8 +2296,7 @@ mod tests {
                 multi_start_sift_strategy_function_robdd(&support.function, budget()).unwrap();
 
             assert_eq!(
-                multi_start.optimized_node_count,
-                exact.minimum_node_count,
+                multi_start.optimized_node_count, exact.minimum_node_count,
                 "function truth-table mask {function_mask}"
             );
             assert!(multi_start.order_evaluations <= budget().max_variable_order_evaluations);
@@ -2308,12 +2304,8 @@ mod tests {
                 multi_start.refined_max_frontier <= multi_start.min_fill_max_frontier,
                 "function truth-table mask {function_mask}"
             );
-            verify_robdd_matches_strategy_function(
-                &multi_start.bdd,
-                &support.function,
-                budget(),
-            )
-            .unwrap();
+            verify_robdd_matches_strategy_function(&multi_start.bdd, &support.function, budget())
+                .unwrap();
         }
     }
 
