@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json",
+  "title": "Connectome phase-response transfer input V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_scope",
+    "leg_axis",
+    "oracle_expectations",
+    "phase_unit",
+    "rows",
+    "run_id",
+    "schema_version",
+    "source_binding"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "in_silico_prediction",
+        "biological_observation"
+      ]
+    },
+    "phase_unit": {
+      "const": "microturns_per_cycle_1000000"
+    },
+    "leg_axis": {
+      "const": [
+        "left_fore",
+        "left_middle",
+        "left_hind",
+        "right_fore",
+        "right_middle",
+        "right_hind"
+      ]
+    },
+    "source_binding": {
+      "$ref": "#/$defs/source_binding"
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "source_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_revision_sha256",
+        "phase_estimator_sha256",
+        "axis_identity_receipt_sha256",
+        "raw_trajectory_sha256",
+        "perturbation_receipt_sha256",
+        "context_definition_sha256",
+        "animal_unit_token",
+        "session_id",
+        "trial_unit_token"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "phase_estimator_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "axis_identity_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "raw_trajectory_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "perturbation_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "context_definition_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "trial_unit_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "animal_unit_token": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "probe_key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context",
+        "delay_index",
+        "descending_neuron_id",
+        "magnitude_bin",
+        "phase_bin",
+        "probe_class",
+        "source_leg_id"
+      ],
+      "properties": {
+        "context": {
+          "enum": [
+            "BALL_CONTACT",
+            "SLIPPERY_SURFACE",
+            "AIR_STEPPING",
+            "AIR_FECO_SILENCED"
+          ]
+        },
+        "probe_class": {
+          "enum": [
+            "LOCAL_PHASE_KICK",
+            "LOAD_OR_CONTACT",
+            "PROPRIOCEPTIVE_CHANNEL",
+            "DESCENDING_COMMAND",
+            "MECHANICAL_BODY_OR_SUBSTRATE"
+          ]
+        },
+        "source_leg_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "left_fore",
+            "left_middle",
+            "left_hind",
+            "right_fore",
+            "right_middle",
+            "right_hind",
+            null
+          ]
+        },
+        "descending_neuron_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "DNg100",
+            "DNg97",
+            "DNb08",
+            null
+          ]
+        },
+        "phase_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "delay_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "magnitude_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "probe_class": {
+                "const": "DESCENDING_COMMAND"
+              }
+            },
+            "required": [
+              "probe_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_leg_id": {
+                "const": null
+              },
+              "descending_neuron_id": {
+                "enum": [
+                  "DNg100",
+                  "DNg97",
+                  "DNb08"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "probe_class": {
+                "const": "LOCAL_PHASE_KICK"
+              }
+            },
+            "required": [
+              "probe_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_leg_id": {
+                "enum": [
+                  "left_fore",
+                  "left_middle",
+                  "left_hind",
+                  "right_fore",
+                  "right_middle",
+                  "right_hind"
+                ]
+              },
+              "descending_neuron_id": {
+                "const": null
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "probe_class": {
+                "not": {
+                  "const": "DESCENDING_COMMAND"
+                }
+              }
+            },
+            "required": [
+              "probe_class"
+            ]
+          },
+          "then": {
+            "properties": {
+              "descending_neuron_id": {
+                "const": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "phase_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycle_index",
+        "fractional_phase_microturns"
+      ],
+      "properties": {
+        "cycle_index": {
+          "type": "integer"
+        },
+        "fractional_phase_microturns": {
+          "type": "integer",
+          "minimum": -500000,
+          "maximum": 499999
+        }
+      }
+    },
+    "phase_sample_vector": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/phase_sample"
+      }
+    },
+    "measured_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "control_phase_samples",
+        "perturbed_phase_samples"
+      ],
+      "properties": {
+        "status": {
+          "const": "MEASURED"
+        },
+        "control_phase_samples": {
+          "$ref": "#/$defs/phase_sample_vector"
+        },
+        "perturbed_phase_samples": {
+          "$ref": "#/$defs/phase_sample_vector"
+        }
+      }
+    },
+    "unavailable_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NO_RESPONSE",
+            "FAILED_ASSAY",
+            "MISSING_TRACK",
+            "OUT_OF_SUPPORT",
+            "NOT_ASSESSED"
+          ]
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "probe_key",
+        "outcome"
+      ],
+      "properties": {
+        "probe_key": {
+          "$ref": "#/$defs/probe_key"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/measured_outcome"
+            },
+            {
+              "$ref": "#/$defs/unavailable_outcome"
+            }
+          ]
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measured_row_index",
+        "phase_reset_fractional_microturns",
+        "cycle_slips_by_leg",
+        "local_reset_microturns",
+        "off_diagonal_l1_microturns",
+        "off_diagonal_cycle_slips_l1"
+      ],
+      "properties": {
+        "measured_row_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phase_reset_fractional_microturns": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "integer",
+            "minimum": -500000,
+            "maximum": 499999
+          }
+        },
+        "cycle_slips_by_leg": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "integer"
+          }
+        },
+        "local_reset_microturns": {
+          "type": "integer",
+          "minimum": -500000,
+          "maximum": 499999
+        },
+        "off_diagonal_l1_microturns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "off_diagonal_cycle_slips_l1": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

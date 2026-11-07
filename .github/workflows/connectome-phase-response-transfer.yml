@@ -1,0 +1,65 @@
+name: Connectome phase-response transfer contract
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "tools/connectome-phase-response/**"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.md"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_TRANSFER.example.json"
+      - ".github/workflows/connectome-phase-response-transfer.yml"
+  push:
+    branches: [main, "research/**"]
+    paths:
+      - "tools/connectome-phase-response/**"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.md"
+      - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_TRANSFER.example.json"
+      - ".github/workflows/connectome-phase-response-transfer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-phase-response-transfer:
+    name: Validate exact six-leg phase-response algebra
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Validate JSON Schema and synthetic fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          schema = json.loads(Path("docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json").read_text())
+          fixture = json.loads(Path("docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_TRANSFER.example.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert fixture["claim_scope"] == "synthetic_known_truth"
+          assert fixture["oracle_expectations"]["phase_reset_fractional_microturns"] == [100000, 0, 25000, 0, 0, 0]
+          assert fixture["rows"][2]["outcome"]["status"] == "NO_RESPONSE"
+          assert fixture["rows"][1]["outcome"]["perturbed_phase_samples"][1]["cycle_index"] == 1
+          assert fixture["oracle_expectations"]["cycle_slips_by_leg"] == [0, 0, 0, 0, 0, 0]
+          assert fixture["oracle_expectations"]["off_diagonal_cycle_slips_l1"] == 0
+          assert fixture["rows"][3]["probe_key"]["descending_neuron_id"] == "DNg100"
+          assert fixture["rows"][4]["probe_key"]["descending_neuron_id"] == "DNg97"
+          assert fixture["rows"][3]["probe_key"] != fixture["rows"][4]["probe_key"]
+          assert fixture["rows"][3]["probe_key"]["magnitude_bin"] == 0
+          assert fixture["rows"][5]["probe_key"]["magnitude_bin"] == 1
+          assert fixture["rows"][3]["probe_key"]["magnitude_bin"] != fixture["rows"][5]["probe_key"]["magnitude_bin"]
+          print("phase-response schema/fixture: PASS")
+          PY
+      - name: Format standalone crate
+        run: cargo fmt --manifest-path tools/connectome-phase-response/Cargo.toml -- --check
+      - name: Test standalone crate without root workspace
+        run: cargo test --manifest-path tools/connectome-phase-response/Cargo.toml --locked

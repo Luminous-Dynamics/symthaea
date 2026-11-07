@@ -1,0 +1,238 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-six-leg-phase-response-transfer-v1",
+  "claim_scope": "synthetic_known_truth",
+  "phase_unit": "microturns_per_cycle_1000000",
+  "leg_axis": [
+    "left_fore",
+    "left_middle",
+    "left_hind",
+    "right_fore",
+    "right_middle",
+    "right_hind"
+  ],
+  "source_binding": {
+    "dataset_id": "synthetic-phase-reset-known-answer",
+    "dataset_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "phase_estimator_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "animal_unit_token": "synthetic-animal-0001",
+    "session_id": "synthetic-session-0001",
+    "axis_identity_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "raw_trajectory_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "perturbation_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "context_definition_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "trial_unit_token": "synthetic-trial-0001"
+  },
+  "rows": [
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "source_leg_id": "left_fore",
+        "phase_bin": 2,
+        "delay_index": 1,
+        "descending_neuron_id": null,
+        "magnitude_bin": 0
+      },
+      "outcome": {
+        "status": "MEASURED",
+        "control_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
+        ],
+        "perturbed_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 100000
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 25000
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
+        ]
+      }
+    },
+    {
+      "probe_key": {
+        "context": "AIR_STEPPING",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "source_leg_id": "left_middle",
+        "phase_bin": 4,
+        "delay_index": 2,
+        "descending_neuron_id": null,
+        "magnitude_bin": 0
+      },
+      "outcome": {
+        "status": "MEASURED",
+        "control_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
+        ],
+        "perturbed_phase_samples": [
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 1,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          },
+          {
+            "cycle_index": 0,
+            "fractional_phase_microturns": 0
+          }
+        ]
+      }
+    },
+    {
+      "probe_key": {
+        "context": "AIR_STEPPING",
+        "probe_class": "LOCAL_PHASE_KICK",
+        "source_leg_id": "left_fore",
+        "phase_bin": 2,
+        "delay_index": 1,
+        "descending_neuron_id": null,
+        "magnitude_bin": 0
+      },
+      "outcome": {
+        "status": "NO_RESPONSE"
+      }
+    },
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "DESCENDING_COMMAND",
+        "source_leg_id": null,
+        "descending_neuron_id": "DNg100",
+        "phase_bin": 2,
+        "delay_index": 1,
+        "magnitude_bin": 0
+      },
+      "outcome": {
+        "status": "NOT_ASSESSED"
+      }
+    },
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "DESCENDING_COMMAND",
+        "source_leg_id": null,
+        "descending_neuron_id": "DNg97",
+        "phase_bin": 2,
+        "delay_index": 1,
+        "magnitude_bin": 0
+      },
+      "outcome": {
+        "status": "NOT_ASSESSED"
+      }
+    },
+    {
+      "probe_key": {
+        "context": "BALL_CONTACT",
+        "probe_class": "DESCENDING_COMMAND",
+        "source_leg_id": null,
+        "descending_neuron_id": "DNg100",
+        "phase_bin": 2,
+        "magnitude_bin": 1,
+        "delay_index": 1
+      },
+      "outcome": {
+        "status": "NOT_ASSESSED"
+      }
+    }
+  ],
+  "oracle_expectations": {
+    "measured_row_index": 0,
+    "phase_reset_fractional_microturns": [
+      100000,
+      0,
+      25000,
+      0,
+      0,
+      0
+    ],
+    "cycle_slips_by_leg": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "local_reset_microturns": 100000,
+    "off_diagonal_l1_microturns": 25000,
+    "off_diagonal_cycle_slips_l1": 0
+  }
+}
