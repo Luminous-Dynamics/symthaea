@@ -809,3 +809,10 @@ pub use trajectory_metrics::{
     MAX_OSPA2_ASSIGNMENT_SIDE, MAX_OSPA2_WINDOW_LENGTH, Ospa2Breakdown, Ospa2Config, Ospa2Error,
     TrackSeries, ospa2_track_distance, ospa2_track_sets,
 };
+
+/// Data-only Jacobian rank and singular-spectrum diagnostics.
+pub mod observability;
+
+pub use observability::{
+    MAX_OBSERVABILITY_PARAMETERS, ObservabilityError, ObservabilityReport, analyze_jacobian,
+};
