@@ -168,7 +168,9 @@ fn validate_candidate_syllable_info(
     }
     if let Some(stress) = stress {
         if stress.iter().any(|value| *value > 2) {
-            return Err(invalid(format!("{label}: stress values must be 0, 1, or 2")));
+            return Err(invalid(format!(
+                "{label}: stress values must be 0, 1, or 2"
+            )));
         }
     }
     Ok(())
@@ -282,7 +284,11 @@ fn align(reference: &[String], candidate: &[String]) -> (EditCounts, usize) {
     }
     for i in 1..=n {
         for j in 1..=m {
-            let substitution = if reference[i - 1] != candidate[j - 1] { 1 } else { 0 };
+            let substitution = if reference[i - 1] != candidate[j - 1] {
+                1
+            } else {
+                0
+            };
             cost[i][j] = (cost[i - 1][j - 1] + substitution)
                 .min(cost[i - 1][j] + 1)
                 .min(cost[i][j - 1] + 1);
@@ -298,7 +304,11 @@ fn align(reference: &[String], candidate: &[String]) -> (EditCounts, usize) {
     while i > 0 || j > 0 {
         // Deterministic tie-break: diagonal, deletion, insertion.
         if i > 0 && j > 0 {
-            let substitution = if reference[i - 1] != candidate[j - 1] { 1 } else { 0 };
+            let substitution = if reference[i - 1] != candidate[j - 1] {
+                1
+            } else {
+                0
+            };
             if cost[i][j] == cost[i - 1][j - 1] + substitution {
                 edits.substitutions += substitution;
                 i -= 1;
@@ -326,10 +336,7 @@ struct VariantScore<'a> {
     stress_compared: Option<usize>,
 }
 
-fn score_variant<'a>(
-    variant: &'a ReferenceVariant,
-    candidate: &CandidateCase,
-) -> VariantScore<'a> {
+fn score_variant<'a>(variant: &'a ReferenceVariant, candidate: &CandidateCase) -> VariantScore<'a> {
     let (edits, distance) = align(&variant.phones, &candidate.phones);
     let boundaries = candidate
         .syllable_boundaries
@@ -364,28 +371,31 @@ fn choose_variant<'a>(
     variants: &'a [ReferenceVariant],
     candidate: &CandidateCase,
 ) -> Option<VariantScore<'a>> {
-    variants.iter().map(|variant| score_variant(variant, candidate)).min_by(|a, b| {
-        a.distance
-            .cmp(&b.distance)
-            .then_with(|| {
-                let ae = a
-                    .boundaries
-                    .as_ref()
-                    .map(|counts| counts.false_positive + counts.false_negative)
-                    .unwrap_or(0);
-                let be = b
-                    .boundaries
-                    .as_ref()
-                    .map(|counts| counts.false_positive + counts.false_negative)
-                    .unwrap_or(0);
-                ae.cmp(&be)
-            })
-            .then_with(|| {
-                let ae = a.stress_compared.unwrap_or(0) - a.stress_correct.unwrap_or(0);
-                let be = b.stress_compared.unwrap_or(0) - b.stress_correct.unwrap_or(0);
-                ae.cmp(&be)
-            })
-    })
+    variants
+        .iter()
+        .map(|variant| score_variant(variant, candidate))
+        .min_by(|a, b| {
+            a.distance
+                .cmp(&b.distance)
+                .then_with(|| {
+                    let ae = a
+                        .boundaries
+                        .as_ref()
+                        .map(|counts| counts.false_positive + counts.false_negative)
+                        .unwrap_or(0);
+                    let be = b
+                        .boundaries
+                        .as_ref()
+                        .map(|counts| counts.false_positive + counts.false_negative)
+                        .unwrap_or(0);
+                    ae.cmp(&be)
+                })
+                .then_with(|| {
+                    let ae = a.stress_compared.unwrap_or(0) - a.stress_correct.unwrap_or(0);
+                    let be = b.stress_compared.unwrap_or(0) - b.stress_correct.unwrap_or(0);
+                    ae.cmp(&be)
+                })
+        })
 }
 
 fn validate_inputs(
@@ -426,7 +436,10 @@ fn validate_inputs(
                 &variant.phones,
                 &variant.syllable_boundaries,
                 &variant.syllable_stress,
-                &format!("reference {} variant {}", reference.case_id, variant.variant_id),
+                &format!(
+                    "reference {} variant {}",
+                    reference.case_id, variant.variant_id
+                ),
             )?;
         }
     }
@@ -441,7 +454,10 @@ fn validate_inputs(
             return Err("candidate case_id, candidate_id, and source_id are required".into());
         }
         if !prediction_ids.insert(prediction.case_id.as_str()) {
-            return Err(format!("duplicate prediction case_id {}", prediction.case_id));
+            return Err(format!(
+                "duplicate prediction case_id {}",
+                prediction.case_id
+            ));
         }
         if !reference_ids.contains(prediction.case_id.as_str()) {
             return Err(format!(
@@ -451,7 +467,10 @@ fn validate_inputs(
         }
         if let Some((candidate_id, source_id)) = identity {
             if candidate_id != prediction.candidate_id || source_id != prediction.source_id {
-                return Err("one predictions file must contain exactly one candidate/source identity".into());
+                return Err(
+                    "one predictions file must contain exactly one candidate/source identity"
+                        .into(),
+                );
             }
         } else {
             identity = Some((&prediction.candidate_id, &prediction.source_id));
@@ -473,7 +492,11 @@ fn validate_inputs(
                     prediction.case_id
                 ));
             }
-            if prediction.phones.iter().any(|phone| phone.trim().is_empty()) {
+            if prediction
+                .phones
+                .iter()
+                .any(|phone| phone.trim().is_empty())
+            {
                 return Err(format!(
                     "prediction {} contains an empty phone token",
                     prediction.case_id
@@ -551,36 +574,43 @@ fn evaluate(
     for reference in references {
         let candidate = prediction_by_id[reference.case_id.as_str()];
         let selected = choose_variant(&reference.accepted_variants, candidate);
-        let (reference_phones, reference_syllables, edits, distance, boundaries, stress_correct, stress_compared, variant_id) =
-            if let Some(score) = selected {
-                (
-                    score.variant.phones.len(),
-                    score.variant.syllable_boundaries.len(),
-                    score.edits,
-                    score.distance,
-                    score.boundaries,
-                    score.stress_correct,
-                    score.stress_compared,
-                    Some(score.variant.variant_id.clone()),
-                )
-            } else {
-                (
-                    0,
-                    0,
-                    EditCounts {
-                        substitutions: 0,
-                        deletions: 0,
-                        insertions: candidate.phones.len(),
-                    },
-                    candidate.phones.len(),
-                    None,
-                    None,
-                    None,
-                    None,
-                )
-            };
-        let exact = (!reference.expected_oov)
-            .then_some(distance == 0 && !candidate.detected_oov);
+        let (
+            reference_phones,
+            reference_syllables,
+            edits,
+            distance,
+            boundaries,
+            stress_correct,
+            stress_compared,
+            variant_id,
+        ) = if let Some(score) = selected {
+            (
+                score.variant.phones.len(),
+                score.variant.syllable_boundaries.len(),
+                score.edits,
+                score.distance,
+                score.boundaries,
+                score.stress_correct,
+                score.stress_compared,
+                Some(score.variant.variant_id.clone()),
+            )
+        } else {
+            (
+                0,
+                0,
+                EditCounts {
+                    substitutions: 0,
+                    deletions: 0,
+                    insertions: candidate.phones.len(),
+                },
+                candidate.phones.len(),
+                None,
+                None,
+                None,
+                None,
+            )
+        };
+        let exact = (!reference.expected_oov).then_some(distance == 0 && !candidate.detected_oov);
         let candidate_phone_count = candidate.phones.len();
         let per = (reference_phones > 0).then(|| distance as f64 / reference_phones as f64);
         total_reference_phones += reference_phones;
@@ -601,10 +631,26 @@ fn evaluate(
             stress_correct_total += correct;
             stress_compared_total += compared;
         }
-        oov_tp += if reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
-        oov_fp += if !reference.expected_oov && candidate.detected_oov { 1 } else { 0 };
-        oov_fn += if reference.expected_oov && !candidate.detected_oov { 1 } else { 0 };
-        oov_correct += if reference.expected_oov == candidate.detected_oov { 1 } else { 0 };
+        oov_tp += if reference.expected_oov && candidate.detected_oov {
+            1
+        } else {
+            0
+        };
+        oov_fp += if !reference.expected_oov && candidate.detected_oov {
+            1
+        } else {
+            0
+        };
+        oov_fn += if reference.expected_oov && !candidate.detected_oov {
+            1
+        } else {
+            0
+        };
+        oov_correct += if reference.expected_oov == candidate.detected_oov {
+            1
+        } else {
+            0
+        };
         if let (Some(confidence), Some(exact)) = (candidate.confidence_exact, exact) {
             let observed = if exact { 1.0 } else { 0.0 };
             confidence_squared_error += (confidence - observed).powi(2);
@@ -623,7 +669,9 @@ fn evaluate(
             boundaries,
             stress_correct,
             stress_compared,
-            stress_accuracy: stress_correct.zip(stress_compared).and_then(|(correct, total)| ratio(correct, total)),
+            stress_accuracy: stress_correct
+                .zip(stress_compared)
+                .and_then(|(correct, total)| ratio(correct, total)),
             expected_oov: reference.expected_oov,
             detected_oov: candidate.detected_oov,
             oov_detection_correct: reference.expected_oov == candidate.detected_oov,
@@ -635,7 +683,10 @@ fn evaluate(
     let oov_recall = ratio(oov_tp, oov_tp + oov_fn);
     let (candidate_id, source_id) = {
         let prediction = &predictions[0];
-        (prediction.candidate_id.clone(), prediction.source_id.clone())
+        (
+            prediction.candidate_id.clone(),
+            prediction.source_id.clone(),
+        )
     };
     Ok(EvaluationReport {
         schema: "g2p-reference-evaluation/v1",
@@ -715,12 +766,7 @@ fn main() {
 mod tests {
     use super::*;
 
-    fn variant(
-        id: &str,
-        phones: &[&str],
-        boundaries: &[usize],
-        stress: &[u8],
-    ) -> ReferenceVariant {
+    fn variant(id: &str, phones: &[&str], boundaries: &[usize], stress: &[u8]) -> ReferenceVariant {
         ReferenceVariant {
             variant_id: id.into(),
             phones: phones.iter().map(|phone| (*phone).into()).collect(),
@@ -766,7 +812,11 @@ mod tests {
     #[test]
     fn exact_candidate_passes_phone_boundary_stress_and_oov_metrics() {
         let refs = vec![
-            reference("hello", false, vec![variant("v1", &["h", "ɛ", "l", "oʊ"], &[2, 4], &[0, 1])]),
+            reference(
+                "hello",
+                false,
+                vec![variant("v1", &["h", "ɛ", "l", "oʊ"], &[2, 4], &[0, 1])],
+            ),
             reference("xqzpl", true, vec![]),
         ];
         let preds = vec![
@@ -791,15 +841,12 @@ mod tests {
                 variant("past", &["ɹ", "ɛ", "d"], &[3], &[1]),
             ],
         )];
-        let preds = vec![candidate(
-            "read-past",
-            &["ɹ", "ɛ", "d"],
-            &[3],
-            &[1],
-            false,
-        )];
+        let preds = vec![candidate("read-past", &["ɹ", "ɛ", "d"], &[3], &[1], false)];
         let report = evaluate(&refs, &preds).unwrap();
-        assert_eq!(report.cases[0].selected_reference_variant.as_deref(), Some("past"));
+        assert_eq!(
+            report.cases[0].selected_reference_variant.as_deref(),
+            Some("past")
+        );
         assert_eq!(report.metrics.phone_error_rate, Some(0.0));
     }
 
