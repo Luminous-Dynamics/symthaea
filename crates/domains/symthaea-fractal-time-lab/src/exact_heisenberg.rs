@@ -236,6 +236,38 @@ impl KickedHeisenbergFloquet {
         Ok(())
     }
 
+    /// Set an arbitrary finite complex state, normalizing it to unit norm.
+    ///
+    /// Basis index bits use the same little-endian spin ordering as
+    /// `set_initial_basis`. A failed update leaves the current state unchanged.
+    pub fn set_initial_state(
+        &mut self,
+        amplitudes: &[Complex<f64>],
+    ) -> Result<(), FloquetError> {
+        if amplitudes.len() != self.dimension() {
+            return Err(FloquetError::InitialStateDimension {
+                expected: self.dimension(),
+                actual: amplitudes.len(),
+            });
+        }
+        for (index, amplitude) in amplitudes.iter().enumerate() {
+            if !amplitude.re.is_finite() || !amplitude.im.is_finite() {
+                return Err(FloquetError::NonFiniteAmplitude { index });
+            }
+        }
+        let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        if !norm_squared.is_finite() || norm_squared <= f64::MIN_POSITIVE {
+            return Err(FloquetError::InvalidInitialStateNorm);
+        }
+        let inverse_norm = norm_squared.sqrt().recip();
+        let normalized: Vec<Complex<f64>> = amplitudes
+            .iter()
+            .map(|amplitude| *amplitude * inverse_norm)
+            .collect();
+        self.amplitudes = normalized;
+        Ok(())
+    }
+
     /// Apply one Floquet period using the declared symmetric Trotter schedule.
     pub fn step(&mut self) {
         self.apply_global_x_rotation();
@@ -575,6 +607,78 @@ mod tests {
                 assert!((*left - *right).norm() < 1e-11);
             }
         }
+    }
+
+    #[test]
+    fn arbitrary_complex_initial_state_is_normalized_and_evolves_unitarily() {
+        let mut model = KickedHeisenbergFloquet::new_square_lattice(
+            2,
+            2,
+            [0.27, 0.13, 0.41],
+            [0.19, 0.31, 0.35],
+            vec![0.01, -0.02, 0.03, -0.04],
+            PI + 0.09,
+            4,
+        )
+        .unwrap();
+        let amplitudes = [
+            Complex::new(1.0, 0.0),
+            Complex::new(0.5, -0.5),
+            Complex::new(-0.25, 0.75),
+            Complex::new(0.0, 1.0),
+            Complex::new(0.2, -0.3),
+            Complex::new(-0.6, 0.1),
+            Complex::new(0.4, 0.2),
+            Complex::new(0.1, 0.9),
+            Complex::new(-0.2, 0.2),
+            Complex::new(0.3, -0.1),
+            Complex::new(0.8, 0.4),
+            Complex::new(-0.1, -0.5),
+            Complex::new(0.2, 0.1),
+            Complex::new(-0.4, 0.2),
+            Complex::new(0.6, -0.3),
+            Complex::new(0.1, 0.1),
+        ];
+        model.set_initial_state(&amplitudes).unwrap();
+        assert!((model.norm_squared() - 1.0).abs() < 1.0e-12);
+        for _ in 0..12 {
+            model.step();
+            assert!((model.norm_squared() - 1.0).abs() < 1.0e-10);
+        }
+    }
+
+    #[test]
+    fn invalid_arbitrary_initial_state_is_rejected_without_mutation() {
+        let mut model = KickedHeisenbergFloquet::new_graph(
+            2,
+            vec![HeisenbergEdge {
+                first: 0,
+                second: 1,
+                j_x: 0.2,
+                j_y: 0.3,
+                j_z: 0.4,
+            }],
+            vec![0.0; 2],
+            PI,
+            2,
+        )
+        .unwrap();
+        let original = model.amplitudes().to_vec();
+        assert!(matches!(
+            model.set_initial_state(&[Complex::new(1.0, 0.0)]),
+            Err(FloquetError::InitialStateDimension { .. })
+        ));
+        assert_eq!(
+            model.set_initial_state(&[Complex::new(0.0, 0.0); 4]),
+            Err(FloquetError::InvalidInitialStateNorm)
+        );
+        let mut non_finite = [Complex::new(0.0, 0.0); 4];
+        non_finite[2] = Complex::new(0.0, f64::INFINITY);
+        assert_eq!(
+            model.set_initial_state(&non_finite),
+            Err(FloquetError::NonFiniteAmplitude { index: 2 })
+        );
+        assert_eq!(model.amplitudes(), original.as_slice());
     }
 
     #[test]
