@@ -46,6 +46,21 @@ jobs:
           Draft202012Validator(schema).validate(fixture)
           assert fixture["requested_guarantee"] == "FWER"
           assert sum((Fraction(claim["weight"]) for claim in fixture["claims"]), Fraction(0)) == 1
+          expected = {
+              "C1-local-reset": (Fraction(20), 2),
+              "C2-off-diagonal-transfer": (Fraction(40), 2),
+              "C3-contact-recovery": (Fraction(40), None),
+          }
+          alpha = Fraction(fixture["alpha"])
+          for claim in fixture["claims"]:
+              threshold = 1 / (alpha * Fraction(claim["weight"]))
+              running_max = Fraction(0)
+              first_crossing = None
+              for stage, encoded in enumerate(claim["e_process_values"]):
+                  running_max = max(running_max, Fraction(encoded))
+                  if first_crossing is None and running_max >= threshold and stage > 0:
+                      first_crossing = stage
+              assert (threshold, first_crossing) == expected[claim["claim_id"]]
           print("phase-response familywise schema/fixture: PASS")
           PY
       - name: Run standalone exact-rational Rust audit
