@@ -22,11 +22,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("N,related_pairs,bin_checksum,persistent_us,bitset_us,exact_match");
 
     for event_count in sizes {
-        let causet = CausalSet2D::sprinkle_fixed_cardinality(
-            0x51A7 + event_count as u64,
-            event_count,
-            1.0,
-        )?;
+        let causet =
+            CausalSet2D::sprinkle_fixed_cardinality(0x51A7 + event_count as u64, event_count, 1.0)?;
 
         let start = Instant::now();
         let persistent = causet.interval_size_histogram();
@@ -58,6 +55,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "complexity_note=persistent O(N^2 log N) time O(N log N) memory; bitset O(R*ceil(N/64)) interval-intersection work O(N^2) bits"
     );
-    println!("timing_note=single-process microbenchmark; repeat and report machine/compiler before performance claims");
+    println!(
+        "timing_note=single-process microbenchmark; repeat and report machine/compiler before performance claims"
+    );
     Ok(())
 }
