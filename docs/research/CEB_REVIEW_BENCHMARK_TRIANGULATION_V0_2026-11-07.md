@@ -99,6 +99,14 @@ Its strongest design lesson is that the **validator, not the model, decides done
 
 **CEB relevance:** compose the deterministic-oracle principle with CEB's stronger provenance, evidence authority, hidden-test fidelity and independent regrade gates. A single fail-to-pass test is strong evidence for one declared behavior, not whole-repository correctness, causal uniqueness, broad language coverage or independent pristine regrade. Keep the Python-only 70-task denominator attached to the result.
 
+### 2.9 Saving SWE-Bench — realistic user framing as an evaluation treatment
+
+Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Approach for Realistic Agent Evaluation*, was submitted October 10, 2025, revised January 23, 2026 (v4), and accepted to CAIN 2026. It converts formal GitHub issue descriptions into realistic user-style queries using observed developer interaction patterns with chat-based coding assistants. The authors report that formal public benchmarks overestimated performance for some evaluated models by **more than 50%**, and report approximately **10–16%** differences on their internal benchmark. These effects are specific to the models and benchmark subsets they tested; they are not a universal correction factor. [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/) · [arXiv:2510.08996](https://arxiv.org/abs/2510.08996).
+
+**CEB implication:** prompt/task framing is an experimental variable. A system may repair a formal issue but fail to clarify an ordinary developer request; a failing test adds information, not merely a different phrasing. Use paired shared-source/defect anchors across formal issue, realistic user request, diff-only review, repository-only discovery and failing-test-guided repair. Separate wording-only contrasts from information-package contrasts. Keep the outcomes in existing CEB-REVIEW, CEB-RESOLUTION, CEB-REPO and CEB-HUMAN lanes; do not average them into a composite engineering-intelligence score.
+
+The [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) defines the six framing conditions, source/defect anchors, leakage controls and paired analysis. It is a design proposal, not a task set or performance result.
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -114,6 +122,7 @@ The current CEB-REVIEW lane retains exactly three primary metrics. This triangul
 | CR-Bench-v2 Usefulness Rate | Related to comment utility, not identical to actionable precision until rubric/denominator are harmonized | Comment-quality diagnostic | Infer defect recall from usefulness |
 | CodeReviewBench human-flagged bug recall | Related but not top-five constrained; gold contains only prior human-detected bugs | Small replay/cost reference and a warning about human-gold completeness | Treat 44.2% as CEB Recall@5 or exhaustive bug recall |
 | Martian production review adoption | Related but distinct: production developer follow-up and LLM-derived adoption analysis | Human-workflow uptake signal; compare only after matching scope and human adjudication | Treat an accepted code change as proof that a finding was correct, or pool non-paired per-agent PR samples |
+| Saving SWE-Bench prompt mutation | Methodological reference for realistic user-query framing versus formal GitHub issues | Paired shared-anchor framing experiment; report information content and task scope | Apply a universal percentage discount to CEB results or treat framing effect as a new metric |
 | Human minutes / adjudication time | Exact only if accounting boundaries match | CEB `reviewer_burden` comparison | Exclude second reviewer, judge audit or context reconstruction time from assisted arm |
 
 ## 4. A diagnosis ladder for CEB review
@@ -242,6 +251,7 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Pereira et al., [CR-Bench-v2: Evaluating the Real-World Utility of AI Code Review Agents](https://arxiv.org/abs/2611.02566), submitted November 2, revised November 3, 2026.
 - Lieret et al., [SWE-sweep: Can Agents Autonomously Find and Fix Bugs?](https://swesweep.com/paper), October 1, 2026; [live leaderboard](https://swesweep.com/) viewed November 7, 2026.
 - Townsend, [LoopControlBench](https://github.com/kltownsend/loopcontrolbench), live repository/readme viewed November 7, 2026.
+- Garg, Steenhoek & Huang, [Saving SWE-Bench: A Benchmark Mutation Approach for Realistic Agent Evaluation](https://arxiv.org/abs/2510.08996), submitted October 10, 2025, revised January 23, 2026; accepted to CAIN 2026.
 - Yang et al., [CRBugBench](https://arxiv.org/abs/2610.13668), October 9, 2026; [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/).
 - Arsentev, [PREreview of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026.
 - Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [method/limitations post](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), data generated 2026-09-11; accessed November 7, 2026.
