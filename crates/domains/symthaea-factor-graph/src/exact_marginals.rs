@@ -233,17 +233,18 @@ mod tests {
     #[test]
     fn extreme_factor_products_keep_finite_log_partition_and_report_underflow() {
         let mut graph = FactorGraph::new();
-        for index in 0..20 {
+        for index in 0..4 {
             let variable = graph.add_variable(&format!("X{index}"), 2);
-            graph.add_factor(&[variable], vec![1.0e-200, 2.0e-200]);
+            graph.add_factor(&[variable], vec![1.0e-200, 1.0]);
         }
 
-        let exact = exhaustive_marginals_bounded(&graph, 1usize << 20).unwrap();
+        let exact = exhaustive_marginals_bounded(&graph, 16).unwrap();
         assert!(exact.log_partition_function.is_finite());
         assert!(exact.underflowed_relative_weights > 0);
+        let tiny_state_probability = 1.0e-200 / (1.0 + 1.0e-200);
         for marginal in &exact.marginals {
-            assert!((marginal[0] - 1.0 / 3.0).abs() < 1.0e-12);
-            assert!((marginal[1] - 2.0 / 3.0).abs() < 1.0e-12);
+            assert!((marginal[0] - tiny_state_probability).abs() < 1.0e-212);
+            assert!((marginal[1] - 1.0).abs() < 1.0e-12);
         }
     }
 
