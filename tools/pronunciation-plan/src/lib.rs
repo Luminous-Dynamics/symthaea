@@ -202,6 +202,21 @@ impl PronunciationPlan {
     }
 }
 
+fn valid_source_digest(value: &str) -> bool {
+    let Some((algorithm, encoded)) = value.split_once(':') else {
+        return false;
+    };
+    let expected_length = match algorithm {
+        "blake3" | "sha256" => 64,
+        "git-sha1" => 40,
+        _ => return false,
+    };
+    encoded.len() == expected_length
+        && encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
 fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), String> {
     let mut ids = std::collections::BTreeSet::new();
     for candidate in &word.candidates {
@@ -213,10 +228,10 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
         }
         if candidate.provenance.provider_id.trim().is_empty()
             || candidate.provenance.provider_version.trim().is_empty()
-            || candidate.provenance.source_digest.trim().is_empty()
+            || !valid_source_digest(&candidate.provenance.source_digest)
         {
             return Err(format!(
-                "candidate {} has incomplete provenance",
+                "candidate {} has incomplete or malformed provenance digest",
                 candidate.candidate_id
             ));
         }
@@ -373,6 +388,12 @@ impl VocalScoreAlignment {
         }
         if self.events.is_empty() || self.syllable_bindings.is_empty() || self.phrases.is_empty() {
             return Err("score events, syllable bindings, and phrases are required".into());
+        }
+        if self.events[0].start_s.abs() > 0.000_01 {
+            return Err(
+                "score must begin at time zero; represent an opening gap as an explicit Rest event"
+                    .into(),
+            );
         }
 
         let mut previous_event_end = 0.0f32;
@@ -578,7 +599,7 @@ mod tests {
             source,
             provider_id: provider.into(),
             provider_version: "1.0.0".into(),
-            source_digest: "blake3:fixture".into(),
+            source_digest: format!("blake3:{}", "0".repeat(64)),
         }
     }
 
