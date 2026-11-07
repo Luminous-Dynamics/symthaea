@@ -140,7 +140,7 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
                 },
             ],
         }
-        events = flatten_performance_phones(performance, minimum_silence_ms=5.0)
+        events = flatten_performance_phones(performance)
         self.assertEqual([event[0] for event in events], [
             "m", "ah", "ah", "SP", "ah", "t", "SP", "k", "eh"
         ])
@@ -174,7 +174,7 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
                 },
             ],
         }
-        events = flatten_performance_phones(performance, minimum_silence_ms=5.0)
+        events = flatten_performance_phones(performance)
         self.assertEqual([event[0] for event in events], ["m", "ah", "t", "k", "eh"])
         # The next /k/ starts at 450 ms, borrowing 50 ms from the first vowel.
         self.assertAlmostEqual(events[1][1], 250.0)
@@ -202,7 +202,7 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
             ],
         }
         with self.assertRaisesRegex(ValueError, "no preceding vowel"):
-            flatten_performance_phones(performance, minimum_silence_ms=5.0)
+            flatten_performance_phones(performance)
 
     def test_flattened_score_rejects_overlap_and_consonant_only_melisma(self) -> None:
         overlapping = {
@@ -221,7 +221,7 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
             ],
         }
         with self.assertRaisesRegex(ValueError, "overlaps"):
-            flatten_performance_phones(overlapping, minimum_silence_ms=5.0)
+            flatten_performance_phones(overlapping)
 
         consonant_only = {
             "language": "en",
@@ -237,7 +237,7 @@ class DiffSingerPhonemeContractTests(unittest.TestCase):
             }],
         }
         with self.assertRaisesRegex(ValueError, "no mapped vowel"):
-            flatten_performance_phones(consonant_only, minimum_silence_ms=5.0)
+            flatten_performance_phones(consonant_only)
 
     def test_duration_and_language_contracts_reject_invalid_values(self) -> None:
         for duration, count in ((0.0, 1), (float("nan"), 1), (40.0, 0)):
