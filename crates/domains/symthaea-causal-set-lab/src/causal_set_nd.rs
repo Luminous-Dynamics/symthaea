@@ -248,6 +248,33 @@ impl CausalSetNd {
         })
     }
 
+    /// Dimensionless four-dimensional Benincasa-Dowker-Glaser action bracket.
+    ///
+    /// For a 4D causal set, the finite-set action is
+    ///
+    /// S / hbar = 4 sqrt(6) (ell / ell_p)^2
+    ///     * [n - N_0 + 9 N_1 - 16 N_2 + 8 N_3],
+    ///
+    /// where N_k counts related endpoint pairs with exactly k events in the
+    /// exclusive order interval. This method returns only the integer bracket;
+    /// it does not choose physical length scales or claim a continuum limit.
+    /// The continuum Einstein-Hilbert interpretation relies on manifold-like
+    /// Poisson-sprinkling assumptions and must be tested separately.
+    pub fn bdg_action_4d_dimensionless_bracket(&self) -> Result<i128, CausalSetNdError> {
+        if self.spacetime_dimension != 4 {
+            return Err(CausalSetNdError::UnsupportedDimension {
+                dimension: self.spacetime_dimension,
+            });
+        }
+        let abundance = self.interval_size_histogram();
+        let n = self.events.len() as i128;
+        let n0 = i128::from(abundance.first().copied().unwrap_or(0));
+        let n1 = i128::from(abundance.get(1).copied().unwrap_or(0));
+        let n2 = i128::from(abundance.get(2).copied().unwrap_or(0));
+        let n3 = i128::from(abundance.get(3).copied().unwrap_or(0));
+        Ok(n - n0 + 9 * n1 - 16 * n2 + 8 * n3)
+    }
+
     /// Myrheim ordering fraction r = R / choose(N,2).
     pub fn ordering_fraction(&self) -> Option<f64> {
         let n = self.events.len() as f64;
@@ -566,6 +593,44 @@ mod tests {
                     "D={dimension}, seed={seed}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn four_dimensional_bdg_action_bracket_matches_hand_counted_posets() {
+        let chain_events = (0..5)
+            .map(|id| EventNd {
+                id,
+                coordinates: vec![id as f64, 0.0, 0.0, 0.0],
+            })
+            .collect();
+        let chain = CausalSetNd::new(4, chain_events).unwrap();
+        assert_eq!(chain.interval_size_histogram(), vec![4, 3, 2, 1]);
+        assert_eq!(chain.bdg_action_4d_dimensionless_bracket().unwrap(), 4);
+
+        let antichain_events = (0..5)
+            .map(|id| EventNd {
+                id,
+                coordinates: vec![0.0, id as f64, 0.0, 0.0],
+            })
+            .collect();
+        let antichain = CausalSetNd::new(4, antichain_events).unwrap();
+        assert_eq!(antichain.interval_size_histogram(), vec![0, 0, 0, 0]);
+        assert_eq!(
+            antichain.bdg_action_4d_dimensionless_bracket().unwrap(),
+            5
+        );
+    }
+
+    #[test]
+    fn four_dimensional_bdg_action_rejects_other_dimensions() {
+        for dimension in [2, 3] {
+            let causet =
+                CausalSetNd::sprinkle_fixed_cardinality(0xBD6, 12, dimension, 1.0).unwrap();
+            assert_eq!(
+                causet.bdg_action_4d_dimensionless_bracket(),
+                Err(CausalSetNdError::UnsupportedDimension { dimension })
+            );
         }
     }
 
