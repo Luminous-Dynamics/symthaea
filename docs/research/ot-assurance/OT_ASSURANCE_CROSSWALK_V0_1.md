@@ -81,6 +81,22 @@ For each claim, preserve:
 
 A signed command, protocol acknowledgement or successful configuration readback does not prove that the process reached a safe or intended state.
 
+## Current OT vendor baseline and build/buy/bridge decision
+
+The comparison must be against actual OT cybersecurity platforms, not generic SIEM alone:
+- [Claroty Platform](https://claroty.com/platform) documents CPS asset inventory, exposure management, network protection, secure access, threat detection and operational-efficiency functions.
+- [Nozomi Networks Platform](https://www.nozominetworks.com/platform) documents OT/IoT visibility, asset inventory, wired/wireless/endpoint sensors, vulnerability/exposure management, anomaly detection and OT-focused threat intelligence. Its [Guardian sensor documentation](https://technicaldocs.nozominetworks.com/guardian/latest/products/guardian/topics/intro/c_guardian.html) describes passive network discovery and monitoring.
+- [Dragos Platform](https://www.dragos.com/cybersecurity-platform/exposure-management/) documents OT asset/exposure visibility, network monitoring, threat intelligence and OT Watch analyst-led monitoring/triage; its 2026 platform updates include AI-assisted analyst workflows and asset lifecycle features: https://www.dragos.com/blog/dragos-platform-ai-ot-security-visibility.
+
+These platforms already operate in the core territory of OT asset discovery, protocol/network visibility, vulnerability/exposure management, threat intelligence and detection. Luminous should not claim to outperform them in those capabilities without a matched, site-authorized benchmark.
+
+The proposed Luminous build/buy/bridge split is:
+- **Buy/bridge:** passive OT sensors, protocol decoders, asset inventory and vendor threat-intelligence feeds from qualified incumbent platforms where appropriate.
+- **Build:** evidence lineage and source dependency semantics; cyber-state/physical-state separation; safety-precedence and authorization non-laundering; uncertainty/abstention; cross-domain dependency and service impact; independently verified recovery receipts.
+- **Do not rebuild:** plant protocol stacks, vendor device libraries, safety PLCs, historian platforms or an OT command/control plane.
+
+The evaluation should compare an incumbent OT platform alone, the operator's established workflow, and incumbent platform plus Luminous evidence/decision layer using the same sensor data and human-review budget. The potential win is fewer unjustified escalations, better contradiction handling, better process-safety preservation and faster verified recovery—not a larger protocol feature checklist.
+
 ## Industry comparison and benchmark protocol
 
 Compare fairly against:
