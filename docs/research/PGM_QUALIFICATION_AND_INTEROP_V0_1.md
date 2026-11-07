@@ -331,6 +331,8 @@ Use proper scoring rules (log score, Brier, CRPS where appropriate), reliability
 - Log-domain or scale-tracked messages.
 - Distinct exact and approximate result types.
 
+**First executable slice:** draft PR https://github.com/Luminous-Dynamics/symthaea/pull/10900 adds a bounded exhaustive joint-MAP reference under `symthaea-factor-graph::exact_map`. It provides an oracle for small assignment spaces and a concrete joint-MAP tie counterexample. It does not yet provide exact posterior marginals, log-partition evidence, a scalable solver, or arbitrary-precision arithmetic; compile/test and exact-head CI remain unverified.
+
 ### Phase 2 — bridge FEP and robust decisions
 - Feed action-conditioned likelihoods into hypothetical posterior calculations.
 - Preserve the existing hierarchical MI chain-rule identity.
