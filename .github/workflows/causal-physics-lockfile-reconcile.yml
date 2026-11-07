@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: causal-physics-lockfile-reconcile-${{ github.ref }}
@@ -46,18 +46,12 @@ jobs:
       - name: Regenerate full workspace lockfile
         run: cargo generate-lockfile
 
-      - name: Commit regenerated lockfile to the research branch
+      - name: Record regenerated lockfile digest
         shell: bash
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Cargo.lock
-          if ! git diff --cached --quiet; then
-            git commit -m "build(physics): commit pinned full-workspace lockfile"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
-          echo "validated_source_head=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          sha256sum Cargo.lock | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "The generated lockfile is exported as an artifact for an explicit, reviewable commit."
 
       - name: Verify lockfile is self-consistent
         run: cargo metadata --locked --format-version 1 > cargo-metadata.json
