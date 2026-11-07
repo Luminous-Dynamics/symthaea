@@ -28,7 +28,8 @@
     "known_class": "A class covered by the frozen training label vocabulary.",
     "unknown": "An input outside the known class support; do not force it into a known label.",
     "indeterminate": "Insufficient, corrupt, low-quality or contradictory evidence to classify or reject reliably.",
-    "rule": "unknown and indeterminate are distinct outcomes; neither implies maliciousness or emitter identity."
+    "rule": "known_class, unknown, indeterminate and degraded_acquisition are distinct outcomes. Unknown is not identity or maliciousness; indeterminate means evidence is insufficient; degraded_acquisition means the capture chain is not qualified.",
+    "degraded_acquisition": "The capture chain or acquisition profile is outside its qualified operating envelope (e.g., clipping, calibration expiry, clock/sample loss, unsupported front end, or buffer overrun); do not treat the sample as a valid classifier input."
   },
   "comparator": {
     "id": "RF-RPL-2026",
@@ -160,7 +161,8 @@
       "per_snr_bucket",
       "per_channel_condition",
       "worst_domain_performance",
-      "cross_day_temporal_generalization"
+      "cross_day_temporal_generalization",
+      "capture_chain_degraded_input_rejection"
     ],
     "deployment": [
       "p50_p95_p99_latency",
@@ -246,5 +248,11 @@
       "license_review_required": true,
       "reproduction_state": "NOT_REPRODUCED"
     }
+  ],
+  "required_output_states": [
+    "known_class",
+    "unknown",
+    "indeterminate",
+    "degraded_acquisition"
   ]
 }
