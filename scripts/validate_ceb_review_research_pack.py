@@ -311,7 +311,7 @@ def self_test() -> list[str]:
     def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str) -> list[str]:
         return validate_documents(t, ch, a, s, p, g, e, x)
 
-    crosswalk = "\\n".join((
+    crosswalk = "\n".join((
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
         *(
             f"| ERG-S{i:02d} | target vs alternative | E1 smallest action | source_declared | stop or ask |"
