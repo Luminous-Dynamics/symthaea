@@ -198,18 +198,18 @@
       "additionalProperties": false,
       "required": [
         "status",
-        "control_phase_microturns",
-        "perturbed_phase_microturns"
+        "control_phase_samples",
+        "perturbed_phase_samples"
       ],
       "properties": {
         "status": {
           "const": "MEASURED"
         },
-        "control_phase_microturns": {
-          "$ref": "#/$defs/phase_vector"
+        "control_phase_samples": {
+          "$ref": "#/$defs/phase_sample_vector"
         },
-        "perturbed_phase_microturns": {
-          "$ref": "#/$defs/phase_vector"
+        "perturbed_phase_samples": {
+          "$ref": "#/$defs/phase_sample_vector"
         }
       }
     },
