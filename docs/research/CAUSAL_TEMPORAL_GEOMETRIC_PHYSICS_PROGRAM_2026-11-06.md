@@ -112,16 +112,20 @@ route to competing with the current state of the art.
 ### General-relativity reference foundation
 
 A new std-only crate, `symthaea-metric-geometry-lab`, now implements
-symmetric 4x4 metric tensors, pivoted inversion, metric derivatives,
-Levi-Civita Christoffel symbols and RK4 affine geodesic integration for
+symmetric 4x4 metric tensors, pivoted inversion, a Jacobi metric-inertia
+check, metric derivatives, Levi-Civita Christoffel symbols, finite-difference
+Riemann/Ricci curvature tensors and invariants, and RK4 affine geodesics for
 Minkowski Cartesian and Schwarzschild exterior coordinate charts.
 
-An independent Python reference calculation at M=1, r=10, theta=pi/2
-matched five analytic Schwarzschild Christoffel components to a maximum
-absolute error of 1.9e-11 and preserved a radial timelike normalization
-within 1.5e-13 over the recorded trajectory. These are independent reference
-numbers, not Rust execution evidence. The crate does not solve Einstein's
-equations, ADM constraints, matter evolution or a metric source problem.
+Independent Python references at M=1, r=10, theta=pi/2 matched five analytic
+Schwarzschild Christoffel components to a maximum absolute error of 1.9e-11.
+The Ricci residual was about 1.6e-7 and the Kretschmann invariant agreed with
+48 M^2/r^6 to an absolute error of about 1.9e-11. Radial and off-radial
+timelike trajectories preserved normalization, Killing energy and angular
+momentum at the reported finite-step tolerances. These are independent
+reference numbers, not Rust execution evidence. The crate does not solve
+Einstein's equations, ADM constraints, matter evolution or a metric source
+problem.
 
 ### UAP evidence foundation
 
@@ -311,7 +315,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-06 | Quantum DTC simulator | Exact complex kicked-Ising graph oracle (1D/2D prototype added); anisotropic Heisenberg remains future work | Independent exact-diagonalization agreement on small systems |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
-| CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, Christoffel and geodesic reference kernel (prototype added) | Rust tests + independent curvature, geodesic conservation and weak-field regression; ADM constraints remain future work |
+| CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, signature, Christoffel, Riemann/Ricci and geodesic reference kernel (prototype added) | Rust tests + independent curvature, conserved quantities and weak-field regression; ADM constraints remain future work |
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
 | CTGP-11 | UAP evidence pipeline | Calibration/provenance contract (prototype added), then reconstruction | Blinded known-object challenge before anomaly claims |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
@@ -352,16 +356,19 @@ between competing hypotheses, not simply to the most complex simulation.
 
 ### GravCraft / GR
 
-1. Minkowski metric: zero curvature, zero source, inertial geodesics.
-2. Schwarzschild exterior: analytic metric, Christoffel and curvature checks.
-3. Weak-field limit: Newtonian acceleration and post-Newtonian observables.
-4. ADM Hamiltonian and momentum constraint residuals.
-5. Full stress-energy reconstruction from the metric ansatz.
-6. NEC/WEC/SEC/DEC tests over observers and spacetime regions.
-7. Quantum-energy-inequality / quantum-interest feasibility analysis where
+1. Minkowski metric: Lorentzian inertia, zero Christoffels/curvature and
+   inertial geodesics.
+2. Schwarzschild exterior: analytic metric, Christoffels, vacuum Ricci tensor
+   and Kretschmann invariant 48 M^2/r^6.
+3. Timelike geodesic normalization, Killing-energy and angular-momentum
+   conservation; step-size convergence.
+4. Weak-field limit: Newtonian acceleration and post-Newtonian observables.
+5. ADM Hamiltonian and momentum constraint residuals.
+6. Full stress-energy reconstruction from the metric ansatz.
+7. NEC/WEC/SEC/DEC tests over observers and spacetime regions.
+8. Quantum-energy-inequality / quantum-interest feasibility analysis where
    the applicable theorem and sampling assumptions are explicit.
-8. Numerical convergence, coordinate-gauge tests and independent solver
-   comparison.
+9. Coordinate-gauge tests and independent solver comparison.
 
 ### UAP observatory
 
