@@ -41,8 +41,13 @@ core. The first 1+1D implementation uses a Fenwick dominance counter for
 related-pair counts and a reconstructed longest-nondecreasing-subsequence
 algorithm for longest chains; both are O(N log N) time / O(N) memory. The
 optimized implementations have brute-force differential tests on small
-quantized sets, including repeated coordinates. These Rust tests still need
-to be run on the pinned toolchain.
+quantized sets, including repeated coordinates. A dimension-generic
+module now also implements fixed-cardinality sprinkling, analytic interval
+volumes, causal order and Lorentz boosts for 2+1D and 3+1D. Independent
+Python reference sweeps over 12 seeds per dimension (N=1,500) recover the
+expected Myrheim–Meyer dimensions within about 0.02 on average. The higher-D
+reference pair-count and chain observables remain O(N²). All Rust tests are
+still pending the pinned toolchain.
 
 ### Time-crystal foundation
 
@@ -53,10 +58,6 @@ Existing components:
   complex state-vector evolution for a finite open-boundary kicked-Ising chain,
   with nearest-neighbour ZZ interactions, longitudinal fields and a global X
   pulse. Its example compares interacting and noninteracting traces.
-
-- `symthaea-fractal-time-lab::floquet_time_crystal` is a classical, scalar,
-  period-two surrogate with an FFT subharmonic score and an early/late
-  persistence ratio.
 
 Known limitation:
 - It is not a quantum many-body Hamiltonian simulator.
@@ -94,6 +95,23 @@ small-system Hamiltonian/Floquet oracle. Only then should an MPS/TEBD path be
 added and compared against external reference implementations such as
 TeNPy, ITensor and quimb. This is a more demanding but scientifically honest
 route to competing with the current state of the art.
+
+### UAP evidence foundation
+
+A new std-only crate, `symthaea-uap-observatory`, defines the initial
+measurement-quality contract:
+
+- Typed EO, IR, radar, RF, magnetometer and IMU/GNSS modalities.
+- Explicit measurement units, coordinate frames and one-sigma uncertainty.
+- TAI timestamps, sensor clock offsets and timestamp uncertainty.
+- Calibration validity windows, modality/frame matching and calibration
+  artefact digests.
+- Raw observation digests, duplicate-record rejection and a data-quality tier.
+- Uncalibrated records are retained and marked, never silently repaired.
+
+This first milestone does not triangulate targets or classify objects. The
+next stages are clock synchronization, coordinate transforms, covariance
+propagation, track association and blinded known-object tests.
 
 ### Broader physics-module audit
 
@@ -231,21 +249,45 @@ Every result should carry:
 - Confidence intervals / uncertainty budget.
 - Claim and non-claim statements.
 
+### 5. From monolithic simulation to a physics compiler
+
+Represent each hypothesis as a typed, executable object containing:
+- state space and units;
+- equations, gauge/sign conventions and boundary conditions;
+- conserved quantities and constraints;
+- measurement map and observable predictions;
+- numerical method, truncation and uncertainty budget;
+- validation domain and explicit non-claims.
+
+The compiler rejects dimensionally inconsistent expressions, unconstrained
+metrics, invalid probability objects and missing calibration inputs before
+running expensive simulations. A hypothesis cannot be promoted merely because
+its trajectory looks plausible.
+
+### 6. From one best theory to an adaptive experimental portfolio
+
+Use multi-fidelity evaluation: analytic limits first, exact small systems
+second, reduced-order or tensor-network models third, high-fidelity solvers
+last, and physical experiments only where observable and instrumentation
+budgets justify them. Allocate effort to experiments that best discriminate
+between competing hypotheses, not simply to the most complex simulation.
+
 ## Work packages and gates
 
 | ID | Work package | Deliverable | Gate |
 |---|---|---|---|
 | CTGP-01 | Causal-set kinematics | 1+1D sprinkling, order, chain, dimension estimator | Minkowski reference + Lorentz invariance |
 | CTGP-02 | Causal-set scaling | Multi-N, multi-seed finite-size study | Error bars, convergence and null controls |
-| CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals | Independent sampler, volume-law validation |
-| CTGP-04 | Chain Theory reproduction | Quantum-state primitives, record enumeration, exact alpha algebra | Independent reproduction + formal proof audit |
+| CTGP-03 | Higher-dimensional sprinkling | 2+1D and 3+1D Alexandrov intervals (prototype added) | Rust tests + independent volume, distribution and boost checks |
+| CTGP-04 | Chain Theory reproduction | Independent std-only record enumerator and radical-sum audit (prototype added) | Per-record CSV match + Lean 4.35.0/axiom audit |
+
 | CTGP-05 | Chain Theory stress tests | Alternative choices, uniqueness and sensitivity analysis | All assumptions enumerated; blind alternatives |
 | CTGP-06 | Quantum DTC simulator | Floquet Ising and anisotropic Heisenberg reference systems | Exact diagonalization agreement on small systems |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | ADM 3+1 metric, constraints, geodesics and curvature | Minkowski, Schwarzschild and weak-field regression |
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
-| CTGP-11 | UAP evidence pipeline | Calibrated multi-sensor reconstruction and provenance | Blinded known-object challenge before anomaly claims |
+| CTGP-11 | UAP evidence pipeline | Calibration/provenance contract (prototype added), then reconstruction | Blinded known-object challenge before anomaly claims |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
 
 ## Benchmarks
@@ -259,7 +301,15 @@ Every result should carry:
 5. Lorentz-boost invariance of causal relations and order-derived observables.
 6. Thinning, boundary and finite-size sensitivity.
 7. Higher-dimensional controls: 2+1D and 3+1D, with expected ordering
-   fractions from the gamma-function relation.
+   fractions 8/35 and 0.1 and interval volumes pi*T^3/12 and pi*T^4/24.
+8. Compare sampled time-coordinate and spatial-radius distributions with their
+   analytic conditional laws; check interval-volume scaling with T.
+9. Boost along every spatial axis and verify pair counts, ordering fraction
+   and longest-chain length; include extreme but representable rapidities.
+10. 1+1D algorithmic scaling: compare O(N log N) observables with an
+    O(N²) brute-force oracle through at least N=2,048; then target N=10^5 and
+    N=10^6 for throughput and peak-memory measurements. Performance targets
+    are not claims until measured on a named machine, exact commit and seed.
 8. **1+1D algorithmic scaling:** compare O(N log N) observables with an
    O(N²) brute-force oracle through at least N=2,048; then target N=10⁵ and
    N=10⁶ for throughput and peak-memory measurements. Performance targets
@@ -270,7 +320,8 @@ Every result should carry:
 
 1. Small-system exact Floquet evolution as the reference oracle.
 2. 1D Ising and 2D anisotropic Heisenberg interactions.
-3. Subharmonic response (f_mathrm{drive}/2), phase rigidity and lifetime.
+3. Subharmonic response at f_drive/2, phase rigidity and lifetime; compare
+   against the exact pi-pulse noninteracting control.
 4. Phase diagram versus drive error, interaction anisotropy, disorder and size.
 5. Finite-size scaling and prethermal heating rate.
 6. Noise, missing-data, aliasing, spectral leakage and adversarial periodic
@@ -301,31 +352,64 @@ Every result should carry:
 5. False-positive rate at a fixed recall, with confidence intervals.
 6. Calibration error, missing metadata and adversarial video transformations.
 7. A separate unresolved category; no forced classification.
+8. Calibration perturbation, clock drift, sensor motion, multipath and
+   parallax controls with known ground truth.
+9. Track-level false-positive rate and calibration error at fixed recall,
+   with confidence intervals and a sealed test set.
 
 ## State-of-the-art comparison and strategy
 
-| Area | Mature reference | Symthaea strategy |
-|---|---|---|
-| Causal sets | Analytic estimators and research implementations | Independent Rust kernels, exact invariance tests, reproducible finite-size suite |
-| Quantum many-body | Exact diagonalization, ITensor, TeNPy, quimb, IBM quantum hardware | Small exact oracle first; then validated MPS/tensor-network backend |
-| Time crystals | IBM quantum devices + tensor networks; diamond nuclear-spin sensing | Reproduce published observables before exploring new protocols |
-| GR | Einstein Toolkit, SpECTRE, established numerical-relativity methods | Verify analytic benchmarks and constraints before novel metric ansatz |
-| UAP | NASA/AARO multi-source assessment and calibrated sensor analysis | Stronger public provenance, uncertainty and blinded benchmark harness |
+The goal is not to claim that Symthaea already outperforms mature specialist
+software. It does not. The present advantage to pursue is a rigorous
+cross-domain evidence layer: explicit assumptions, typed units, independent
+oracles, calibration provenance, falsification gates and reproducibility.
 
-Do not attempt to replace mature tensor-network or numerical-relativity stacks immediately. First match their reference cases, then seek a measurable advantage in reproducibility, cross-model consistency, compute efficiency or data provenance.
+| Area | Mature reference / current frontier | Symthaea current position | Credible path to compete |
+|---|---|---|---|
+| Causal sets | Analytic Myrheim–Meyer estimators and research codes; causal-set literature includes d'Alembertian, propagator and action work | New std-only kinematics prototypes in D=2,3,4; no dynamics | Match estimators and invariants; add higher-D efficient counting, curved embeddings, discrete wave operators and independent continuum tests |
+| Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact state-vector oracle only for small kicked-Ising chains; existing MPS/DMRG helpers are pedagogical | Match exact diagonalization; then implement and benchmark MPS/TEBD, validate against TeNPy/quimb/ITensor and published hardware observables |
+| Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Classical toy detector plus new small exact Floquet oracle | Reproduce a published phase diagram, phase rigidity and lifetime scaling; only then investigate new higher-order or sensor protocols |
+| Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; 2026 Hypatia release adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings and a speculative GravCraft shift-field surrogate, not a GR solver | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
+| UAP / sensor analysis | NASA recommends purpose-built, calibrated multi-sensor data and complete metadata; existing reports are often insufficiently calibrated | New typed sensor/evidence contract only | Build a blind known-object set, calibration and trajectory reconstruction, uncertainty propagation and measured false-positive guarantees |
+
+### Where Symthaea can realistically do better
+
+1. **Reproducibility as a first-class product:** every result becomes a signed,
+   content-addressed experiment package with source revision, immutable inputs,
+   calibration, configuration, oracle, uncertainty and claim scope.
+2. **Cross-domain consistency:** one hypothesis must survive several
+   independently measured observables. A fit to one number or one trajectory
+   cannot override failure on charge, symmetry, causality, energy or
+   instrumental controls.
+3. **Adaptive discovery:** use active experimental design to choose the next
+   measurement with the highest expected discrimination between models.
+4. **Independent implementation:** maintain a small Rust reference kernel
+   and compare it against a separate implementation or established library.
+5. **Evidence-weighted automation:** an autonomous researcher may propose a
+   theory, but cannot self-certify it. Separate verifiers own numerical,
+   formal, physical and empirical claims.
+
+The competitive benchmark should therefore be a multi-axis frontier:
+accuracy, calibration, numerical stability, runtime, memory, energy cost,
+reproducibility, robustness to misspecification and scientific claim quality.
+Symthaea should only claim SOTA on axes where an exact-head, matched-baseline
+benchmark demonstrates it.
 
 ## Immediate next actions
 
-1. Complete and test the new std-only 1+1D causal-set crate.
-2. Publish its exact outputs with multiple seeds and independent reference
-   calculations.
-3. Add higher-dimensional sprinkling only after the 1+1D invariance suite is
-   stable.
-4. Reproduce Chain Theory's published algebra and audit the formalization.
-5. Upgrade the time-crystal lab with an exact small-system quantum oracle.
-6. Replace GravCraft's shift-as-acceleration shortcut with an explicitly
-   derived metric and constraint-consistent geodesic solver.
-7. Define UAP data contracts before importing imagery or case narratives.
+1. Run Rust formatting and tests for the causal-set, Chain Theory audit,
+   exact Floquet and UAP evidence crates on the pinned toolchain.
+2. Compare all 172 Chain Theory record identities, signs and weights against
+   the author's published CSV; audit the read-cap premise and charge assignment.
+3. Add coordinate-distribution and finite-size tests to the 2+1D / 3+1D
+   causal-set implementation; then profile before optimizing O(N²) observables.
+4. Upgrade time-crystal phase-rigidity and lifetime metrics around the exact
+   small-system oracle; add external TeNPy/quimb reference comparison.
+5. Extend the UAP evidence contract with synchronization, frame transforms,
+   covariance propagation, track association and blind known-object tests.
+6. Build a separate GR metric kernel with analytic references before changing
+   GravCraft trajectory code.
+7. Preserve exact-head check evidence; skipped or queued CI is never a pass.
 
 ## Scientific non-claims
 
