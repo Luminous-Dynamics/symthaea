@@ -208,7 +208,7 @@ impl HceEpoch {
                 SplitRole::Search => (
                     1,
                     self.task_family_id.as_str(),
-                    split.features_visible_to_agent
+                    !split.features_visible_to_agent
                         && !split.labels_visible_to_agent
                         && split.score_visible_to_agent
                         && split.search_evaluator_access
