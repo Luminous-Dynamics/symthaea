@@ -650,3 +650,19 @@ A new approximate-compression comparator is Korakitis and Nakos, “Fast Quantiz
 Use these as approximate fast-tier profiles within #10978, not as exact pruning certificates. An unbiased estimator or high-probability error interval is not a worst-case bound on each stored candidate. It may order candidates, trigger exact refinement or support a separately labelled statistical early-stop policy with a nonzero error budget; it cannot emit ExactComplete or justify a zero-false-prune claim without an independently verified conservative bound.
 
 Compare FQJL D/P profiles against raw payloads and global/blockwise residual certificates at equal total memory and task quality. Report statistical confidence, empirical recall and mathematical certificates separately; never fuse them into one generic "confidence" field.
+
+
+## 20. Adaptive block ordering and cross-component consistent checkpoints
+
+Two further children close gaps in the retrieval and recovery contract:
+
+- [#11000 — HME-ADAPTIVE-BLOCK-001](https://github.com/Luminous-Dynamics/symthaea/issues/11000) compares fixed-order, query-energy, query/corpus-statistics and candidate-sketch-informed block ordering for progressive exact scans. Candidate sketches may influence evaluation order only; admissible norm/error bounds remain the sole authority for pruning. This acknowledges BlockMaxWAND / variable-block-max WAND as prior art rather than claiming dynamic block-max pruning is new.
+- [#11001 — HME-CONSISTENT-CUT-001](https://github.com/Luminous-Dynamics/symthaea/issues/11001) binds a complete #10979 bridge checkpoint, HME immutable manifest/segments and per-partition learner-consumed / memory-covered event prefixes into one CompositeCognitiveCheckpoint. Individually valid artifacts are not necessarily a coherent cognitive history.
+
+Machine-readable fixtures:
+- `docs/research/fixtures/hme_adaptive_block_order_v0.json`
+- `docs/research/fixtures/hme_consistent_cut_states_v0.json`
+
+The adaptive-order fixture uses q=[1,1,1,1], x=[-1,-1,1,1], exact cosine 0 and kth threshold 0.1. Processing the negative block first yields a safe real-arithmetic upper bound 0; processing the positive block first yields upper bound 1 and cannot prune. The ordering hint never participates in the proof.
+
+The consistent-cut fixture distinguishes a materialized-update watermark from an event-coverage watermark. A typed explicit no-memory-mutation disposition can advance event coverage without a segment write; missing disposition, partition gaps or parameter-generation mismatch prevent a complete cut. These are synthetic fixtures, not runtime tests or crash-recovery evidence.
