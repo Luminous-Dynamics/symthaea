@@ -31,6 +31,24 @@ TasteVal isolates experiment design and interpretation by giving the researcher 
 
 Interpretation: this is the most direct experimental-taste baseline. We should match its separation of researcher decisions from coding/implementation, and target >2.3x on a comparable task suite only after matching its protocol. Never claim direct reproduction on our own tasks.
 
+### AgentIdeaBench (2026-09-07)
+
+AgentIdeaBench provides a matched Static-versus-Active ideation comparison across 33 models, 40 subfields and five disciplines. In its 28-model primary roster, Active retrieval's mean gain over Static was +0.34; 19/28 models improved. The benefit was capability-gated (Pearson r=0.69): the weakest quartile lost 0.18 on average while the strongest gained 0.76. Active retrieval improved feasibility (+1.21), clarity (+0.63), specificity (+0.58) and impact (+0.23), while measured originality changed −0.14, not significantly. The Active-versus-Static trend across model cutoff years was about 2.1× steeper, a descriptive scaling comparison rather than a universal causal effect of retrieval. [Paper](https://arxiv.org/abs/2609.07611).
+
+Interpretation: active exploration improves grounding and executability more reliably than originality, and it can hurt weaker models. Our preregistration now has a matched information-mode factor: static evidence packet, active retrieval/search, cost-matched random retrieval, and no-search control. Freeze capability tiers before treatment and report capability × exploration interactions. Measure novelty and feasibility separately.
+
+### Autonomous Science Bench 0.1 (2026-10-01)
+
+Autonomous Science Bench provides six laboratory-derived design-build-test-learn campaigns across biology, chemistry and materials. It requires agents to select experiment batches, interpret returned measurements and adapt their decisions. Two calibrated gates separate discovery quality among measured designs from learning quality on the ranking of unmeasured designs. The public pilot compares random, Bayesian optimization and lab-reference workflows. Its leaderboard reports nine configurations with three trials per task: GPT-6 Astra/Codex 72.2% ($190 total) and Opus 5.5/Claude Code 66.7% ($173). The benchmark page explicitly cautions that small gaps are not yet meaningful at three trials/task. [Benchmark](https://www.autonomous-science-bench.ai/) · [Paper](https://arxiv.org/abs/2610.18449).
+
+Interpretation: a researcher can identify promising designs among measured candidates yet fail to predict unseen candidates, or the reverse. Keep discovery and held-out learning as separate gates. Its replay-oracle → digital-twin → live-lab backend ladder is a useful deployment progression, not permission to call replay evaluations live-lab evidence.
+
+### FIRE-Bench (ICML 2026)
+
+FIRE-Bench asks agents to rediscover established, verifiable findings from recent machine-learning research. Given a high-level question, they must design and run experiments and draw evidence-backed conclusions. Its strongest evaluated agents remain below 50 F1, with high run-to-run variance and recurring failures in experimental design, execution and evidence-based reasoning. [PMLR paper](https://proceedings.mlr.press/v306/wang26d.html).
+
+Interpretation: full-cycle rediscovery is a more verifiable test than judging an attractive research proposal. It remains distinct from novel discovery: reproducing a known result validates parts of the research process but does not establish original science.
+
 ### Related evidence
 
 - TASTE measures agreement with experienced researchers on paired AI-safety research proposals and finds model judgments below human judgments. High-confidence human labels and discussion improve the reference. [Anthropic](https://alignment.anthropic.com/2026/taste/).
@@ -54,6 +72,25 @@ A candidate experiment should therefore carry:
 - an explicit action that would follow each result.
 
 Score the experimenter's *prospective prediction* before observing the result, then assess calibration, information gain, realized value and next-action correctness after unblinding. This makes hindsight reconstruction less useful.
+
+## Active exploration and campaign execution
+
+The preregistration's information-mode factor compares:
+1. static fixed evidence packet;
+2. active literature and tool exploration;
+3. random retrieval matched on total cost;
+4. no external-search control.
+
+Keep the source/time cutoff, allowed sources and query contract, query limits, model tokens, tool/API cost and total budget matched. Freeze capability tiers before treatment using an independent pre-treatment benchmark; never define a model's tier from active-treatment outcomes. Report per-tier effects, not only the pooled average. AgentIdeaBench's evidence warns that active retrieval may improve feasibility and specificity while leaving originality unchanged, and can harm lower-capability systems.
+
+For end-to-end scientific campaigns, compose a fixed-Coder researcher study with #8721 (prospective tool allocation) and #9332 (adaptive benchmark/oracle qualification):
+- **Discovery gate:** quality/value of experiments the agent chooses to measure.
+- **Learning gate:** accuracy/calibration of its predictions for unmeasured designs.
+- Report experiment cost, value of sample information, time-to-target, measured-design yield, held-out ranking, protected constraints and negative results separately.
+- Start with replayed observations, proceed to a noisy digital twin, and use live instruments only where access and safety are justified.
+- Add FIRE-Bench-style full-cycle rediscovery of established findings as a verifiable track; keep it distinct from novel scientific discovery.
+
+A benchmark score, a proposal rating, and a rediscovered result are three different types of evidence.
 
 ## 3. Proposed benchmark architecture
 
