@@ -15,6 +15,7 @@ on:
       - "tools/connectome-phase-response/**"
       - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.md"
       - "docs/neuroscience/CONNECTOME_PHASE_RESPONSE_TRANSFER_V1.schema.json"
+      - "docs/neuroscience/examples/CONNECTOME_PHASE_RESPONSE_TRANSFER.example.json"
       - ".github/workflows/connectome-phase-response-transfer.yml"
   workflow_dispatch:
 
@@ -45,6 +46,9 @@ jobs:
           assert fixture["claim_scope"] == "synthetic_known_truth"
           assert fixture["oracle_expectations"]["phase_reset_fractional_microturns"] == [100000, 0, 25000, 0, 0, 0]
           assert fixture["rows"][1]["outcome"]["status"] == "NO_RESPONSE"
+          assert fixture["rows"][1]["outcome"]["perturbed_phase_samples"][1]["cycle_index"] == 1
+          assert fixture["oracle_expectations"]["cycle_slips_by_leg"] == [0, 0, 0, 0, 0, 0]
+          assert fixture["oracle_expectations"]["off_diagonal_cycle_slips_l1"] == 0
           print("phase-response schema/fixture: PASS")
           PY
       - name: Format standalone crate
