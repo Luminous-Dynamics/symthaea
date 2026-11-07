@@ -19266,6 +19266,7 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea-core",
+ "symthaea-metric-geometry-lab",
 ]
 
 [[package]]
