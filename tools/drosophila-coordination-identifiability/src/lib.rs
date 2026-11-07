@@ -81,6 +81,8 @@ pub struct MechanismAudit {
     pub baseline_separated_pairs: usize,
     pub feasible_portfolio_separated_pairs: usize,
     pub feasible_portfolio_unresolved_pairs: usize,
+    /// This crate only evaluates exact synthetic signature equality.
+    pub interpretation: &'static str,
     pub status: &'static str,
     pub mechanism_certificate_issued: bool,
     pub unavailable_candidate_interventions: Vec<String>,
@@ -407,10 +409,11 @@ pub fn audit_mechanism_identifiability(
         baseline_separated_pairs,
         feasible_portfolio_separated_pairs,
         feasible_portfolio_unresolved_pairs,
+        interpretation: "SYNTHETIC_EXACT_SIGNATURE_PREFILTER_ONLY",
         status: if identifiable {
-            "DISTINGUISHABLE_WITHIN_DECLARED_FEASIBLE_PORTFOLIO"
+            "PAIRWISE_DISTINCT_EXACT_SIGNATURES"
         } else {
-            "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO"
+            "EXACT_SIGNATURE_EQUIVALENCE_REMAINS"
         },
         mechanism_certificate_issued: false,
         unavailable_candidate_interventions,
@@ -637,7 +640,7 @@ mod tests {
         );
         assert_eq!(
             report.status,
-            "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO"
+            "EXACT_SIGNATURE_EQUIVALENCE_REMAINS"
         );
         assert!(!report.mechanism_certificate_issued);
         assert_eq!(
@@ -658,9 +661,27 @@ mod tests {
         assert_eq!(report.feasible_portfolio_unresolved_pairs, 0);
         assert_eq!(
             report.status,
-            "DISTINGUISHABLE_WITHIN_DECLARED_FEASIBLE_PORTFOLIO"
+            "PAIRWISE_DISTINCT_EXACT_SIGNATURES"
         );
         assert!(!report.mechanism_certificate_issued);
+    }
+
+    #[test]
+    fn mechanism_labels_do_not_change_observational_equivalence_classes() {
+        let (worlds, interventions) = fixture();
+        let original = audit_mechanism_identifiability(&worlds, &interventions).unwrap();
+        let mut relabeled = worlds.clone();
+        for (index, world) in relabeled.iter_mut().enumerate() {
+            world.mechanism_family = format!("ARBITRARY_LABEL_{index}");
+        }
+        let relabeled_report =
+            audit_mechanism_identifiability(&relabeled, &interventions).unwrap();
+        assert_eq!(original, relabeled_report);
+        assert_eq!(
+            original.interpretation,
+            "SYNTHETIC_EXACT_SIGNATURE_PREFILTER_ONLY"
+        );
+        assert!(!original.mechanism_certificate_issued);
     }
 
     #[test]
@@ -711,7 +732,7 @@ mod tests {
         assert_eq!(report.unavailable_candidate_interventions.len(), 2);
         assert_eq!(
             report.status,
-            "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO"
+            "EXACT_SIGNATURE_EQUIVALENCE_REMAINS"
         );
     }
 }
