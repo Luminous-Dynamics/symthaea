@@ -202,7 +202,7 @@ def validate_documents(
 
 
 def self_test() -> list[str]:
-    triangulation = "\\n".join((
+    triangulation = "\n".join((
         *COMPARATORS,
         *PRIMARY_METRICS,
         "https://review-bench.ai/",
@@ -217,12 +217,12 @@ def self_test() -> list[str]:
         "Sequential Evidence Acquisition",
         "#10064 #10369",
     ))
-    challenge = "\\n\\n".join(
-        f"### ERG-S{i:02d} — Synthetic\\n\\n**Evidence pack:** X\\n\\n"
-        "**Expected review behavior:** Y\\n\\n**Invalid behaviors:** Z"
+    challenge = "\n\n".join(
+        f"### ERG-S{i:02d} — Synthetic\n\n**Evidence pack:** X\n\n"
+        "**Expected review behavior:** Y\n\n**Invalid behaviors:** Z"
         for i in range(1, 27)
-    ) + "\\n#10064 #10369"
-    adjudication = "\\n".join((
+    ) + "\n#10064 #10369"
+    adjudication = "\n".join((
         *PRIMARY_METRICS,
         *EVIDENCE_CLASSES,
         "Stage 1 — Discovery",
@@ -234,11 +234,11 @@ def self_test() -> list[str]:
         "#10064 #10369",
     ))
     scorecard = (
-        "3.10 From code location to causal mechanism diagnosis\\n"
-        "3.11 From human-found gold to open-set completeness\\n"
+        "3.10 From code location to causal mechanism diagnosis\n"
+        "3.11 From human-found gold to open-set completeness\n"
         "3.12 From tools to sequential evidence acquisition"
     )
-    preregistration = "\\n".join((
+    preregistration = "\n".join((
         "P — Parent / pre-introduction",
         "I — Introducing",
         "F — Fixed companion",
@@ -252,7 +252,7 @@ def self_test() -> list[str]:
         "same total inference budget no new primary metric lane #10064 #10369 No tasks are admitted by this preregistration",
         *PRIMARY_METRICS,
     ))
-    gold_completeness = "\\n".join((
+    gold_completeness = "\n".join((
         "Frozen target set",
         "Adjudicated open-set discoveries",
         "Unobserved defect remainder",
@@ -262,7 +262,7 @@ def self_test() -> list[str]:
         "does not create a new primary metric",
         "#10064 #10369",
     ))
-    sequential_evidence = "\\n".join((
+    sequential_evidence = "\n".join((
         "Evidence action ladder",
         "Sequential policy arms",
         "Matched-budget accounting",
