@@ -63,6 +63,31 @@
       "exact_cosine": 0.5
     },
     {
+      "id": "naive_f64_rounding_can_false_prune",
+      "query": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "candidate": [
+        -1,
+        1,
+        1,
+        1
+      ],
+      "prefix_length": 1,
+      "kth_threshold": 0.49999999999999994,
+      "partial_dot": -1,
+      "query_suffix_norm": 1.7320508075688772,
+      "candidate_suffix_norm": 1.7320508075688772,
+      "naive_f64_upper_bound": 0.4999999999999999,
+      "exact_cosine": 0.5,
+      "naive_comparison_would_prune": true,
+      "expected_prune": false,
+      "reason": "The computed real-arithmetic expression rounds slightly below the exact score in binary64. A conservative interval must expand the bound upward; using this rounded scalar directly could reject a true kth item."
+    },
+    {
       "id": "safe_prune_below_threshold",
       "query": [
         1,
@@ -158,6 +183,7 @@
     "If upper bound equals threshold, continue scoring to preserve stable-ID tie ordering.",
     "A checksum binds metadata bytes but does not prove that a suffix norm is mathematically conservative.",
     "Production floating-point bounds require outward rounding / interval analysis consistent with the canonical score algorithm.",
-    "This fixture is not a performance benchmark and does not qualify a production pruning implementation."
+    "This fixture is not a performance benchmark and does not qualify a production pruning implementation.",
+    "The f64 rounding adversary deliberately demonstrates that evaluating the Cauchy–Schwarz expression in ordinary floating point is not itself a conservative upper bound."
   ]
 }
