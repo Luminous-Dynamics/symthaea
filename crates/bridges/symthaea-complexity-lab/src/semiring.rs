@@ -38,6 +38,155 @@ pub trait ExactSemiring: Clone {
     fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError>;
 }
 
+
+/// Failure in bounded exact rational arithmetic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RationalError {
+    ZeroDenominator,
+    Overflow,
+}
+impl fmt::Display for RationalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZeroDenominator => write!(f, "rational denominator is zero"),
+            Self::Overflow => write!(f, "checked rational arithmetic overflow"),
+        }
+    }
+}
+impl Error for RationalError {}
+
+/// Canonical rational value backed by checked i128 numerator/denominator.
+///
+/// The denominator is always positive and the pair is reduced by gcd.
+/// This is exact only while every intermediate fits in i128; operations
+/// return an error rather than silently wrapping or approximating.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CheckedRational {
+    numerator: i128,
+    denominator: i128,
+}
+impl CheckedRational {
+    pub fn new(numerator: i128, denominator: i128) -> Result<Self, RationalError> {
+        if denominator == 0 {
+            return Err(RationalError::ZeroDenominator);
+        }
+        let divisor = gcd_u128(numerator.unsigned_abs(), denominator.unsigned_abs());
+        let mut numerator = divide_signed_by_unsigned(numerator, divisor)?;
+        let mut denominator = divide_signed_by_unsigned(denominator, divisor)?;
+        if denominator < 0 {
+            numerator = numerator.checked_neg().ok_or(RationalError::Overflow)?;
+            denominator = denominator.checked_neg().ok_or(RationalError::Overflow)?;
+        }
+        if denominator <= 0 {
+            return Err(RationalError::Overflow);
+        }
+        Ok(Self { numerator, denominator })
+    }
+
+    pub fn from_integer(value: i128) -> Self {
+        Self { numerator: value, denominator: 1 }
+    }
+
+    pub const fn zero() -> Self {
+        Self { numerator: 0, denominator: 1 }
+    }
+
+    pub const fn one() -> Self {
+        Self { numerator: 1, denominator: 1 }
+    }
+
+    pub const fn numerator(self) -> i128 { self.numerator }
+    pub const fn denominator(self) -> i128 { self.denominator }
+    pub const fn is_zero(self) -> bool { self.numerator == 0 }
+    pub const fn is_negative(self) -> bool { self.numerator < 0 }
+
+    pub fn checked_add(self, other: Self) -> Result<Self, RationalError> {
+        let common = gcd_u128(self.denominator as u128, other.denominator as u128);
+        let self_scale = divide_signed_by_unsigned(
+            other.denominator,
+            common,
+        )?;
+        let other_scale = divide_signed_by_unsigned(
+            self.denominator,
+            common,
+        )?;
+        let left = self.numerator.checked_mul(self_scale).ok_or(RationalError::Overflow)?;
+        let right = other.numerator.checked_mul(other_scale).ok_or(RationalError::Overflow)?;
+        let numerator = left.checked_add(right).ok_or(RationalError::Overflow)?;
+        let denominator = self.denominator.checked_mul(self_scale).ok_or(RationalError::Overflow)?;
+        Self::new(numerator, denominator)
+    }
+
+    pub fn checked_mul(self, other: Self) -> Result<Self, RationalError> {
+        // Cross-cancel before multiplication to preserve representable results.
+        let cancel_left = gcd_u128(self.numerator.unsigned_abs(), other.denominator as u128);
+        let cancel_right = gcd_u128(other.numerator.unsigned_abs(), self.denominator as u128);
+        let left_num = divide_signed_by_unsigned(self.numerator, cancel_left)?;
+        let right_den = divide_signed_by_unsigned(other.denominator, cancel_left)?;
+        let right_num = divide_signed_by_unsigned(other.numerator, cancel_right)?;
+        let left_den = divide_signed_by_unsigned(self.denominator, cancel_right)?;
+        let numerator = left_num.checked_mul(right_num).ok_or(RationalError::Overflow)?;
+        let denominator = left_den.checked_mul(right_den).ok_or(RationalError::Overflow)?;
+        Self::new(numerator, denominator)
+    }
+
+    pub fn checked_div(self, other: Self) -> Result<Self, RationalError> {
+        if other.numerator == 0 {
+            return Err(RationalError::ZeroDenominator);
+        }
+        // (a/b)/(c/d) = (a*d)/(b*c), cross-cancel first.
+        let cancel_left = gcd_u128(self.numerator.unsigned_abs(), other.numerator.unsigned_abs());
+        let cancel_right = gcd_u128(other.denominator as u128, self.denominator as u128);
+        let left_num = divide_signed_by_unsigned(self.numerator, cancel_left)?;
+        let other_num = divide_signed_by_unsigned(other.numerator, cancel_left)?;
+        let other_den = divide_signed_by_unsigned(other.denominator, cancel_right)?;
+        let left_den = divide_signed_by_unsigned(self.denominator, cancel_right)?;
+        let numerator = left_num.checked_mul(other_den).ok_or(RationalError::Overflow)?;
+        let denominator = left_den.checked_mul(other_num).ok_or(RationalError::Overflow)?;
+        Self::new(numerator, denominator)
+    }
+}
+impl fmt::Display for CheckedRational {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.denominator == 1 {
+            write!(f, "{}", self.numerator)
+        } else {
+            write!(f, "{}/{}", self.numerator, self.denominator)
+        }
+    }
+}
+impl ExactSemiring for CheckedRational {
+    fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> {
+        (*self).checked_add(*other).map_err(|error| SemiringError::Domain(error.to_string()))
+    }
+    fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> {
+        (*self).checked_mul(*other).map_err(|error| SemiringError::Domain(error.to_string()))
+    }
+}
+
+fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.max(1)
+}
+
+fn divide_signed_by_unsigned(value: i128, divisor: u128) -> Result<i128, RationalError> {
+    if divisor == 0 {
+        return Err(RationalError::ZeroDenominator);
+    }
+    if value == 0 {
+        return Ok(0);
+    }
+    if divisor == (1u128 << 127) {
+        return if value == i128::MIN { Ok(-1) } else { Err(RationalError::Overflow) };
+    }
+    let divisor = i128::try_from(divisor).map_err(|_| RationalError::Overflow)?;
+    value.checked_div(divisor).ok_or(RationalError::Overflow)
+}
+
 impl ExactSemiring for bool {
     fn checked_add(&self, other: &Self) -> Result<Self, SemiringError> { Ok(*self || *other) }
     fn checked_mul(&self, other: &Self) -> Result<Self, SemiringError> { Ok(*self && *other) }
@@ -254,6 +403,7 @@ impl<S: ExactSemiring> ExactFactorGraph<S> {
         Ok(Self { cardinalities, factors: Vec::new(), zero, one })
     }
     pub fn variable_count(&self) -> usize { self.cardinalities.len() }
+    pub fn cardinalities(&self) -> &[usize] { &self.cardinalities }
     pub fn add_factor(&mut self, scope: Vec<usize>, values: Vec<S>) -> Result<usize, EliminationError> {
         let index = self.factors.len();
         self.factors.push(ExactFactor::new(index, scope, values, &self.cardinalities)?);
