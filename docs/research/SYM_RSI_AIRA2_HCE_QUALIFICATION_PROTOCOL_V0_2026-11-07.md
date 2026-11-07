@@ -70,14 +70,33 @@ Digest linkage is also required: inspection output → hypothesis input; hypothe
 
 A synthetic fixture contains one failed execution, an observation, a revision, a successful retry and submission. It is not a model run or operator-performance result. Tool permissions are exact tool-ID to permission-ID bindings, not generic non-empty permission strings. The operator validator is run as part of the same offline `--fixtures` command. The operator trace validator has 14 authored Rust tests; together with 12 HCE/worker-trace tests, the standalone crate now contains 26 authored tests. None has been executed here.
 
+## Matched async-versus-barrier event simulation
+
+The reference now includes a deterministic diagnostic simulator that consumes the same ordered task-duration/cost/disposition set and produces both:
+- synchronous waves with a barrier between waves;
+- asynchronous dispatch to the earliest-free worker.
+
+The resulting traces are evaluated by the same worker-trace analyzer. It reports both fixed-budget throughput/utilization and observed-span makespan/throughput/utilization. This prevents a finite fixed task set from hiding latency reduction behind a common maximum-budget denominator.
+
+The synthetic six-task, two-worker example has one long straggler:
+- synchronous barrier makespan: 1,400 ms;
+- asynchronous steady-state makespan: 1,000 ms;
+- makespan ratio: 1.4×;
+- total attempt count, unique valid candidate count, 1,900 ms of worker work and cost are held constant;
+- observed worker idle capacity: 900 ms synchronous vs 100 ms asynchronous;
+- observed-span worker utilization: 67.86% synchronous vs 95% asynchronous.
+
+These are deterministic fixture arithmetic, not an observed scheduler or model result. The simulator is explicitly not a production scheduler and does not make model calls or dispatch real work.
+
 ## Current implementation
 
 `tools/sym-rsi-hce-reference/` contains:
 - synthetic HCE epoch JSON fixture and structural schema;
 - role/visibility/family/custodian semantic validator;
-- synthetic worker trace and trace analyzer;
+- synthetic worker trace and analyzer with fixed-budget and observed-span throughput/utilization;
+- matched synchronous-barrier vs asynchronous-steady-state diagnostic simulator and task fixture;
 - CLI mode `--fixtures`;
-- 26 authored Rust tests (12 HCE/worker-trace and 14 operator-trace).
+- 31 authored Rust tests (12 HCE/worker-trace, 14 operator-trace and 5 worker-simulation).
 
 The fixture CLI command is:
 
@@ -90,7 +109,7 @@ No Rust tests have been compiled or run. The tool makes no worker, GPU, model, e
 ## Proposed qualification targets
 
 Calibrate the local pilot first. Do not set a throughput multiplier in advance. The confirmatory target should be:
-- statistically supported increase in valid, unique candidates per inclusive total cost, not merely attempts per hour;
+- statistically supported increase in valid, unique candidates per inclusive total cost, reported against both maximum-budget and observed-span time, not merely attempts per hour;
 - no degradation of selection/confirmation/transfer or protected capability floors;
 - no false-promotion or integrity-gate regression;
 - positive effect replicated across fresh task families;
