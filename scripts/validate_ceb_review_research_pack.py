@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 TRIANGULATION = "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
+CROSS_FRAMING = "docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md"
 COUNTERFACTUAL_QUALIFICATION = "docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md"
 GOLD_COMPLETENESS = "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
 SEQUENTIAL_EVIDENCE = "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
@@ -47,6 +48,7 @@ COMPARATORS = (
     "Martian Code Review Benchmark",
     "SWE-sweep",
     "LoopControlBench",
+    "Saving SWE-Bench",
 )
 EXECUTION_GATES = ("#10064", "#10369")
 
@@ -74,6 +76,7 @@ def validate_documents(
     calibration_pack: str,
     calibration_key: str,
     counterfactual_qualification: str,
+    cross_framing: str,
 ) -> list[str]:
     errors: list[str] = []
 
@@ -110,6 +113,8 @@ def validate_documents(
         "https://swesweep.com/paper",
         "https://swesweep.com/",
         "https://github.com/kltownsend/loopcontrolbench",
+        "https://arxiv.org/abs/2510.08996",
+        "https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/",
     ):
         if url not in triangulation:
             errors.append(f"triangulation document is missing source URL {url}")
@@ -151,6 +156,8 @@ def validate_documents(
         errors.append("engineering scorecard is missing the adoption-versus-correctness paradigm shift")
     if "3.14 From historical fix commits to qualified counterfactual controls" not in scorecard:
         errors.append("engineering scorecard is missing the counterfactual-control qualification paradigm shift")
+    if "3.15 From fixed benchmark prompts to matched information framings" not in scorecard:
+        errors.append("engineering scorecard is missing the cross-framing paradigm shift")
 
     required_states = (
         "P — Parent / pre-introduction",
@@ -308,6 +315,35 @@ def validate_documents(
     if "not hidden ground truth" not in calibration_key.lower():
         errors.append("calibration answer key must not claim hidden/oracle authority")
 
+    if "### 2.9 Saving SWE-Bench" not in triangulation:
+        errors.append("triangulation is missing Saving SWE-Bench prompt-framing evidence")
+    if "Cross-Framing Anchor Protocol V0" not in triangulation or "Cross-Framing Anchor Protocol V0" not in preregistration:
+        errors.append("triangulation and causal preregistration must link the cross-framing protocol")
+
+    for required in (
+        "F0 — Formal issue-conditioned repair",
+        "F1 — Realistic user request",
+        "F2 — Diff-only review",
+        "F3 — Repository-only single-defect discovery",
+        "F4 — Failing-test-guided repair",
+        "F5 — Open-world multi-bug sweep",
+        "Stratum A — Single-defect common anchor",
+        "Stratum B — Multi-defect repository anchor",
+        "same source/defect anchor",
+        "wording-only mutation",
+        "information content",
+        "randomize condition order",
+        "fresh isolated contexts",
+        "clustered under the original anchor",
+        "do not create a composite",
+        "not a universal correction factor",
+        "#10064",
+        "#10369",
+        "no task is admitted",
+    ):
+        if required.lower() not in cross_framing.lower():
+            errors.append(f"cross-framing protocol is missing {required}")
+
     for required in (
         "six independent control-qualification dimensions",
         "Q1 — Identity and lineage",
@@ -443,8 +479,22 @@ def self_test() -> list[str]:
         "No new primary metric; #10064 #10369",
     ))
 
+    cross_framing = "\\n".join((
+        "F0 — Formal issue-conditioned repair",
+        "F1 — Realistic user request",
+        "F2 — Diff-only review",
+        "F3 — Repository-only single-defect discovery",
+        "F4 — Failing-test-guided repair",
+        "F5 — Open-world multi-bug sweep",
+        "Stratum A — Single-defect common anchor",
+        "Stratum B — Multi-defect repository anchor",
+        "same source/defect anchor; wording-only mutation; information content",
+        "randomize condition order; fresh isolated contexts; clustered under the original anchor",
+        "do not create a composite; not a universal correction factor; no task is admitted; #10064 #10369",
+    ))
+
     def run(t: str, ch: str, a: str, s: str, p: str, g: str, e: str, x: str, cp: str, ck: str, q: str) -> list[str]:
-        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q)
+        return validate_documents(t, ch, a, s, p, g, e, x, cp, ck, q, cf)
 
     crosswalk = "\n".join((
         "| Scenario | Competing hypotheses / claim to resolve | Minimum discriminating action | Strongest authority this action can establish | Stop / escalate condition |",
@@ -457,7 +507,7 @@ def self_test() -> list[str]:
     valid = run(
         triangulation, challenge, adjudication, scorecard,
         preregistration, gold_completeness, sequential_evidence, crosswalk,
-        calibration_pack, calibration_key, counterfactual_qualification
+        calibration_pack, calibration_key, counterfactual_qualification, cross_framing
     )
     if valid:
         return [f"minimal valid authoring pack rejected: {valid[0]}"]
@@ -491,6 +541,7 @@ def self_test() -> list[str]:
         ("missing control disentanglement", "counterfactual_qualification", counterfactual_qualification.replace("Q2 — Change disentanglement", "Q2 removed")),
         ("missing SWE-sweep population", "triangulation", triangulation.replace("4,068 bugs across 100 repositories and 22 languages", "population removed")),
         ("missing LoopControlBench scope caveat", "triangulation", triangulation.replace("not 65.7% of software bugs generally", "claim removed")),
+        ("missing F5 framing condition", "cross_framing", cross_framing.replace("F5 — Open-world multi-bug sweep", "F5 removed")),
     )
     for label, target, mutant in mutations:
         args = {
@@ -505,6 +556,7 @@ def self_test() -> list[str]:
             "calibration_pack": calibration_pack,
             "calibration_key": calibration_key,
             "counterfactual_qualification": counterfactual_qualification,
+            "cross_framing": cross_framing,
         }
         args[target] = mutant
         result = run(
@@ -519,6 +571,7 @@ def self_test() -> list[str]:
             args["calibration_pack"],
             args["calibration_key"],
             args["counterfactual_qualification"],
+            args["cross_framing"],
         )
         if not result:
             return [f"negative self-test was accepted: {label}"]
@@ -546,7 +599,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 28 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 29 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
@@ -560,6 +613,7 @@ def main() -> int:
         calibration_pack = read_required(args.repo_root, CALIBRATION_PACK)
         calibration_key = read_required(args.repo_root, CALIBRATION_KEY)
         counterfactual_qualification = read_required(args.repo_root, COUNTERFACTUAL_QUALIFICATION)
+        cross_framing = read_required(args.repo_root, CROSS_FRAMING)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -581,7 +635,7 @@ def main() -> int:
         f"adjudication_stages=5 primary_metrics={len(PRIMARY_METRICS)} "
         "counterfactual_states=6 experimental_phases=3 gold_protocol=1 evidence_policy=1 crosswalk_rows=26 "
         "human_calibration_cases=3 variants=18 answer_key=separate-public "
-        "counterfactual_controls=6 qualification_dimensions=6"
+        "counterfactual_controls=6 qualification_dimensions=6 cross_framing_conditions=6"
     )
     print(
         "CEB_REVIEW_RESEARCH_CLAIM_BOUNDARY: documentation validation only; "
