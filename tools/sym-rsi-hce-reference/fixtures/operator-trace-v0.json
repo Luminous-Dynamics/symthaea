@@ -7,8 +7,14 @@
   "wall_clock_budget_ms": 10000,
   "max_resource_cost_units": 10,
   "allowed_tools": [
-    "artifact-inspector",
-    "sandbox-executor"
+    {
+      "tool_id": "artifact-inspector",
+      "permission_id": "perm-read-artifacts"
+    },
+    {
+      "tool_id": "sandbox-executor",
+      "permission_id": "perm-exec-sandbox"
+    }
   ],
   "actions": [
     {
