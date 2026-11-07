@@ -43,14 +43,17 @@ A biological row must bind the exact source revision/materialization, animal/ses
 
 ## Fixed-point semantics
 
-V1 stores phase in signed integer microturns:
+Each phase sample preserves an integer cycle index and a signed fractional phase in microturns:
 - one cycle = 1,000,000 microturns;
-- canonical interval = [-500,000, 500,000);
-- circular difference = wrapped perturbed phase minus matched control phase.
+- canonical fractional interval = [-500,000, 500,000);
+- wrapped reset = fractional perturbed phase minus fractional matched-control phase;
+- cycle slip = perturbed cycle index minus matched-control cycle index.
+
+A full-cycle advance can therefore have zero wrapped phase reset but a cycle slip of +1. The two quantities remain separate and are never collapsed into one scalar.
 
 The canonical six-leg axis is left fore, left middle, left hind, right fore, right middle, right hind. Any source matrix/annotation ordering must be independently mapped to stable leg IDs before populating this axis.
 
-For a measured row, the crate computes one wrapped phase reset per leg. Non-response, failed assay, missing tracking, out-of-support and unassessed rows remain typed statuses and cannot be silently turned into zero responses.
+For a measured row, the crate computes one wrapped phase reset and one cycle-slip count per leg. Non-response, failed assay, missing tracking, out-of-support and unassessed rows remain typed statuses and cannot be silently turned into zero responses.
 
 ## Synthetic known-answer tranche
 
