@@ -581,3 +581,18 @@ The source audit behind [#10918](https://github.com/Luminous-Dynamics/symthaea/i
 - Higher-level helpers may sanitize non-finite results while `ContinuousHV::similarity` itself does not; HME must not inherit caller-specific silent sanitization.
 
 HME's exact score profile must bind full-coordinate coverage, accumulation semantics, numeric domain, zero/near-zero behavior, non-finite rejection and tie ordering. A similarity tolerance is not permission to change top-k ordering near ties.
+
+
+## 18. Certified compressed exact retrieval
+
+New child: [#10978 — HME-CERT-COMPRESS-001](https://github.com/Luminous-Dynamics/symthaea/issues/10978).
+
+Explore a two-tier ContinuousHV representation:
+- compact approximate code + certified residual/error envelope in the fast tier;
+- original exact ContinuousHV payload in a colder immutable segment.
+
+For x = x_hat + r with a verified ||r||₂ ≤ ε, Cauchy–Schwarz yields a conservative real-arithmetic upper bound for q·x. With a certified interval for ||x||, derive a cosine upper interval; if the norm lower bound is zero or numeric uncertainty overlaps the kth threshold, load the original payload rather than prune.
+
+The intended first benefit is lower hot-memory residency and fewer cold-payload reads, not necessarily lower total bytes. Every exact result still reranks survivors from original payloads. This must remain distinct from ANN and from lossy quantized output.
+
+The mathematical formula is not a floating-point certificate: outward rounding, metadata provenance, transform/codebook digest and independent validation of the residual envelope are mandatory. A checksum alone cannot prove that epsilon is conservative.
