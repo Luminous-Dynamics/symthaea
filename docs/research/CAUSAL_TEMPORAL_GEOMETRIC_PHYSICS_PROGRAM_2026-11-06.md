@@ -109,6 +109,20 @@ added and compared against external reference implementations such as
 TeNPy, ITensor and quimb. This is a more demanding but scientifically honest
 route to competing with the current state of the art.
 
+### General-relativity reference foundation
+
+A new std-only crate, `symthaea-metric-geometry-lab`, now implements
+symmetric 4x4 metric tensors, pivoted inversion, metric derivatives,
+Levi-Civita Christoffel symbols and RK4 affine geodesic integration for
+Minkowski Cartesian and Schwarzschild exterior coordinate charts.
+
+An independent Python reference calculation at M=1, r=10, theta=pi/2
+matched five analytic Schwarzschild Christoffel components to a maximum
+absolute error of 1.9e-11 and preserved a radial timelike normalization
+within 1.5e-13 over the recorded trajectory. These are independent reference
+numbers, not Rust execution evidence. The crate does not solve Einstein's
+equations, ADM constraints, matter evolution or a metric source problem.
+
 ### UAP evidence foundation
 
 A new std-only crate, `symthaea-uap-observatory`, defines the initial
@@ -297,7 +311,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-06 | Quantum DTC simulator | Exact complex kicked-Ising graph oracle (1D/2D prototype added); anisotropic Heisenberg remains future work | Independent exact-diagonalization agreement on small systems |
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
-| CTGP-09 | GR metric engine | ADM 3+1 metric, constraints, geodesics and curvature | Minkowski, Schwarzschild and weak-field regression |
+| CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, Christoffel and geodesic reference kernel (prototype added) | Rust tests + independent curvature, geodesic conservation and weak-field regression; ADM constraints remain future work |
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
 | CTGP-11 | UAP evidence pipeline | Calibration/provenance contract (prototype added), then reconstruction | Blinded known-object challenge before anomaly claims |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
@@ -376,7 +390,7 @@ oracles, calibration provenance, falsification gates and reproducibility.
 | Causal sets | Analytic Myrheim–Meyer estimators and research codes; causal-set literature includes d'Alembertian, propagator and action work | New std-only kinematics prototypes in D=2,3,4; no dynamics | Match estimators and invariants; add higher-D efficient counting, curved embeddings, discrete wave operators and independent continuum tests |
 | Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact state-vector oracle for small 1D/2D kicked-Ising graphs; existing MPS/DMRG helpers remain pedagogical | Match independent exact diagonalization; then implement and benchmark MPS/TEBD, validate against TeNPy/quimb/ITensor and published hardware observables |
 | Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Classical toy detector plus new small exact Floquet oracle | Reproduce a published phase diagram, phase rigidity and lifetime scaling; only then investigate new higher-order or sensor protocols |
-| Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; 2026 Hypatia release adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings and a speculative GravCraft shift-field surrogate, not a GR solver | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
+| Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; Hypatia adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings plus a new std-only analytic metric / geodesic reference kernel; still no Einstein evolution or constraints | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
 | UAP / sensor analysis | NASA recommends purpose-built, calibrated multi-sensor data and complete metadata; existing reports are often insufficiently calibrated | New typed sensor/evidence contract only | Build a blind known-object set, calibration and trajectory reconstruction, uncertainty propagation and measured false-positive guarantees |
 
 ### Where Symthaea can realistically do better
@@ -415,8 +429,9 @@ benchmark demonstrates it.
    external TeNPy/quimb reference comparisons.
 5. Extend the UAP evidence contract with synchronization, frame transforms,
    covariance propagation, track association and blind known-object tests.
-6. Build a separate GR metric kernel with analytic references before changing
-   GravCraft trajectory code.
+6. Extend the metric geometry kernel with signature checks, Riemann/Ricci
+   tensors, curvature invariants, coordinate-transform tests and convergence
+   studies before changing GravCraft trajectory code.
 7. Preserve exact-head check evidence; skipped or queued CI is never a pass.
 
 ## Scientific non-claims
