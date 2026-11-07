@@ -534,6 +534,17 @@ impl CausalSet2D {
         interval_size_histogram_1p1(&self.events)
     }
 
+    /// Retained generic bitset reference for 1+1D interval-histogram comparison.
+    ///
+    /// This deliberately uses the dimension-generic successor/predecessor
+    /// intersection path rather than the specialized persistent range tree.
+    /// It is useful as an independent implementation and a benchmark baseline.
+    pub fn interval_size_histogram_bitset_reference(&self) -> Vec<u64> {
+        interval_size_histogram_by(self.events.len(), |first, second| {
+            self.events[first].causally_precedes(self.events[second])
+        })
+    }
+
     /// Dimensionless two-dimensional Benincasa-Dowker action bracket.
     ///
     /// For a 1+1D causal set:
