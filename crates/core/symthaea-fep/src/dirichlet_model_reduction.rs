@@ -898,10 +898,16 @@ impl std::error::Error for DirichletModelInformationGainError {}
 /// model-probability-weighted mean of the reduced priors (the Bayesian model
 /// average constraint in Friston et al., 2026).
 ///
-/// The supplied full-model predictive outcome probabilities are combined with
-/// BMR evidence ratios to reconstruct model-averaged outcome probabilities.
-/// Their total mass must remain one. This deliberately rejects mismatched
-/// predictive and BMR parameterizations rather than silently renormalizing.
+/// The caller supplies each action outcome's predictive probability under
+/// the full Bayesian-model-average parent model. Those probabilities are used
+/// directly to average post-outcome model entropy and must sum to one. BMR
+/// evidence ratios update model identity after a hypothetical outcome; they
+/// do not redefine or reweight the outcome probabilities a second time.
+/// The caller is responsible for deriving predictive probabilities and
+/// sufficient-statistic increments from the same generative-model family,
+/// parent beliefs, action, and ordered parameterization. This module validates
+/// the Dirichlet parameterization/support and probability mass, but it does
+/// not itself implement a general observation likelihood or perception model.
 ///
 /// This function scores model information only. Parameter and state EIG,
 /// preference/risk, ambiguity, action cost, and multi-step planning remain
