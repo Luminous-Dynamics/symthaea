@@ -181,7 +181,78 @@ Prospective stretch goals:
 
 These are research targets, not current Symthaea results.
 
+## 6A. Natural African code-switching is a separate frontier
+
+The August 2026 **AfriSwitch** paper adds a much stronger test of real-world code-switching than synthetic mixing or a monolingual language matrix. It reports 61.36 hours, 18,861 utterances, 78,333 switch events and 16 African language varieties, with English-span tags, per-utterance Code-Mixing Index (CMI) and switch-point counts. Its South African-related varieties include Zulu, Tswana and Afrikaans.
+
+However, the current Hugging Face dataset card differs materially:
+- paper: 61.36h / 18,861 utterances / 16 varieties / paper text says CC BY 4.0;
+- current HF card: 54.41h / 16,602 utterances / 14 configurations / CC BY-NC-SA 4.0 / gated / one test split only.
+
+This may reflect different dataset revisions, but exact lineage and rights are unresolved. Treat the current artifact as REVIEW_REQUIRED/RESTRICTED in #10942. Do not train on it or use it commercially; do not even start confirmatory evaluation until exact version and permitted use are clarified. If admitted, it is test-only: no tuning or training on its labels. See #10999.
+
+Sources:
+- Paper: https://arxiv.org/abs/2608.26434
+- Current dataset card: https://huggingface.co/datasets/intronhealth/AfriSwitch
+
+### Strongest published code-switch baseline
+
+The AfriSwitch paper reports a zero-shot, matrix-language-conditioned comparison across 12 evaluated language varieties:
+
+| System | Mean WER |
+|---|---:|
+| Sahara v2.5 | 35.93% |
+| Omnilingual LLM 7B | 51.46% |
+| Gemini 3.6 | 55.05% |
+| ElevenLabs | 56.48% |
+| Sahara v2 | 59.90% |
+
+Sahara v2.5 leads the reported mean, but not every row: for Zulu, Omnilingual LLM 7B is 48.19% versus Sahara v2.5 at 49.30%. Afrikaans has only 0.68 hours / 198 utterances in the paper's table, so its point estimate has wide uncertainty. The benchmark includes additional language configurations not represented in the 12-language ASR results table.
+
+The current Sahara product documentation describes bilingual mixing models across African language pairs, including Afrikaans, Zulu and other African languages. The Intron CodeSwitch Africa Challenge closed registration on 15 September 2026 and announced winners on 1 October 2026; it is a completed programme, but its public benchmark methodology remains useful context.
+
+Sources:
+- AfriSwitch results: https://arxiv.org/abs/2608.26434
+- Sahara v2.5: https://www.intron.io/
+- Challenge timeline: https://www.intron.io/sahara-v2-5/sahara-codeswitch-africa/
+
+### Evaluate what aggregate WER hides
+
+PIER (Point-of-Interest Error Rate, ICASSP 2025) shows why aggregate WER alone is inadequate: conventional WER can improve while recognition of embedded-language words deteriorates. For code-switch evaluation, retain:
+- standard WER/CER;
+- PIER on the explicitly tagged embedded-language words;
+- embedded-span deletion rate and recall;
+- boundary-window errors;
+- transcript language-collapse rate;
+- CMI and switch-point strata reported independently.
+
+AfriSwitch's public tags identify English spans; they are not complete per-token labels for every language. Do not claim full switch-boundary F1 from English-span labels alone. Use PIER only on a clearly declared, tag-covered subset, and reproduce its official definition rather than improvising a new score.
+
+Sources:
+- PIER paper: https://arxiv.org/abs/2501.09512
+- DOI: https://doi.org/10.1109/ICASSP49660.2025.10889660
+
+CMI and switch-point count capture different properties. Frequent short insertions and infrequent balanced language blocks should not be collapsed into a single code-switch difficulty scalar.
+
+### Additional architecture baseline: PUMA
+
+PUMA (Findings of ACL 2026) uses a Universal Language Projection module that combines a learnable language token with acoustic representations, sharing parameters across languages. It is a relevant comparator for language-conditioned acoustic adaptation and parameter-efficient multilingual learning. Include the exact released implementation/checkpoint and its tested language/data scope before claiming South African coverage or a code-switch capability; the paper abstract's African-language results do not establish natural mixed-speech performance.
+
+Source: https://aclanthology.org/2026.findings-acl.17/
+
+### Comparison protocol consequence
+
+Run distinct tracks:
+1. **Oracle-language monolingual ASR:** supply the correct language to systems that require it.
+2. **Matrix-language-conditioned code-switch ASR:** reproduce the AfriSwitch paper's optimistic interface contract.
+3. **Unknown-language code-switch ASR:** no per-utterance oracle label; measure language identification and switching as part of the system.
+4. **Streaming dialogue:** identical PCM/chunk schedule; measure partial/final latency, revision churn, interruption, recovery and risk-aware clarification.
+
+Never compare a forced-language, one-language-per-clip model such as SunflowerASR directly against a no-oracle mixed-language system without declaring the interface mismatch. The Sunflower model card itself says the language token is supplied at decode time and that automatic language identification, timestamps and speaker labels are not provided in this configuration.
+
 ## 7. Repository work map
+
+
 
 - #10910 — typed encoder/projection compatibility and prototype artifact metadata.
 - #10912 — shared offline/live raw direct-mel encoding candidate.
@@ -190,7 +261,7 @@ These are research targets, not current Symthaea results.
 - #10914 — metadata-only cohort registry.
 - #10942 — fail-closed cohort admission, split-leakage audit and scoring contracts.
 - #10970 — version-pinned external model/provider comparison ledger.
-- #10971 — morphology-aware evaluation research.
+- #10971 — morphology-aware evaluation research.\n- #10976 — canonical offline audio ingress: rate, channels and decode integrity.\n- #10999 — switch-aware evaluation with AfriSwitch, PIER and mixing-complexity strata.
 - #10873 — risk-controlled selective recognition and active clarification.
 - #10871 — word/phone alignment and temporal uncertainty.
 - #10890 — acoustic-faithful prosody/vocal-event perception.
