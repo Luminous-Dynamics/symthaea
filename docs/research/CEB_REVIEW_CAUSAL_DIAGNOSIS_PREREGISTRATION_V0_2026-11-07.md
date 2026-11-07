@@ -321,6 +321,18 @@ The P/I/F/N/M/IRR variants are usable only to the extent that each control suppo
 
 A historical fix is not a minimal intervention by default. Commit messages, merged status, green CI and textual proximity cannot establish causal isolation. These requirements are methodological safeguards; they do not add a metric, task schema, receipt, authority class, runner or execution permission.
 
+## 12.4 Cross-framing anchor design
+
+Use [CEB Review Cross-Framing Anchor Protocol V0](CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) to estimate framing and information effects on shared source/defect anchors. It defines formal issue, realistic user request, diff-only review, repository-only discovery, failing-test-guided repair and open-world multi-bug sweep conditions.
+
+- Keep the source/defect identity, frozen requirement and oracle constant for paired conditions whenever the task objective permits.
+- Distinguish wording-only mutation from changes in information content; a failing test or target location is additional information, not merely a paraphrase.
+- Randomize condition order and use fresh isolated contexts; never let the same agent see multiple variants of one anchor in the same session.
+- Cluster all prompt/revision variants under the original defect/repository.
+- Score each output using its existing lane-specific CEB measures; do not construct a composite score from review recall, repair resolution, repository discovery and clarification quality.
+
+This adds no metric, task schema, receipt or execution permission and does not change the existing Phase A/B/C preregistered primary hypotheses.
+
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
