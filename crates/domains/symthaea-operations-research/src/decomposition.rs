@@ -716,10 +716,10 @@ pub fn existential_support_union(
 
     let mut support = BTreeSet::new();
     for fragment in fragments {
-        if fragment.visible_variables != *visible_variables {
+        if fragment.visible_variables.as_slice() != visible_variables.as_slice() {
             return Err(DecompositionError::ProjectionScopeMismatch {
-                expected: visible_variables.clone(),
-                actual: fragment.visible_variables.clone(),
+                expected: visible_variables.to_vec(),
+                actual: fragment.visible_variables.to_vec(),
             });
         }
         for assignment in &fragment.support {
@@ -742,7 +742,7 @@ pub fn existential_support_union(
     let projected_count =
         u128::try_from(support.len()).map_err(|_| DecompositionError::CountOverflow)?;
     Ok(ProjectedSupportUnionReport {
-        visible_variables: visible_variables.clone(),
+        visible_variables: visible_variables.to_vec(),
         support,
         projected_count,
     })
