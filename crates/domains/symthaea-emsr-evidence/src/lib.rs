@@ -1356,6 +1356,8 @@ mod tests {
     #[test]
     fn common_mode_graph_rejects_duplicate_source_ids() {
         let source = EvidenceSourceProfile {
+            snapshot_id: "dependency-snapshot-duplicate-test".to_owned(),
+            as_of: "2026-11-06T00:00:00Z".to_owned(),
             source_id: "rx-a".to_owned(),
             failure_domains: vec!["clock:a".to_owned()],
             dependencies_complete: true,
