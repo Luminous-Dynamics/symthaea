@@ -118,13 +118,15 @@ These are implementation declarations, not listening-quality results. The benchm
 
 The Rust singing API now has an executable `SingingRenderPolicy`. A controlled score-conditioned comparison can require language profile, explicit phone sequence, syllable alignment, note pitch/duration, absolute onset/rest handling, and melisma. Before a renderer is called, its complete capability manifest is checked against that policy.
 
+The policy distinguishes two separate phrase tracks: `phrase_expression_comparison` can admit documented energy/voice-quality approximations, while `phrase_breath_comparison` requires an explicit breath-timing capability. A musical rest encoded by note onsets is not an inhalation event.
+
 The policy makes three support levels meaningful:
 - `native`: accepted without qualification;
 - `approximated`: accepted only when the caller explicitly permits approximations;
 - `conditional`: accepted only when the caller explicitly permits conditional support (for example, a language/voicebank limitation);
 - `unsupported`: always rejected when required.
 
-The shared comparison policy currently permits documented approximations and conditional language support, because Kokoro, DiffSinger and FormantSingingEngine have different but useful control profiles. It does not require continuous pitch curves, breathiness, portamento, phrase-expression curves, phrase breath timing, or local edits, so those must remain separately reported as unsupported or approximated rather than silently counted as fully successful. The per-backend manifest tests also verify that all 20 controls—including consonant anticipation and phrase breath timing—are declared.
+The shared comparison policy currently permits documented approximations and conditional language support, because Kokoro, DiffSinger and FormantSingingEngine have different but useful control profiles. It does not require continuous pitch curves, breathiness, portamento, phrase-expression curves, phrase breath timing, or local edits in the common score-conditioned track; phrase expression is qualified separately and phrase breath remains an explicit unsupported track until audible breath events are implemented. The per-backend manifest tests also verify that all 20 controls—including consonant anticipation and phrase breath timing—are declared.
 
 This is **admission to a fair comparison**, not proof that approximated controls are equivalent to native controls or that either backend achieved good perceptual quality. Report capability support class alongside all benchmark scores.
 
