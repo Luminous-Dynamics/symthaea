@@ -927,7 +927,10 @@ mod tests {
         };
         plan.words[0].candidates[0].syllables[0].phones[1].ipa = "æ".into();
         let error = plan.validate().unwrap_err();
-        assert!(error.contains("exact selected pronunciation candidate"), "{error}");
+        assert!(
+            error.contains("exact selected pronunciation candidate"),
+            "{error}"
+        );
     }
 
     #[test]
@@ -948,7 +951,10 @@ mod tests {
         };
         plan.language = "en-GB".into();
         let error = plan.validate().unwrap_err();
-        assert!(error.contains("exact language/text/span context"), "{error}");
+        assert!(
+            error.contains("exact language/text/span context"),
+            "{error}"
+        );
     }
 
     #[test]
