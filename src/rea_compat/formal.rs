@@ -8,9 +8,8 @@
 //! qualification boundary.
 
 use super::claims::{
-    CLAIM_EVALUATION_SCHEMA, CLAIM_EVALUATOR_VERSION, CLAIM_SCHEMA, ClaimDisposition,
-    ClaimError, ClaimEvaluation, ClaimPredicate, ClaimRequest, EvidenceAssessmentKind,
-    validate_claim,
+    CLAIM_EVALUATION_SCHEMA, CLAIM_EVALUATOR_VERSION, CLAIM_SCHEMA, ClaimDisposition, ClaimError,
+    ClaimEvaluation, ClaimPredicate, ClaimRequest, EvidenceAssessmentKind, validate_claim,
 };
 use super::{canonical_jcs_bytes, sha256_hex};
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
@@ -19,14 +18,11 @@ use serde_json::{Map, Number, Value};
 use std::collections::HashSet;
 use std::fmt;
 
-pub const FORMAL_PROVIDER_OBSERVATION_SCHEMA: &str =
-    "luminous.rea.formal-provider-observation.v1";
-pub const FORMAL_PROVIDER_OBSERVATION_RULE: &str =
-    "rea-provider-observation-projection/v1";
+pub const FORMAL_PROVIDER_OBSERVATION_SCHEMA: &str = "luminous.rea.formal-provider-observation.v1";
+pub const FORMAL_PROVIDER_OBSERVATION_RULE: &str = "rea-provider-observation-projection/v1";
 pub const MAX_FORMAL_PROVIDER_OBSERVATION_JSON_BYTES: usize = 4 * 1024 * 1024;
 
-const V0_OBSERVATION_RULE_ID: &str =
-    "provider-reported-observation/exact-normalized-result/v0";
+const V0_OBSERVATION_RULE_ID: &str = "provider-reported-observation/exact-normalized-result/v0";
 const V0_UNVERIFIED_RULE_ID: &str = "no-registered-predicate-rule/v0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,9 +127,7 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn valid_evidence_id(value: &str) -> bool {
-    value
-        .strip_prefix("ev_")
-        .is_some_and(valid_sha256)
+    value.strip_prefix("ev_").is_some_and(valid_sha256)
 }
 
 fn request_from_evaluation(
@@ -159,9 +153,7 @@ fn request_from_evaluation(
     Ok(request)
 }
 
-fn validate_reference_partition(
-    evaluation: &ClaimEvaluation,
-) -> Result<(), FormalMappingError> {
+fn validate_reference_partition(evaluation: &ClaimEvaluation) -> Result<(), FormalMappingError> {
     let mut requested = HashSet::with_capacity(evaluation.requested_evidence_ids.len());
     for id in &evaluation.requested_evidence_ids {
         if !valid_evidence_id(id) || !requested.insert(id.as_str()) {
@@ -213,9 +205,7 @@ fn validate_reference_partition(
     Ok(())
 }
 
-fn recompute_request_digest(
-    request: &ClaimRequest,
-) -> Result<String, FormalMappingError> {
+fn recompute_request_digest(request: &ClaimRequest) -> Result<String, FormalMappingError> {
     let value = serde_json::to_value(request).map_err(|error| {
         FormalMappingError::new(
             FormalMappingErrorKind::Canonicalization,
@@ -231,7 +221,9 @@ fn recompute_request_digest(
     Ok(sha256_hex(&canonical))
 }
 
-fn validate_evaluation(evaluation: &ClaimEvaluation) -> Result<FormalSemanticPolarity, FormalMappingError> {
+fn validate_evaluation(
+    evaluation: &ClaimEvaluation,
+) -> Result<FormalSemanticPolarity, FormalMappingError> {
     if evaluation.schema != CLAIM_EVALUATION_SCHEMA
         || evaluation.evaluator_version != CLAIM_EVALUATOR_VERSION
     {
@@ -399,7 +391,6 @@ pub fn validate_formal_provider_observation(
     }
     Ok(())
 }
-
 
 struct UniqueJsonValue(Value);
 
