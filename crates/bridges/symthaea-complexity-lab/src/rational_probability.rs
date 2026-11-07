@@ -148,7 +148,7 @@ pub fn posterior_marginals(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::semiring::{ExactFactorGraph, SemiringError};
+    use crate::semiring::{ExactFactorGraph, ExactSemiring, SemiringError};
 
     fn q(numerator: i128, denominator: i128) -> CheckedRational {
         CheckedRational::new(numerator, denominator).unwrap()
