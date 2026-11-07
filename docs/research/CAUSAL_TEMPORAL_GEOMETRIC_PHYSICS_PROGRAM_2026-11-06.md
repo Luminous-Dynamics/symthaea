@@ -269,19 +269,25 @@ Existing components:
   acceleration; it is not a geodesic solver.
 - A new `adm_reference` path builds a full covariant 4D metric from the
   three-amplifier shift using the explicit ADM choice lapse=1 and
-  spatial metric=identity. It checks Lorentzian inertia, derives Christoffel
+  spatial metric=identity. It uses a fixed command direction per bubble and
+  a radial Alcubierre shaping profile around the focal point; this is smooth
+  at the bubble centre. It checks Lorentzian inertia, derives Christoffel
   symbols from metric derivatives, normalizes timelike four-velocities, and
   integrates the full affine geodesic equation through the metric-geometry
   kernel.
 - The same path reconstructs the Einstein-implied stress-energy
   (T_{\mu\nu}=G_{\mu\nu}/(8\pi)) from the metric's curvature, reports
   Eulerian energy density, and samples null-energy contractions.
+- A separate defect audit found that the older radial-away-from-focal-point
+  shift is discontinuous at the exact focus: it is manually set to zero at
+  the focus, while its directional limit is nonzero and depends on approach
+  direction. The ADM path no longer uses that legacy radial vector field.
 
-This is an important mathematical improvement: the three-amplifier field is
-now tested as a metric, not treated as a free acceleration. But it is a
-prescribed static metric ansatz with fixed amplifier focal points. The implied
-stress-energy is not a source model or evidence of realizable matter. The
-finite-difference curvature and finite-direction energy-condition sample
+This is an important mathematical improvement: the amplifier field is now
+tested as a metric, not treated as a free acceleration. But it remains a
+prescribed static metric ansatz with fixed amplifier focal points. The
+implied stress-energy is not a source model or evidence of realizable matter.
+The finite-difference curvature and finite-direction energy-condition sample
 require step-size/angular convergence and independent symbolic checks. The
 legacy simulator remains explicitly non-physical; no propulsion claim follows.
 
