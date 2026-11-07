@@ -206,10 +206,10 @@ def validate_documents(
 
     crosswalk_rows = [
         line for line in evidence_crosswalk.splitlines()
-        if re.match(r"^\\| ERG-S\\d{2} \\|", line)
+        if re.match(r"^\| ERG-S\d{2} \|", line)
     ]
     crosswalk_ids = [
-        int(re.match(r"^\\| ERG-S(\\d{2}) \\|", line).group(1))
+        int(re.match(r"^\| ERG-S(\d{2}) \|", line).group(1))
         for line in crosswalk_rows
     ]
     if crosswalk_ids != list(range(1, 27)):
