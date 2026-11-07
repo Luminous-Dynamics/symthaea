@@ -270,9 +270,9 @@ pub struct SupportGatedSelectorReport {
     pub heldout_selected_mean: Option<f64>,
     pub heldout_baseline_mean: Option<f64>,
     pub heldout_gain: Option<f64>,
-    /// Count of candidate × continuation branches evaluated in each lane.
-    pub selection_rollout_count: usize,
-    pub evaluation_rollout_count: usize,
+    /// Number of candidate × continuation utility cells in each supplied matrix. This is not a simulator rollout count.
+    pub selection_candidate_continuation_cells: usize,
+    pub evaluation_candidate_continuation_cells: usize,
 }
 
 /// A finite reference selector using repeated continuation means and a
@@ -338,10 +338,10 @@ pub fn select_supported_candidate(
     }
 
     let rollout_count = design.headroom.candidate_ids.len();
-    let selection_rollout_count = rollout_count
+    let selection_candidate_continuation_cells = rollout_count
         .checked_mul(design.headroom.selection.continuation_ids.len())
         .ok_or(SupportedSelectorError::WorkCountOverflow)?;
-    let evaluation_rollout_count = rollout_count
+    let evaluation_candidate_continuation_cells = rollout_count
         .checked_mul(design.headroom.evaluation.continuation_ids.len())
         .ok_or(SupportedSelectorError::WorkCountOverflow)?;
 
@@ -391,8 +391,8 @@ pub fn select_supported_candidate(
             heldout_selected_mean: None,
             heldout_baseline_mean: None,
             heldout_gain: None,
-            selection_rollout_count,
-            evaluation_rollout_count,
+            selection_candidate_continuation_cells,
+            evaluation_candidate_continuation_cells,
         });
     }
 
@@ -481,8 +481,8 @@ pub fn select_supported_candidate(
         heldout_selected_mean: Some(heldout_selected_mean),
         heldout_baseline_mean: Some(heldout_baseline_mean),
         heldout_gain: Some(heldout_selected_mean - heldout_baseline_mean),
-        selection_rollout_count,
-        evaluation_rollout_count,
+        selection_candidate_continuation_cells,
+        evaluation_candidate_continuation_cells,
     })
 }
 
@@ -1251,8 +1251,8 @@ mod tests {
         assert_eq!(report.scope, SelectorScope::CompleteWithinDeclaredScope);
         assert!(report.selected_lower_bound.unwrap() > report.baseline_upper_bound.unwrap());
         assert_eq!(report.heldout_gain, Some(9.0));
-        assert_eq!(report.selection_rollout_count, 34);
-        assert_eq!(report.evaluation_rollout_count, 6);
+        assert_eq!(report.selection_candidate_continuation_cells, 34);
+        assert_eq!(report.evaluation_candidate_continuation_cells, 6);
     }
 
     #[test]

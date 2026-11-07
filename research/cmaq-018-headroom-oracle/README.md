@@ -42,7 +42,7 @@ The crate now includes a finite reference selector that is separate from the eva
 - If the baseline's support is not qualified, the selector abstains. It does not silently fall back to a nominal baseline.
 - If no alternative clears the simultaneous separation gate, it retains the supported baseline. This means "no improvement established", not "baseline proven optimal".
 - An incomplete or budget-limited candidate universe is labelled `EnumeratedBankOnly`; the result is not represented as a global action optimum.
-- The bounded utility range, familywise delta, selection continuation count and rollout counts are returned with the decision, alongside the original support records and sampling contract so a reviewer can reconstruct the gate.
+- The bounded utility range, familywise delta, selection continuation count and candidate×continuation matrix-cell counts are returned with the decision, alongside the original support records and sampling contract so a reviewer can reconstruct the gate.
 - The confidence formula assumes independent continuation draws across continuation IDs for each candidate. The caller must supply an IID sampling contract and justification reference. The crate retains that claim but does not authenticate it or validate the scientific sampling process.
 - The selected candidate is scored only after selection on the disjoint evaluation continuation batch. These held-out values are descriptive in this reference and do not feed back into the choice.
 
@@ -62,6 +62,6 @@ The tests include:
 
 ## Deliberate limits
 
-This reference does not implement a simulator, policy continuation, learned D3 selector, D0/D1/D2/D3 campaign, confidence sequence, cluster bootstrap, statistical power analysis, common-random-number causal proof, external receipt authentication, or physical-driving experiment. Its support-gated rule is a transparent finite reference selector, not an empirically qualified planner. It does not infer empirical performance from finite fixture results.
+This reference does not execute simulator rollouts or policy continuations; its reported matrix-cell counts are not physical rollout or transition counts. It does not implement a learned D3 selector, D0/D1/D2/D3 campaign, confidence sequence, cluster bootstrap, statistical power analysis, common-random-number causal proof, external receipt authentication, or physical-driving experiment. Its support-gated rule is a transparent finite reference selector, not an empirically qualified planner. It does not infer empirical performance from finite fixture results.
 
 The full #10625 protocol remains responsible for repeated closed-loop continuations, separate calibration and sealed evaluation sets, matched-compute comparisons, support/abstention gates, correspondence hypotheses, causal stochastic receipts, family-clustered inference, and compute/latency/energy accounting.
