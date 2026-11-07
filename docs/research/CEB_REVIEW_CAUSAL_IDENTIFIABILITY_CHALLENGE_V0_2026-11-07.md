@@ -181,6 +181,8 @@ Two possible orders:
 
 **Claim kind:** Actual-cause attribution to a repair component and identifiability of that component's minimal intervention effect; the incident-level outcome is separately attributed to the bundled revision.
 
+**Evidence packet:** The only before/after source excerpts and historical outcome supplied are the following. The additional queue/retention/store changes are known to be part of the same historical change but their exact source excerpts and isolated outcomes are not supplied.
+
 Before revision:
 
 ```rust
