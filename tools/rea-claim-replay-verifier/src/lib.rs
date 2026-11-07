@@ -1091,8 +1091,7 @@ fn derive_reference_result(
     claim: &ClaimRequest,
     evidence_by_id: &HashMap<String, AdmittedEvidence>,
 ) -> Result<ClaimEvaluation, ReplayError> {
-    let mut numeric_precision_warnings =
-        asserted_value_precision_warnings(&claim.asserted_value);
+    let mut numeric_precision_warnings = asserted_value_precision_warnings(&claim.asserted_value);
     for evidence_id in &claim.evidence_ids {
         if let Some(record) = evidence_by_id.get(evidence_id) {
             numeric_precision_warnings.extend(record.numeric_precision_warnings.clone());
@@ -1245,10 +1244,7 @@ fn derive_reference_result(
         .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
     let claim_request_sha256 = sha256_hex(&claim_bytes);
 
-    let ceiling = claim_ceiling(
-        claim.predicate,
-        !numeric_precision_warnings.is_empty(),
-    );
+    let ceiling = claim_ceiling(claim.predicate, !numeric_precision_warnings.is_empty());
     let body = DerivationBody {
         schema: RESULT_SCHEMA,
         evaluator_version: EVALUATOR_VERSION,
