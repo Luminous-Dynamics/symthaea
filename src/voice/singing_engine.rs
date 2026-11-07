@@ -190,7 +190,7 @@ impl VocalPerformance {
             .map(|(index, syllable_end)| VocalPhraseSpec {
                 syllable_end,
                 breath_before_s: if index == 0 { 0.0 } else { 0.12 },
-                breath_after_s: 0.12,
+                breath_after_s: if index + 1 == phrase_ends.len() { 0.10 } else { 0.12 },
                 expression: PhraseExpressionProfile::default(),
             })
             .collect();
@@ -1246,6 +1246,107 @@ mod tests {
         assert!(performance.phrases[0].breath_after_s > 0.0);
         assert!(performance.phrases[1].breath_before_s > 0.0);
         performance.validate().unwrap();
+    }
+
+    #[test]
+    fn phrase_specs_apply_independent_breath_and_expression_arcs() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 246.94,
+                start_time: 0.75,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let phrase_specs = [
+            VocalPhraseSpec {
+                syllable_end: 1,
+                breath_before_s: 0.0,
+                breath_after_s: 0.25,
+                expression: PhraseExpressionProfile {
+                    energy_multiplier: [0.5, 1.5, 0.6],
+                    breathiness_offset: [-0.1, 0.2, -0.2],
+                    tension: [0.1, 0.9, 0.2],
+                },
+            },
+            VocalPhraseSpec {
+                syllable_end: 2,
+                breath_before_s: 0.37,
+                breath_after_s: 0.18,
+                expression: PhraseExpressionProfile {
+                    energy_multiplier: [1.0, 0.8, 0.4],
+                    breathiness_offset: [0.0, -0.1, 0.3],
+                    tension: [0.3, 0.4, 0.05],
+                },
+            },
+        ];
+        let performance = VocalPerformance::from_melody_with_phrase_specs(
+            "light bright",
+            &notes,
+            "en",
+            &phrase_specs,
+        )
+        .unwrap();
+
+        assert_eq!(performance.phrases.len(), 2);
+        assert_eq!(performance.phrases[0].breath_after_s, 0.25);
+        assert_eq!(performance.phrases[1].breath_before_s, 0.37);
+        assert_eq!(performance.phrases[1].breath_after_s, 0.18);
+
+        let first = &performance.phrases[0].expression_curve;
+        assert!((first[0].energy - 0.35).abs() < 1e-5);
+        assert_eq!(first[0].tension, 0.1);
+        assert_eq!(first[1].tension, 0.9);
+        assert_eq!(first[2].tension, 0.2);
+
+        let second = &performance.phrases[1].expression_curve;
+        assert_eq!(second[0].tension, 0.3);
+        assert_eq!(second[1].tension, 0.4);
+        assert_eq!(second[2].tension, 0.05);
+        performance.validate().unwrap();
+    }
+
+    #[test]
+    fn phrase_specs_reject_non_finite_and_out_of_range_expression_controls() {
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let mut invalid = VocalPhraseSpec::with_end(1);
+        invalid.expression.energy_multiplier[1] = f32::NAN;
+        assert!(
+            VocalPerformance::from_melody_with_phrase_specs(
+                "light",
+                &[note],
+                "en",
+                &[invalid],
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("energy multipliers")
+        );
+
+        let mut invalid = VocalPhraseSpec::with_end(1);
+        invalid.breath_after_s = 6.0;
+        assert!(
+            VocalPerformance::from_melody_with_phrase_specs(
+                "light",
+                &[note],
+                "en",
+                &[invalid],
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("breath durations")
+        );
     }
 
     #[test]
