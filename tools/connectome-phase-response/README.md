@@ -30,6 +30,8 @@ The local reset is the sender-axis component; off-diagonal transfer is the sum o
 
 Descending-command probe keys require the exact source identity DNg100, DNg97 or DNb08. A generic descending-command row is invalid; this prevents distinct command pathways from being pooled in the same transfer surface.
 
+Every `PhaseResponseSurface` requires a `SourceBinding` object. It carries the dataset/revision, phase-estimator, axis-identity, raw-trajectory, perturbation/dose, context-definition digests plus animal/session/trial tokens. The Rust constructor validates nonempty unit tokens and lowercase 64-character SHA-256 syntax. This is lineage-shape validation only: the crate does not authenticate signatures, recompute the source-file hashes or verify a transparency-log proof.
+
 ## Fail-closed semantics
 
 No response, failed assay, missing track, out-of-support and not-assessed are explicit states. They are not encoded as six zero phase shifts. Probe keys preserve context, perturbation class, sender leg or exact descending-neuron identity, phase bin, perturbation magnitude bin and response delay. Magnitude bins are bounded to 16 in V1; the perturbation receipt digest commits the physical dose/strength mapping.
