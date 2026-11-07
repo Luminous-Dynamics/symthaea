@@ -40,9 +40,7 @@ impl Phase {
             return Err(PhaseError::NonFinitePhase);
         }
         let microturns = value * (PHASE_SCALE as f64) / std::f64::consts::TAU;
-        if !microturns.is_finite()
-            || microturns < i64::MIN as f64
-            || microturns >= i64::MAX as f64
+        if !microturns.is_finite() || microturns < i64::MIN as f64 || microturns >= i64::MAX as f64
         {
             return Err(PhaseError::PhaseOutOfRange);
         }
@@ -223,12 +221,27 @@ impl SourceBinding {
             }
         }
         for (field, digest) in [
-            ("dataset_revision_sha256", self.dataset_revision_sha256.as_str()),
-            ("phase_estimator_sha256", self.phase_estimator_sha256.as_str()),
-            ("axis_identity_receipt_sha256", self.axis_identity_receipt_sha256.as_str()),
+            (
+                "dataset_revision_sha256",
+                self.dataset_revision_sha256.as_str(),
+            ),
+            (
+                "phase_estimator_sha256",
+                self.phase_estimator_sha256.as_str(),
+            ),
+            (
+                "axis_identity_receipt_sha256",
+                self.axis_identity_receipt_sha256.as_str(),
+            ),
             ("raw_trajectory_sha256", self.raw_trajectory_sha256.as_str()),
-            ("perturbation_receipt_sha256", self.perturbation_receipt_sha256.as_str()),
-            ("context_definition_sha256", self.context_definition_sha256.as_str()),
+            (
+                "perturbation_receipt_sha256",
+                self.perturbation_receipt_sha256.as_str(),
+            ),
+            (
+                "context_definition_sha256",
+                self.context_definition_sha256.as_str(),
+            ),
         ] {
             if !valid_sha256(digest) {
                 return Err(PhaseError::InvalidSourceDigest(field));
@@ -300,7 +313,8 @@ impl PhaseReset {
     }
 
     pub fn local_cycle_slips(self) -> Option<i64> {
-        self.source_leg.map(|leg| self.cycle_slips_by_leg[leg.index()])
+        self.source_leg
+            .map(|leg| self.cycle_slips_by_leg[leg.index()])
     }
 }
 
@@ -314,10 +328,7 @@ pub struct PhaseResponseSurface {
 impl PhaseResponseSurface {
     /// Require source lineage, reject duplicate design cells, and validate
     /// every probe key before admitting the response surface.
-    pub fn new(
-        source_binding: SourceBinding,
-        rows: Vec<TransferRow>,
-    ) -> Result<Self, PhaseError> {
+    pub fn new(source_binding: SourceBinding, rows: Vec<TransferRow>) -> Result<Self, PhaseError> {
         source_binding.validate()?;
         let mut indexed = BTreeMap::new();
         for row in rows {
@@ -358,7 +369,10 @@ impl PhaseResponseSurface {
         if actual != expected_set {
             let missing = expected_set.difference(&actual).count();
             let unexpected = actual.difference(&expected_set).count();
-            return Err(PhaseError::GridMismatch { missing, unexpected });
+            return Err(PhaseError::GridMismatch {
+                missing,
+                unexpected,
+            });
         }
         Ok(())
     }
@@ -404,8 +418,7 @@ impl PhaseResponseSurface {
 /// fractional phase displacement. This avoids counting a small phase advance
 /// across the fractional branch boundary as a full-cycle slip.
 fn cycle_slip_delta(perturbed: PhaseSample, control: PhaseSample, wrapped: Phase) -> i64 {
-    let winding_delta = i128::from(perturbed.cycle_index())
-        - i128::from(control.cycle_index());
+    let winding_delta = i128::from(perturbed.cycle_index()) - i128::from(control.cycle_index());
     let fractional_delta = i128::from(perturbed.fractional_phase().microturns())
         - i128::from(control.fractional_phase().microturns());
     let unwrapped_delta = winding_delta * i128::from(PHASE_SCALE) + fractional_delta;
@@ -466,10 +479,7 @@ impl ModelSignature {
 /// Exact circular L1 separation in microturns between two model-predicted
 /// six-leg response vectors. This is a deterministic synthetic diagnostic,
 /// not a likelihood, probability or biological effect size.
-pub fn response_vector_distance(
-    left: &[Phase; LEG_COUNT],
-    right: &[Phase; LEG_COUNT],
-) -> u64 {
+pub fn response_vector_distance(left: &[Phase; LEG_COUNT], right: &[Phase; LEG_COUNT]) -> u64 {
     left.iter()
         .zip(right.iter())
         .map(|(a, b)| u64::from(a.circular_distance(*b)))
@@ -511,10 +521,7 @@ pub fn minimum_pairwise_probe_separation(
         let mut minimum = u64::MAX;
         for left in 0..maps.len() {
             for right in (left + 1)..maps.len() {
-                let distance = response_vector_distance(
-                    &maps[left][&key].0,
-                    &maps[right][&key].0,
-                );
+                let distance = response_vector_distance(&maps[left][&key].0, &maps[right][&key].0);
                 minimum = minimum.min(distance);
             }
         }
@@ -566,11 +573,9 @@ pub fn minimum_pairwise_cycle_slip_separation(
         let mut minimum = u64::MAX;
         for left in 0..maps.len() {
             for right in (left + 1)..maps.len() {
-                let distance = checked_cycle_slip_vector_distance(
-                    &maps[left][&key].1,
-                    &maps[right][&key].1,
-                )
-                .ok_or(PhaseError::ArithmeticOverflow)?;
+                let distance =
+                    checked_cycle_slip_vector_distance(&maps[left][&key].1, &maps[right][&key].1)
+                        .ok_or(PhaseError::ArithmeticOverflow)?;
                 minimum = minimum.min(distance);
             }
         }
@@ -686,7 +691,11 @@ pub fn minimum_joint_campaign_cycle_slip_separation(
 /// the fractional phase component only.
 pub fn minimum_campaign_separation(models: &[ModelSignature]) -> Result<u64, PhaseError> {
     let by_probe = minimum_pairwise_probe_separation(models)?;
-    by_probe.values().copied().min().ok_or(PhaseError::EmptyProbeGrid)
+    by_probe
+        .values()
+        .copied()
+        .min()
+        .ok_or(PhaseError::EmptyProbeGrid)
 }
 
 /// Minimum separation across all model pairs and supplied probe cells, for
@@ -732,29 +741,71 @@ impl fmt::Display for PhaseError {
         match self {
             Self::InvalidLeg(value) => write!(f, "invalid leg ID {value}; expected 0..6"),
             Self::InvalidPhaseBin(value) => write!(f, "invalid phase bin {value}; expected 0..8"),
-            Self::InvalidMagnitudeBin(value) => write!(f, "invalid magnitude bin {value}; expected 0..16"),
+            Self::InvalidMagnitudeBin(value) => {
+                write!(f, "invalid magnitude bin {value}; expected 0..16")
+            }
             Self::NonFinitePhase => write!(f, "phase input is non-finite"),
-            Self::PhaseOutOfRange => write!(f, "unwrapped phase is outside the representable microturn range"),
-            Self::SourceLegRequired(class) => write!(f, "probe class {class:?} requires a source leg"),
-            Self::SourceLegForbidden(class) => write!(f, "probe class {class:?} is a global input and forbids a source leg"),
-            Self::DescendingNeuronRequired => write!(f, "descending command probe requires an exact DNg100/DNg97/DNb08 identity"),
-            Self::DescendingNeuronForbidden => write!(f, "non-descending probe cannot carry a descending-neuron identity"),
+            Self::PhaseOutOfRange => write!(
+                f,
+                "unwrapped phase is outside the representable microturn range"
+            ),
+            Self::SourceLegRequired(class) => {
+                write!(f, "probe class {class:?} requires a source leg")
+            }
+            Self::SourceLegForbidden(class) => write!(
+                f,
+                "probe class {class:?} is a global input and forbids a source leg"
+            ),
+            Self::DescendingNeuronRequired => write!(
+                f,
+                "descending command probe requires an exact DNg100/DNg97/DNb08 identity"
+            ),
+            Self::DescendingNeuronForbidden => write!(
+                f,
+                "non-descending probe cannot carry a descending-neuron identity"
+            ),
             Self::DuplicateProbeKey => write!(f, "duplicate phase-response probe key"),
-            Self::DuplicateExpectedKey => write!(f, "duplicate key in expected phase-response grid"),
+            Self::DuplicateExpectedKey => {
+                write!(f, "duplicate key in expected phase-response grid")
+            }
             Self::MissingProbeKey => write!(f, "phase-response probe key is absent"),
-            Self::GridMismatch { missing, unexpected } => write!(f, "phase-response grid mismatch: {missing} missing, {unexpected} unexpected"),
-            Self::Unavailable(status) => write!(f, "phase-response measurement unavailable: {status:?}"),
+            Self::GridMismatch {
+                missing,
+                unexpected,
+            } => write!(
+                f,
+                "phase-response grid mismatch: {missing} missing, {unexpected} unexpected"
+            ),
+            Self::Unavailable(status) => {
+                write!(f, "phase-response measurement unavailable: {status:?}")
+            }
             Self::EmptyModelId => write!(f, "model ID is empty"),
             Self::InvalidPlv(value) => write!(f, "PLV milli value {value} exceeds 1000"),
-            Self::DuplicatePredictionKey(model) => write!(f, "model {model} has duplicate prediction keys"),
+            Self::DuplicatePredictionKey(model) => {
+                write!(f, "model {model} has duplicate prediction keys")
+            }
             Self::EmptyPredictionSet(model) => write!(f, "model {model} has no predictions"),
-            Self::InsufficientModels => write!(f, "at least two models are required for pairwise separation"),
+            Self::InsufficientModels => write!(
+                f,
+                "at least two models are required for pairwise separation"
+            ),
             Self::DuplicateModelId(model) => write!(f, "duplicate model ID {model}"),
-            Self::ModelProbeGridMismatch { model_id } => write!(f, "model {model_id} does not predict the identical probe grid"),
+            Self::ModelProbeGridMismatch { model_id } => write!(
+                f,
+                "model {model_id} does not predict the identical probe grid"
+            ),
             Self::EmptyProbeGrid => write!(f, "phase-response probe grid is empty"),
-            Self::ArithmeticOverflow => write!(f, "phase-response separation overflowed its exact integer range"),
-            Self::MissingSourceBindingField(field) => write!(f, "source binding field {field} is empty"),
-            Self::InvalidSourceDigest(field) => write!(f, "source binding digest {field} is not a lowercase SHA-256 hex string"),
+            Self::ArithmeticOverflow => write!(
+                f,
+                "phase-response separation overflowed its exact integer range"
+            ),
+            Self::MissingSourceBindingField(field) => {
+                write!(f, "source binding field {field} is empty")
+            }
+            Self::InvalidSourceDigest(field) => write!(
+                f,
+                "source binding digest {field} is not a lowercase SHA-256 hex string"
+            ),
         }
     }
 }
@@ -1114,13 +1165,21 @@ mod tests {
             model_id: "central-only".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: local_only, cycle_slips_by_leg: [0; LEG_COUNT] }],
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: local_only,
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
         };
         let proprioceptive = ModelSignature {
             model_id: "central-plus-proprioception".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: sensory_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
+            predictions: vec![ProbePrediction {
+                key: probe,
+                by_leg: sensory_transfer,
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
         };
         let separation = minimum_pairwise_probe_separation(&[central, proprioceptive]).unwrap();
         assert_eq!(separation[&probe], 30_000);
@@ -1143,13 +1202,21 @@ mod tests {
             model_id: "a".to_string(),
             steady_state_frequency_millihz: 10_000,
             steady_state_plv_milli: 500,
-            predictions: vec![ProbePrediction { key: probe_a, by_leg: zeros(), cycle_slips_by_leg: [0; LEG_COUNT] }],
+            predictions: vec![ProbePrediction {
+                key: probe_a,
+                by_leg: zeros(),
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
         };
         let second = ModelSignature {
             model_id: "b".to_string(),
             steady_state_frequency_millihz: 10_000,
             steady_state_plv_milli: 500,
-            predictions: vec![ProbePrediction { key: probe_b, by_leg: zeros(), cycle_slips_by_leg: [0; LEG_COUNT] }],
+            predictions: vec![ProbePrediction {
+                key: probe_b,
+                by_leg: zeros(),
+                cycle_slips_by_leg: [0; LEG_COUNT],
+            }],
         };
         assert!(matches!(
             minimum_pairwise_probe_separation(&[first, second]),
