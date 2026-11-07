@@ -1,0 +1,108 @@
+{
+  "schema_version": "0.1.0",
+  "checked_at": "2026-11-07",
+  "status": "reference_register_not_acceptance_limits",
+  "entries": [
+    {
+      "id": "ISO2631-1-1997-Amd1-2010",
+      "kind": "published_standard",
+      "status_as_of_check": "published_current_pending_replacement",
+      "scope": "whole-body vibration measurement; informative guidance on health, comfort, perception and motion sickness",
+      "source": "https://www.iso.org/standard/7612.html",
+      "note": "Do not treat as a complete vessel seakeeping or habitability acceptance method. New ISO/FDIS revision remains unpublished as at check date."
+    },
+    {
+      "id": "ISO-DIS-2631-1-ed3-preview",
+      "kind": "draft_preview",
+      "status_as_of_check": "under_development",
+      "source": "https://www.iso.org/obp/ui?_escaped_fragment_=iso%3Astd%3Aiso%3A2631%3A-1%3Adis%3Aed-3%3Av1%3Aen",
+      "frequency_domains_hz": {
+        "health_comfort_perception": [
+          0.5,
+          80
+        ],
+        "motion_sickness": [
+          0.1,
+          0.5
+        ]
+      },
+      "note": "These frequency descriptions are taken from the draft preview, not claimed as a newly published edition."
+    },
+    {
+      "id": "Zu-et-al-2026-task-oriented-seakeeping",
+      "kind": "peer_reviewed_methodology",
+      "first_published_online": "2026-02-27",
+      "source": "https://journals.sagepub.com/doi/10.1177/14750902251412460",
+      "effect_domains": [
+        "MII",
+        "MIF",
+        "MSI"
+      ],
+      "reference_examples": {
+        "mii_per_min_risk_bands": {
+          "possible": 0.1,
+          "probable": 0.5,
+          "serious": 1.5,
+          "severe": 3,
+          "extreme": 5
+        }
+      },
+      "unit": "interruptions/min",
+      "applicability": "literature risk bands for particular crew-task contexts; not LOS acceptance thresholds",
+      "note": "MII criteria are adapted from earlier crew work; criteria differ by task and mission. Study cases are workboats, not long-duration private liveaboards."
+    },
+    {
+      "id": "Mauro-et-al-2025-small-cruise-motion-comfort",
+      "kind": "peer_reviewed_model_and_dataset",
+      "publication_date": "2025-12-30",
+      "doi": "10.1016/j.oceaneng.2025.122825",
+      "source": "https://doi.org/10.1016/j.oceaneng.2025.122825",
+      "method": "25-ship concept database; heave/pitch transfer-function model in head seas; external ship verification",
+      "reference_criteria_reported_in_related_paper": {
+        "MSI_percent": 10,
+        "scope": "published criteria table context, not LOS acceptance"
+      },
+      "applicability": "small cruise ship concept design only; transfer to LOS-18 / multihulls not assumed",
+      "note": "Acquire and review exact article and its criteria table before adopting any numbers."
+    },
+    {
+      "id": "MII-task-effectiveness-literature-summary-2026",
+      "kind": "literature_summary_in_2026_method_paper",
+      "source": "https://journals.sagepub.com/doi/10.1177/14750902251412460",
+      "reference_examples": {
+        "mii_per_min": {
+          "possible": 0.1,
+          "probable": 0.5,
+          "serious": 1.5,
+          "severe": 3,
+          "extreme": 5
+        },
+        "task_effectiveness_examples": {
+          "recovery_3_5s": {
+            "possible": 0.994,
+            "probable": 0.971,
+            "serious": 0.913,
+            "severe": 0.825,
+            "extreme": 0.708
+          },
+          "recovery_9s": {
+            "possible": 0.985,
+            "probable": 0.925,
+            "serious": 0.775,
+            "severe": 0.55,
+            "extreme": 0.25
+          }
+        }
+      },
+      "unit": "dimensionless task effectiveness",
+      "applicability": "crew-task risk bands adapted from cited literature; not a passenger/inhabitant acceptance threshold"
+    }
+  ],
+  "selection_rules": [
+    "Every adopted criterion binds a population, task, posture, exposure duration, frequency domain, measurement/model method and source edition.",
+    "A threshold from a workboat crew or cruise ship is a comparison reference, not automatically applicable to a small liveaboard.",
+    "Do not compare criteria with unlike units or exposure windows.",
+    "A candidate must be validated against a reference dataset or physical trial before it informs design ranking.",
+    "Comfort and workability are not substitutes for stability, structural integrity, fire safety, flooding, escape or statutory approval."
+  ]
+}
