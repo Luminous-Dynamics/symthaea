@@ -122,6 +122,14 @@ Under the paper's stated model conditions, OATS is \(\delta\)-correct and asympt
 
 OATS is the primary comparator, not a claim of SPECTRA novelty. A SPECTRA implementation must first reproduce its exact assumptions and reference behavior. Any gain must be measured against an exact, independently checked OATS implementation.
 
+### What the published OATS experiment does and does not establish
+
+The paper's appendix reports 500 independent runs for its numerical experiments. Its HELM-derived case begins with ratings for four models over five scenarios, aggregated from 678 prompts, then rescales the resulting mean vectors using a median Euclidean gap and generates observations from the Gaussian reference model. This is a useful controlled transfer fixture, but it is not a direct replay of raw prompt-level online evaluations or a field experiment.
+
+In one reported four-arm, linear-preference configuration at confidence level 0.05, the paper reports mean stopping counts of 61,797 for OATS, 87,600 for uniform allocation, and 61,938 for the oracle allocation, with zero observed errors among 500 runs. This is a strong result for that specified Gaussian instance (roughly 29.5% fewer pulls than uniform), not a universal SOTA gain over all preferences, arm geometries, distributions or industrial experimentation systems. SPECTRA should reproduce the table and its setup before making any comparative claim, then extend the confirmation campaign to the larger run counts needed for tighter error-rate precision.
+
+**Stopping-threshold fairness is theorem-sensitive.** The paper's threshold depends on the number of independent experiments and the dimension of the mean parameter. For the theorem-matched vector-feedback construction, the experiment count is K and the mean dimension is KM; for coordinate feedback, the count is KM and the mean dimension remains KM. Therefore use the paper's proof-correct threshold for each feedback mode at the same target δ. A common numeric threshold across vector and coordinate feedback is only a secondary ablation, and only if its validity is independently established for both modes. “Same δ and same guarantees” is the primary comparison; “same numeric threshold” is not automatically a fair or valid comparison.
+
 ## 5. Reproduction campaign
 
 ### Analytic and numerical fixtures
