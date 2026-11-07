@@ -225,6 +225,9 @@ pub struct StrategyBddSiftingReport {
     pub initial_node_count: usize,
     pub optimized_node_count: usize,
     pub order_evaluations: usize,
+    /// Whether every configured sifting pass completed. This is not a proof
+    /// that the selected ordering is globally optimal.
+    pub search_complete: bool,
     pub bdd: ReducedOrderedBdd,
 }
 
@@ -252,6 +255,9 @@ pub struct StrategyBddMultiStartReport {
     pub min_fill_max_frontier: usize,
     pub refined_max_frontier: usize,
     pub order_evaluations: usize,
+    pub seeds_evaluated: usize,
+    /// Whether every unique seed completed its configured sifting schedule.
+    pub search_complete: bool,
     pub bdd: ReducedOrderedBdd,
 }
 
@@ -316,6 +322,7 @@ pub struct CompiledStrategyFunction {
     pub min_fill_max_frontier: usize,
     pub refined_max_frontier: usize,
     pub order_evaluations: usize,
+    pub optimization_search_complete: bool,
     pub bdd: ReducedOrderedBdd,
 }
 
@@ -330,6 +337,7 @@ pub struct CompiledWinningStrategy {
     pub reduced_truth_table_entries: u128,
     pub total_bdd_nodes: usize,
     pub total_order_evaluations: usize,
+    pub optimization_search_complete: bool,
 }
 
 /// Result of verifying the source QBF strategy and then compiling its
@@ -860,13 +868,23 @@ pub fn sift_strategy_function_robdd_from_order(
     validate_truth_table(function, budget)?;
     let dependency_count = function.dependencies.len();
     validate_variable_order(dependency_count, initial_order)?;
+    if budget.max_variable_order_evaluations == 0 {
+        return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+            required: 1,
+            limit: 0,
+        });
+    }
+
+    // Establish and retain a valid baseline before spending the remaining
+    // budget on alternative orderings.
     let mut order = initial_order.to_vec();
     let mut bdd = compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
     let initial_variable_order = order.clone();
     let initial_node_count = bdd.nodes.len();
     let mut evaluations = 1usize;
+    let mut search_complete = true;
 
-    for _ in 0..budget.max_sifting_passes {
+    'passes: for _ in 0..budget.max_sifting_passes {
         let mut pass_improved = false;
         for dependency_index in 0..dependency_count {
             let mut remainder = order.clone();
@@ -884,6 +902,7 @@ pub fn sift_strategy_function_robdd_from_order(
 
             let mut best_order = order.clone();
             let mut best_bdd = bdd.clone();
+            let mut budget_exhausted = false;
             for insertion_position in 0..dependency_count {
                 let mut candidate = remainder.clone();
                 candidate.insert(insertion_position, dependency_index);
@@ -895,10 +914,8 @@ pub fn sift_strategy_function_robdd_from_order(
                     .checked_add(1)
                     .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
                 if required > budget.max_variable_order_evaluations {
-                    return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
-                        required,
-                        limit: budget.max_variable_order_evaluations,
-                    });
+                    budget_exhausted = true;
+                    break;
                 }
                 evaluations = required;
 
@@ -918,10 +935,16 @@ pub fn sift_strategy_function_robdd_from_order(
                 }
             }
 
+            // Commit the best candidate seen so far for this variable before
+            // returning an incomplete-search result.
             if best_order != order {
                 order = best_order;
                 bdd = best_bdd;
                 pass_improved = true;
+            }
+            if budget_exhausted {
+                search_complete = false;
+                break 'passes;
             }
         }
         if !pass_improved {
@@ -935,6 +958,7 @@ pub fn sift_strategy_function_robdd_from_order(
         initial_node_count,
         optimized_node_count: bdd.nodes.len(),
         order_evaluations: evaluations,
+        search_complete,
         bdd,
     })
 }
@@ -1278,22 +1302,31 @@ pub fn multi_start_sift_strategy_function_robdd(
         }
     }
 
+    if budget.max_variable_order_evaluations == 0 {
+        return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+            required: 1,
+            limit: 0,
+        });
+    }
     let mut remaining_budget = budget.max_variable_order_evaluations;
     let mut order_evaluations = 0usize;
+    let mut seeds_evaluated = 0usize;
+    let mut search_complete = true;
     let mut best: Option<(StrategyBddOrderSeed, usize, StrategyBddSiftingReport)> = None;
 
     for (seed, order) in &unique_orders {
         if remaining_budget == 0 {
-            return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
-                required: order_evaluations.saturating_add(1),
-                limit: budget.max_variable_order_evaluations,
-            });
+            search_complete = false;
+            break;
         }
         let seed_budget = StrategyBddBudget {
             max_variable_order_evaluations: remaining_budget,
             ..budget
         };
         let report = sift_strategy_function_robdd_from_order(function, order, seed_budget)?;
+        seeds_evaluated = seeds_evaluated
+            .checked_add(1)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
         order_evaluations = order_evaluations
             .checked_add(report.order_evaluations)
             .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
@@ -1302,6 +1335,7 @@ pub fn multi_start_sift_strategy_function_robdd(
             .checked_sub(order_evaluations)
             .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
 
+        let seed_search_complete = report.search_complete;
         let replace = best.as_ref().is_none_or(|(best_seed, _, best_report)| {
             report.optimized_node_count < best_report.optimized_node_count
                 || (report.optimized_node_count == best_report.optimized_node_count
@@ -1313,8 +1347,15 @@ pub fn multi_start_sift_strategy_function_robdd(
         if replace {
             best = Some((*seed, report.initial_node_count, report));
         }
+        if !seed_search_complete {
+            search_complete = false;
+            break;
+        }
     }
 
+    if seeds_evaluated < unique_orders.len() {
+        search_complete = false;
+    }
     let Some((selected_seed, selected_initial_node_count, selected_report)) = best else {
         return Err(StrategyBddError::ResourceAccountingOverflow);
     };
@@ -1329,6 +1370,8 @@ pub fn multi_start_sift_strategy_function_robdd(
         min_fill_max_frontier,
         refined_max_frontier,
         order_evaluations,
+        seeds_evaluated,
+        search_complete,
         bdd: selected_report.bdd,
     })
 }
@@ -1462,6 +1505,7 @@ pub fn compile_winning_strategy_functions(
             min_fill_max_frontier,
             refined_max_frontier,
             order_evaluations,
+            optimization_search_complete,
             bdd,
         ) = if exact_order_space_fits(
             support.function.dependencies.len(),
@@ -1476,6 +1520,7 @@ pub fn compile_winning_strategy_functions(
                 0,
                 0,
                 report.orders_evaluated,
+                true,
                 report.bdd,
             )
         } else {
@@ -1488,6 +1533,7 @@ pub fn compile_winning_strategy_functions(
                 report.min_fill_max_frontier,
                 report.refined_max_frontier,
                 report.order_evaluations,
+                report.search_complete,
                 report.bdd,
             )
         };
@@ -1525,10 +1571,14 @@ pub fn compile_winning_strategy_functions(
             min_fill_max_frontier,
             refined_max_frontier,
             order_evaluations,
+            optimization_search_complete,
             bdd,
         });
     }
 
+    let optimization_search_complete = functions
+        .iter()
+        .all(|function| function.optimization_search_complete);
     Ok(CompiledWinningStrategy {
         owner: strategy.owner,
         functions,
@@ -1538,6 +1588,7 @@ pub fn compile_winning_strategy_functions(
         reduced_truth_table_entries,
         total_bdd_nodes,
         total_order_evaluations,
+        optimization_search_complete,
     })
 }
 
@@ -1811,7 +1862,7 @@ mod tests {
     }
 
     #[test]
-    fn variable_order_sifting_budget_is_fail_closed() {
+    fn variable_order_sifting_preserves_verified_incumbent_when_budget_is_exhausted() {
         let source = function(
             &[11, 12, 10],
             &[false, true, false, true, false, false, true, true],
@@ -1820,9 +1871,27 @@ mod tests {
             max_variable_order_evaluations: 1,
             ..budget()
         };
+        let baseline = compile_strategy_function_to_robdd(&source, tight).unwrap();
+        let report = sift_strategy_function_robdd(&source, tight).unwrap();
+        assert!(!report.search_complete);
+        assert_eq!(report.order_evaluations, 1);
+        assert_eq!(report.bdd, baseline);
+        verify_robdd_matches_strategy_function(&report.bdd, &source, tight).unwrap();
+    }
+
+    #[test]
+    fn zero_sifting_budget_fails_before_building_an_incumbent() {
+        let source = function(&[0, 1], &[false, true, true, false]);
+        let tight = StrategyBddBudget {
+            max_variable_order_evaluations: 0,
+            ..budget()
+        };
         assert!(matches!(
             sift_strategy_function_robdd(&source, tight),
-            Err(StrategyBddError::VariableOrderSearchBudgetExceeded { .. })
+            Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+                required: 1,
+                limit: 0
+            })
         ));
     }
 
@@ -2394,6 +2463,47 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn multi_start_preserves_best_incumbent_when_global_budget_exhausts() {
+        let source = function(
+            &[11, 12, 10],
+            &[false, true, false, true, false, false, true, true],
+        );
+        let tight = StrategyBddBudget {
+            max_variable_order_evaluations: 1,
+            ..budget()
+        };
+        let report = multi_start_sift_strategy_function_robdd(&source, tight).unwrap();
+        assert!(!report.search_complete);
+        assert_eq!(report.seeds_evaluated, 1);
+        assert_eq!(report.order_evaluations, 1);
+        verify_robdd_matches_strategy_function(&report.bdd, &source, tight).unwrap();
+    }
+
+    #[test]
+    fn high_level_compiler_exposes_incomplete_order_search() {
+        let values: Vec<bool> = (0usize..64)
+            .map(|mask| mask.count_ones() % 2 == 1)
+            .collect();
+        let strategy = WinningStrategy {
+            owner: StrategyOwner::Existential,
+            functions: vec![function(&[0, 1, 2, 3, 4, 5], &values)],
+        };
+        let tight = StrategyBddBudget {
+            max_variable_order_evaluations: 1,
+            ..budget()
+        };
+        let compiled = compile_winning_strategy_functions(&strategy, tight).unwrap();
+        assert!(!compiled.optimization_search_complete);
+        assert!(!compiled.functions[0].optimization_search_complete);
+        verify_robdd_matches_strategy_function(
+            &compiled.functions[0].bdd,
+            &compiled.functions[0].reduced_function,
+            tight,
+        )
+        .unwrap();
     }
 
     #[test]
