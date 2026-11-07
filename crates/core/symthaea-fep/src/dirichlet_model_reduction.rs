@@ -350,6 +350,14 @@ pub fn reduce_dirichlet_models(
             });
         }
         prior_sum += model.prior_probability;
+        for (column, support) in model.parameter_prior.active_support.iter().enumerate() {
+            if !support.iter().any(|active| *active) {
+                return Err(DirichletBayesianModelReductionError::EmptyReducedSupport {
+                    model_id: model.model_id.clone(),
+                    column,
+                });
+            }
+        }
         validate_tensor(
             &model.parameter_prior,
             "reduced prior",
