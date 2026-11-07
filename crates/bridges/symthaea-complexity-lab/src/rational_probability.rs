@@ -145,6 +145,10 @@ pub struct RationalPosterior {
     pub partition_stats: EliminationStats,
     /// Number of additional conditioned eliminations used for marginal queries.
     pub conditioned_eliminations: usize,
+    /// Number of additive state-indicator moments carried per semiring value.
+    /// Zero for the repeated-conditioning reference; sum of cardinalities for
+    /// the one-pass expectation-semiring route.
+    pub moment_dimension: usize,
 }
 
 /// Compute exact posterior marginals by repeated conditioned variable elimination.
@@ -218,6 +222,7 @@ pub fn posterior_marginals(
         marginals,
         partition_stats,
         conditioned_eliminations,
+        moment_dimension: 0,
     })
 }
 
@@ -314,6 +319,7 @@ pub fn posterior_marginals_expectation_semiring(
         marginals,
         partition_stats,
         conditioned_eliminations: 0,
+        moment_dimension: dimensions,
     })
 }
 
@@ -362,6 +368,8 @@ mod tests {
         assert_eq!(one_pass.partition_function, posterior.partition_function);
         assert_eq!(one_pass.marginals, posterior.marginals);
         assert_eq!(one_pass.conditioned_eliminations, 0);
+        assert_eq!(one_pass.moment_dimension, 4);
+        assert_eq!(posterior.moment_dimension, 0);
     }
 
     #[test]
@@ -374,6 +382,9 @@ mod tests {
         assert_eq!(posterior.partition_function, q(37, 60));
         assert_eq!(posterior.marginals[0], vec![q(5, 37), q(32, 37)]);
         assert_eq!(posterior.marginals[1], vec![q(0, 1), q(1, 1)]);
+        let one_pass = posterior_marginals_expectation_semiring(&graph, &[1, 0]).unwrap();
+        assert_eq!(one_pass.partition_function, posterior.partition_function);
+        assert_eq!(one_pass.marginals, posterior.marginals);
     }
 
     #[test]
@@ -521,6 +532,45 @@ mod tests {
             assert_eq!(one_pass.partition_function, posterior.partition_function);
             assert_eq!(one_pass.marginals, posterior.marginals);
         }
+    }
+
+    #[test]
+    fn expectation_semiring_satisfies_first_order_semiring_laws() {
+        let zero = RationalExpectationValue::zero(2);
+        let one = RationalExpectationValue::one(2);
+        let a = RationalExpectationValue {
+            mass: q(2, 3),
+            moments: vec![q(1, 3), q(0, 1)],
+        };
+        let b = RationalExpectationValue {
+            mass: q(3, 5),
+            moments: vec![q(0, 1), q(2, 5)],
+        };
+        let c = RationalExpectationValue {
+            mass: q(4, 7),
+            moments: vec![q(1, 7), q(1, 7)],
+        };
+
+        let add = |left: &RationalExpectationValue, right: &RationalExpectationValue| {
+            ExactSemiring::checked_add(left, right).unwrap()
+        };
+        let mul = |left: &RationalExpectationValue, right: &RationalExpectationValue| {
+            ExactSemiring::checked_mul(left, right).unwrap()
+        };
+
+        assert_eq!(add(&a, &zero), a);
+        assert_eq!(mul(&a, &one), a);
+        assert_eq!(add(&a, &b), add(&b, &a));
+        assert_eq!(mul(&a, &b), mul(&b, &a));
+        assert_eq!(add(&add(&a, &b), &c), add(&a, &add(&b, &c)));
+        assert_eq!(mul(&mul(&a, &b), &c), mul(&a, &mul(&b, &c)));
+        assert_eq!(mul(&a, &add(&b, &c)), add(&mul(&a, &b), &mul(&a, &c)));
+
+        let mismatched = RationalExpectationValue::zero(1);
+        assert!(matches!(
+            ExactSemiring::checked_add(&a, &mismatched),
+            Err(SemiringError::DimensionMismatch { .. })
+        ));
     }
 
     #[test]
