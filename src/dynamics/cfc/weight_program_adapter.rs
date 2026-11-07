@@ -2243,6 +2243,66 @@ mod tests {
                 .is_some_and(|margin| margin > 0.0)
         );
 
+        let canonicalization = build_cfc_hidden_unit_canonicalization_program(
+            &original,
+            &permuted,
+            digest('d'),
+            &alignment,
+            CfCAlignmentAcceptancePolicy {
+                max_mean_squared_activation_error: 1e-10,
+                min_assignment_margin: 0.0,
+            },
+        )
+        .expect("verified coordinate canonicalization program");
+        assert_eq!(canonicalization.operations.len(), 5);
+        assert_eq!(
+            canonicalization.fault_hypothesis_ids,
+            vec!["symmetry:hidden-unit-permutation-canonicalization"]
+        );
+        let canonicalized =
+            materialize_cfc_weight_program(&permuted, digest('d'), &canonicalization)
+                .expect("canonicalized candidate");
+        assert_eq!(canonicalized.candidate_native_model_digest, snapshot.model_digest);
+        assert_eq!(
+            permuted.fingerprint().expect("permuted source remains immutable").model_digest,
+            candidate.candidate_native_model_digest
+        );
+        assert_eq!(original.fingerprint().expect("original remains immutable").model_digest, snapshot.model_digest);
+
+        // The coordinate change must preserve the candidate's function and
+        // recover the source coordinate representation for this exact fixture.
+        let canonical_signatures =
+            cfc_hidden_unit_activation_signatures(&canonicalized.network, 0, &probes)
+                .expect("canonicalized signatures");
+        assert_eq!(canonical_signatures.signatures, source_signatures.signatures);
+        let mut permuted_function = permuted.clone();
+        let mut canonicalized_function = canonicalized.network.clone();
+        for input in &inputs {
+            let before = permuted_function.forward(input, 0.1);
+            let after = canonicalized_function.forward(input, 0.1);
+            for (left, right) in before.iter().zip(after.iter()) {
+                assert!((left - right).abs() < 1e-6);
+            }
+        }
+
+        // A stale alignment cannot authorize a parameter rewrite after either
+        // model fingerprint changes.
+        assert!(matches!(
+            build_cfc_hidden_unit_canonicalization_program(
+                &original,
+                &inconsistent.network,
+                digest('d'),
+                &alignment,
+                CfCAlignmentAcceptancePolicy {
+                    max_mean_squared_activation_error: 1e-10,
+                    min_assignment_margin: 0.0,
+                },
+            ),
+            Err(CfCPermutationAlignmentError::StaleAlignment {
+                field: "candidate model"
+            })
+        ));
+
         // Verify the learned correspondence on a disjoint probe sequence.
         // No assignment is recomputed on the held-out probes.
         let held_out_probes = [
