@@ -224,6 +224,13 @@
           },
           "reported_noise_band": {
             "type": "number"
+          },
+          "in_distribution_heldout": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
