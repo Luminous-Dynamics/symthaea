@@ -539,7 +539,9 @@ pub enum CfCPermutationAlignmentError {
     AssignmentAmbiguous { measured: Option<f64>, minimum: f64 },
     #[error("alignment receipt does not match the current {field} fingerprint")]
     StaleAlignment { field: &'static str },
-    #[error("permutation canonicalization supports only a one-layer, non-residual, non-backbone, unidirectional CfC network")]
+    #[error(
+        "permutation canonicalization supports only a one-layer, non-residual, non-backbone, unidirectional CfC network"
+    )]
     UnsupportedCanonicalizationTopology,
     #[error("required CfC parameter group is absent from the candidate snapshot: {0}")]
     MissingCanonicalizationGroup(String),
@@ -767,16 +769,15 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
     }
 
     let task_digest = target_specification_digest.into();
-    let snapshot = cfc_weight_model_snapshot(candidate, task_digest.clone()).map_err(|error| {
-        match error {
+    let snapshot =
+        cfc_weight_model_snapshot(candidate, task_digest.clone()).map_err(|error| match error {
             CfCWeightProgramAdapterError::Fingerprint(message) => {
                 CfCPermutationAlignmentError::FingerprintFailed(message)
             }
             _ => CfCPermutationAlignmentError::MissingCanonicalizationGroup(
                 "candidate snapshot".to_owned(),
             ),
-        }
-    })?;
+        })?;
     let hidden_dim = config.hidden_dim;
     let mut operations = Vec::with_capacity(5);
     let mut changed_parameter_count = 0_usize;
@@ -796,11 +797,18 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
                 CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{group_id:?}"))
             })?;
         if group.shape != expected_shape || group.values.len() != replacement.len() {
-            return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-                group: format!("{group_id:?}"),
-            });
+            return Err(
+                CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                    group: format!("{group_id:?}"),
+                },
+            );
         }
-        for (before, after) in group.values.iter().copied().zip(replacement.iter().copied()) {
+        for (before, after) in group
+            .values
+            .iter()
+            .copied()
+            .zip(replacement.iter().copied())
+        {
             let delta = after - before;
             if delta != 0.0 {
                 changed_parameter_count += 1;
@@ -825,9 +833,11 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         })?;
     let input_shape = input_snapshot.shape.clone();
     if input_shape.len() != 2 || input_shape[0] != hidden_dim {
-        return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-            group: format!("{input_group:?}"),
-        });
+        return Err(
+            CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                group: format!("{input_group:?}"),
+            },
+        );
     }
     let permuted_input = permute_matrix_rows_checked(
         &input_snapshot.values,
@@ -835,9 +845,11 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         input_shape[1],
         &alignment.source_to_candidate,
     )
-    .ok_or_else(|| CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-        group: format!("{input_group:?}"),
-    })?;
+    .ok_or_else(
+        || CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+            group: format!("{input_group:?}"),
+        },
+    )?;
     add_replacement(input_group, &input_shape, permuted_input)?;
 
     let recurrent_group = CfCWeightGroupId::CellRecurrentProjection { cell: 0 };
@@ -846,22 +858,28 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         .iter()
         .find(|group| group.target == WeightProgramTarget::CfC(recurrent_group.clone()))
         .ok_or_else(|| {
-            CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{recurrent_group:?}"))
+            CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!(
+                "{recurrent_group:?}"
+            ))
         })?;
     let recurrent_shape = recurrent_snapshot.shape.clone();
     if recurrent_shape != [hidden_dim, hidden_dim] {
-        return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-            group: format!("{recurrent_group:?}"),
-        });
+        return Err(
+            CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                group: format!("{recurrent_group:?}"),
+            },
+        );
     }
     let permuted_recurrent = permute_square_checked(
         &recurrent_snapshot.values,
         hidden_dim,
         &alignment.source_to_candidate,
     )
-    .ok_or_else(|| CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-        group: format!("{recurrent_group:?}"),
-    })?;
+    .ok_or_else(
+        || CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+            group: format!("{recurrent_group:?}"),
+        },
+    )?;
     add_replacement(recurrent_group, &recurrent_shape, permuted_recurrent)?;
 
     for group_id in [
@@ -876,9 +894,11 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
                 CfCPermutationAlignmentError::MissingCanonicalizationGroup(format!("{group_id:?}"))
             })?;
         if group.shape != [hidden_dim] || group.values.len() != hidden_dim {
-            return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-                group: format!("{group_id:?}"),
-            });
+            return Err(
+                CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                    group: format!("{group_id:?}"),
+                },
+            );
         }
         let replacement = alignment
             .source_to_candidate
@@ -898,9 +918,11 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         })?;
     let output_shape = output_snapshot.shape.clone();
     if output_shape != [config.output_dim, hidden_dim] {
-        return Err(CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-            group: format!("{output_group:?}"),
-        });
+        return Err(
+            CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+                group: format!("{output_group:?}"),
+            },
+        );
     }
     let permuted_output = permute_matrix_columns_checked(
         &output_snapshot.values,
@@ -908,9 +930,11 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         hidden_dim,
         &alignment.source_to_candidate,
     )
-    .ok_or_else(|| CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
-        group: format!("{output_group:?}"),
-    })?;
+    .ok_or_else(
+        || CfCPermutationAlignmentError::InvalidCanonicalizationGroupShape {
+            group: format!("{output_group:?}"),
+        },
+    )?;
     add_replacement(output_group, &output_shape, permuted_output)?;
     drop(add_replacement);
 
@@ -945,10 +969,7 @@ pub fn build_cfc_hidden_unit_canonicalization_program(
         base_model_digest: snapshot.model_digest,
         target_specification_digest: task_digest,
         fault_hypothesis_ids: vec!["symmetry:hidden-unit-permutation-canonicalization".to_owned()],
-        evidence_receipt_ids: vec![format!(
-            "alignment:{}",
-            evidence_hasher.finalize().to_hex()
-        )],
+        evidence_receipt_ids: vec![format!("alignment:{}", evidence_hasher.finalize().to_hex())],
         max_changed_parameters: changed_parameter_count,
         max_total_l2_delta,
         max_abs_delta,
@@ -1475,13 +1496,7 @@ mod tests {
     }
 
     fn brute_force_best_cost(costs: &[Vec<f64>]) -> Option<f64> {
-        fn visit(
-            row: usize,
-            costs: &[Vec<f64>],
-            used: &mut [bool],
-            running: f64,
-            best: &mut f64,
-        ) {
+        fn visit(row: usize, costs: &[Vec<f64>], used: &mut [bool], running: f64, best: &mut f64) {
             if row == costs.len() {
                 *best = best.min(running);
                 return;
@@ -1537,8 +1552,7 @@ mod tests {
                 forbidden[row][column] = f64::INFINITY;
                 let alternative = brute_force_best_cost(&forbidden);
                 if let Some(alternative_cost) = alternative {
-                    exhaustive_margin =
-                        exhaustive_margin.min((alternative_cost - total).max(0.0));
+                    exhaustive_margin = exhaustive_margin.min((alternative_cost - total).max(0.0));
                 }
             }
             let cycle_margin = alternating_cycle_assignment_margin(&costs, &assignment);
@@ -2263,19 +2277,34 @@ mod tests {
         let canonicalized =
             materialize_cfc_weight_program(&permuted, digest('d'), &canonicalization)
                 .expect("canonicalized candidate");
-        assert_eq!(canonicalized.candidate_native_model_digest, snapshot.model_digest);
         assert_eq!(
-            permuted.fingerprint().expect("permuted source remains immutable").model_digest,
+            canonicalized.candidate_native_model_digest,
+            snapshot.model_digest
+        );
+        assert_eq!(
+            permuted
+                .fingerprint()
+                .expect("permuted source remains immutable")
+                .model_digest,
             candidate.candidate_native_model_digest
         );
-        assert_eq!(original.fingerprint().expect("original remains immutable").model_digest, snapshot.model_digest);
+        assert_eq!(
+            original
+                .fingerprint()
+                .expect("original remains immutable")
+                .model_digest,
+            snapshot.model_digest
+        );
 
         // The coordinate change must preserve the candidate's function and
         // recover the source coordinate representation for this exact fixture.
         let canonical_signatures =
             cfc_hidden_unit_activation_signatures(&canonicalized.network, 0, &probes)
                 .expect("canonicalized signatures");
-        assert_eq!(canonical_signatures.signatures, source_signatures.signatures);
+        assert_eq!(
+            canonical_signatures.signatures,
+            source_signatures.signatures
+        );
         let mut permuted_function = permuted.clone();
         let mut canonicalized_function = canonicalized.network.clone();
         for input in &inputs {
@@ -2320,18 +2349,29 @@ mod tests {
                 dt: 0.29,
             },
         ];
-        let source_held_out =
-            cfc_hidden_unit_activation_signatures(&original, 0, &held_out_probes)
-                .expect("source held-out signatures");
+        let source_held_out = cfc_hidden_unit_activation_signatures(&original, 0, &held_out_probes)
+            .expect("source held-out signatures");
         let candidate_held_out =
             cfc_hidden_unit_activation_signatures(&permuted, 0, &held_out_probes)
                 .expect("candidate held-out signatures");
         assert_ne!(source_held_out.probe_digest, alignment.probe_digest);
-        assert_eq!(source_held_out.probe_digest, candidate_held_out.probe_digest);
-        assert_eq!(source_held_out.architecture_digest, alignment.architecture_digest);
-        assert_eq!(candidate_held_out.architecture_digest, alignment.architecture_digest);
+        assert_eq!(
+            source_held_out.probe_digest,
+            candidate_held_out.probe_digest
+        );
+        assert_eq!(
+            source_held_out.architecture_digest,
+            alignment.architecture_digest
+        );
+        assert_eq!(
+            candidate_held_out.architecture_digest,
+            alignment.architecture_digest
+        );
         assert_eq!(source_held_out.manifest_digest, alignment.manifest_digest);
-        assert_eq!(candidate_held_out.manifest_digest, alignment.manifest_digest);
+        assert_eq!(
+            candidate_held_out.manifest_digest,
+            alignment.manifest_digest
+        );
         let mut held_out_squared_error = 0.0_f64;
         let mut held_out_coordinate_count = 0usize;
         for (source_unit, candidate_unit) in
@@ -2345,8 +2385,7 @@ mod tests {
                 held_out_coordinate_count += 1;
             }
         }
-        let held_out_mse =
-            held_out_squared_error / held_out_coordinate_count as f64;
+        let held_out_mse = held_out_squared_error / held_out_coordinate_count as f64;
         assert!(
             held_out_mse < 1e-10,
             "the selection-time mapping must generalize to held-out probes, mse={held_out_mse}"
