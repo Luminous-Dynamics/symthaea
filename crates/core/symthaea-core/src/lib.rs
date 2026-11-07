@@ -86,6 +86,8 @@ pub mod observability;
 pub mod observation;
 /// Typed, digest-bound candidate programs for bounded weight-space edits.
 pub mod weight_space_program;
+/// Sequential evidence-feedback execution for frozen, candidate-only WeightProgram templates.
+pub mod sequential_weight_program;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
