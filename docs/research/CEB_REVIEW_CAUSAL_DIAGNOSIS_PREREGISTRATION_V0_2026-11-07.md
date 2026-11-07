@@ -294,6 +294,20 @@ The six-state counterfactual design must be evaluated within a defect-provenance
 
 For Phase B, use [CEB Review Sequential Evidence Acquisition V0](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md) as the action-policy contract: name the claim and competing mechanisms, select the smallest safe discriminating observation, bind it to exact revision/scope/authority, and account for all-in cost and stopping behavior. It expands the Phase B policy contrast; it does not add a metric or authorize execution before #10064.
 
+## 12.2 Counterfactual-control qualification
+
+Use [CEB Review Counterfactual-Control Qualification V0](CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md) before treating any P/I/F/N/M/IRR source state as a causal control. In particular:
+
+- Historical parent/introducing/fix revisions are source-state observations, not randomized interventions.
+- A repair commit must be disentangled from tests, docs, refactors, dependencies, environment changes and unrelated fixes.
+- A fixed companion may be partial, symptom-masking or tangled; verify every in-scope alternate path before claiming the target is absent.
+- Minimality is semantic in the causal model, not a count of changed lines.
+- An irrelevant intervention must be shown not to alter target causal parents or paths; distance or formatting alone is insufficient.
+- Source-only controls can support bounded structural claims, not runtime outcome claims.
+- Each control is qualified per claim across identity/lineage, change disentanglement, mechanism/reachability, intervention fidelity, environment/applicability and outcome/oracle validity. Unresolved dimensions remain unresolved; do not average them into one score.
+
+The control protocol is a methodological companion only. It adds no task schema, receipt, authority class, metric lane or execution permission.
+
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
