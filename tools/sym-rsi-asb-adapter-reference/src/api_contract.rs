@@ -163,6 +163,8 @@ pub enum ApiContractError {
     ResultIdentityMissing { index: usize, field: String },
     ResultIdentityMismatch(String),
     DuplicateResultIdentity(String),
+    ResultMeasurementMissing { index: usize, field: String },
+    InvalidResultMeasurement { index: usize, field: String },
     Job(JobContractError),
 }
 
@@ -464,6 +466,7 @@ impl JobResponseV1 {
         &self,
         campaign: &CampaignCardV1,
     ) -> Result<(), ApiContractError> {
+        campaign.validate()?;
         if !self.ok {
             return Err(ApiContractError::ResponseNotOk);
         }
@@ -492,6 +495,29 @@ impl JobResponseV1 {
                 }
                 if !self.job.designs.iter().any(|design| design == id) {
                     return Err(ApiContractError::ResultIdentityMismatch(id.to_owned()));
+                }
+
+                // A completed job must carry every declared measurement. A row
+                // with the right design ID but no measurement is not evidence
+                // that the submitted design was actually measured.
+                for measurement in &campaign.measurements {
+                    let Some(value) = result.get(&measurement.name) else {
+                        return Err(ApiContractError::ResultMeasurementMissing {
+                            index,
+                            field: measurement.name.clone(),
+                        });
+                    };
+                    let valid = match measurement.kind.as_deref() {
+                        Some("file") => value.as_str().is_some_and(non_empty),
+                        Some("value") | None => value.as_f64().is_some_and(f64::is_finite),
+                        _ => false,
+                    };
+                    if !valid {
+                        return Err(ApiContractError::InvalidResultMeasurement {
+                            index,
+                            field: measurement.name.clone(),
+                        });
+                    }
                 }
             }
             if result_ids.len() != self.job.designs.len() {
@@ -725,6 +751,77 @@ mod tests {
         assert!(matches!(
             bad.validate_against(&card),
             Err(ApiContractError::ResultIdentityMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_completed_job_missing_a_declared_measurement() {
+        let card = campaign();
+        let mut value: Value = serde_json::from_str(COMPLETED_JOB).expect("job JSON parses");
+        value["job"]["results"][0].as_object_mut()
+            .expect("result object")
+            .remove("activity");
+        let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
+        assert_eq!(
+            bad.validate_against(&card).expect_err("completed row needs measurement"),
+            ApiContractError::ResultMeasurementMissing {
+                index: 0,
+                field: "activity".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_non_numeric_scalar_measurement_values() {
+        let card = campaign();
+        let mut value: Value = serde_json::from_str(COMPLETED_JOB).expect("job JSON parses");
+        value["job"]["results"][0]["activity"] = Value::String("high".to_owned());
+        let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
+        assert_eq!(
+            bad.validate_against(&card).expect_err("scalar measurements must be numeric"),
+            ApiContractError::InvalidResultMeasurement {
+                index: 0,
+                field: "activity".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn accepts_nonempty_file_references_for_file_measurements() {
+        let mut card = campaign();
+        card.measurements[0].kind = Some("file".to_owned());
+        let mut value: Value = serde_json::from_str(COMPLETED_JOB).expect("job JSON parses");
+        value["job"]["results"][0]["activity"] = Value::String("measurement-a.csv".to_owned());
+        value["job"]["results"][1]["activity"] = Value::String("measurement-b.csv".to_owned());
+        let job = JobResponseV1::parse(&value.to_string()).expect("file measurement job parses");
+        assert!(job.validate_against(&card).is_ok());
+    }
+
+    #[test]
+    fn rejects_empty_file_references_for_file_measurements() {
+        let mut card = campaign();
+        card.measurements[0].kind = Some("file".to_owned());
+        let mut value: Value = serde_json::from_str(COMPLETED_JOB).expect("job JSON parses");
+        value["job"]["results"][0]["activity"] = Value::String("  ".to_owned());
+        let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
+        assert_eq!(
+            bad.validate_against(&card).expect_err("file measurement reference cannot be blank"),
+            ApiContractError::InvalidResultMeasurement {
+                index: 0,
+                field: "activity".to_owned()
+            }
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_result_design_id_even_when_row_count_matches() {
+        let card = campaign();
+        let mut value: Value = serde_json::from_str(COMPLETED_JOB).expect("job JSON parses");
+        value["job"]["results"][1]["design_id"] = Value::String("d-01".to_owned());
+        let bad = JobResponseV1::parse(&value.to_string()).expect("mutated job parses");
+        assert!(matches!(
+            bad.validate_against(&card),
+            Err(ApiContractError::DuplicateResultIdentity(id)) if id == "d-01"
         ));
     }
 
