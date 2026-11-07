@@ -224,7 +224,7 @@
   ],
   "search_limits": {
     "max_memo_states": 200000,
-    "max_policy_depth": 12
+    "max_policy_depth": 3
   },
   "expected": {
     "adaptive_status": "EXACT_POLICY",
