@@ -481,7 +481,7 @@ mod tests {
         assert!(report.valid, "{:?}", report.issues);
         assert_eq!(report.fixture_count, 10);
         assert_eq!(report.paired_control_groups, 1);
-        assert_eq!(report.tier_counts, [1, 0, 4, 2, 2, 2]);
+        assert_eq!(report.tier_counts, [1, 0, 3, 2, 2, 2]);
     }
 
     #[test]
