@@ -79,6 +79,11 @@ mod tests {
             tokens.iter().any(|token| token == " "),
             "word boundaries must remain explicit in the IPA stream: {tokens:?}"
         );
+        assert_eq!(
+            tokens.len(),
+            _prosody.len(),
+            "prosody entries must remain aligned one-to-one with IPA character tokens"
+        );
     }
 
     #[test]
