@@ -487,7 +487,7 @@
     },
     {
       "id": "three_ball_sequential_finite_hypothesis_adaptation",
-      "environment": "Deterministic seeded multi-trial adaptation over the source-pinned three-ball rule family. Each trial independently samples a hidden left/centre/right colour configuration, runs the two-step finite-hypothesis gaze→observe→choice policy, receives feedback from planted rule 65, carries semantic model posterior mass forward, and resets only the hidden-state prior. Discovery uses neutral feedback preferences until semantic-class posterior log odds exceed 16 nats, then restores [0,2,-6]. It deliberately differs from the published SPM schedule (one gaze/choice pair per trial rather than five moves per trial) and does not maintain a continuous Dirichlet parameter posterior.",
+      "environment": "Deterministic seeded multi-trial adaptation over the source-pinned three-ball rule family. Each trial independently samples a hidden left/centre/right colour configuration, runs the two-step finite-hypothesis gaze→observe→choice policy, receives feedback from planted rule 65, carries semantic model posterior mass forward, and resets only the hidden-state prior. Discovery uses neutral feedback preferences until semantic-class posterior log odds exceed 16 nats, then restores [0,2,-6]. It deliberately differs from the published SPM schedule (one gaze/choice pair per trial rather than five moves per trial) and does not maintain a continuous Dirichlet parameter posterior. A paired-seed policy matrix now runs full expected-free-energy selection, state-only EIG, model-only EIG, pragmatic-only, immediate-choice-only, fixed-centre-gaze, and uniform-random legal action arms. Environment RNG is domain-separated from policy RNG so all arms see identical hidden scenes for a given seed.",
       "primary_outcomes": [
         "trials_to_correct_rule_commitment",
         "final_true_semantic_class_posterior",
@@ -507,7 +507,12 @@
         "receipt_replay_exactness",
         "trials_to_model_commitment",
         "winning_semantic_class_posterior_by_trial",
-        "correct_semantic_class_commitment_rate"
+        "correct_semantic_class_commitment_rate",
+        "paired_environment_seed_identity",
+        "per_policy_episode_receipt",
+        "mean_delta_true_class_brier_by_paired_seed",
+        "mean_delta_correct_commitment_rate_by_paired_seed",
+        "mean_delta_cumulative_reward_by_paired_seed"
       ],
       "negative_controls": [
         "no_model_information_gain",
@@ -868,6 +873,22 @@
     {
       "id": "three_ball_source_labelled_vs_semantic_quotient",
       "scope": "Paired seeded episodes comparing 81 source labels to semantically deduplicated likelihood-tensor classes, scored after aggregating equivalent labels"
+    },
+    {
+      "id": "three_ball_full_expected_free_energy",
+      "scope": "Paired-seed active inference with model and conditional-state information, pragmatic preferences, and observation cost"
+    },
+    {
+      "id": "three_ball_immediate_choice_only",
+      "scope": "No additional gaze; choose immediately under the same response policy and preferences"
+    },
+    {
+      "id": "three_ball_fixed_centre_gaze",
+      "scope": "Always inspect the centre location then use the same downstream response policy"
+    },
+    {
+      "id": "three_ball_uniform_random_legal_action",
+      "scope": "Uniform random choice among immediate response or one of three gaze locations, then uniform random response among three colours or no response; independent policy RNG"
     }
   ],
   "seeds": {
@@ -1144,7 +1165,9 @@
     "Sequential three-ball result receipts bind the pinned SPM demo commit, rule-generator commit, canonical parameterization digest, model-family choice, seed, and deterministic RNG algorithm/version.",
     "The sequential discovery runner carries only model posterior marginals across independent trials and resets the hidden-state prior; the hidden scene is never an input to action selection and appears only in evaluator-visible receipts.",
     "Preference schedule values are validated before the first trial, including post-commitment preferences that may not be reached in a finite test episode.",
-    "An exactly certain semantic model posterior is represented in serialized receipts without non-finite JSON numbers; commitment logic treats posterior 1 as infinite log odds while the trace stores an explicit absence marker."
+    "An exactly certain semantic model posterior is represented in serialized receipts without non-finite JSON numbers; commitment logic treats posterior 1 as infinite log odds while the trace stores an explicit absence marker.",
+    "Paired three-ball policy arms must use a domain-separated environment RNG and policy RNG so all policies receive identical hidden-scene sequences for matched seeds regardless of policy random draw count.",
+    "Policy ablation runs must preserve the same model family, true rule, scene seeds, scene reset schedule, trial horizon, action costs, and evaluator information; only the declared policy component may change."
   ],
   "research_references": [
     {
