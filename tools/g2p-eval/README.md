@@ -10,7 +10,7 @@ Each JSONL reference record represents one lexical item or fixed phrase:
 - `expected_oov`;
 - zero or more accepted pronunciation variants. Each variant contains canonical IPA phone tokens, exclusive syllable-ending phone indices, and one stress value per syllable (0 none, 1 primary, 2 secondary).
 
-Each candidate JSONL record carries the same case ID, candidate/system identity, source identity, canonical phone tokens, syllable boundaries, stress values, OOV decision, and optional probability that the complete pronunciation is exactly correct.
+Each candidate JSONL record carries the same case ID, candidate/system identity, source identity, canonical phone tokens, optional syllable boundaries and stress values, OOV decision, and optional probability that the complete pronunciation is exactly correct. A backend may omit syllable boundaries or stress; those metrics remain null while phone error rate is still calculated. An OOV candidate must return empty phones and null syllable metadata.
 
 Accepted variants are explicit so contextual heteronyms and dialect variants can be represented without treating one dictionary entry as universal truth. The evaluator selects the candidate's closest accepted variant using deterministic phone-edit, boundary-error, and stress-error tie-breaking.
 
@@ -23,7 +23,7 @@ Accepted variants are explicit so contextual heteronyms and dialect variants can
 - OOV precision, recall, F1, and accuracy.
 - Optional Brier score for a system-provided exact-pronunciation confidence. It is omitted if no such probability is supplied.
 
-All metrics with no valid denominator are null/undefined, not zero. Unknown phones remain tokens; no fuzzy symbol mapping is applied. Malformed reference or candidate structure, duplicate IDs, missing cases, mixed system identities, and contradictory OOV declarations fail closed.
+All metrics with no valid denominator or no candidate estimate are null/undefined, not zero. The exact-pronunciation rate denominator contains only in-vocabulary cases; OOV detection is scored separately. Unknown phones remain tokens; no fuzzy symbol mapping is applied. Malformed reference or candidate structure, duplicate IDs, missing cases, mixed system identities, and contradictory OOV declarations fail closed.
 
 ## Run
 
