@@ -135,7 +135,6 @@ impl PronunciationPlan {
         }
 
         let mut previous_end = 0usize;
-        let mut previous_surface_end = 0usize;
         for (word_index, word) in self.words.iter().enumerate() {
             if word.start_byte >= word.end_byte || word.end_byte > self.source_text.len() {
                 return Err(format!("word {word_index} has an invalid byte span"));
@@ -153,13 +152,14 @@ impl PronunciationPlan {
                     "word {word_index} surface does not match source_text"
                 ));
             }
-            if word.surface.chars().all(char::is_whitespace) {
-                return Err(format!("word {word_index} contains only whitespace"));
+            if word.surface.chars().any(char::is_whitespace) {
+                return Err(format!(
+                    "word {word_index} span contains whitespace; each pronunciation span must contain one lexical token"
+                ));
             }
             validate_word_state(word_index, word)?;
 
             previous_end = word.end_byte;
-            previous_surface_end = word.end_byte;
         }
 
         // Every non-whitespace source character must belong to exactly one
@@ -179,9 +179,6 @@ impl PronunciationPlan {
             }
         }
 
-        if previous_surface_end > self.source_text.len() {
-            return Err("word span exceeds source text".into());
-        }
         Ok(())
     }
 
@@ -793,6 +790,23 @@ mod tests {
         };
         let error = plan.validate().unwrap_err();
         assert!(error.contains("not covered"), "{error}");
+    }
+
+    #[test]
+    fn one_pronunciation_span_cannot_merge_multiple_whitespace_separated_words() {
+        let plan = PronunciationPlan {
+            schema_version: 1,
+            language: "en".into(),
+            source_text: "hello world".into(),
+            words: vec![word(
+                "hello world",
+                0,
+                ResolutionState::NeedsReview,
+                vec![candidate("merged", "ɛ", CandidateSource::Dictionary)],
+            )],
+        };
+        let error = plan.validate().unwrap_err();
+        assert!(error.contains("contains whitespace"), "{error}");
     }
 
     #[test]
