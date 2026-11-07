@@ -1,0 +1,39 @@
+name: OT assurance crosswalk integrity
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/ot-assurance/**"
+      - ".github/workflows/ot-assurance-crosswalk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ot-assurance-crosswalk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-crosswalk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON and required CSF functions
+        shell: bash
+        run: |
+          jq -e '
+            .schema == "luminous.ot_assurance_crosswalk.v0.1" and
+            .status == "research_crosswalk_not_conformity_assessment" and
+            .claim_ceiling == "framework_function_and_stakeholder_crosswalk_only" and
+            ([.functions[].nist_csf_2_function] | sort) ==
+              ["Detect", "Govern", "Identify", "Protect", "Recover", "Respond"] and
+            (.functions | length == 6) and
+            (.sector_applicability | length >= 6) and
+            .proposed_gates.controller_ack_promoted_to_physical_truth == 0 and
+            .proposed_gates.recommendation_promoted_to_device_authority == 0
+          ' docs/research/ot-assurance/OT_ASSURANCE_CROSSWALK_V0_1.json >/dev/null
+      - name: Confirm NIST draft remains explicitly non-final
+        run: |
+          jq -e '.sources[] | select(.id == "NIST-SP-800-82R4-IPD" and .status == "draft_not_final" and .comment_deadline == "2026-11-30")' docs/research/ot-assurance/OT_ASSURANCE_CROSSWALK_V0_1.json >/dev/null
