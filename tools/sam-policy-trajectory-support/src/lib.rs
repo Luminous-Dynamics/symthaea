@@ -92,7 +92,6 @@ impl AssessmentReceipt {
     }
 }
 
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TrajectoryQuery {
     pub target_policy_digest: String,
