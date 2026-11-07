@@ -183,6 +183,16 @@ Minimum process:
 
 A high percentage of target-related lines does not automatically make the patch causal-isolated; a small number of non-target lines can alter behavior substantially. Line counts are descriptive diagnostics, not causal weights.
 
+
+### 5.1 Historical states, semantic minimality and claim ceiling
+
+Historical parent/introducing/fix revisions are **historical source-state observations**, not randomized treatments or interventions. A commit that happens to remove the observed target is not automatically a causal-isolated control.
+
+Minimality is judged **minimal in the causal model**: no proper subset of the changed causal conditions achieves the same qualified effect under the declared scope. A one-line edit is not necessarily minimal, and a multi-line semantic change can be.
+
+When only source text and lineage have been qualified, report **source-only structural claims** (for example, “this path is reachable under condition X”). Do not turn them into runtime outcome, incident attribution or intervention-effect claims without the corresponding evidence and authority.
+
+
 ## 6. Causal identification assumptions and confounder register
 
 Before interpreting P/I/F/N/M/IRR as a causal comparison, explicitly state:
