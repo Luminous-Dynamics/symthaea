@@ -520,8 +520,14 @@ pub fn audit_admission(ledger: &GlobalLedger, admission: &FiltrationAdmission) -
                 return invalid(AdmissionStatus::InvalidReceipt);
             };
             if admission.source_filtration_sha256 == ledger.global_filtration_sha256
-                || admission.proof_receipt_sha256.as_deref().is_none_or(|d| !valid_sha256(d))
-                || admission.assumption_sha256.as_deref().is_none_or(|d| !valid_sha256(d))
+                || admission
+                    .proof_receipt_sha256
+                    .as_deref()
+                    .is_none_or(|d| !valid_sha256(d))
+                || admission
+                    .assumption_sha256
+                    .as_deref()
+                    .is_none_or(|d| !valid_sha256(d))
                 || adjuster.adjuster_id.is_empty()
                 || adjuster.adjuster_version.is_empty()
                 || adjuster.source_process_sha256 != admission.input_process_sha256
@@ -770,7 +776,10 @@ mod tests {
         );
         // T7 has not yet been delivered at sequence 2.
         let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::LookaheadDetected);
+        assert_eq!(
+            audit.decisions[0].status,
+            DecisionAuditStatus::LookaheadDetected
+        );
     }
 
     #[test]
@@ -868,7 +877,10 @@ mod tests {
             item.sequence = index as u64 + 1;
         }
         let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::LockboxLeakage);
+        assert_eq!(
+            audit.decisions[0].status,
+            DecisionAuditStatus::LockboxLeakage
+        );
     }
 
     #[test]
