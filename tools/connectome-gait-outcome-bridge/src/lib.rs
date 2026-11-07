@@ -342,7 +342,11 @@ impl BridgeError {
 
 impl fmt::Display for BridgeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "gait outcome bridge rejected packet: {:?}", self.reasons)
+        write!(
+            formatter,
+            "gait outcome bridge rejected packet: {:?}",
+            self.reasons
+        )
     }
 }
 
@@ -385,15 +389,13 @@ fn expected_metric(endpoint: EndpointKind, metric: MetricId) -> bool {
             MetricId::PuglieseSingleLegStepFrequency
         ) | (
             EndpointKind::PairwiseInterlegCoupling,
-            MetricId::GenericPhaseVectorStrength
-                | MetricId::SapkalButterworthHilbertPlvV2
+            MetricId::GenericPhaseVectorStrength | MetricId::SapkalButterworthHilbertPlvV2
         ) | (
             EndpointKind::TripodCoordination,
             MetricId::TcsNatvar2024 | MetricId::TcsSapkal2026V2
         ) | (
             EndpointKind::PhaseResetTransfer,
-            MetricId::PhaseResetFractionalMicroturnsV1
-                | MetricId::PhaseResetCycleSlipsV1
+            MetricId::PhaseResetFractionalMicroturnsV1 | MetricId::PhaseResetCycleSlipsV1
         ) | (
             EndpointKind::EmbodiedBehaviour,
             MetricId::FicTracForwardVelocity
@@ -412,26 +414,16 @@ fn expected_unit(metric: MetricId, unit: Unit) -> bool {
             Unit::CyclesPerSample | Unit::Hertz
         ) | (MetricId::PuglieseSingleLegStepFrequency, Unit::Hertz)
             | (
-                MetricId::GenericPhaseVectorStrength
-                    | MetricId::SapkalButterworthHilbertPlvV2,
+                MetricId::GenericPhaseVectorStrength | MetricId::SapkalButterworthHilbertPlvV2,
                 Unit::PhaseVectorStrength
             )
             | (
                 MetricId::TcsNatvar2024 | MetricId::TcsSapkal2026V2,
                 Unit::Ratio
             )
-            | (
-                MetricId::PhaseResetFractionalMicroturnsV1,
-                Unit::Microturns
-            )
-            | (
-                MetricId::PhaseResetCycleSlipsV1,
-                Unit::CycleSlips
-            )
-            | (
-                MetricId::FicTracForwardVelocity,
-                Unit::MillimetresPerSecond
-            )
+            | (MetricId::PhaseResetFractionalMicroturnsV1, Unit::Microturns)
+            | (MetricId::PhaseResetCycleSlipsV1, Unit::CycleSlips)
+            | (MetricId::FicTracForwardVelocity, Unit::MillimetresPerSecond)
     )
 }
 
@@ -477,10 +469,8 @@ fn validate_measurement(
         ReasonCode::InvalidWindow,
     );
 
-    if let (Some(start), Some(end)) = (
-        measurement.window_start_frame,
-        measurement.window_end_frame,
-    ) {
+    if let (Some(start), Some(end)) = (measurement.window_start_frame, measurement.window_end_frame)
+    {
         add(start >= end, ReasonCode::InvalidWindow);
         add(end > packet.frame_count, ReasonCode::WindowOutsideTrial);
     }
@@ -503,17 +493,22 @@ fn validate_measurement(
                 | MetricId::FicTracForwardVelocity => {
                     add(value < 0.0, ReasonCode::NegativeValue);
                 }
-                MetricId::PhaseResetFractionalMicroturnsV1
-                | MetricId::PhaseResetCycleSlipsV1 => {}
+                MetricId::PhaseResetFractionalMicroturnsV1 | MetricId::PhaseResetCycleSlipsV1 => {}
             }
             match measurement.metric_id {
                 MetricId::PuglieseAutocorrelationOscillationScore
                 | MetricId::GenericPhaseVectorStrength
                 | MetricId::SapkalButterworthHilbertPlvV2 => {
-                    add(!(0.0..=1.0).contains(&value), ReasonCode::PhaseVectorStrengthOutOfRange);
+                    add(
+                        !(0.0..=1.0).contains(&value),
+                        ReasonCode::PhaseVectorStrengthOutOfRange,
+                    );
                 }
                 MetricId::TcsNatvar2024 => {
-                    add(!(0.0..=1.0).contains(&value), ReasonCode::NatvarTcsOutOfRange);
+                    add(
+                        !(0.0..=1.0).contains(&value),
+                        ReasonCode::NatvarTcsOutOfRange,
+                    );
                 }
                 MetricId::PhaseResetFractionalMicroturnsV1 => {
                     add(
@@ -537,20 +532,59 @@ fn validate_measurement(
     match measurement.endpoint {
         EndpointKind::LocalJointRhythmicity => {
             add(measurement.leg.is_none(), ReasonCode::MissingLegIdentity);
-            add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
-            add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
-            add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
-            add(measurement.channel_id.as_deref().is_none_or(|v| !is_nonempty(v)), ReasonCode::MissingChannelIdentity);
-            add(measurement.preprocessing_sha256.is_none(), ReasonCode::MissingPreprocessingDigest);
-            add(measurement.sample_count.is_none(), ReasonCode::InvalidSampleCount);
+            add(
+                measurement.pair.is_some(),
+                ReasonCode::UnexpectedPairIdentity,
+            );
+            add(
+                measurement.tripod_group.is_some(),
+                ReasonCode::UnexpectedTripodIdentity,
+            );
+            add(
+                measurement.transfer_probe.is_some(),
+                ReasonCode::UnexpectedTransferProbe,
+            );
+            add(
+                measurement
+                    .channel_id
+                    .as_deref()
+                    .is_none_or(|v| !is_nonempty(v)),
+                ReasonCode::MissingChannelIdentity,
+            );
+            add(
+                measurement.preprocessing_sha256.is_none(),
+                ReasonCode::MissingPreprocessingDigest,
+            );
+            add(
+                measurement.sample_count.is_none(),
+                ReasonCode::InvalidSampleCount,
+            );
         }
         EndpointKind::PerLegStepping => {
             add(measurement.leg.is_none(), ReasonCode::MissingLegIdentity);
-            add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
-            add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
-            add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
-            add(measurement.channel_id.as_deref().is_none_or(|v| !is_nonempty(v)), ReasonCode::MissingChannelIdentity);
-            add(measurement.sample_count.is_none(), ReasonCode::InvalidSampleCount);
+            add(
+                measurement.pair.is_some(),
+                ReasonCode::UnexpectedPairIdentity,
+            );
+            add(
+                measurement.tripod_group.is_some(),
+                ReasonCode::UnexpectedTripodIdentity,
+            );
+            add(
+                measurement.transfer_probe.is_some(),
+                ReasonCode::UnexpectedTransferProbe,
+            );
+            add(
+                measurement
+                    .channel_id
+                    .as_deref()
+                    .is_none_or(|v| !is_nonempty(v)),
+                ReasonCode::MissingChannelIdentity,
+            );
+            add(
+                measurement.sample_count.is_none(),
+                ReasonCode::InvalidSampleCount,
+            );
         }
         EndpointKind::PairwiseInterlegCoupling => {
             add(measurement.pair.is_none(), ReasonCode::MissingPairIdentity);
@@ -571,43 +605,90 @@ fn validate_measurement(
             }
         }
         EndpointKind::TripodCoordination => {
-            add(measurement.tripod_group.is_none(), ReasonCode::MissingTripodIdentity);
-            add(measurement.aggregation != AggregationLevel::Trial, ReasonCode::MixedAggregationLevelFrame);
-            add(measurement.support_count.is_none(), ReasonCode::InvalidSupportCount);
-            add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
-            add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
-            add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
             add(
-                measurement.numerator_ticks.is_none() || measurement.denominator_ticks.is_none(),
-                ReasonCode::MissingTcsNumeratorDenominator,
+                measurement.tripod_group.is_none(),
+                ReasonCode::MissingTripodIdentity,
             );
-            if let (Some(numerator), Some(denominator), Some(value)) = (
-                measurement.numerator_ticks,
-                measurement.denominator_ticks,
-                measurement.value,
-            ) {
-                add(denominator == 0, ReasonCode::ZeroTcsDenominator);
-                if denominator > 0 {
-                    let expected = numerator as f64 / denominator as f64;
-                    add((expected - value).abs() > 1e-12, ReasonCode::TcsValueMismatch);
+            add(
+                measurement.aggregation != AggregationLevel::Trial,
+                ReasonCode::MixedAggregationLevelFrame,
+            );
+            add(
+                measurement.support_count.is_none(),
+                ReasonCode::InvalidSupportCount,
+            );
+            add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
+            add(
+                measurement.pair.is_some(),
+                ReasonCode::UnexpectedPairIdentity,
+            );
+            add(
+                measurement.transfer_probe.is_some(),
+                ReasonCode::UnexpectedTransferProbe,
+            );
+            if measured(measurement) {
+                add(
+                    measurement.numerator_ticks.is_none()
+                        || measurement.denominator_ticks.is_none(),
+                    ReasonCode::MissingTcsNumeratorDenominator,
+                );
+                if let (Some(numerator), Some(denominator), Some(value)) = (
+                    measurement.numerator_ticks,
+                    measurement.denominator_ticks,
+                    measurement.value,
+                ) {
+                    add(denominator == 0, ReasonCode::ZeroTcsDenominator);
+                    if denominator > 0 {
+                        let expected = numerator as f64 / denominator as f64;
+                        add(
+                            (expected - value).abs() > 1e-12,
+                            ReasonCode::TcsValueMismatch,
+                        );
+                    }
                 }
+            } else if measurement.availability == Availability::NotEstimable {
+                add(
+                    measurement.denominator_ticks != Some(0),
+                    ReasonCode::ZeroTcsDenominator,
+                );
             }
         }
         EndpointKind::PhaseResetTransfer => {
-            add(measurement.transfer_probe.is_none(), ReasonCode::MissingTransferProbe);
+            add(
+                measurement.transfer_probe.is_none(),
+                ReasonCode::MissingTransferProbe,
+            );
             add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
-            add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
-            add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
+            add(
+                measurement.pair.is_some(),
+                ReasonCode::UnexpectedPairIdentity,
+            );
+            add(
+                measurement.tripod_group.is_some(),
+                ReasonCode::UnexpectedTripodIdentity,
+            );
             if let Some(key) = measurement.transfer_probe {
                 add(key.phase_bin >= PHASE_BINS, ReasonCode::InvalidPhaseBin);
-                add(key.magnitude_bin >= MAGNITUDE_BINS, ReasonCode::InvalidMagnitudeBin);
+                add(
+                    key.magnitude_bin >= MAGNITUDE_BINS,
+                    ReasonCode::InvalidMagnitudeBin,
+                );
             }
         }
         EndpointKind::EmbodiedBehaviour => {
             add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
-            add(measurement.pair.is_some(), ReasonCode::UnexpectedPairIdentity);
-            add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
-            add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
+            add(
+                measurement.pair.is_some(),
+                ReasonCode::UnexpectedPairIdentity,
+            );
+            add(
+                measurement.tripod_group.is_some(),
+                ReasonCode::UnexpectedTripodIdentity,
+            );
+            add(
+                measurement.transfer_probe.is_some(),
+                ReasonCode::UnexpectedTransferProbe,
+            );
             if !packet.fictrac_columns_available {
                 add(
                     measured(measurement),
@@ -666,9 +747,7 @@ fn validate_packet(packet: &GaitOutcomePacket) -> Result<(), BridgeError> {
     if packet.frame_count == 0 {
         reasons.push(ReasonCode::ZeroFrameCount);
     }
-    if packet.expected_transfer_probe_count == 0
-        && packet.expected_transfer_grid_sha256.is_some()
-    {
+    if packet.expected_transfer_probe_count == 0 && packet.expected_transfer_grid_sha256.is_some() {
         reasons.push(ReasonCode::InvalidTransferGridCommitment);
     }
     if packet.expected_transfer_probe_count > 0
@@ -774,9 +853,9 @@ fn grouped_metric_coverage(
             EndpointKind::PairwiseInterlegCoupling => measurement
                 .pair
                 .map(|pair| format!("{:?}:{:?}", pair.first, pair.second)),
-            EndpointKind::TripodCoordination => measurement
-                .tripod_group
-                .map(|group| format!("{group:?}")),
+            EndpointKind::TripodCoordination => {
+                measurement.tripod_group.map(|group| format!("{group:?}"))
+            }
             _ => None,
         };
         if let Some(identity) = identity {
@@ -1083,36 +1162,44 @@ mod tests {
             .find(|m| m.metric_id == MetricId::FicTracForwardVelocity)
             .unwrap();
         velocity.value = Some(0.0);
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::NonMeasuredValuePresent));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::NonMeasuredValuePresent)
+        );
     }
 
     #[test]
     fn rejects_frame_level_rows_as_independent_outcomes() {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         packet.measurements[0].aggregation = AggregationLevel::Frame;
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::MixedAggregationLevelFrame));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::MixedAggregationLevelFrame)
+        );
     }
 
     #[test]
     fn rejects_empty_measurement_identity() {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         packet.measurements[0].measurement_id.clear();
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::MissingIdentity));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::MissingIdentity)
+        );
     }
 
     #[test]
     fn rejects_measurement_from_another_animal_session_or_trial() {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         packet.measurements[0].source_binding.animal_id = "other-animal".into();
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::MixedSourceIdentity));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::MixedSourceIdentity)
+        );
     }
 
     #[test]
@@ -1138,9 +1225,11 @@ mod tests {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         let duplicate = packet.measurements[0].clone();
         packet.measurements.push(duplicate);
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::DuplicateMeasurementId));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::DuplicateMeasurementId)
+        );
     }
 
     #[test]
@@ -1156,9 +1245,11 @@ mod tests {
         row.pair = Some(LegPair::new(LegId::LeftFore, LegId::RightFore).unwrap());
         row.phase_estimator_sha256 = None;
         packet.measurements.push(row);
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::MissingPhaseEstimatorDigest));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::MissingPhaseEstimatorDigest)
+        );
     }
 
     #[test]
@@ -1174,7 +1265,10 @@ mod tests {
         row.pair = Some(LegPair::new(LegId::LeftFore, LegId::RightFore).unwrap());
         packet.measurements.push(row);
         let report = audit_packet(&packet).unwrap();
-        assert_eq!(report.pairwise_coverage[0].metric_id, MetricId::GenericPhaseVectorStrength);
+        assert_eq!(
+            report.pairwise_coverage[0].metric_id,
+            MetricId::GenericPhaseVectorStrength
+        );
         assert_eq!(report.summary, SummaryState::InterlegCoveragePartial);
     }
 
@@ -1216,10 +1310,12 @@ mod tests {
         }
         let report = audit_packet(&packet).unwrap();
         assert_eq!(report.tripod_coverage.len(), 2);
-        assert!(report
-            .tripod_coverage
-            .iter()
-            .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial));
+        assert!(
+            report
+                .tripod_coverage
+                .iter()
+                .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial)
+        );
         assert_eq!(report.summary, SummaryState::InterlegCoveragePartial);
     }
 
@@ -1237,9 +1333,11 @@ mod tests {
         row.numerator_ticks = Some(5);
         row.denominator_ticks = Some(10);
         packet.measurements.push(row);
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::TcsValueMismatch));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::TcsValueMismatch)
+        );
     }
 
     #[test]
@@ -1295,10 +1393,12 @@ mod tests {
         }
         let report = audit_packet(&packet).unwrap();
         assert_eq!(report.pairwise_coverage.len(), 2);
-        assert!(report
-            .pairwise_coverage
-            .iter()
-            .all(|coverage| coverage.state == CoverageState::Partial));
+        assert!(
+            report
+                .pairwise_coverage
+                .iter()
+                .all(|coverage| coverage.state == CoverageState::Partial)
+        );
         assert_eq!(report.summary, SummaryState::InterlegCoveragePartial);
     }
 
@@ -1346,14 +1446,8 @@ mod tests {
             packet.measurements.push(row);
         }
         assert!(audit_packet(&packet).is_ok());
-        assert_eq!(
-            packet.measurements[0].metric_id,
-            MetricId::TcsNatvar2024
-        );
-        assert_eq!(
-            packet.measurements[1].metric_id,
-            MetricId::TcsSapkal2026V2
-        );
+        assert_eq!(packet.measurements[0].metric_id, MetricId::TcsNatvar2024);
+        assert_eq!(packet.measurements[1].metric_id, MetricId::TcsSapkal2026V2);
     }
 
     #[test]
@@ -1361,8 +1455,14 @@ mod tests {
         let dng100 = full_rhythm_fixture(Stimulus::DNg100, true);
         let mut dnb08 = full_rhythm_fixture(Stimulus::DNb08, false);
         dnb08.packet_id = "synthetic-dnb08-trial-0001".into();
-        assert_eq!(audit_packet(&dng100).unwrap().fictrac_velocity_state, CoverageState::Complete);
-        assert_eq!(audit_packet(&dnb08).unwrap().fictrac_velocity_state, CoverageState::NotAvailable);
+        assert_eq!(
+            audit_packet(&dng100).unwrap().fictrac_velocity_state,
+            CoverageState::Complete
+        );
+        assert_eq!(
+            audit_packet(&dnb08).unwrap().fictrac_velocity_state,
+            CoverageState::NotAvailable
+        );
         // A single packet has one immutable stimulus identity. The adapter
         // intentionally offers no cross-stimulus pooling function.
         assert_ne!(dng100.stimulus, dnb08.stimulus);
@@ -1403,18 +1503,22 @@ mod tests {
     fn rejects_malformed_dataset_or_method_digest() {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         packet.raw_trajectory_sha256 = "not-a-digest".into();
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::InvalidDigest));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::InvalidDigest)
+        );
     }
 
     #[test]
     fn rejects_out_of_window_measurement() {
         let mut packet = full_rhythm_fixture(Stimulus::DNg100, true);
         packet.measurements[0].window_end_frame = Some(4501);
-        assert!(audit_packet(&packet)
-            .unwrap_err()
-            .contains(ReasonCode::WindowOutsideTrial));
+        assert!(
+            audit_packet(&packet)
+                .unwrap_err()
+                .contains(ReasonCode::WindowOutsideTrial)
+        );
     }
 
     #[test]
