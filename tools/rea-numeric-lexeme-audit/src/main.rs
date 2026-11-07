@@ -6,7 +6,9 @@ use std::io::{Read, Write};
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = env::args_os();
     let _program = args.next();
-    let path = args.next().ok_or("usage: rea-numeric-lexeme-audit <input.json>")?;
+    let path = args
+        .next()
+        .ok_or("usage: rea-numeric-lexeme-audit <input.json>")?;
     if args.next().is_some() {
         return Err("expected exactly one input path".into());
     }
