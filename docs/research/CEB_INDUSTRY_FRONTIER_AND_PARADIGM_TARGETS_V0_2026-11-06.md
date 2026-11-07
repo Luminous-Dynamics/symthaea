@@ -218,7 +218,7 @@ This adds an important production outcome: does a suggestion enter the developer
 
 **CEB implication:** record four dimensions separately: factual/causal correctness, actionability/usefulness, human uptake/disposition, and downstream engineering outcome where observable. Test causal attribution of adoption rather than treating a subsequent diff as proof that the comment caused it. Reuse CEB-REVIEW and CEB-HUMAN; do not create an opaque adoption score or new metric lane.
 
-### 2.23 SWE-sweep — open-world, multi-bug repository discovery
+### 2.26 SWE-sweep — open-world, multi-bug repository discovery
 
 SWE-sweep broadens the task beyond issue-conditioned resolution: the agent receives a repository with no bug descriptions or locations and must discover and repair concurrent defects. The October 1, 2026 paper covers **4,068 bugs across 100 repositories and 22 languages**. The task uses repository states where many known bugs coexist; every repair is checked by a corresponding hidden fail-to-pass test while the original test suite guards against regressions. The paper's main evaluation reports the strongest model resolving **4.7%** of all bugs and finds discovery harder than repair. [Paper](https://swesweep.com/paper).
 
@@ -226,17 +226,40 @@ The live leaderboard viewed November 7, 2026 lists Astra 6 with mini-SWE-agent a
 
 **CEB implication:** this is an adjacent open-world repository discovery/repair frontier, not a code-review metric comparator. It motivates a distinct discovery mode where the agent must decide what work exists, manage multiple interacting defects and prioritize attention before repair. Reuse CEB's repository, causality, continuity, safety and repair contracts; do not translate bug-resolved percentage into Recall@5 or claim matched superiority.
 
-### 2.24 LoopControlBench — deterministic task completion and narrow-scope evidence
+### 2.27 LoopControlBench — deterministic task completion and narrow-scope evidence
 
 LoopControlBench publishes an auditable benchmark harness for real merged Python library bug-fix PRs. Its gate verifies that the maintainer's test fails on the buggy parent and passes after the real fix, in the scoring image. Its reference result is **46/70 = 65.7% solved** for GPT-5-mini, with one attempt per task and no escalation or repair loop. The task pool has since grown to 89, but the published reference remains scoped to the original 70. The maintainers explicitly state that this result applies only to their reproducible, maintainer-tested Python task pool and is not 65.7% of software bugs generally. [Repository and method](https://github.com/kltownsend/loopcontrolbench).
 
 **CEB implication:** the strongest lesson is that the validator, not the model, decides completion. Use deterministic target tests, test immutability, source-path allowlists, task certification in the scoring environment and explicit outcome denominators. However, a named fail-to-pass test proves one declared behavior only; it does not establish whole-program safety, causal uniqueness or an independent pristine regrade. The benchmark's own security note identifies repository build/test execution as untrusted code and requires container/VM isolation. This reinforces #10064 rather than relaxing it.
 
-### 2.25 Saving SWE-Bench — realistic user framing as an evaluation treatment
+### 2.28 Saving SWE-Bench — realistic user framing as an evaluation treatment
 
 Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Approach for Realistic Agent Evaluation*, was submitted October 10, 2025, revised January 23, 2026 (v4), and accepted to CAIN 2026. It converts formal GitHub issue descriptions into realistic user-style queries using observed developer interaction patterns with chat-based coding assistants. The authors report that formal public benchmarks overestimated performance for some evaluated models by **more than 50%**, with approximately **10–16%** differences on their internal benchmark. These are results for the paper's specific models, task sets and mutation process, not a universal discount factor. [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/saving-swe-bench-a-benchmark-mutation-approach-for-realistic-agent-evaluation/) · [arXiv:2510.08996](https://arxiv.org/abs/2510.08996).
 
 **CEB implication:** task framing and information content are experimental variables. A model may repair a formal issue but fail to clarify a realistic developer request; a failing test is additional evidence, not just a paraphrase. Use paired source/defect anchors across issue-conditioned repair, realistic user request, diff-only review, repository-only discovery and failing-test-guided repair. Distinguish wording-only changes from additional/missing information, and keep outputs under their existing CEB lanes rather than creating a composite engineering-intelligence score. The shared-anchor [Cross-Framing Anchor Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md) specifies the paired design and confounder controls.
+
+
+### 2.29 SWE-Serve: production integration can reverse local success
+
+NVIDIA's [SWE-Serve](https://research.nvidia.com/benchmarks/swe-serve) turns recent SGLang engineering into **53 repository-grounded production-inference tasks** spanning model integration, public APIs, cache systems and GPU kernels. Its declared environments include **41 single-H100 GPU tasks and 12 CPU tasks**. The benchmark evaluates 11 models / 31 model-effort configurations with three complete runs per configuration using a fixed mini-SWE-agent harness. The live results page reports Claude Opus 5 (max) at **75% ± 4% Pass@1, $17 mean cost and 57.5 minutes** and GPT-5.6 Sol (max) at **75% ± 6%, $12 and 29.5 minutes**. The page states the ± values are 95% confidence intervals across three complete runs. These are SWE-Serve-specific results, not CEB scores or general coding ability. [NVIDIA results/methodology](https://research.nvidia.com/benchmarks/swe-serve) · [paper, arXiv:2609.26777](https://arxiv.org/abs/2609.26777).
+
+The most consequential result is the **19-task E2E coverage ablation**: patches pass **69.4%** when live end-to-end serving checks are excluded, but only **45.9%** under the complete verifier. Roughly one-third of the patches that pass all other checks are rejected once the serving path is exercised. SWE-Serve's task construction also uses a strong validity pair: the unchanged repository must fail new-behavior tests while preserving regressions; the frozen reference must pass; agent-assisted adversarial probing challenges the verifier; and human reviewers inspect qualification results. The authors explicitly note that pass/fail reflects verifier outcome, not merge readiness or code quality. [SWE-Serve method](https://research.nvidia.com/benchmarks/swe-serve) · [NVIDIA technical explanation](https://developer.nvidia.com/blog/how-swe-serve-exposes-the-gap-between-local-tests-and-live-serving/).
+
+**CEB implication:** local success is not a deployable engineering outcome. Include production-path oracles only where the frozen requirement needs them; separately report the local/full-boundary ablation. Reuse CEB-RESOLUTION / TEST / SECURE / RUST and current admission/V4V controls. Do not promote SWE-Serve's 53-task SGLang/H100 setup to a universal baseline.
+
+### 2.30 SWE-Cycle: environment reconstruction, repair and verification must compose
+
+[SWE-Cycle](https://arxiv.org/abs/2605.13139) contains **489 rigorously filtered instances** and evaluates three isolated phases—environment reconstruction, code implementation and verification-test generation—plus a FullCycle task that combines all three from a bare repository without human scaffolding. Its SWE-Judge combines static code review with dynamic execution. The authors report a sharp solve-rate drop moving from isolated phases to FullCycle, exposing cross-phase dependencies and friction hidden by preconfigured environments. [Paper, May 13, 2026](https://arxiv.org/abs/2605.13139).
+
+**CEB implication:** environment reconstruction, implementation and verification generation should be measured separately and as an integrated sequence. A strong implementation result after a prepared environment does not establish complete autonomous resolution. Reuse existing CEB environment/task setup, test-oracle, resolution, human-escalation and evidence-custody contracts; keep FullCycle as a composition/sequence condition rather than a new primary lane.
+
+### 2.31 E2E-SWE: specification-test solvability is part of the benchmark
+
+[E2E-SWE](https://arxiv.org/abs/2609.38335) evaluates **186 whole-repository generation tasks across 11 languages**. Agents start from an empty workspace with a natural-language specification, create an installable project and must pass hidden tests in a fresh grading container. Across 13 frontier models, reported Pass@1 ranges from **11.7% to 67.7%**. The authors stress that every tested behavior must be specified or follow from a standard convention, and that test assertions must accept any implementation satisfying the declared contract. [Paper, September 29 / October 2, 2026](https://arxiv.org/abs/2609.38335) · [dataset and evaluation code](https://github.com/facebookresearch/E2E-SWE).
+
+This is especially important for CEB: a low pass rate can result from model weakness, an underspecified requirement, a brittle test or a hidden dependence on the reference implementation. E2E-SWE's post-hoc static and rollout-guided audits address that risk. Its paper also cites a targeted audit where 59.4% of 138 SWE-Bench Verified tasks had material specification/test issues; this figure belongs to that audit, not to all coding benchmarks.
+
+**CEB implication:** hidden-test fidelity and specification composition are not merely verifier details. Require an implementation-independent behavior contract, one-to-one requirement/test traceability, fresh-environment execution when qualified, and separate adjudication of model failure versus task/oracle failure. Reuse #10685/#10686 and existing V4V/task-admission ownership rather than creating another oracle registry.
 
 ## 3. What the industry does well — and what remains open
 
@@ -252,6 +275,9 @@ Garg, Steenhoek and Huang's paper, *Saving SWE-Bench: A Benchmark Mutation Appro
 | ReviewBench | Multi-source gold, grounded and augmented precision/recall/F1; 219 PRs / 187 repositories / 19 languages | Separate known-gold comparison from independently adjudicated new findings; version matcher/judge and expert audit |
 | SecPRBench | Security-root-cause diagnosis on 265 vulnerability-introducing changes across nine systems projects; 32.5–78.1% target recall | Test causal mechanism, cross-file paths and exact revision rather than location overlap; report precision limitations and per-run cost |
 | SWE-sweep | Open-world multi-bug discovery/repair across 100 repositories and 22 languages; 4,068 bugs | Adjacent repository-maintenance frontier; keep its bug-resolved score separate from review recall/precision |
+| SWE-Serve | 53 production SGLang inference tasks; 19 E2E-covered tasks expose local-vs-live-serving gap | Require full declared boundary for production claims; measure local/full-verifier ablation under matching hardware |
+| SWE-Cycle | 489 instances: environment reconstruction, implementation, test generation and integrated FullCycle | Measure phase composition; do not infer FullCycle autonomy from isolated-phase success |
+| E2E-SWE | 186 whole-repository generation tasks / 11 languages, with fresh-environment hidden tests | Audit implementation-independent spec/test alignment and fresh-install reproducibility; distinguish task defects from agent failures |
 | LoopControlBench | Deterministic fail-to-pass completion on 70 certified Python tasks; 46/70 reference | Methodological comparator for deterministic outcome/admission; not a broad industry SOTA or code-review benchmark |
 | Saving SWE-Bench | Benchmark mutation from formal issues to realistic developer-style requests | Methodological reference for paired prompt/information-framing effects; no universal correction factor or direct leaderboard comparison |
 | Coding Agent Index V2 | Broad capability coverage plus cost, tokens and time | Human effort, reviewer reconstruction burden, durable acceptance and evidence lifecycle economics |
@@ -384,6 +410,15 @@ A formal issue, a realistic developer request, a diff, a repository without bug 
 CEB should pair multiple task framings on the same source/defect anchor. Keep repository state, target contract, oracle and environment fixed wherever possible; explicitly record when the information package changes. Separate discovery from repair, review from resolution, and clarification from abstention. A failing test or location hint is additional evidence, not a different wording. Randomize condition order, isolate contexts, cluster prompt variants under the original anchor, and score each output with the existing CEB-REVIEW / RESOLUTION / REPO / HUMAN metrics. Do not produce a cross-framing composite or treat the paper's >50% result as a universal discount.
 
 Use the [CEB Review Cross-Framing Anchor Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md); it is a design proposal, not an empirical result or new metric lane.
+
+
+### Shift 18 — From local test success to boundary-qualified system claims
+
+A component can pass its unit suite while the declared user-facing behavior fails at a downstream consumer, public interface, live service, restart, concurrent request or operational workload. SWE-Serve's local-versus-E2E verifier ablation makes this measurable; SWE-Cycle shows that environment reconstruction, implementation and verification do not compose automatically; E2E-SWE shows that complete-system generation depends on both architecture and specification/test solvability.
+
+CEB should make the applicable verification boundary explicit for each claim: static/source, component, workspace, interface, system, operational and evolution (B0–B6). The level is a **scope descriptor, not a score**. A task may legitimately require only B1; a live serving feature may require B4/B5. An agent should select the smallest sufficient boundary check that distinguishes the competing hypotheses, but it must not claim broader correctness from narrower evidence. Reuse existing CEB-RESOLUTION / TEST / SECURE / RUST / CAUSE / CONTINUITY / HUMAN metrics and #10685/#10686 oracle-quality work. No new integration lane or task/receipt schema is needed.
+
+See [CEB End-to-End Integration Boundary Protocol V0](https://github.com/Luminous-Dynamics/symthaea/blob/research/ceb-causal-debugging-2026-11-04/docs/research/CEB_END_TO_END_INTEGRATION_BOUNDARY_PROTOCOL_V0_2026-11-07.md) for seven scope definitions, 12 synthetic scenarios, boundary-pair controls, experiment arms and claim limits.
 
 ## 5. Recommended CEB scorecard — independent dimensions
 
@@ -543,5 +578,9 @@ These remain open draft PRs, not merged releases. Their CEB Contract Validation 
 - Zhao et al., [SpecBench: Measuring Reward Hacking in Long-Horizon Coding Agents](https://arxiv.org/abs/2605.21384), May 20, 2026.
 - Atinafu and Cohen, [RewardHackingAgents: Benchmarking Evaluation Integrity for LLM ML-Engineering Agents](https://arxiv.org/abs/2603.11337), March 11, 2026.
 - Endor Labs, [Agent Security League](https://www.endorlabs.com/research/ai-code-security-benchmark), leaderboard viewed November 6, 2026.
+
+- NVIDIA, [SWE-Serve results and methodology](https://research.nvidia.com/benchmarks/swe-serve), accessed November 7, 2026; [paper](https://arxiv.org/abs/2609.26777), September 22, 2026.
+- Guan et al., [SWE-Cycle: Benchmarking Code Agents across the Complete Issue Resolution Cycle](https://arxiv.org/abs/2605.13139), May 13, 2026.
+- Ding et al., [E2E-SWE: Benchmarking LLMs on Building Working Codebases from Scratch](https://arxiv.org/abs/2609.38335), September 29, 2026; [dataset/reproduction repository](https://github.com/facebookresearch/E2E-SWE).
 
 **Cross-benchmark caveat:** every metric in this synthesis has its own task population, unit, harness, agent configuration, grader and release version. The numbers establish context and research motivation; they do not provide a direct CEB score conversion or a matched CEB-vs-industry comparison.
