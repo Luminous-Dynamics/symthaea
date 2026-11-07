@@ -313,15 +313,15 @@ def EvidenceGraphClosed
         semanticPolarity prerequisite.result = .PositiveSupport
 
 /-- A root is closed only when its entire reachable dependency subgraph is. -/
-def EvidenceClosed
+structure EvidenceClosed
     (rank : EvidenceIdentity → Nat)
     (receipts : List EvidenceReceipt)
-    (e : EvidenceReceipt) : Prop :=
-  e ∈ receipts ∧
-  e.validity = .Current ∧
-  disposition e.result = .Pass ∧
-  semanticPolarity e.result = .PositiveSupport ∧
-  EvidenceGraphClosed rank receipts e
+    (e : EvidenceReceipt) : Prop where
+  member : e ∈ receipts
+  current : e.validity = .Current
+  passed : disposition e.result = .Pass
+  positive : semanticPolarity e.result = .PositiveSupport
+  dependencyGraph : EvidenceGraphClosed rank receipts e
 
 /--
 Finite first-kernel closure: every mandatory obligation has current admissible
@@ -589,7 +589,7 @@ theorem evidence_closed_is_current_pass
     (e : EvidenceReceipt)
     (hclosed : EvidenceClosed rank receipts e) :
     e.validity = .Current ∧ disposition e.result = .Pass := by
-  exact ⟨hclosed.2.1, hclosed.2.2.1⟩
+  exact ⟨hclosed.current, hclosed.passed⟩
 
 theorem evidence_closed_is_positive_support
     (rank : EvidenceIdentity → Nat)
@@ -597,7 +597,7 @@ theorem evidence_closed_is_positive_support
     (e : EvidenceReceipt)
     (hclosed : EvidenceClosed rank receipts e) :
     semanticPolarity e.result = .PositiveSupport := by
-  exact hclosed.2.2.2.1
+  exact hclosed.positive
 
 theorem evidence_closed_rejects_self_dependency
     (rank : EvidenceIdentity → Nat)
@@ -605,9 +605,8 @@ theorem evidence_closed_rejects_self_dependency
     (e : EvidenceReceipt)
     (hclosed : EvidenceClosed rank receipts e)
     (hself : e.evidenceId ∈ e.dependencies) : False := by
-  have hgraph := hclosed.2.2.2.2
-  have hroot := hgraph e hclosed.1 (Or.inl rfl)
-    hclosed.2.1 hclosed.2.2.1 hclosed.2.2.2.1
+  have hroot := hclosed.dependencyGraph e hclosed.member (Or.inl rfl)
+    hclosed.current hclosed.passed hclosed.positive
   obtain ⟨prerequisite, hmember, hid, hlt, hcurrent, hpassed, hpositive⟩ :=
     hroot e.evidenceId hself
   rw [hid] at hlt
