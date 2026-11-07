@@ -1484,3 +1484,367 @@ fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
 }
 
 }
+
+#[test]
+fn removing_environment_scope_dimensions_cannot_upgrade_a_specific_observation() {
+    let mut evidence_value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    evidence_value["environment"] = json!({
+        "id": "device-42",
+        "platform": "Android",
+        "architecture": "aarch64",
+        "isolation": "process"
+    });
+    evidence_value["evidence_id"] =
+        json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&evidence_value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let mut exact_scope = provider_claim(evidence.evidence_id.clone());
+    exact_scope.scope.platform = Some("Android".to_owned());
+    exact_scope.scope.environment_id = Some("device-42".to_owned());
+    let (exact_claim_bytes, exact_result_bytes) =
+        produce(&exact_scope, std::slice::from_ref(&evidence));
+    let exact =
+        replay_claim_evaluation(&exact_claim_bytes, &[&evidence_bytes], &exact_result_bytes)
+            .unwrap();
+    assert_eq!(exact.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        exact.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+
+    // Removing either requested dimension broadens the claim beyond what the
+    // specific environment observation can establish. It must not preserve
+    // or upgrade the prior positive conclusion.
+    for (label, platform, environment_id) in [
+        ("platform", None, Some("device-42".to_owned())),
+        ("environment_id", Some("Android".to_owned()), None),
+        ("both", None, None),
+    ] {
+        let mut broadened = exact_scope.clone();
+        broadened.scope.platform = platform;
+        broadened.scope.environment_id = environment_id;
+        let (claim_bytes, result_bytes) = produce(&broadened, std::slice::from_ref(&evidence));
+        let replay =
+            replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+        assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch, "{label}");
+        assert_eq!(
+            replay.expected_disposition,
+            Disposition::Underdetermined,
+            "removing {label} scope unexpectedly retained positive support"
+        );
+
+        let assessments: Value = serde_json::from_slice(&result_bytes).unwrap();
+        assert!(
+            assessments["evidence_assessments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|item| item["kind"] == json!("scope_unverifiable")),
+            "removing {label} scope did not preserve the missing-scope reason"
+        );
+
+        let stale_positive =
+            replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &exact_result_bytes).unwrap();
+        assert_eq!(
+            stale_positive.outcome,
+            ReplayOutcome::ReplayMismatch,
+            "old positive result replayed after {label} scope was removed"
+        );
+        assert_eq!(
+            stale_positive.expected_disposition,
+            Disposition::Underdetermined
+        );
+    }
+}
+
+#[test]
+fn confidence_and_authority_labels_cannot_promote_unimplemented_predicates() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let confidence_levels = ["observed", "derived", "inferred"];
+    let authority_classes = [
+        "shipped-artifact",
+        "controlled-replay",
+        "historical-reference",
+        "external-service",
+        "analyst-inference",
+    ];
+    let unsupported_predicates = [
+        ClaimPredicate::MemberContentIntegrity,
+        ClaimPredicate::ArchiveContentIdentity,
+        ClaimPredicate::WholeArchiveCompleteness,
+        ClaimPredicate::ProducerAuthenticity,
+        ClaimPredicate::SignatureCryptographicValidity,
+        ClaimPredicate::SignerIdentity,
+        ClaimPredicate::SignerTrust,
+        ClaimPredicate::PackageAuthorization,
+        ClaimPredicate::PlatformAcceptance,
+        ClaimPredicate::ProviderCorroboration,
+        ClaimPredicate::CausalFinding,
+        ClaimPredicate::SecurityControlPass,
+    ];
+
+    for predicate in unsupported_predicates {
+        for confidence in confidence_levels {
+            for authority in authority_classes {
+                let mut value = original.value.clone();
+                value["confidence"] = json!(confidence);
+                value["authority"] = json!(authority);
+                value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+                let evidence_bytes = serde_json::to_vec(&value).unwrap();
+                let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+                let mut claim = provider_claim(evidence.evidence_id.clone());
+                claim.predicate = predicate;
+                claim.source_predicate_type = None;
+                let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+                let replay =
+                    replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes)
+                        .unwrap();
+
+                assert_eq!(
+                    replay.outcome,
+                    ReplayOutcome::ReplayMatch,
+                    "{predicate:?}/{confidence}/{authority}"
+                );
+                assert_eq!(
+                    replay.expected_disposition,
+                    Disposition::Unverified,
+                    "{predicate:?}/{confidence}/{authority} changed claim authority"
+                );
+                let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+                assert_eq!(
+                    result["evidence_assessments"][0]["kind"],
+                    json!("not_evaluated")
+                );
+                assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+            }
+        }
+    }
+}
+
+#[test]
+fn unknown_temporal_scope_fields_are_rejected_instead_of_ignored() {
+    let evidence = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let claim = provider_claim(evidence.evidence_id.clone());
+    let (claim_bytes, result_bytes) = produce(&claim, std::slice::from_ref(&evidence));
+
+    let mut claim_value: Value = serde_json::from_slice(&claim_bytes).unwrap();
+    claim_value["scope"]["as_of"] = json!("2026-11-07T08:00:00Z");
+    claim_value["scope"]["freshness_policy"] = json!("max-age-24h");
+    let changed_claim = serde_json::to_vec(&claim_value).unwrap();
+
+    let error =
+        replay_claim_evaluation(&changed_claim, &[fixture_bytes()], &result_bytes).unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidClaim);
+}
+
+#[test]
+fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_completeness() {
+    let mut value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    value["normalized_result"] = json!({
+        "registered_statements": [
+            {"statement_id": "stmt-001", "subject": "artifact-A"}
+        ],
+        "registered_count": 1,
+        "all_registered_statements_retrieved": true,
+        "terminal_pagination_cursor_seen": true,
+        "issuer_signed_all_issued_declaration": true,
+        "issuer_issued_statement_population_independently_audited": false,
+        "excluded_statement_population": "unknown"
+    });
+    value["raw_result"] = json!({
+        "query": "all statements for artifact-A",
+        "filters": [],
+        "pagination": {"terminal": true},
+        "source_note": "issuer claims all statements were submitted"
+    });
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    // The narrow provider-observation predicate may establish exactly what
+    // the issuer/provider reported. Its claim ceiling must not turn the
+    // self-declared coverage fields into proof of the underlying population.
+    let mut report_claim = provider_claim(evidence.evidence_id.clone());
+    report_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (report_claim_bytes, report_result_bytes) =
+        produce(&report_claim, std::slice::from_ref(&evidence));
+    let report_replay = replay_claim_evaluation(
+        &report_claim_bytes,
+        &[&evidence_bytes],
+        &report_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(report_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        report_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+    let report_result: Value = serde_json::from_slice(&report_result_bytes).unwrap();
+    assert!(
+        report_result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
+    );
+
+    // A complete view of registered statements plus an issuer-signed
+    // completeness declaration is still not an independently qualified
+    // issuer-participation proof. The stronger completeness predicate stays
+    // unverified until a dedicated rule consumes such a proof.
+    let mut completeness_claim = report_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("No predicate-specific verifier"))
+    );
+
+#[test]
+fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
+    let original = rea_compat::verify_evidence_json(fixture_bytes()).unwrap();
+    let reported_completeness = [
+        json!({
+            "kind": "declared_query",
+            "query": "all statements for issuer during interval T",
+            "snapshot_id": "snapshot-01",
+            "page_count": 4,
+            "terminal_cursor_seen": true,
+            "all_pages_seen": true,
+            "observed_count": 400,
+            "reported_total_count": 400,
+            "hidden_filter": null
+        }),
+        json!({
+            "kind": "issuer_participation",
+            "issuer_claims_all_issued_statements_submitted": true,
+            "independent_issuer_history_audit": null,
+            "withheld_statement_check": null
+        }),
+        json!({
+            "kind": "transparency_view",
+            "all_registered_entries_enumerated": true,
+            "checkpoint_verified": true,
+            "issuer_submission_completeness_established": false
+        }),
+    ];
+
+    let mut evidence_values = Vec::new();
+    let mut evidence_bytes = Vec::new();
+    for (index, report) in reported_completeness.into_iter().enumerate() {
+        let mut value = original.value.clone();
+        value["provider"]["id"] = json!(format!("population-provider-{index}"));
+        value["provider"]["name"] = json!(format!("Population Provider {index}"));
+        value["analysis_profile"]["provider"] = value["provider"].clone();
+        value["analysis_profile"]["digest"] =
+            json!(rea_compat::analysis_profile_digest(&value["analysis_profile"]).unwrap());
+        value["confidence"] = json!("observed");
+        value["authority"] = json!("external-service");
+        value["normalized_result"]["population_completeness"] = report;
+        value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+
+        let bytes = serde_json::to_vec(&value).unwrap();
+        evidence_values.push(rea_compat::verify_evidence_json(&bytes).unwrap());
+        evidence_bytes.push(bytes);
+    }
+
+    // The narrow provider-report meta-claim may be supported: it says only
+    // that this provider returned these exact normalized pagination fields.
+    // It must not be confused with the separate whole-population proposition.
+    let mut report_claim = provider_claim(evidence_values[0].evidence_id.clone());
+    report_claim.asserted_value = evidence_values[0].value["normalized_result"].clone();
+    let (report_claim_bytes, report_result_bytes) =
+        produce(&report_claim, std::slice::from_ref(&evidence_values[0]));
+    let report_replay = replay_claim_evaluation(
+        &report_claim_bytes,
+        &[evidence_bytes[0].as_slice()],
+        &report_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(report_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        report_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+    let report_result: Value = serde_json::from_slice(&report_result_bytes).unwrap();
+    assert!(
+        report_result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
+    );
+
+    let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
+    claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    claim.source_predicate_type = None;
+    claim.asserted_value = json!({
+        "whole_archive_complete": true,
+        "issuer_history_complete": true
+    });
+    claim.evidence_ids = evidence_values
+        .iter()
+        .map(|evidence| evidence.evidence_id.clone())
+        .collect();
+
+    let (claim_bytes, result_bytes) = produce(&claim, &evidence_values);
+    let supplied: Vec<&[u8]> = evidence_bytes.iter().map(Vec::as_slice).collect();
+    let replay = replay_claim_evaluation(&claim_bytes, &supplied, &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    assert_eq!(replay.reported_disposition, Disposition::Unverified);
+    assert_eq!(replay.evidence_count, 3);
+    assert_eq!(replay.rule_id, "no-registered-predicate-rule/v0");
+
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert!(
+        result["evidence_assessments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|assessment| assessment["kind"] == json!("not_evaluated"))
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
+    );
+}
+
+}
