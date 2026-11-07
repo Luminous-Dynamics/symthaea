@@ -128,7 +128,8 @@
     "rf_rpl_knownness_only_ablation",
     "rf_rpl_full_gate_ablation",
     "no_rf_consistency_pretraining_ablation",
-    "human_expert_review_on_rights_cleared_subset"
+    "human_expert_review_on_rights_cleared_subset",
+    "temporal_and_open_set_satellite_RF_benchmark_comparator_if_rights_and_protocol_permit"
   ],
   "metrics": {
     "known_class": [
@@ -142,7 +143,8 @@
       "unknown_aupr",
       "fpr95",
       "false_accept_rate_at_fixed_known_recall",
-      "unknown_pseudo_label_contamination"
+      "unknown_pseudo_label_contamination",
+      "unknown_rejection_at_fixed_known_identity_recall"
     ],
     "epistemic": [
       "brier_score",
@@ -157,7 +159,8 @@
       "per_dataset_family",
       "per_snr_bucket",
       "per_channel_condition",
-      "worst_domain_performance"
+      "worst_domain_performance",
+      "cross_day_temporal_generalization"
     ],
     "deployment": [
       "p50_p95_p99_latency",
@@ -208,5 +211,40 @@
     "shared_dataset_and_receipt_contracts": "Symthaea #10814 / PR #10875",
     "edge_hardware_profile": "Luminous Platform #300",
     "pnt_sector_profile": "Luminous Platform #297 / PR #298"
-  }
+  },
+  "external_benchmark_candidates": [
+    {
+      "id": "IRISIG-SPOOF-2026",
+      "paper": "IriSig-Spoof: A Real-World Benchmark for Time-Robust Satellite RF Fingerprinting and Spoofing Detection",
+      "source_uri": "https://arxiv.org/abs/2608.18642",
+      "publication_status": "PREPRINT_NOT_INDEPENDENTLY_REPRODUCED",
+      "reported_dataset": {
+        "real_message_count": 5170000,
+        "satellite_count": 66,
+        "collection_days": 32,
+        "spoofing_signal_collection": "SDR-generated signals collected in indoor and outdoor settings",
+        "note": "Paper abstract description; exact file inventory and source-level terms require independent inspection."
+      },
+      "reported_tasks": [
+        "temporal_robustness",
+        "open_set_unknown_rejection",
+        "cross_scenario_detection"
+      ],
+      "reported_metrics": {
+        "best_cross_day_accuracy": 0.9775,
+        "open_set_auroc": 0.9715
+      },
+      "qualification_limits": [
+        "Reported metrics are paper results, not independent reproduction.",
+        "Unknown-signal rejection does not establish reliable identity assignment.",
+        "Satellite RF fingerprinting is not GNSS PNT integrity.",
+        "No physical emitter location, hostile intent, or operational actor attribution is inferred."
+      ],
+      "rights_state": "PENDING_REVIEW",
+      "payload_state": "NOT_IMPORTED",
+      "intended_use": "research",
+      "license_review_required": true,
+      "reproduction_state": "NOT_REPRODUCED"
+    }
+  ]
 }
