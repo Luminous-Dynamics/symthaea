@@ -241,8 +241,8 @@ def semantic_errors(payload: dict) -> list[str]:
             errors.append(f"{comparator_id}: denominator contract changed")
 
     required_adjacent_observations = {
-        "cgarf-repair-success-gain-lower": ("cgarf-swebench-repair", "repair_success_gain_range_bound", 2),
-        "cgarf-repair-success-gain-upper": ("cgarf-swebench-repair", "repair_success_gain_range_bound", 4),
+        "cgarf-repair-success-gain-lower": ("cgarf-swebench-repair", "repair_success_gain_lower_bound", 2),
+        "cgarf-repair-success-gain-upper": ("cgarf-swebench-repair", "repair_success_gain_upper_bound", 4),
         "cgarf-patch-applicability-gain": ("cgarf-swebench-repair", "patch_applicability_gain", 3),
         "secrepobench-top-setup-secure-pass-at-1": ("secrepobench-secure-completion", "secure_pass_at_1", 60.1),
         "secrepobench-top-setup-pass-at-1": ("secrepobench-secure-completion", "pass_at_1", 76.4),
