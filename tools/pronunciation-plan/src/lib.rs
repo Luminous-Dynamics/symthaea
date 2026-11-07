@@ -82,8 +82,9 @@ pub struct PronunciationSyllable {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Phone {
-    /// One canonical normalized IPA token. Stress, syllable boundary and
-    /// length markers are represented in typed fields, not mixed into tokens.
+    /// One canonical normalized IPA phone token. Syllable stress and
+    /// boundaries are represented in typed fields; a conventional length
+    /// diacritic may remain attached to the phone (for example, "iː").
     pub ipa: String,
     pub kind: PhoneKind,
 }
@@ -267,8 +268,8 @@ fn validate_word_state(index: usize, word: &WordPronunciation) -> Result<(), Str
             for (phone_index, phone) in syllable.phones.iter().enumerate() {
                 if phone.ipa.trim().is_empty()
                     || phone.ipa.chars().any(char::is_whitespace)
-                    || phone.ipa == "ˈ"
-                    || phone.ipa == "ˌ"
+                    || phone.ipa.contains('ˈ')
+                    || phone.ipa.contains('ˌ')
                     || phone.ipa == "ː"
                 {
                     return Err(format!(
@@ -1121,7 +1122,7 @@ mod tests {
         }];
         alignment.syllable_bindings[0].melisma_phone_index = None;
         let error = alignment.validate_against(&pronunciation).unwrap_err();
-        assert!(error.contains("unassigned interval"), "{error}");
+        assert!(error.contains("not fully covered"), "{error}");
 
         let (pronunciation, mut alignment) = alignment_fixture();
         alignment.events[1].kind = ScoreEventKind::Rest;
@@ -1231,7 +1232,11 @@ mod tests {
 
         alignment.syllable_bindings[1].spans[0].start_offset_s = 0.35;
         let error = alignment.validate_against(&pronunciation).unwrap_err();
-        assert!(error.contains("overlapping syllable intervals"), "{error}");
+        assert!(
+            error.contains("overlaps or reorders a preceding syllable")
+                || error.contains("overlapping syllable intervals"),
+            "{error}"
+        );
     }
 
     #[test]
