@@ -41,8 +41,8 @@ struct CandidateCase {
     candidate_id: String,
     source_id: String,
     phones: Vec<String>,
-    syllable_boundaries: Vec<usize>,
-    syllable_stress: Vec<u8>,
+    syllable_boundaries: Option<Vec<usize>>,
+    syllable_stress: Option<Vec<u8>>,
     detected_oov: bool,
     /// Probability that this complete case's pronunciation is exactly correct.
     /// Omit when the candidate system does not expose calibrated confidence.
@@ -82,8 +82,8 @@ struct CaseScore {
     phone_error_rate: Option<f64>,
     exact_pronunciation: Option<bool>,
     syllable_count_reference: usize,
-    syllable_count_candidate: usize,
-    boundaries: BoundaryCounts,
+    syllable_count_candidate: Option<usize>,
+    boundaries: Option<BoundaryCounts>,
     stress_correct: Option<usize>,
     stress_compared: Option<usize>,
     stress_accuracy: Option<f64>,
@@ -104,6 +104,7 @@ struct AggregateMetrics {
     in_vocabulary_cases: usize,
     exact_pronunciation_cases: usize,
     exact_pronunciation_rate: Option<f64>,
+    syllable_boundary_cases_compared: usize,
     boundary_true_positive: usize,
     boundary_false_positive: usize,
     boundary_false_negative: usize,
@@ -132,6 +133,45 @@ struct EvaluationReport {
 
 fn invalid(message: impl Into<String>) -> String {
     message.into()
+}
+
+fn validate_candidate_syllable_info(
+    phone_count: usize,
+    boundaries: &Option<Vec<usize>>,
+    stress: &Option<Vec<u8>>,
+    label: &str,
+) -> Result<(), String> {
+    if let Some(boundaries) = boundaries {
+        if phone_count == 0 || boundaries.is_empty() || *boundaries.last().unwrap() != phone_count {
+            return Err(invalid(format!(
+                "{label}: final exclusive syllable boundary must equal non-empty phone count"
+            )));
+        }
+        let mut previous = 0usize;
+        for (index, boundary) in boundaries.iter().copied().enumerate() {
+            if boundary <= previous || boundary > phone_count {
+                return Err(invalid(format!(
+                    "{label}: syllable boundary {index} is not strictly increasing or exceeds phone count"
+                )));
+            }
+            previous = boundary;
+        }
+        if let Some(stress) = stress {
+            if stress.len() != boundaries.len() {
+                return Err(invalid(format!(
+                    "{label}: stress count {} does not match syllable count {}",
+                    stress.len(),
+                    boundaries.len()
+                )));
+            }
+        }
+    }
+    if let Some(stress) = stress {
+        if stress.iter().any(|value| *value > 2) {
+            return Err(invalid(format!("{label}: stress values must be 0, 1, or 2")));
+        }
+    }
+    Ok(())
 }
 
 fn validate_phone_sequence(
@@ -281,7 +321,7 @@ struct VariantScore<'a> {
     variant: &'a ReferenceVariant,
     edits: EditCounts,
     distance: usize,
-    boundaries: BoundaryCounts,
+    boundaries: Option<BoundaryCounts>,
     stress_correct: Option<usize>,
     stress_compared: Option<usize>,
 }
@@ -291,23 +331,25 @@ fn score_variant<'a>(
     candidate: &CandidateCase,
 ) -> VariantScore<'a> {
     let (edits, distance) = align(&variant.phones, &candidate.phones);
-    let boundaries = boundary_counts(
-        &variant.syllable_boundaries,
-        &candidate.syllable_boundaries,
-    );
-    let (stress_correct, stress_compared) =
-        if variant.syllable_stress.len() == candidate.syllable_stress.len() {
+    let boundaries = candidate
+        .syllable_boundaries
+        .as_ref()
+        .map(|observed| boundary_counts(&variant.syllable_boundaries, observed));
+    let (stress_correct, stress_compared) = candidate
+        .syllable_stress
+        .as_ref()
+        .filter(|observed| variant.syllable_stress.len() == observed.len())
+        .map(|observed| {
             let compared = variant.syllable_stress.len();
             let correct = variant
                 .syllable_stress
                 .iter()
-                .zip(&candidate.syllable_stress)
-                .filter(|(expected, observed)| expected == observed)
+                .zip(observed)
+                .filter(|(expected, actual)| expected == actual)
                 .count();
             (Some(correct), Some(compared))
-        } else {
-            (None, None)
-        };
+        })
+        .unwrap_or((None, None));
     VariantScore {
         variant,
         edits,
@@ -326,8 +368,16 @@ fn choose_variant<'a>(
         a.distance
             .cmp(&b.distance)
             .then_with(|| {
-                let ae = a.boundaries.false_positive + a.boundaries.false_negative;
-                let be = b.boundaries.false_positive + b.boundaries.false_negative;
+                let ae = a
+                    .boundaries
+                    .as_ref()
+                    .map(|counts| counts.false_positive + counts.false_negative)
+                    .unwrap_or(0);
+                let be = b
+                    .boundaries
+                    .as_ref()
+                    .map(|counts| counts.false_positive + counts.false_negative)
+                    .unwrap_or(0);
                 ae.cmp(&be)
             })
             .then_with(|| {
@@ -408,11 +458,11 @@ fn validate_inputs(
         }
         if prediction.detected_oov {
             if !prediction.phones.is_empty()
-                || !prediction.syllable_boundaries.is_empty()
-                || !prediction.syllable_stress.is_empty()
+                || prediction.syllable_boundaries.is_some()
+                || prediction.syllable_stress.is_some()
             {
                 return Err(format!(
-                    "prediction {} marked OOV must not contain a guessed phone sequence",
+                    "prediction {} marked OOV must not contain guessed phones or syllable metadata",
                     prediction.case_id
                 ));
             }
@@ -423,8 +473,14 @@ fn validate_inputs(
                     prediction.case_id
                 ));
             }
-            validate_phone_sequence(
-                &prediction.phones,
+            if prediction.phones.iter().any(|phone| phone.trim().is_empty()) {
+                return Err(format!(
+                    "prediction {} contains an empty phone token",
+                    prediction.case_id
+                ));
+            }
+            validate_candidate_syllable_info(
+                prediction.phones.len(),
                 &prediction.syllable_boundaries,
                 &prediction.syllable_stress,
                 &format!("prediction {}", prediction.case_id),
@@ -479,6 +535,7 @@ fn evaluate(
     let mut total_edits = 0usize;
     let mut in_vocabulary_cases = 0usize;
     let mut exact_cases = 0usize;
+    let mut boundary_cases_compared = 0usize;
     let mut boundary_tp = 0usize;
     let mut boundary_fp = 0usize;
     let mut boundary_fn = 0usize;
@@ -516,14 +573,7 @@ fn evaluate(
                         insertions: candidate.phones.len(),
                     },
                     candidate.phones.len(),
-                    BoundaryCounts {
-                        true_positive: 0,
-                        false_positive: 0,
-                        false_negative: 0,
-                        precision: None,
-                        recall: None,
-                        f1: None,
-                    },
+                    None,
                     None,
                     None,
                     None,
@@ -541,9 +591,12 @@ fn evaluate(
                 exact_cases += 1;
             }
         }
-        boundary_tp += boundaries.true_positive;
-        boundary_fp += boundaries.false_positive;
-        boundary_fn += boundaries.false_negative;
+        if let Some(boundaries) = &boundaries {
+            boundary_cases_compared += 1;
+            boundary_tp += boundaries.true_positive;
+            boundary_fp += boundaries.false_positive;
+            boundary_fn += boundaries.false_negative;
+        }
         if let (Some(correct), Some(compared)) = (stress_correct, stress_compared) {
             stress_correct_total += correct;
             stress_compared_total += compared;
@@ -566,7 +619,7 @@ fn evaluate(
             phone_error_rate: per,
             exact_pronunciation: exact,
             syllable_count_reference: reference_syllables,
-            syllable_count_candidate: candidate.syllable_boundaries.len(),
+            syllable_count_candidate: candidate.syllable_boundaries.as_ref().map(Vec::len),
             boundaries,
             stress_correct,
             stress_compared,
@@ -596,6 +649,7 @@ fn evaluate(
             in_vocabulary_cases,
             exact_pronunciation_cases: exact_cases,
             exact_pronunciation_rate: ratio(exact_cases, in_vocabulary_cases),
+            syllable_boundary_cases_compared: boundary_cases_compared,
             boundary_true_positive: boundary_tp,
             boundary_false_positive: boundary_fp,
             boundary_false_negative: boundary_fn,
@@ -700,8 +754,8 @@ mod tests {
             candidate_id: "candidate-a".into(),
             source_id: "test-source".into(),
             phones: phones.iter().map(|phone| (*phone).into()).collect(),
-            syllable_boundaries: boundaries.to_vec(),
-            syllable_stress: stress.to_vec(),
+            syllable_boundaries: (!detected_oov).then(|| boundaries.to_vec()),
+            syllable_stress: (!detected_oov).then(|| stress.to_vec()),
             detected_oov,
             confidence_exact: None,
         }
@@ -773,6 +827,23 @@ mod tests {
         let report = evaluate(&refs, &preds).unwrap();
         assert_eq!(report.metrics.boundary_true_positive, 0);
         assert_eq!(report.metrics.syllable_boundary_f1, None);
+    }
+
+    #[test]
+    fn missing_syllable_prediction_keeps_phone_error_defined_and_syllable_metrics_undefined() {
+        let refs = vec![reference(
+            "hello",
+            false,
+            vec![variant("v1", &["h", "ə", "l", "oʊ"], &[2, 4], &[0, 1])],
+        )];
+        let mut prediction = candidate("hello", &["h", "ə", "l", "oʊ"], &[], &[], false);
+        prediction.syllable_boundaries = None;
+        prediction.syllable_stress = None;
+        let report = evaluate(&refs, &[prediction]).unwrap();
+        assert_eq!(report.metrics.phone_error_rate, Some(0.0));
+        assert_eq!(report.metrics.syllable_boundary_f1, None);
+        assert_eq!(report.metrics.stress_accuracy, None);
+        assert_eq!(report.cases[0].syllable_count_candidate, None);
     }
 
     #[test]
