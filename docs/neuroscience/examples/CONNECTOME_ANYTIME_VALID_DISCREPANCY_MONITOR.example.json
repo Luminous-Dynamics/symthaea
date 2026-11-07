@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-connectome-anytime-valid-discrepancy-v1",
+  "claim_scope": "synthetic_known_truth",
+  "horizon": 2,
+  "alpha": "1/2",
+  "outcome_alphabet": [
+    "H",
+    "L"
+  ],
+  "actions": [
+    {
+      "action_id": "screen",
+      "feasibility_status": "SYNTHETIC_FIXTURE_ELIGIBLE",
+      "feasibility_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "action_id": "follow-H",
+      "feasibility_status": "SYNTHETIC_FIXTURE_ELIGIBLE",
+      "feasibility_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "action_id": "follow-L",
+      "feasibility_status": "SYNTHETIC_FIXTURE_ELIGIBLE",
+      "feasibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "policy": [
+    {
+      "history": [],
+      "action_id": "screen"
+    },
+    {
+      "history": [
+        "H"
+      ],
+      "action_id": "follow-H"
+    },
+    {
+      "history": [
+        "L"
+      ],
+      "action_id": "follow-L"
+    }
+  ],
+  "null_models": [
+    {
+      "model_id": "N0",
+      "kernels": [
+        {
+          "history": [],
+          "action_id": "screen",
+          "probabilities": {
+            "H": "1/2",
+            "L": "1/2"
+          }
+        },
+        {
+          "history": [
+            "H"
+          ],
+          "action_id": "follow-H",
+          "probabilities": {
+            "H": "1/2",
+            "L": "1/2"
+          }
+        },
+        {
+          "history": [
+            "L"
+          ],
+          "action_id": "follow-L",
+          "probabilities": {
+            "H": "1/2",
+            "L": "1/2"
+          }
+        }
+      ]
+    },
+    {
+      "model_id": "N1",
+      "kernels": [
+        {
+          "history": [],
+          "action_id": "screen",
+          "probabilities": {
+            "H": "3/5",
+            "L": "2/5"
+          }
+        },
+        {
+          "history": [
+            "H"
+          ],
+          "action_id": "follow-H",
+          "probabilities": {
+            "H": "3/5",
+            "L": "2/5"
+          }
+        },
+        {
+          "history": [
+            "L"
+          ],
+          "action_id": "follow-L",
+          "probabilities": {
+            "H": "3/5",
+            "L": "2/5"
+          }
+        }
+      ]
+    }
+  ],
+  "challenger_models": [
+    {
+      "model_id": "C-strong",
+      "prior_probability": "1/2",
+      "kernels": [
+        {
+          "history": [],
+          "action_id": "screen",
+          "probabilities": {
+            "H": "19/20",
+            "L": "1/20"
+          }
+        },
+        {
+          "history": [
+            "H"
+          ],
+          "action_id": "follow-H",
+          "probabilities": {
+            "H": "19/20",
+            "L": "1/20"
+          }
+        },
+        {
+          "history": [
+            "L"
+          ],
+          "action_id": "follow-L",
+          "probabilities": {
+            "H": "19/20",
+            "L": "1/20"
+          }
+        }
+      ]
+    },
+    {
+      "model_id": "C-weak",
+      "prior_probability": "1/2",
+      "kernels": [
+        {
+          "history": [],
+          "action_id": "screen",
+          "probabilities": {
+            "H": "17/20",
+            "L": "3/20"
+          }
+        },
+        {
+          "history": [
+            "H"
+          ],
+          "action_id": "follow-H",
+          "probabilities": {
+            "H": "17/20",
+            "L": "3/20"
+          }
+        },
+        {
+          "history": [
+            "L"
+          ],
+          "action_id": "follow-L",
+          "probabilities": {
+            "H": "17/20",
+            "L": "3/20"
+          }
+        }
+      ]
+    }
+  ],
+  "observed_history": [
+    {
+      "action_id": "screen",
+      "outcome_id": "H"
+    },
+    {
+      "action_id": "follow-H",
+      "outcome_id": "H"
+    }
+  ],
+  "oracle_expectations": {
+    "challenger_predictive_by_history": [
+      {
+        "history": [],
+        "probabilities": {
+          "H": "9/10",
+          "L": "1/10"
+        }
+      },
+      {
+        "history": [
+          "H"
+        ],
+        "probabilities": {
+          "H": "65/72",
+          "L": "7/72"
+        }
+      },
+      {
+        "history": [
+          "L"
+        ],
+        "probabilities": {
+          "H": "7/8",
+          "L": "1/8"
+        }
+      }
+    ],
+    "e_factors_by_history": [
+      {
+        "history": [],
+        "factors": {
+          "H": "3/2",
+          "L": "1/5"
+        }
+      },
+      {
+        "history": [
+          "H"
+        ],
+        "factors": {
+          "H": "325/216",
+          "L": "7/36"
+        }
+      },
+      {
+        "history": [
+          "L"
+        ],
+        "factors": {
+          "H": "35/24",
+          "L": "1/4"
+        }
+      }
+    ],
+    "crossing_paths": [
+      [
+        "H",
+        "H"
+      ]
+    ],
+    "observed_e_value": "325/144",
+    "false_alarm_probability_by_null": {
+      "N0": "1/4",
+      "N1": "9/25"
+    },
+    "expected_status": "MODEL_DISCREPANCY_DETECTED"
+  }
+}
