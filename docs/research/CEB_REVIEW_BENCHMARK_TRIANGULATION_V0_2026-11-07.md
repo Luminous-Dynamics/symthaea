@@ -73,6 +73,16 @@ Kodus maintains CodeReviewBench: **30 merged pull requests and 95 human-authored
 
 **CEB implication:** retain it as a contextual comparator, not a direct Recall@5 equivalent. Its most important contribution is making the *human-gold ceiling* explicit. CEB should add blind audits of zero-finding PRs and multi-producer "clean" consensus, so defects missed by the original review population have a route to independent discovery. Do not retroactively add newly discovered defects to a frozen task denominator; report them through a separate, blinded open-set channel.
 
+### 2.6 Martian Code Review Benchmark — production adoption signal at scale
+
+Martian's online Code Review Benchmark analyzes production review-bot activity and developer response timelines: bot suggestions, author responses, follow-up changes and resolved conversations. Its current dashboard (accessed November 7, 2026) reports a recent-period view of **17,768 scored PRs**. Its visible overall table lists Greptile at **65.2 F1 / 82.9% precision / 53.7% recall**, Cubic Dev AI at 63.2 / 68.6 / 58.7, and Qodo Code Review at 62.3 / 75.3 / 53.1. The tool-specific recent-period sample sizes shown separately are 1,600, 1,525 and 2,435 PRs, respectively; visible all-time PR counters are much larger and are not the same denominators. [Live dashboard](https://www.codereviewbenchmark.com/) · [dashboard alternate URL](https://codereview.withmartian.com/?fscore_group=day).
+
+The benchmark's distinctive contribution is operational: it examines whether review-bot suggestions are followed by developer responses, code changes and resolved threads, using LLM-powered analysis of the review timeline. That is a useful human-workflow signal which fixed-gold replay benchmarks do not directly measure.
+
+**Critical distinction:** suggestion adoption is not ground-truth correctness. A developer can accept a correct comment, reject a correct comment for timing/scope reasons, accept a mistaken comment for unrelated reasons, or make the same code change independently. Follow-up code is evidence about workflow impact, not automatic proof of the finding's factual or causal validity. The table's pooled/recent view and agent-specific samples are also not a common paired denominator.
+
+**CEB implication — separate truth from uptake.** Keep four outcomes distinct: (1) independently adjudicated correctness/causal diagnosis, (2) actionability/usefulness, (3) human uptake or disposition, and (4) downstream engineering outcome such as recurrence/rework where observable. Do not add a single adoption score or use uptake to rewrite frozen gold. Record uptake as observed process data and investigate attribution; report silence, defer, correction and rejection separately from acceptance.
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -87,6 +97,7 @@ The current CEB-REVIEW lane retains exactly three primary metrics. This triangul
 | CR-Bench-v2 KDDR | Related target-detection construct; one known defect / instance and review-only agents | Known-target detection stress test | Treat a valid suggestion as a target hit |
 | CR-Bench-v2 Usefulness Rate | Related to comment utility, not identical to actionable precision until rubric/denominator are harmonized | Comment-quality diagnostic | Infer defect recall from usefulness |
 | CodeReviewBench human-flagged bug recall | Related but not top-five constrained; gold contains only prior human-detected bugs | Small replay/cost reference and a warning about human-gold completeness | Treat 44.2% as CEB Recall@5 or exhaustive bug recall |
+| Martian production review adoption | Related but distinct: production developer follow-up and LLM-derived adoption analysis | Human-workflow uptake signal; compare only after matching scope and human adjudication | Treat an accepted code change as proof that a finding was correct, or pool non-paired per-agent PR samples |
 | Human minutes / adjudication time | Exact only if accounting boundaries match | CEB `reviewer_burden` comparison | Exclude second reviewer, judge audit or context reconstruction time from assisted arm |
 
 ## 4. A diagnosis ladder for CEB review
