@@ -17,6 +17,8 @@ Do not infer runtime behavior from source fragments. Do not invent probabilities
 
 **Claim:** Does the supplied request handler establish that every resource mutation is authorized for the requesting tenant?
 
+**Claim kind:** Source structural possibility (and completeness of the in-scope mutation-path inventory). This is not an incident-attribution claim.
+
 **Evidence packet:**
 
 ```rust
@@ -54,6 +56,8 @@ fn check(actor: UserId, _tenant: TenantId, _resource: ResourceId) -> Result<bool
 
 **Claim:** Does the supplied workspace source prove that the shipped binary uses the fail-closed implementation?
 
+**Claim kind:** Build-world selection. The question is which conditional implementation is selected in the artifact, not whether either source branch is executable in principle.
+
 **Evidence packet:**
 
 ```rust
@@ -80,6 +84,8 @@ Two compatible build worlds: (A) strict-policy is enabled and the fail-closed de
 
 **Claim:** Do cache evictions cause the request failures?
 
+**Claim kind:** Actual-cause attribution for the observed requests, plus identifiability of an eviction intervention effect under the competing common-cause models.
+
 **Evidence packet:**
 
 ```rust
@@ -105,6 +111,8 @@ Two compatible models:
 **Family:** Overdetermination / alternative sufficient mechanisms.
 
 **Claim:** Does removing the legacy retry path eliminate the observed duplicate-transfer failure?
+
+**Claim kind:** Source-level structural sufficiency and residual-path analysis; separately, actual-cause attribution to one route in the reported incident.
 
 **Evidence packet:**
 
@@ -138,6 +146,8 @@ Both paths are independently sufficient. A third possibility is that both were a
 
 **Claim:** Did the observed worker mutation execute after authority revocation?
 
+**Claim kind:** Distinguish source structural possibility from execution realization and incident attribution. The supplied code may permit the ordering without showing that it occurred.
+
 **Evidence packet:**
 
 ```rust
@@ -168,6 +178,8 @@ Two possible orders:
 **Family:** Repair entanglement / causal attribution ambiguity.
 
 **Claim:** Which change was necessary to remove the target duplicate-transfer mechanism?
+
+**Claim kind:** Actual-cause attribution to a repair component and identifiability of that component's minimal intervention effect; the incident-level outcome is separately attributed to the bundled revision.
 
 Before revision:
 
