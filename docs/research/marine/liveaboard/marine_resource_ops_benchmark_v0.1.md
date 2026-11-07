@@ -1,0 +1,131 @@
+# Marine resource-service operations benchmark — V0.1
+
+**Status:** synthetic benchmark and interface proposal; not an executable controller or physical vessel qualification.  
+**Parent:** [MARINE-RESOURCE-OPS-001 #11008](https://github.com/Luminous-Dynamics/symthaea/issues/11008)
+
+## 1. Objective
+
+Schedule onboard services against the vessel's time-varying electrical and resource state without treating all loads as equally flexible.
+
+The scheduler receives a frozen mission/operating case, time-aligned forecasts and measured/modelled service state. It proposes service start times and energy dispatch requests. Existing local equipment controllers retain authority.
+
+The benchmark asks:
+
+> Under identical environment forecasts, service requirements, vessel state and hardware constraints, can a marine-specific service scheduler preserve every required onboard service while reducing avoidable peaks, generator operation and battery wear against simple baselines?
+
+No answer is assumed in V0.
+
+## 2. Existing technology to compose
+
+- `symthaea-grid-physics` already has battery energy/SoH, solar/load scenario replay, a naive greedy policy and a reserve-aware policy. Reuse it; do not clone the battery or generic grid scheduler.
+- Symtropy Habitat Metabolism owns authoritative water, food, waste, thermal, maintenance and material stocks/flows.
+- MARINE-DESIGN-001 #7703 owns itinerary and ship/route co-optimization.
+- MARINE-ENERGY-BUDGET-001 #8092 / MARINE-TRACE-001 #8102 own mission energy accounting and measured voyage traces.
+- MARINE-WATERMAKER-BENCH-001 #10994 owns qualified RO output and electrical input evidence.
+- MARINE-AUTONOMY-VECTOR-001 #10956 owns per-resource horizon assessment.
+- MARINE-HABITABILITY-SEAKEEPING-001 #10966 owns task/location comfort evidence.
+- MARINE-LIVEABOARD-EVIDENCE-JOIN-001 #10988 owns exact-case cross-domain evidence alignment.
+- SMDC-ELECTRICAL-001 #3846 owns three-phase model, protection, coordination, transfer sequences and electrical assurance.
+
+The shared grid-physics scenario harness currently receives an aggregate load profile, generation profile and battery policy. This V0 marine contract adds the service-origin semantics and constraints needed to construct those profiles; it does not claim that the existing harness already models watermakers, generator dynamics, refrigeration thermal state or full vessel operation.
+
+## 3. Paradigm shift: service scheduling rather than load shifting
+
+A kilowatt is not a complete service description.
+
+A watermaker needs feed within its qualified envelope, prefilter/membrane state, a minimum production run, flush and preservation stages, product-water quality diversion and available tank headroom. A refrigerator has stored thermal state and temperature limits. Hot water has a thermal store. HVAC has comfort and humidity bounds. A workshop task has a deadline and safe operating prerequisites. Propulsion, steering, navigation and emergency systems cannot be treated as discretionary loads.
+
+The optimizer should schedule *service requests*, not manipulate arbitrary kW bars.
+
+Each service request therefore declares:
+- required output and acceptance criterion;
+- earliest/latest start and deadline;
+- process stages and minimum on/off times;
+- time-varying power envelope and energy interval;
+- state prerequisites (temperature, tank level, feed conditions, maintenance state);
+- hard operating limits and allowed flexibility;
+- consequences of deferment, interruption or failure;
+- source, evidence class, revision and exact mission-case binding.
+
+## 4. Decision hierarchy
+
+Use constrained/lexicographic decisions, not a free weighted sum:
+
+1. Hard safety, electrical, thermal, battery, machinery, fire/flood and route constraints.
+2. Non-deferrable critical services and degraded-mode minimums.
+3. Qualified potable-water, refrigeration, ventilation and emergency reserves.
+4. Occupant service deadlines, comfort and privacy/noise limits.
+5. Reduce unserved services, emergency generator starts, peak demand, fuel, battery throughput/degradation, energy cost and maintenance burden.
+6. Preserve a Pareto view of trade-offs; no average score may mask a failed hard constraint.
+
+V0 is shadow/recommendation mode only. It cannot command the watermaker, generator, battery, HVAC, refrigerator, propulsion or protection devices. Physical controllers, certified local interlocks and operator authority remain independent.
+
+## 5. Benchmark policy baselines
+
+Compare on identical frozen cases and the same information:
+1. Fixed equipment defaults / static timetable.
+2. Greedy solar-surplus execution.
+3. Reserve-aware priority rules.
+4. Constrained receding-horizon / MPC where the models are sufficiently specified.
+5. Symthaea advisory proposal.
+6. Perfect-foresight schedule as a clearly labelled non-realizable oracle upper bound.
+
+Do not compare a forecast-informed policy against a baseline deprived of the same forecast. Freeze compute budgets and replanning intervals.
+
+## 6. Metrics
+
+Report separately:
+- critical service violations (non-compensable hard fail);
+- service completion, delivery quality, postponement and failure by service class;
+- energy by propulsion, auxiliaries, hotel, thermal and flexible service;
+- battery SOC minimum/reserve events, charge/discharge throughput and equivalent full cycles;
+- generator starts, runtime, fuel, ramp/step-load violations and maintenance implications;
+- renewable energy used and curtailed based on actual time-series power, not panel nameplate;
+- potable water accepted by quality criteria, flush/preservation energy and autonomy-vector impact;
+- refrigerator/freezer temperature excursions and duration (not a food-safety conclusion);
+- comfort-band / humidity violations by occupied location and time;
+- peak and p95 electrical demand;
+- deferred service age, deadline slack, operator overrides and maintenance-window collisions;
+- forecast sensitivity, uncertainty and worst-case outcomes by scenario;
+- policy runtime and data requirements.
+
+No one score combines these. Publish the full service and energy ledger plus hard-gate disposition.
+
+## 7. Frozen scenario corpus
+
+The companion JSON defines four synthetic profiles:
+- clear solar surplus with scheduled watermaking and hot-water service;
+- cloud / low-solar event concurrent with fixed underway propulsion load;
+- low battery reserve with increased water demand and a watermaker service deadline;
+- watermaker feed outside its qualified envelope, where scheduling production must be refused or deferred even if electrical energy is available.
+
+These profiles are deliberately synthetic. Their numbers are contract-test inputs, not recommended vessel sizing or measured operating assumptions.
+
+## 8. Negative controls
+
+- Missing or stale battery state must not be treated as reserve headroom.
+- Watermaker feed outside qualified limits must block the production request.
+- Water production that fails its quality criterion does not count toward potable stock.
+- Flush/preservation energy may not be omitted from watermaker service energy.
+- Generator noise restrictions at anchorage may constrain operation, but cannot justify violating critical safety/electrical limits.
+- A refrigeration temperature excursion must not be hidden by a lower energy cost.
+- High solar nameplate capacity does not imply contemporaneous generation.
+- Propulsion load supplied by a route case is fixed in V0; the service scheduler may not change speed or route to improve its score.
+- A schedule with a lower energy total but missed service deadlines does not win.
+- Reordered service rows must produce equivalent deterministic output.
+- Loss of network, forecast, Symthaea or Mycelix cannot disable local equipment safety controls.
+
+## 9. Acceptance targets — goals, not results
+
+- Zero hard-constraint violations in the frozen adversarial corpus.
+- 100% service accounting: completed, postponed, failed, blocked, or indeterminate with reason.
+- 100% deterministic replay for the same frozen scenario, policy and toolchain where promised.
+- Zero off-spec water credited as potable service.
+- Zero false-safe scheduling recommendations when safety-critical telemetry or prerequisites are unknown.
+- Demonstrate improvement over at least one simple baseline on a preregistered metric without worsening hard constraints or service delivery.
+- Report paired results, tails and worst scenario; no universal kWh saving is predeclared.
+- Use held-out scenario families for policy confirmation; do not split time samples from one synthetic trace into train and test.
+
+## 10. Claim ceiling
+
+A PASS establishes only that the frozen scheduling contract behaves as specified on the synthetic replay corpus. It does not establish physical energy savings, generator fuel reduction, battery-life improvement, potable-water availability, food safety, habitability, seaworthiness or authority to operate equipment.
