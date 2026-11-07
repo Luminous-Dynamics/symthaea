@@ -104,6 +104,7 @@ def validate_documents(
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
         "https://www.codereviewbenchmark.com/",
+        "https://www.codereviewbenchmark.com/",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
     ):
