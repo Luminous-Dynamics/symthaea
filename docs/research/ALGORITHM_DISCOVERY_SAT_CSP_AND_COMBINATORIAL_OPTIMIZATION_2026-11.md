@@ -481,6 +481,17 @@ The aggregation law is part of the theorem, not metadata. For example:
 
 This is tracked in [#10868 — proof-carrying AND/OR hyperedges for decomposition](https://github.com/Luminous-Dynamics/symthaea/issues/10868), composing with #10811/#10835, the structural witnesses in ETH-019 #10244, and the typed circuit/proof adapters in ETH-026 #10301 and ETH-027 #10305. It should reuse their schemas and proof artifacts, not introduce a parallel circuit IR or receipt system.
 
+#### Canonical finite known-answer fixtures
+
+Freeze these three fixtures before implementing generic hypergraph search:
+
+1. **BranchSum:** (F=(x\lor y)\land(\lnot x\lor z)), declared universe ({x,y,z}). The (x=0) cofactor is (y) with (z) free (2 assignments); the (x=1) cofactor is (z) with (y) free (2 assignments). The exhaustive, disjoint partition gives (#F=2+2=4). A missing cofactor, overlapping branch condition or dropped free variable must be rejected.
+2. **IndependentProduct:** let (C_1=(a\lor b)\land(\lnot a\lor b)), (C_2=(c\lor d)), and (F=C_1\land C_2). (C_1) has 2 assignments, (C_2) has 3, and their variable scopes are disjoint, so (#F=2\times3=6). If unused variable (e) is also in the declared source universe, the answer is 12. A shared variable or omitted free variable must invalidate an unsupported product claim.
+3. **ExistentialSupportUnion:** let (F(v,h_1,h_2)=(v\land h_1)\lor(v\land h_2)), with visible (v) and hidden (h_1,h_2). There are 3 satisfying full assignments but only 1 supported visible assignment ((v=1)). Hidden-witness branches overlap on visible support, so arithmetic addition double-counts; Boolean OR must collapse support before counting.
+
+These cases are small enough for exhaustive truth-table checking. They distinguish SAT branching, #SAT component products and projected counting semantics without making a performance claim.
+
+
 
 ## Architecture proposal
 
