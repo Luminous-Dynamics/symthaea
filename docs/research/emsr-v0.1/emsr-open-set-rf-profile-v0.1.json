@@ -1,0 +1,212 @@
+{
+  "schema": "emsr.open-set-rf-profile",
+  "version": "0.1.0",
+  "state": "FROZEN_DESIGN",
+  "profile_id": "EMSR-RF-OPENSET-001",
+  "title": "Passive open-set RF signal awareness",
+  "scope": {
+    "mode": "recorded_receive_side_data_and_synthetic_replay_only",
+    "purpose": "known_signal_family_recognition_with_unknown_rejection",
+    "excluded_claims": [
+      "gnss_pnt_service_integrity",
+      "cause_or_actor_attribution",
+      "emitter_identity_or_location",
+      "malicious_intent",
+      "operational_authorization"
+    ],
+    "forbidden_capabilities": [
+      "rf_transmission",
+      "waveform_generation_or_optimization",
+      "live_interference",
+      "emitter_targeting",
+      "offensive_electronic_attack",
+      "weapons_integration",
+      "physical_actuation"
+    ]
+  },
+  "decision_vocabulary": {
+    "known_class": "A class covered by the frozen training label vocabulary.",
+    "unknown": "An input outside the known class support; do not force it into a known label.",
+    "indeterminate": "Insufficient, corrupt, low-quality or contradictory evidence to classify or reject reliably.",
+    "rule": "unknown and indeterminate are distinct outcomes; neither implies maliciousness or emitter identity."
+  },
+  "comparator": {
+    "id": "RF-RPL-2026",
+    "paper": "Reliability-Gated RF Consistency Learning for Open-Set Spectrum Sensing",
+    "doi": "10.1016/j.phycom.2026.103352",
+    "available_online": "2026-09-02",
+    "method_summary": [
+      "RF-consistency representation pretraining",
+      "EMA teacher aggregation across RF-preserving transformations",
+      "reliability gate using confidence, transformation stability and energy-based knownness",
+      "known-class pseudo-label routing with rejection of uncertain/unknown windows"
+    ],
+    "reported_conditions": {
+      "label_availability": 0.05,
+      "datasets": [
+        "RadioML2016.10A",
+        "RadioML2016.10B",
+        "simulated electromagnetic-monitoring benchmark"
+      ],
+      "note": "Reported results are specific to the paper's datasets and protocol; do not transfer them to GNSS campaigns or field receivers."
+    },
+    "reported_metrics": {
+      "accuracy": 0.721,
+      "macro_f1": 0.703,
+      "unknown_auroc": 0.894,
+      "fpr95": 0.286,
+      "unknown_pseudo_label_contamination": 0.059
+    },
+    "reproduction_state": "NOT_REPRODUCED"
+  },
+  "datasets": [
+    {
+      "id": "RADIOML2016.10A",
+      "source_uri": "https://www.deepsig.ai/datasets",
+      "version": "2016.10A",
+      "rights_state": "PENDING_REVIEW",
+      "payload_state": "NOT_IMPORTED",
+      "intended_use": "research",
+      "license_review_required": true
+    },
+    {
+      "id": "RADIOML2016.10B",
+      "source_uri": "https://www.deepsig.ai/datasets",
+      "version": "2016.10B",
+      "rights_state": "PENDING_REVIEW",
+      "payload_state": "NOT_IMPORTED",
+      "intended_use": "research",
+      "license_review_required": true
+    },
+    {
+      "id": "EMSR-SYNTHETIC-OPENSET",
+      "source_uri": "urn:luminous:synthetic:emsr-openset:v0.1",
+      "version": "0.1.0",
+      "rights_state": "INTERNAL_SYNTHETIC",
+      "payload_state": "GENERATE_AFTER_FIXTURE_REVIEW",
+      "intended_use": "research",
+      "license_review_required": false
+    }
+  ],
+  "split_policy": {
+    "mandatory_grouping": [
+      "event_id",
+      "recording_id"
+    ],
+    "optional_holdouts": [
+      "receiver_or_capture_device",
+      "site_or_area",
+      "campaign",
+      "collection_date",
+      "dataset_family",
+      "signal_family"
+    ],
+    "required_tracks": [
+      "within_domain_reference",
+      "receiver_or_capture_device_holdout",
+      "campaign_or_site_holdout",
+      "dataset_family_holdout",
+      "unknown_family_holdout",
+      "low_snr_and_channel_shift"
+    ],
+    "leakage_controls": [
+      "adjacent_windows_from_one_recording_must_not_cross_partitions",
+      "all_windows_from_one_event_group_stay_in_one_partition",
+      "transformed_views_of_one_base_window_stay_in_the_same_partition",
+      "normalization_and_feature_selection_fit_on_training_data_only",
+      "unknown_test_classes_must_not_leak_into_known_training_labels"
+    ]
+  },
+  "mandatory_baselines": [
+    "energy_detection_or_receiver_occupancy",
+    "supervised_cnn_or_equivalent",
+    "ema_or_fixmatch_style_pseudo_labeling_without_rf_reliability_gate",
+    "open_set_threshold_or_prototype_baseline",
+    "rf_rpl_full_method_if_faithfully_reproducible",
+    "rf_rpl_confidence_only_ablation",
+    "rf_rpl_transformation_stability_only_ablation",
+    "rf_rpl_knownness_only_ablation",
+    "rf_rpl_full_gate_ablation",
+    "no_rf_consistency_pretraining_ablation",
+    "human_expert_review_on_rights_cleared_subset"
+  ],
+  "metrics": {
+    "known_class": [
+      "per_class_precision_recall",
+      "macro_f1",
+      "macro_pr_auc",
+      "confusion_matrix"
+    ],
+    "open_set": [
+      "unknown_auroc",
+      "unknown_aupr",
+      "fpr95",
+      "false_accept_rate_at_fixed_known_recall",
+      "unknown_pseudo_label_contamination"
+    ],
+    "epistemic": [
+      "brier_score",
+      "log_loss",
+      "reliability_diagram",
+      "risk_coverage_curve",
+      "abstention_correctness"
+    ],
+    "robustness": [
+      "per_receiver_or_capture_device",
+      "per_campaign_and_site",
+      "per_dataset_family",
+      "per_snr_bucket",
+      "per_channel_condition",
+      "worst_domain_performance"
+    ],
+    "deployment": [
+      "p50_p95_p99_latency",
+      "throughput",
+      "peak_ram",
+      "model_and_feature_storage",
+      "energy_per_window_or_decision",
+      "sample_buffer_overrun_rate"
+    ]
+  },
+  "comparison_rules": [
+    "compare_methods_on_identical_recordings_splits_labels_and_false_accept_budgets",
+    "do_not_compare_radioml_metrics_directly_to_gnss_campaign_metrics",
+    "do_not_use_overall_accuracy_as_the_only_open_set_metric",
+    "report_known_class_recall_and_unknown_false_acceptance_together",
+    "publish_all_ablation_and_negative_control_results"
+  ],
+  "rights_and_provenance": {
+    "no_dataset_binary_import_until_source_level_rights_review_is_complete": true,
+    "each_payload_file_requires_exact_sha256": true,
+    "each_run_requires_exact_dataset_split_code_model_config_and_environment_digests": true,
+    "ground_truth_manifest_digest_required": true,
+    "source_labels_must_preserve_measured_reported_simulated_inferred_and_unknown": true
+  },
+  "edge_hardware": {
+    "edge_nodes_are_optional": true,
+    "esp32_role": "auxiliary_sensors_or_bounded_inference_on_derived_features_only_when_measured",
+    "rf_front_end_is_separate_qualified_instrument": true,
+    "board_and_receiver_identity_must_be_pinned": true,
+    "required_measurements": [
+      "latency",
+      "memory",
+      "energy",
+      "thermal_state",
+      "buffer_overruns",
+      "quantization_effect_on_unknown_rejection"
+    ]
+  },
+  "claim_ceiling": [
+    "No PNT integrity claim.",
+    "No RF cause or actor attribution.",
+    "No emitter identity or location.",
+    "No operational safety or weapons claim.",
+    "No field performance claim from RadioML or simulated data alone."
+  ],
+  "ownership": {
+    "research_track": "Symthaea #10893",
+    "shared_dataset_and_receipt_contracts": "Symthaea #10814 / PR #10875",
+    "edge_hardware_profile": "Luminous Platform #300",
+    "pnt_sector_profile": "Luminous Platform #297 / PR #298"
+  }
+}
