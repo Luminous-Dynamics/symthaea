@@ -402,3 +402,55 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 40. SciAgentArena: https://sciagentarena.github.io/
 41. Recursive Self-Improvement in AI survey (2026-07-08): https://arxiv.org/abs/2607.07663
 42. Symthaea research-taste benchmark (#10877): https://github.com/Luminous-Dynamics/symthaea/issues/10877
+
+
+## 11. AIRA₂: asynchronous throughput, hidden consistent evaluation and dynamic operators (v2, 2026-04-13)
+
+AIRA₂ (arXiv:2603.26499v2) is a direct architecture comparator that should be treated as a first-class baseline, not just another paper in the list.
+
+### Reported evidence
+
+- **MLE-bench-30:** AIRA†₂ (Gemini 3.1) reports mean Percentile Rank 81.5% at 24 hours and 83.1% at 72 hours, versus a strongest published baseline of 72.7%. Base AIRA₂ (Gemini 3.0) reports 71.8% and 76.0%, respectively. The table reports three seeds per task and mean ± standard error.
+- **Compute:** main experiments use eight NVIDIA H200 workers, each assigned a dedicated GPU, with 12 logical CPU cores and 120 GB host memory. This is a high-compute regime; do not compare its raw wall-clock numbers to a one-GPU or laptop run without normalizing total accelerator-hours, hardware, model and cost.
+- **Ablation:** the no-HCE variant falls from 56.8 percentile rank at 24 hours to 56.3 at 72 hours, while the complete Gemini 3.0 AIRA₂ rises from 71.8 to 76.0. Removing subagents or evolution also degrades results. These are reported ablations, not local Symthaea replications.
+- **AIRS-Bench integrity distinction:** the paper's abstract reports human-SOTA exceedance on 6/20 tasks. Its detailed audit says 11/20 tasks exceeded published SOTA before manual integrity review, but only six used clean methodologies; the others include direct test-label extraction/leakage, model contamination, or results primarily inherited from task-specialized pretrained models. Treat **six clean wins** as the defensible comparison, not eleven unqualified SOTA wins.
+
+### Architectural mechanisms worth testing
+
+1. **Asynchronous steady-state work:** dispatch a new research task whenever a worker becomes free, without generational barriers. Evaluate useful completed-candidate throughput, idle time, tail latency, failure isolation and cost—not worker count alone.
+2. **Hidden Consistent Evaluation (HCE):** freeze the data partitions once and reuse them consistently across candidates and seeds. The paper uses train/search/validation partitions (80/10/10): agents see training data, the orchestrator gets a hidden-label search score, final selection uses validation data after search ends, and test data remains isolated from both agent and orchestrator. The exact task-specific split should be adapted and preregistered, not copied blindly.
+3. **Dynamic multi-turn operators:** replace brittle one-shot proposal/debug prompts with bounded interactive inspect → hypothesize → execute → observe → revise trajectories. Preserve tool permissions, action limits, complete logs and inclusive cost.
+
+### Symthaea qualification design
+
+Do a component-factorial comparison, not one bundled architecture bake-off:
+
+- Execution factor: synchronous vs asynchronous steady-state, under the same maximum total compute and wall-clock envelopes.
+- Evaluation factor: repeated visible validation vs fixed hidden search score plus a final untouched selection/confirmation split.
+- Operator factor: one-shot fixed operator vs bounded interactive ReAct operator; subagent/multi-agent behavior is a separate factor.
+- Search factor: fixed meta-policy vs direction-board allocation, reusing #9230 rather than duplicating its scheduler.
+
+Report interaction effects and ablations. A throughput increase is not a research-quality improvement unless held-out quality, integrity and cost remain acceptable. More samples can accelerate evaluator exploitation if the signal is unstable.
+
+### HCE integrity controls
+
+- The evaluator is an external authority; agents receive only score outputs and never hidden labels, target partitions or evaluator code.
+- The search score may guide search, but the final selection score is not used for hill-climbing; final confirmation and fresh-family transfer are untouched by all selection.
+- Keep partitions and task manifests identical across candidate arms and paired seeds; a changed split is a new benchmark epoch.
+- Evaluate the entire candidate population, not just the winning trace; preserve failed runs and missing scores.
+- Include injected evaluator noise and deterministic ground-truth synthetic tasks to distinguish true search overfit from measurement noise.
+- Add negative controls for direct label extraction, external test-set ingestion, metadata leakage, cached-result contamination, evaluator-side mutable state and repeated adaptive queries.
+- Use an explicit query / evaluation-feedback budget and sequential error control. HCE is not a substitute for contamination auditing or statistical promotion policy.
+
+### Ownership
+
+- #10756 retains evaluator design, integrity and epoch control.
+- #9230 retains direction allocation.
+- #8721 retains prospective tool/computation allocation.
+- #10717 retains causal mechanism attribution.
+- #10497 retains same-start, matched-total-budget R4 qualification.
+- #10921 remains the external scientific-campaign adapter.
+
+This is a benchmark/protocol integration, not a request to copy AIRA₂'s eight-GPU architecture or introduce a new evaluator/worker-pool authority.
+
+Sources: https://arxiv.org/abs/2603.26499 (v2); https://ai.meta.com/research/publications/aira-overcoming-bottlenecks-in-ai-research-agents/
