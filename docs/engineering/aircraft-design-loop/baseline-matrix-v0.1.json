@@ -1,0 +1,91 @@
+{
+  "schema": "luminous.symthaea.aircraft-engineering-baseline-matrix",
+  "schema_version": "0.1.0",
+  "status": "proposed_benchmark_protocol",
+  "evidence_ceiling": "No comparative results are claimed. Baselines require a frozen common oracle, candidate set, operating-case set and total evaluation cost.",
+  "shared_controls": [
+    "same initial evidence and candidate set",
+    "same design variables, objectives, units and hard constraints",
+    "same required operating-case coverage",
+    "same total budget, including engineering, solver and follow-up validation cost",
+    "same high-fidelity or hidden synthetic truth oracle",
+    "same failed, aborted, censored and out-of-domain cost accounting"
+  ],
+  "policies": [
+    {
+      "id": "seeded_random",
+      "class": "search",
+      "description": "select next candidate/method from a preregistered random seed"
+    },
+    {
+      "id": "space_filling",
+      "class": "search",
+      "description": "Latin-hypercube or another frozen space-filling design"
+    },
+    {
+      "id": "grid_sweep",
+      "class": "search",
+      "description": "deterministic grid/sweep over the same domain"
+    },
+    {
+      "id": "sequential_discipline",
+      "class": "workflow",
+      "description": "fixed low-to-high sequence with one discipline handoff at a time"
+    },
+    {
+      "id": "nsga_ii_or_iii",
+      "class": "multi_objective_optimizer",
+      "description": "evolutionary Pareto search with fixed population/termination budget"
+    },
+    {
+      "id": "bayesian_expected_improvement",
+      "class": "probabilistic_optimizer",
+      "assumption": "requires calibrated predictive distributions and declared acquisition semantics"
+    },
+    {
+      "id": "constrained_multifidelity_bo",
+      "class": "probabilistic_optimizer",
+      "assumption": "requires qualified cross-fidelity correlation and constraint probability semantics"
+    },
+    {
+      "id": "uncertainty_sampling",
+      "class": "experiment_selector",
+      "description": "select largest predicted uncertainty; control for decision-irrelevant uncertainty"
+    },
+    {
+      "id": "information_gain",
+      "class": "experiment_selector",
+      "assumption": "requires a defensible probabilistic model; entropy reduction alone is not decision value"
+    },
+    {
+      "id": "decision_aware_evsi",
+      "class": "experiment_selector",
+      "assumption": "requires calibrated distributions and an explicit loss/decision model"
+    },
+    {
+      "id": "distribution_free_robust_regret",
+      "class": "experiment_selector",
+      "assumption": "works with declared uncertainty sets; do not infer probabilities"
+    }
+  ],
+  "metrics": [
+    "cost_to_first_feasible",
+    "feasible_evaluation_yield",
+    "false_feasible_rate_with_denominator",
+    "missed_feasible_rate_with_denominator",
+    "robust_frontier_recovery",
+    "decision_regret_against_hidden_truth",
+    "high_fidelity_follow_up_cost",
+    "required_operating_case_coverage",
+    "out_of_domain_abstention_quality",
+    "failed_and_censored_evaluation_accounting",
+    "total_engineering_hours_and_compute_cost"
+  ],
+  "non_compensable_gates": [
+    "any false-feasible synthetic case is reported separately and prevents a zero-false-feasible gate",
+    "missing required analysis is not a pass",
+    "out-of-domain use is not silently extrapolated",
+    "hard constraint failures cannot be offset by objective improvements",
+    "unknown cost is not treated as zero"
+  ]
+}
