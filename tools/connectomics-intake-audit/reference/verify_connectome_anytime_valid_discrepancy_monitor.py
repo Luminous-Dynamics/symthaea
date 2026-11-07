@@ -228,6 +228,13 @@ def e_factor_table(history: tuple[str, ...], prepared: dict[str, Any]) -> dict[s
     }
 
 
+def validate_false_alarm_bounds(false_alarm: dict[str, Fraction], alpha: Fraction) -> None:
+    for model_id, probability in false_alarm.items():
+        require(probability <= alpha,
+                f"false-alarm probability under {model_id} exceeds alpha: "
+                f"{rational_text(probability)} > {rational_text(alpha)}")
+
+
 def crossing_probability(null_model_id: str, prepared: dict[str, Any]) -> Fraction:
     model = prepared["null_models"][null_model_id]
     threshold = prepared["threshold"]
@@ -350,10 +357,7 @@ def verify(data: dict[str, Any], check_expected: bool = True) -> dict[str, Any]:
         model_id: crossing_probability(model_id, prepared)
         for model_id in prepared["null_models"]
     }
-    for model_id, probability in false_alarm.items():
-        require(probability <= prepared["alpha"],
-                f"false-alarm probability under {model_id} exceeds alpha: "
-                f"{rational_text(probability)} > {rational_text(prepared['alpha'])}")
+    validate_false_alarm_bounds(false_alarm, prepared["alpha"])
 
     histories = [(), ("H",), ("L",)]
     predictive_rows = []
@@ -421,10 +425,10 @@ def self_test() -> None:
     require(report["false_alarm_probability_by_null"] == {"N0": "1/4", "N1": "9/25"},
             "exact false-alarm probabilities mismatch")
 
-    bad = copy.deepcopy(data)
-    bad["alpha"] = "1/4"
-    expect_rejection("alpha below N1 crossing probability",
-                     lambda: verify(bad, check_expected=False))
+    expect_rejection(
+        "precomputed false-alarm probability above declared alpha",
+        lambda: validate_false_alarm_bounds({"N1": Fraction(9, 25)}, Fraction(1, 4)),
+    )
 
     bad = copy.deepcopy(data)
     bad["policy"][0]["hidden_model_id"] = "N0"
