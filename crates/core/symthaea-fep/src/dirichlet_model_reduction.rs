@@ -1968,13 +1968,9 @@ mod tests {
                 ),
             ],
         };
-        let result = evaluate_dirichlet_model_information_gain(
-            &full_prior,
-            &full_prior,
-            &models,
-            &action,
-        )
-        .expect("zero-prior hypothesis does not require predictive entries");
+        let result =
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &action)
+                .expect("zero-prior hypothesis does not require predictive entries");
         assert_eq!(result.outcomes[0].posterior_model_probabilities.len(), 3);
         assert_eq!(
             result.outcomes[0]
@@ -2009,10 +2005,7 @@ mod tests {
             Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch { .. })
         ));
 
-        let unknown = make_action(vec![
-            ("success-favouring", 0.8),
-            ("unknown-model", 0.2),
-        ]);
+        let unknown = make_action(vec![("success-favouring", 0.8), ("unknown-model", 0.2)]);
         assert!(matches!(
             evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &unknown),
             Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch { .. })
@@ -2024,7 +2017,12 @@ mod tests {
             ("failure-favouring", 0.2),
         ]);
         assert!(matches!(
-            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &duplicate),
+            evaluate_dirichlet_model_information_gain(
+                &full_prior,
+                &full_prior,
+                &models,
+                &duplicate
+            ),
             Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch { .. })
         ));
     }
