@@ -45,31 +45,46 @@ fn validate_api_fixtures() -> Result<serde_json::Value, String> {
     let pinned_cards = [
         (
             "nuclease-active-learning",
+            "deepmind/nuclease-active-learning",
+            "variant_id",
+            4usize,
+            96u64,
+            384u64,
             include_str!("../fixtures/asb_lab_v1/nuclease_campaign_card.json"),
         ),
         (
             "propylene-active-learning",
+            "sargent-lab/propylene-active-learning",
+            "composition",
+            3usize,
+            20u64,
+            60u64,
             include_str!("../fixtures/asb_lab_v1/propylene_campaign_card.json"),
         ),
     ];
     let mut pinned_campaign_reports = Vec::new();
-    for (expected_id, contents) in pinned_cards {
+    for (label, expected_id, expected_design_field, expected_stages, expected_batch, expected_budget, contents)
+        in pinned_cards
+    {
         let pinned = CampaignCardV1::parse(contents)
-            .map_err(|error| format!("{expected_id} pinned campaign card: {error}"))?;
-        pinned.validate().map_err(|error| format!("{expected_id} pinned campaign contract: {error}"))?;
-        let expected_budget = match expected_id {
-            "nuclease-active-learning" => 384,
-            "propylene-active-learning" => 60,
-            _ => unreachable!("fixed pinned campaign fixture"),
-        };
-        if !pinned.campaign_id.ends_with(expected_id) || pinned.budget.total != expected_budget {
-            return Err(format!("{expected_id}: pinned campaign identity/budget mismatch"));
+            .map_err(|error| format!("{label} pinned campaign card: {error}"))?;
+        pinned.validate().map_err(|error| format!("{label} pinned campaign contract: {error}"))?;
+        if pinned.campaign_id != expected_id
+            || pinned.design_id_field != expected_design_field
+            || pinned.stages.len() != expected_stages
+            || pinned.stages.iter().any(|stage| stage.batch_size != expected_batch)
+            || pinned.budget.total != expected_budget
+            || !pinned.is_shared_pool_catalog()
+        {
+            return Err(format!("{label}: pinned campaign identity, design field or budget mismatch"));
         }
         pinned_campaign_reports.push(serde_json::json!({
-            "campaign": expected_id,
+            "campaign": label,
             "campaign_id": pinned.campaign_id,
+            "design_id_field": pinned.design_id_field,
             "total_budget": pinned.budget.total,
             "stages": pinned.stages.len(),
+            "batch_size": expected_batch,
             "shared_pool": pinned.is_shared_pool_catalog()
         }));
     }
