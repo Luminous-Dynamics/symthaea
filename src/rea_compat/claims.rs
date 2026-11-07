@@ -1007,7 +1007,7 @@ mod tests {
             vec![evidence.evidence_id.clone()],
         );
         claim.asserted_value = evidence.value["normalized_result"].clone();
-        let result = evaluate_claim(&claim, &[evidence.clone()]).unwrap();
+        let result = evaluate_claim(&claim, std::slice::from_ref(&evidence)).unwrap();
 
         assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
         assert_eq!(
