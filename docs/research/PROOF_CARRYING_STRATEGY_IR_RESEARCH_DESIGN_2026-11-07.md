@@ -403,3 +403,15 @@ The recent frontier-aware OBDD study reports strong pathwidth/frontier results f
 The higher-order limitation is important: pairwise mixed derivatives can reveal pairwise interactions induced by higher-order monomials, but a graph cannot encode the full Boolean interaction hypergraph. Future experiments should compare graph seeds against interaction hypergraphs, hypergraph partitioning, FORCE-like placement, clause/gate order where available, and counterexample-guided order selection.
 
 A separate strategic direction is proof-derived synthesis. The 2026 SAT paper *Proof Systems for QBF Synthesis* provides a sound and complete QBF proof system from which Skolem/Herbrand functions and intermediate game values can be extracted in polynomial time. Symthaea's exhaustive engine should remain the finite oracle; a future adapter should target a proof system with explicit derivation/checking semantics rather than scaling recursive expansion. See https://doi.org/10.4230/LIPIcs.SAT.2026.3.
+
+
+## 18. End-to-end verified strategy compilation
+
+A safe entry point now composes the two independent semantic layers:
+
+1. Check that the reported QBF truth value agrees with the declared winner (TRUE requires an existential Skolem strategy; FALSE requires a universal Herbrand strategy).
+2. Re-run the independent winning-strategy checker against the original CNF matrix and ordered prefix. The checker recomputes opponent-assignment coverage and ignores any producer-supplied verification counters.
+3. Only after source verification succeeds, minimize semantic support, compile each strategy function into an ROBDD, and independently compare every BDD against its reduced truth table.
+4. Retain selected multi-start seed, interaction checks, frontier measurements, sifting evaluations, support-reduction counts and BDD node totals in the compiled bundle.
+
+This does not make the proof format itself checked: the finite reference path still verifies strategy behavior directly. The future proof-derived adapter is tracked separately in [#11034](https://github.com/Luminous-Dynamics/symthaea/issues/11034), and must add an independent proof checker before its extraction output can be admitted.
