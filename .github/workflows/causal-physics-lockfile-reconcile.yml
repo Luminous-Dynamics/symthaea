@@ -9,6 +9,7 @@ on:
       - 'Cargo.lock'
       - 'crates/domains/symthaea-*/Cargo.toml'
       - '.github/workflows/causal-physics-lockfile-reconcile.yml'
+      - '.github/workflows/causal-temporal-physics.yml'
   workflow_dispatch:
 
 permissions:
