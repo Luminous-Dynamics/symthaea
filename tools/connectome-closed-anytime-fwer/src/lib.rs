@@ -833,6 +833,79 @@ mod tests {
     }
 
     #[test]
+    fn canonical_path_sha256_matches_standard_vector() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn admits_a_theorem_matched_lifted_elementary_process() {
+        let mut family = fixture();
+        let claim = &mut family.claims[1];
+        let admission = &mut claim.filtration_admission;
+        admission.mode = AdmissionMode::AdjusterLifted;
+        admission.source_filtration_id = "neural-local-stream-v1".into();
+        admission.source_filtration_sha256 = digest('7');
+        admission.adjuster = Some(AdjusterReceipt {
+            adjuster_id: "chore-ramdas-filtration-lift".into(),
+            adjuster_version: "reviewed-v1".into(),
+            source_process_sha256: admission.input_process_sha256.clone(),
+            source_filtration_sha256: admission.source_filtration_sha256.clone(),
+            target_filtration_sha256: admission.target_filtration_sha256.clone(),
+            parameter_sha256: digest('8'),
+            theorem_assumptions_sha256: admission.assumption_sha256.clone().unwrap(),
+            lifted_output_sha256: admission.output_process_sha256.clone(),
+        });
+        assert!(audit_closed_family(&family).is_ok());
+    }
+
+    #[test]
+    fn rejects_local_only_and_incomparable_elementary_streams() {
+        let mut local = fixture();
+        local.claims[0].filtration_admission.mode = AdmissionMode::LocalOnly;
+        assert!(audit_closed_family(&local).is_err());
+
+        let mut incomparable = fixture();
+        incomparable.claims[0].filtration_admission.mode = AdmissionMode::IncomparableOrUnknown;
+        assert!(audit_closed_family(&incomparable).is_err());
+    }
+
+    #[test]
+    fn rejects_e_process_path_mutation_without_matching_admission() {
+        let mut family = fixture();
+        family.claims[0].e_process_values[2] = r(21, 1);
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
+    fn rejects_wrong_null_process_or_proof_binding() {
+        for mutation in 0..3 {
+            let mut family = fixture();
+            match mutation {
+                0 => family.claims[0].filtration_admission.null_spec_sha256 = digest('9'),
+                1 => family.claims[0].filtration_admission.process_id = "other-process".into(),
+                _ => {
+                    family.claims[0].filtration_admission.proof_receipt_sha256 =
+                        Some(digest('9'));
+                }
+            }
+            assert!(audit_closed_family(&family).is_err(), "mutation {mutation}");
+        }
+    }
+
+    #[test]
+    fn rejects_event_observed_at_or_after_process_output() {
+        let mut family = fixture();
+        family.claims[0]
+            .filtration_admission
+            .observed_event_ids
+            .push("T7".into());
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
     fn exact_rational_mixture_is_normalized() {
         let report = audit_closed_family(&fixture()).unwrap();
         let intersection = report
