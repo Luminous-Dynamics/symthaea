@@ -209,7 +209,7 @@ impl SelectionReceipt {
 
 impl PronunciationPlan {
     pub fn validate(&self) -> Result<(), String> {
-        if self.schema_version != 1 {
+        if self.schema_version != 2 {
             return Err(format!(
                 "unsupported pronunciation-plan schema version {}",
                 self.schema_version
@@ -874,7 +874,7 @@ mod tests {
     #[test]
     fn contextual_heteronym_retains_multiple_candidates_until_review() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -901,7 +901,7 @@ mod tests {
         selected.selected_candidate_id = Some("present".into());
         selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![selected],
@@ -920,7 +920,7 @@ mod tests {
         selected.selected_candidate_id = Some("past".into());
         selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let mut plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![selected],
@@ -941,7 +941,7 @@ mod tests {
         selected.selected_candidate_id = Some("past".into());
         selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let mut plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![selected],
@@ -954,7 +954,7 @@ mod tests {
     #[test]
     fn out_of_vocabulary_is_explicit_and_contains_no_guessed_phone() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "xqzpl".into(),
             words: vec![word("xqzpl", 0, ResolutionState::OutOfVocabulary, vec![])],
@@ -965,7 +965,7 @@ mod tests {
     #[test]
     fn unrepresented_source_text_cannot_be_silently_dropped() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "light bright".into(),
             words: vec![word(
@@ -982,7 +982,7 @@ mod tests {
     #[test]
     fn one_pronunciation_span_cannot_merge_multiple_whitespace_separated_words() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "hello world".into(),
             words: vec![word(
@@ -999,7 +999,7 @@ mod tests {
     #[test]
     fn spans_must_be_valid_utf8_boundaries_and_match_the_surface() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "café".into(),
             words: vec![word(
@@ -1012,7 +1012,7 @@ mod tests {
         assert!(plan.validate().is_err());
 
         let split = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "café".into(),
             words: vec![WordPronunciation {
@@ -1039,7 +1039,7 @@ mod tests {
         unknown.selected_candidate_id = Some("missing".into());
         unknown.selection_receipt = Some(selected_receipt("en", "read", &unknown, 0));
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![unknown],
@@ -1056,7 +1056,7 @@ mod tests {
         let mut invalid = candidate("bad", "ɛ", CandidateSource::Dictionary);
         invalid.syllables[0].phones[1].ipa = "ˈɛ".into();
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word("read", 0, ResolutionState::NeedsReview, vec![invalid])],
@@ -1068,7 +1068,7 @@ mod tests {
             .phones
             .retain(|phone| phone.kind == PhoneKind::Consonant);
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -1095,7 +1095,7 @@ mod tests {
         let mut bad_score = candidate("bad-score", "ɛ", CandidateSource::ModelG2p);
         bad_score.raw_provider_score = Some(f32::NAN);
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -1110,7 +1110,7 @@ mod tests {
         let mut bad_source = candidate("bad-source", "ɛ", CandidateSource::ModelG2p);
         bad_source.provenance.source_digest.clear();
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -1125,7 +1125,7 @@ mod tests {
     #[test]
     fn unresolved_heteronym_is_valid_but_not_renderable() {
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![word(
@@ -1157,7 +1157,7 @@ mod tests {
         selected.selected_candidate_id = Some("past".into());
         selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let plan = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read".into(),
             words: vec![selected],
@@ -1209,7 +1209,7 @@ mod tests {
 
     fn alignment_fixture() -> (PronunciationPlan, VocalScoreAlignment) {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
             words: vec![
@@ -1218,7 +1218,7 @@ mod tests {
             ],
         };
         let alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![
                 ScoreEvent {
                     start_s: 0.0,
@@ -1319,13 +1319,13 @@ mod tests {
     #[test]
     fn multiple_syllables_can_share_one_long_note_without_overlap() {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
             words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
         };
         let alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![ScoreEvent {
                 start_s: 0.0,
                 duration_s: 1.0,
@@ -1369,13 +1369,13 @@ mod tests {
     #[test]
     fn syllable_intervals_must_cover_each_note_without_gaps_or_overlap() {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
             words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
         };
         let mut alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![ScoreEvent {
                 start_s: 0.0,
                 duration_s: 1.0,
@@ -1428,13 +1428,13 @@ mod tests {
     #[test]
     fn melisma_cannot_skip_an_explicit_rest() {
         let pronunciation = PronunciationPlan {
-            schema_version: 1,
+            schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
             words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
         };
         let alignment = VocalScoreAlignment {
-            schema_version: 1,
+            schema_version: 2,
             events: vec![
                 ScoreEvent {
                     start_s: 0.0,
