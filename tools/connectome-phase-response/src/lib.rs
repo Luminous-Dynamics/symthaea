@@ -213,13 +213,15 @@ impl PhaseReset {
         self.source_leg.map(|leg| self.by_leg[leg.index()])
     }
 
-    pub fn off_diagonal_cycle_slips_l1(self) -> u64 {
+    pub fn off_diagonal_cycle_slips_l1(self) -> Result<u64, PhaseError> {
         self.cycle_slips_by_leg
             .iter()
             .enumerate()
             .filter(|(axis, _)| self.source_leg.map(LegId::index) != Some(*axis))
-            .map(|(_, slips)| slips.unsigned_abs())
-            .sum()
+            .try_fold(0_u64, |total, (_, slips)| {
+                total.checked_add(slips.unsigned_abs())
+            })
+            .ok_or(PhaseError::ArithmeticOverflow)
     }
 
     pub fn local_cycle_slips(self) -> Option<i64> {
@@ -1048,6 +1050,19 @@ mod tests {
     }
 
     #[test]
+    fn raw_phase_reset_cycle_slip_summary_rejects_overflow() {
+        let reset = PhaseReset {
+            source_leg: None,
+            by_leg: zeros(),
+            cycle_slips_by_leg: [i64::MIN; LEG_COUNT],
+        };
+        assert_eq!(
+            reset.off_diagonal_cycle_slips_l1(),
+            Err(PhaseError::ArithmeticOverflow)
+        );
+    }
+
+    #[test]
     fn cycle_slip_distance_overflow_is_rejected() {
         let probe = key(Context::BallContact, 0, 0, 1);
         let left = ModelSignature {
@@ -1097,7 +1112,7 @@ mod tests {
         assert_eq!(response.cycle_slips_by_leg[0], 1);
         assert_eq!(response.by_leg[2].microturns(), 100_000);
         assert_eq!(response.cycle_slips_by_leg[2], 1);
-        assert_eq!(response.off_diagonal_cycle_slips_l1(), 1);
+        assert_eq!(response.off_diagonal_cycle_slips_l1().unwrap(), 1);
     }
 
     #[test]
