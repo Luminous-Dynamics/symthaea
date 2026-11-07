@@ -246,9 +246,11 @@
         }
       }
     ],
-    "crossing_path": [
-      "H",
-      "H"
+    "crossing_paths": [
+      [
+        "H",
+        "H"
+      ]
     ],
     "observed_e_value": "325/144",
     "false_alarm_probability_by_null": {
