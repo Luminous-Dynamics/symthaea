@@ -1472,7 +1472,8 @@ mod tests {
                     "sha256": payload_sha256
                 }]
             }]
-        }).to_string();
+        })
+        .to_string();
         let split = json!({
             "schema": SPLIT_SCHEMA,
             "version": SPLIT_VERSION,
@@ -1489,7 +1490,8 @@ mod tests {
             "schema": "emsr.ground-truth-manifest",
             "version": "0.1.0",
             "status": "synthetic_only"
-        }).to_string();
+        })
+        .to_string();
         let receipt = json!({
             "schema": RECEIPT_SCHEMA,
             "version": RECEIPT_VERSION,
