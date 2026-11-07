@@ -45,6 +45,7 @@ jobs:
           Draft202012Validator(schema).validate(fixture)
           assert fixture["claim_scope"] == "synthetic_known_truth"
           assert fixture["oracle_expectations"]["query_only_action_id"] != fixture["oracle_expectations"]["discrepancy_only_action_id"]
+          assert set(fixture["challenge_binding"]["challenger_discovery_unit_ids"]).issubset(set(fixture["split_manifest"]["challenger_discovery_units"]))
           print("active discrepancy probe schema/fixture: PASS")
           PY
       - name: Run independent finite probe oracle
