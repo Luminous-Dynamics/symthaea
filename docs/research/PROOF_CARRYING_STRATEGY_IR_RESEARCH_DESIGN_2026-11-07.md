@@ -323,3 +323,28 @@ Research references:
 - Q-MICE for #QBF: https://eccc.weizmann.ac.il/report/2026/101/
 - MaxSAT-specific proof logging for core-guided OLL: https://conf.researchr.org/details/ase-2025/ase-2025-papers/49/Efficient-and-Verifiable-Proof-Logging-for-MaxSAT-Solving
 - VeriPB's pseudo-Boolean proof format and current solver ecosystem: https://veripb.org/
+
+
+## 15. Quantifier-aware strategy synthesis
+
+A quantifier-aware strategy is a stronger computational result than a Boolean decision. For a true prenex QBF, the result is a set of Skolem functions for existential variables, each depending only on preceding universal variables. For a false prenex QBF, the dual result is a set of Herbrand functions for universal variables, each depending only on preceding existential variables.
+
+The dependency order is semantic data. Do not represent it as an unordered visible/hidden set, and do not let a generated function depend on a future opposing-player variable or another variable in its own quantifier block.
+
+The bounded implementation workstream is #10991. It builds on the validated prefix in quantified_scope.rs and the source CNF type:
+- recursive finite game semantics synthesizes the winning player's functions;
+- strategy tables use explicit ordered dependency keys;
+- an independent checker enumerates every opponent assignment, fills choices in prefix order and checks the original CNF matrix;
+- budget exhaustion yields an error/unknown, never a TRUE/FALSE claim.
+
+The implementation must keep QBF decision, QBF strategy extraction, proof certificates, DQBF dependencies and #QBF strategy counting as separate task/evidence types. SAT 2026 research on proof systems for QBF synthesis shows why proof-derived Skolem/Herbrand functions and intermediate game values deserve to be first-class outputs; the finite truth-table engine is only a reference oracle, not a competing scalable proof system.
+
+Long-term strategy discovery should jointly optimize:
+1. whether the quantified instance is solved;
+2. the circuit/table size of the strategy;
+3. dependency sparsity and circuit structure;
+4. proof/strategy generation overhead;
+5. independent verification cost;
+6. robustness on held-out quantifier alternation depths and application families.
+
+A smaller, independently checkable strategy is often the more useful synthesis result even when two strategies solve the same quantified instance.
