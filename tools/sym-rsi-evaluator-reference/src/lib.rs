@@ -365,6 +365,334 @@ pub fn parse_and_validate(contents: &str) -> Result<ValidationReport, serde_json
     Ok(validate_fixture_pack(&pack))
 }
 
+const STATE_ROUTING_SCHEMA_VERSION: &str = "sym-rsi-state-routing-fixtures-v0";
+const STATE_ROUTING_STATUS: &str = "SYNTHETIC_FIXTURE_DESCRIPTIONS_NOT_BENCHMARK_RESULTS";
+const STATE_ROUTING_TOTAL: usize = 16;
+const STATE_ROUTING_NEGATIVE: usize = 10;
+const STATE_ROUTING_POSITIVE: usize = 4;
+const STATE_ROUTING_ABSTENTION: usize = 2;
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StateRoutingFixtureClass {
+    AdversarialNegativeControl,
+    PositiveControl,
+    AbstentionControl,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateRoutingFixture {
+    pub fixture_id: String,
+    pub control_id: Option<String>,
+    pub category: Option<String>,
+    pub scenario: String,
+    pub disposition: String,
+    pub hard_gate: bool,
+    pub fields: Vec<String>,
+    pub note: Option<String>,
+    pub fixture_class: StateRoutingFixtureClass,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateRoutingScoringPolicy {
+    pub hard_gate_rule: String,
+    pub positive_control_rule: String,
+    pub abstention_rule: String,
+    pub denominator_rule: String,
+    pub replication_unit: String,
+    pub authority_boundary: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct StateRoutingFixturePack {
+    pub schema_version: String,
+    pub date: String,
+    pub status: String,
+    pub source_issue: String,
+    pub source_protocol: String,
+    pub purpose: String,
+    pub expected_fixture_count: usize,
+    pub expected_negative_count: usize,
+    pub expected_positive_count: usize,
+    pub expected_abstention_count: usize,
+    pub fixtures: Vec<StateRoutingFixture>,
+    pub scoring_policy: StateRoutingScoringPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct StateRoutingValidationReport {
+    pub schema_version: String,
+    pub valid_fixture_pack: bool,
+    pub fixture_count: usize,
+    pub negative_control_count: usize,
+    pub positive_control_count: usize,
+    pub abstention_control_count: usize,
+    pub issues: Vec<String>,
+    pub limitations: Vec<String>,
+}
+
+impl StateRoutingValidationReport {
+    fn new(pack: &StateRoutingFixturePack) -> Self {
+        Self {
+            schema_version: STATE_ROUTING_SCHEMA_VERSION.to_owned(),
+            valid_fixture_pack: true,
+            fixture_count: pack.fixtures.len(),
+            negative_control_count: 0,
+            positive_control_count: 0,
+            abstention_control_count: 0,
+            issues: Vec::new(),
+            limitations: vec![
+                "This checks fixture-pack declarations; it does not run a state router or establish real task-family correctness."
+                    .to_owned(),
+                "Synthetic scenarios are not task payloads, real memory records, hidden labels or measured transfer outcomes."
+                    .to_owned(),
+                "The validator does not authenticate source-family lineage, custodians, scope manifests, transfer receipts or benchmark rights."
+                    .to_owned(),
+                "A valid fixture pack is not evidence of useful memory routing, continual learning, recursive self-improvement or promotion authority."
+                    .to_owned(),
+            ],
+        }
+    }
+
+    fn issue(&mut self, code: &str, detail: impl AsRef<str>) {
+        self.valid_fixture_pack = false;
+        self.issues.push(format!("{code}: {}", detail.as_ref()));
+    }
+
+    fn finish(mut self) -> Self {
+        self.issues.sort();
+        self.issues.dedup();
+        self
+    }
+}
+
+const STATE_ROUTING_NEGATIVE: [(&str, &str, &str, &str); STATE_ROUTING_NEGATIVE] = [
+    ("SR-N01", "lexical_alias_unrelated_family", "false sharing", "REJECT_CROSS_SCOPE_SHARE"),
+    ("SR-N02", "unreceipted_cross_cluster_copy", "transfer provenance", "REJECT_UNRECEIPTED_TRANSFER"),
+    ("SR-N03", "stale_evaluator_epoch_currentness", "stale evidence", "REJECT_STALE_CURRENTNESS"),
+    ("SR-N04", "hidden_future_task_identifier", "privileged routing leakage", "REJECT_HIDDEN_LABEL_ROUTING"),
+    ("SR-N05", "incompatible_tool_action_space", "invalid harness transfer", "REJECT_TOOL_SPACE_TRANSFER"),
+    ("SR-N06", "global_overmerge_cross_domain", "under-fragmentation", "REJECT_GLOBAL_SCOPE_MERGE"),
+    ("SR-N07", "per_task_cluster_fragmentation", "over-fragmentation", "REJECT_EXCESSIVE_FRAGMENTATION"),
+    ("SR-N08", "contradiction_collapsed_across_scopes", "contradiction handling", "REJECT_CONTRADICTION_COLLAPSE"),
+    ("SR-N09", "outcome_reward_route_leakage", "outcome leakage", "REJECT_OUTCOME_LEAKAGE"),
+    ("SR-N10", "missing_lineage_false_share", "provenance failure", "REJECT_UNGROUNDED_SHARING"),
+];
+
+const STATE_ROUTING_POSITIVE: [(&str, &str); STATE_ROUTING_POSITIVE] = [
+    ("SR-P01", "ALLOW_SCOPED_REUSE"),
+    ("SR-P02", "ALLOW_RECEIPTED_TRANSFER"),
+    ("SR-P03", "REVALIDATE_BEFORE_REUSE"),
+    ("SR-P04", "PRESERVE_SCOPED_CONTRADICTION"),
+];
+
+const STATE_ROUTING_ABSTENTIONS: [(&str, &str); STATE_ROUTING_ABSTENTION] = [
+    ("SR-A01", "ABSTAIN_SCOPE_UNIDENTIFIED"),
+    ("SR-A02", "ABSTAIN_INSUFFICIENT_PROVENANCE"),
+];
+
+fn non_empty_state_routing(value: Option<&str>) -> bool {
+    value.is_some_and(|raw| !raw.trim().is_empty())
+}
+
+pub fn validate_state_routing_fixture_pack(
+    pack: &StateRoutingFixturePack,
+) -> StateRoutingValidationReport {
+    let mut report = StateRoutingValidationReport::new(pack);
+    if pack.schema_version != STATE_ROUTING_SCHEMA_VERSION {
+        report.issue("SCHEMA_VERSION", "unsupported state-routing fixture schema");
+    }
+    if pack.status != STATE_ROUTING_STATUS {
+        report.issue("STATUS", "fixture pack must remain synthetic and not benchmark results");
+    }
+    if pack.source_issue != "#10844" {
+        report.issue("SOURCE_ISSUE", "expected source issue #10844");
+    }
+    if !pack.date.as_bytes().get(4).is_some_and(|b| *b == b'-')
+        || !pack.date.as_bytes().get(7).is_some_and(|b| *b == b'-')
+        || pack.date.len() != 10
+    {
+        report.issue("DATE", "date must use YYYY-MM-DD");
+    }
+    for (field, value) in [
+        ("source_protocol", pack.source_protocol.as_str()),
+        ("purpose", pack.purpose.as_str()),
+        ("hard_gate_rule", pack.scoring_policy.hard_gate_rule.as_str()),
+        ("positive_control_rule", pack.scoring_policy.positive_control_rule.as_str()),
+        ("abstention_rule", pack.scoring_policy.abstention_rule.as_str()),
+        ("denominator_rule", pack.scoring_policy.denominator_rule.as_str()),
+        ("replication_unit", pack.scoring_policy.replication_unit.as_str()),
+        ("authority_boundary", pack.scoring_policy.authority_boundary.as_str()),
+    ] {
+        if value.trim().is_empty() {
+            report.issue("REQUIRED_FIELD", field);
+        }
+    }
+    for (field, actual, expected) in [
+        ("expected_fixture_count", pack.expected_fixture_count, STATE_ROUTING_TOTAL),
+        ("expected_negative_count", pack.expected_negative_count, STATE_ROUTING_NEGATIVE),
+        ("expected_positive_count", pack.expected_positive_count, STATE_ROUTING_POSITIVE),
+        ("expected_abstention_count", pack.expected_abstention_count, STATE_ROUTING_ABSTENTION),
+    ] {
+        if actual != expected {
+            report.issue("DECLARED_COUNT", format!("{field}: expected {expected}, got {actual}"));
+        }
+    }
+    if pack.fixtures.len() != STATE_ROUTING_TOTAL {
+        report.issue(
+            "FIXTURE_COUNT",
+            format!("expected {STATE_ROUTING_TOTAL}, found {}", pack.fixtures.len()),
+        );
+    }
+
+    let mut ids: BTreeSet<String> = BTreeSet::new();
+    let mut controls: BTreeSet<String> = BTreeSet::new();
+    let mut negatives = 0usize;
+    let mut positives = 0usize;
+    let mut abstentions = 0usize;
+
+    for fixture in &pack.fixtures {
+        if !ids.insert(fixture.fixture_id.clone()) {
+            report.issue("DUPLICATE_FIXTURE_ID", &fixture.fixture_id);
+        }
+        if fixture.scenario.trim().is_empty() {
+            report.issue("EMPTY_SCENARIO", &fixture.fixture_id);
+        }
+        if fixture.fields.is_empty() {
+            report.issue("FIELDS_EMPTY", &fixture.fixture_id);
+        }
+        if fixture.fields.iter().any(|field| field.trim().is_empty()) {
+            report.issue("FIELD_NAME_EMPTY", &fixture.fixture_id);
+        }
+        let mut unique_fields = BTreeSet::new();
+        for field in &fixture.fields {
+            if !unique_fields.insert(field.as_str()) {
+                report.issue("DUPLICATE_FIELD_NAME", format!("{}: {field}", fixture.fixture_id));
+            }
+        }
+
+        match fixture.fixture_class {
+            StateRoutingFixtureClass::AdversarialNegativeControl => {
+                negatives += 1;
+                if !fixture.hard_gate {
+                    report.issue("NEGATIVE_NOT_HARD_GATE", &fixture.fixture_id);
+                }
+                let Some(control_id) = fixture.control_id.as_deref() else {
+                    report.issue("NEGATIVE_CONTROL_ID_MISSING", &fixture.fixture_id);
+                    continue;
+                };
+                if !controls.insert(control_id.to_owned()) {
+                    report.issue("DUPLICATE_CONTROL_ID", control_id);
+                }
+                match STATE_ROUTING_NEGATIVE.iter().find(|(_, id, _, _)| *id == control_id) {
+                    Some((expected_fixture_id, _, category, disposition)) => {
+                        if fixture.fixture_id != *expected_fixture_id {
+                            report.issue("NEGATIVE_FIXTURE_ID_MISMATCH", control_id);
+                        }
+                        if fixture.category.as_deref() != Some(*category) {
+                            report.issue("NEGATIVE_CATEGORY_MISMATCH", control_id);
+                        }
+                        if fixture.disposition != *disposition {
+                            report.issue(
+                                "NEGATIVE_DISPOSITION_MISMATCH",
+                                format!("{control_id}: expected {disposition}, got {}", fixture.disposition),
+                            );
+                        }
+                    }
+                    None => report.issue("UNKNOWN_NEGATIVE_CONTROL", control_id),
+                }
+                if !non_empty_state_routing(fixture.category.as_deref()) {
+                    report.issue("NEGATIVE_CATEGORY_MISSING", &fixture.fixture_id);
+                }
+            }
+            StateRoutingFixtureClass::PositiveControl => {
+                positives += 1;
+                if fixture.hard_gate {
+                    report.issue("POSITIVE_MARKED_HARD_GATE", &fixture.fixture_id);
+                }
+                if fixture.control_id.is_some() || fixture.category.is_some() {
+                    report.issue("POSITIVE_HAS_NEGATIVE_METADATA", &fixture.fixture_id);
+                }
+                match STATE_ROUTING_POSITIVE.iter().find(|(id, _)| *id == fixture.fixture_id) {
+                    Some((_, expected_disposition)) => {
+                        if fixture.disposition != *expected_disposition {
+                            report.issue("POSITIVE_DISPOSITION_MISMATCH", &fixture.fixture_id);
+                        }
+                    }
+                    None => report.issue("UNKNOWN_POSITIVE_FIXTURE", &fixture.fixture_id),
+                }
+                if !non_empty_state_routing(fixture.note.as_deref()) {
+                    report.issue("POSITIVE_NOTE_MISSING", &fixture.fixture_id);
+                }
+            }
+            StateRoutingFixtureClass::AbstentionControl => {
+                abstentions += 1;
+                if fixture.hard_gate {
+                    report.issue("ABSTENTION_MARKED_HARD_GATE", &fixture.fixture_id);
+                }
+                if fixture.control_id.is_some() || fixture.category.is_some() {
+                    report.issue("ABSTENTION_HAS_NEGATIVE_METADATA", &fixture.fixture_id);
+                }
+                match STATE_ROUTING_ABSTENTIONS.iter().find(|(id, _)| *id == fixture.fixture_id) {
+                    Some((_, expected_disposition)) => {
+                        if fixture.disposition != *expected_disposition {
+                            report.issue("ABSTENTION_DISPOSITION_MISMATCH", &fixture.fixture_id);
+                        }
+                    }
+                    None => report.issue("UNKNOWN_ABSTENTION_FIXTURE", &fixture.fixture_id),
+                }
+                if !non_empty_state_routing(fixture.note.as_deref()) {
+                    report.issue("ABSTENTION_NOTE_MISSING", &fixture.fixture_id);
+                }
+            }
+        }
+    }
+
+    report.negative_control_count = negatives;
+    report.positive_control_count = positives;
+    report.abstention_control_count = abstentions;
+
+    if negatives != STATE_ROUTING_NEGATIVE {
+        report.issue("NEGATIVE_CONTROL_COUNT", format!("expected {}, found {negatives}", STATE_ROUTING_NEGATIVE));
+    }
+    if positives != STATE_ROUTING_POSITIVE {
+        report.issue("POSITIVE_CONTROL_COUNT", format!("expected {}, found {positives}", STATE_ROUTING_POSITIVE));
+    }
+    if abstentions != STATE_ROUTING_ABSTENTION {
+        report.issue("ABSTENTION_CONTROL_COUNT", format!("expected {}, found {abstentions}", STATE_ROUTING_ABSTENTION));
+    }
+    for (fixture_id, control_id, _, _) in STATE_ROUTING_NEGATIVE {
+        if !ids.contains(fixture_id) {
+            report.issue("REQUIRED_NEGATIVE_FIXTURE_MISSING", fixture_id);
+        }
+        if !controls.contains(control_id) {
+            report.issue("REQUIRED_NEGATIVE_CONTROL_MISSING", control_id);
+        }
+    }
+    for (fixture_id, _) in STATE_ROUTING_POSITIVE {
+        if !ids.contains(fixture_id) {
+            report.issue("REQUIRED_POSITIVE_FIXTURE_MISSING", fixture_id);
+        }
+    }
+    for (fixture_id, _) in STATE_ROUTING_ABSTENTIONS {
+        if !ids.contains(fixture_id) {
+            report.issue("REQUIRED_ABSTENTION_FIXTURE_MISSING", fixture_id);
+        }
+    }
+
+    report.finish()
+}
+
+pub fn parse_and_validate_state_routing(
+    contents: &str,
+) -> Result<StateRoutingValidationReport, serde_json::Error> {
+    let pack: StateRoutingFixturePack = serde_json::from_str(contents)?;
+    Ok(validate_state_routing_fixture_pack(&pack))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
