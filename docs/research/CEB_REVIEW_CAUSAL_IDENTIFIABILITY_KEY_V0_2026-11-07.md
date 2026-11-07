@@ -66,6 +66,8 @@ Temporal precedence alone does not rule out a common cause. The visible request 
 
 **Expected disposition:** identified for the conditional source-level claim that each branch is a sufficient route when its gate is active; non_identifiable for which route, if any, produced the reported incident. Do not infer that at least one supplied route actually executed from the outcome alone unless the incident record also establishes that this function was the exclusive producer.
 
+**Material alternatives:** Either source branch may be the realized cause, both may execute, or the duplicate may have another source outside the supplied evidence boundary.
+
 The two branches are OR alternatives, each with its own gate. Either may produce the same duplicate. The outcome alone does not identify which path executed; both may also have executed.
 
 **Disagreement witness:** observe or safely isolate the two branch conditions and their corresponding apply_transfer call identities. Removing only the legacy retry route leaves replay fallback as a sufficient path.
