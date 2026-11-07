@@ -853,6 +853,24 @@ mod tests {
         }
     }
 
+    fn selected_receipt(
+        language: &str,
+        source_text: &str,
+        word: &WordPronunciation,
+        candidate_index: usize,
+    ) -> SelectionReceipt {
+        SelectionReceipt::bind(
+            SelectionAuthority::HumanReviewer,
+            "review:fixture",
+            1,
+            language,
+            source_text,
+            word,
+            &word.candidates[candidate_index],
+        )
+        .unwrap()
+    }
+
     #[test]
     fn contextual_heteronym_retains_multiple_candidates_until_review() {
         let plan = PronunciationPlan {
@@ -881,10 +899,7 @@ mod tests {
             vec![candidate("present", "iː", CandidateSource::Dictionary)],
         );
         selected.selected_candidate_id = Some("present".into());
-        selected.selection_receipt = Some(SelectionReceipt {
-            authority: SelectionAuthority::HumanReviewer,
-            evidence_reference: "review:fixture-001".into(),
-        });
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let plan = PronunciationPlan {
             schema_version: 1,
             language: "en-US".into(),
@@ -892,6 +907,48 @@ mod tests {
             words: vec![selected],
         };
         assert!(plan.validate().is_ok());
+    }
+
+    #[test]
+    fn changing_selected_phones_invalidates_the_old_receipt() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
+        let mut plan = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+        plan.words[0].candidates[0].syllables[0].phones[1].ipa = "æ".into();
+        let error = plan.validate().unwrap_err();
+        assert!(error.contains("exact selected pronunciation candidate"), "{error}");
+    }
+
+    #[test]
+    fn changing_language_or_source_context_invalidates_the_old_receipt() {
+        let mut selected = word(
+            "read",
+            0,
+            ResolutionState::Selected,
+            vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
+        );
+        selected.selected_candidate_id = Some("past".into());
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
+        let mut plan = PronunciationPlan {
+            schema_version: 1,
+            language: "en-US".into(),
+            source_text: "read".into(),
+            words: vec![selected],
+        };
+        plan.language = "en-GB".into();
+        let error = plan.validate().unwrap_err();
+        assert!(error.contains("exact language/text/span context"), "{error}");
     }
 
     #[test]
@@ -980,10 +1037,7 @@ mod tests {
             vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
         );
         unknown.selected_candidate_id = Some("missing".into());
-        unknown.selection_receipt = Some(SelectionReceipt {
-            authority: SelectionAuthority::User,
-            evidence_reference: "user-choice:1".into(),
-        });
+        unknown.selection_receipt = Some(selected_receipt("en", "read", &unknown, 0));
         let plan = PronunciationPlan {
             schema_version: 1,
             language: "en".into(),
@@ -1101,10 +1155,7 @@ mod tests {
             vec![candidate("past", "ɛ", CandidateSource::Dictionary)],
         );
         selected.selected_candidate_id = Some("past".into());
-        selected.selection_receipt = Some(SelectionReceipt {
-            authority: SelectionAuthority::HumanReviewer,
-            evidence_reference: "review:read-past-001".into(),
-        });
+        selected.selection_receipt = Some(selected_receipt("en-US", "read", &selected, 0));
         let plan = PronunciationPlan {
             schema_version: 1,
             language: "en-US".into(),
@@ -1114,7 +1165,12 @@ mod tests {
         assert!(plan.validate_renderable().is_ok());
     }
 
-    fn selected_word(surface: &str, start_byte: usize, vowel: &str) -> WordPronunciation {
+    fn selected_word(
+        surface: &str,
+        start_byte: usize,
+        vowel: &str,
+        source_text: &str,
+    ) -> WordPronunciation {
         let mut candidate = PronunciationCandidate {
             candidate_id: format!("{surface}-variant-1"),
             provenance: provenance(CandidateSource::HumanReviewed, "review-fixture"),
@@ -1138,18 +1194,17 @@ mod tests {
             }],
         };
         candidate.provenance.source_digest = format!("blake3:{}", "0".repeat(64));
-        WordPronunciation {
+        let mut word = WordPronunciation {
             start_byte,
             end_byte: start_byte + surface.len(),
             surface: surface.into(),
             state: ResolutionState::Selected,
             selected_candidate_id: Some(candidate.candidate_id.clone()),
             candidates: vec![candidate],
-            selection_receipt: Some(SelectionReceipt {
-                authority: SelectionAuthority::HumanReviewer,
-                evidence_reference: "review:fixture".into(),
-            }),
-        }
+            selection_receipt: None,
+        };
+        word.selection_receipt = Some(selected_receipt("en-US", source_text, &word, 0));
+        word
     }
 
     fn alignment_fixture() -> (PronunciationPlan, VocalScoreAlignment) {
@@ -1157,7 +1212,10 @@ mod tests {
             schema_version: 1,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let alignment = VocalScoreAlignment {
             schema_version: 1,
