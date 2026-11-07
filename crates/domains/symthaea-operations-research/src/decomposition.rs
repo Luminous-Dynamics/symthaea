@@ -48,6 +48,8 @@ pub struct CnfProblem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnumerationBudget {
     pub max_variables: usize,
+    pub max_clauses: usize,
+    pub max_literals: usize,
     pub max_total_assignment_evaluations: u128,
     pub max_projection_support: usize,
 }
@@ -56,6 +58,8 @@ impl Default for EnumerationBudget {
     fn default() -> Self {
         Self {
             max_variables: 20,
+            max_clauses: 1 << 16,
+            max_literals: 1 << 20,
             max_total_assignment_evaluations: 1 << 20,
             max_projection_support: 1 << 20,
         }
@@ -77,6 +81,8 @@ pub enum DecompositionError {
     AssignmentSpaceOverflow { variable_count: usize },
     VariableBudgetExceeded { required: usize, limit: usize },
     AssignmentBudgetExceeded { required: u128, limit: u128 },
+    ClauseBudgetExceeded { required: usize, limit: usize },
+    LiteralBudgetExceeded { required: usize, limit: usize },
     ProjectionVariableOutOfRange { variable: usize, variable_count: usize },
     DuplicateProjectionVariable(usize),
     ProjectionSupportBudgetExceeded { required_at_least: usize, limit: usize },
@@ -95,7 +101,32 @@ pub enum DecompositionError {
     SemanticMismatch { source_count: u128, aggregate_count: u128 },
 }
 
-fn validate_problem(problem: &CnfProblem) -> Result<(), DecompositionError> {
+fn validate_problem(
+    problem: &CnfProblem,
+    budget: EnumerationBudget,
+) -> Result<(), DecompositionError> {
+    if problem.variables.len() > budget.max_variables {
+        return Err(DecompositionError::VariableBudgetExceeded {
+            required: problem.variables.len(),
+            limit: budget.max_variables,
+        });
+    }
+    if problem.clauses.len() > budget.max_clauses {
+        return Err(DecompositionError::ClauseBudgetExceeded {
+            required: problem.clauses.len(),
+            limit: budget.max_clauses,
+        });
+    }
+    let literal_count = problem.clauses.iter().try_fold(0usize, |total, clause| {
+        total.checked_add(clause.len()).ok_or(DecompositionError::CountOverflow)
+    })?;
+    if literal_count > budget.max_literals {
+        return Err(DecompositionError::LiteralBudgetExceeded {
+            required: literal_count,
+            limit: budget.max_literals,
+        });
+    }
+
     let mut names = HashSet::with_capacity(problem.variables.len());
     for (index, name) in problem.variables.iter().enumerate() {
         if name.is_empty() {
@@ -179,7 +210,7 @@ pub fn count_models(
     problem: &CnfProblem,
     budget: EnumerationBudget,
 ) -> Result<u128, DecompositionError> {
-    validate_problem(problem)?;
+    validate_problem(problem, budget)?;
     let rows = assignment_count(problem.variables.len(), budget)?;
     let mut count = 0u128;
 
@@ -514,12 +545,13 @@ pub fn verify_projected_support(
                 .iter()
                 .map(|&variable| assignment[variable])
                 .collect();
-            if support.insert(projected) && support.len() > budget.max_projection_support {
+            if !support.contains(&projected) && support.len() >= budget.max_projection_support {
                 return Err(DecompositionError::ProjectionSupportBudgetExceeded {
-                    required_at_least: support.len(),
+                    required_at_least: support.len().saturating_add(1),
                     limit: budget.max_projection_support,
                 });
             }
+            support.insert(projected);
         }
     }
 
@@ -547,6 +579,8 @@ mod tests {
     fn budget() -> EnumerationBudget {
         EnumerationBudget {
             max_variables: 8,
+            max_clauses: 64,
+            max_literals: 256,
             max_total_assignment_evaluations: 1 << 8,
             max_projection_support: 1 << 8,
         }
@@ -673,6 +707,8 @@ mod tests {
     fn resource_limit_is_unknown_not_zero_models() {
         let tight = EnumerationBudget {
             max_variables: 8,
+            max_clauses: 64,
+            max_literals: 256,
             max_total_assignment_evaluations: 4,
             max_projection_support: 8,
         };
@@ -689,6 +725,8 @@ mod tests {
     fn branch_sum_enforces_composed_total_enumeration_budget() {
         let tight = EnumerationBudget {
             max_variables: 8,
+            max_clauses: 64,
+            max_literals: 256,
             max_total_assignment_evaluations: 12,
             max_projection_support: 8,
         };
@@ -705,6 +743,8 @@ mod tests {
     fn independent_product_enforces_composed_total_enumeration_budget() {
         let tight = EnumerationBudget {
             max_variables: 8,
+            max_clauses: 64,
+            max_literals: 256,
             max_total_assignment_evaluations: 35,
             max_projection_support: 8,
         };
@@ -719,6 +759,51 @@ mod tests {
             DecompositionError::AssignmentBudgetExceeded {
                 required: 40,
                 limit: 35
+            }
+        );
+    }
+
+    #[test]
+    fn clause_budget_is_checked_before_enumeration() {
+        let tight = EnumerationBudget {
+            max_clauses: 1,
+            ..budget()
+        };
+        assert_eq!(
+            count_models(&branch_fixture(), tight).unwrap_err(),
+            DecompositionError::ClauseBudgetExceeded {
+                required: 2,
+                limit: 1
+            }
+        );
+    }
+
+    #[test]
+    fn literal_budget_is_checked_before_enumeration() {
+        let tight = EnumerationBudget {
+            max_literals: 3,
+            ..budget()
+        };
+        assert_eq!(
+            count_models(&branch_fixture(), tight).unwrap_err(),
+            DecompositionError::LiteralBudgetExceeded {
+                required: 4,
+                limit: 3
+            }
+        );
+    }
+
+    #[test]
+    fn projected_support_budget_stops_before_inserting_extra_support() {
+        let tight = EnumerationBudget {
+            max_projection_support: 0,
+            ..budget()
+        };
+        assert_eq!(
+            verify_projected_support(&projection_fixture(), &[0], tight).unwrap_err(),
+            DecompositionError::ProjectionSupportBudgetExceeded {
+                required_at_least: 1,
+                limit: 0
             }
         );
     }
