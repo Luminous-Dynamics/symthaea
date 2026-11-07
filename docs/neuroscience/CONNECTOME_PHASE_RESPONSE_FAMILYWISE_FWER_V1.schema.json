@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_PHASE_RESPONSE_FAMILYWISE_FWER_V1.schema.json",
+  "title": "Connectome phase-response familywise FWER manifest V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "family_id",
+    "campaign_id",
+    "requested_guarantee",
+    "claim_scope",
+    "registered_before_confirmatory_outcomes",
+    "confirmation_lockbox_opened_before_freeze",
+    "family_commitment_sha256",
+    "alpha",
+    "global_filtration_sha256",
+    "confirmation_split_sha256",
+    "claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requested_guarantee": {
+      "const": "FWER"
+    },
+    "claim_scope": {
+      "const": "synthetic_known_truth"
+    },
+    "registered_before_confirmatory_outcomes": {
+      "const": true
+    },
+    "confirmation_lockbox_opened_before_freeze": {
+      "const": false
+    },
+    "family_commitment_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "alpha": {
+      "$ref": "#/$defs/rational"
+    },
+    "global_filtration_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "confirmation_split_sha256": {
+      "$ref": "#/$defs/sha64"
+    },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rational": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)(/[1-9][0-9]*)?$"
+    },
+    "claim_key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sender_leg",
+        "recipient_leg",
+        "probe_class",
+        "descending_neuron",
+        "context",
+        "phase_bin",
+        "magnitude_bin",
+        "delay_index",
+        "endpoint"
+      ],
+      "properties": {
+        "sender_leg": {
+          "enum": [
+            "left_fore",
+            "left_middle",
+            "left_hind",
+            "right_fore",
+            "right_middle",
+            "right_hind"
+          ]
+        },
+        "recipient_leg": {
+          "enum": [
+            "left_fore",
+            "left_middle",
+            "left_hind",
+            "right_fore",
+            "right_middle",
+            "right_hind"
+          ]
+        },
+        "probe_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descending_neuron": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "DNg100",
+            "DNg97",
+            "DNb08",
+            null
+          ]
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "phase_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 7
+        },
+        "magnitude_bin": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 15
+        },
+        "delay_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "key",
+        "query_spec_sha256",
+        "null_envelope_sha256",
+        "component_e_process_receipt_sha256",
+        "component_validity_receipt_sha256",
+        "global_filtration_sha256",
+        "confirmation_split_sha256",
+        "component_status",
+        "weight",
+        "e_process_values"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "$ref": "#/$defs/claim_key"
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "null_envelope_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "component_e_process_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "component_validity_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "global_filtration_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "confirmation_split_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "component_status": {
+          "const": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
+        },
+        "weight": {
+          "$ref": "#/$defs/rational"
+        },
+        "e_process_values": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/rational"
+          }
+        }
+      }
+    }
+  }
+}
