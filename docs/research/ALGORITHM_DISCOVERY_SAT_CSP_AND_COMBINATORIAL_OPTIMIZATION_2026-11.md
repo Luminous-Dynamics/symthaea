@@ -704,6 +704,24 @@ Use confidence intervals or paired instance-level tests where appropriate. Repor
 - **Sol-Atlas:** apply graph and constraint optimization to transport, port, energy and infrastructure networks.
 - **Luminous platform:** host common contracts, solver registry, benchmark registry, evaluation protocol and evidence lineage.
 
+### Machine-readable hyperedge fixtures and reference DPLL work
+
+The AND/OR hyperedge tranche now has a frozen machine-readable known-answer fixture:
+[`REPRESENTATION_HYPEREDGE_KNOWN_ANSWERS_V1.json`](REPRESENTATION_HYPEREDGE_KNOWN_ANSWERS_V1.json).
+
+The three fixture identities were independently enumerated in a small direct truth-table check:
+- BranchSum: source count 4, cofactor counts 2 and 2.
+- IndependentProduct: component counts 2 and 3, with one unconstrained declared variable, so 2 × 3 × 2 = 12.
+- ExistentialSupportUnion: three full satisfying assignments project to one visible assignment.
+
+The five negative controls cover incomplete/overlapping branches, overlapping product scopes, dropped free variables and arithmetic addition in place of projected support union. These are finite semantic fixtures only; they do not establish scalable decomposition or Rust implementation correctness.
+
+A separate implementation workstream, [#10885 — trail-based DPLL with deterministic budgets](https://github.com/Luminous-Dynamics/symthaea/issues/10885), follows from source inspection of #10801. The current copy-based branch isolation is a useful correctness-first reference, but it clones accumulated assignments and proof-step vectors at each branch. The new work proposes indexed tri-state assignments, a reversible trail, decision-frame checkpoints, explicit backtrack events and deterministic decisions/propagations/literal-inspection/event budgets. It remains a reference DPLL, not a claimed competitor to Kissat. Conversion budgets are separate and ordered: NNF expansion (#10849), CNF distribution (#10849), Tseitin output/depth (#10809/#10804), truth-table oracle (#10870), then solver search (#10885). Any phase exhaustion yields UNKNOWN/resource-limited, never UNSAT.
+
+The shared anytime envelope now also has a normative semantics note:
+[`ANYTIME_RESULT_ENVELOPE_V1_SEMANTICS.md`](ANYTIME_RESULT_ENVELOPE_V1_SEMANTICS.md).
+It defines exact objective comparison, lower/upper-bound direction, request/contract binding, monotone accepted incumbent sequences, disposition invariants, exhaustive completion and forbidden status upgrades. The JSON Schema remains structural validation; independent Rust cross-record/objective/state-transition verification is tracked in [#10887](https://github.com/Luminous-Dynamics/symthaea/issues/10887).
+
 ## Cross-domain verified anytime optimization
 
 A solver should be allowed to return a verified feasible incumbent before it proves optimality, without losing that useful result when a deadline or worker failure occurs. But the result must distinguish **candidate feasibility**, **search completeness**, and **optimality**.
