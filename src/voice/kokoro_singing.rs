@@ -825,6 +825,18 @@ mod capability_manifest_tests {
                 .iter()
                 .any(|entry| entry.control == SingingControl::ConsonantAnticipation)
         );
+        assert_eq!(
+            manifest.support(SingingControl::PhraseExpressionCurve),
+            CapabilitySupport::Approximated
+        );
+        assert_eq!(
+            manifest.support(SingingControl::PhraseBreathTiming),
+            CapabilitySupport::Unsupported
+        );
+        assert_eq!(
+            manifest.support(SingingControl::Breathiness),
+            CapabilitySupport::Unsupported
+        );
         super::super::singing_engine::SingingRenderPolicy::score_conditioned_comparison()
             .validate_against(&manifest)
             .unwrap();
