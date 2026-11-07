@@ -90,6 +90,7 @@ jobs:
       - name: Additional anisotropic-Heisenberg executable check
         if: matrix.package == 'symthaea-fractal-time-lab'
         run: cargo check --locked -p symthaea-fractal-time-lab --example heisenberg_2d_sweep
+
       - name: Run exact causal-set interval-histogram comparison
         if: matrix.package == 'symthaea-causal-set-lab'
         shell: bash
@@ -98,9 +99,9 @@ jobs:
           cargo run --locked -p symthaea-causal-set-lab --example interval_histogram_benchmark | tee interval-histogram-benchmark.csv
           {
             echo "## Exact interval-histogram algorithm comparison"
-            echo '^`csv`'
+            echo '```csv'
             cat interval-histogram-benchmark.csv
-            echo '^``^`'
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish package summary
