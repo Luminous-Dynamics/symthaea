@@ -85,6 +85,12 @@ Do not use a library's own output as ground truth for scoring that library. For 
 - Pure Rust eSpeak NG API and GPL-3.0-or-later license: https://github.com/eugenehp/espeak-ng-rs
 
 
+
+### Pronunciation lattice prototype
+
+An isolated schema/validator now exists at `tools/pronunciation-plan/`, with exact-head checks in `.github/workflows/pronunciation-plan-contract.yml`. It represents each source-text word span with multiple candidates, candidate provenance (source/provider/version/digest), normalized IPA phones, syllabification, stress, explicit review/OOV/unsupported state, and a selection receipt. Its renderer-facing `validate_renderable()` allows only explicitly selected candidates. This is a contract prototype; it does not perform G2P or contextual selection. The intended integration is: G2P systems propose candidates, a context/lexicon/human layer resolves them, and every renderer consumes the same frozen pronunciation artifact without making a new pronunciation decision.
+
+
 ## Research framing: benchmark different tasks separately
 
 There is no single leaderboard that answers whether a system is a good singer under a prescribed score.
