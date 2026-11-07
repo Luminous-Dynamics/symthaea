@@ -11,6 +11,9 @@
     },
     {
       "$ref": "#/$defs/OperatorTrace"
+    },
+    {
+      "$ref": "#/$defs/WorkerSimulationPlan"
     }
   ],
   "$defs": {
@@ -466,6 +469,70 @@
             {
               "type": "null"
             }
+          ]
+        },
+        "resource_cost_units": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "WorkerSimulationPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "worker_count",
+        "wall_clock_budget_ms",
+        "tasks"
+      ],
+      "properties": {
+        "worker_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "wall_clock_budget_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/SimulationTask"
+          }
+        }
+      }
+    },
+    "SimulationTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "candidate_id",
+        "duration_ms",
+        "disposition",
+        "resource_cost_units"
+      ],
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "disposition": {
+          "enum": [
+            "valid",
+            "invalid",
+            "failed",
+            "cancelled",
+            "timed_out"
           ]
         },
         "resource_cost_units": {
