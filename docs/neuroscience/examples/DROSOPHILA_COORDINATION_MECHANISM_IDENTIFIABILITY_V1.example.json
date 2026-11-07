@@ -1,0 +1,1970 @@
+{
+  "schema_version": 1,
+  "claim_scope": "synthetic_known_truth",
+  "evidence_tier": "SYNTHETIC_KNOWN_TRUTH_ONLY",
+  "worlds": [
+    {
+      "world_id": "W-local",
+      "mechanism_family": "LOCAL_CPG",
+      "source_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "world_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "baseline_summary": {
+        "mean_frequency_millihz": 11000,
+        "aggregate_phase_locking_milli": 920,
+        "tripod_occupancy_milli": 800
+      },
+      "baseline_trajectory": {
+        "pairwise_phase_offsets_microturns": [
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000
+        ],
+        "stance_count_histogram_milli": [
+          0,
+          0,
+          50,
+          700,
+          200,
+          50,
+          0
+        ]
+      },
+      "interventions": [
+        {
+          "intervention_id": "left_fore_kick_air",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact_afferents_silenced",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "candidate_central_bridge_block",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "world_id": "W-central",
+      "mechanism_family": "CENTRAL_NEURAL_COUPLING",
+      "source_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "world_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "baseline_summary": {
+        "mean_frequency_millihz": 11000,
+        "aggregate_phase_locking_milli": 920,
+        "tripod_occupancy_milli": 800
+      },
+      "baseline_trajectory": {
+        "pairwise_phase_offsets_microturns": [
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000
+        ],
+        "stance_count_histogram_milli": [
+          0,
+          0,
+          50,
+          700,
+          200,
+          50,
+          0
+        ]
+      },
+      "interventions": [
+        {
+          "intervention_id": "left_fore_kick_air",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact_afferents_silenced",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "candidate_central_bridge_block",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "world_id": "W-sensory",
+      "mechanism_family": "PROPRIOCEPTIVE_LOAD_FEEDBACK",
+      "source_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "world_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "baseline_summary": {
+        "mean_frequency_millihz": 11000,
+        "aggregate_phase_locking_milli": 920,
+        "tripod_occupancy_milli": 800
+      },
+      "baseline_trajectory": {
+        "pairwise_phase_offsets_microturns": [
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000
+        ],
+        "stance_count_histogram_milli": [
+          0,
+          0,
+          50,
+          700,
+          200,
+          50,
+          0
+        ]
+      },
+      "interventions": [
+        {
+          "intervention_id": "left_fore_kick_air",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                30000,
+                0,
+                20000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                15000,
+                0,
+                10000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact_afferents_silenced",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "candidate_central_bridge_block",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "world_id": "W-mechanical",
+      "mechanism_family": "BODY_ENVIRONMENT_COUPLING",
+      "source_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "world_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "baseline_summary": {
+        "mean_frequency_millihz": 11000,
+        "aggregate_phase_locking_milli": 920,
+        "tripod_occupancy_milli": 800
+      },
+      "baseline_trajectory": {
+        "pairwise_phase_offsets_microturns": [
+          -100000,
+          50000,
+          50000,
+          50000,
+          150000,
+          50000,
+          50000,
+          50000,
+          50000,
+          -175000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000
+        ],
+        "stance_count_histogram_milli": [
+          0,
+          0,
+          50,
+          700,
+          200,
+          50,
+          0
+        ]
+      },
+      "interventions": [
+        {
+          "intervention_id": "left_fore_kick_air",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                30000,
+                0,
+                20000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                15000,
+                0,
+                10000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact_afferents_silenced",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                25000,
+                0,
+                10000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                12500,
+                0,
+                5000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "candidate_central_bridge_block",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                0,
+                25000,
+                0,
+                10000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                0,
+                12500,
+                0,
+                5000,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "world_id": "W-shared-drive",
+      "mechanism_family": "OMITTED_SHARED_DRIVE",
+      "source_revision_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "world_spec_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "baseline_summary": {
+        "mean_frequency_millihz": 11000,
+        "aggregate_phase_locking_milli": 920,
+        "tripod_occupancy_milli": 800
+      },
+      "baseline_trajectory": {
+        "pairwise_phase_offsets_microturns": [
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000,
+          50000
+        ],
+        "stance_count_histogram_milli": [
+          0,
+          0,
+          50,
+          700,
+          200,
+          50,
+          0
+        ]
+      },
+      "interventions": [
+        {
+          "intervention_id": "left_fore_kick_air",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "left_fore_kick_contact_afferents_silenced",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        },
+        {
+          "intervention_id": "candidate_central_bridge_block",
+          "frames": [
+            {
+              "phase_reset_by_leg_microturns": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                100000,
+                40000,
+                25000,
+                30000,
+                20000,
+                10000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            },
+            {
+              "phase_reset_by_leg_microturns": [
+                50000,
+                20000,
+                12500,
+                15000,
+                10000,
+                5000
+              ],
+              "cycle_slips_by_leg": [
+                0,
+                0,
+                0,
+                0,
+                0,
+                0
+              ],
+              "frequency_by_leg_millihz": [
+                11000,
+                11000,
+                11000,
+                11000,
+                11000,
+                11000
+              ],
+              "tripod_occupancy_milli": 800
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "interventions": [
+    {
+      "intervention_id": "left_fore_kick_air",
+      "feasible": true,
+      "feasibility_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "intervention_id": "left_fore_kick_contact",
+      "feasible": true,
+      "feasibility_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "intervention_id": "left_fore_kick_contact_afferents_silenced",
+      "feasible": true,
+      "feasibility_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "intervention_id": "candidate_central_bridge_block",
+      "feasible": false,
+      "feasibility_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "oracle_expectations": {
+    "total_world_pairs": 10,
+    "summary_only_class_count": 1,
+    "summary_unresolved_pairs": 10,
+    "full_baseline_class_count": 2,
+    "baseline_separated_pairs": 4,
+    "feasible_portfolio_class_count": 4,
+    "feasible_portfolio_separated_pairs": 9,
+    "feasible_portfolio_unresolved_pairs": 1,
+    "status": "NOT_IDENTIFIABLE_UNDER_DECLARED_FEASIBLE_PORTFOLIO",
+    "unresolved_world_pair": [
+      "W-central",
+      "W-shared-drive"
+    ],
+    "mechanism_certificate_issued": false
+  }
+}
