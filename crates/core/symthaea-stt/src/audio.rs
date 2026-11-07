@@ -445,9 +445,12 @@ impl AudioProjector {
         hvs
     }
 
-    /// Project audio without temporal windowing - returns raw frame HVs
+    /// Project audio without temporal windowing - returns raw direct-mel frame HVs.
     ///
-    /// Used for diagnostic purposes to check encoding quality
+    /// This is the prototype-compatible frame space used by aligned phoneme
+    /// training and live streaming. The context-windowed `project()` method
+    /// returns a different representation and must use matching context-trained
+    /// prototypes.
     pub fn project_raw(&mut self, audio: &[f32]) -> Vec<HV16> {
         self.reset();
 
