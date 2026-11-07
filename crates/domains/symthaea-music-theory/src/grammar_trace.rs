@@ -222,7 +222,10 @@ fn motif_assertions(
                     .onset
                     .beats();
                 let end_note = score.voice(region.end.role)[region.end.role_index];
-                let end = (end_note.onset + end_note.duration).beats();
+                let Some(end) = end_note.onset.checked_add(end_note.duration) else {
+                    return false;
+                };
+                let end = end.beats();
                 onset >= start - 1e-6 && onset <= end + 1e-6
             })
             .map_or_else(|| "piece".into(), |region| region.id.clone());

@@ -155,6 +155,7 @@ pub fn exact_fingerprint(score: &Score) -> u64 {
                     VoiceRole::Harmony => 1,
                     VoiceRole::Bass => 2,
                     VoiceRole::CounterMelody => 3,
+                    VoiceRole::Unspecified => 4,
                 },
                 n.pitch.midi(),
                 n.onset.num(),

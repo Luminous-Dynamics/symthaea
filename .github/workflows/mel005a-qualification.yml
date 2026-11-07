@@ -1,0 +1,47 @@
+name: MEL-005A Focused Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/**"
+      - "crates/domains/symthaea-music-theory/**"
+      - "scripts/mel005a_qualification.sh"
+      - ".github/workflows/mel005a-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  targeted:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      MEL005A_EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Run focused fail-fast qualification
+        shell: bash
+        run: bash scripts/mel005a_qualification.sh target/mel005a-qualification
+
+      - name: Upload receipts and full command output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel005a-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/mel005a-qualification/
+          if-no-files-found: error
+          retention-days: 30

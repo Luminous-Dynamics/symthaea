@@ -109,6 +109,7 @@ fn synth(score: &Score) -> Vec<[f32; 2]> {
             VoiceRole::Harmony => (&[1.0, 0.4, 0.2], 0.28, 0.25),
             VoiceRole::Bass => (&[1.0, 0.5, 0.25], 0.5, 0.0),
             VoiceRole::CounterMelody => (&[1.0, 0.45, 0.28], 0.38, -0.15),
+            VoiceRole::Unspecified => (&[1.0, 0.45, 0.28], 0.38, 0.0),
         };
         let amp = gain * note.velocity;
         let gl = (0.5 * (1.0 - pan)).sqrt();
