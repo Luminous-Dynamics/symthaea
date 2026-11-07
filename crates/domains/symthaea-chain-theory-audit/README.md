@@ -17,7 +17,7 @@ Run:
 
     cargo test -p symthaea-chain-theory-audit
     cargo run -p symthaea-chain-theory-audit --example chain_alpha_audit > /tmp/chain-alpha-rust.csv
-    tail -n +2 /tmp/chain-alpha-rust.csv > /tmp/chain-alpha-rows.csv
+    sed -n '/^record,construction,slot_kinds/,$p' /tmp/chain-alpha-rust.csv > /tmp/chain-alpha-rows.csv
     diff -u /path/to/author/records.csv /tmp/chain-alpha-rows.csv
 
 The sector counts reproduce the author's published table:
