@@ -721,3 +721,17 @@ mod tests {
         assert_eq!(record.corrected_timestamp_tai_ns(5_000).unwrap(), 5_012);
     }
 }
+
+/// Calibrated bearing-only multi-sensor triangulation and local uncertainty.
+pub mod triangulation;
+
+pub use triangulation::{
+    Quaternion as SensorToEcefQuaternion,
+    RayObservation,
+    TriangulatedPosition,
+    TriangulationConfig,
+    TriangulationError,
+    Vector3 as EcefVector3,
+    triangulate_bearings,
+    triangulate_bearings_with_config,
+};
