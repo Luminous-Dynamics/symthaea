@@ -9,11 +9,11 @@ abbrev ProvenanceRoot := Nat
 abbrev IndependenceBasis := Nat
 
 inductive EvidenceClass where
+  | ProviderObservation
   | AbstractProof
   | BoundedModel
   | RuntimeObservation
   | SourceAudit
-  | ProviderObservation
   | RefinementProof
   | TemporalProof
   deriving DecidableEq, Repr
@@ -259,28 +259,69 @@ def ConflictFree (receipts : List EvidenceReceipt) : Prop :=
     ∀ right, right ∈ receipts →
       ¬ Conflicting left right
 
+/-- A declared dependency edge is bound to the receipt that names it. -/
+def HasDependency
+    (receipts : List EvidenceReceipt)
+    (dependent prerequisite : EvidenceIdentity) : Prop :=
+  ∃ receipt,
+    receipt ∈ receipts ∧
+    receipt.evidenceId = dependent ∧
+    prerequisite ∈ receipt.dependencies
+
 /--
-Dependency evidence is recursively closed. Every declared prerequisite must be
-present as a current positive-support Pass, strictly lower in the well-founded
-rank, and itself dependency-closed.
+A dependency path follows actual declared edges and strictly decreases rank.
+The rank witnesses that the finite admitted dependency graph is acyclic.
 -/
-inductive EvidenceClosed
+inductive DependencyPath
     (rank : EvidenceIdentity → Nat)
     (receipts : List EvidenceReceipt) :
-    EvidenceReceipt → Prop where
-  | intro (e : EvidenceReceipt)
-      (current : e.validity = .Current)
-      (passed : disposition e.result = .Pass)
-      (positive : semanticPolarity e.result = .PositiveSupport)
-      (dependencies :
-        ∀ dependency,
-          dependency ∈ e.dependencies →
-          ∃ prerequisite,
-            prerequisite ∈ receipts ∧
-            prerequisite.evidenceId = dependency ∧
-            rank prerequisite.evidenceId < rank e.evidenceId ∧
-            EvidenceClosed rank receipts prerequisite) :
-      EvidenceClosed rank receipts e
+    EvidenceIdentity → EvidenceIdentity → Prop where
+  | edge {dependent prerequisite} :
+      HasDependency receipts dependent prerequisite →
+      rank prerequisite < rank dependent →
+      DependencyPath rank receipts dependent prerequisite
+  | trans {source middle target} :
+      DependencyPath rank receipts source middle →
+      DependencyPath rank receipts middle target →
+      DependencyPath rank receipts source target
+
+/--
+Every reachable current positive receipt has all of its declared dependencies
+present in the same receipt set, current, positive, and lower-ranked. Reachability
+is defined only by actual dependency edges, so this closes the transitive graph
+without a nested recursive inductive definition.
+-/
+def EvidenceGraphClosed
+    (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt)
+    (root : EvidenceReceipt) : Prop :=
+  ∀ node,
+    node ∈ receipts →
+    (node.evidenceId = root.evidenceId ∨
+      DependencyPath rank receipts root.evidenceId node.evidenceId) →
+    node.validity = .Current →
+    disposition node.result = .Pass →
+    semanticPolarity node.result = .PositiveSupport →
+    ∀ dependency,
+      dependency ∈ node.dependencies →
+      ∃ prerequisite,
+        prerequisite ∈ receipts ∧
+        prerequisite.evidenceId = dependency ∧
+        rank prerequisite.evidenceId < rank node.evidenceId ∧
+        prerequisite.validity = .Current ∧
+        disposition prerequisite.result = .Pass ∧
+        semanticPolarity prerequisite.result = .PositiveSupport
+
+/-- A root is closed only when its entire reachable dependency subgraph is. -/
+def EvidenceClosed
+    (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt)
+    (e : EvidenceReceipt) : Prop :=
+  e ∈ receipts ∧
+  e.validity = .Current ∧
+  disposition e.result = .Pass ∧
+  semanticPolarity e.result = .PositiveSupport ∧
+  EvidenceGraphClosed rank receipts e
 
 /--
 Finite first-kernel closure: every mandatory obligation has current admissible
@@ -328,20 +369,8 @@ def IndependentSupport
     w.leftProvenance = left.provenanceRoot ∧
     w.rightProvenance = right.provenanceRoot
 
-/--
-A rank-decreasing dependency path gives an explicit finite anti-cycle witness
-for the same order used by `EvidenceClosed`.
--/
-inductive DependencyPath
-    (rank : EvidenceIdentity → Nat) :
-    EvidenceIdentity → EvidenceIdentity → Prop where
-  | edge {dependent prerequisite} :
-      rank prerequisite < rank dependent →
-      DependencyPath rank dependent prerequisite
-  | trans {a b c} :
-      DependencyPath rank a b →
-      DependencyPath rank b c →
-      DependencyPath rank a c
+/-- The actual-edge path relation is defined above the closure predicate. -/
+
 
 theorem proof_failure_is_fail_without_refutation :
     disposition .ProofOrQualificationFailure = .Fail ∧
@@ -560,8 +589,7 @@ theorem evidence_closed_is_current_pass
     (e : EvidenceReceipt)
     (hclosed : EvidenceClosed rank receipts e) :
     e.validity = .Current ∧ disposition e.result = .Pass := by
-  cases hclosed with
-  | intro _ current passed _ _ => exact ⟨current, passed⟩
+  exact ⟨hclosed.2.1, hclosed.2.2.1⟩
 
 theorem evidence_closed_is_positive_support
     (rank : EvidenceIdentity → Nat)
@@ -569,8 +597,7 @@ theorem evidence_closed_is_positive_support
     (e : EvidenceReceipt)
     (hclosed : EvidenceClosed rank receipts e) :
     semanticPolarity e.result = .PositiveSupport := by
-  cases hclosed with
-  | intro _ _ _ positive _ => exact positive
+  exact hclosed.2.2.2.1
 
 theorem evidence_closed_rejects_self_dependency
     (rank : EvidenceIdentity → Nat)
@@ -578,15 +605,13 @@ theorem evidence_closed_rejects_self_dependency
     (e : EvidenceReceipt)
     (hclosed : EvidenceClosed rank receipts e)
     (hself : e.evidenceId ∈ e.dependencies) : False := by
-  cases hclosed with
-  | intro _ _ _ _ dependencies =>
-      have hexists := dependencies e.evidenceId hself
-      cases hexists with
-      | intro prerequisite hrest =>
-          have hid : prerequisite.evidenceId = e.evidenceId := hrest.2.1
-          have hlt : rank prerequisite.evidenceId < rank e.evidenceId := hrest.2.2.1
-          rw [hid] at hlt
-          exact (Nat.lt_irrefl (rank e.evidenceId)) hlt
+  have hgraph := hclosed.2.2.2.2
+  have hroot := hgraph e hclosed.1 (Or.inl rfl)
+    hclosed.2.1 hclosed.2.2.1 hclosed.2.2.2.1
+  obtain ⟨prerequisite, hmember, hid, hlt, hcurrent, hpassed, hpositive⟩ :=
+    hroot e.evidenceId hself
+  rw [hid] at hlt
+  exact (Nat.lt_irrefl (rank e.evidenceId)) hlt
 
 theorem qualification_failure_cannot_create_semantic_conflict
     (left right : EvidenceReceipt)
@@ -639,19 +664,22 @@ theorem contradictory_current_evidence_prevents_closure
 
 theorem dependency_path_decreases
     (rank : EvidenceIdentity → Nat)
-    {from to : EvidenceIdentity}
-    (hpath : DependencyPath rank from to) :
-    rank to < rank from := by
+    (receipts : List EvidenceReceipt)
+    {source target : EvidenceIdentity}
+    (hpath : DependencyPath rank receipts source target) :
+    rank target < rank source := by
   induction hpath with
-  | edge hlt => exact hlt
-  | trans hab hbc ihab ihbc => exact Nat.lt_trans ihbc ihab
+  | edge _ hlt => exact hlt
+  | trans _ _ ihsm imt => exact Nat.lt_trans imt ihsm
 
 theorem dependency_cycles_rejected
     (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt)
     (evidence : EvidenceIdentity) :
-    ¬ DependencyPath rank evidence evidence := by
+    ¬ DependencyPath rank receipts evidence evidence := by
   intro hcycle
-  have hlt : rank evidence < rank evidence := dependency_path_decreases rank hcycle
+  have hlt : rank evidence < rank evidence :=
+    dependency_path_decreases rank receipts hcycle
   exact (Nat.lt_irrefl (rank evidence)) hlt
 
 theorem support_non_amplification_summary
