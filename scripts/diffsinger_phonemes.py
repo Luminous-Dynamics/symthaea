@@ -149,6 +149,93 @@ def timeline_gap_ms(start_s: float, previous_end_s: float, context: str) -> floa
     return max(gap_s, 0.0) * 1000.0
 
 
+def flatten_performance_phones(
+    performance: object,
+    minimum_silence_ms: float,
+) -> list[tuple[str, float, float]]:
+    """Flatten the validated English v2 score into (ARPAbet/SP, duration_ms, Hz).
+
+    Absolute note start times are retained as explicit SP events. The minimum
+    silence threshold is supplied by the renderer's frame resolution.
+    """
+    if not isinstance(performance, Mapping):
+        raise ValueError("performance must be an object")
+    if performance.get("language") != "en":
+        raise ValueError(
+            f"DiffSinger phone flattening currently supports language='en' only; "
+            f"got {performance.get('language')!r}"
+        )
+    if (
+        type(minimum_silence_ms) not in (int, float)
+        or not math.isfinite(minimum_silence_ms)
+        or minimum_silence_ms < 0.0
+    ):
+        raise ValueError("minimum_silence_ms must be finite and non-negative")
+    syllables = performance.get("syllables")
+    if not isinstance(syllables, list) or not syllables:
+        raise ValueError("performance requires a non-empty syllables array")
+
+    events: list[tuple[str, float, float]] = []
+    previous_end_s = 0.0
+    for syllable_index, syllable in enumerate(syllables):
+        if not isinstance(syllable, Mapping):
+            raise ValueError(f"syllable {syllable_index} must be an object")
+        phonemes = syllable.get("phonemes")
+        mapped_groups, last_vowel = map_syllable_phones(phonemes, syllable_index)
+        note_start_s, note_duration_s, note_hz, note_end_s = note_timing(
+            syllable.get("note"),
+            f"syllable {syllable_index} note",
+        )
+        gap_ms = timeline_gap_ms(
+            note_start_s,
+            previous_end_s,
+            f"syllable {syllable_index} onset",
+        )
+        if gap_ms >= minimum_silence_ms and gap_ms > 0.0:
+            events.append(("SP", gap_ms, note_hz))
+
+        total_natural_ms = sum(
+            float(phone["natural_duration_s"]) * 1000.0 for phone in phonemes
+        )
+        if not math.isfinite(total_natural_ms) or total_natural_ms <= 0.0:
+            raise ValueError(f"syllable {syllable_index} has invalid natural phone duration")
+        note_ms = max(note_duration_s * 1000.0, 1.0)
+        for phoneme, mapped_phones in zip(phonemes, mapped_groups, strict=True):
+            per_token_ms = duration_per_mapped_phone(
+                float(phoneme["natural_duration_s"]) * 1000.0,
+                len(mapped_phones),
+            )
+            for arpabet in mapped_phones:
+                share = per_token_ms / total_natural_ms
+                events.append((arpabet, max(share * note_ms, 1.0), note_hz))
+
+        previous_end_s = note_end_s
+        melisma_notes = syllable.get("melisma_notes")
+        if not isinstance(melisma_notes, list):
+            raise ValueError(f"syllable {syllable_index}.melisma_notes must be an array")
+        for melisma_index, melisma_note in enumerate(melisma_notes):
+            melisma_start_s, melisma_duration_s, melisma_hz, melisma_end_s = note_timing(
+                melisma_note,
+                f"syllable {syllable_index} melisma note {melisma_index}",
+            )
+            melisma_gap_ms = timeline_gap_ms(
+                melisma_start_s,
+                previous_end_s,
+                f"syllable {syllable_index} melisma note {melisma_index}",
+            )
+            if melisma_gap_ms >= minimum_silence_ms and melisma_gap_ms > 0.0:
+                events.append(("SP", melisma_gap_ms, melisma_hz))
+            events.append(
+                (
+                    require_melisma_vowel(last_vowel, syllable_index),
+                    max(melisma_duration_s * 1000.0, 1.0),
+                    melisma_hz,
+                )
+            )
+            previous_end_s = melisma_end_s
+    return events
+
+
 def resolve_language_id(language_ids: Mapping[str, Any], language: str) -> int:
     """Require an explicit valid language entry; never default to language zero."""
     if not isinstance(language, str) or not language.strip():
