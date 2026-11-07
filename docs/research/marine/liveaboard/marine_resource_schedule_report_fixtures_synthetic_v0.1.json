@@ -210,7 +210,8 @@
         "Synthetic fixture only; no physical performance or safety claim.",
         "No direct equipment control or actuation authority.",
         "Carrier quantities and quality dispositions are synthetic inputs."
-      ]
+      ],
+      "schema_version": "0.1.0"
     },
     {
       "report_id": "cloud_underway_service_degraded_v0",
@@ -279,7 +280,8 @@
         "Synthetic fixture only; no physical performance or safety claim.",
         "No direct equipment control or actuation authority.",
         "Carrier quantities and quality dispositions are synthetic inputs."
-      ]
+      ],
+      "schema_version": "0.1.0"
     },
     {
       "report_id": "low_reserve_service_degraded_v0",
@@ -392,7 +394,8 @@
         "Synthetic fixture only; no physical performance or safety claim.",
         "No direct equipment control or actuation authority.",
         "Carrier quantities and quality dispositions are synthetic inputs."
-      ]
+      ],
+      "schema_version": "0.1.0"
     },
     {
       "report_id": "feed_out_of_domain_not_supported_v0",
@@ -444,7 +447,8 @@
         "Synthetic fixture only; no physical performance or safety claim.",
         "No direct equipment control or actuation authority.",
         "Carrier quantities and quality dispositions are synthetic inputs."
-      ]
+      ],
+      "schema_version": "0.1.0"
     },
     {
       "report_id": "unknown_battery_state_indeterminate_v0",
@@ -496,7 +500,8 @@
         "Synthetic fixture only; no physical performance or safety claim.",
         "No direct equipment control or actuation authority.",
         "Carrier quantities and quality dispositions are synthetic inputs."
-      ]
+      ],
+      "schema_version": "0.1.0"
     }
   ]
 }
