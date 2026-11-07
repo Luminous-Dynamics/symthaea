@@ -45,6 +45,8 @@ COMPARATORS = (
     "CRBugBench",
     "CodeReviewBench",
     "Martian Code Review Benchmark",
+    "SWE-sweep",
+    "LoopControlBench",
 )
 EXECUTION_GATES = ("#10064", "#10369")
 
@@ -105,6 +107,9 @@ def validate_documents(
         "https://arxiv.org/abs/2610.13668",
         "https://www.codereviewbench.com/leaderboard",
         "https://www.codereviewbenchmark.com/",
+        "https://swesweep.com/paper",
+        "https://swesweep.com/",
+        "https://github.com/kltownsend/loopcontrolbench",
     ):
         if url not in triangulation:
             errors.append(f"triangulation document is missing source URL {url}")
@@ -185,6 +190,16 @@ def validate_documents(
         errors.append("triangulation must distinguish Martian production adoption")
     if "suggestion adoption is not ground-truth correctness" not in triangulation.lower():
         errors.append("triangulation must distinguish suggestion adoption from factual correctness")
+    if "### 2.7 SWE-sweep" not in triangulation or "4,068 bugs across 100 repositories and 22 languages" not in triangulation:
+        errors.append("triangulation must include SWE-sweep open-world discovery with its exact population")
+    if "4.7%" not in triangulation or "9.5%" not in triangulation or "different model/harness snapshot" not in triangulation:
+        errors.append("SWE-sweep paper result and live leaderboard snapshot must remain separate")
+    if "### 2.8 LoopControlBench" not in triangulation or "46/70 = 65.7%" not in triangulation:
+        errors.append("triangulation must include LoopControlBench's scoped deterministic result")
+    if "not 65.7% of software bugs generally" not in triangulation.lower():
+        errors.append("LoopControlBench narrow-population caveat is missing")
+    if "validator, not the model, decides done" not in triangulation.lower():
+        errors.append("LoopControlBench deterministic completion-authority lesson is missing")
     if "Gold-Completeness and Open-Set Discovery" not in triangulation:
         errors.append("triangulation must link the gold-completeness protocol")
     if "Sequential Evidence Acquisition" not in triangulation:
@@ -330,6 +345,9 @@ def self_test() -> list[str]:
         "candidate-specific and appears in both numerator and denominator",
         "CodeReviewBench human-flagged bug recall",
         "Martian production review adoption; suggestion adoption is not ground-truth correctness",
+        "SWE-sweep LoopControlBench 4,068 bugs across 100 repositories and 22 languages 4.7% 9.5% different model/harness snapshot",
+        "### 2.7 SWE-sweep ### 2.8 LoopControlBench 46/70 = 65.7% not 65.7% of software bugs generally validator, not the model, decides done",
+        "https://swesweep.com/paper https://swesweep.com/ https://github.com/kltownsend/loopcontrolbench",
         "Gold-Completeness and Open-Set Discovery",
         "Sequential Evidence Acquisition",
         "#10064 #10369",
@@ -471,6 +489,8 @@ def self_test() -> list[str]:
         ("missing calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X3 |", "| CAL-02 | X8 |", 1)),
         ("duplicate calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X1 |", "| CAL-01 | X1 |", 1)),
         ("missing control disentanglement", "counterfactual_qualification", counterfactual_qualification.replace("Q2 — Change disentanglement", "Q2 removed")),
+        ("missing SWE-sweep population", "triangulation", triangulation.replace("4,068 bugs across 100 repositories and 22 languages", "population removed")),
+        ("missing LoopControlBench scope caveat", "triangulation", triangulation.replace("not 65.7% of software bugs generally", "claim removed")),
     )
     for label, target, mutant in mutations:
         args = {
@@ -526,7 +546,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 26 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 28 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
