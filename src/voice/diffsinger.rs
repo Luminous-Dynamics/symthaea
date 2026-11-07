@@ -108,6 +108,7 @@ fn diffsinger_capability_manifest() -> SingingBackendCapabilities {
             control(SingingControl::Melisma, Native, "the explicitly marked vowel is extended across melisma notes without re-articulating consonants"),
             control(SingingControl::ContinuousPitchCurve, Unsupported, "only discrete note F0 is expanded; arbitrary PitchPoint interpolation is not applied"),
             control(SingingControl::PhraseExpressionCurve, Unsupported, "phrase expression curves are not passed to the worker model"),
+            control(SingingControl::PhraseBreathTiming, Unsupported, "phrase breath durations are not converted into breath events; only explicit score rests become SP tokens"),
             control(SingingControl::Breathiness, Unsupported, "the current worker asks the variance model to predict breathiness rather than applying VocalSyllable breathiness"),
             control(SingingControl::Energy, Unsupported, "VocalSyllable energy is not currently mapped to the model's velocity input"),
             control(SingingControl::Tension, Unsupported, "VocalSyllable/phrase tension is not applied to the variance model input"),
