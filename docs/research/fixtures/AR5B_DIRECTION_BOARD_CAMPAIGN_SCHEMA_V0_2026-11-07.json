@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ar5b-direction-board-campaign-v0",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "ar5b-direction-board-campaign-v0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "available_cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "available_cost_units"
+      ],
+      "additionalProperties": false
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "exploration_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "prior_strength": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "empty_history_prior_gain_per_cost": {
+          "type": "number"
+        },
+        "max_allocation_slots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "exploration_weight",
+        "prior_strength",
+        "empty_history_prior_gain_per_cost",
+        "max_allocation_slots"
+      ],
+      "additionalProperties": false
+    },
+    "directions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "direction_id": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "const": "NEW"
+            }
+          },
+          "canonical_fingerprint": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "target_capability_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "solution_object_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "construction_principle_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "scope_assumptions_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "verifier_assignment_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protected_floor_audit_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "qualified"
+          },
+          "protected_capability_floor_passed": {
+            "const": true
+          },
+          "local_best_score": {
+            "type": "number"
+          },
+          "estimated_cost_per_evaluation": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "max_share_bps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "evaluation_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "task_family_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "disposition": {
+                  "enum": [
+                    "confirmed",
+                    "rejected",
+                    "inconclusive",
+                    "invalid"
+                  ]
+                },
+                "delta_vs_local_best": {
+                  "type": "number"
+                },
+                "cost_units": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "evaluation_id",
+                "task_family_digest",
+                "disposition",
+                "delta_vs_local_best",
+                "cost_units"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "direction_id",
+          "canonical_fingerprint",
+          "target_capability_digest",
+          "solution_object_digest",
+          "construction_principle_digest",
+          "scope_assumptions_digest",
+          "verifier_assignment_ref",
+          "protected_floor_audit_ref",
+          "status",
+          "protected_capability_floor_passed",
+          "local_best_score",
+          "estimated_cost_per_evaluation",
+          "max_share_bps",
+          "history"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "new_direction_option": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "prior_gain_per_cost": {
+          "type": "number"
+        },
+        "estimated_cost_per_evaluation": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_share_bps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "verifier_intake_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "prior_gain_per_cost",
+        "estimated_cost_per_evaluation",
+        "max_share_bps",
+        "verifier_intake_ref"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "budget",
+    "config",
+    "directions",
+    "new_direction_option"
+  ],
+  "additionalProperties": false
+}
