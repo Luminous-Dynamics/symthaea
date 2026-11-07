@@ -501,7 +501,7 @@ def self_test() -> list[str]:
         "3.11 From human-found gold to independently audited open-set discovery\n"
         "3.12 From tool use to sequential evidence acquisition\\n"
         "3.13 From uptake to verified engineering impact\n"
-        "3.14 From historical fix commits to qualified counterfactual controls",
+        "3.14 From historical fix commits to qualified counterfactual controls"
         "3.15 From fixed benchmark prompts to matched information framings"
     )
     preregistration = "\n".join((
