@@ -294,6 +294,14 @@ mod tests {
     }
 
     #[test]
+    fn stuck_on_cells_are_present_but_not_healthy() {
+        let mut m = FaultMap::new(4, 4).unwrap();
+        m.set_cell(0, 0, Cell::StuckOn).unwrap();
+        assert_eq!(m.present(0, 0), Ok(true));
+        assert_eq!(m.healthy_cells(), 15);
+    }
+
+    #[test]
     fn cluster_and_output_failures_have_distinct_geometry() {
         let mut m = FaultMap::new(8, 8).unwrap();
         m.fail_rectangle(2, 3, 2, 3, Cell::StuckOff).unwrap();
