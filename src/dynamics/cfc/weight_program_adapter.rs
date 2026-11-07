@@ -1142,6 +1142,82 @@ mod tests {
         assert_eq!(first.signatures, repeated.signatures);
     }
 
+    fn brute_force_best_cost(costs: &[Vec<f64>]) -> Option<f64> {
+        fn visit(
+            row: usize,
+            costs: &[Vec<f64>],
+            used: &mut [bool],
+            running: f64,
+            best: &mut f64,
+        ) {
+            if row == costs.len() {
+                *best = best.min(running);
+                return;
+            }
+            for column in 0..costs.len() {
+                let edge = costs[row][column];
+                if !used[column] && edge.is_finite() {
+                    used[column] = true;
+                    visit(row + 1, costs, used, running + edge, best);
+                    used[column] = false;
+                }
+            }
+        }
+
+        if costs.is_empty() || costs.iter().any(|row| row.len() != costs.len()) {
+            return None;
+        }
+        let mut best = f64::INFINITY;
+        visit(0, costs, &mut vec![false; costs.len()], 0.0, &mut best);
+        best.is_finite().then_some(best)
+    }
+
+    #[test]
+    fn hungarian_and_alternating_cycle_margin_match_exhaustive_assignments() {
+        let matrices = [
+            vec![
+                vec![0.0, 4.0, 9.0],
+                vec![7.0, 0.0, 5.0],
+                vec![3.0, 8.0, 0.0],
+            ],
+            vec![
+                vec![0.2, 0.7, 1.5, 0.9],
+                vec![0.8, 0.1, 0.6, 1.4],
+                vec![1.1, 0.4, 0.3, 0.5],
+                vec![0.6, 1.0, 0.8, 0.2],
+            ],
+            vec![
+                vec![0.0, 0.0, 4.0],
+                vec![0.0, 0.0, 3.0],
+                vec![2.0, 5.0, 0.0],
+            ],
+        ];
+
+        for costs in matrices {
+            let (assignment, total) =
+                minimum_cost_assignment(&costs).expect("Hungarian assignment");
+            let exhaustive = brute_force_best_cost(&costs).expect("exhaustive assignment");
+            assert!((total - exhaustive).abs() < 1e-10);
+
+            let mut exhaustive_margin = f64::INFINITY;
+            for (row, column) in assignment.iter().copied().enumerate() {
+                let mut forbidden = costs.clone();
+                forbidden[row][column] = f64::INFINITY;
+                let alternative = brute_force_best_cost(&forbidden);
+                if let Some(alternative_cost) = alternative {
+                    exhaustive_margin =
+                        exhaustive_margin.min((alternative_cost - total).max(0.0));
+                }
+            }
+            let cycle_margin = alternating_cycle_assignment_margin(&costs, &assignment);
+            if exhaustive_margin.is_infinite() {
+                assert!(cycle_margin.is_infinite());
+            } else {
+                assert!((cycle_margin - exhaustive_margin).abs() < 1e-10);
+            }
+        }
+    }
+
     #[test]
     fn alternating_cycle_margin_matches_small_exact_assignment_fixture() {
         let costs = vec![
