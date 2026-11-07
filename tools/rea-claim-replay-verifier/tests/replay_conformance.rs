@@ -1640,3 +1640,72 @@ fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_com
     );
 
 }
+
+#[test]
+fn terminal_pagination_and_self_reported_all_pages_do_not_prove_population_completeness() {
+    let mut evidence_value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    evidence_value["normalized_result"] = json!({
+        "query": {
+            "query_id": "snapshot-query-17",
+            "filters": [],
+            "source_snapshot_id": null,
+            "declared_total_pages": 3
+        },
+        "pages": [
+            {"page": 1, "cursor_in": null, "cursor_out": "cursor-1", "items": ["a", "b"]},
+            {"page": 3, "cursor_in": "cursor-2", "cursor_out": "terminal", "items": ["e"]}
+        ],
+        "observed_page_numbers": [1, 3],
+        "terminal_cursor_seen": true,
+        "all_pages_seen": true,
+        "missing_page_numbers": [2],
+        "issuer_participation_independently_audited": false
+    });
+    evidence_value["evidence_id"] =
+        json!(rea_compat::compute_evidence_id(&evidence_value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&evidence_value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    let mut observation_claim = provider_claim(evidence.evidence_id.clone());
+    observation_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (observation_claim_bytes, observation_result_bytes) =
+        produce(&observation_claim, std::slice::from_ref(&evidence));
+    let observation_replay = replay_claim_evaluation(
+        &observation_claim_bytes,
+        &[&evidence_bytes],
+        &observation_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(observation_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        observation_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+
+    let mut completeness_claim = observation_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) =
+        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
+    assert!(
+        result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str().unwrap().contains("No predicate-specific verifier"))
+    );
+}
+
