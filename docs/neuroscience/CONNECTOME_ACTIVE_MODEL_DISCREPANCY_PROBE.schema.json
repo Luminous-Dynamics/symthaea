@@ -222,6 +222,7 @@
       "required": [
         "baseline_model_ids",
         "challenger_model_ids",
+        "challenger_discovery_unit_ids",
         "challenge_evidence_sha256",
         "adjudication_status",
         "ancestry_group_ids"
@@ -237,6 +238,15 @@
           "uniqueItems": true
         },
         "challenger_model_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenger_discovery_unit_ids": {
           "type": "array",
           "minItems": 1,
           "items": {
@@ -454,6 +464,13 @@
           }
         },
         "discrepancy_tv": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "model_mutual_information_bits_diagnostic": {
           "type": "object",
           "additionalProperties": {
             "type": "number",
