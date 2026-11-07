@@ -166,7 +166,10 @@ pub enum ThreeBallPartialObservationError {
     #[error("model ID is duplicated: {0}")]
     DuplicateModelId(String),
     #[error("rule index {rule_index} is outside 0..{rule_count}")]
-    InvalidRuleIndex { rule_index: usize, rule_count: usize },
+    InvalidRuleIndex {
+        rule_index: usize,
+        rule_count: usize,
+    },
     #[error("model posterior length {actual} does not match model family length {expected}")]
     ModelPosteriorLengthMismatch { expected: usize, actual: usize },
     #[error("model rule-index length {actual} does not match model family length {expected}")]
@@ -205,7 +208,11 @@ impl ThreeBallJointBelief {
         space: &ThreeBallRuleSpace,
         state_prior: &[f64],
     ) -> Result<Self, ThreeBallPartialObservationError> {
-        let model_ids = space.rules.iter().map(|rule| rule.model_id.clone()).collect();
+        let model_ids = space
+            .rules
+            .iter()
+            .map(|rule| rule.model_id.clone())
+            .collect();
         let rule_indices = (0..space.rules.len()).collect::<Vec<_>>();
         let model_prior = space
             .rules
@@ -262,16 +269,20 @@ impl ThreeBallJointBelief {
             return Err(ThreeBallPartialObservationError::EmptyModelFamily);
         }
         if model_ids.len() != rule_indices.len() {
-            return Err(ThreeBallPartialObservationError::ModelRuleIndexLengthMismatch {
-                expected: model_ids.len(),
-                actual: rule_indices.len(),
-            });
+            return Err(
+                ThreeBallPartialObservationError::ModelRuleIndexLengthMismatch {
+                    expected: model_ids.len(),
+                    actual: rule_indices.len(),
+                },
+            );
         }
         if model_ids.len() != model_prior.len() {
-            return Err(ThreeBallPartialObservationError::ModelPosteriorLengthMismatch {
-                expected: model_ids.len(),
-                actual: model_prior.len(),
-            });
+            return Err(
+                ThreeBallPartialObservationError::ModelPosteriorLengthMismatch {
+                    expected: model_ids.len(),
+                    actual: model_prior.len(),
+                },
+            );
         }
         if state_prior.len() != THREE_BALL_HIDDEN_STATE_COUNT {
             return Err(ThreeBallPartialObservationError::InvalidStatePriorLength(
@@ -331,7 +342,11 @@ impl ThreeBallJointBelief {
     /// Validate dimensions, normalization, and source-family bindings.
     pub fn validate(&self) -> Result<(), ThreeBallPartialObservationError> {
         let mut seen_model_ids = BTreeSet::new();
-        if self.model_ids.iter().any(|id| id.trim().is_empty() || !seen_model_ids.insert(id)) {
+        if self
+            .model_ids
+            .iter()
+            .any(|id| id.trim().is_empty() || !seen_model_ids.insert(id))
+        {
             return Err(ThreeBallPartialObservationError::InvalidJointBelief);
         }
         if self.format_version != 1
@@ -369,7 +384,11 @@ impl ThreeBallJointBelief {
         observed_colour: ThreeBallColour,
     ) -> Result<Self, ThreeBallPartialObservationError> {
         self.condition_on_likelihood(|state| {
-            if state[location as usize] == observed_colour { 1.0 } else { 0.0 }
+            if state[location as usize] == observed_colour {
+                1.0
+            } else {
+                0.0
+            }
         })
     }
 
@@ -385,15 +404,18 @@ impl ThreeBallJointBelief {
         let mut mass = 0.0;
         for model_index in 0..self.model_ids.len() {
             let rule_index = self.rule_indices[model_index];
-            let rule = space
-                .rules
-                .get(rule_index)
-                .ok_or(ThreeBallPartialObservationError::InvalidRuleIndex {
+            let rule = space.rules.get(rule_index).ok_or(
+                ThreeBallPartialObservationError::InvalidRuleIndex {
                     rule_index,
                     rule_count: space.rules.len(),
-                })?;
+                },
+            )?;
             for (state_index, state) in self.hidden_states.iter().enumerate() {
-                let likelihood = if rule.feedback(*state, choice) == observed_feedback { 1.0 } else { 0.0 };
+                let likelihood = if rule.feedback(*state, choice) == observed_feedback {
+                    1.0
+                } else {
+                    0.0
+                };
                 next.joint_probabilities[model_index][state_index] *= likelihood;
                 mass += next.joint_probabilities[model_index][state_index];
             }
@@ -432,12 +454,7 @@ impl ThreeBallJointBelief {
 
     pub fn state_marginals(&self) -> Vec<f64> {
         (0..THREE_BALL_HIDDEN_STATE_COUNT)
-            .map(|state| {
-                self.joint_probabilities
-                    .iter()
-                    .map(|row| row[state])
-                    .sum()
-            })
+            .map(|state| self.joint_probabilities.iter().map(|row| row[state]).sum())
             .collect()
     }
 }
@@ -499,13 +516,17 @@ pub fn score_three_ball_gaze_policies(
         ThreeBallLocation::Right,
     ] {
         let likelihoods = gaze_likelihoods(belief, location);
-        let information = evaluate_information_gain(belief, &likelihoods, THREE_BALL_VISUAL_OUTCOME_COUNT)?;
+        let information =
+            evaluate_information_gain(belief, &likelihoods, THREE_BALL_VISUAL_OUTCOME_COUNT)?;
         let mut contingencies = Vec::new();
         let mut observation_probabilities = Vec::new();
         let mut expected_downstream = 0.0;
 
-        for (colour_index, observation_probability) in
-            information.outcome_probabilities.iter().copied().enumerate()
+        for (colour_index, observation_probability) in information
+            .outcome_probabilities
+            .iter()
+            .copied()
+            .enumerate()
         {
             let colour = colour_from_index(colour_index);
             observation_probabilities.push((colour, observation_probability));
@@ -586,7 +607,12 @@ fn score_choice(
         ThreeBallFeedback::Correct,
         ThreeBallFeedback::Incorrect,
     ];
-    for (index, probability) in information.outcome_probabilities.iter().copied().enumerate() {
+    for (index, probability) in information
+        .outcome_probabilities
+        .iter()
+        .copied()
+        .enumerate()
+    {
         if probability > 0.0 {
             pragmatic_risk += probability * (probability.ln() - preferences[index]);
         }
@@ -595,8 +621,7 @@ fn score_choice(
         return Err(ThreeBallPartialObservationError::InvalidConfiguration);
     }
     let pragmatic_risk = pragmatic_risk.max(0.0);
-    let epistemic_value = config.model_information_weight
-        * information.model_information_gain_nats
+    let epistemic_value = config.model_information_weight * information.model_information_gain_nats
         + config.conditional_state_information_weight
             * information.conditional_state_information_gain_nats;
     let action_cost = config.choice_action_cost_nats;
@@ -649,13 +674,12 @@ fn feedback_likelihoods(
         .rule_indices
         .iter()
         .map(|rule_index| {
-            let rule = space
-                .rules
-                .get(*rule_index)
-                .ok_or(ThreeBallPartialObservationError::InvalidRuleIndex {
+            let rule = space.rules.get(*rule_index).ok_or(
+                ThreeBallPartialObservationError::InvalidRuleIndex {
                     rule_index: *rule_index,
                     rule_count: space.rules.len(),
-                })?;
+                },
+            )?;
             Ok(belief
                 .hidden_states
                 .iter()
@@ -718,8 +742,7 @@ fn evaluate_information_gain(
             .collect::<Vec<_>>(),
     );
     let prior_model_entropy = entropy(&prior_model);
-    let prior_state_given_model_entropy =
-        conditional_state_entropy(&belief.joint_probabilities);
+    let prior_state_given_model_entropy = conditional_state_entropy(&belief.joint_probabilities);
 
     let mut expected_model_entropy = 0.0;
     let mut expected_state_given_model_entropy = 0.0;
@@ -734,12 +757,15 @@ fn evaluate_information_gain(
                 posterior[model][state] *= likelihoods[model][state][outcome] / outcome_probability;
             }
         }
-        let model_marginal = posterior.iter().map(|row| row.iter().sum()).collect::<Vec<_>>();
+        let model_marginal = posterior
+            .iter()
+            .map(|row| row.iter().sum())
+            .collect::<Vec<_>>();
         expected_model_entropy += outcome_probability * entropy(&model_marginal);
         expected_state_given_model_entropy +=
             outcome_probability * conditional_state_entropy(&posterior);
-        expected_joint_entropy += outcome_probability
-            * entropy(&posterior.iter().flatten().copied().collect::<Vec<_>>());
+        expected_joint_entropy +=
+            outcome_probability * entropy(&posterior.iter().flatten().copied().collect::<Vec<_>>());
     }
 
     let model_information_gain_nats = prior_model_entropy - expected_model_entropy;
@@ -770,7 +796,10 @@ fn evaluate_information_gain(
 }
 
 fn conditional_state_entropy(joint: &[Vec<f64>]) -> f64 {
-    let model_marginals = joint.iter().map(|row| row.iter().sum::<f64>()).collect::<Vec<_>>();
+    let model_marginals = joint
+        .iter()
+        .map(|row| row.iter().sum::<f64>())
+        .collect::<Vec<_>>();
     let mut conditional = 0.0;
     for (model, row) in joint.iter().enumerate() {
         let model_probability = model_marginals[model];
@@ -796,7 +825,12 @@ fn entropy(probabilities: &[f64]) -> f64 {
 
 fn normalized_log_preferences(preferences: [f64; 3]) -> [f64; 3] {
     let max = preferences.into_iter().fold(f64::NEG_INFINITY, f64::max);
-    let log_normalizer = max + preferences.iter().map(|value| (value - max).exp()).sum::<f64>().ln();
+    let log_normalizer = max
+        + preferences
+            .iter()
+            .map(|value| (value - max).exp())
+            .sum::<f64>()
+            .ln();
     preferences.map(|value| value - log_normalizer)
 }
 
@@ -865,7 +899,8 @@ fn normalize_joint(
 
 fn best_choice(
     scores: &[ThreeBallChoiceActionScore],
-) -> Result<(Option<ThreeBallColour>, &ThreeBallChoiceActionScore), ThreeBallPartialObservationError> {
+) -> Result<(Option<ThreeBallColour>, &ThreeBallChoiceActionScore), ThreeBallPartialObservationError>
+{
     scores
         .iter()
         .enumerate()
@@ -898,12 +933,9 @@ mod tests {
         let space = build_three_ball_rule_space();
         let belief = ThreeBallJointBelief::uniform_source_prior(&space).expect("prior");
         let likelihoods = gaze_likelihoods(&belief, ThreeBallLocation::Centre);
-        let gain = evaluate_information_gain(
-            &belief,
-            &likelihoods,
-            THREE_BALL_VISUAL_OUTCOME_COUNT,
-        )
-        .expect("gaze information");
+        let gain =
+            evaluate_information_gain(&belief, &likelihoods, THREE_BALL_VISUAL_OUTCOME_COUNT)
+                .expect("gaze information");
 
         assert_eq!(gain.model_information_gain_nats, 0.0);
         assert!((gain.conditional_state_information_gain_nats - 3.0_f64.ln()).abs() < 1e-10);
@@ -922,7 +954,11 @@ mod tests {
         let after_models = posterior.model_marginals();
 
         assert_eq!(
-            posterior.state_marginals().iter().filter(|p| **p > 0.0).count(),
+            posterior
+                .state_marginals()
+                .iter()
+                .filter(|p| **p > 0.0)
+                .count(),
             9
         );
         for (before, after) in before_models.iter().zip(after_models.iter()) {
@@ -985,7 +1021,11 @@ mod tests {
                 );
                 assert_eq!(action.contingencies.len(), 3);
                 for contingency in &action.contingencies {
-                    assert!(contingency.downstream_choice_expected_free_energy_nats.is_finite());
+                    assert!(
+                        contingency
+                            .downstream_choice_expected_free_energy_nats
+                            .is_finite()
+                    );
                 }
             } else {
                 assert!(action.contingencies.is_empty());
@@ -997,15 +1037,23 @@ mod tests {
     fn semantic_quotient_preserves_gaze_and_choice_scores() {
         let space = build_three_ball_rule_space();
         let source = ThreeBallJointBelief::uniform_source_prior(&space).expect("source prior");
-        let quotient =
-            ThreeBallJointBelief::from_semantic_quotient_prior(&space, &uniform_three_ball_state_prior())
-                .expect("quotient prior");
-        let source_choices =
-            score_three_ball_choice_actions(&space, &source, ThreeBallPartialObservationConfig::default())
-                .expect("source choices");
-        let quotient_choices =
-            score_three_ball_choice_actions(&space, &quotient, ThreeBallPartialObservationConfig::default())
-                .expect("quotient choices");
+        let quotient = ThreeBallJointBelief::from_semantic_quotient_prior(
+            &space,
+            &uniform_three_ball_state_prior(),
+        )
+        .expect("quotient prior");
+        let source_choices = score_three_ball_choice_actions(
+            &space,
+            &source,
+            ThreeBallPartialObservationConfig::default(),
+        )
+        .expect("source choices");
+        let quotient_choices = score_three_ball_choice_actions(
+            &space,
+            &quotient,
+            ThreeBallPartialObservationConfig::default(),
+        )
+        .expect("quotient choices");
         for (left, right) in source_choices.iter().zip(quotient_choices.iter()) {
             assert!((left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-10);
         }
@@ -1022,8 +1070,14 @@ mod tests {
             ThreeBallPartialObservationConfig::default(),
         )
         .expect("quotient gaze policy");
-        for (left, right) in source_policy.action_scores.iter().zip(quotient_policy.action_scores.iter()) {
-            assert!((left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-10);
+        for (left, right) in source_policy
+            .action_scores
+            .iter()
+            .zip(quotient_policy.action_scores.iter())
+        {
+            assert!(
+                (left.expected_free_energy_nats - right.expected_free_energy_nats).abs() < 1e-10
+            );
         }
     }
 
