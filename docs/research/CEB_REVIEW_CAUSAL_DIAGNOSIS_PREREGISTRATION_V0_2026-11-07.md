@@ -308,6 +308,19 @@ Use [CEB Review Counterfactual-Control Qualification V0](CEB_REVIEW_COUNTERFACTU
 
 The control protocol is a methodological companion only. It adds no task schema, receipt, authority class, metric lane or execution permission.
 
+## 12.3 Counterfactual-control qualification and historical-fix disentanglement
+
+The P/I/F/N/M/IRR variants are usable only to the extent that each control supports the claim being made. Apply [CEB Review Counterfactual-Control Qualification V0](CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md) to every proposed control:
+
+- Treat historical parent/introducing/fix commits as source-state observations, not randomized interventions.
+- Independently disentangle target-causal hunks from tests, contract context, enabling/follow-on changes, refactors, environment changes, unrelated work and disputed hunks.
+- Check residual paths after fixes, and verify that N really is a distinct mechanism, M changes the necessary causal factor, and IRR preserves the target mechanism.
+- Pin environment and applicability; record confounders and alternate paths.
+- Qualify the control separately for lineage, disentanglement, mechanism/reachability, intervention fidelity, environment/applicability and outcome/oracle validity. Do not average those dimensions.
+- Source-only controls support bounded structural claims only. Runtime outcomes require the qualified execution path and exact-bound evidence.
+
+A historical fix is not a minimal intervention by default. Commit messages, merged status, green CI and textual proximity cannot establish causal isolation. These requirements are methodological safeguards; they do not add a metric, task schema, receipt, authority class, runner or execution permission.
+
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
