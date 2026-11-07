@@ -191,6 +191,21 @@ not Rust execution or real sensor performance. Pose/clock covariance,
 asynchronous fusion, atmospheric effects, multi-target tracking and blind
 known-object tests remain open. No object classification is performed.
 
+Frame-level multi-target evaluation now includes a dependency-free GOSPA
+reference with global exact assignment, separate localization/missed/false
+components, and brute-force differential tests. A separate trajectory-metrics
+module implements fixed-window OSPA(2): it time-aggregates each truth/estimated
+track pair and solves one global track-set assignment for the whole window.
+It therefore exposes identity swaps and fragmentation that frame-only
+unordered set metrics can miss. This is metric code, not a target tracker or
+data-association algorithm. The implementation caps the smaller assignment
+side at 20 tracks and supports uniform or caller-supplied time weights.
+
+The current implementation is OSPA(2), not T-GOSPA. The 2026 T-GOSPA family
+adds an explicit track-switch cost on top of localization and cardinality
+penalties. It should be implemented or integrated as an independent comparator
+before any superiority claim about track continuity.
+
 ### UAP sensor-placement design
 
 The triangulation primitive exposes a local Fisher-information matrix,
@@ -611,6 +626,22 @@ between competing hypotheses, not simply to the most complex simulation.
 12. Local CRLB coverage audit: Monte Carlo empirical covariance, bias,
     NEES/NIS and 50/90/95/99% ellipsoid coverage under correctly specified
     and misspecified noise, pose and clock models.
+13. Frame-set GOSPA and fixed-window OSPA(2) on identical sealed truth/track
+    sets. Report localization, missed/false cardinality and unmatched-track
+    terms separately; freeze p, q, cutoff, weights, window length and units.
+14. Track-identity challenge: construct crossing tracks whose unordered point
+    sets match at each frame but whose estimate IDs switch. Verify frame GOSPA
+    can be zero while OSPA(2) remains nonzero under its fixed global assignment.
+15. Fragmentation/coalescence challenge: split a true trajectory into two
+    estimate IDs, merge two truths into one track, add short-lived false
+    tracks, and include prolonged missed segments.
+16. Compare OSPA(2) with the 2026 T-GOSPA reference, which adds an explicit
+    track-switch penalty, and with standard tracking metrics such as ID
+    switches and track continuity. Do not label a custom switch term as
+    T-GOSPA without reproducing its published association/cost formulation.
+17. Evaluate metric sensitivity to window length, custom time weights,
+    asynchronous/missing frames and track birth/death boundaries; provide
+    confidence intervals across independent scenes, not only frame averages.
 
 ### New 2026 frontier comparator: anisotropic-Heisenberg DTCs
 
@@ -639,7 +670,7 @@ oracles, calibration provenance, falsification gates and reproducibility.
 | Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact small 1D/2D kicked-Ising oracle plus controlled second-order Trotter XYZ graph solver; existing MPS/DMRG helpers remain pedagogical | Match dense exact diagonalization for N<=9; verify second-order convergence; then validate MPS/TEBD against TeNPy/quimb/ITensor and published hardware observables |
 | Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Small exact kicked-Ising oracle and second-order Trotter anisotropic-Heisenberg prototype; arbitrary complex initial-state input added; no large-scale phase demonstration | Match exact small-system and published protocol observables; then establish initial-state-ensemble robustness, finite-size phase rigidity, heating/lifetime and tensor-network agreement |
 | Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; Hypatia adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings plus a new std-only analytic metric / geodesic reference kernel; still no Einstein evolution or constraints | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
-| UAP / sensor analysis | NASA recommends purpose-built, calibrated multi-sensor data and complete metadata; existing reports are often insufficiently calibrated | New typed sensor/evidence contract only | Build a blind known-object set, calibration and trajectory reconstruction, uncertainty propagation and measured false-positive guarantees |
+| UAP / sensor analysis | Calibrated multi-sensor measurement, triangulation, CRLB design and track metrics (OSPA/OSPA(2)/T-GOSPA) | Typed evidence provenance, local bearing triangulation/covariance, finite-region FIM placement, frame GOSPA and fixed-window OSPA(2); no tracker | Exact synthetic Rust/Python and covariance calibration, sealed known-object tracks, OSPA(2)/T-GOSPA parity, false-track rates and cost-aware placement |
 
 ### Where Symthaea can realistically do better
 
@@ -677,7 +708,7 @@ physical fidelity only count after matched benchmarks.
 | Chain Theory | Independent 172-row enumerator plus separate exact charge/generator arithmetic checks | Author's Lean/Python source; independent SproutSeeds consistency and alternatives audit | Full CSV byte diff, Lean axiom/read-cap audit, exact charge and weak-angle tests, reproducible census of listed alternatives | Parameter-free propagator/vertex/scattering predictions; preregistered blind comparisons and explicit look-elsewhere accounting |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
 | GR / GravCraft | Analytic Minkowski/Schwarzschild kernel plus new amplifier-derived ADM metric, full 4D geodesics and Einstein-implied source diagnostics | Einstein Toolkit Hypatia (GPU BSSNOK/Z4c), SpECTRE, Apples-with-Apples and analytic GR references | Exact Minkowski/Schwarzschild references; ADM projection consistency; curvature step-size and gauge tests | Self-consistent 3+1 evolution, matter coupling, global energy-condition and source/boundary analysis |
-| UAP | Calibration/provenance, bearing triangulation, local covariance and point/finite-region FIM placement prototypes | Calibrated multi-sensor methodology; EKF/UKF/factor-graph tracking; CRLB-based placement | Synthetic 93–97% ellipsoid coverage, exact Rust/Python agreement, increasing-region-grid stability and blind known-object calibration | Low false-positive track reconstruction on sealed data with nuisance covariance and cost-aware placement |
+| UAP | Calibration/provenance, bearing triangulation, local covariance, point/finite-region FIM placement, frame GOSPA and OSPA(2) metric references; no tracker | EKF/UKF/JPDA/MHT and random-finite-set tracking; MathWorks OSPA(2); 2026 T-GOSPA with explicit switch cost | Synthetic 93–97% ellipsoid coverage, independent geometry agreement, sealed known-object tracks and OSPA(2)/T-GOSPA comparison | Calibrated low false-track rates, robust identity continuity, nuisance covariance, active sensor placement under visibility/cost constraints |
 | Evidence plane | Exact-head BLAKE3 manifest and receipt prototype | Reproducible-build, SBOM and scientific workflow provenance systems | Tamper/stale-head/skip/dirty-tree negative controls | Reusable proof-carrying experiments across Symthaea, Mycelix and Sol-Atlas |
 
 ### Measurable targets
@@ -739,6 +770,16 @@ physical fidelity only count after matched benchmarks.
 - Xu et al. (2025), Optimal Sensor Placement for Target Localization in IoT
   Systems: a CRLB-based overview of placement criteria and methods.
   https://doi.org/10.1109/MIOT.2025.3575317
+- MathWorks Sensor Fusion and Tracking Toolbox, trackOSPAMetric (R2026b):
+  documents frame OSPA and cumulative OSPA(2), including its windowed
+  time-aggregation formulation, custom weights and fixed track-history
+  comparison.
+  https://www.mathworks.com/help/fusion/ref/trackospametric-system-object.html
+- García-Fernández et al. (2026), GOSPA and T-GOSPA Quasi-Metrics for
+  Evaluation of Multiobject Tracking Algorithms, IEEE Transactions on
+  Aerospace and Electronic Systems 62, 9631-9644. T-GOSPA includes an
+  explicit track-switch cost alongside localization and cardinality terms.
+  https://doi.org/10.1109/TAES.2026.3686336
 - Switzer et al. (2026), Realization of two-dimensional discrete time crystals
   with anisotropic Heisenberg coupling, Nature Communications 17, 605.
   https://doi.org/10.1038/s41467-025-67787-1
