@@ -12,6 +12,7 @@ on:
       - "crates/domains/symthaea-causal-set-lab/**"
       - "crates/domains/symthaea-chain-theory-audit/**"
       - "crates/domains/symthaea-fractal-time-lab/**"
+      - "crates/domains/symthaea-gravcraft/**"
       - "crates/domains/symthaea-metric-geometry-lab/**"
       - "crates/domains/symthaea-science-evidence/**"
       - "crates/domains/symthaea-uap-observatory/**"
@@ -40,6 +41,7 @@ jobs:
           - symthaea-causal-set-lab
           - symthaea-chain-theory-audit
           - symthaea-fractal-time-lab
+          - symthaea-gravcraft
           - symthaea-metric-geometry-lab
           - symthaea-science-evidence
           - symthaea-uap-observatory
