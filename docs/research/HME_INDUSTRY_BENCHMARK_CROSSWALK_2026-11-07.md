@@ -424,3 +424,47 @@ For a zero-failure binomial audit, the one-sided upper limit is \(p_{upper}=1-\a
 Project promotion targets: exact profiles require 100% canonical-oracle agreement and zero false pruning; a probabilistic standard tier targets \(\tau\geq0.99,\delta\leq0.01\) per fixed query under a reviewed proof and explicit assumptions; a stretch tier targets \(\tau\geq0.999,\delta\leq0.001\) only if practical and proven. Empirical selective bounds remain explicitly empirical.
 
 No HME runtime result, PQR reproduction, per-query theorem, or SOTA win is claimed by these research artifacts.
+
+
+## 2026-11-07 addendum: learned query-cost estimation, declarative recall and I/O-first systems
+
+The current comparison is expanded beyond PQR-Search and quantization.
+
+### Query-aware cost and budget baselines
+
+- **ANNiE** — Wang et al., PVLDB 19(11):3820–3833 (2026), DOI 10.14778/3836663.3836728. A graph-local-feature GBDT estimates distance-computation cost for a target recall. Reported ANNiE-S speedup is 2.3x over the paper's baselines, and cost-estimation accuracy improves 6x over those baselines. Its formal RTG property is a conditional-quantile relation over random model-input / query-cost variables under an ideal globally optimal expected quantile-loss optimizer. The paper explicitly limits the theorem to the training distribution and warns about finite samples, optimization and train/test shift. In its Text2Image10M modality-transfer experiment, IMG→TXT empirical RTG coverage is 58.55% against a 95% target; same-modality cases are materially better. Do not equate this with PQR-Search's probability over index randomness for each fixed query.
+- **QBAT** — Bae et al., PVLDB 19(11):3091–3104 (2026), DOI 10.14778/3836663.3836675. Compares GBDT and an interpretable AlphaEvolve-derived heuristic for query-adaptive ScaNN budgets; the paper's abstract reports up to 68.8% lower total searched budget in consistency mode while enforcing a strict per-query recall target. This is a direct cost/budget allocation comparator.
+- **DARTH / DARTH+** — DARTH predicts runtime per-query recall for early termination; DARTH+ improves prediction and training efficiency and adds optional probabilistic quality guarantees in its March 2026 preprint. This belongs in the declarative-recall comparison, not the exact-search guarantee column.
+- **Ada-ef** — Zhang & Miller, SIGMOD 2026, arXiv:2512.06636. Uses a statistical query–database similarity model to adapt HNSW exploration per query, reporting up to 4x lower online latency and substantial offline computation/memory reductions versus its evaluated learning-based adaptive baselines.
+
+References:
+- ANNiE paper/code: https://doi.org/10.14778/3836663.3836728 ; https://github.com/CaucherWang/ANNiE
+- QBAT: https://doi.org/10.14778/3836663.3836675
+- DARTH+: https://mchatzakis.github.io/declarative-recall/
+- Ada-ef: https://arxiv.org/abs/2512.06636
+
+### OOD graph robustness
+
+Hua et al., "Dynamically Detect and Fix Hardness for Efficient Approximate Nearest Neighbor Search" (PACMMOD 2025 / SIGMOD 2026), defines Escape Hardness and uses RFix/NGFix to repair graph regions online, reporting up to 2.25x faster OOD search at 99% recall than RoarGraph and 6.88x than HNSW in evaluated settings. This is an index-structure repair approach, distinct from HME's proposed query-cost OOD monitor. Treat as a graph-index comparator, not an HME guarantee.
+
+Reference: https://doi.org/10.1145/3769783 ; https://arxiv.org/abs/2510.22316
+
+### Disk I/O and heterogeneous system baselines
+
+- **OctopusANN / I/O-first graph ANN design-space study** — Li et al., PVLDB 19(7) (2026), DOI 10.14778/3801059.3801064. Reports 4.1–37.9% higher throughput than Starling and 87.5–149.5% higher throughput than DiskANN at matched Recall@10=90%, using a composition of memory-resident navigation, dynamic width, page shuffle and page search. Its abstract states SSD I/O can contribute 70–90% of query latency for disk-resident graph ANN workloads.
+- **SVFusion** — Peng et al., PVLDB 19(5):1074–1087 (2026), DOI 10.14778/3796195.3796216. CPU/GPU/disk co-processing, workload-aware caching and dynamic-update concurrency control; reports 20.9x average throughput and 1.3x–50.7x lower latency than its baselines under its evaluated streaming workloads.
+
+These results strengthen the HME requirement to measure pages, bytes, cache state, data movement, concurrency and update cost. They do not imply a directly comparable HDC result.
+
+### New HME workstreams
+
+- [#11022 — HME-PQR-001](https://github.com/Luminous-Dynamics/symthaea/issues/11022) owns the cross-algorithm per-query reliability audit and separates theorem-backed per-fixed-query results from population-level / empirical quantile models.
+- [#11041 — HME-COST-001](https://github.com/Luminous-Dynamics/symthaea/issues/11041) owns retrieval-cost estimation, calibration / OOD qualification and proof-guided value-of-computation scheduling without duplicating #5471/#10973/#11000.
+
+New protocol:
+- [HME query-cost and proof-guided scheduling](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/HME_QUERY_COST_AND_PROOF_GUIDED_SCHEDULING_2026-11-07.md)
+- [Machine-readable cost-model / model-trust matrix](https://github.com/Luminous-Dynamics/symthaea/blob/research/hlb-memory-engine-20261107/docs/research/fixtures/hme_query_cost_estimation_v0.json)
+
+The differentiating HME hypothesis is **proof-guided value of computation**: predict which candidate/block/page is likely to reduce future exact work per byte, while the predictor only schedules work and conservative score bounds alone authorize pruning. On ExactOnly workloads, an OOD predictor is disabled and a qualified deterministic exact schedule is used; if its budget expires, return Incomplete. On ApproximateAllowed workloads, a calibration breach revokes the model-dependent empirical claim until recalibration or an explicitly permitted exact fallback.
+
+No HME cost estimator, OOD detector, PG-VoC scheduler, Rust engine, SOTA win or performance result is claimed by these protocols.
