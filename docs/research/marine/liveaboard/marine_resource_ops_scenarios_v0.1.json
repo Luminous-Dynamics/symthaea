@@ -1,0 +1,358 @@
+{
+  "schema_version": "0.1.0",
+  "status": "synthetic_contract_fixtures_not_physical_vessel_data",
+  "time_step_s": 900,
+  "common_case_binding": {
+    "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "cases": [
+    {
+      "id": "clear_solar_anchor",
+      "operating_case_id": "anchor_clear_sky_v1",
+      "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "scenario_horizon_h": 24,
+      "initial_state": {
+        "battery_usable_kwh": 90,
+        "battery_soc": 0.55,
+        "battery_min_soc": 0.25,
+        "potable_water_l": 180,
+        "potable_water_target_l": 260,
+        "hot_water_thermal_kwh": 1.5
+      },
+      "forecast": {
+        "solar_kwh": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          2,
+          4,
+          6,
+          8,
+          9,
+          9,
+          8,
+          6,
+          4,
+          2,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "solar_evidence": "synthetic"
+      },
+      "fixed_load_kw": [
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2,
+        1.2
+      ],
+      "services": [
+        {
+          "service_id": "watermaker_daily",
+          "service_class": "water_production",
+          "earliest_start_h": 8,
+          "latest_start_h": 15,
+          "deadline_h": 18,
+          "required_output_l": 80,
+          "power_kw": 1.2,
+          "minimum_run_min": 60,
+          "restart_energy_kwh": 0.08,
+          "prerequisite": "feed_in_qualified_envelope"
+        },
+        {
+          "service_id": "hot_water_recovery",
+          "service_class": "domestic_thermal",
+          "earliest_start_h": 9,
+          "latest_start_h": 16,
+          "deadline_h": 19,
+          "required_output_kwh_th": 2,
+          "power_kw": 1.8,
+          "minimum_run_min": 30,
+          "prerequisite": "thermal_store_below_target"
+        },
+        {
+          "service_id": "workshop_charge",
+          "service_class": "flexible_workshop",
+          "earliest_start_h": 9,
+          "latest_start_h": 17,
+          "deadline_h": 20,
+          "required_output_kwh": 2,
+          "power_kw": 1,
+          "minimum_run_min": 30,
+          "prerequisite": "no_maintenance_safety_lockout"
+        }
+      ],
+      "hard_constraints": [
+        "critical_loads_never_shed",
+        "battery_soc_gte_min",
+        "watermaker_feed_qualified",
+        "potable_water_quality_gate",
+        "service_deadlines"
+      ]
+    },
+    {
+      "id": "cloud_underway_propulsion_fixed",
+      "operating_case_id": "underway_cloud_event_v1",
+      "conditions_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "scenario_horizon_h": 12,
+      "initial_state": {
+        "battery_usable_kwh": 90,
+        "battery_soc": 0.62,
+        "battery_min_soc": 0.3,
+        "potable_water_l": 110,
+        "potable_water_target_l": 200
+      },
+      "forecast": {
+        "solar_kwh": [
+          0,
+          0,
+          0,
+          1,
+          2,
+          2,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "solar_evidence": "synthetic_forecast_error_case"
+      },
+      "fixed_load_kw": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "services": [
+        {
+          "service_id": "watermaker_replenishment",
+          "service_class": "water_production",
+          "earliest_start_h": 4,
+          "latest_start_h": 10,
+          "deadline_h": 12,
+          "required_output_l": 60,
+          "power_kw": 1.2,
+          "minimum_run_min": 45,
+          "prerequisite": "feed_in_qualified_envelope"
+        },
+        {
+          "service_id": "hot_water_optional",
+          "service_class": "domestic_thermal",
+          "earliest_start_h": 2,
+          "latest_start_h": 11,
+          "deadline_h": 12,
+          "required_output_kwh_th": 1.5,
+          "power_kw": 1.8,
+          "minimum_run_min": 30,
+          "prerequisite": "comfort_service_window"
+        }
+      ],
+      "hard_constraints": [
+        "propulsion_profile_fixed_by_route_owner",
+        "critical_loads_never_shed",
+        "battery_soc_gte_min",
+        "no_speed_or_route_change_by_service_scheduler"
+      ]
+    },
+    {
+      "id": "low_reserve_high_water_demand",
+      "operating_case_id": "low_reserve_water_service_v1",
+      "conditions_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "scenario_horizon_h": 24,
+      "initial_state": {
+        "battery_usable_kwh": 90,
+        "battery_soc": 0.28,
+        "battery_min_soc": 0.25,
+        "potable_water_l": 35,
+        "potable_water_target_l": 220
+      },
+      "forecast": {
+        "solar_kwh": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.5,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          0.5,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "solar_evidence": "synthetic_low_solar"
+      },
+      "fixed_load_kw": [
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4,
+        1.4
+      ],
+      "services": [
+        {
+          "service_id": "urgent_water_reserve",
+          "service_class": "water_production",
+          "earliest_start_h": 7,
+          "latest_start_h": 12,
+          "deadline_h": 16,
+          "required_output_l": 100,
+          "power_kw": 1.2,
+          "minimum_run_min": 75,
+          "prerequisite": "qualified_feed_and_membrane_health"
+        },
+        {
+          "service_id": "discretionary_hot_water",
+          "service_class": "domestic_thermal",
+          "earliest_start_h": 8,
+          "latest_start_h": 22,
+          "deadline_h": 23,
+          "required_output_kwh_th": 2,
+          "power_kw": 1.8,
+          "minimum_run_min": 30,
+          "prerequisite": "comfort_and_reserve_allow"
+        }
+      ],
+      "hard_constraints": [
+        "battery_soc_gte_min",
+        "watermaker_feed_qualified",
+        "potable_water_quality_gate",
+        "no_silent_unmet_water_service"
+      ]
+    },
+    {
+      "id": "watermaker_feed_out_of_domain",
+      "operating_case_id": "feed_quality_out_of_domain_v1",
+      "conditions_digest": "1212121212121212121212121212121212121212121212121212121212121212",
+      "scenario_horizon_h": 12,
+      "initial_state": {
+        "battery_usable_kwh": 90,
+        "battery_soc": 0.8,
+        "battery_min_soc": 0.25,
+        "potable_water_l": 40,
+        "potable_water_target_l": 220
+      },
+      "forecast": {
+        "solar_kwh": [
+          0,
+          0,
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          5,
+          4,
+          2,
+          1
+        ],
+        "solar_evidence": "synthetic_clear_sky"
+      },
+      "fixed_load_kw": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "services": [
+        {
+          "service_id": "watermaker_attempt",
+          "service_class": "water_production",
+          "earliest_start_h": 2,
+          "latest_start_h": 8,
+          "deadline_h": 10,
+          "required_output_l": 100,
+          "power_kw": 1.2,
+          "minimum_run_min": 60,
+          "prerequisite": "feed_salinity_temperature_intake_all_within_qualified_envelope"
+        }
+      ],
+      "hard_constraints": [
+        "watermaker_feed_qualified",
+        "no_output_credit_when_feed_out_of_domain",
+        "service_must_be_blocked_or_deferred_with_reason"
+      ]
+    }
+  ]
+}
