@@ -6,8 +6,8 @@
 //! causal correctness, provider independence, or security-control compliance.
 
 use super::{
-    EVIDENCE_ID_PREFIX, JcsIntegerPrecisionWarning, VerifiedEvidence, canonical_jcs_bytes,
-    jcs_integer_precision_warnings, sha256_hex, verify_evidence_value,
+    EVIDENCE_ID_PREFIX, VerifiedEvidence, canonical_jcs_bytes, jcs_integer_precision_warnings,
+    sha256_hex, verify_evidence_value,
 };
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize as SerdeDeserialize, Serialize};
