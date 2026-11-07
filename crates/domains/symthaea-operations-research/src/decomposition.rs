@@ -686,6 +686,44 @@ mod tests {
     }
 
     #[test]
+    fn branch_sum_enforces_composed_total_enumeration_budget() {
+        let tight = EnumerationBudget {
+            max_variables: 8,
+            max_total_assignment_evaluations: 12,
+            max_projection_support: 8,
+        };
+        assert_eq!(
+            verify_branch_sum(&branch_fixture(), 0, tight).unwrap_err(),
+            DecompositionError::AssignmentBudgetExceeded {
+                required: 16,
+                limit: 12
+            }
+        );
+    }
+
+    #[test]
+    fn independent_product_enforces_composed_total_enumeration_budget() {
+        let tight = EnumerationBudget {
+            max_variables: 8,
+            max_total_assignment_evaluations: 35,
+            max_projection_support: 8,
+        };
+        assert_eq!(
+            verify_independent_product(
+                &independent_fixture(),
+                &[vec![0, 1], vec![2, 3]],
+                &[4],
+                tight,
+            )
+            .unwrap_err(),
+            DecompositionError::AssignmentBudgetExceeded {
+                required: 40,
+                limit: 35
+            }
+        );
+    }
+
+    #[test]
     fn branch_rejects_unknown_split_variable() {
         assert_eq!(
             verify_branch_sum(&branch_fixture(), 3, budget()).unwrap_err(),
