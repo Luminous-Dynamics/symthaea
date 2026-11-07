@@ -69,6 +69,8 @@ pub struct EvidenceEvent {
     pub qc_at_ms: Option<i64>,
     pub availability_state: AvailabilityState,
     pub split: EvidenceSplit,
+    /// Required for confirmation-split data; binds it to the frozen family.
+    pub confirmatory_family_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -201,6 +203,35 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                         event.event_id
                     )));
                 }
+                match event.split {
+                    EvidenceSplit::Confirmation => {
+                        let Some(family_id) = event.confirmatory_family_id.as_ref() else {
+                            return Err(AuditError(format!(
+                                "confirmation event {} lacks a family binding",
+                                event.event_id
+                            )));
+                        };
+                        let Some((freeze_sequence, _)) = families.get(family_id) else {
+                            return Err(AuditError(format!(
+                                "confirmation event {} arrived before its family freeze",
+                                event.event_id
+                            )));
+                        };
+                        if *freeze_sequence >= entry.sequence {
+                            return Err(AuditError(format!(
+                                "confirmation event {} is not after its family freeze",
+                                event.event_id
+                            )));
+                        }
+                    }
+                    _ if event.confirmatory_family_id.is_some() => {
+                        return Err(AuditError(format!(
+                            "non-confirmation event {} has a confirmatory family binding",
+                            event.event_id
+                        )));
+                    }
+                    _ => {}
+                }
                 match (&event.supersedes_event_id, event.revision) {
                     (None, 0) => {}
                     (Some(previous_id), revision) if revision > 0 => {
@@ -297,6 +328,8 @@ pub fn audit_ledger(ledger: &GlobalLedger) -> Result<LedgerAudit, AuditError> {
                                 };
                                 if *freeze_sequence >= entry.sequence
                                     || *available_sequence <= *freeze_sequence
+                                    || event.confirmatory_family_id.as_deref()
+                                        != Some(family_id.as_str())
                                 {
                                     status = DecisionAuditStatus::LockboxLeakage;
                                 }
@@ -363,6 +396,8 @@ pub struct FiltrationAdmission {
     pub target_filtration_id: String,
     pub target_filtration_sha256: String,
     pub observed_event_ids: Vec<String>,
+    /// The process output is committed after this availability prefix.
+    pub process_output_sequence: u64,
     pub mode: AdmissionMode,
     /// Independent proof-review receipt; this verifier does not check its theorem.
     pub proof_receipt_sha256: Option<String>,
@@ -413,6 +448,8 @@ pub fn audit_admission(
         || !valid_sha256(&admission.source_filtration_sha256)
         || !valid_sha256(&admission.target_filtration_sha256)
         || admission.observed_event_ids.is_empty()
+        || admission.process_output_sequence == 0
+        || admission.process_output_sequence > ledger.entries.len() as u64
     {
         return invalid(AdmissionStatus::InvalidReceipt);
     }
@@ -427,7 +464,13 @@ pub fn audit_admission(
         .collect();
     let mut observed = BTreeSet::new();
     for event_id in &admission.observed_event_ids {
-        if !observed.insert(event_id.as_str()) || !evidence_map.contains_key(event_id.as_str()) {
+        let Some((available_sequence, event)) = evidence_map.get(event_id.as_str()) else {
+            return invalid(AdmissionStatus::InvalidReceipt);
+        };
+        if !observed.insert(event_id.as_str())
+            || *available_sequence >= admission.process_output_sequence
+            || !event.availability_state.consumable_as_typed_state()
+        {
             return invalid(AdmissionStatus::InvalidReceipt);
         }
     }
@@ -538,6 +581,7 @@ mod tests {
             qc_at_ms: Some(event_time + 3),
             availability_state: state,
             split,
+            confirmatory_family_id: None,
         })
     }
 
@@ -587,6 +631,20 @@ mod tests {
         }
     }
 
+    fn confirmation_event() -> LedgerPayload {
+        let mut payload = event(
+            "T7",
+            "behaviour-trial-7",
+            90,
+            AvailabilityState::Approved,
+            EvidenceSplit::Confirmation,
+        );
+        if let LedgerPayload::Evidence(ref mut value) = payload {
+            value.confirmatory_family_id = Some("family-1".into());
+        }
+        payload
+    }
+
     fn admission(mode: AdmissionMode) -> FiltrationAdmission {
         FiltrationAdmission {
             campaign_id: "campaign-1".into(),
@@ -599,6 +657,7 @@ mod tests {
             target_filtration_id: "connectome-global-v1".into(),
             target_filtration_sha256: d('8'),
             observed_event_ids: vec!["S1".into(), "T7".into()],
+            process_output_sequence: 4,
             mode,
             proof_receipt_sha256: Some(d('d')),
             assumption_sha256: Some(d('e')),
@@ -628,7 +687,7 @@ mod tests {
         );
         // T7 has not yet been delivered at sequence 2.
         let audit = audit_ledger(&ledger).unwrap();
-        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::PrefixMismatch);
+        assert_eq!(audit.decisions[0].status, DecisionAuditStatus::LookaheadDetected);
     }
 
     #[test]
