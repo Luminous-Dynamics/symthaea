@@ -582,7 +582,6 @@ def self_test() -> list[str]:
         "do not create a composite; not a universal correction factor; no task is admitted; #10064 #10369",
         "C1 — Contract preservation; C2 — Target identity; C3 — Information inventory; C4 — Objective/output; C5 — Interaction realism; C6 — Target leakage",
         "W — Wording-only; R — Information-reduced; A — Information-added; O — Objective-changed; X — Invalid / unresolved; two reviewers independently; not convert these labels into a new metric",
-    ,
     ))
 
     cross_framing_calibration_pack = "\n".join((
