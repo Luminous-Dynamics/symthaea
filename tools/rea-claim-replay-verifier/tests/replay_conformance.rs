@@ -1687,6 +1687,36 @@ fn self_reported_population_completeness_cannot_upgrade_whole_archive_claims() {
         evidence_bytes.push(bytes);
     }
 
+    // The narrow provider-report meta-claim may be supported: it says only
+    // that this provider returned these exact normalized pagination fields.
+    // It must not be confused with the separate whole-population proposition.
+    let mut report_claim = provider_claim(evidence_values[0].evidence_id.clone());
+    report_claim.asserted_value = evidence_values[0].value["normalized_result"].clone();
+    let (report_claim_bytes, report_result_bytes) =
+        produce(&report_claim, std::slice::from_ref(&evidence_values[0]));
+    let report_replay = replay_claim_evaluation(
+        &report_claim_bytes,
+        &[evidence_bytes[0].as_slice()],
+        &report_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(report_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        report_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+    let report_result: Value = serde_json::from_slice(&report_result_bytes).unwrap();
+    assert!(
+        report_result["claim_ceiling"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
+    );
+
     let mut claim = provider_claim(evidence_values[0].evidence_id.clone());
     claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
     claim.source_predicate_type = None;
