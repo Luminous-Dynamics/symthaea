@@ -432,19 +432,33 @@ fn abstentions_missing_submissions_and_zero_denominators_remain_explicit() {
         None,
         None,
     );
-    let (oracle, submission) = manifest(&[abstained]);
+    let missing = make_case(
+        "missing",
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        expected,
+        None,
+        None,
+        None,
+        None,
+        false,
+        false,
+        false,
+        None,
+        None,
+    );
+    let (oracle, submission) = manifest(&[abstained, missing]);
     let mut parsed: Value = serde_json::from_slice(&submission).unwrap();
-    parsed["submissions"] = json!([]);
+    parsed["submissions"].as_array_mut().unwrap().pop();
     let scorecard = evaluate_scorecard(&oracle, &serde_json::to_vec(&parsed).unwrap()).unwrap();
 
-    assert_eq!(scorecard.overall.counts.eligible, 1);
-    assert_eq!(scorecard.overall.counts.submitted, 0);
+    assert_eq!(scorecard.overall.counts.eligible, 2);
+    assert_eq!(scorecard.overall.counts.submitted, 1);
     assert_eq!(scorecard.overall.counts.raw_correct, 0);
-    assert_eq!(scorecard.overall.counts.abstained, 0);
+    assert_eq!(scorecard.overall.counts.abstained, 1);
     assert_eq!(scorecard.overall.parametric_leakage_rate.rate, None);
     assert_eq!(scorecard.overall.answer_coverage.rate, Some(0.0));
+    assert_eq!(scorecard.overall.abstention_rate.rate, Some(0.5));
 }
-
 #[test]
 fn duplicate_object_keys_are_rejected_in_oracle_and_submission() {
     let oracle = br#"{
