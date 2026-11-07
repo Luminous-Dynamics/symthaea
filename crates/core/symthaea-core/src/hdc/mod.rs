@@ -81,6 +81,18 @@ pub const HDC_DIMENSION_32K: usize = 32_768;
 /// **64K dimensions** for extreme precision requirements
 pub const HDC_DIMENSION_64K: usize = 65_536;
 
+/// Validated, extensible resolution metadata for research paths.
+///
+/// The finite empirical ladder remains separate from the open resolution space.
+pub mod resolution_space;
+
+/// Research-only resource admissibility separate from mathematical resolution validity.
+pub mod resolution_budget;
+
+/// Machine-readable scalar/SIMD operator conformance evidence for research qualification.
+#[cfg(feature = "simd")]
+pub mod operator_evidence;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
@@ -878,7 +890,7 @@ pub use hv_pool::{
     pooled_bind, pooled_similarity,
 };
 
-// Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)
+// Re-export SIMD continuous HV operations; performance is benchmark-dependent.
 pub use simd_continuous::{
     bind_simd as continuous_bind_simd, bundle_simd as continuous_bundle_simd,
     dot_product_simd as continuous_dot_product_simd, norm_simd as continuous_norm_simd,
