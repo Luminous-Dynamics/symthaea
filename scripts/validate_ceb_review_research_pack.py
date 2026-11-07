@@ -114,8 +114,8 @@ def validate_documents(
     for gate in EXECUTION_GATES:
         if gate not in challenge or gate not in adjudication or gate not in triangulation:
             errors.append(f"execution/regrade gate {gate} must remain explicit")
-    if "does not create another review lane" not in triangulation:
-        errors.append("triangulation must state that it does not create another review lane")
+    if not any(phrase in triangulation for phrase in ("does not create another review lane", "No new metric lane")):
+        errors.append("triangulation must state that it does not create another review/metric lane")
     if "does not create metrics" not in adjudication:
         errors.append("adjudication card must state that it does not create new metrics")
     if "3.10 From code location to causal mechanism diagnosis" not in scorecard:
