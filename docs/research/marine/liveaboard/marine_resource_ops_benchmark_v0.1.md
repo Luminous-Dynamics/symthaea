@@ -183,7 +183,7 @@ Each requested service must receive exactly one disposition:
 - `failed`: attempted service did not meet the contract;
 - `indeterminate`: missing/stale/unknown input prevents a defensible decision.
 
-The report separately records every hard constraint as satisfied, violated or unknown, and preserves a carrier ledger. It must not turn a blocked/failed/postponed/indeterminate service into delivered potable water or thermal service. Electrical energy, thermal energy, recoverable heat, water, seawater feed and fuel remain separate carriers.
+The report separately records every hard constraint as satisfied, violated or unknown, and preserves a carrier ledger. The service-request schema also declares expected process residuals (for example RO concentrate/brine) with an intended disposition and quality constraint. The schedule-report schema records generated residual quantities and disposition separately from accepted service outputs. Unknown or unauthorized brine handling blocks environmental/discharge claims; the scheduler may only report a contained-for-shore-disposal plan when storage/capacity and transfer evidence support it. It must not turn a blocked/failed/postponed/indeterminate service into delivered potable water or thermal service. Electrical energy, thermal energy, recoverable heat, water, seawater feed and fuel remain separate carriers.
 
 The companion fixture file contains five **hand-authored expected-result reports**, not scheduler outputs:
 1. clear-solar anchorage — all three services synthetically delivered;
@@ -196,6 +196,7 @@ Acceptance invariants for future scheduler implementations:
 - every request in the frozen input has exactly one output disposition; no missing or duplicate service rows;
 - a scheduled service has valid start/end times, accepted output quality and supporting evidence;
 - non-scheduled services have no accepted-output credit;
+- each process residual expected by the request is accounted for as generated, not generated, retained, treated, contained for shore disposal, discharged under an applicable permission, or unknown; missing residual rows are incomplete;
 - `all_required_services_delivered` is permitted only when every required service is scheduled and accepted;
 - `service_degraded` explicitly exposes postponed or failed services;
 - `not_supported` has a violated hard constraint or blocked/failed required service;
@@ -203,6 +204,8 @@ Acceptance invariants for future scheduler implementations:
 - no output status authorizes equipment control, voyage dispatch, operation, statutory compliance or seaworthiness.
 
 Static verification of the V0 fixtures includes recursive schema checks and these disposition invariants. It does not execute a scheduler or establish energy savings.
+
+For physical watermaker tests, do not enforce a naive sum of feed/product/concentrate *volumes* as exact conservation: measure synchronized feed, permeate and concentrate flow with salinity/density and measurement uncertainty, and reconcile mass/salt balances under the declared system boundary. The numeric brine quantities in the current synthetic fixtures are bookkeeping examples only; they are not RO recovery predictions or discharge recommendations.
 
 ## 13. Claim ceiling
 
