@@ -65,6 +65,14 @@ CRBugBench pairs human-verified bugs with introducing PRs: 1,000 public tasks ac
 
 **Research protocol:** the proposed [CEB Review Causal-Diagnosis Preregistration V0](CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md) turns these insights into a staged, paired, counterfactual experiment. It includes P/I/F/N/M/IRR source-state controls, matched reviewer arms, gold/matcher adjudication, cost accounting and a power-derived sample-size rule. This is a design proposal, not a task set or evaluation result.
 
+### 2.5 CodeReviewBench — small replay benchmark and human-gold ceiling
+
+Kodus maintains CodeReviewBench: **30 merged pull requests and 95 human-authored golden bugs**, drawn from five repositories (cal.com, Discourse, Grafana, Keycloak and Sentry) and five languages (Go, Java, Python, Ruby and TypeScript). Its current leaderboard has 13 model configurations, run through the Kodus harness with Claude Haiku 4.5 as judge. The top row is DeepSeek V4 Pro: **43.9 F1 / 43.6% precision / 44.2% recall**, finding 42 of 95 golden bugs at an estimated **$0.30 per PR / $0.21 per bug found**. The per-model page reports a 95% PR-bootstrap interval of **32.3–56.3 recall points** over 2,000 resamples across 30 PRs. It separately reports three judge re-scores of the same findings (43.9 ±0.6 recall points); this estimates judge noise, not model run-to-run variance. Every model entry had one agent pass. [Live leaderboard](https://www.codereviewbench.com/leaderboard) · [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro) · [maintainer's recall discussion, August 21](https://www.codereviewbench.com/blog/ai-code-review-recall-2026).
+
+**Critical limitation:** the benchmark's gold set consists of bugs already reported by human reviewers before merge. Its maintainers explicitly say defects that escaped the original human review are absent, so measured recall is recovery of human-found bugs—not exhaustive defect discovery. The benchmark is useful for model/harness replay, inspectable per-PR misses, precision/recall trade-offs and historical cost, but has only 30 PRs, one harness and one judge family. Some model entries have different evaluated coverage; compare each scorecard's denominator. [CodeReviewBench scope and limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026) · [per-model artifacts](https://github.com/kodustech/codereviewbench).
+
+**CEB implication:** retain it as a contextual comparator, not a direct Recall@5 equivalent. Its most important contribution is making the *human-gold ceiling* explicit. CEB should add blind audits of zero-finding PRs and multi-producer "clean" consensus, so defects missed by the original review population have a route to independent discovery. Do not retroactively add newly discovered defects to a frozen task denominator; report them through a separate, blinded open-set channel.
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -78,6 +86,7 @@ The current CEB-REVIEW lane retains exactly three primary metrics. This triangul
 | SecPRBench target recall | Related to defect detection, but all reported findings and security-only domain differ | Mechanism-diagnosis and systems-security stress slice | Treat target recall as top-five recall or report precision |
 | CR-Bench-v2 KDDR | Related target-detection construct; one known defect / instance and review-only agents | Known-target detection stress test | Treat a valid suggestion as a target hit |
 | CR-Bench-v2 Usefulness Rate | Related to comment utility, not identical to actionable precision until rubric/denominator are harmonized | Comment-quality diagnostic | Infer defect recall from usefulness |
+| CodeReviewBench human-flagged bug recall | Related but not top-five constrained; gold contains only prior human-detected bugs | Small replay/cost reference and a warning about human-gold completeness | Treat 44.2% as CEB Recall@5 or exhaustive bug recall |
 | Human minutes / adjudication time | Exact only if accounting boundaries match | CEB `reviewer_burden` comparison | Exclude second reviewer, judge audit or context reconstruction time from assisted arm |
 
 ## 4. A diagnosis ladder for CEB review
@@ -107,6 +116,11 @@ A finding that localizes correctly but gives the wrong mechanism is a **diagnosi
 Keep these labels at the finding/defect adjudication layer; they do not expand CEB's primary metric registry.
 
 **Annotation instrument:** use the copyable [CEB Review Finding Adjudication Card V0](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md) for each candidate finding. It records the five-link causal explanation, exact source revision, evidence authority/freshness, target versus non-target status, adjudicator uncertainty and judge/matcher audit. It is an annotation aid, not a parallel task or receipt schema.
+
+**Two additional runner-independent protocols now make the comparison actionable:**
+
+- [CEB Review Gold-Completeness and Open-Set Discovery V0](CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md) separates frozen target truth, independently adjudicated novel findings and the unknown unobserved defect remainder. It adds blind sampling of zero-finding PRs and multi-producer "clean" cases. Naïve capture–recapture is explicitly prohibited because reviewer/agent producers are dependent.
+- [CEB Review Sequential Evidence Acquisition V0](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md) compares static-first, unconstrained tool use, transparent evidence-directed heuristics, calibrated sequential value-of-information and ask/abstain. Each action must name competing hypotheses, a discriminating observation, authority, safety and total cost. No tool-call activity score is added.
 
 ## 5. Proposed experimental design
 
@@ -201,5 +215,6 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - Pereira et al., [CR-Bench-v2: Evaluating the Real-World Utility of AI Code Review Agents](https://arxiv.org/abs/2611.02566), submitted November 2, revised November 3, 2026.
 - Yang et al., [CRBugBench](https://arxiv.org/abs/2610.13668), October 9, 2026; [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/).
 - Arsentev, [PREreview of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026.
+- Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [method/limitations post](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), data generated 2026-09-11; accessed November 7, 2026.
 
 **Cross-benchmark claim rule:** never rank a system by combining these numbers. Preserve each benchmark's task denominator, single-/multi-defect design, language/repository mix, review budget, tool/harness, judge/matcher, severity slice and release version. A CEB-versus-industry superiority claim requires a paired, protocol-matched evaluation and independent audit.
