@@ -1,0 +1,202 @@
+name: REA Formal Provider Observation
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/assurance/Closure.lean"
+      - "formal/lean/assurance/REAProviderObservation.lean"
+      - "docs/formal/rea-provider-observation-v1.json"
+      - "scripts/validate_rea_formal_001.py"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/rea-formal-provider-observation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "formal/lean/assurance/Closure.lean"
+      - "formal/lean/assurance/REAProviderObservation.lean"
+      - "docs/formal/rea-provider-observation-v1.json"
+      - "scripts/validate_rea_formal_001.py"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/rea-formal-provider-observation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rea-formal-provider-observation-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  rea-provider-observation:
+    name: REA provider-observation non-amplification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Record exact Git subject
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git status --porcelain=v1 --untracked-files=all
+
+      - name: Validate static REA-to-closure contract and hostile controls
+        run: python3 scripts/validate_rea_formal_001.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Prove the wrapper propagates Lean failure
+        run: |
+          set -euo pipefail
+          cat > /tmp/rea-formal-known-bad.lean <<'LEAN'
+          example : False := by
+            trivial
+          LEAN
+          if nix develop .#formal --command sh -c 'lean /tmp/rea-formal-known-bad.lean > /tmp/rea-formal-known-bad-output.txt 2>&1'; then
+            cat /tmp/rea-formal-known-bad-output.txt
+            echo "known-bad Lean subject incorrectly returned success" >&2
+            exit 1
+          fi
+          cat /tmp/rea-formal-known-bad-output.txt
+          grep -q 'error:' /tmp/rea-formal-known-bad-output.txt
+
+      - name: Typecheck existing closure kernel and REA adapter
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rea-formal-lean-build/assurance
+          nix develop .#formal --command bash -c '
+            set -uo pipefail
+            export LEAN_PATH=/tmp/rea-formal-lean-build
+            lean --version | tee /tmp/rea-formal-lean-version.txt
+
+            lean -o "$LEAN_PATH/assurance/Closure.olean" formal/lean/assurance/Closure.lean \
+              > /tmp/rea-formal-closure-output.txt 2>&1
+            closure_status=$?
+            cat /tmp/rea-formal-closure-output.txt
+            if test "$closure_status" -ne 0; then
+              echo "Closure.lean typecheck failed with exit $closure_status" >&2
+              exit "$closure_status"
+            fi
+
+            lean -o "$LEAN_PATH/assurance/REAProviderObservation.olean" \
+              formal/lean/assurance/REAProviderObservation.lean \
+              > /tmp/rea-formal-adapter-output.txt 2>&1
+            adapter_status=$?
+            cat /tmp/rea-formal-adapter-output.txt
+            if test "$adapter_status" -ne 0; then
+              echo "REAProviderObservation.lean typecheck failed with exit $adapter_status" >&2
+              exit "$adapter_status"
+            fi
+
+            if grep -q "sorryAx" /tmp/rea-formal-closure-output.txt /tmp/rea-formal-adapter-output.txt; then
+              echo "forbidden sorryAx in Lean axiom census" >&2
+              exit 1
+            fi
+            if grep -q "error:" /tmp/rea-formal-closure-output.txt /tmp/rea-formal-adapter-output.txt; then
+              echo "Lean output contains an error marker despite zero exit" >&2
+              exit 1
+            fi
+          '
+
+      - name: Retain Lean compiler diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-formal-lean-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/rea-formal-lean-version.txt
+            /tmp/rea-formal-closure-output.txt
+            /tmp/rea-formal-adapter-output.txt
+            /tmp/rea-formal-known-bad-output.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Postflight immutability and exact-head qualification receipt
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def digest(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          parent = "e0172f5440e917641bfd124c4ccfc8458819883b"
+          proof = "formal/lean/assurance/REAProviderObservation.lean"
+          closure = "formal/lean/assurance/Closure.lean"
+          manifest = "docs/formal/rea-provider-observation-v1.json"
+          validator = "scripts/validate_rea_formal_001.py"
+          workflow = ".github/workflows/rea-formal-provider-observation.yml"
+          Path("/tmp/rea-formal-receipt.json").write_text(
+              json.dumps({
+                  "schema": "symthaea.formal.rea-provider-observation-receipt.v1",
+                  "issue": 10782,
+                  "parent_issue": 6073,
+                  "parent_pr": 6077,
+                  "evidence_class": "AbstractFormalTheorem",
+                  "result": "LeanTypecheckedAndAxiomClean",
+                  "head": git("rev-parse", "HEAD"),
+                  "tree": git("rev-parse", "HEAD^{tree}"),
+                  "parent_head": parent,
+                  "parent_is_ancestor": git("merge-base", "--is-ancestor", parent, "HEAD") == "",
+                  "closure_blob": git("rev-parse", f"HEAD:{closure}"),
+                  "closure_sha256": digest(closure),
+                  "adapter_blob": git("rev-parse", f"HEAD:{proof}"),
+                  "adapter_sha256": digest(proof),
+                  "manifest_blob": git("rev-parse", f"HEAD:{manifest}"),
+                  "manifest_sha256": digest(manifest),
+                  "validator_blob": git("rev-parse", f"HEAD:{validator}"),
+                  "validator_sha256": digest(validator),
+                  "workflow_blob": git("rev-parse", f"HEAD:{workflow}"),
+                  "workflow_sha256": digest(workflow),
+                  "lean_version": Path("/tmp/rea-formal-lean-version.txt").read_text().strip(),
+                  "known_bad_subject_rejected": True,
+                  "closure_typecheck_exit_zero": True,
+                  "adapter_typecheck_exit_zero": True,
+                  "sorryAx_absent": True,
+                  "postflight_clean": True,
+                  "nonclaims": [
+                      "not-truth-of-provider-observation",
+                      "not-producer-authenticity-or-signer-trust",
+                      "not-package-authorization-or-security-control-pass",
+                      "not-soundness-of-imported-rust-verifiers",
+                      "not-runtime-authorization-or-security-certification"
+                  ]
+              }, indent=2, sort_keys=True) + "\n"
+          )
+          print(Path("/tmp/rea-formal-receipt.json").read_text())
+          PY
+
+      - name: Retain exact proof and qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rea-formal-provider-observation-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/rea-formal-lean-version.txt
+            /tmp/rea-formal-closure-output.txt
+            /tmp/rea-formal-adapter-output.txt
+            /tmp/rea-formal-known-bad-output.txt
+            /tmp/rea-formal-receipt.json
+          if-no-files-found: error
+          retention-days: 30
