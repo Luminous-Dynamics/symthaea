@@ -278,7 +278,7 @@ impl HceEpoch {
             return Err(HceError::InvalidSelectionPolicy);
         }
         if !non_empty(&self.overlap_audit.independent_custodian_id)
-            || custodians.contains(self.overlap_audit.independent_custodian_id.as_str())
+            || custodians.iter().any(|custodian| *custodian == self.overlap_audit.independent_custodian_id.as_str())
             || !self.overlap_audit.exact_membership_comparison_completed
             || !self.overlap_audit.zero_overlap_declared
             || self.overlap_audit.audited_split_count != self.splits.len()
