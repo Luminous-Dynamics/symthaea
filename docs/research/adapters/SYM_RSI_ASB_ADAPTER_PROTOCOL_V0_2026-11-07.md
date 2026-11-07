@@ -47,7 +47,7 @@ The twin task returns exact published measurements for 96 of 980 source-study de
 | `POST /v1/deliverables` | Submit final model/report | Preserve upstream type, schema, size and required-stage checks |
 | lab-owned `/state/ledger.json` | Campaign execution record | Bind the existing canonical receipt/evidence pipeline to the lab-provided ledger; do not trust agent-container copies |
 
-The lab owns stage order, accepted batch size, eligibility, uniqueness and budget enforcement. Rejected requests must not be treated as consuming a stage. Re-submitting the latest accepted batch is idempotent. A failed asynchronous job is not a completed experiment.
+The lab owns stage order, accepted batch size, eligibility, uniqueness and budget enforcement. Rejected requests must not be treated as consuming a stage. Re-submitting the latest accepted batch is idempotent. A failed asynchronous job is not a completed experiment. The offline Rust reference contract in `tools/sym-rsi-asb-adapter-reference/src/job_lifecycle.rs` rejects pending jobs with result rows, completed jobs without a full result batch, failed jobs with result rows, and repeated design IDs. It advances a stage only for a valid `completed` job with one result row per submitted design.
 
 The verifier is a separate no-network boundary. Its hidden truth and evaluation data must never be exposed to the policy process, Coder, retrieval tools or direction board.
 
@@ -93,4 +93,4 @@ Do not allow a high discovery score to compensate for failed held-out learning, 
 
 ## Current implementation boundary
 
-The first artifact is a pinned JSON manifest, its JSON Schema, and an offline Rust semantic checker. It does not yet make AS-Bench API calls or execute either campaign. The manifest remains `PINNED_UPSTREAM_COMPATIBILITY_TARGET_NOT_YET_RUN` until executable conformance evidence exists.
+The first artifacts are a pinned JSON manifest, its JSON Schema, an offline Rust manifest checker, and a typed Lab API job-lifecycle contract with negative controls. It does not yet make AS-Bench API calls or execute either campaign. The manifest remains `PINNED_UPSTREAM_COMPATIBILITY_TARGET_NOT_YET_RUN` until executable conformance evidence exists.
