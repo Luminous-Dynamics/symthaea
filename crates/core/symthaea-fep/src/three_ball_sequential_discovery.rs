@@ -40,6 +40,26 @@ pub enum ThreeBallModelFamily {
     SemanticQuotient,
 }
 
+/// Action-selection policy for the sequential discovery adaptation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ThreeBallSequentialPolicyKind {
+    /// Select the lowest expected-free-energy gaze/choice action.
+    ExpectedFreeEnergy,
+    /// Remove model information value, retaining conditional state information.
+    StateInformationOnly,
+    /// Remove conditional state information value, retaining model information.
+    ModelInformationOnly,
+    /// Remove both epistemic terms; retain pragmatic preferences and costs.
+    PragmaticOnly,
+    /// Do not gaze: select the best immediate choice action.
+    ImmediateChoiceOnly,
+    /// Choose uniformly among the four legal action surfaces (immediate choice or one of three gazes)
+    /// and uniformly among the four possible responses (three colours or no response).
+    UniformRandomLegalAction,
+    /// Force a gaze at one location; use the policy's best contingent response.
+    FixedGaze(ThreeBallLocation),
+}
+
 /// Configuration for one repeated two-step discovery episode.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ThreeBallSequentialDiscoveryConfig {
@@ -57,6 +77,8 @@ pub struct ThreeBallSequentialDiscoveryConfig {
     pub policy: ThreeBallPartialObservationConfig,
     /// Preserve all source labels or run over the semantic quotient.
     pub model_family: ThreeBallModelFamily,
+    /// Policy arm used for this episode.
+    pub policy_kind: ThreeBallSequentialPolicyKind,
 }
 
 impl Default for ThreeBallSequentialDiscoveryConfig {
@@ -68,6 +90,7 @@ impl Default for ThreeBallSequentialDiscoveryConfig {
             post_commitment_feedback_log_preferences_nats: [0.0, 2.0, -6.0],
             policy: ThreeBallPartialObservationConfig::default(),
             model_family: ThreeBallModelFamily::SemanticQuotient,
+            policy_kind: ThreeBallSequentialPolicyKind::ExpectedFreeEnergy,
         }
     }
 }
@@ -109,6 +132,7 @@ pub struct ThreeBallSequentialDiscoveryResult {
     pub true_rule_one_based_index: usize,
     pub true_semantic_class_one_based_index: usize,
     pub model_family: ThreeBallModelFamily,
+    pub policy_kind: ThreeBallSequentialPolicyKind,
     pub trial_receipts: Vec<ThreeBallSequentialTrialReceipt>,
     pub trials_to_model_commitment: Option<usize>,
     pub trials_to_correct_rule_commitment: Option<usize>,
@@ -207,7 +231,11 @@ pub fn run_three_ball_sequential_discovery(
         return Err(ThreeBallSequentialDiscoveryError::TrueRuleMissingFromModelFamily);
     }
 
-    let mut rng = SplitMix64::new(seed);
+    // Environment and policy randomness are domain-separated. Paired policy
+    // arms with the same seed therefore see identical hidden scenes even when
+    // a stochastic policy consumes a different number of random draws.
+    let mut environment_rng = SplitMix64::new(seed);
+    let mut policy_rng = SplitMix64::new(seed ^ 0xA11C_E5EED_5EED_0001);
     let mut trial_receipts = Vec::with_capacity(config.max_trials);
     let mut trials_to_model_commitment = None;
     let mut trials_to_correct_rule_commitment = None;
@@ -222,9 +250,9 @@ pub fn run_three_ball_sequential_discovery(
 
     for trial_index in 1..=config.max_trials {
         let hidden_state = [
-            colour_from_index(rng.below(3)),
-            colour_from_index(rng.below(3)),
-            colour_from_index(rng.below(3)),
+            colour_from_index(environment_rng.below(3)),
+            colour_from_index(environment_rng.below(3)),
+            colour_from_index(environment_rng.below(3)),
         ];
 
         let model_posterior_before = semantic_model_posterior(space, &belief)?;
@@ -239,11 +267,45 @@ pub fn run_three_ball_sequential_discovery(
         } else {
             config.discovery_feedback_log_preferences_nats
         };
+        match config.policy_kind {
+            ThreeBallSequentialPolicyKind::ExpectedFreeEnergy
+            | ThreeBallSequentialPolicyKind::ImmediateChoiceOnly
+            | ThreeBallSequentialPolicyKind::FixedGaze(_) => {}
+            ThreeBallSequentialPolicyKind::StateInformationOnly => {
+                trial_policy.model_information_weight = 0.0;
+            }
+            ThreeBallSequentialPolicyKind::ModelInformationOnly => {
+                trial_policy.conditional_state_information_weight = 0.0;
+            }
+            ThreeBallSequentialPolicyKind::PragmaticOnly => {
+                trial_policy.model_information_weight = 0.0;
+                trial_policy.conditional_state_information_weight = 0.0;
+            }
+            ThreeBallSequentialPolicyKind::UniformRandomLegalAction => {}
+        }
 
         let decision = score_three_ball_gaze_policies(space, &belief, trial_policy)?;
+        let selected_action_index = match config.policy_kind {
+            ThreeBallSequentialPolicyKind::ExpectedFreeEnergy
+            | ThreeBallSequentialPolicyKind::StateInformationOnly
+            | ThreeBallSequentialPolicyKind::ModelInformationOnly
+            | ThreeBallSequentialPolicyKind::PragmaticOnly => decision.selected_action_index,
+            ThreeBallSequentialPolicyKind::ImmediateChoiceOnly => 0,
+            ThreeBallSequentialPolicyKind::UniformRandomLegalAction => {
+                policy_rng.below(decision.action_scores.len() as u64)
+            }
+            ThreeBallSequentialPolicyKind::FixedGaze(location) => decision
+                .action_scores
+                .iter()
+                .position(|score| score.location == Some(location))
+                .ok_or(ThreeBallSequentialDiscoveryError::InvalidSelectedAction {
+                    index: decision.action_scores.len(),
+                    action_count: decision.action_scores.len(),
+                })?,
+        };
         let action = decision
             .action_scores
-            .get(decision.selected_action_index)
+            .get(selected_action_index)
             .ok_or(ThreeBallSequentialDiscoveryError::InvalidSelectedAction {
                 index: decision.selected_action_index,
                 action_count: decision.action_scores.len(),
@@ -255,14 +317,28 @@ pub fn run_three_ball_sequential_discovery(
                 gaze_count += 1;
                 let colour = hidden_state[location as usize];
                 let posterior = belief.condition_on_gaze(location, colour)?;
-                let contingency = action
-                    .contingencies
-                    .iter()
-                    .find(|entry| entry.observed_colour == colour)
-                    .ok_or(ThreeBallSequentialDiscoveryError::MissingGazeContingency)?;
-                (posterior, Some(colour), contingency.selected_choice)
+                let selected_choice = if config.policy_kind
+                    == ThreeBallSequentialPolicyKind::UniformRandomLegalAction
+                {
+                    random_response(&mut policy_rng)
+                } else {
+                    action
+                        .contingencies
+                        .iter()
+                        .find(|entry| entry.observed_colour == colour)
+                        .ok_or(ThreeBallSequentialDiscoveryError::MissingGazeContingency)?
+                        .selected_choice
+                };
+                (posterior, Some(colour), selected_choice)
             } else {
-                (belief.clone(), None, action.immediate_choice)
+                let selected_choice = if config.policy_kind
+                    == ThreeBallSequentialPolicyKind::UniformRandomLegalAction
+                {
+                    random_response(&mut policy_rng)
+                } else {
+                    action.immediate_choice
+                };
+                (belief.clone(), None, selected_choice)
             };
 
         let feedback = true_rule.feedback(hidden_state, selected_choice);
@@ -363,6 +439,7 @@ pub fn run_three_ball_sequential_discovery(
         true_rule_one_based_index,
         true_semantic_class_one_based_index,
         model_family: config.model_family,
+        policy_kind: config.policy_kind,
         trial_receipts,
         trials_to_model_commitment,
         trials_to_correct_rule_commitment,
@@ -465,6 +542,16 @@ fn exceeds_log_odds_threshold(probability: f64, threshold: f64) -> bool {
         || finite_log_odds(probability).is_some_and(|log_odds| log_odds > threshold)
 }
 
+fn random_response(rng: &mut SplitMix64) -> Option<ThreeBallColour> {
+    match rng.below(4) {
+        0 => Some(ThreeBallColour::Red),
+        1 => Some(ThreeBallColour::Green),
+        2 => Some(ThreeBallColour::Blue),
+        3 => None,
+        _ => unreachable!("response index is in 0..4"),
+    }
+}
+
 fn colour_from_index(index: usize) -> ThreeBallColour {
     match index {
         0 => ThreeBallColour::Red,
@@ -516,6 +603,86 @@ mod tests {
         ThreeBallSequentialDiscoveryConfig {
             model_family,
             ..ThreeBallSequentialDiscoveryConfig::default()
+        }
+    }
+
+    #[test]
+    fn paired_policy_arms_receive_identical_environment_scenes() {
+        let space = build_three_ball_rule_space();
+        let seed = 0x51de_2026;
+        let base = ThreeBallSequentialDiscoveryConfig {
+            max_trials: 12,
+            ..Default::default()
+        };
+        let active = run_three_ball_sequential_discovery(
+            &space,
+            65,
+            seed,
+            ThreeBallSequentialDiscoveryConfig {
+                policy_kind: ThreeBallSequentialPolicyKind::ExpectedFreeEnergy,
+                ..base
+            },
+        )
+        .expect("active inference episode");
+        let random = run_three_ball_sequential_discovery(
+            &space,
+            65,
+            seed,
+            ThreeBallSequentialDiscoveryConfig {
+                policy_kind: ThreeBallSequentialPolicyKind::UniformRandomLegalAction,
+                ..base
+            },
+        )
+        .expect("random policy episode");
+
+        let active_scenes = active
+            .trial_receipts
+            .iter()
+            .map(|trial| trial.hidden_state_for_audit)
+            .collect::<Vec<_>>();
+        let random_scenes = random
+            .trial_receipts
+            .iter()
+            .map(|trial| trial.hidden_state_for_audit)
+            .collect::<Vec<_>>();
+        assert_eq!(active_scenes, random_scenes);
+        assert_eq!(active.seed, random.seed);
+        assert_ne!(active.policy_kind, random.policy_kind);
+    }
+
+    #[test]
+    fn registered_policy_ablations_are_deterministic_and_finite() {
+        let space = build_three_ball_rule_space();
+        let kinds = [
+            ThreeBallSequentialPolicyKind::ExpectedFreeEnergy,
+            ThreeBallSequentialPolicyKind::StateInformationOnly,
+            ThreeBallSequentialPolicyKind::ModelInformationOnly,
+            ThreeBallSequentialPolicyKind::PragmaticOnly,
+            ThreeBallSequentialPolicyKind::ImmediateChoiceOnly,
+            ThreeBallSequentialPolicyKind::FixedGaze(ThreeBallLocation::Centre),
+            ThreeBallSequentialPolicyKind::UniformRandomLegalAction,
+        ];
+        for policy_kind in kinds {
+            let config = ThreeBallSequentialDiscoveryConfig {
+                max_trials: 8,
+                policy_kind,
+                ..Default::default()
+            };
+            let first = run_three_ball_sequential_discovery(&space, 65, 77, config)
+                .expect("policy arm");
+            let replay = run_three_ball_sequential_discovery(&space, 65, 77, config)
+                .expect("policy replay");
+            assert_eq!(first, replay);
+            assert_eq!(first.policy_kind, policy_kind);
+            assert!(first.final_model_entropy_nats.is_finite());
+            assert!(first.mean_true_class_brier_score.is_finite());
+            assert!(
+                first
+                    .trial_receipts
+                    .iter()
+                    .all(|trial| trial.model_entropy_before_nats.is_finite()
+                        && trial.model_entropy_after_nats.is_finite())
+            );
         }
     }
 
