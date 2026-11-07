@@ -165,6 +165,8 @@ pub enum ThreeBallPartialObservationError {
     InvalidRuleIndex { rule_index: usize, rule_count: usize },
     #[error("model posterior length {actual} does not match model family length {expected}")]
     ModelPosteriorLengthMismatch { expected: usize, actual: usize },
+    #[error("model rule-index length {actual} does not match model family length {expected}")]
+    ModelRuleIndexLengthMismatch { expected: usize, actual: usize },
     #[error("state prior must contain exactly 27 entries, got {0}")]
     InvalidStatePriorLength(usize),
     #[error("prior probability at {dimension} index {index} is invalid: {value}")]
@@ -255,7 +257,13 @@ impl ThreeBallJointBelief {
         if model_ids.is_empty() {
             return Err(ThreeBallPartialObservationError::EmptyModelFamily);
         }
-        if model_ids.len() != rule_indices.len() || model_ids.len() != model_prior.len() {
+        if model_ids.len() != rule_indices.len() {
+            return Err(ThreeBallPartialObservationError::ModelRuleIndexLengthMismatch {
+                expected: model_ids.len(),
+                actual: rule_indices.len(),
+            });
+        }
+        if model_ids.len() != model_prior.len() {
             return Err(ThreeBallPartialObservationError::ModelPosteriorLengthMismatch {
                 expected: model_ids.len(),
                 actual: model_prior.len(),
@@ -318,10 +326,14 @@ impl ThreeBallJointBelief {
 
     /// Validate dimensions, normalization, and source-family bindings.
     pub fn validate(&self) -> Result<(), ThreeBallPartialObservationError> {
+        let mut seen_model_ids = BTreeSet::new();
+        if self.model_ids.iter().any(|id| id.trim().is_empty() || !seen_model_ids.insert(id)) {
+            return Err(ThreeBallPartialObservationError::InvalidJointBelief);
+        }
         if self.format_version != 1
             || self.model_ids.is_empty()
             || self.model_ids.len() != self.rule_indices.len()
-            || self.hidden_states.len() != THREE_BALL_HIDDEN_STATE_COUNT
+            || self.hidden_states != enumerate_three_ball_hidden_states()
             || self.joint_probabilities.len() != self.model_ids.len()
             || self
                 .joint_probabilities
@@ -353,7 +365,7 @@ impl ThreeBallJointBelief {
         observed_colour: ThreeBallColour,
     ) -> Result<Self, ThreeBallPartialObservationError> {
         self.condition_on_likelihood(|state| {
-            f64::from(state[location as usize] == observed_colour)
+            if state[location as usize] == observed_colour { 1.0 } else { 0.0 }
         })
     }
 
@@ -377,7 +389,7 @@ impl ThreeBallJointBelief {
                     rule_count: space.rules.len(),
                 })?;
             for (state_index, state) in self.hidden_states.iter().enumerate() {
-                let likelihood = f64::from(rule.feedback(*state, choice) == observed_feedback);
+                let likelihood = if rule.feedback(*state, choice) == observed_feedback { 1.0 } else { 0.0 };
                 next.joint_probabilities[model_index][state_index] *= likelihood;
                 mass += next.joint_probabilities[model_index][state_index];
             }
@@ -462,8 +474,6 @@ pub fn score_three_ball_gaze_policies(
 ) -> Result<ThreeBallPartialObservationDecision, ThreeBallPartialObservationError> {
     belief.validate()?;
     validate_config(config)?;
-    let preferences = normalized_log_preferences(config.feedback_log_preferences_nats);
-
     let current_choices = score_three_ball_choice_actions(space, belief, config)?;
     let (current_choice, current_score) = best_choice(&current_choices)?;
     let mut action_scores = vec![ThreeBallGazeActionScore {
