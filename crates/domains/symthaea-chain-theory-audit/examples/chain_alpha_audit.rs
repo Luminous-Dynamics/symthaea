@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-use symthaea_chain_theory_audit::reproduce;
+use symthaea_chain_theory_audit::{record_rows, reproduce};
 
 fn main() {
     let audit = reproduce();
@@ -38,4 +38,26 @@ fn main() {
         audit.difference_in_standard_uncertainties
     );
     println!("This reproduces the stated formula, not its identification with electromagnetism or photons.");
+    println!();
+    println!("record,construction,slot_kinds,X,Y,ends_passed,k,weight");
+    for row in record_rows() {
+        let weight = match row.weight_squared {
+            1 => "1",
+            2 => "sqrt(2)",
+            3 => "sqrt(3)",
+            6 => "sqrt(6)",
+            _ => unreachable!("the four exchange sectors define k"),
+        };
+        println!(
+            "R{:03},{},{},{:+},{:+},{},{},{}",
+            row.ordinal,
+            row.construction,
+            row.slot_kinds,
+            row.signature_x,
+            row.signature_y,
+            row.ends_passed,
+            row.weight_squared,
+            weight,
+        );
+    }
 }
