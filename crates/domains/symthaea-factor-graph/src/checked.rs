@@ -736,6 +736,12 @@ pub fn bethe_free_energy(
         {
             return Err(CheckedBPError::BeliefShapeMismatch { context: "non-finite or negative variable marginal" });
         }
+        for (&probability, &log_probability) in probabilities.iter().zip(log_probabilities) {
+            let reconstructed = log_probability.exp();
+            if (probability - reconstructed).abs() > 1.0e-10 {
+                return Err(CheckedBPError::BeliefShapeMismatch { context: "variable probability/log-probability mismatch" });
+            }
+        }
         let probability_sum = probabilities.iter().sum::<f64>();
         let log_sum = log_sum_exp(log_probabilities);
         if (probability_sum - 1.0).abs() > 1.0e-8 || !log_sum.is_finite() || log_sum.abs() > 1.0e-8 {
@@ -755,6 +761,12 @@ pub fn bethe_free_energy(
             || log_probabilities.iter().any(|value| value.is_nan() || *value == f64::INFINITY)
         {
             return Err(CheckedBPError::BeliefShapeMismatch { context: "non-finite or negative factor marginal" });
+        }
+        for (&probability, &log_probability) in probabilities.iter().zip(log_probabilities) {
+            let reconstructed = log_probability.exp();
+            if (probability - reconstructed).abs() > 1.0e-10 {
+                return Err(CheckedBPError::BeliefShapeMismatch { context: "factor probability/log-probability mismatch" });
+            }
         }
         let probability_sum = probabilities.iter().sum::<f64>();
         let log_sum = log_sum_exp(log_probabilities);
@@ -817,11 +829,14 @@ pub fn bethe_free_energy(
         return Err(CheckedBPError::NonFiniteMessage { context: "Bethe free energy" });
     }
 
-    let status = match inference.inference_status {
-        InferenceStatus::ExactForest => BetheStatus::ExactForest,
-        InferenceStatus::ApproximateDampedForest | InferenceStatus::ApproximateForest
-        | InferenceStatus::ApproximateLoopy => BetheStatus::ApproximateFixedPoint,
-        InferenceStatus::NotConverged => BetheStatus::NonStationary,
+    let status = if !inference.converged {
+        BetheStatus::NonStationary
+    } else {
+        match (inference.inference_status, inference.graph_structure) {
+            (InferenceStatus::ExactForest, GraphStructure::Forest) => BetheStatus::ExactForest,
+            (InferenceStatus::NotConverged, _) => BetheStatus::NonStationary,
+            _ => BetheStatus::ApproximateFixedPoint,
+        }
     };
 
     Ok(BetheResult {
@@ -1420,6 +1435,57 @@ mod tests {
         let bethe = bethe_free_energy(&graph, &inference).unwrap();
         assert_eq!(bethe.status, BetheStatus::ExactForest);
         assert!((bethe.log_partition_estimate - z.ln()).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn chain_factor_beliefs_match_direct_joint_marginals() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let c = graph.add_variable("C", 2);
+        let f1 = [0.4, 0.1, 0.2, 0.3];
+        let f2 = [0.5, 0.5, 0.3, 0.7];
+        graph.add_factor(&[a, b], f1.to_vec());
+        graph.add_factor(&[b, c], f2.to_vec());
+
+        let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+        let mut z = 0.0;
+        let mut exact_f1 = [0.0; 4];
+        let mut exact_f2 = [0.0; 4];
+        for av in 0..2 {
+            for bv in 0..2 {
+                for cv in 0..2 {
+                    let weight = f1[av * 2 + bv] * f2[bv * 2 + cv];
+                    z += weight;
+                    exact_f1[av * 2 + bv] += weight;
+                    exact_f2[bv * 2 + cv] += weight;
+                }
+            }
+        }
+        for index in 0..4 {
+            assert!((inference.factor_beliefs[0][index] - exact_f1[index] / z).abs() < 1.0e-10);
+            assert!((inference.factor_beliefs[1][index] - exact_f2[index] / z).abs() < 1.0e-10);
+        }
+    }
+
+    #[test]
+    fn bethe_rejects_mutated_factor_belief_dimensions_and_inconsistent_probability_views() {
+        let graph = two_node_tree();
+        let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+
+        let mut wrong_shape = inference.clone();
+        wrong_shape.log_factor_beliefs[0].pop();
+        assert!(matches!(
+            bethe_free_energy(&graph, &wrong_shape),
+            Err(CheckedBPError::BeliefShapeMismatch { .. })
+        ));
+
+        let mut wrong_values = inference.clone();
+        wrong_values.factor_beliefs[0][0] = 0.9;
+        assert!(matches!(
+            bethe_free_energy(&graph, &wrong_values),
+            Err(CheckedBPError::BeliefShapeMismatch { .. })
+        ));
     }
 
     #[test]
