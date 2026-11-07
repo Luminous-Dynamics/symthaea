@@ -170,13 +170,13 @@ pub fn jcs_integer_precision_warnings(value: &Value) -> Vec<JcsIntegerPrecisionW
                     .map(|value| value.to_string())
                     .or_else(|| number.as_u64().map(|value| value.to_string()));
 
-                if let Some(integer_value) = integer {
-                    if integer_outside_ecmascript_safe_range(&integer_value) {
-                        warnings.push(JcsIntegerPrecisionWarning {
-                            json_pointer: pointer,
-                            integer_value,
-                        });
-                    }
+                if let Some(integer_value) = integer
+                    .filter(|integer_value| integer_outside_ecmascript_safe_range(integer_value))
+                {
+                    warnings.push(JcsIntegerPrecisionWarning {
+                        json_pointer: pointer,
+                        integer_value,
+                    });
                 }
             }
             Value::Array(items) => {
