@@ -13,6 +13,22 @@ The spike enables the crate's `bundled-dicts` feature and uses `EnglishPhonemize
 
 The output is a tab-separated diagnostic table containing case ID, input text, Piper Plus IPA tokens, current Muse IPA tokens, and Piper Plus prosody debug output. Both frontends receive the same fixture text. Muse is given one synthetic note per syllable so the existing singing bridge exposes its current per-syllable phone sequence. This makes the baseline comparison executable, while the human-reviewed reference remains a separate source of truth.
 
+## Reference scorer
+
+The research-only scorer compares raw candidate outputs with an independently completed word-level reference CSV:
+
+```bash
+python3 -m unittest discover -s tools/g2p-spike -p 'test_*.py' -v
+python3 tools/g2p-spike/score_reference.py \
+  --candidates piper-plus-g2p-spike.tsv \
+  --references tools/g2p-spike/references.csv \
+  --output g2p-reference-report.json
+```
+
+Copy `references.template.csv` to a separate working copy and have qualified reviewers fill in `accepted_ipa_variants`, `reference_status`, and `reviewer_evidence`. Do not fill reference phones from Piper Plus or Muse output. Mark a word `reviewed` only after independent adjudication; mark an OOV only when reviewers have confirmed the reference status and recorded an evidence reference. Rows still marked `pending` are excluded.
+
+The scorer reports character/code-point PER after token-boundary flattening, exact word pronunciation, heteronym exact accuracy, missing candidate words, and OOV false-positive rate. This is a deliberately simple, transparent first metric. It is **not** a full phonological edit distance: stress accuracy, syllable-boundary F1, dialect variance, phone-feature distances, and contextual variant selection need separate annotation and scoring. The report records the normalization method so results are not mistaken for a standard benchmark PER.
+
 ## Why this candidate
 
 Piper Plus G2P 0.5.3 is a Rust crate released 26 October 2026. Its project documentation states MIT licensing, an IPA-first output API, and eight language backends; English is described as a rule-based CMUdict-derived backend. It avoids linking the GPL eSpeak NG engine into the proposed pipeline.
