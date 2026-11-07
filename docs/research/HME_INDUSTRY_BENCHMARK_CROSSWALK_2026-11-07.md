@@ -247,3 +247,10 @@ A fair head-to-head requires more than equal vector counts. A 16,384D continuous
 3. **Equal-quality Pareto comparisons** (same downstream success / recall floor, then compare bytes, latency and energy with declared measurement boundaries).
 
 If HME uses substantially more bytes per memory than a conventional embedding store, it must demonstrate a task-utility, interference, provenance or state-continuity improvement that justifies the extra footprint. The benchmark must be allowed to show that a conventional embedding or database path wins for a workload; HME should be selected only where its representation-aware semantics are valuable.
+
+
+The bounded-query contract also has a structural artifact:
+- [hme_query_receipt_v0.schema.json](schemas/hme_query_receipt_v0.schema.json)
+- [hme_query_receipt_states_v0.json](fixtures/hme_query_receipt_states_v0.json)
+
+The synthetic receipts distinguish exact full scan, exact safe pruning, approximate candidate completion, budget-exhausted incomplete search and invalid generation. The schema is structural; exact candidate-accounting arithmetic and mathematical bounds require an independent verifier.
