@@ -1,0 +1,42 @@
+{
+  "decision_id": "weather-umbrella",
+  "states": [
+    "sun",
+    "rain"
+  ],
+  "prior": [
+    0.5,
+    0.5
+  ],
+  "actions": [
+    "umbrella",
+    "no_umbrella"
+  ],
+  "utilities": [
+    [
+      8,
+      6
+    ],
+    [
+      10,
+      0
+    ]
+  ],
+  "outcomes": [
+    {
+      "outcome_id": "forecast_sun",
+      "likelihood_by_state": [
+        0.8,
+        0.2
+      ]
+    },
+    {
+      "outcome_id": "forecast_rain",
+      "likelihood_by_state": [
+        0.2,
+        0.8
+      ]
+    }
+  ],
+  "experiment_cost": 0.1
+}
