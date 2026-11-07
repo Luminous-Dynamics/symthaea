@@ -851,15 +851,21 @@ impl SingingRenderPolicy {
     }
 
     /// Additional controls for comparisons specifically targeting phrase
-    /// shaping and breath planning. Current integrated renderers do not yet
-    /// satisfy this policy; they must not be advertised as breath-aware.
+    /// expression curves. Backends may qualify with documented approximations.
     pub fn phrase_expression_comparison() -> Self {
         Self {
-            required_controls: vec![
-                SingingControl::PhraseExpressionCurve,
-                SingingControl::PhraseBreathTiming,
-            ],
+            required_controls: vec![SingingControl::PhraseExpressionCurve],
             allow_approximated: true,
+            allow_conditional: true,
+        }
+    }
+
+    /// Separate qualification for breath-before/after timing and audible
+    /// inhalation behavior. Explicit score rests do not satisfy this policy.
+    pub fn phrase_breath_comparison() -> Self {
+        Self {
+            required_controls: vec![SingingControl::PhraseBreathTiming],
+            allow_approximated: false,
             allow_conditional: true,
         }
     }
@@ -1329,12 +1335,16 @@ mod tests {
     }
 
     #[test]
-    fn phrase_breath_policy_is_distinct_from_score_rest_policy() {
-        let policy = SingingRenderPolicy::phrase_expression_comparison();
-        assert!(
-            policy
-                .required_controls
-                .contains(&SingingControl::PhraseBreathTiming)
+    fn phrase_expression_and_phrase_breath_policies_are_separate() {
+        let expression = SingingRenderPolicy::phrase_expression_comparison();
+        assert_eq!(
+            expression.required_controls,
+            vec![SingingControl::PhraseExpressionCurve]
+        );
+        let breath = SingingRenderPolicy::phrase_breath_comparison();
+        assert_eq!(
+            breath.required_controls,
+            vec![SingingControl::PhraseBreathTiming]
         );
         assert!(
             !SingingRenderPolicy::score_conditioned_comparison()
