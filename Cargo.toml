@@ -1,5 +1,6 @@
 # Cargo workspace placeholders are excluded explicitly so glob discovery
 # remains deterministic and manifest-backed on every pinned-toolchain run.
+# The focused physics lockfile job regenerates and commits the Cargo-resolved graph.
 
 [workspace]
 resolver = "2"
