@@ -411,8 +411,8 @@ pub fn select_supported_candidate(
     let utility_range =
         (i128::from(design.utility_upper_bound) - i128::from(design.utility_lower_bound)) as f64;
     let selection_count = design.headroom.selection.continuation_ids.len();
-    let radius =
-        utility_range * ((2.0 * simultaneous_count as f64 / delta).ln() / (2.0 * selection_count as f64)).sqrt();
+    let radius = utility_range
+        * ((2.0 * simultaneous_count as f64 / delta).ln() / (2.0 * selection_count as f64)).sqrt();
 
     let baseline_mean = mean(&design.headroom.selection.candidates[baseline_index].values);
     let baseline_upper_bound = baseline_mean + radius;
@@ -426,7 +426,8 @@ pub fn select_supported_candidate(
             checked_sum(values).map_err(SupportedSelectorError::InvalidHeadroomDesign)?;
         let mean_difference = (candidate_sum
             .checked_sub(baseline_sum)
-            .ok_or(SupportedSelectorError::WorkCountOverflow)?) as f64
+            .ok_or(SupportedSelectorError::WorkCountOverflow)?)
+            as f64
             / selection_count as f64;
         if mean_difference > 2.0 * radius {
             qualifying.push((index, candidate_sum));
@@ -1172,7 +1173,6 @@ mod tests {
     }
 
 
-
     fn support_record(
         candidate_id: &str,
         disposition: CandidateSupportDisposition,
@@ -1328,7 +1328,10 @@ mod tests {
         );
         let report = select_supported_candidate(&selector).unwrap();
 
-        assert_eq!(report.disposition, SupportedSelectorDisposition::BaselineRetained);
+        assert_eq!(
+            report.disposition,
+            SupportedSelectorDisposition::BaselineRetained
+        );
         assert_eq!(report.selected_candidate_id.as_deref(), Some("baseline"));
         assert_eq!(report.eligible_alternative_count, 0);
         assert_eq!(
@@ -1397,7 +1400,10 @@ mod tests {
         selector.utility_upper_bound = 10;
         let report = select_supported_candidate(&selector).unwrap();
 
-        assert_eq!(report.disposition, SupportedSelectorDisposition::AlternativeSelected);
+        assert_eq!(
+            report.disposition,
+            SupportedSelectorDisposition::AlternativeSelected
+        );
         assert_eq!(report.scope, SelectorScope::EnumeratedBankOnly);
     }
 
