@@ -2316,7 +2316,7 @@ mod tests {
             BTreeSet::from([0, 1, 2]),
             BTreeSet::new(),
         ];
-        let min_fill = interaction_graph_min_fill_order(&graph);
+        let min_fill = interaction_graph_min_fill_order(&graph).unwrap();
         let tight = StrategyBddBudget {
             max_frontier_order_evaluations: 0,
             ..budget()
@@ -2332,7 +2332,7 @@ mod tests {
         let graph = vec![BTreeSet::from([1]), BTreeSet::new()];
         assert!(matches!(
             interaction_graph_frontier_profile(&graph, &[0, 1]),
-            Err(StrategyBddError::DependencyScopeMismatch { .. })
+            Err(StrategyBddError::InteractionGraphAsymmetricEdge { .. })
         ));
     }
 
