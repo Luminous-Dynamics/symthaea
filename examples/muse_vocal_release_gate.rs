@@ -404,7 +404,7 @@ fn validate_rating_inputs(
     let complete = listeners.len() >= minimum_listeners
         && clips.iter().all(|clip| {
             listeners.iter().all(|listener| {
-                by_clip_listener.contains_key(&(clip.clip_id.as_str(), listener))
+                by_clip_listener.contains_key(&(clip.clip_id.as_str(), *listener))
             })
         });
 
