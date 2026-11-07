@@ -101,6 +101,14 @@ the response depends strongly on the initially ordered state and interaction
 regime. A full study must include ensembles of initial states and observables,
 not only a favorable symmetry-broken product state.
 
+The exact graph engine now also accepts explicit ZZ edges and creates
+open-boundary square lattices. For the independent 2D sweep, the interaction
+term preserves a high finite-window response across 2x2, 2x3 and 3x3 grids at
+J=0.5 and pulse errors 0.05, 0.10 and 0.20. The zero-coupling controls have
+near-zero mean demodulated order and low sign coherence. The smallest 2x2
+grid at J=1.5 loses its response quickly under pulse error, demonstrating
+that stronger coupling is not automatically better.
+
 ## Relation to the state of the art
 
 Recent 2026 work demonstrated:
