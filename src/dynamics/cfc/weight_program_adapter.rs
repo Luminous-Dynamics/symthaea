@@ -412,6 +412,36 @@ pub struct CfCHiddenUnitAlignment {
     pub minimum_assignment_margin: Option<f64>,
 }
 
+/// Measured score for one candidate diagnostic probe appended to a frozen probe set.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCProbeCandidateScore {
+    pub candidate_index: usize,
+    /// Digest of the complete augmented probe set, not only the newly added probe.
+    pub augmented_probe_digest: String,
+    pub mean_squared_activation_error: f64,
+    /// Accumulated assignment evidence margin. None means the layer has no alternative assignment.
+    pub assignment_margin: Option<f64>,
+}
+
+/// Deterministic probe-selection receipt for reducing hidden-unit correspondence ambiguity.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CfCDisambiguatingProbeSelection {
+    pub format_version: u32,
+    pub source_model_digest: String,
+    pub candidate_model_digest: String,
+    pub architecture_digest: String,
+    pub manifest_digest: String,
+    pub selected_candidate_index: usize,
+    pub selected_probe: CfCFunctionalProbe,
+    pub selected_augmented_probe_digest: String,
+    pub baseline_assignment_margin: Option<f64>,
+    pub baseline_mean_squared_activation_error: Option<f64>,
+    pub selected_assignment_margin: f64,
+    pub selected_mean_squared_activation_error: f64,
+    /// All evaluated probes in original candidate order.
+    pub candidate_scores: Vec<CfCProbeCandidateScore>,
+}
+
 /// Acceptance thresholds required before a caller uses an inferred unit mapping
 /// to transform parameter groups. These are task-calibrated tolerances, not
 /// universal constants.
@@ -469,6 +499,10 @@ pub enum CfCPermutationAlignmentError {
     FingerprintFailed(String),
     #[error("at least one functional probe is required")]
     EmptyProbeSet,
+    #[error("at least one candidate disambiguating probe is required")]
+    EmptyCandidateProbeSet,
+    #[error("a one-unit hidden layer has no alternative permutation to disambiguate")]
+    NoAlternativeAssignment,
     #[error("layer index {layer_index} is outside 0..{layer_count}")]
     InvalidLayerIndex {
         layer_index: usize,
@@ -651,6 +685,139 @@ pub fn align_cfc_hidden_unit_signatures(
         source_to_candidate,
         mean_squared_activation_error: best_total_cost / (unit_count * probe_count) as f64,
         minimum_assignment_margin,
+    })
+}
+
+/// Select the next functional probe that most increases assignment confidence.
+///
+/// Existing probes are treated as frozen evidence. Each candidate probe is
+/// appended in turn and the complete signature assignment is recomputed.
+/// Candidates are ranked lexicographically by accumulated assignment margin,
+/// then by lower mean-squared activation error, then by original index.
+///
+/// This is deterministic active probe design, not Bayesian expected information
+/// gain: no observation-noise likelihood or posterior over latent mappings is
+/// assumed. It never edits either network.
+pub fn select_cfc_disambiguating_probe(
+    source: &CfCNetwork,
+    candidate: &CfCNetwork,
+    layer_index: usize,
+    existing_probes: &[CfCFunctionalProbe],
+    candidate_probes: &[CfCFunctionalProbe],
+) -> Result<CfCDisambiguatingProbeSelection, CfCPermutationAlignmentError> {
+    if candidate_probes.is_empty() {
+        return Err(CfCPermutationAlignmentError::EmptyCandidateProbeSet);
+    }
+
+    let baseline_alignment = if existing_probes.is_empty() {
+        None
+    } else {
+        let source_set =
+            cfc_hidden_unit_activation_signatures(source, layer_index, existing_probes)?;
+        let candidate_set =
+            cfc_hidden_unit_activation_signatures(candidate, layer_index, existing_probes)?;
+        Some(align_cfc_hidden_unit_signatures(
+            &source_set,
+            &candidate_set,
+        )?)
+    };
+
+    let baseline_assignment_margin = baseline_alignment
+        .as_ref()
+        .and_then(|alignment| alignment.minimum_assignment_margin);
+    let baseline_mean_squared_activation_error = baseline_alignment
+        .as_ref()
+        .map(|alignment| alignment.mean_squared_activation_error);
+
+    let mut candidate_scores = Vec::with_capacity(candidate_probes.len());
+    let mut best_index = None::<usize>;
+
+    for (candidate_index, probe) in candidate_probes.iter().enumerate() {
+        let mut augmented_probes = Vec::with_capacity(existing_probes.len() + 1);
+        augmented_probes.extend_from_slice(existing_probes);
+        augmented_probes.push(probe.clone());
+
+        let source_set =
+            cfc_hidden_unit_activation_signatures(source, layer_index, &augmented_probes)?;
+        let candidate_set =
+            cfc_hidden_unit_activation_signatures(candidate, layer_index, &augmented_probes)?;
+        let alignment = align_cfc_hidden_unit_signatures(&source_set, &candidate_set)?;
+        let assignment_margin = alignment.minimum_assignment_margin;
+
+        candidate_scores.push(CfCProbeCandidateScore {
+            candidate_index,
+            augmented_probe_digest: source_set.probe_digest,
+            mean_squared_activation_error: alignment.mean_squared_activation_error,
+            assignment_margin,
+        });
+
+        if best_index.is_none_or(|best| {
+            let measured = &candidate_scores[candidate_index];
+            let previous = &candidate_scores[best];
+            match measured
+                .assignment_margin
+                .unwrap_or(0.0)
+                .total_cmp(&previous.assignment_margin.unwrap_or(0.0))
+            {
+                std::cmp::Ordering::Greater => true,
+                std::cmp::Ordering::Less => false,
+                std::cmp::Ordering::Equal => {
+                    match previous
+                        .mean_squared_activation_error
+                        .total_cmp(&measured.mean_squared_activation_error)
+                    {
+                        std::cmp::Ordering::Greater => true,
+                        std::cmp::Ordering::Less => false,
+                        std::cmp::Ordering::Equal => candidate_index < best,
+                    }
+                }
+            }
+        }) {
+            best_index = Some(candidate_index);
+        }
+    }
+
+    let selected_candidate_index =
+        best_index.ok_or(CfCPermutationAlignmentError::NoFeasibleAssignment)?;
+    let selected_score = &candidate_scores[selected_candidate_index];
+    let selected_assignment_margin = selected_score
+        .assignment_margin
+        .ok_or(CfCPermutationAlignmentError::NoAlternativeAssignment)?;
+    let selected_probe = candidate_probes[selected_candidate_index].clone();
+
+    let source_fingerprint = source
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    let candidate_fingerprint = candidate
+        .fingerprint()
+        .map_err(CfCPermutationAlignmentError::FingerprintFailed)?;
+    if source_fingerprint.architecture_digest != candidate_fingerprint.architecture_digest {
+        return Err(CfCPermutationAlignmentError::ArchitectureMismatch {
+            source: source_fingerprint.architecture_digest,
+            candidate: candidate_fingerprint.architecture_digest,
+        });
+    }
+    if source_fingerprint.manifest_digest != candidate_fingerprint.manifest_digest {
+        return Err(CfCPermutationAlignmentError::ManifestMismatch {
+            source: source_fingerprint.manifest_digest,
+            candidate: candidate_fingerprint.manifest_digest,
+        });
+    }
+
+    Ok(CfCDisambiguatingProbeSelection {
+        format_version: 1,
+        source_model_digest: source_fingerprint.model_digest,
+        candidate_model_digest: candidate_fingerprint.model_digest,
+        architecture_digest: source_fingerprint.architecture_digest,
+        manifest_digest: source_fingerprint.manifest_digest,
+        selected_candidate_index,
+        selected_probe,
+        selected_augmented_probe_digest: selected_score.augmented_probe_digest.clone(),
+        baseline_assignment_margin,
+        baseline_mean_squared_activation_error,
+        selected_assignment_margin,
+        selected_mean_squared_activation_error: selected_score.mean_squared_activation_error,
+        candidate_scores,
     })
 }
 
