@@ -1,0 +1,497 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_RESPONSE_MODEL_ADEQUACY.schema.json",
+  "title": "Connectome response-model adequacy challenge input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "claim_scope",
+    "dataset_binding",
+    "query",
+    "worlds",
+    "baseline_model_id",
+    "models",
+    "challenges",
+    "interventions",
+    "predictions",
+    "split_manifest",
+    "oracle_expectations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_scope": {
+      "enum": [
+        "synthetic_known_truth",
+        "retrospective_biological",
+        "prospective_biological"
+      ]
+    },
+    "dataset_binding": {
+      "$ref": "#/$defs/dataset_binding"
+    },
+    "query": {
+      "$ref": "#/$defs/query"
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/world"
+      }
+    },
+    "baseline_model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "models": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/model"
+      }
+    },
+    "challenges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/challenge"
+      }
+    },
+    "interventions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/intervention"
+      }
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/prediction"
+      }
+    },
+    "split_manifest": {
+      "$ref": "#/$defs/split_manifest"
+    },
+    "oracle_expectations": {
+      "$ref": "#/$defs/oracle_expectations"
+    }
+  },
+  "$defs": {
+    "sha64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dataset_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "revision_sha256",
+        "evidence_tier",
+        "source_access_receipt_sha256"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "evidence_tier": {
+          "enum": [
+            "SYNTHETIC",
+            "OBSERVATIONAL_FUNCTIONAL",
+            "MEASURED_INTERVENTION",
+            "PROSPECTIVE_INTERVENTION"
+          ]
+        },
+        "source_access_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "query_spec_sha256",
+        "decision_rule_sha256",
+        "baseline_decision",
+        "loss_false_true",
+        "loss_true_false"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "query_spec_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "decision_rule_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "baseline_decision": {
+          "type": "boolean"
+        },
+        "loss_false_true": {
+          "type": "number",
+          "minimum": 0
+        },
+        "loss_true_false": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "world_id",
+        "graph_sha256",
+        "source_evidence_sha256",
+        "biological_disposition",
+        "query_decision",
+        "prior_probability"
+      ],
+      "properties": {
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "source_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "biological_disposition": {
+          "enum": [
+            "ADMISSIBLE",
+            "INADMISSIBLE",
+            "INDETERMINATE",
+            "DISPUTED"
+          ]
+        },
+        "query_decision": {
+          "type": "boolean"
+        },
+        "prior_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "role",
+        "model_sha256",
+        "observation_kernel_sha256",
+        "ancestry_group_ids",
+        "challenge_id"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "BASELINE",
+            "CHALLENGER"
+          ]
+        },
+        "model_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "observation_kernel_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "ancestry_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenge_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "challenge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_id",
+        "challenge_channel_id",
+        "challenge_kind",
+        "disposition",
+        "challenge_unit_ids",
+        "raw_evidence_sha256",
+        "challenge_report_sha256",
+        "adjudication_receipt_sha256",
+        "ancestry_group_ids",
+        "model_id"
+      ],
+      "properties": {
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challenge_channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "challenge_kind": {
+          "enum": [
+            "HELD_OUT_RESIDUAL",
+            "ORTHOGONAL_MEASUREMENT",
+            "INDEPENDENT_MECHANISTIC_MODEL",
+            "BLINDED_REVIEW",
+            "PROBABILITY_SAMPLED_AUDIT"
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "ADMITTED",
+            "REJECTED",
+            "DISPUTED",
+            "INDETERMINATE",
+            "INACCESSIBLE"
+          ]
+        },
+        "challenge_unit_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "raw_evidence_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "challenge_report_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "adjudication_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "ancestry_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "model_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "cost_units",
+        "feasibility_status",
+        "feasibility_receipt_sha256",
+        "safety_profile_sha256"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "feasibility_status": {
+          "enum": [
+            "FEASIBLE",
+            "DISALLOWED",
+            "INACCESSIBLE",
+            "NOT_ASSESSED"
+          ]
+        },
+        "feasibility_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "safety_profile_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "prediction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "intervention_id",
+        "world_id",
+        "model_id",
+        "outcomes"
+      ],
+      "properties": {
+        "intervention_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "world_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "probability"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "split_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_fit_units",
+        "challenge_units",
+        "policy_lockbox_units",
+        "split_sha256"
+      ],
+      "properties": {
+        "model_fit_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "challenge_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "policy_lockbox_units": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "split_sha256": {
+          "$ref": "#/$defs/sha64"
+        }
+      }
+    },
+    "oracle_expectations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseline_expected_query_loss",
+        "baseline_envelope_best_intervention_id",
+        "expanded_envelope_best_intervention_id",
+        "baseline_envelope_robust_loss",
+        "expanded_envelope_robust_loss",
+        "status"
+      ],
+      "properties": {
+        "baseline_expected_query_loss": {
+          "type": "number",
+          "minimum": 0
+        },
+        "baseline_envelope_best_intervention_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expanded_envelope_best_intervention_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baseline_envelope_robust_loss": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "expanded_envelope_robust_loss": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "status": {
+          "enum": [
+            "SYNTHETIC_CONTRACT_VALIDATED",
+            "NOT_PROMOTABLE_UNRESOLVED_CHALLENGE",
+            "NO_FEASIBLE_DISCRIMINATING_INTERVENTION"
+          ]
+        }
+      }
+    }
+  }
+}
