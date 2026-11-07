@@ -752,7 +752,10 @@ fn log_gamma_positive(value: f64) -> f64 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DirichletPredictedOutcome {
     pub outcome_id: String,
+    /// Caller-supplied posterior-predictive mixture, independently checked below.
     pub full_model_predictive_probability: f64,
+    /// P(outcome | model, action, current evidence), keyed by exact reduced-model ID.
+    pub model_predictive_probabilities: Vec<(String, f64)>,
     pub posterior_count_increment: Vec<Vec<f64>>,
 }
 
@@ -801,6 +804,23 @@ pub enum DirichletModelInformationGainError {
     },
     PredictiveProbabilityMassNotNormalized {
         sum: f64,
+    },
+    ModelPredictiveSetMismatch {
+        outcome_id: String,
+    },
+    InvalidModelPredictiveProbability {
+        model_id: String,
+        outcome_id: String,
+        probability: f64,
+    },
+    ModelPredictiveProbabilityMassNotNormalized {
+        model_id: String,
+        sum: f64,
+    },
+    FullPredictiveProbabilityMismatch {
+        outcome_id: String,
+        supplied: f64,
+        derived: f64,
     },
     CountIncrementColumnCountMismatch {
         outcome_id: String,
@@ -853,6 +873,30 @@ impl std::fmt::Display for DirichletModelInformationGainError {
                     "full-model predictive outcome mass sums to {sum}, expected 1"
                 )
             }
+            Self::ModelPredictiveSetMismatch { outcome_id } => write!(
+                f,
+                "outcome {outcome_id} must contain exactly one predictive probability for every current model"
+            ),
+            Self::InvalidModelPredictiveProbability {
+                model_id,
+                outcome_id,
+                probability,
+            } => write!(
+                f,
+                "model {model_id} assigns invalid probability {probability} to outcome {outcome_id}"
+            ),
+            Self::ModelPredictiveProbabilityMassNotNormalized { model_id, sum } => write!(
+                f,
+                "predictive probabilities for model {model_id} sum to {sum}, expected 1 across the action outcomes"
+            ),
+            Self::FullPredictiveProbabilityMismatch {
+                outcome_id,
+                supplied,
+                derived,
+            } => write!(
+                f,
+                "outcome {outcome_id} supplied full-model probability {supplied}, but posterior model averaging gives {derived}"
+            ),
             Self::CountIncrementColumnCountMismatch {
                 outcome_id,
                 expected,
@@ -952,6 +996,15 @@ pub fn evaluate_dirichlet_model_information_gain(
         return Err(DirichletModelInformationGainError::EmptyOutcomeSet);
     }
 
+    let current_model_probabilities = current_model_belief
+        .models
+        .iter()
+        .map(|model| (model.model_id.clone(), model.posterior_probability))
+        .collect::<BTreeMap<_, _>>();
+    let mut model_predictive_mass = current_model_probabilities
+        .keys()
+        .map(|model_id| (model_id.clone(), 0.0_f64))
+        .collect::<BTreeMap<_, _>>();
     let mut outcome_ids = BTreeSet::new();
     let mut full_probability_mass = 0.0;
     for (index, outcome) in action.outcomes.iter().enumerate() {
@@ -973,6 +1026,53 @@ pub fn evaluate_dirichlet_model_information_gain(
             );
         }
         full_probability_mass += probability;
+
+        let mut outcome_model_ids = BTreeSet::new();
+        let mut derived_mixture_probability = 0.0;
+        for (model_id, model_probability) in &outcome.model_predictive_probabilities {
+            if !outcome_model_ids.insert(model_id.clone()) {
+                return Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch {
+                    outcome_id: outcome.outcome_id.clone(),
+                });
+            }
+            let Some(current_model_probability) = current_model_probabilities.get(model_id) else {
+                return Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch {
+                    outcome_id: outcome.outcome_id.clone(),
+                });
+            };
+            if !model_probability.is_finite() || *model_probability < 0.0 || *model_probability > 1.0 {
+                return Err(
+                    DirichletModelInformationGainError::InvalidModelPredictiveProbability {
+                        model_id: model_id.clone(),
+                        outcome_id: outcome.outcome_id.clone(),
+                        probability: *model_probability,
+                    },
+                );
+            }
+            derived_mixture_probability += current_model_probability * model_probability;
+            *model_predictive_mass
+                .get_mut(model_id)
+                .expect("model IDs were checked against the current posterior") += model_probability;
+        }
+        if outcome_model_ids.len() != current_model_probabilities.len()
+            || current_model_probabilities
+                .keys()
+                .any(|model_id| !outcome_model_ids.contains(model_id))
+        {
+            return Err(DirichletModelInformationGainError::ModelPredictiveSetMismatch {
+                outcome_id: outcome.outcome_id.clone(),
+            });
+        }
+        if (probability - derived_mixture_probability).abs() > PROBABILITY_TOLERANCE {
+            return Err(
+                DirichletModelInformationGainError::FullPredictiveProbabilityMismatch {
+                    outcome_id: outcome.outcome_id.clone(),
+                    supplied: probability,
+                    derived: derived_mixture_probability,
+                },
+            );
+        }
+
         if outcome.posterior_count_increment.len() != full_posterior.columns.len() {
             return Err(
                 DirichletModelInformationGainError::CountIncrementColumnCountMismatch {
@@ -1017,6 +1117,16 @@ pub fn evaluate_dirichlet_model_information_gain(
             },
         );
     }
+    for (model_id, probability_mass) in &model_predictive_mass {
+        if (probability_mass - 1.0).abs() > PROBABILITY_TOLERANCE {
+            return Err(
+                DirichletModelInformationGainError::ModelPredictiveProbabilityMassNotNormalized {
+                    model_id: model_id.clone(),
+                    sum: *probability_mass,
+                },
+            );
+        }
+    }
 
     let current_model_entropy_nats = current_model_belief.posterior_model_entropy_nats;
 
@@ -1038,7 +1148,13 @@ pub fn evaluate_dirichlet_model_information_gain(
         // of the current full / Bayesian-model-average parent model. BMR supplies
         // the current and post-outcome model beliefs; it does not redefine the
         // action's observation probabilities.
-        let predictive_probability = outcome.full_model_predictive_probability;
+        let predictive_probability = outcome
+            .model_predictive_probabilities
+            .iter()
+            .map(|(model_id, probability)| {
+                current_model_probabilities[model_id] * probability
+            })
+            .sum::<f64>();
         expected_posterior_model_entropy_nats +=
             predictive_probability * reduced.posterior_model_entropy_nats;
         outcomes.push(DirichletOutcomeModelBelief {
