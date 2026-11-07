@@ -137,6 +137,12 @@ Order-Aware Track-and-Stop (OATS) repeatedly:
 
 Under the paper's stated model conditions, OATS is \(\delta\)-correct and asymptotically matches the characteristic-time lower bound as \(\delta\downarrow0\).
 
+### Identification cost is not always the whole cost
+
+Yang, Tan & Jin (JMLR 2026), *Best Arm Identification with Minimal Regret*, studies fixed-confidence best-arm identification while minimizing cumulative regret. It derives an instance-dependent lower bound and an impossibility result exposing a tension between reducing the expected sample count and reducing regret; its Double KL-UCB method is asymptotically optimal for the paper's single-parameter exponential-family setting: https://www.jmlr.org/beta/papers/v27/24-1612.html
+
+This is not a direct multi-objective OATS comparator. It motivates a separately reported live-experiment objective: **cumulative decision loss incurred while obtaining evidence**. For offline simulation, sampling an arm may only consume compute; for live interventions, choosing an exploratory arm may affect participants, customers, operators or physical systems. Do not combine these into one generic regret number. Report (i) sample/compute cost to certificate, (ii) cumulative outcome regret under a declared decision-loss model, (iii) hard-constraint exposure, and (iv) human/participant burden separately. Compose this with the opportunity-cost outcomes already in [#10601](https://github.com/Luminous-Dynamics/symthaea/issues/10601); any regret-optimal sequential policy needs its own estimand, feedback model and proof.
+
 OATS is the primary comparator, not a claim of SPECTRA novelty. A SPECTRA implementation must first reproduce its exact assumptions and reference behavior. Any gain must be measured against an exact, independently checked OATS implementation.
 
 ### What the published OATS experiment does and does not establish
@@ -243,3 +249,4 @@ This note does not implement OATS, certify the paper's theorem independently, pr
 5. Cao, L., Shi, M. & Shroff, N. (2026). [Provably Efficient Multi-Objective Bandit Algorithms Under Preference-Centric Customization](https://doi.org/10.1609/aaai.v40i24.39072), AAAI 2026.
 6. Cao, L., Shi, M. & Shroff, N. (2026). [Provably Efficient Personalized Multi-Objective Bandits with Proactive Conversational Queries](https://proceedings.mlr.press/v337/cao26a.html), UAI 2026.
 7. Wang, S., Sun, H. & Li, K. (2026). [Preference Is More than Comparisons: Rethinking Dueling Bandits with Augmented Human Feedback](https://doi.org/10.1609/aaai.v40i31.39852), AAAI 2026.
+8. Yang, J., Tan, V. Y. F. & Jin, T. (2026). [Best Arm Identification with Minimal Regret](https://www.jmlr.org/beta/papers/v27/24-1612.html), JMLR 27(86).
