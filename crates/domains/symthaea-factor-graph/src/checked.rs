@@ -322,7 +322,8 @@ fn graph_structure(graph: &FactorGraph) -> GraphStructure {
 
     fn find(parent: &mut [usize], node: usize) -> usize {
         if parent[node] != node {
-            let root = find(parent, parent[node]);
+            let next = parent[node];
+            let root = find(parent, next);
             parent[node] = root;
         }
         parent[node]
@@ -698,6 +699,33 @@ mod tests {
         }).unwrap();
         assert!(!result.converged);
         assert_eq!(result.inference_status, InferenceStatus::NotConverged);
+    }
+
+    #[test]
+    fn stale_or_corrupt_cached_messages_are_ignored() {
+        let graph = two_node_tree();
+        let expected = run_sum_product(&graph, &BPConfig::default()).unwrap();
+
+        let mut corrupted = graph.clone();
+        corrupted.messages.insert((0, 1), vec![f64::NAN, f64::INFINITY]);
+        corrupted.messages.insert((usize::MAX, 0), vec![]);
+        let actual = run_sum_product(&corrupted, &BPConfig::default()).unwrap();
+
+        assert_eq!(actual.beliefs, expected.beliefs);
+        assert_eq!(actual.inference_status, expected.inference_status);
+    }
+
+    #[test]
+    fn zero_iteration_limit_is_rejected() {
+        let graph = two_node_tree();
+        let invalid = BPConfig {
+            max_iterations: 0,
+            ..BPConfig::default()
+        };
+        assert_eq!(
+            run_sum_product(&graph, &invalid),
+            Err(CheckedBPError::InvalidIterationLimit)
+        );
     }
 
     #[test]
