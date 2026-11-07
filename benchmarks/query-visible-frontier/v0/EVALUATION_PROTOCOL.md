@@ -29,6 +29,7 @@ Use each benchmark only under its exact version, license, split, scoring protoco
 | Proposition relationships | ProStruct-RAG / Asteria (EMNLP 2026) | Update, contradiction and support relation retrieval; version-consistent synthesis |
 | Multilingual retrieval | SHIFT, AfrIFact, LAURA and relevant language-specific tracks | Same-language and cross-language retrieval, language/culture preservation and unsupported-language abstention |
 | Query integrity | Evidence-anchor-preserving retrieval tests | Harmful rewrite rate, anchor retention, exact named entity/date/numeric preservation |
+| Source-grounded reading / evidence use | RDQA (EMNLP 2026), Retrieval Myopia (Findings EMNLP 2026) | Parametric Leakage Rate, gold-present reading failure, evidence-use attribution and clean-format recovery |
 | Query-visible frontier | QVF-R synthetic + lawful real-world telemetry cohorts | False eligibility, post-cutoff leakage, replica visibility, as-of version correctness |
 | Enterprise provider adapters | Azure AI Search, Amazon Bedrock Knowledge Bases, Google Vertex AI RAG Engine | Same query/corpus/compute budgets; exact exposed execution and index facts; provider-opaque fields remain Unknown |
 
@@ -51,6 +52,7 @@ Hold the corpus, candidate budget, answer model and evaluation split constant wi
 | A8 | Multilingual index-side harmonization | SHIFT-style language correction; only with lawful, qualified parallel data |
 | A9 | A8 + anchor-preserving query plan | Measure cross-language query reformulation harm |
 | A10 | Full stack + QVF-R eligibility gate | End-to-end query-visible and lifecycle correctness |
+| A11 | Force-injected gold evidence; compare native agent format with clean QA presentation of the exact same evidence | Isolate reading/interpretation failures from retrieval failures without changing evidence availability |
 
 Run one-shot, choice-free fixed-iteration and adaptive-agent variants under the same evidence frontier, model, token/call budget and candidate ceiling. Symthaea #10719 owns causal attribution; do not use different evidence availability or format as a hidden advantage for the adaptive arm.
 
@@ -95,6 +97,9 @@ Do not call a provider's request filter commitment proof that it applied the fil
 - **Bridge Lineage Completeness:** fraction of returned derived propositions whose full parent statement-version, source-span, transform and rights dependencies are present.
 - **Revocation Propagation Delay:** time from effective parent revocation/correction to descendant materialization invalidation or verified stale marking. Keep rights state distinct from index freshness.
 - **Evidence Use / Attribution:** evaluate whether the answer actually uses the required retrieved span, separately from whether that span was retrieved. Use a process-aware source-attribution protocol and human adjudication on a stratified sample.
+- **Parametric Leakage Rate (PLR):** use RDQA's official definition/scorer to quantify correct answers produced without the required source-access path. This prevents parametric recall, guessing or contamination from being counted as source-grounded success.
+- **Gold-Present Reading Failure:** force-inject the gold-bearing evidence into the reader's input and measure failure to extract/use it. This isolates reading/interpretation from retrieval, as in Retrieval Myopia.
+- **Clean-Format Recovery:** with identical retrieved evidence, compare the agent's native interaction format against a clean QA presentation. Report recovery as a reader/presentation effect, not a retrieval improvement or model-learning gain.
 
 A digest or provenance chain proves binding/lineage properties under its contract; it does not prove factual truth, semantic entailment, source independence or a correct rights decision.
 
@@ -129,6 +134,8 @@ These are aspirational gates to test, not current Symthaea results.
 | IndexRAG bridge baseline | Reproduce or exceed the reported +4.6 F1-point average over Naive RAG | Include index compute, parent lineage and invalidation tests |
 | Exact finite-corpus filtering | 0 false negatives in fully enumerable controls | Provider filter mode and scope fixed/verified |
 | Serving-frontier correctness | 0 post-cutoff leakage in deterministic replay | Exact replica and index revision bound |
+| Source-required evidence use | PLR <=5% on source-required held-out tasks | Official RDQA scorer and full process trace |
+| Gold-present reading | <=5% failure when exact gold evidence is force-injected | Same evidence bytes and answer budget across reader-format arms |
 | Efficiency | ≤20% p95 overhead for the QVF eligibility checks in the first integrated prototype | Same hardware, workload and output quality; revise after measuring baseline |
 
 These targets are not interchangeable. In particular, the TEMPO ranking target must not be purchased by dropping historical evidence needed for coverage, and temporal coverage must not be purchased by admitting the wrong proposition version.
@@ -145,6 +152,7 @@ These targets are not interchangeable. In particular, the TEMPO ranking target m
 8. Audit dataset and source licenses before download, training, redistribution or commercial evaluation. A paper's benchmark release does not imply that all underlying source material is commercially reusable.
 9. Publish all failed, abstained, truncated, Unknown and invalidated cases. A run with unavailable evidence is not silently dropped from the denominator.
 10. Preserve exact-head source, artifact digests and validator outputs. A rebase or fixture mutation invalidates earlier qualification until rerun.
+11. For evidence-use/reader-format experiments, inject byte-identical gold evidence, randomize arm order, isolate session/cache state and bind the exact reader input. A clean-format recovery cannot be counted as a retrieval recall gain.
 
 ## Required result packet
 
@@ -167,6 +175,8 @@ Every evaluation packet should include:
 - Re³ / Re² Bench: https://aclanthology.org/2026.acl-long.1180/
 - IndexRAG: https://aclanthology.org/2026.findings-aacl.175/
 - ProStruct-RAG / Asteria: https://aclanthology.org/2026.emnlp-main.294/
+- RDQA: https://aclanthology.org/2026.emnlp-main.1855/
+- Retrieval Myopia: https://aclanthology.org/2026.findings-emnlp.1713/
 - Azure vector filtering: https://learn.microsoft.com/en-us/azure/search/vector-search-filters
 - AWS Bedrock Knowledge Bases: https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html
 - Google RAG Engine Vector Search: https://docs.cloud.google.com/gemini-enterprise-agent-platform/build/rag-engine/use-rag-managed-vertex-ai-vector-search
