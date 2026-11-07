@@ -573,10 +573,7 @@ pub struct SingingBackendCapabilities {
 impl SingingBackendCapabilities {
     pub const SCHEMA: &'static str = "singing-backend-capabilities/v1";
 
-    pub fn new(
-        backend_id: impl Into<String>,
-        controls: Vec<ControlCapability>,
-    ) -> Result<Self> {
+    pub fn new(backend_id: impl Into<String>, controls: Vec<ControlCapability>) -> Result<Self> {
         let capabilities = Self {
             schema: Self::SCHEMA.to_string(),
             backend_id: backend_id.into(),
@@ -639,8 +636,14 @@ impl SingingBackendCapabilities {
                 );
             }
         }
-        if SingingControl::ALL.iter().any(|control| !seen.contains(control)) {
-            bail!("backend {} has an incomplete singing capability manifest", self.backend_id);
+        if SingingControl::ALL
+            .iter()
+            .any(|control| !seen.contains(control))
+        {
+            bail!(
+                "backend {} has an incomplete singing capability manifest",
+                self.backend_id
+            );
         }
         Ok(())
     }
