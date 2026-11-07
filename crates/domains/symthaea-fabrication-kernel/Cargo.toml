@@ -15,6 +15,7 @@ symthaea-atelier = { path = "../symthaea-atelier" }
 symthaea-canvas = { path = "../symthaea-canvas" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 tracing = { workspace = true }
 anyhow = { workspace = true }
 rand = { workspace = true }

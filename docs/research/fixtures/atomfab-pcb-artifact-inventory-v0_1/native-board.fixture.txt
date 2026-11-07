@@ -1,0 +1,2 @@
+SYNTHETIC ARTIFACT-INVENTORY FIXTURE ONLY.
+Not a KiCad board file and not a fabrication-ready design.

@@ -1,0 +1,381 @@
+name: AtomFab Native KiCad CLI Smoke
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/ATOMFAB_KICAD_CLI_SMOKE_V0_1.md"
+      - "docs/research/fixtures/atomfab-kicad-cli-smoke/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-kicad-cli-smoke:
+    name: Native PCB DRC, negative control, Gerber and drill export
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            docs/research/fixtures/atomfab-kicad-cli-smoke
+          sparse-checkout-cone-mode: true
+
+      - name: Run pinned official KiCad CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="kicad/kicad@sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
+          BOARD_REL="docs/research/fixtures/atomfab-kicad-cli-smoke/continuity-coupon.kicad_pcb"
+          BOARD="/work/${BOARD_REL}"
+          OUT_HOST="$GITHUB_WORKSPACE/atomfab-kicad-smoke-out"
+          OUT="/work/atomfab-kicad-smoke-out"
+          mkdir -p "$OUT_HOST/gerbers" "$OUT_HOST/gerbers-repeat" "$OUT_HOST/drill" "$OUT_HOST/drill-repeat"
+          chmod -R a+rwX "$OUT_HOST"
+
+          docker pull --platform linux/amd64 "$IMAGE"
+          kicad() {
+            docker run --rm --platform linux/amd64 \
+              -v "$GITHUB_WORKSPACE:/work" -w /work "$IMAGE" kicad-cli "$@"
+          }
+
+          test -s "$GITHUB_WORKSPACE/$BOARD_REL"
+          cp "$GITHUB_WORKSPACE/$BOARD_REL" "$OUT_HOST/continuity-coupon.kicad_pcb"
+          kicad version > "$OUT_HOST/kicad-version.txt"
+          grep -q "9.0.9" "$OUT_HOST/kicad-version.txt"
+
+          # Positive control: the intentional, small 2-layer coupon should have
+          # no enabled rule violations in the pinned native EDA CLI.
+          set +e
+          kicad pcb drc --severity-all --format json \
+            --output "$OUT/clean-drc.json" --exit-code-violations "$BOARD"
+          clean_exit=$?
+          set -e
+          jq empty "$OUT_HOST/clean-drc.json"
+          if [ "$clean_exit" -ne 0 ]; then
+            echo "Positive-control board has DRC violations (exit=$clean_exit). Findings follow:"
+            jq -c '.violations[]? // empty | {severity: .severity, type: .type, description: .description, items: .items}' "$OUT_HOST/clean-drc.json" || cat "$OUT_HOST/clean-drc.json"
+          fi
+          set +e
+          kicad pcb drc --severity-all --format json \
+            --output "$OUT/clean-drc-repeat.json" --exit-code-violations "$BOARD"
+          repeat_clean_exit=$?
+          set -e
+          test "$repeat_clean_exit" -eq "$clean_exit"
+          diff -u <(jq -S 'del(.date)' "$OUT_HOST/clean-drc.json") <(jq -S 'del(.date)' "$OUT_HOST/clean-drc-repeat.json")
+
+          # Negative control: reroute GND through VCC while keeping both GND
+          # pads connected. An exit code alone is insufficient: require KiCad's
+          # two-net short diagnostic and zero unconnected items.
+          awk '
+            /segment \(start 105 102\.54\) \(end 115 102\.54\).*uuid "30000000-0000-4000-8000-000000000002"/ {
+              print "  (segment (start 105 102.54) (end 110 100) (width 0.5) (layer \"F.Cu\") (net 2) (uuid \"30000000-0000-4000-8000-000000000002\"))"
+              print "  (segment (start 110 100) (end 115 102.54) (width 0.5) (layer \"F.Cu\") (net 2) (uuid \"30000000-0000-4000-8000-000000000003\"))"
+              changed++
+              next
+            }
+            { print }
+            END { if (changed != 1) exit 41 }
+          ' "$GITHUB_WORKSPACE/$BOARD_REL" > "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+          grep -Fq '(segment (start 105 102.54) (end 110 100) (width 0.5) (layer "F.Cu") (net 2)' \
+            "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+          grep -Fq '(segment (start 110 100) (end 115 102.54) (width 0.5) (layer "F.Cu") (net 2)' \
+            "$OUT_HOST/continuity-coupon-shorted.kicad_pcb"
+
+          set +e
+          kicad pcb drc --severity-all --format json \
+            --output "$OUT/shorted-drc.json" --exit-code-violations \
+            "$OUT/continuity-coupon-shorted.kicad_pcb"
+          shorted_exit=$?
+          set -e
+          jq empty "$OUT_HOST/shorted-drc.json"
+
+          # Export actual files from the real board with the pinned CLI.
+          kicad pcb export gerbers --output "$OUT/gerbers/" \
+            --layers F.Cu,B.Cu,F.Mask,B.Mask,F.SilkS,Edge.Cuts \
+            --no-protel-ext "$BOARD"
+          kicad pcb export drill --output "$OUT/drill/" \
+            --format excellon "$BOARD"
+
+          # Replay both exporters into clean directories. Deterministic bytes
+          # are a required benchmark result, not an assumption.
+          kicad pcb export gerbers --output "$OUT/gerbers-repeat/" \
+            --layers F.Cu,B.Cu,F.Mask,B.Mask,F.SilkS,Edge.Cuts \
+            --no-protel-ext "$BOARD"
+          kicad pcb export drill --output "$OUT/drill-repeat/" \
+            --format excellon "$BOARD"
+          diff <(find "$OUT_HOST/gerbers" -maxdepth 1 -type f -printf '%f\\n' | sort) \
+            <(find "$OUT_HOST/gerbers-repeat" -maxdepth 1 -type f -printf '%f\\n' | sort)
+          diff <(find "$OUT_HOST/drill" -maxdepth 1 -type f -printf '%f\\n' | sort) \
+            <(find "$OUT_HOST/drill-repeat" -maxdepth 1 -type f -printf '%f\\n' | sort)
+          # KiCad embeds wall-clock creation timestamps in fabrication files.
+          # Retain/hash raw files, but compare the payload after removing only
+          # declared volatile date metadata.
+          for generated in "$OUT_HOST"/gerbers/*; do
+            repeated="$OUT_HOST/gerbers-repeat/$(basename "$generated")"
+            case "$generated" in
+              *.gbr)
+                diff -u \
+                  <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$generated") \
+                  <(sed -E -e '/^%TF\.CreationDate,/d' -e '/^G04 Created by KiCad .* date /d' "$repeated")
+                ;;
+              *.gbrjob)
+                diff -u \
+                  <(jq -S 'del(.Header.CreationDate)' "$generated") \
+                  <(jq -S 'del(.Header.CreationDate)' "$repeated")
+                ;;
+              *)
+                echo "unexpected Gerber output type: $generated" >&2
+                exit 43
+                ;;
+            esac
+          done
+          for generated in "$OUT_HOST"/drill/*; do
+            repeated="$OUT_HOST/drill-repeat/$(basename "$generated")"
+            diff -u \
+              <(sed -E -e '/^; DRILL file \{KiCad [^}]+\} date /d' -e '/^; #@! TF\.CreationDate,/d' "$generated") \
+              <(sed -E -e '/^; DRILL file \{KiCad [^}]+\} date /d' -e '/^; #@! TF\.CreationDate,/d' "$repeated")
+          done
+
+          gerber_count=$(find "$OUT_HOST/gerbers" -maxdepth 1 -type f -name '*.gbr' -size +0c | wc -l)
+          drill_count=$(find "$OUT_HOST/drill" -maxdepth 1 -type f -size +0c | wc -l)
+          test "$gerber_count" -ge 5
+          test "$drill_count" -ge 1
+
+          # Assert each required fabrication layer by name; a file-count-only
+          # check could otherwise hide a missing copper, mask or outline layer.
+          for expected in \
+            continuity-coupon-F_Cu.gbr \
+            continuity-coupon-B_Cu.gbr \
+            continuity-coupon-F_Mask.gbr \
+            continuity-coupon-B_Mask.gbr \
+            continuity-coupon-F_Silkscreen.gbr \
+            continuity-coupon-Edge_Cuts.gbr; do
+            test -s "$OUT_HOST/gerbers/$expected"
+            test -s "$OUT_HOST/gerbers-repeat/$expected"
+          done
+          test -s "$OUT_HOST/gerbers/continuity-coupon-job.gbrjob"
+          test -s "$OUT_HOST/gerbers-repeat/continuity-coupon-job.gbrjob"
+          test -s "$OUT_HOST/drill/continuity-coupon.drl"
+          grep -qx 'M48' "$OUT_HOST/drill/continuity-coupon.drl"
+          grep -qx '%' "$OUT_HOST/drill/continuity-coupon.drl"
+          grep -q '^T1C1\.000$' "$OUT_HOST/drill/continuity-coupon.drl"
+
+          board_sha=$(sha256sum "$OUT_HOST/continuity-coupon.kicad_pcb" | cut -d ' ' -f 1)
+          git_head=$(git rev-parse HEAD)
+          image_digest="sha256:cef4a572df1465b98fa63cdac88780e0f8d39f03c5493434802bcd92f62123fb"
+          kicad_version=$(cat "$OUT_HOST/kicad-version.txt")
+
+          # Materialize a structured CAM manifest. Every file is opened and
+          # hashed after generation; roles and paths are explicit and unique.
+          artifact_entries_json="$(
+            while IFS= read -r -d '' file; do
+              relative="${file#"$OUT_HOST/"}"
+              case "$relative" in
+                continuity-coupon.kicad_pcb) role=native_board ;;
+                continuity-coupon-shorted.kicad_pcb) role=negative_control_board ;;
+                kicad-version.txt) role=tool_version ;;
+                clean-drc.json) role=clean_drc_report ;;
+                clean-drc-repeat.json) role=clean_drc_repeat_report ;;
+                shorted-drc.json) role=shorted_drc_report ;;
+                gerbers/continuity-coupon-F_Cu.gbr) role=gerber_f_cu ;;
+                gerbers/continuity-coupon-B_Cu.gbr) role=gerber_b_cu ;;
+                gerbers/continuity-coupon-F_Mask.gbr) role=gerber_f_mask ;;
+                gerbers/continuity-coupon-B_Mask.gbr) role=gerber_b_mask ;;
+                gerbers/continuity-coupon-F_Silkscreen.gbr) role=gerber_f_silkscreen ;;
+                gerbers/continuity-coupon-Edge_Cuts.gbr) role=gerber_edge_cuts ;;
+                gerbers/continuity-coupon-job.gbrjob) role=gerber_job_metadata ;;
+                gerbers-repeat/continuity-coupon-F_Cu.gbr) role=repeated_gerber_f_cu ;;
+                gerbers-repeat/continuity-coupon-B_Cu.gbr) role=repeated_gerber_b_cu ;;
+                gerbers-repeat/continuity-coupon-F_Mask.gbr) role=repeated_gerber_f_mask ;;
+                gerbers-repeat/continuity-coupon-B_Mask.gbr) role=repeated_gerber_b_mask ;;
+                gerbers-repeat/continuity-coupon-F_Silkscreen.gbr) role=repeated_gerber_f_silkscreen ;;
+                gerbers-repeat/continuity-coupon-Edge_Cuts.gbr) role=repeated_gerber_edge_cuts ;;
+                gerbers-repeat/continuity-coupon-job.gbrjob) role=repeated_gerber_job_metadata ;;
+                drill/continuity-coupon.drl) role=excellon_drill ;;
+                drill-repeat/continuity-coupon.drl) role=repeated_excellon_drill ;;
+                *) echo "unclassified CAM artifact: $relative" >&2; exit 42 ;;
+              esac
+              digest=$(sha256sum "$file" | cut -d ' ' -f 1)
+              jq -cn --arg path "$relative" --arg role "$role" --arg sha256 "$digest" \
+                '{path:$path,role:$role,expected_sha256:$sha256}'
+            done < <(find "$OUT_HOST" -type f -print0 | sort -z) | jq -s 'sort_by(.path)'
+          )"
+
+          jq -n -S \
+            --arg schema "atomfab-pcb-artifact-inventory-v0.1" \
+            --argjson artifacts "$artifact_entries_json" \
+            '{
+              schema: $schema,
+              design_id: "ATOMFAB-CONTINUITY-COUPON",
+              design_revision: "r0",
+              required_roles: [
+                "clean_drc_repeat_report",
+                "clean_drc_report",
+                "excellon_drill",
+                "gerber_b_cu",
+                "gerber_b_mask",
+                "gerber_edge_cuts",
+                "gerber_f_cu",
+                "gerber_f_mask",
+                "gerber_f_silkscreen",
+                "gerber_job_metadata",
+                "native_board",
+                "negative_control_board",
+                "repeated_excellon_drill",
+                "repeated_gerber_b_cu",
+                "repeated_gerber_b_mask",
+                "repeated_gerber_edge_cuts",
+                "repeated_gerber_f_cu",
+                "repeated_gerber_f_mask",
+                "repeated_gerber_f_silkscreen",
+                "repeated_gerber_job_metadata",
+                "shorted_drc_report",
+                "tool_version"
+              ],
+              artifacts: $artifacts,
+              authority: "artifact_presence_and_digest_inventory_only_no_design_or_production_authority",
+              claim_ceiling: "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
+            }' > "$OUT_HOST/artifact-manifest.json"
+
+          jq -e '
+            .schema == "atomfab-pcb-artifact-inventory-v0.1"
+            and .design_id == "ATOMFAB-CONTINUITY-COUPON"
+            and .design_revision == "r0"
+            and .authority == "artifact_presence_and_digest_inventory_only_no_design_or_production_authority"
+            and .claim_ceiling == "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
+            and .required_roles == [
+                "clean_drc_repeat_report",
+                "clean_drc_report",
+                "excellon_drill",
+                "gerber_b_cu",
+                "gerber_b_mask",
+                "gerber_edge_cuts",
+                "gerber_f_cu",
+                "gerber_f_mask",
+                "gerber_f_silkscreen",
+                "gerber_job_metadata",
+                "native_board",
+                "negative_control_board",
+                "repeated_excellon_drill",
+                "repeated_gerber_b_cu",
+                "repeated_gerber_b_mask",
+                "repeated_gerber_edge_cuts",
+                "repeated_gerber_f_cu",
+                "repeated_gerber_f_mask",
+                "repeated_gerber_f_silkscreen",
+                "repeated_gerber_job_metadata",
+                "shorted_drc_report",
+                "tool_version"
+              ]
+            and .required_roles == ([.artifacts[].role] | unique)
+            and (.artifacts | length) == 22
+            and ([.artifacts[].path] | unique | length) == 22
+            and ([.artifacts[].role] | unique | length) == 22
+            and all(.artifacts[]; .expected_sha256 | test("^[0-9a-f]{64}$"))
+          ' "$OUT_HOST/artifact-manifest.json" > /dev/null
+          manifest_sha=$(sha256sum "$OUT_HOST/artifact-manifest.json" | cut -d ' ' -f 1)
+
+          jq -n \
+            --arg schema "atomfab-kicad-cli-smoke-receipt-v0.1" \
+            --arg git_head "$git_head" \
+            --arg board_path "$BOARD_REL" \
+            --arg board_sha256 "$board_sha" \
+            --arg artifact_manifest_sha256 "$manifest_sha" \
+            --argjson artifact_count "$(jq '.artifacts | length' "$OUT_HOST/artifact-manifest.json")" \
+            --arg image "$IMAGE" \
+            --arg image_digest "$image_digest" \
+            --arg kicad_version "$kicad_version" \
+            --arg clean_drc_exit_code "$clean_exit" \
+            --arg shorted_drc_exit_code "$shorted_exit" \
+            --argjson gerber_count "$gerber_count" \
+            --argjson drill_file_count "$drill_count" \
+            --argjson clean_drc_violation_types "$(jq -c '[.violations[]? | .type] | sort' "$OUT_HOST/clean-drc.json")" \
+            --argjson clean_drc_violation_count "$(jq '.violations | length' "$OUT_HOST/clean-drc.json")" \
+            --argjson clean_drc_unconnected_count "$(jq '.unconnected_items | length' "$OUT_HOST/clean-drc.json")" \
+            --argjson shorted_drc_violation_types "$(jq -c '[.violations[]? | .type] | sort' "$OUT_HOST/shorted-drc.json")" \
+            --argjson shorted_drc_violation_count "$(jq '.violations | length' "$OUT_HOST/shorted-drc.json")" \
+            --argjson shorted_drc_unconnected_count "$(jq '.unconnected_items | length' "$OUT_HOST/shorted-drc.json")" \
+            '{
+              schema: $schema,
+              git_head: $git_head,
+              board_path: $board_path,
+              board_sha256: $board_sha256,
+              artifact_manifest: {
+                path: "artifact-manifest.json",
+                sha256: $artifact_manifest_sha256,
+                artifact_count: $artifact_count
+              },
+              tool: {
+                image: $image,
+                pinned_image_digest: $image_digest,
+                version_output: $kicad_version
+              },
+              controls: {
+                clean_board_drc_exit_code: ($clean_drc_exit_code | tonumber),
+                clean_board_report_parsed_as_json: true,
+                clean_board_violation_types: $clean_drc_violation_types,
+                clean_board_violation_count: $clean_drc_violation_count,
+                clean_board_unconnected_item_count: $clean_drc_unconnected_count,
+                repeated_clean_drc_semantically_equal_after_date_normalization: true,
+                repeated_gerber_payloads_match_after_timestamp_normalization: true,
+                repeated_drill_payloads_match_after_timestamp_normalization: true,
+                intentionally_shorted_board_drc_exit_code: ($shorted_drc_exit_code | tonumber),
+                expected_shorted_board_exit_code: 5,
+                shorted_board_violation_types: $shorted_drc_violation_types,
+                shorted_board_violation_count: $shorted_drc_violation_count,
+                shorted_board_unconnected_item_count: $shorted_drc_unconnected_count
+              },
+              generated_outputs: {
+                nonempty_gerber_files: $gerber_count,
+                nonempty_drill_files: $drill_file_count,
+                required_gerber_filename_set_checked: true,
+                expected_excellon_filename_and_header_checked: true
+              },
+              authority: "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority",
+              claim_ceiling: "The CLI parsed the fixture and generated the recorded outputs; this does not prove physical board conformity, electrical safety, assembly quality, or product qualification."
+            }' > "$OUT_HOST/receipt.json"
+
+          # Portable, artifact-root-relative checksums. This bundle must verify
+          # after download on another host; never leak runner absolute paths.
+          (
+            cd "$OUT_HOST"
+            find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+          jq -e '
+            .schema == "atomfab-kicad-cli-smoke-receipt-v0.1"
+            and (.git_head | test("^[0-9a-f]{40}$"))
+            and (.board_sha256 | test("^[0-9a-f]{64}$"))
+            and .artifact_manifest.path == "artifact-manifest.json"
+            and (.artifact_manifest.sha256 | test("^[0-9a-f]{64}$"))
+            and .artifact_manifest.artifact_count == 22
+            and .controls.clean_board_drc_exit_code == 0
+            and .controls.clean_board_violation_count == 0
+            and .controls.clean_board_unconnected_item_count == 0
+            and (.controls.clean_board_violation_types | length) == 0
+            and .controls.repeated_clean_drc_semantically_equal_after_date_normalization
+            and .controls.repeated_gerber_payloads_match_after_timestamp_normalization
+            and .controls.repeated_drill_payloads_match_after_timestamp_normalization
+            and .controls.intentionally_shorted_board_drc_exit_code == 5
+            and .controls.expected_shorted_board_exit_code == 5
+            and (.controls.shorted_board_violation_types | any(. == "shorting_items" or . == "tracks_crossing"))
+            and .controls.shorted_board_violation_count >= 1
+            and .controls.shorted_board_unconnected_item_count == 0
+            and .generated_outputs.nonempty_gerber_files == 6
+            and .generated_outputs.nonempty_drill_files == 1
+            and .generated_outputs.required_gerber_filename_set_checked
+            and .generated_outputs.expected_excellon_filename_and_header_checked
+            and .authority == "native_eda_cli_drc_and_export_smoke_only_no_physical_or_production_release_authority"
+          ' "$OUT_HOST/receipt.json"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: atomfab-kicad-cli-smoke-receipt
+          path: atomfab-kicad-smoke-out/
+          if-no-files-found: warn

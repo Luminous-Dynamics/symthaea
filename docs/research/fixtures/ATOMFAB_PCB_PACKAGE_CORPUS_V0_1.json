@@ -1,0 +1,1060 @@
+{
+  "schema": "atomfab-pcb-package-corpus-v0.1",
+  "version": "0.1.0",
+  "authority": "synthetic_package_integrity_only_no_fabrication_or_execution_authority",
+  "case_count": 12,
+  "evidence_boundary": {
+    "inputs_are_synthetic": true,
+    "ready_for_review_does_not_mean_manufacturable": true,
+    "ready_for_review_does_not_mean_physical_qualification": true,
+    "package_validation_does_not_authorize_machine_execution": true
+  },
+  "required_source_roles": [
+    "board_native",
+    "schematic_native",
+    "netlist",
+    "bom_source"
+  ],
+  "required_output_roles": [
+    "gerber_front_copper",
+    "gerber_back_copper",
+    "gerber_outline",
+    "drill_file",
+    "bom_export",
+    "placement_csv"
+  ],
+  "cases": [
+    {
+      "id": "PCB-PKG-001",
+      "description": "Native sources, current DRC, and all required outputs agree on board revision",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "ready_for_review",
+        "reason_codes": [
+          "PACKAGE_AND_DRC_BINDINGS_VALID"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-002",
+      "description": "Required back-copper Gerber is missing",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "incomplete",
+        "reason_codes": [
+          "MISSING_REQUIRED_OUTPUT:gerber_back_copper"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-003",
+      "description": "DRC explicitly reports rule violations",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "violations",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "DRC_HAS_VIOLATIONS"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-004",
+      "description": "DRC report was generated from a different board digest",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "DRC_BOARD_DIGEST_MISMATCH"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-005",
+      "description": "DRC report board revision does not match package",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r0",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "DRC_REVISION_MISMATCH"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-006",
+      "description": "Drill artifact was generated for an older board revision",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r0"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "ARTIFACT_REVISION_MISMATCH:drill_file"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-007",
+      "description": "Drill output has a malformed SHA-256 value",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "xyz",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "INVALID_ARTIFACT_DIGEST:drill_file"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-008",
+      "description": "Two exported artifacts alias the same relative path",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "DUPLICATE_ARTIFACT_PATH:fab/board-F_Cu.gbr"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-009",
+      "description": "Export output path attempts directory traversal",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "../unsafe.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "UNSAFE_ARTIFACT_PATH:../unsafe.gbr"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-010",
+      "description": "Native schematic source is absent",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "incomplete",
+        "reason_codes": [
+          "MISSING_REQUIRED_SOURCE:schematic_native"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-011",
+      "description": "DRC run state is unknown and therefore cannot establish readiness",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "unknown",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "disposition": "incomplete",
+        "reason_codes": [
+          "DRC_NOT_CLEAN:unknown"
+        ]
+      }
+    },
+    {
+      "id": "PCB-PKG-012",
+      "description": "DRC report uses a different rule-profile digest from the required profile",
+      "package": {
+        "schema": "atomfab-pcb-manufacturing-package-v0.1",
+        "version": "0.1.0",
+        "package_id": "atomfab-demo-board-r1",
+        "board_revision": "BOARD-r1",
+        "target_drc_profile_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "source_artifacts": [
+          {
+            "role": "board_native",
+            "path": "project/board.kicad_pcb",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "schematic_native",
+            "path": "project/board.kicad_sch",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "netlist",
+            "path": "export/board.net",
+            "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_source",
+            "path": "project/bom.csv",
+            "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "output_artifacts": [
+          {
+            "role": "gerber_front_copper",
+            "path": "fab/board-F_Cu.gbr",
+            "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_back_copper",
+            "path": "fab/board-B_Cu.gbr",
+            "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "gerber_outline",
+            "path": "fab/board-Edge_Cuts.gbr",
+            "sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "drill_file",
+            "path": "fab/board.drl",
+            "sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "bom_export",
+            "path": "assy/bom.csv",
+            "sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "board_revision": "BOARD-r1"
+          },
+          {
+            "role": "placement_csv",
+            "path": "assy/placement.csv",
+            "sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+            "board_revision": "BOARD-r1"
+          }
+        ],
+        "drc": {
+          "status": "clean",
+          "source_board_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "board_revision": "BOARD-r1",
+          "profile_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      "expected": {
+        "disposition": "rejected",
+        "reason_codes": [
+          "DRC_PROFILE_DIGEST_MISMATCH"
+        ]
+      }
+    }
+  ]
+}

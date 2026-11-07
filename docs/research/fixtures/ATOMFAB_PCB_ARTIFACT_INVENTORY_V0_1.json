@@ -1,0 +1,26 @@
+{
+  "schema": "atomfab-pcb-artifact-inventory-v0.1",
+  "design_id": "ATOMFAB-ARTIFACT-IO-SMOKE",
+  "design_revision": "r0",
+  "required_roles": [
+    "drc_report",
+    "gerber_top_copper",
+    "native_board"
+  ],
+  "artifacts": [
+    {
+      "role": "native_board",
+      "path": "atomfab-pcb-artifact-inventory-v0_1/native-board.fixture.txt"
+    },
+    {
+      "role": "drc_report",
+      "path": "atomfab-pcb-artifact-inventory-v0_1/drc-report.fixture.txt"
+    },
+    {
+      "role": "gerber_top_copper",
+      "path": "atomfab-pcb-artifact-inventory-v0_1/gerber-top-copper.fixture.txt"
+    }
+  ],
+  "authority": "artifact_presence_and_digest_inventory_only_no_design_or_production_authority",
+  "claim_ceiling": "Artifact presence and SHA-256 inventory only; no KiCad DRC, design manufacturability, physical quality, safety, or production-release authority."
+}
