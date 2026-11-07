@@ -44,7 +44,17 @@
           ],
           "quality_status": "accepted",
           "disposition_reason": "Completed within window; synthetic quality gate accepted.",
-          "evidence_ref": "synthetic:expected-disposition:watermaker_daily"
+          "evidence_ref": "synthetic:expected-disposition:watermaker_daily",
+          "residuals_generated": [
+            {
+              "carrier": "brine_concentrate",
+              "quantity": 14.4,
+              "unit": "L",
+              "disposition": "contained_for_shore_disposal",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "evidence_ref": "synthetic:brine-meter"
+            }
+          ]
         },
         {
           "service_id": "hot_water_recovery",
@@ -75,7 +85,8 @@
           ],
           "quality_status": "accepted",
           "disposition_reason": "Delivered through synthetic electric plus recoverable-heat inputs.",
-          "evidence_ref": "synthetic:expected-disposition:hot_water_recovery"
+          "evidence_ref": "synthetic:expected-disposition:hot_water_recovery",
+          "residuals_generated": []
         },
         {
           "service_id": "workshop_charge",
@@ -101,7 +112,8 @@
           ],
           "quality_status": "accepted",
           "disposition_reason": "Task energy stored; synthetic conversion loss retained in input ledger.",
-          "evidence_ref": "synthetic:expected-disposition:workshop_charge"
+          "evidence_ref": "synthetic:expected-disposition:workshop_charge",
+          "residuals_generated": []
         }
       ],
       "hard_constraints": [
@@ -129,6 +141,11 @@
           "constraint_id": "service_deadlines",
           "status": "satisfied",
           "evidence_ref": "synthetic:deadline-audit"
+        },
+        {
+          "constraint_id": "brine_contained_for_shore_disposal",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:brine-disposition"
         }
       ],
       "carrier_ledger": [
@@ -195,6 +212,14 @@
           "quantity": 2,
           "unit": "kWh_e",
           "source_ref": "synthetic:stored-energy"
+        },
+        {
+          "service_id": "watermaker_daily",
+          "direction": "output",
+          "carrier": "brine_concentrate",
+          "quantity": 14.4,
+          "unit": "L",
+          "source_ref": "synthetic:concentrate-flow-meter"
         }
       ],
       "policy": {
@@ -234,7 +259,8 @@
           "outputs_delivered": [],
           "quality_status": "unknown",
           "disposition_reason": "Deferred to preserve battery reserve during low-solar fixed-propulsion segment.",
-          "evidence_ref": "synthetic:expected-disposition:watermaker_replenishment"
+          "evidence_ref": "synthetic:expected-disposition:watermaker_replenishment",
+          "residuals_generated": []
         },
         {
           "service_id": "hot_water_optional",
@@ -246,7 +272,8 @@
           "outputs_delivered": [],
           "quality_status": "not_applicable",
           "disposition_reason": "Deferred within declared comfort/service window; no safety-critical service shed.",
-          "evidence_ref": "synthetic:expected-disposition:hot_water_optional"
+          "evidence_ref": "synthetic:expected-disposition:hot_water_optional",
+          "residuals_generated": []
         }
       ],
       "hard_constraints": [
@@ -323,7 +350,17 @@
           ],
           "quality_status": "accepted",
           "disposition_reason": "Water service delivered; battery reserve remained above declared minimum in the synthetic case.",
-          "evidence_ref": "synthetic:expected-disposition:urgent_water_reserve"
+          "evidence_ref": "synthetic:expected-disposition:urgent_water_reserve",
+          "residuals_generated": [
+            {
+              "carrier": "brine_concentrate",
+              "quantity": 18,
+              "unit": "L",
+              "disposition": "contained_for_shore_disposal",
+              "disposition_ref": "synthetic:brine-tank-shore-disposal",
+              "evidence_ref": "synthetic:brine-meter"
+            }
+          ]
         },
         {
           "service_id": "discretionary_hot_water",
@@ -335,7 +372,8 @@
           "outputs_delivered": [],
           "quality_status": "not_applicable",
           "disposition_reason": "Deferred to protect potable-water and battery reserves.",
-          "evidence_ref": "synthetic:expected-disposition:discretionary_hot_water"
+          "evidence_ref": "synthetic:expected-disposition:discretionary_hot_water",
+          "residuals_generated": []
         }
       ],
       "hard_constraints": [
@@ -353,6 +391,11 @@
           "constraint_id": "potable_water_quality_gate",
           "status": "satisfied",
           "evidence_ref": "synthetic:water-quality-audit"
+        },
+        {
+          "constraint_id": "brine_contained_for_shore_disposal",
+          "status": "satisfied",
+          "evidence_ref": "synthetic:brine-disposition"
         }
       ],
       "carrier_ledger": [
@@ -379,6 +422,14 @@
           "quantity": 100,
           "unit": "L",
           "source_ref": "synthetic:product-meter"
+        },
+        {
+          "service_id": "urgent_water_reserve",
+          "direction": "output",
+          "carrier": "brine_concentrate",
+          "quantity": 18,
+          "unit": "L",
+          "source_ref": "synthetic:concentrate-flow-meter"
         }
       ],
       "policy": {
@@ -418,7 +469,8 @@
           "outputs_delivered": [],
           "quality_status": "unknown",
           "disposition_reason": "Blocked because seawater feed is outside the synthetic qualified envelope; no water or energy-output credit is permitted.",
-          "evidence_ref": "synthetic:expected-disposition:watermaker_attempt"
+          "evidence_ref": "synthetic:expected-disposition:watermaker_attempt",
+          "residuals_generated": []
         }
       ],
       "hard_constraints": [
@@ -471,7 +523,8 @@
           "outputs_delivered": [],
           "quality_status": "unknown",
           "disposition_reason": "No schedule recommendation: battery state-of-charge/temperature telemetry is stale or unavailable.",
-          "evidence_ref": "synthetic:expected-disposition:watermaker_daily"
+          "evidence_ref": "synthetic:expected-disposition:watermaker_daily",
+          "residuals_generated": []
         }
       ],
       "hard_constraints": [
