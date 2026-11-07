@@ -265,7 +265,6 @@ pub struct StrategyBddFrontierRefinementReport {
     pub order_evaluations: usize,
 }
 
-
 /// Evidence for exact semantic-support reduction of one strategy function.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StrategySupportReductionReport {
@@ -2147,13 +2146,12 @@ mod tests {
     #[test]
     fn end_to_end_compiler_rejects_truth_value_owner_mismatch() {
         let (problem, prefix) = equality_qbf_problem();
-        let mut candidate =
-            super::super::quantified_strategy::evaluate_qbf_with_strategy(
-                &problem,
-                &prefix,
-                QuantifiedEvaluationBudget::default(),
-            )
-            .unwrap();
+        let mut candidate = super::super::quantified_strategy::evaluate_qbf_with_strategy(
+            &problem,
+            &prefix,
+            QuantifiedEvaluationBudget::default(),
+        )
+        .unwrap();
         candidate.strategy.owner = StrategyOwner::Universal;
         assert!(matches!(
             verify_and_compile_qbf_strategy(
