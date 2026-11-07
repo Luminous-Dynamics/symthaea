@@ -32,7 +32,9 @@ Descending-command probe keys require the exact source identity DNg100, DNg97 or
 
 ## Fail-closed semantics
 
-No response, failed assay, missing track, out-of-support and not-assessed are explicit states. They are not encoded as six zero phase shifts. Probe keys preserve context, perturbation class, sender leg or exact descending-neuron identity, phase bin, perturbation magnitude bin and response delay. Magnitude bins are bounded to 16 in V1; the perturbation receipt digest commits the physical dose/strength mapping. Duplicate rows, missing grid cells, invalid phase bins and mismatched model probe grids are rejected.
+No response, failed assay, missing track, out-of-support and not-assessed are explicit states. They are not encoded as six zero phase shifts. Probe keys preserve context, perturbation class, sender leg or exact descending-neuron identity, phase bin, perturbation magnitude bin and response delay. Magnitude bins are bounded to 16 in V1; the perturbation receipt digest commits the physical dose/strength mapping.
+
+This crate is an adapter, not a phase oscillator or optimiser. Symtropy #3926 supplies phase-network traces; #3454 owns noise-aware predictive separation; #3345 owns physical contact feedback; #3478 hands frozen predictions to Symthaea EIG/Fisher/EVSI objectives. Duplicate rows, missing grid cells, invalid phase bins and mismatched model probe grids are rejected.
 
 Model-separation diagnostics compare exact circular L1 distances over the same registered probe cells. They are deterministic phase-unit diagnostics, not likelihoods, probabilities, causal effects or biological effect sizes. A positive distance only distinguishes supplied finite model signatures on the supplied design.
 
