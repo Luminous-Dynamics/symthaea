@@ -554,3 +554,30 @@ Exact/stride-sampled similarity semantics are tracked separately in [#10918 — 
 The companion [HME industry benchmark crosswalk](HME_INDUSTRY_BENCHMARK_CROSSWALK_2026-11-07.md) maps HME claims to three separate benchmark layers: HDC representation/dynamics, agent-memory utility/governance, and storage/retrieval systems. It reuses #8427, #9145, #9075, #9177, #9139, #7922, #7934, #7955, #7864/#7866 and #10896; it does not create a competing benchmark runner.
 
 A new research child, [#10945 — HME-EXACT-PRUNE-001](https://github.com/Luminous-Dynamics/symthaea/issues/10945), investigates progressive exact scans using admissible partial-score bounds. The goal is to stop reading a candidate only after proving it cannot enter top-k, while preserving full-scan oracle IDs, ordering and scores. This is distinct from ANN: all candidates remain logically accounted for, and approximate indexes may reorder evaluation but may not omit candidates. The Binary/Hamming and Continuous/cosine bounds have separate proof and numeric-safety requirements. No speedup is claimed; a full scan remains the fallback and canonical oracle.
+
+
+## 16. Bounded query execution, explicit approximation profiles and current research children
+
+Three further child programmes extend HME without creating a new manager or benchmark system:
+
+- [#10945 — progressive exact scans with admissible early-abandon bounds](https://github.com/Luminous-Dynamics/symthaea/issues/10945). Full candidate accounting; prune only by a proven conservative bound; optional proof-carrying receipts.
+- [#10973 — bounded query execution and truthful completion states](https://github.com/Luminous-Dynamics/symthaea/issues/10973). Separates ExactComplete, ApproximateComplete, Incomplete, BudgetExhausted and UnavailableOrInvalid. A best-so-far result is not a complete top-k. Composes #5471 value-of-computation and #9177 proof-packet budgets.
+- [#10974 — phase-balanced, uncertainty-aware approximate similarity](https://github.com/Luminous-Dynamics/symthaea/issues/10974). Characterizes fixed-origin `step_by(stride)` aliasing and evaluates seeded stratified / phase-rotating / adaptive-refinement profiles. Legacy cognition throttling remains unchanged until qualified migration.
+
+Two deterministic machine-readable fixtures are checked into this branch:
+- `docs/research/fixtures/hme_query_sampling_and_completion_v0.json`
+- `docs/research/fixtures/hme_progressive_exact_bounds_v0.json`
+
+The small sampling fixture contains counterexamples where fixed-origin stride 4 maps full cosine 1.0 to its zero-norm fallback 0.0, and maps full cosine 0.0 to sampled cosine 1.0. The progressive-bound fixture checks 19,200 small continuous real-arithmetic prefix cases and 768 four-bit binary cases; no mathematical under-bound was observed within the declared enumeration tolerance. It also demonstrates an ordinary binary64 evaluation of the ContinuousHV upper-bound expression returning 0.4999999999999999 when the true cosine is 0.5, sufficient to falsely prune at a 0.49999999999999994 threshold. This is a concrete reason not to treat an ordinary floating-point value as a conservative bound.
+
+These are small synthetic contract fixtures and independent arithmetic sanity checks, not Rust tests, production floating-point proofs, benchmark runs or performance claims.
+
+## 17. Similarity numerical contract details
+
+The source audit behind [#10918](https://github.com/Luminous-Dynamics/symthaea/issues/10918) additionally found:
+- Full-coordinate coverage is not bitwise-deterministic scoring: AVX2+FMA, scalar fallback and unrolled scalar paths use different accumulation orders.
+- `ContinuousHV::from_vec` accepts arbitrary f32 values even though the representation is described as [-1,1]; NaN/Inf/out-of-profile and overflow semantics must be explicit at HME segment admission.
+- The current cosine implementation returns 0.0 when the product-norm denominator is below 1e-10; a future checked profile must version any changed near-zero behavior.
+- Higher-level helpers may sanitize non-finite results while `ContinuousHV::similarity` itself does not; HME must not inherit caller-specific silent sanitization.
+
+HME's exact score profile must bind full-coordinate coverage, accumulation semantics, numeric domain, zero/near-zero behavior, non-finite rejection and tie ordering. A similarity tolerance is not permission to change top-k ordering near ties.
