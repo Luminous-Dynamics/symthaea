@@ -6,9 +6,11 @@
 //! and delegates all measurement to the existing trace analyzer.
 
 use crate::{AttemptDisposition, ExecutionRegime, WorkerAttempt, WorkerTrace};
+use serde::Deserialize;
 use std::collections::BTreeSet;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimulationTask {
     pub attempt_id: String,
     pub candidate_id: String,
