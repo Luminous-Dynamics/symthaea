@@ -16,14 +16,14 @@ Accepted variants are explicit so contextual heteronyms and dialect variants can
 
 ## Metrics
 
-- Phone error rate: (substitutions + deletions + insertions) / reference phone count.
+- In-vocabulary phone error rate: (substitutions + deletions + insertions) / in-vocabulary reference phone count. OOV cases are excluded from this denominator and numerator; guessed phones on an OOV case remain visible in the case-level candidate phone count and are evaluated separately by OOV detection.
 - Exact pronunciation rate by case.
 - Syllable-boundary precision, recall, and F1; final utterance terminators are excluded from internal-boundary scoring.
 - Lexical stress accuracy on cases where reference and candidate syllable counts agree.
 - OOV precision, recall, F1, and accuracy.
 - Optional Brier score for a system-provided exact-pronunciation confidence. It is omitted if no such probability is supplied.
 
-All metrics with no valid denominator or no candidate estimate are null/undefined, not zero. The exact-pronunciation rate denominator contains only in-vocabulary cases; OOV detection is scored separately. Unknown phones remain tokens; no fuzzy symbol mapping is applied. Malformed reference or candidate structure, duplicate IDs, missing cases, mixed system identities, and contradictory OOV declarations fail closed.
+All metrics with no valid denominator or no candidate estimate are null/undefined, not zero. The exact-pronunciation and phone-error-rate denominators contain only in-vocabulary cases; OOV detection is scored separately. Unknown phones remain tokens; no fuzzy symbol mapping is applied. Malformed reference or candidate structure, duplicate case/variant IDs, missing cases, mixed system identities, standalone stress/length-marker tokens, stress values without boundaries, and contradictory OOV declarations fail closed.
 
 ## Run
 
