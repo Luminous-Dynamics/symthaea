@@ -5,7 +5,7 @@
 
 ## Findings addressed by this patch
 
-The shared VocalPerformance constructor now explicitly reflects the current English-only Muse G2P frontend. It rejects non-English language tags, and preflights orthography so unsupported graphemes, digits and internal punctuation cannot be silently skipped by the ASCII letter fallback. Boundary punctuation around supported words is accepted. It also rejects a melody with fewer notes than the lyric syllable count rather than silently dropping trailing lyrics. Surplus melody notes continue to be represented as melisma.
+The shared VocalPerformance constructor and validator now explicitly reflect the current English-only Muse G2P frontend. They reject non-English language tags, unsupported graphemes, digits, internal punctuation, tokens that produce no G2P syllables, and serialized performances whose declared syllable count no longer matches their lyrics. Boundary punctuation around supported words is accepted. The constructor also rejects a melody with fewer notes than the lyric syllable count rather than silently dropping trailing lyrics. Surplus melody notes continue to be represented as melisma. These checks prevent silent corruption; they do not prove the letter-fallback frontend produced a linguistically correct pronunciation. The remaining G2P coverage/accuracy problem is tracked separately in issue #10869.
 
 The physical-tract singing prototype in `src/voice/functional_singing.rs` was not declared by `src/voice/mod.rs`. I temporarily exposed it behind the `singing` feature to test its actual integration contract. Exact-head compilation then showed that it references a set of physical renderer types and controller methods absent from the current `symthaea-vocal-tract` crate API (including `GesturePlanner`, `BranchedWaveguideV2`, `PhysicalTractFrame`, `phoneme_latent`, and `latent_output`). The module was therefore removed from the compiled module graph again, and the prototype file was restored unchanged. It is not a working or production-integrated backend in the current tree.
 
@@ -20,10 +20,13 @@ This patch:
 - sustains the last explicitly marked vowel across melisma; consonant-only syllables cannot acquire an implicit schwa;
 - requires the voicebank's silence token explicitly;
 - rejects a non-English performance language in the current English-only DiffSinger worker;
-- hardens `VocalPerformance` construction and validation (language mismatch, dropped lyric syllables, invalid note/phoneme/expression values, overlapping melismas and malformed timelines);
+- hardens `VocalPerformance` construction and validation (language mismatch, unsupported orthography, unpronounceable tokens, lyric/syllable mismatch, dropped lyric syllables, invalid note/phoneme/expression values, overlapping melismas and malformed timelines);
+- adds a Muse G2P phone-inventory fixture so new source phones cannot silently lack a DiffSinger mapping;
+- removes the unintegrated physical singer from the comparative release gate;
+- adds exact per-case melody/performance receipts and BLAKE3 digests for serialized performance inputs and rendered WAV artifacts;
 - records and repairs six source-only workspace paths and a stale `sha2` lockfile entry needed for a truthful feature compile.
 
-No claim is made that the physical waveguide singer is exposed or buildable by this patch.
+No claim is made that the physical waveguide singer is exposed or buildable by this patch. The comparison gate now covers only the integrated Kokoro path and optional DiffSinger worker. Its `run_manifest.json` records the source revision, voice ID, optional worker path, per-case seed/lyrics/style/score notes, and serialized VocalPerformance digest. Each blind clip carries the exact WAV-file digest and its performance-input digest. The manifest does not yet attest the full voicebank/model-weight tree; that needs a separate provisioned-model manifest before claiming complete model provenance.
 ## Research framing: benchmark different tasks separately
 
 There is no single leaderboard that answers whether a system is a good singer under a prescribed score.
@@ -79,7 +82,7 @@ The same held-out lyric/score set should be sent to every score-conditioned back
 - No fallback substitution: zero unknown-phone-to-schwa or unknown-language-to-ID-zero mappings.
 - Composite phone preservation: exact ordered phone expansion and conserved source duration.
 - Melisma: one sustained vowel across note changes; no repeated consonant token; consonant-only melisma rejected.
-- Provenance: phone-map version, language profile, voicebank digest, and source-audio digest attached to every evaluation run.
+- Provenance: exact source revision, score/performance digest, rendered WAV digest and explicit language/backend metadata attached to each run. Voicebank/model-weight tree digest remains a separate required receipt.
 
 ### Singing performance
 
@@ -122,7 +125,7 @@ Build the language capability registry by task, not by language-count marketing.
 2. Run the dependency-free DiffSinger phone-contract tests and pinned Rust formatting checks.
 3. Render identical English score/lyric cases through Kokoro, DiffSinger, and the physical tract backend; do not assume comparable quality before the outputs are measured.
 4. Run SoulX-Singer on a small, rights-compatible subset of the same score-conditioned benchmark.
-5. Prepare a licensed Afrikaans singing pilot, followed by carefully reviewed isiZulu and isiXhosa pilots.
+5. Resolve issue #10869: replace the small dictionary plus letter fallback with a versioned, uncertainty-aware pronunciation plan and a held-out lexical benchmark. Prepare a licensed Afrikaans singing pilot, followed by carefully reviewed isiZulu and isiXhosa pilots.
 6. Keep the vocal-tract identity/gesture path as a research renderer until blind listening and held-out acoustic evidence justify a production claim.
 
 ## Claim boundary
