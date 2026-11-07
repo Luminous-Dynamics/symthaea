@@ -113,6 +113,9 @@ jobs:
       - name: Crate registry integrity
         run: cargo run -q -p xtask -- crate-status
 
+      - name: Test communication contracts and local ASR worker
+        run: cargo test -p symthaea-communication --all-targets
+
   embodiment-safety-composition:
     name: Embodiment Safety Composition
     runs-on: ubuntu-latest
@@ -234,6 +237,25 @@ jobs:
 
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Test DiffSinger phoneme and language contract
+        run: python3 scripts/test_diffsinger_phonemes.py
+      - name: Validate voice language capability registry
+        run: python3 scripts/validate_voice_language_registry.py
+      - name: Test voice language capability evidence gates
+        run: python3 scripts/test_voice_language_registry.py
+      - name: Test voice dataset intake and split integrity
+        run: python3 scripts/test_voice_dataset_intake.py
+      - name: Test provenance-checked ASR scoring
+        run: python3 scripts/test_voice_asr_score.py
+      - name: Test private WAV preparation
+        run: python3 scripts/test_prepare_voice_asr_pilot.py
+      - name: Test pilot outcome provenance packaging
+        run: python3 scripts/test_voice_pilot_outcomes_to_predictions.py
+      - name: Test offline Transformers ASR worker contract
+        run: python3 scripts/test_voice_transformers_worker.py
+      - name: Test spoken-passage comprehension pack
+        run: python3 scripts/test_voice_comprehension_gate.py
 
       - name: Test (default features)
         run: cargo test -p symthaea-muse --lib
@@ -1200,6 +1222,9 @@ jobs:
               # because feature legs were check-only and never built tests.
               cargo check -p symthaea --features "$FEATURES" \
                 --test voice_integration --test voice_pipeline_integration
+              # Compile/run the round-trip evaluator's manifest-contract tests without loading a voice model or ASR worker.
+              # This ensures the example cannot drift out of sync with its frozen case manifests.
+              cargo test -p symthaea --example voice_roundtrip_wer --features "$FEATURES" -- --test-threads=1
               ;;
             *)
               cargo check --features "$FEATURES"

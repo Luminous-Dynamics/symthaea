@@ -23,7 +23,10 @@ fn main() -> Result<()> {
     let performance = VocalPerformance::from_melody("light", &melody, "en")?;
     let mut engine = DiffSingerEngine::spawn(&worker)?;
     let stem = engine.render(&performance)?;
-    anyhow::ensure!(stem.sample_rate == 24_000, "unexpected fixture sample rate");
+    // Match the checked-in worker contract (44.1 kHz). This verifies the
+    // bridge declaration, not the external checkpoint's true native rate;
+    // that still requires a pinned model config or an observed WAV render.
+    anyhow::ensure!(stem.sample_rate == 44_100, "unexpected worker-declared sample rate");
     anyhow::ensure!(!stem.samples.is_empty(), "worker returned empty audio");
     println!(
         "Rust -> worker -> adapter smoke: PASS ({} samples at {} Hz)",

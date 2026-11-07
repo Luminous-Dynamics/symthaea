@@ -42,8 +42,12 @@ pub struct PreservedText {
 
 impl PreservedText {
     pub fn validate(&self) -> Result<(), String> {
-        if self.original.is_empty() {
-            return Err("original text must be preserved".into());
+        let explicitly_empty_asr_hypothesis = self.original.is_empty()
+            && self.normalized.as_deref() == Some("")
+            && self.primary_language.as_deref().is_some_and(|language| !language.trim().is_empty())
+            && self.spans.is_empty();
+        if self.original.is_empty() && !explicitly_empty_asr_hypothesis {
+            return Err("empty text must be explicitly represented as an empty hypothesis".into());
         }
         if self.spans.iter().any(|span| {
             span.original.is_empty()
@@ -302,6 +306,7 @@ impl HumanCommunicationProvider for LocalJsonlProvider {
         &mut self,
         observation: &SignalObservation,
     ) -> Result<Vec<LanguageCandidate>, String> {
+        observation.validate_identity().map_err(|error| error.to_string())?;
         let request_id = self.request_id();
         match self.send(&HumanProviderRequest::IdentifyLanguage {
             request_id,
@@ -313,6 +318,7 @@ impl HumanCommunicationProvider for LocalJsonlProvider {
     }
 
     fn transcribe(&mut self, observation: &SignalObservation) -> Result<PreservedText, String> {
+        observation.validate_identity().map_err(|error| error.to_string())?;
         let request_id = self.request_id();
         match self.send(&HumanProviderRequest::Transcribe {
             request_id,
@@ -351,6 +357,7 @@ impl HumanCommunicationProvider for LocalJsonlProvider {
         observation: &SignalObservation,
         target_language: &str,
     ) -> Result<PreservedText, String> {
+        observation.validate_identity().map_err(|error| error.to_string())?;
         let request_id = self.request_id();
         match self.send(&HumanProviderRequest::TranslateSpeech {
             request_id,
@@ -376,6 +383,30 @@ mod tests {
             original: String::new(),
             normalized: Some("hello".into()),
             primary_language: Some("en".into()),
+            script: Some("Latn".into()),
+            spans: vec![],
+        };
+        assert!(text.validate().is_err());
+    }
+
+    #[test]
+    fn explicitly_empty_asr_hypothesis_is_valid() {
+        let text = PreservedText {
+            original: String::new(),
+            normalized: Some(String::new()),
+            primary_language: Some("af".into()),
+            script: Some("Latn".into()),
+            spans: vec![],
+        };
+        assert!(text.validate().is_ok());
+    }
+
+    #[test]
+    fn unmarked_empty_text_remains_invalid() {
+        let text = PreservedText {
+            original: String::new(),
+            normalized: None,
+            primary_language: Some("af".into()),
             script: Some("Latn".into()),
             spans: vec![],
         };

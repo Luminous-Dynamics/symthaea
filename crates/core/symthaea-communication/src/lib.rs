@@ -415,6 +415,20 @@ pub enum CommunicationError {
     InvalidResult(String),
 }
 
+impl std::fmt::Display for CommunicationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidObservation(msg) => write!(f, "invalid observation: {msg}"),
+            Self::UnsupportedModality => write!(f, "unsupported modality"),
+            Self::InsufficientEvidence(msg) => write!(f, "insufficient evidence: {msg}"),
+            Self::Provider(msg) => write!(f, "provider error: {msg}"),
+            Self::InvalidResult(msg) => write!(f, "invalid result: {msg}"),
+        }
+    }
+}
+
+impl std::error::Error for CommunicationError {}
+
 pub trait CommunicationModel {
     type Encoding;
     type Structure;
