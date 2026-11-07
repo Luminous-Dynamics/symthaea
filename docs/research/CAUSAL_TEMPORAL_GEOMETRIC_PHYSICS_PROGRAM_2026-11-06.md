@@ -84,6 +84,12 @@ Known limitation of the original scalar surrogate:
   to generic perturbations.
 - The new exact state-vector oracle is a small-system reference, not a
   many-body thermodynamic-limit solver or a DTC phase demonstration.
+- Both exact kicked-Ising and Trotterized anisotropic-Heisenberg engines now
+  accept arbitrary finite complex initial-state vectors, normalize them to
+  unit norm, and fail closed on wrong-sized, non-finite or zero-norm inputs.
+  Tests check unitary norm preservation from non-basis superpositions. This
+  enables initial-state ensembles but does not yet establish phase rigidity
+  across those ensembles.
 - Independent finite-window sweeps show strong subharmonic response for a
   symmetry-broken all-up/all-down product initial state at moderate ZZ
   coupling, while the zero-coupling control loses phase coherence under pulse
@@ -429,7 +435,12 @@ between competing hypotheses, not simply to the most complex simulation.
    against the exact pi-pulse noninteracting control.
 4. Phase diagram versus drive error, interaction anisotropy, disorder and size.
 5. Finite-size scaling and prethermal heating rate.
-6. Noise, missing-data, aliasing, spectral leakage and adversarial periodic
+6. Initial-state ensemble study: all-up/down, single- and multi-spin defects,
+   random product states with sampled Bloch vectors, and seeded Haar-like
+   complex vectors. Report full response distributions, not just the best
+   initial state; separately distinguish symmetry-broken and symmetric
+   ensembles.
+7. Noise, missing-data, aliasing, spectral leakage and adversarial periodic
    controls.
 7. Sensing: sensitivity, linewidth, dynamic range, stability and energy per
    measurement, matched against conventional sensors.
@@ -502,7 +513,7 @@ oracles, calibration provenance, falsification gates and reproducibility.
 |---|---|---|---|
 | Causal sets | Analytic Myrheim–Meyer estimators and research codes; causal-set literature includes d'Alembertian, propagator and action work | New std-only kinematics prototypes in D=2,3,4; no dynamics | Match estimators and invariants; add higher-D efficient counting, curved embeddings, discrete wave operators and independent continuum tests |
 | Quantum many-body | TeNPy and quimb implement real MPS/PEPS, DMRG and TEBD; IBM hardware has demonstrated 2D DTCs | Exact small 1D/2D kicked-Ising oracle plus controlled second-order Trotter XYZ graph solver; existing MPS/DMRG helpers remain pedagogical | Match dense exact diagonalization for N<=9; verify second-order convergence; then validate MPS/TEBD against TeNPy/quimb/ITensor and published hardware observables |
-| Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Small exact kicked-Ising oracle plus second-order Trotter anisotropic-Heisenberg prototype; no large-scale phase demonstration | Match exact small-system and published protocol observables; then establish finite-size phase rigidity, heating/lifetime and tensor-network agreement |
+| Time crystals | 2026 demonstrations include anisotropic 2D Heisenberg DTCs and clean 2D DTCs on a 133-qubit IBM processor, measured up to 100 Floquet cycles | Small exact kicked-Ising oracle and second-order Trotter anisotropic-Heisenberg prototype; arbitrary complex initial-state input added; no large-scale phase demonstration | Match exact small-system and published protocol observables; then establish initial-state-ensemble robustness, finite-size phase rigidity, heating/lifetime and tensor-network agreement |
 | Numerical GR | Einstein Toolkit provides mature BSSN/Z4c infrastructure; Hypatia adds GPU-accelerated CarpetX evolution thorns; SpECTRE targets high-order spectral elements and large-scale parallelism | HDC concept encodings plus a new std-only analytic metric / geodesic reference kernel; still no Einstein evolution or constraints | First match Minkowski, Schwarzschild, gauge-wave, constraint and convergence tests; interoperate with specialist solvers rather than replace them |
 | UAP / sensor analysis | NASA recommends purpose-built, calibrated multi-sensor data and complete metadata; existing reports are often insufficiently calibrated | New typed sensor/evidence contract only | Build a blind known-object set, calibration and trajectory reconstruction, uncertainty propagation and measured false-positive guarantees |
 
