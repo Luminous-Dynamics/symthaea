@@ -617,9 +617,18 @@ fn validate_measurement(
         EndpointKind::PairwiseInterlegCoupling => {
             add(measurement.pair.is_none(), ReasonCode::MissingPairIdentity);
             add(measurement.leg.is_some(), ReasonCode::UnexpectedLegIdentity);
-            add(measurement.tripod_group.is_some(), ReasonCode::UnexpectedTripodIdentity);
-            add(measurement.transfer_probe.is_some(), ReasonCode::UnexpectedTransferProbe);
-            add(measurement.sample_count.is_none(), ReasonCode::InvalidSampleCount);
+            add(
+                measurement.tripod_group.is_some(),
+                ReasonCode::UnexpectedTripodIdentity,
+            );
+            add(
+                measurement.transfer_probe.is_some(),
+                ReasonCode::UnexpectedTransferProbe,
+            );
+            add(
+                measurement.sample_count.is_none(),
+                ReasonCode::InvalidSampleCount,
+            );
             add(
                 measurement.preprocessing_sha256.is_none(),
                 ReasonCode::MissingPreprocessingDigest,
@@ -905,10 +914,8 @@ fn grouped_metric_coverage(
     endpoint: EndpointKind,
     required: usize,
 ) -> Vec<MetricCoverage> {
-    let mut groups: BTreeMap<
-        (MetricId, String, Option<String>, Option<String>),
-        BTreeSet<String>,
-    > = BTreeMap::new();
+    let mut groups: BTreeMap<(MetricId, String, Option<String>, Option<String>), BTreeSet<String>> =
+        BTreeMap::new();
     for measurement in &packet.measurements {
         if measurement.endpoint != endpoint || !measured(measurement) {
             continue;
@@ -919,7 +926,10 @@ fn grouped_metric_coverage(
         let identity = match endpoint {
             EndpointKind::LocalJointRhythmicity | EndpointKind::PerLegStepping => {
                 measurement.leg.map(|leg| {
-                    format!("{leg:?}:{}", measurement.channel_id.as_deref().unwrap_or(""))
+                    format!(
+                        "{leg:?}:{}",
+                        measurement.channel_id.as_deref().unwrap_or("")
+                    )
                 })
             }
             EndpointKind::PairwiseInterlegCoupling => measurement
@@ -946,7 +956,10 @@ fn grouped_metric_coverage(
     groups
         .into_iter()
         .map(
-            |((metric_id, method_sha256, preprocessing_sha256, phase_estimator_sha256), identities)| {
+            |(
+                (metric_id, method_sha256, preprocessing_sha256, phase_estimator_sha256),
+                identities,
+            )| {
                 let measured = identities.len();
                 MetricCoverage {
                     metric_id,
@@ -1302,18 +1315,19 @@ mod tests {
                 .measurements
                 .iter_mut()
                 .find(|row| {
-                    row.endpoint == EndpointKind::LocalJointRhythmicity
-                        && row.leg == Some(leg)
+                    row.endpoint == EndpointKind::LocalJointRhythmicity && row.leg == Some(leg)
                 })
                 .unwrap();
             row.method_sha256 = digest(char::from(b'a' + index as u8));
         }
         let report = audit_packet(&packet).unwrap();
         assert_eq!(report.local_rhythm_coverage.len(), LEG_COUNT);
-        assert!(report
-            .local_rhythm_coverage
-            .iter()
-            .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial));
+        assert!(
+            report
+                .local_rhythm_coverage
+                .iter()
+                .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial)
+        );
     }
 
     #[test]
@@ -1323,18 +1337,18 @@ mod tests {
             let row = packet
                 .measurements
                 .iter_mut()
-                .find(|row| {
-                    row.endpoint == EndpointKind::PerLegStepping && row.leg == Some(leg)
-                })
+                .find(|row| row.endpoint == EndpointKind::PerLegStepping && row.leg == Some(leg))
                 .unwrap();
             row.channel_id = Some(format!("joint-{index}"));
         }
         let report = audit_packet(&packet).unwrap();
         assert_eq!(report.per_leg_stepping_coverage.len(), LEG_COUNT);
-        assert!(report
-            .per_leg_stepping_coverage
-            .iter()
-            .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial));
+        assert!(
+            report
+                .per_leg_stepping_coverage
+                .iter()
+                .all(|coverage| coverage.measured == 1 && coverage.state == CoverageState::Partial)
+        );
     }
 
     #[test]
@@ -1582,10 +1596,12 @@ mod tests {
         let report = audit_packet(&packet).unwrap();
         assert_eq!(report.pairwise_coverage.len(), 2);
         assert!(report.pairwise_coverage.iter().all(|row| row.measured == 1));
-        assert!(report
-            .pairwise_coverage
-            .iter()
-            .all(|row| row.state == CoverageState::Partial));
+        assert!(
+            report
+                .pairwise_coverage
+                .iter()
+                .all(|row| row.state == CoverageState::Partial)
+        );
     }
 
     #[test]
