@@ -13,7 +13,7 @@ const FIXTURE_STATUS: &str = "SYNTHETIC_POLICY_CASES_NOT_EXPERT_GOLD_OR_BENCHMAR
 const EXPECTED_FIXTURES: usize = 16;
 const PROBABILITY_TOLERANCE: f64 = 1e-9;
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Stage {
     DirectionSelection,
@@ -23,7 +23,7 @@ pub enum Stage {
     Transfer,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionFixture {
     pub fixture_id: String,
@@ -37,7 +37,7 @@ pub struct DecisionFixture {
     pub why: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct EvaluationPolicy {
     pub adjudication: String,
@@ -47,7 +47,7 @@ pub struct EvaluationPolicy {
     pub transfer: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DecisionFixturePack {
     pub schema_version: String,
@@ -272,6 +272,14 @@ pub enum EvsiError {
     NonFiniteUtility,
     InvalidCost,
 }
+
+impl std::fmt::Display for EvsiError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for EvsiError {}
 
 fn duplicate_or_empty(values: &[String], kind: &'static str) -> Result<(), EvsiError> {
     let mut seen = BTreeSet::new();
