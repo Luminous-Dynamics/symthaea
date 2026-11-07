@@ -263,23 +263,31 @@ MPS/TEBD or PEPS route for larger 1D/2D systems.
 
 ### GravCraft foundation
 
-Existing component:
-- `symthaea-gravcraft` has a shaping function, three-amplifier shift ansatz,
-  simplified simulator, HDC command projection, Phi gating, equivalence
-  principle regression checks and an energetics estimate.
+Existing components:
+- The legacy `symthaea-gravcraft::simulator` remains a kinematic toy. Its
+  acceleration method directly uses the shift vector as coordinate
+  acceleration; it is not a geodesic solver.
+- A new `adm_reference` path builds a full covariant 4D metric from the
+  three-amplifier shift using the explicit ADM choice lapse=1 and
+  spatial metric=identity. It checks Lorentzian inertia, derives Christoffel
+  symbols from metric derivatives, normalizes timelike four-velocities, and
+  integrates the full affine geodesic equation through the metric-geometry
+  kernel.
+- The same path reconstructs the Einstein-implied stress-energy
+  (T_{\mu\nu}=G_{\mu\nu}/(8\pi)) from the metric's curvature, reports
+  Eulerian energy density, and samples null-energy contractions.
 
-Critical model gap:
-- The simulator's acceleration function returns the shift vector as a
-  coordinate acceleration. It does not construct (g_{\mu\nu}), calculate
-  (g^{\mu\nu}), derive Christoffel symbols from metric derivatives, or
-  integrate the full geodesic system.
-- The energetics module explicitly reuses the single-bubble Alcubierre density
-  formula as an order-of-magnitude check, not as the stress-energy solution
-  for the three-amplifier metric.
-- Phi-dependent actuation is a design choice, not a known physical coupling.
+This is an important mathematical improvement: the three-amplifier field is
+now tested as a metric, not treated as a free acceleration. But it is a
+prescribed static metric ansatz with fixed amplifier focal points. The implied
+stress-energy is not a source model or evidence of realizable matter. The
+finite-difference curvature and finite-direction energy-condition sample
+require step-size/angular convergence and independent symbolic checks. The
+legacy simulator remains explicitly non-physical; no propulsion claim follows.
 
-Reframe: a metric-ansatz exploration tool until a constraint-consistent GR
-solver and physical source model exist.
+Next: ADM Hamiltonian/momentum projection consistency, source/constraint
+residuals, coordinate transformations, curvature convergence, integrated
+energy requirements and independent Einstein Toolkit/SpECTRE comparisons.
 
 ### Chain Theory
 
@@ -387,10 +395,11 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-07 | DTC phase diagram | Finite-size scaling, lifetime, rigidity, heating | Reproduce published qualitative phase boundaries |
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, signature, Christoffel, Riemann/Ricci and geodesic reference kernel (prototype added) | Rust tests + independent curvature, conserved quantities and weak-field regression; ADM constraints remain future work |
-| CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
+| CTGP-10 | GravCraft physical audit | ADM metric + true 4D geodesic reference and Einstein-implied stress-energy prototype added | Curvature convergence, ADM constraint projection checks, energy-condition sampling and no propulsion claim without self-consistent source solution |
 | CTGP-11 | UAP evidence pipeline | Calibration/provenance, bearing triangulation, local covariance, point FIM and finite-target-region robust placement prototypes added | Pinned Rust tests + exact Rust/Python agreement, pose/time covariance, Monte Carlo coverage and blind known-object challenge |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
 | CTGP-13 | Scientific evidence plane | Shared exact-head BLAKE3 manifest/receipt contract (prototype added) | Unit tests; reject dirty trees, stale heads, queued/skipped checks and missing log/output digests |
+| CTGP-14 | ADM/Einstein bridge | Amplifier-derived ADM metric, geodesics and implied source tensor (prototype added) | Independent symbolic reference, step-size convergence and ADM projection residuals |
 
 ## Benchmarks
 
@@ -454,12 +463,24 @@ between competing hypotheses, not simply to the most complex simulation.
 3. Timelike geodesic normalization, Killing-energy and angular-momentum
    conservation; step-size convergence.
 4. Weak-field limit: Newtonian acceleration and post-Newtonian observables.
-5. ADM Hamiltonian and momentum constraint residuals.
-6. Full stress-energy reconstruction from the metric ansatz.
-7. NEC/WEC/SEC/DEC tests over observers and spacetime regions.
-8. Quantum-energy-inequality / quantum-interest feasibility analysis where
-   the applicable theorem and sampling assumptions are explicit.
-9. Coordinate-gauge tests and independent solver comparison.
+5. For the amplifier ADM ansatz, compare numeric Christoffels and curvature
+   against an independent symbolic/autodiff reference over a frozen corpus.
+6. ADM Hamiltonian/momentum projections: independently compute lapse, shift,
+   spatial metric and extrinsic curvature; compare projected Einstein tensor
+   with the energy/momentum densities reconstructed from T_mu_nu.
+7. Repeat curvature and source calculations over a derivative-step ladder;
+   report convergence order and reject unstable digits.
+8. Sample NEC/WEC/SEC/DEC over observer and null-direction ensembles; perform
+   angular refinement and label finite samples as diagnostics, not proofs.
+9. Integrate positive/negative energy density over explicit domains; test
+   boundary falloff, finite-domain dependence and energy conditions.
+10. Coordinate/gauge transformations: transform the same metric and
+    geodesic to another chart and compare invariant observables.
+11. Compare matching initial data with Einstein Toolkit Hypatia's gauge-wave,
+    linear-wave and other applicable test problems; do not equate a prescribed
+    metric geodesic with BSSNOK/Z4c evolution.
+12. Quantum-energy-inequality / quantum-interest feasibility only where the
+    theorem, sampling function, duration and field assumptions apply.
 
 ### UAP observatory
 
@@ -489,18 +510,15 @@ between competing hypotheses, not simply to the most complex simulation.
 
 The 28 January 2026 Nature Communications paper by Switzer et al. reports
 a two-dimensional DTC with anisotropic Heisenberg interactions, combining IBM
-quantum processors and tensor-network methods; its experimental lattice has
-144 qubits. A separate 24 February 2026 npj Quantum Information paper reports
-clean two-dimensional kicked-Ising DTC dynamics on a 133-qubit IBM Heron
-processor for up to 100 Floquet cycles. These are distinct Hamiltonians,
-hardware layouts and protocols. Symthaea's anisotropic-XYZ graph is a small
-numerical prototype, not a replication of either experiment. The immediate
-benchmark is protocol-matched small-system exact evolution and convergence
-against tensor-network reference data before any scale claim.lver with explicit second-order
-Trotter control, but it does not yet reproduce either paper's full phase
-diagram or hardware/tensor-network scale. The next gate is exact small-system
-dense agreement, convergence versus Trotter slices, and an independent
-tensor-network comparison under the paper's precise protocol.
+quantum processors and tensor-network methods. A separate 24 February 2026
+npj Quantum Information paper reports clean two-dimensional kicked-Ising DTC
+dynamics on a 133-qubit IBM Heron processor for up to 100 Floquet cycles.
+These are distinct Hamiltonians, hardware layouts and protocols. Symthaea's
+anisotropic-XYZ graph is a small numerical prototype, not a replication of
+either experiment. The immediate benchmark is protocol-matched small-system
+exact evolution and convergence against tensor-network reference data before
+any scale claim. It does not yet reproduce either paper's full phase diagram
+or hardware/tensor-network scale.
 
 ## State-of-the-art comparison and strategy
 
@@ -552,7 +570,7 @@ physical fidelity only count after matched benchmarks.
 | Causal sets | 1+1D O(N log N), D=2..4 O(N²) kinematics | Causal-set literature/reference implementations | Multi-seed finite-size, Lorentz boosts, volume and dimension recovery | Higher-D efficient causal relations, curved embeddings and discrete wave operators |
 | Chain Theory | Independent 172-row algebraic enumerator | Author's Python/Lean source and third-party audit | Full CSV byte diff, pinned Lean build and assumption audit | Formalize alternative grammars and falsify/derive the physical bridge |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
-| GR / GravCraft | Minkowski/Schwarzschild metric, connection, curvature and geodesic kernel | Einstein Toolkit, SpECTRE, analytic GR references | Curvature, invariants, convergence and coordinate checks | Constraint-consistent 3+1 evolution and stress-energy/energy-condition audit |
+| GR / GravCraft | Analytic Minkowski/Schwarzschild kernel plus new amplifier-derived ADM metric, full 4D geodesics and Einstein-implied source diagnostics | Einstein Toolkit Hypatia (GPU BSSNOK/Z4c), SpECTRE, Apples-with-Apples and analytic GR references | Exact Minkowski/Schwarzschild references; ADM projection consistency; curvature step-size and gauge tests | Self-consistent 3+1 evolution, matter coupling, global energy-condition and source/boundary analysis |
 | UAP | Calibration/provenance, bearing triangulation, local covariance and point/finite-region FIM placement prototypes | Calibrated multi-sensor methodology; EKF/UKF/factor-graph tracking; CRLB-based placement | Synthetic 93–97% ellipsoid coverage, exact Rust/Python agreement, increasing-region-grid stability and blind known-object calibration | Low false-positive track reconstruction on sealed data with nuisance covariance and cost-aware placement |
 | Evidence plane | Exact-head BLAKE3 manifest and receipt prototype | Reproducible-build, SBOM and scientific workflow provenance systems | Tamper/stale-head/skip/dirty-tree negative controls | Reusable proof-carrying experiments across Symthaea, Mycelix and Sol-Atlas |
 
@@ -590,8 +608,11 @@ physical fidelity only count after matched benchmarks.
    state sweep under J=0 and interacting controls. Then extend to disorder,
    heating and finite-size scaling; report state-class distributions rather
    than selecting a best initial state.
-5. Add coordinate-transform and step-size convergence tests to the metric
-   geometry kernel; only then begin replacing the GravCraft shift shortcut.
+5. Run the new GravCraft ADM reference: verify zero-shift Minkowski,
+   Lorentzian inertia, full 4D geodesic norm conservation and Einstein-implied
+   source diagnostics. Then add ADM projection checks, derivative-step
+   convergence and independent symbolic comparison. Keep the legacy
+   shift-as-acceleration simulator labelled as a heuristic toy.
 6. Extend UAP triangulation into clock synchronization, pose/boresight
    covariance, platform-motion/parallax estimation, asynchronous multi-sensor
    track association and sealed known-object challenges.
@@ -624,6 +645,14 @@ physical fidelity only count after matched benchmarks.
 - NIST CODATA (2022 adjustment; published 2025), Recommended Values of the
   Fundamental Physical Constants.
   https://physics.nist.gov/constants
+
+- Einstein Toolkit Hypatia release (10 July 2026): GPU-accelerated
+  BSSNOK/Z4c evolution with 4th-order stencils, matter support, and gauge/linear
+  wave initial-data thorns; also includes exact Kerr and Teukolsky initial data.
+  https://www.einsteintoolkit.org/about/releases/ET_2026_05_announcement.html
+- Einstein Toolkit Hypatia gallery tests include binary black holes, scalar
+  waves, stable neutron stars and binary neutron stars.
+  https://docs.einsteintoolkit.org/et-docs/Release_Details
 
 ## Scientific non-claims
 
