@@ -34,7 +34,7 @@
       "task_family_id": "synthetic-continual-learning-family",
       "case_count": 100,
       "membership_commitment_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-      "features_visible_to_agent": true,
+      "features_visible_to_agent": false,
       "labels_visible_to_agent": false,
       "score_visible_to_agent": true,
       "search_evaluator_access": true,
