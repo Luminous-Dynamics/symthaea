@@ -6,6 +6,23 @@ on:
       - "benchmarks/ceb/**"
       - "docs/research/COMPUTATIONAL_ENGINEERING_BENCH_V0_2026-11-02.md"
       - "docs/research/CEB_VERIFIER_INTEGRITY_PROTOCOL_V0_2026-11-02.md"
+      - "docs/research/CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_CROSS_FRAMING_ANCHOR_PROTOCOL_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_CROSS_FRAMING_CALIBRATION_PACK_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_COUNTERFACTUAL_CONTROL_QUALIFICATION_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_EVIDENCE_ACTION_CROSSWALK_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md"
+      - "docs/research/CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_PRODUCTION_IMPACT_PROTOCOL_V0_2026-11-07.md"
+      - "docs/research/CEB_END_TO_END_INTEGRATION_BOUNDARY_PROTOCOL_V0_2026-11-07.md"
+      - "scripts/validate_ceb_integration_boundary_protocol.py"
+      - "docs/research/CEB_REVIEW_HUMAN_CALIBRATION_PACK_V0_2026-11-07.md"
+      - "docs/research/CEB_REVIEW_HUMAN_CALIBRATION_KEY_V0_2026-11-07.md"
+      - "docs/research/CEB_ENGINEERING_QUALITY_SCORECARD_V0_2026-11-04.md"
+      - "scripts/validate_ceb_review_research_pack.py"
       - ".github/workflows/ceb-contract-validation-v0.yml"
   workflow_dispatch:
 
@@ -557,3 +574,15 @@ jobs:
           )
           print("CEB_CLAIM_BOUNDARY: schema validation is not DSSE signature verification or runner qualification")
           PY
+      - name: Validate CEB review research pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_ceb_review_research_pack.py --self-test --repo-root .
+          python scripts/validate_ceb_review_research_pack.py --repo-root .
+      - name: Validate CEB integration-boundary research protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/validate_ceb_integration_boundary_protocol.py --self-test --repo-root .
+          python scripts/validate_ceb_integration_boundary_protocol.py --repo-root .

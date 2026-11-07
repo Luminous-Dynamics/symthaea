@@ -333,3 +333,27 @@ Next qualification: obtain Cargo metadata and rust-analyzer/SCIP output inside
 the isolated pinned runner for each feature/target world, then compare observed
 active nodes and edges against the sealed gold sets. Do not compile the fixture
 on a host development runner.
+
+
+## 19. Review evidence and causal diagnosis expansion (2026-11-07)
+
+CEB-REVIEW now treats a review finding as a falsifiable engineering claim rather than a suspicious-line comment. It preserves the three registered primary measures—`defect_recall_at_5`, `actionable_precision` and `reviewer_burden`—and uses supporting diagnosis annotations for discovery, localization, causal mechanism, evidence authority/freshness and decision utility. No review metric lane, task schema, receipt format or evaluator authority is added.
+
+### Current research artifacts
+
+- [CEB Review Benchmark Triangulation V0](CEB_REVIEW_BENCHMARK_TRIANGULATION_V0_2026-11-07.md) compares ReviewBench, SecPRBench, CR-Bench-v2, CRBugBench and CodeReviewBench without combining their incompatible units, denominators or judge protocols.
+- [CEB Review Causal-Diagnosis Preregistration V0](CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md) defines the P/I/F/N/M/IRR source-state ladder and staged source-only, isolation-dependent evidence-acquisition and human-complementarity experiments.
+- [CEB Review Gold-Completeness and Open-Set Discovery V0](CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md) separates frozen target defects, independently adjudicated novel discoveries and the unknown unobserved remainder. It calls for blind audits of zero-finding PRs and multi-producer clean consensus; naïve capture–recapture is not accepted under correlated producer populations.
+- [CEB Review Sequential Evidence Acquisition V0](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md) requires each proposed evidence action to name the claim, alternatives, discriminating observation, applicability, authority, safety, cost and stopping implication.
+- [CEB Review Evidence-Action Crosswalk V0](CEB_REVIEW_EVIDENCE_ACTION_CROSSWALK_V0_2026-11-07.md) maps all 26 public synthetic ERG scenarios to a minimum discriminating action and stop/escalation condition.
+- [CEB Review Finding Adjudication Card V0](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md) supports independent human annotation without treating LLM consensus as truth.
+
+### Comparator interpretation
+
+The structured external-observation registry includes ReviewBench, SecPRBench, CR-Bench-v2, CRBugBench and CodeReviewBench. Their scores are contextual references. Human-found bug recall, target-mechanism recall, top-five recall, grounded precision and comment usefulness are not interchangeable. Candidate-specific augmented-recall denominators are not common cross-agent ranking denominators.
+
+### Current research maturity and gates
+
+The public ERG challenge contains 26 synthetic scenarios; its authoring validator now checks five comparator references, five adjudication stages, the original three primary metrics, six counterfactual states, three experiment phases, gold-completeness protocol, sequential evidence policy and 26-row evidence-action crosswalk. Exact-head authoring/schema validation is recorded in [PR #10367](https://github.com/Luminous-Dynamics/symthaea/pull/10367).
+
+All these artifacts remain design-only and public-development material. No candidate review benchmark has been run, no new task has been admitted, no holdout has been created and no model-performance result is claimed. Candidate-controlled code, builds, tests, static analyzers and reproductions remain blocked until #10064 qualifies isolation. Independent pristine regrade remains blocked until #10369 qualifies signer trust and runner attestation.
