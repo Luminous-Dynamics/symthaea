@@ -195,13 +195,7 @@ fn interval_size_histogram_1p1(events: &[Event2D]) -> Vec<u64> {
             let v_position = v_coordinates
                 .binary_search_by(|candidate| candidate.total_cmp(&event.v))
                 .expect("event v coordinate is present in compression");
-            root = persistent_count_insert(
-                root,
-                0,
-                v_coordinates.len(),
-                v_position,
-                &mut nodes,
-            );
+            root = persistent_count_insert(root, 0, v_coordinates.len(), v_position, &mut nodes);
             order_index += 1;
         }
         roots.push(root);
