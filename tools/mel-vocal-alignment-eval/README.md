@@ -15,7 +15,7 @@ It compares an independently authored reference event sequence with the output o
 
 - Phoneme edit counts: exact, substitution, deletion, insertion.
 - Phone error rate: (S + D + I) / reference-phone count.
-- Exact phone timing: onset, offset, and duration absolute error, calculated only for exact phone-identity matches.
+- Exact phone identity requires symbol, word index, syllable index, and vowel/consonant class to agree. Onset, offset, and duration error are calculated only for those exact matches.
 - Melisma coverage: whether the predicted vowel interval covers the complete declared multi-note span.
 - Undefined timing or melisma support is None, never a synthetic zero.
 
@@ -36,4 +36,4 @@ The existing singing release path has score-conditioned pitch/timing checks, wav
 
 ## Test status
 
-Ten deterministic unit tests are authored. No local compile/test pass is claimed until the exact commit is built with the pinned Rust toolchain. The dedicated PR workflow checks out the exact commit and executes formatting plus tests. A queued or skipped workflow is not a pass.
+Twelve deterministic unit tests are authored, including same-symbol wrong-word/syllable and wrong vowel-class controls. No local compile/test pass is claimed until the exact commit is built with the pinned Rust toolchain. The dedicated PR workflow checks out the exact commit and executes formatting plus tests. A queued or skipped workflow is not a pass.
