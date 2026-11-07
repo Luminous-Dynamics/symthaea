@@ -27,6 +27,7 @@ pub mod decomposition;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
+pub mod quantified_scope;
 
 pub use graph::dijkstra;
 pub use inventory::economic_order_quantity;
