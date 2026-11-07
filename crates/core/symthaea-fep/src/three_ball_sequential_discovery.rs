@@ -23,9 +23,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use crate::three_ball_partial_observation::{
-    ThreeBallJointBelief, ThreeBallPartialObservationConfig,
-    ThreeBallPartialObservationError, score_three_ball_gaze_policies,
-    uniform_three_ball_state_prior,
+    ThreeBallJointBelief, ThreeBallPartialObservationConfig, ThreeBallPartialObservationError,
+    score_three_ball_gaze_policies, uniform_three_ball_state_prior,
 };
 use crate::three_ball_rule_space::{
     ThreeBallColour, ThreeBallFeedback, ThreeBallLocation, ThreeBallRuleSpace,
@@ -312,13 +311,13 @@ pub fn run_three_ball_sequential_discovery(
     let true_semantic_class_one_based_index = semantic_representative(true_rule);
 
     let mut belief = match config.model_family {
-        ThreeBallModelFamily::SourceLabelled => {
-            ThreeBallJointBelief::uniform_source_prior(space)?
+        ThreeBallModelFamily::SourceLabelled => ThreeBallJointBelief::uniform_source_prior(space)?,
+        ThreeBallModelFamily::SemanticQuotient => {
+            ThreeBallJointBelief::from_semantic_quotient_prior(
+                space,
+                &uniform_three_ball_state_prior(),
+            )?
         }
-        ThreeBallModelFamily::SemanticQuotient => ThreeBallJointBelief::from_semantic_quotient_prior(
-            space,
-            &uniform_three_ball_state_prior(),
-        )?,
     };
     let initial_semantic_posterior = semantic_model_posterior(space, &belief)?;
     if !initial_semantic_posterior.contains_key(&true_semantic_class_one_based_index) {
@@ -352,8 +351,10 @@ pub fn run_three_ball_sequential_discovery(
         let model_posterior_before = semantic_model_posterior(space, &belief)?;
         let model_entropy_before = entropy(&model_posterior_before);
         let (_, max_probability_before) = winning_semantic_class(&model_posterior_before)?;
-        preferences_restored |=
-            exceeds_log_odds_threshold(max_probability_before, config.commitment_log_odds_threshold_nats);
+        preferences_restored |= exceeds_log_odds_threshold(
+            max_probability_before,
+            config.commitment_log_odds_threshold_nats,
+        );
 
         let mut trial_policy = config.policy;
         trial_policy.feedback_log_preferences_nats = if preferences_restored {
@@ -455,15 +456,14 @@ pub fn run_three_ball_sequential_discovery(
         let true_probability = *model_posterior_after
             .get(&true_semantic_class_one_based_index)
             .ok_or(ThreeBallSequentialDiscoveryError::TrueRuleMissingFromModelFamily)?;
-        let (winning_rule, winning_probability) =
-            winning_semantic_class(&model_posterior_after)?;
+        let (winning_rule, winning_probability) = winning_semantic_class(&model_posterior_after)?;
         let winning_log_odds = finite_log_odds(winning_probability);
         let committed_after_trial = exceeds_log_odds_threshold(
             winning_probability,
             config.commitment_log_odds_threshold_nats,
         );
-        let correct_commitment_after_trial = committed_after_trial
-            && winning_rule == true_semantic_class_one_based_index;
+        let correct_commitment_after_trial =
+            committed_after_trial && winning_rule == true_semantic_class_one_based_index;
 
         if committed_after_trial && trials_to_model_commitment.is_none() {
             trials_to_model_commitment = Some(trial_index);
@@ -490,8 +490,7 @@ pub fn run_three_ball_sequential_discovery(
             selected_choice,
             observed_feedback: feedback,
             model_information_gain_nats: action.model_information_gain_nats,
-            conditional_state_information_gain_nats: action
-                .conditional_state_information_gain_nats,
+            conditional_state_information_gain_nats: action.conditional_state_information_gain_nats,
             model_entropy_before_nats: model_entropy_before,
             model_entropy_after_nats: model_entropy_after,
             true_semantic_class_posterior_after: true_probability,
@@ -551,7 +550,10 @@ pub fn run_three_ball_sequential_discovery(
         final_model_posterior: final_semantic_posterior
             .into_iter()
             .map(|(class_index, probability)| {
-                (format!("three-ball-semantic-rule-{class_index:02}"), probability)
+                (
+                    format!("three-ball-semantic-rule-{class_index:02}"),
+                    probability,
+                )
             })
             .collect(),
     })
@@ -632,8 +634,7 @@ fn finite_log_odds(probability: f64) -> Option<f64> {
 }
 
 fn exceeds_log_odds_threshold(probability: f64, threshold: f64) -> bool {
-    probability >= 1.0
-        || finite_log_odds(probability).is_some_and(|log_odds| log_odds > threshold)
+    probability >= 1.0 || finite_log_odds(probability).is_some_and(|log_odds| log_odds > threshold)
 }
 
 fn random_response(rng: &mut SplitMix64) -> Option<ThreeBallColour> {
@@ -872,12 +873,15 @@ mod tests {
         let config = discovery_config(ThreeBallModelFamily::SemanticQuotient);
         let first =
             run_three_ball_sequential_discovery(&space, 65, 0x5eed, config).expect("first episode");
-        let second =
-            run_three_ball_sequential_discovery(&space, 65, 0x5eed, config).expect("second episode");
+        let second = run_three_ball_sequential_discovery(&space, 65, 0x5eed, config)
+            .expect("second episode");
         assert_eq!(first, second);
         assert_eq!(first.trial_receipts.len(), config.max_trials);
         assert_eq!(first.trial_receipts[0].trial_index, 1);
-        assert_eq!(first.trial_receipts.last().unwrap().trial_index, config.max_trials);
+        assert_eq!(
+            first.trial_receipts.last().unwrap().trial_index,
+            config.max_trials
+        );
     }
 
     #[test]
@@ -887,8 +891,7 @@ mod tests {
             max_trials: 8,
             ..discovery_config(ThreeBallModelFamily::SemanticQuotient)
         };
-        let result =
-            run_three_ball_sequential_discovery(&space, 65, 17, config).expect("episode");
+        let result = run_three_ball_sequential_discovery(&space, 65, 17, config).expect("episode");
         assert!(result.trial_receipts.iter().all(|trial| {
             trial.hidden_state_for_audit.iter().all(|colour| {
                 matches!(
@@ -929,9 +932,7 @@ mod tests {
                 .abs()
                 < 1e-9
         );
-        assert!(
-            (source.final_model_entropy_nats - quotient.final_model_entropy_nats).abs() < 1e-9
-        );
+        assert!((source.final_model_entropy_nats - quotient.final_model_entropy_nats).abs() < 1e-9);
         assert_eq!(
             source.trials_to_correct_rule_commitment,
             quotient.trials_to_correct_rule_commitment
@@ -947,9 +948,8 @@ mod tests {
             model_family: ThreeBallModelFamily::SemanticQuotient,
             ..ThreeBallSequentialDiscoveryConfig::default()
         };
-        let result =
-            run_three_ball_sequential_discovery(&space, 65, 0x2026_1107, config)
-                .expect("seeded rule discovery");
+        let result = run_three_ball_sequential_discovery(&space, 65, 0x2026_1107, config)
+            .expect("seeded rule discovery");
         let initial_entropy = (space.semantic_unique_rule_count as f64).ln();
         assert!(
             result.final_model_entropy_nats < initial_entropy,
