@@ -5,7 +5,7 @@
 //! responses and agent-visible requests. Hidden truth and verifier artifacts
 //! are intentionally absent from every type in this module.
 
-use crate::job_lifecycle::{JobContractError, JobStatus, LabJob};
+use crate::job_lifecycle::{JobContractError, LabJob};
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
