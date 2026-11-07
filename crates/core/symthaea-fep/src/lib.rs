@@ -137,15 +137,15 @@
 //!   Principle in Mind, Brain, and Behavior.
 //! - Sutton, R.S. & Barto, A.G. (2018). Reinforcement Learning: An Introduction (2nd ed.)
 
-pub mod bayesian_model_reduction;
-pub mod dirichlet_model_reduction;
 mod agent;
+pub mod bayesian_model_reduction;
 mod bridge;
+pub mod dirichlet_model_reduction;
 pub mod free_energy;
 pub mod generative_model;
-pub mod hierarchical_information_gain;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
+pub mod hierarchical_information_gain;
 pub mod markov_blanket;
 mod motor;
 mod td_learning;
@@ -172,9 +172,8 @@ pub use generative_model::GenerativeModel;
 pub use dirichlet_model_reduction::{
     DirichletActionPrediction, DirichletBayesianModelReductionError,
     DirichletBayesianModelReductionResult, DirichletConcentrationTensor,
-    DirichletModelInformationGain, DirichletModelInformationGainError,
-    DirichletOutcomeModelBelief, DirichletPredictedOutcome,
-    ReducedDirichletModelEvidence, ReducedDirichletModelHypothesis,
+    DirichletModelInformationGain, DirichletModelInformationGainError, DirichletOutcomeModelBelief,
+    DirichletPredictedOutcome, ReducedDirichletModelEvidence, ReducedDirichletModelHypothesis,
     evaluate_dirichlet_model_information_gain, reduce_dirichlet_models,
 };
 
