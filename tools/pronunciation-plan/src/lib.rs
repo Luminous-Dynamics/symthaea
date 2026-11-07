@@ -1377,7 +1377,10 @@ mod tests {
             schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let alignment = VocalScoreAlignment {
             schema_version: 2,
@@ -1427,7 +1430,10 @@ mod tests {
             schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let mut alignment = VocalScoreAlignment {
             schema_version: 2,
@@ -1486,7 +1492,10 @@ mod tests {
             schema_version: 2,
             language: "en-US".into(),
             source_text: "read now".into(),
-            words: vec![selected_word("read", 0, "ɛ"), selected_word("now", 5, "aʊ")],
+            words: vec![
+                selected_word("read", 0, "ɛ", "read now"),
+                selected_word("now", 5, "aʊ", "read now"),
+            ],
         };
         let alignment = VocalScoreAlignment {
             schema_version: 2,
