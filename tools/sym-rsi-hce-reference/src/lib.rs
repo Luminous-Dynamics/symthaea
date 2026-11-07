@@ -170,7 +170,10 @@ impl HceEpoch {
         let mut custodians = BTreeSet::new();
         let mut roles = [0usize; 5];
         for split in &self.splits {
-            if !non_empty(&split.split_id) || !non_empty(&split.custodian_id) {
+            if !non_empty(&split.split_id)
+                || !non_empty(&split.task_family_id)
+                || !non_empty(&split.custodian_id)
+            {
                 return Err(HceError::EmptyIdentifier("split_id_or_custodian"));
             }
             if split.case_count == 0 {
