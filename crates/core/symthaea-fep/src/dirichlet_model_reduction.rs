@@ -874,6 +874,26 @@ fn log_gamma_positive(value: f64) -> f64 {
     0.5 * (2.0 * std::f64::consts::PI).ln() + (shifted + 0.5) * t.ln() - t + series.ln()
 }
 
+/// Evaluate prospective model-structure information gain using SPM's
+/// source-compatible 1/32 Dirichlet pseudocount BMR and globally normalized
+/// model-average prior. The outcome likelihoods and expected count increments
+/// remain action-conditioned inputs and are validated against the current
+/// posterior model belief.
+pub fn evaluate_dirichlet_model_information_gain_spm_compatible(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+    action: &DirichletActionPrediction,
+) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
+    evaluate_dirichlet_model_information_gain_with_mode(
+        full_posterior,
+        full_prior,
+        reduced_models,
+        action,
+        true,
+    )
+}
+
 /// One possible observation under an action, with its full-model predictive
 /// probability and the expected Dirichlet sufficient-statistic increment.
 ///
@@ -1094,7 +1114,29 @@ impl std::error::Error for DirichletModelInformationGainError {}
 /// This function scores model information only. Parameter and state EIG,
 /// preference/risk, ambiguity, action cost, and multi-step planning remain
 /// separate terms in a complete expected-free-energy policy.
+/// Evaluate prospective information gain with the strict structural-zero BMR.
 pub fn evaluate_dirichlet_model_information_gain(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+    action: &DirichletActionPrediction,
+) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
+    evaluate_dirichlet_model_information_gain_with_mode(
+        full_posterior,
+        full_prior,
+        reduced_models,
+        action,
+        false,
+    )
+}
+
+fn evaluate_dirichlet_model_information_gain_with_mode(
+    full_posterior: &DirichletConcentrationTensor,
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+    action: &DirichletActionPrediction,
+    spm_compatible: bool,
+) -> Result<DirichletModelInformationGain, DirichletModelInformationGainError> {
     full_posterior: &DirichletConcentrationTensor,
     full_prior: &DirichletConcentrationTensor,
     reduced_models: &[ReducedDirichletModelHypothesis],
@@ -1115,9 +1157,17 @@ pub fn evaluate_dirichlet_model_information_gain(
 
     // This is the current posterior over model identity, not the original
     // model prior. BMR evaluates it from evidence accumulated so far.
-    let current_model_belief = reduce_dirichlet_models(full_posterior, full_prior, reduced_models)
-        .map_err(DirichletModelInformationGainError::ModelReduction)?;
-    validate_model_average_prior(full_prior, reduced_models)?;
+    let current_model_belief = if spm_compatible {
+        reduce_dirichlet_models_spm_compatible(full_posterior, full_prior, reduced_models)
+    } else {
+        reduce_dirichlet_models(full_posterior, full_prior, reduced_models)
+    }
+    .map_err(DirichletModelInformationGainError::ModelReduction)?;
+    if spm_compatible {
+        validate_spm_model_average_prior(full_prior, reduced_models)?;
+    } else {
+        validate_model_average_prior(full_prior, reduced_models)?;
+    }
 
     if action.action_id.trim().is_empty() {
         return Err(DirichletModelInformationGainError::EmptyActionId);
@@ -1282,8 +1332,16 @@ pub fn evaluate_dirichlet_model_information_gain(
             }
         }
 
-        let reduced = reduce_dirichlet_models(&hypothetical_posterior, full_prior, reduced_models)
-            .map_err(DirichletModelInformationGainError::ModelReduction)?;
+        let reduced = if spm_compatible {
+            reduce_dirichlet_models_spm_compatible(
+                &hypothetical_posterior,
+                full_prior,
+                reduced_models,
+            )
+        } else {
+            reduce_dirichlet_models(&hypothetical_posterior, full_prior, reduced_models)
+        }
+        .map_err(DirichletModelInformationGainError::ModelReduction)?;
 
         // Eq. 10-11: expectation is under the predictive outcome distribution
         // of the current full / Bayesian-model-average parent model. BMR supplies
@@ -1325,6 +1383,70 @@ pub fn evaluate_dirichlet_model_information_gain(
         predictive_probability_mass: full_probability_mass,
         outcomes,
     })
+}
+
+/// SPM's `spm_MDP_BMR` globally normalizes the weighted sum of reduced
+/// priors, not each likelihood column independently.
+fn validate_spm_model_average_prior(
+    full_prior: &DirichletConcentrationTensor,
+    reduced_models: &[ReducedDirichletModelHypothesis],
+) -> Result<(), DirichletModelInformationGainError> {
+    let mut expected = full_prior
+        .columns
+        .iter()
+        .map(|column| vec![0.0; column.len()])
+        .collect::<Vec<_>>();
+    let mut expected_support = full_prior
+        .active_support
+        .iter()
+        .map(|support| vec![false; support.len()])
+        .collect::<Vec<_>>();
+
+    for model in reduced_models {
+        for column in 0..expected.len() {
+            for coordinate in 0..expected[column].len() {
+                expected[column][coordinate] +=
+                    model.prior_probability * model.parameter_prior.columns[column][coordinate];
+                expected_support[column][coordinate] |= model.prior_probability > 0.0
+                    && model.parameter_prior.active_support[column][coordinate];
+            }
+        }
+    }
+    let total_mass = expected.iter().flatten().sum::<f64>();
+    if !total_mass.is_finite() || total_mass <= 0.0 {
+        return Err(DirichletModelInformationGainError::InvalidModelInformationGain {
+            value: total_mass,
+        });
+    }
+    for column in 0..expected.len() {
+        for coordinate in 0..expected[column].len() {
+            if expected_support[column][coordinate]
+                != full_prior.active_support[column][coordinate]
+            {
+                return Err(DirichletModelInformationGainError::ModelReduction(
+                    DirichletBayesianModelReductionError::SupportMismatch {
+                        distribution: "SPM model-average prior",
+                        column,
+                        outcome: coordinate,
+                    },
+                ));
+            }
+            let expected_value = expected[column][coordinate] / total_mass;
+            let actual = full_prior.columns[column][coordinate];
+            let tolerance = 1e-8 * expected_value.abs().max(actual.abs()).max(1.0);
+            if (expected_value - actual).abs() > tolerance {
+                return Err(
+                    DirichletModelInformationGainError::ModelAveragePriorMismatch {
+                        column,
+                        outcome: coordinate,
+                        expected: expected_value,
+                        actual,
+                    },
+                );
+            }
+        }
+    }
+    Ok(())
 }
 
 fn validate_model_average_prior(
@@ -1547,7 +1669,7 @@ mod tests {
         let strict = reduce_dirichlet_models(&posterior, &full_prior, &models);
         assert!(matches!(
             strict,
-            Err(DirichletBayesianModelReductionError::SupportMismatch { .. })
+            Err(DirichletBayesianModelReductionError::InvalidPosteriorNormalization)
         ));
 
         let smoothed = reduce_dirichlet_models_spm_compatible(&posterior, &full_prior, &models)
