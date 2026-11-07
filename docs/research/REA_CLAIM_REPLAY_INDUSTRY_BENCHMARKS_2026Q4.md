@@ -90,6 +90,8 @@ SWE-Milestone reconstructs real release histories into milestone DAGs and evalua
 
 SWE-CI evaluates 100 repository-maintenance tasks whose histories span an average of 233 days and 71 commits. Both reinforce that a patch passing at one revision is not evidence that a repository claim remains valid after later changes.
 
+ChainSWE (EMNLP 2026) adds sequential multi-bug maintenance: 304 chronological issues across 54 Python projects, where later fixes depend on the shared evolving codebase. Its evaluation reports performance drops of up to 70% as issue-chain length increases. This is adjacent evidence, not a REA score: ChainSWE measures code-maintenance success, while REA must additionally measure whether earlier evidence claims become stale, remain historically replayable, or are selectively invalidated as upstream code and dependencies change. [ChainSWE paper](https://aclanthology.org/2026.emnlp-main.371/).
+
 DORA's current software-delivery model complements agent benchmarks with five operational metrics: change lead time, deployment frequency, failed-deployment recovery time, change-failure rate, and deployment rework rate. DORA groups the first three as throughput and the last two as instability. REA should report its operational qualification similarly: replay and selective-revalidation latency as throughput; false matches, missed drift, rework after invalidation, and recovery from failed qualification as instability. Keep these disaggregated rather than collapsing them into one scalar.
 
 **REA consequence:** a claim derivation is valid for its exact source revision, dependency closure and rule version. Add a continuity track for selective revalidation after changes; reuse #10630 rather than creating another repository graph.
@@ -98,6 +100,7 @@ References:
 - [SWE-Milestone paper (ICML 2026)](https://proceedings.mlr.press/v306/deng26d.html)
 - [SWE-Milestone project and current leaderboard](https://swe-milestone.com/)
 - [SWE-CI paper](https://arxiv.org/abs/2603.03823)
+- [ChainSWE (EMNLP 2026)](https://aclanthology.org/2026.emnlp-main.371/)
 
 ### Lifecycle and temporal reasoning — Vera-Life-Eval, TRACE and TKE-Bench
 
@@ -113,6 +116,25 @@ References:
 - [Vera-Life-Eval / Vera-Life (ACL Anthology, 2026)](https://aclanthology.org/2026.groundlm-1.18/)
 - [TRACE (EMNLP Findings 2026)](https://aclanthology.org/2026.findings-emnlp.1045/)
 - [TKE-Bench / ChronoExpert (EMNLP Findings 2026)](https://aclanthology.org/2026.findings-emnlp.1823/)
+
+### Numeric semantics and precision intent — RFC 7493 and RFC 8785
+
+RFC 8785 defines a canonical representation by constraining JSON numbers to IEEE-754 binary64 and using ECMAScript-compatible serialization. It explicitly shows rounding during canonical serialization and recommends strings for values requiring greater integer or decimal precision. RFC 7493 separately says interoperable receivers cannot be expected to treat integers outside ±(2^53−1) as exact, and recommends JSON strings when exact interchange is required. [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html) · [RFC 7493](https://www.rfc-editor.org/rfc/rfc7493.html).
+
+This produces four different objects that REA must not conflate:
+
+1. **Raw source lexeme:** exact byte spelling and JSON Pointer, bound to the raw input SHA-256.
+2. **JCS semantic number:** the binary64 interpretation used for deterministic canonicalization and semantic identity.
+3. **Domain numeric intent:** whether a path denotes a binary64 measurement, bounded exact integer, exact integer string, fixed decimal string, or opaque number.
+4. **Measurement semantics:** unit, scale, calibration, range and rounding policy.
+
+The producer/replay pair (#10927/#10958) now discloses unsafe integer precision where the parsed representation retains the integer. The standalone raw-token audit (#10952) can preserve integer lexemes before that information is lost. Neither layer determines whether a number is a money amount, a byte count, a timestamp, a sensor measurement or an opaque field.
+
+**REA consequence:** keep Evidence v1 and JCS identities unchanged; add a separate, versioned numeric-intent profile at schema-defined JSON Pointers. Proposed types are \`binary64\`, \`safe_integer\`, \`exact_integer_string\`, \`fixed_decimal_string\` and \`opaque_numeric\`. Bind the profile digest, path, raw-source digest, unit/scale and rounding policy into a typed validation result. Never infer exactness from the token's magnitude or lexical form.
+
+**Benchmark gates:** 100% type-profile conformance on a frozen corpus; zero silent binary64 coercions for exact-integer/decimal-string paths; 100% RFC 8785 parity for binary64 paths; zero profile/unit/scale mismatches accepted; and explicit lexical-coverage states for raw-token-audited, parsed-value-only and unavailable. Keep numeric correctness, measurement validity and provider truth as distinct claims.
+
+This is a research extension tracked by [#10989 — schema-bound numeric intent](https://github.com/Luminous-Dynamics/symthaea/issues/10989), not authority added to claim evaluator v0.
 
 ### Statistical validity — NIST AI 800-3 and TEVV-Athlon
 
