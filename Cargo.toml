@@ -20,6 +20,8 @@ exclude = [
     "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-rea-evidence-verifier",
     "crates/core/symthaea",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
