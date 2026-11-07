@@ -107,6 +107,12 @@ pub struct CheckedBPResult {
     /// Normalized log probabilities, preserving states whose probabilities
     /// underflow when converted into ordinary f64 probability space.
     pub log_beliefs: Vec<Vec<f64>>,
+    /// True factor marginals from factor potential times incoming cavity
+    /// messages. Each row is in the corresponding factor's table order.
+    pub factor_beliefs: Vec<Vec<f64>>,
+    /// Log-domain factor marginals, preserving support under exponentiation
+    /// underflow. Each row follows the corresponding factor's table order.
+    pub log_factor_beliefs: Vec<Vec<f64>>,
     pub converged: bool,
     pub iterations: usize,
     /// Maximum absolute probability-message change on the final iteration.
@@ -247,6 +253,44 @@ pub fn run_sum_product(
         log_beliefs.push(log_belief);
     }
 
+    let mut factor_beliefs = Vec::with_capacity(graph.factors.len());
+    let mut log_factor_beliefs = Vec::with_capacity(graph.factors.len());
+    for factor in &graph.factors {
+        let cards = factor.variables.iter()
+            .map(|&variable| graph.variables[variable].cardinality)
+            .collect::<Vec<_>>();
+        let total = cards.iter().try_fold(1usize, |count, &cardinality| {
+            count.checked_mul(cardinality)
+        }).ok_or(CheckedBPError::TableSizeOverflow { factor: factor.id })?;
+        let mut log_belief = vec![f64::NEG_INFINITY; total];
+
+        for flat_index in 0..total {
+            let potential = factor.table[flat_index];
+            if potential == 0.0 {
+                continue;
+            }
+            let config = decode_assignment(flat_index, &cards);
+            let mut score = potential.ln();
+            for (position, &variable) in factor.variables.iter().enumerate() {
+                let message = messages
+                    .get(&var_to_factor_key(n_variables, variable, factor.id))
+                    .expect("validated message initialization");
+                score += message[config[position]];
+            }
+            if !score.is_finite() {
+                if score == f64::NEG_INFINITY {
+                    continue;
+                }
+                return Err(CheckedBPError::NonFiniteMessage { context: "factor belief" });
+            }
+            log_belief[flat_index] = score;
+        }
+
+        normalize_log(&mut log_belief, "factor belief")?;
+        factor_beliefs.push(log_belief.iter().map(|value| value.exp()).collect());
+        log_factor_beliefs.push(log_belief);
+    }
+
     let inference_status = if !converged {
         InferenceStatus::NotConverged
     } else {
@@ -261,6 +305,8 @@ pub fn run_sum_product(
     Ok(CheckedBPResult {
         beliefs,
         log_beliefs,
+        factor_beliefs,
+        log_factor_beliefs,
         converged,
         iterations,
         max_message_delta: final_delta,
@@ -616,6 +662,119 @@ fn compensated_sum(values: &[f64]) -> f64 {
         sum = next;
     }
     sum + correction
+}
+
+/// Bethe free-energy evaluation status.
+///
+/// On a forest with exact undamped BP beliefs, the Bethe log-partition equals
+/// the exact log partition. On loopy graphs, it is a variational approximation.
+/// If BP did not converge, this is simply the Bethe functional evaluated at
+/// the returned local beliefs, not a stationary-point estimate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BetheStatus {
+    ExactForest,
+    ApproximateLoopy,
+    NonStationary,
+}
+
+/// Bethe functional and its sign-converted log-partition estimate.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BetheResult {
+    pub free_energy: f64,
+    pub log_partition_estimate: f64,
+    pub status: BetheStatus,
+}
+
+/// Evaluate the Bethe functional using true cavity-derived factor beliefs.
+///
+/// F_B = sum_a E_{b_a}[log b_a - log f_a]
+///       + sum_i (1 - degree(i)) E_{b_i}[log b_i].
+///
+/// This function consumes only beliefs emitted by the checked sum-product API.
+/// It does not use the legacy singleton-product factor approximation or an
+/// arbitrary penalty for impossible factor entries.
+pub fn bethe_free_energy(
+    graph: &FactorGraph,
+    inference: &CheckedBPResult,
+) -> Result<BetheResult, CheckedBPError> {
+    validate_graph(graph)?;
+    if inference.factor_beliefs.len() != graph.factors.len()
+        || inference.log_factor_beliefs.len() != graph.factors.len()
+        || inference.log_beliefs.len() != graph.variables.len()
+    {
+        return Err(CheckedBPError::InvalidPotential {
+            factor: 0,
+            table_index: 0,
+            value: f64::NAN,
+        });
+    }
+
+    let mut energy_terms = Vec::new();
+    for (factor_index, factor) in graph.factors.iter().enumerate() {
+        let log_beliefs = &inference.log_factor_beliefs[factor_index];
+        if log_beliefs.len() != factor.table.len() {
+            return Err(CheckedBPError::TableLengthMismatch {
+                factor: factor_index,
+                expected: factor.table.len(),
+                actual: log_beliefs.len(),
+            });
+        }
+        for (table_index, &log_belief) in log_beliefs.iter().enumerate() {
+            if log_belief == f64::NEG_INFINITY {
+                continue;
+            }
+            let potential = factor.table[table_index];
+            if potential <= 0.0 {
+                return Err(CheckedBPError::ZeroSupport { context: "Bethe factor energy" });
+            }
+            let probability = log_belief.exp();
+            if probability == 0.0 {
+                continue;
+            }
+            energy_terms.push(probability * (log_belief - potential.ln()));
+        }
+    }
+
+    for (variable_index, variable) in graph.variables.iter().enumerate() {
+        let degree = variable.neighbors.len() as f64;
+        let log_belief = &inference.log_beliefs[variable_index];
+        if log_belief.len() != variable.cardinality {
+            return Err(CheckedBPError::TableLengthMismatch {
+                factor: usize::MAX,
+                expected: variable.cardinality,
+                actual: log_belief.len(),
+            });
+        }
+        for &log_probability in log_belief {
+            if log_probability == f64::NEG_INFINITY {
+                continue;
+            }
+            let probability = log_probability.exp();
+            if probability > 0.0 {
+                energy_terms.push((1.0 - degree) * probability * log_probability);
+            }
+        }
+    }
+
+    energy_terms.sort_by(f64::total_cmp);
+    let free_energy = compensated_sum(&energy_terms);
+    let log_partition_estimate = -free_energy;
+    if !(free_energy.is_finite() && log_partition_estimate.is_finite()) {
+        return Err(CheckedBPError::NonFiniteMessage { context: "Bethe free energy" });
+    }
+
+    let status = match (inference.inference_status, inference.graph_structure) {
+        (InferenceStatus::ExactForest, GraphStructure::Forest) => BetheStatus::ExactForest,
+        (InferenceStatus::NotConverged, _) => BetheStatus::NonStationary,
+        (_, GraphStructure::Loopy) => BetheStatus::ApproximateLoopy,
+        _ => BetheStatus::NonStationary,
+    };
+
+    Ok(BetheResult {
+        free_energy,
+        log_partition_estimate,
+        status,
+    })
 }
 
 fn validate_config(config: &BPConfig) -> Result<(), CheckedBPError> {
@@ -1129,6 +1288,84 @@ mod tests {
 
         assert_eq!(actual.beliefs, expected.beliefs);
         assert_eq!(actual.inference_status, expected.inference_status);
+    }
+
+    #[test]
+    fn factor_beliefs_match_direct_factor_marginals_on_a_tree() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        graph.add_factor(&[a, b], vec![0.3, 0.1, 0.2, 0.4]);
+
+        let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+        assert_eq!(inference.factor_beliefs.len(), 1);
+        let expected = [0.3_f64 / 1.0, 0.1, 0.2, 0.4];
+        for (actual, expected) in inference.factor_beliefs[0].iter().zip(expected) {
+            assert!((actual - expected).abs() < 1.0e-10);
+        }
+        let bethe = bethe_free_energy(&graph, &inference).unwrap();
+        assert_eq!(bethe.status, BetheStatus::ExactForest);
+        assert!((bethe.log_partition_estimate - 0.0).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn factor_belief_uses_cavity_potential_not_product_of_singleton_marginals() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let c = graph.add_variable("C", 2);
+        graph.add_factor(&[a, b], vec![0.9, 0.1, 0.1, 0.9]);
+        graph.add_factor(&[b, c], vec![0.9, 0.1, 0.1, 0.9]);
+        graph.add_factor(&[a, c], vec![0.9, 0.1, 0.1, 0.9]);
+
+        let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+        // Symmetry makes singleton marginals 0.5/0.5, whose product is 0.25.
+        // The true cavity-derived factor belief is proportional to the factor:
+        // [0.45, 0.05, 0.05, 0.45].
+        let expected = [0.45, 0.05, 0.05, 0.45];
+        for (actual, expected) in inference.factor_beliefs[0].iter().zip(expected) {
+            assert!((actual - expected).abs() < 1.0e-10);
+        }
+        assert!((inference.factor_beliefs[0][0] - 0.25).abs() > 0.1);
+        let bethe = bethe_free_energy(&graph, &inference).unwrap();
+        assert_eq!(bethe.status, BetheStatus::ApproximateLoopy);
+    }
+
+    #[test]
+    fn bethe_log_partition_matches_direct_enumeration_on_a_three_node_tree() {
+        let mut graph = FactorGraph::new();
+        let a = graph.add_variable("A", 2);
+        let b = graph.add_variable("B", 2);
+        let c = graph.add_variable("C", 2);
+        graph.add_factor(&[a, b], vec![0.4, 0.1, 0.2, 0.3]);
+        graph.add_factor(&[b, c], vec![0.5, 0.5, 0.3, 0.7]);
+
+        let inference = run_sum_product(&graph, &BPConfig::default()).unwrap();
+        let mut z = 0.0;
+        for av in 0..2 {
+            for bv in 0..2 {
+                for cv in 0..2 {
+                    let left = [[0.4, 0.1], [0.2, 0.3]][av][bv];
+                    let right = [[0.5, 0.5], [0.3, 0.7]][bv][cv];
+                    z += left * right;
+                }
+            }
+        }
+        let bethe = bethe_free_energy(&graph, &inference).unwrap();
+        assert_eq!(bethe.status, BetheStatus::ExactForest);
+        assert!((bethe.log_partition_estimate - z.ln()).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn loose_tolerance_bethe_is_not_labelled_exact() {
+        let graph = two_node_tree();
+        let inference = run_sum_product(&graph, &BPConfig {
+            max_iterations: 1,
+            tolerance: 10.0,
+            ..BPConfig::default()
+        }).unwrap();
+        let bethe = bethe_free_energy(&graph, &inference).unwrap();
+        assert_eq!(bethe.status, BetheStatus::NonStationary);
     }
 
     #[test]
