@@ -992,12 +992,8 @@ mod tests {
             "{authority_error}"
         );
 
-        plan.words[0].selection_receipt = Some(selected_receipt(
-            "en-US",
-            "read",
-            &plan.words[0],
-            0,
-        ));
+        let rebound_receipt = selected_receipt("en-US", "read", &plan.words[0], 0);
+        plan.words[0].selection_receipt = Some(rebound_receipt);
         plan.words[0]
             .selection_receipt
             .as_mut()
