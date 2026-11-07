@@ -53,6 +53,34 @@ A system can identify one statement while a related statement remains non-identi
 
 Never assign one global “identified graph” badge. Record dispositions per causal claim and intervention prediction.
 
+
+### 2.3 Do not collapse six different causal claims
+
+These statements are related, but they are not interchangeable evidence levels. A result supporting one does not automatically establish the next.
+
+| Claim kind | Exact question | Minimum evidence needed | What it does not establish |
+|---|---|---|---|
+| **Source structural possibility** | Does this source/configuration permit a path under stated assumptions? | Exact source revision, relevant caller/configuration scope, and source-grounded control/data/authority edges | That the path was compiled, selected, executed or caused an incident |
+| **Build-world selection** | Which source/feature/target implementation is present in this artifact? | Frozen build invocation, resolved features/cfg/target, artifact digest and provenance | That the selected path executed for a given request |
+| **Execution realization** | Did this path/state transition occur in this concrete run? | Qualified trace/test/instrumentation bound to exact run, source and environment | That the event was an actual cause rather than correlated, redundant or pre-empted |
+| **Actual-cause attribution** | In this context and under the declared causal model, did this realized factor make a counterfactual difference to the outcome? | A contextual causal model, actual values/events, justified structural equations/causal semantics, and a valid contrast/intervention or other accepted actual-cause criterion | That the same factor is a general causal effect across other models, builds or populations |
+| **Interventional-effect identifiability** | Do all evidence-compatible models agree on the effect of a specified intervention? | A declared model class/assumptions and compatible-model set, with intervention semantics and query-specific predictions | That the intervention occurred, or that a specific historical incident was caused by the factor |
+| **Incident attribution** | Is the causal claim tied to this incident, asset, actor, revision, artifact, environment and time window? | Identity/lineage binding plus admissible event and causal evidence for that incident | A generalizable causal law beyond the attributed scope |
+
+The table is a claim-disambiguation aid, not a compulsory linear ladder. For example, interventional-effect identifiability can be studied from a qualified model and assumptions without claiming that a particular historical incident occurred. Conversely, a trace may establish execution realization while the actual cause remains ambiguous.
+
+Use the following wording discipline:
+
+- “The source permits…” for source structural possibility.
+- “The artifact selects…” only for qualified build-world selection.
+- “The trace records…” for execution realization.
+- “This factor is an actual cause under model/semantics X and context C…” only when the actual-cause criterion is justified.
+- “The effect of intervention do(X=x) is identified within model class A…” only when all admissible models agree on the query.
+- “This incident is attributed to…” only when event identity, source/artifact lineage and causal evidence are all bound.
+
+**Relationship to the literature:** actual-causality fault localization such as SoftReX addresses responsibility/actual-cause questions over an execution- and mutation-grounded evaluation; dynamic slicing such as CausalRepair identifies executed dependencies relevant to a failing test; partially observed SCM theory studies whether interventional quantities are identified across compatible causal models. These are complementary constructs, not alternative names for one task. CEB must preserve each paper's target claim and evidence assumptions.
+
+
 ## 3. Evidence-compatible alternative models
 
 For each material claim, the reviewer records:
