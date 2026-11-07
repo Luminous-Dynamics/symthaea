@@ -114,6 +114,22 @@ pub struct Assessment {
     pub reason: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, SerdeDeserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimPrecisionSource {
+    AssertedValue,
+    EvidenceRecord,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, SerdeDeserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClaimPrecisionWarning {
+    pub source: ClaimPrecisionSource,
+    pub evidence_id: Option<String>,
+    pub json_pointer: String,
+    pub integer_value: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, SerdeDeserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClaimEvaluation {
@@ -129,6 +145,7 @@ pub struct ClaimEvaluation {
     pub source_predicate_type: Option<String>,
     pub requested_evidence_ids: Vec<String>,
     pub assumptions: Vec<String>,
+    pub numeric_precision_warnings: Vec<ClaimPrecisionWarning>,
     pub evidence_assessments: Vec<Assessment>,
     pub missing_evidence_ids: Vec<String>,
     pub unmet_obligations: Vec<String>,
@@ -708,6 +725,7 @@ enum ScopeDisposition {
 
 #[derive(Debug)]
 struct AdmittedEvidence {
+    numeric_precision_warnings: Vec<ClaimPrecisionWarning>,
     subject_sha256: Option<String>,
     operation: Option<String>,
     platform: Option<String>,
@@ -721,8 +739,150 @@ struct AdmittedEvidence {
     authority: Option<String>,
 }
 
+const MAX_EXACT_BINARY64_INTEGER: u64 = 9_007_199_254_740_991;
+
+fn escape_json_pointer_token(token: &str) -> String {
+    token.replace('~', "~0").replace('/', "~1")
+}
+
+fn collect_integer_precision_warnings(
+    value: &Value,
+    pointer: &str,
+    evidence_id: &str,
+    warnings: &mut Vec<ClaimPrecisionWarning>,
+) {
+    match value {
+        Value::Number(number) if number.is_i64() => {
+            if let Some(integer) = number.as_i64()
+                && (integer < -(MAX_EXACT_BINARY64_INTEGER as i64)
+                    || integer > MAX_EXACT_BINARY64_INTEGER as i64)
+            {
+                warnings.push(ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::EvidenceRecord,
+                    evidence_id: Some(evidence_id.to_owned()),
+                    json_pointer: pointer.to_owned(),
+                    integer_value: integer.to_string(),
+                });
+            }
+        }
+        Value::Number(number) if number.is_u64() => {
+            if let Some(integer) = number.as_u64()
+                && integer > MAX_EXACT_BINARY64_INTEGER
+            {
+                warnings.push(ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::EvidenceRecord,
+                    evidence_id: Some(evidence_id.to_owned()),
+                    json_pointer: pointer.to_owned(),
+                    integer_value: integer.to_string(),
+                });
+            }
+        }
+        Value::Array(values) => {
+            for (index, item) in values.iter().enumerate() {
+                collect_integer_precision_warnings(
+                    item,
+                    &format!("{pointer}/{index}"),
+                    evidence_id,
+                    warnings,
+                );
+            }
+        }
+        Value::Object(values) => {
+            for (key, item) in values {
+                collect_integer_precision_warnings(
+                    item,
+                    &format!("{pointer}/{}", escape_json_pointer_token(key)),
+                    evidence_id,
+                    warnings,
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
+fn evidence_integer_precision_warnings(
+    value: &Value,
+    evidence_id: &str,
+) -> Vec<ClaimPrecisionWarning> {
+    let mut warnings = Vec::new();
+    collect_integer_precision_warnings(value, "", evidence_id, &mut warnings);
+    warnings.sort_by(|left, right| {
+        left.json_pointer
+            .cmp(&right.json_pointer)
+            .then_with(|| left.integer_value.cmp(&right.integer_value))
+    });
+    warnings
+}
+
+fn asserted_value_precision_warnings(value: &Value) -> Vec<ClaimPrecisionWarning> {
+    let mut warnings = Vec::new();
+    collect_asserted_integer_precision_warnings(value, "", &mut warnings);
+    warnings.sort_by(|left, right| {
+        left.json_pointer
+            .cmp(&right.json_pointer)
+            .then_with(|| left.integer_value.cmp(&right.integer_value))
+    });
+    warnings
+}
+
+fn collect_asserted_integer_precision_warnings(
+    value: &Value,
+    pointer: &str,
+    warnings: &mut Vec<ClaimPrecisionWarning>,
+) {
+    match value {
+        Value::Number(number) if number.is_i64() => {
+            if let Some(integer) = number.as_i64()
+                && (integer < -(MAX_EXACT_BINARY64_INTEGER as i64)
+                    || integer > MAX_EXACT_BINARY64_INTEGER as i64)
+            {
+                warnings.push(ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::AssertedValue,
+                    evidence_id: None,
+                    json_pointer: pointer.to_owned(),
+                    integer_value: integer.to_string(),
+                });
+            }
+        }
+        Value::Number(number) if number.is_u64() => {
+            if let Some(integer) = number.as_u64()
+                && integer > MAX_EXACT_BINARY64_INTEGER
+            {
+                warnings.push(ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::AssertedValue,
+                    evidence_id: None,
+                    json_pointer: pointer.to_owned(),
+                    integer_value: integer.to_string(),
+                });
+            }
+        }
+        Value::Array(values) => {
+            for (index, item) in values.iter().enumerate() {
+                collect_asserted_integer_precision_warnings(
+                    item,
+                    &format!("{pointer}/{index}"),
+                    warnings,
+                );
+            }
+        }
+        Value::Object(values) => {
+            for (key, item) in values {
+                collect_asserted_integer_precision_warnings(
+                    item,
+                    &format!("{pointer}/{}", escape_json_pointer_token(key)),
+                    warnings,
+                );
+            }
+        }
+        _ => {}
+    }
+}
+
 fn admit_verified_evidence(evidence: VerifiedEvidence) -> AdmittedEvidence {
+    let evidence_id = evidence.evidence_id;
     let mut value = evidence.value;
+    let numeric_precision_warnings = evidence_integer_precision_warnings(&value, &evidence_id);
     let subject_sha256 = string_at(&value, &["subject", "digest", "sha256"]).map(str::to_owned);
     let operation = string_at(&value, &["operation"]).map(str::to_owned);
     let platform = string_at(&value, &["environment", "platform"]).map(str::to_owned);
@@ -741,6 +901,7 @@ fn admit_verified_evidence(evidence: VerifiedEvidence) -> AdmittedEvidence {
     // The full, schema-verified Evidence value is dropped after projection.
     // Claim inference retains only fields authorized by the v0 rule.
     AdmittedEvidence {
+        numeric_precision_warnings,
         subject_sha256,
         operation,
         platform,
@@ -882,12 +1043,18 @@ fn assessment(
     }
 }
 
-fn claim_ceiling(predicate: Predicate) -> Vec<String> {
+fn claim_ceiling(predicate: Predicate, has_precision_warnings: bool) -> Vec<String> {
     let mut ceiling = vec![
         "A supported result is scoped to the exact subject, operation, environment fields and Evidence IDs in this derivation.".to_owned(),
         "This evaluator verifies what a REA Evidence record reports; it does not prove the underlying real-world proposition is true.".to_owned(),
         "Evidence ID verification is a semantic commitment, not producer authentication or trusted-time evidence.".to_owned(),
     ];
+    if has_precision_warnings {
+        ceiling.push(
+            "One or more JSON integer tokens exceed the ECMAScript safe-integer range; RFC 8785 evaluates their binary64 interpretation, so exact integer preservation is not established. See numeric_precision_warnings and encode exact large integers as decimal strings."
+                .to_owned(),
+        );
+    }
     if predicate == Predicate::ProviderReportedObservation {
         ceiling.push(
             "Exact normalized_result equality establishes a recorded provider observation only; it does not establish artifact semantics, completeness, authenticity or safety.".to_owned(),
@@ -904,6 +1071,14 @@ fn derive_reference_result(
     claim: &ClaimRequest,
     evidence_by_id: &HashMap<String, AdmittedEvidence>,
 ) -> Result<ClaimEvaluation, ReplayError> {
+    let mut numeric_precision_warnings =
+        asserted_value_precision_warnings(&claim.asserted_value);
+    for evidence_id in &claim.evidence_ids {
+        if let Some(record) = evidence_by_id.get(evidence_id) {
+            numeric_precision_warnings.extend(record.numeric_precision_warnings.clone());
+        }
+    }
+
     let mut assessments = Vec::new();
     let mut missing = Vec::new();
     let mut unmet = Vec::new();
@@ -1050,7 +1225,10 @@ fn derive_reference_result(
         .map_err(|error| ReplayError::new(ReplayErrorKind::Canonicalization, error.to_string()))?;
     let claim_request_sha256 = sha256_hex(&claim_bytes);
 
-    let ceiling = claim_ceiling(claim.predicate);
+    let ceiling = claim_ceiling(
+        claim.predicate,
+        !numeric_precision_warnings.is_empty(),
+    );
     let body = DerivationBody {
         schema: RESULT_SCHEMA,
         evaluator_version: EVALUATOR_VERSION,
@@ -1064,6 +1242,7 @@ fn derive_reference_result(
         source_predicate_type: &claim.source_predicate_type,
         requested_evidence_ids: &claim.evidence_ids,
         assumptions: &claim.assumptions,
+        numeric_precision_warnings: &numeric_precision_warnings,
         evidence_assessments: &assessments,
         missing_evidence_ids: &missing,
         unmet_obligations: &unmet,
@@ -1089,6 +1268,7 @@ fn derive_reference_result(
         source_predicate_type: claim.source_predicate_type.clone(),
         requested_evidence_ids: claim.evidence_ids.clone(),
         assumptions: claim.assumptions.clone(),
+        numeric_precision_warnings,
         evidence_assessments: assessments,
         missing_evidence_ids: missing,
         unmet_obligations: unmet,
@@ -1112,6 +1292,7 @@ struct DerivationBody<'a> {
     source_predicate_type: &'a Option<String>,
     requested_evidence_ids: &'a [String],
     assumptions: &'a [String],
+    numeric_precision_warnings: &'a [ClaimPrecisionWarning],
     evidence_assessments: &'a [Assessment],
     missing_evidence_ids: &'a [String],
     unmet_obligations: &'a [String],
