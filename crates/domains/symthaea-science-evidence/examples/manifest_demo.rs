@@ -21,7 +21,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let source_commit_sha = required_env("SYMTHAEA_SOURCE_COMMIT")?;
     let toolchain = required_env("SYMTHAEA_TOOLCHAIN")?;
     let platform = required_env("SYMTHAEA_PLATFORM")?;
-    let clean = required_env("SYMTHAEA_SOURCE_TREE_CLEAN")? == "true";
+    let clean = match required_env("SYMTHAEA_SOURCE_TREE_CLEAN")?.as_str() {
+        "true" => true,
+        "false" => false,
+        _ => return Err("SYMTHAEA_SOURCE_TREE_CLEAN must be exactly true or false".into()),
+    };
 
     let fixture_bytes = b"{\"seed\":42,\"events\":1500}";
     let manifest = ExperimentManifest {
