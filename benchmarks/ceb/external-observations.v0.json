@@ -2,12 +2,12 @@
   "schema_version": 0,
   "registry_id": "CEB-EXTERNAL-OBSERVATIONS-V0",
   "status": "design_only_external_reference_snapshot",
-  "snapshot_date": "2026-11-05",
+  "snapshot_date": "2026-11-07",
   "policy": {
     "unit_of_observation": "One row represents one metric from one benchmark split and one named system configuration. Never combine metrics from different configurations into a synthetic system.",
     "comparison_ceiling": "All included external scores are contextual or historical references unless a separately preregistered matched comparison is recorded; no direct CEB superiority claim is supported by this registry.",
     "uncertainty_rule": "Preserve source-reported uncertainty notation. Do not infer a confidence level or interval method unless the source states it.",
-    "denominator_rule": "Every task or pair count belongs to its exact benchmark/split. Missing denominators must be explicitly marked not_reported, not silently imputed.",
+    "denominator_rule": "Every task or pair count belongs to its exact benchmark/split. Missing denominators must be explicitly marked not_reported, not silently imputed. Candidate-dependent augmented-recall denominators are per-agent discovery diagnostics and must not be used as a common cross-agent ranking denominator.",
     "unlabeled_rule": "An unlabeled leaderboard value remains unlabeled; it cannot be mapped to a named metric by guesswork."
   },
   "sources": [
@@ -199,6 +199,50 @@
       "published_on": null,
       "supports": [
         "CEB-CONTINUITY"
+      ]
+    },
+    {
+      "source_id": "reviewbench-leaderboard",
+      "source_url": "https://review-bench.ai/",
+      "title": "ReviewBench high-severity grounded-F1 leaderboard",
+      "source_type": "benchmark_leaderboard",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "reviewbench-methodology",
+      "source_url": "https://review-bench.ai/methodology/",
+      "title": "ReviewBench offline benchmark methodology",
+      "source_type": "benchmark_documentation",
+      "accessed_on": "2026-11-07",
+      "published_on": null,
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "secprbench-paper",
+      "source_url": "https://arxiv.org/abs/2610.33509",
+      "title": "SecPRBench: vulnerability-introducing pull-request review benchmark",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-10-24",
+      "supports": [
+        "CEB-REVIEW"
+      ]
+    },
+    {
+      "source_id": "cr-bench-v2-paper",
+      "source_url": "https://arxiv.org/abs/2611.02566",
+      "title": "CR-Bench-v2: known-defect detection and comment usefulness",
+      "source_type": "benchmark_paper",
+      "accessed_on": "2026-11-07",
+      "published_on": "2026-11-02",
+      "supports": [
+        "CEB-REVIEW"
       ]
     }
   ],
@@ -585,6 +629,75 @@
         "The benchmark uses continuous release-history milestone DAGs; it is not a CEB evidence-disposition task set.",
         "The visible leaderboard row does not expose the task denominator, exact aggregation details, uncertainty interval or all run configuration fields.",
         "No metric correspondence here licenses a direct CEB superiority comparison."
+      ]
+    },
+    {
+      "comparator_id": "reviewbench-high-severity",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "ReviewBench",
+      "benchmark_version": "live high-severity leaderboard accessed 2026-11-07",
+      "split": "High-severity grounded-F1 leaderboard",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 219,
+        "unit": "pull_requests"
+      },
+      "source_id": "reviewbench-leaderboard",
+      "supporting_source_ids": [
+        "reviewbench-methodology"
+      ],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Dataset contains 219 PRs from 187 public repositories across 19 languages; exact high-severity TP denominator is not separately stated on the live leaderboard.",
+        "Leader row OhMyBug run dated 2026-10-25: 83.0 grounded F1 / 92.0 precision / 75.6 recall.",
+        "Grounded scores count findings reviewed by people; these are not all-severity results or CEB Recall@5/actionable-precision scores.",
+        "Augmented recall is candidate-dependent because unmatched true positives increase that candidate's numerator and denominator; use grounded recall for common-gold ranking.",
+        "The methodology uses a Claude Sonnet 5 classifier for labels and unmatched-finding classification; senior-engineer audit scope is separately disclosed."
+      ]
+    },
+    {
+      "comparator_id": "secprbench-direct-review",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "SecPRBench",
+      "benchmark_version": "arXiv paper submitted 2026-10-24",
+      "split": "265 buggy security-introducing changes; direct review",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 265,
+        "unit": "buggy_tasks"
+      },
+      "source_id": "secprbench-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "Nine C/C++/Rust systems projects, including Firefox, V8 and OpenSSL.",
+        "217 cases pass mechanical checks and 48 use human adjudication; each has a fixed companion.",
+        "Measures target-mechanism recall across findings, not top-five recall or ordinary-PR vulnerability prevalence.",
+        "68% of analyzed misses locate a root-cause file but explain a neighboring/incorrect mechanism.",
+        "Fixed companions check the target only and do not establish report precision; fixed revisions can include intervening changes.",
+        "The evaluator is Claude Opus 5.5, also an evaluated model; one run per task and unmatched budgets limit comparisons."
+      ]
+    },
+    {
+      "comparator_id": "cr-bench-v2-verified",
+      "lane_id": "CEB-REVIEW",
+      "benchmark_name": "CR-Bench-v2",
+      "benchmark_version": "2026-11-03 revised preprint",
+      "split": "CR-Bench-Verified",
+      "sample_denominator": {
+        "status": "reported",
+        "value": 174,
+        "unit": "verified_PR_instances"
+      },
+      "source_id": "cr-bench-v2-paper",
+      "supporting_source_ids": [],
+      "comparison_class": "contextual_reference",
+      "caveats": [
+        "174 verified instances derived from a 584-instance corpus; 11 Python repositories, with Django contributing 63 tasks.",
+        "Each instance has one labeled known defect; other true defects are not necessarily counted as KDDR hits.",
+        "KDDR and Usefulness Rate are separate; useful comments are not necessarily target-defect detections.",
+        "Table 7 ± values are sample SD across three judges, not sampling confidence intervals; Table 8 reports per-judge bootstrap intervals.",
+        "The reference/judge lineage and 60-comment human study are limited; agents in the study did not use tools or execute code."
       ]
     }
   ],
@@ -1934,6 +2047,720 @@
       "notes": [
         "Test recall is not a direct measure of CEB evidence invalidation or evidence continuity.",
         "Context only; do not pool with precision or the benchmark's separate aggregate Score."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-ohmybug-grounded-f1",
+      "comparator_id": "reviewbench-high-severity",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard, row OhMyBug, dated 2026-10-25",
+      "system": {
+        "system_id": "reviewbench-ohmybug",
+        "model": "not_reported_on_leaderboard",
+        "harness": "OhMyBug review-agent submission",
+        "configuration": "High-severity grounded leaderboard; run date 2026-10-25"
+      },
+      "metric": {
+        "metric_id": "grounded_f1",
+        "label": "Grounded F1",
+        "definition": "Harmonic mean of grounded precision and grounded recall against the fixed human-reviewed gold set.",
+        "value": 83,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "83.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "grounded_f1",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "High-severity slice only; not an all-severity review score."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-ohmybug-grounded-precision",
+      "comparator_id": "reviewbench-high-severity",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard, row OhMyBug, dated 2026-10-25",
+      "system": {
+        "system_id": "reviewbench-ohmybug",
+        "model": "not_reported_on_leaderboard",
+        "harness": "OhMyBug review-agent submission",
+        "configuration": "High-severity grounded leaderboard; run date 2026-10-25"
+      },
+      "metric": {
+        "metric_id": "grounded_precision",
+        "label": "Grounded precision",
+        "definition": "Fraction of candidate findings matched to fixed-gold actionable findings under the ReviewBench matcher.",
+        "value": 92,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "92.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "grounded_precision",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "ReviewBench classifier/rubric differs from CEB blinded actionable precision."
+      ]
+    },
+    {
+      "observation_id": "reviewbench-ohmybug-grounded-recall",
+      "comparator_id": "reviewbench-high-severity",
+      "source_locator": "ReviewBench live high-severity grounded-F1 leaderboard, row OhMyBug, dated 2026-10-25",
+      "system": {
+        "system_id": "reviewbench-ohmybug",
+        "model": "not_reported_on_leaderboard",
+        "harness": "OhMyBug review-agent submission",
+        "configuration": "High-severity grounded leaderboard; run date 2026-10-25"
+      },
+      "metric": {
+        "metric_id": "grounded_recall",
+        "label": "Grounded recall",
+        "definition": "Fraction of fixed-gold true-positive findings identified by the candidate.",
+        "value": 75.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "75.6%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "grounded_recall",
+          "applies_to_task_count": 219
+        }
+      },
+      "notes": [
+        "Not top-five constrained; not CEB defect_recall_at_5."
+      ]
+    },
+    {
+      "observation_id": "secpr-grok46-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Grok 4.6 / Claude Code",
+      "system": {
+        "system_id": "secpr-grok46",
+        "model": "Grok 4.6",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 78.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "78.1%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-grok46-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Grok 4.6 / Claude Code",
+      "system": {
+        "system_id": "secpr-grok46",
+        "model": "Grok 4.6",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 3.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$3.20",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-grok46-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Grok 4.6 / Claude Code",
+      "system": {
+        "system_id": "secpr-grok46",
+        "model": "Grok 4.6",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 12.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "12.6 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "secpr-gpt6-sol-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GPT-6 sol / Codex CLI",
+      "system": {
+        "system_id": "secpr-gpt6-sol",
+        "model": "GPT-6 sol",
+        "harness": "Codex CLI",
+        "configuration": "xhigh direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 76.2,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "76.2%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-gpt6-sol-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GPT-6 sol / Codex CLI",
+      "system": {
+        "system_id": "secpr-gpt6-sol",
+        "model": "GPT-6 sol",
+        "harness": "Codex CLI",
+        "configuration": "xhigh direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 0.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$0.60",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-gpt6-sol-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GPT-6 sol / Codex CLI",
+      "system": {
+        "system_id": "secpr-gpt6-sol",
+        "model": "GPT-6 sol",
+        "harness": "Codex CLI",
+        "configuration": "xhigh direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 3.3,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "3.3 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "secpr-glm53-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GLM 5.3 / Claude Code",
+      "system": {
+        "system_id": "secpr-glm53",
+        "model": "GLM 5.3",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 74.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "74.7%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-glm53-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GLM 5.3 / Claude Code",
+      "system": {
+        "system_id": "secpr-glm53",
+        "model": "GLM 5.3",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 4.99,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$4.99",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-glm53-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, GLM 5.3 / Claude Code",
+      "system": {
+        "system_id": "secpr-glm53",
+        "model": "GLM 5.3",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 20.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "20.8 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "secpr-opus55-target-recall",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Claude Opus 5.5 / Claude Code",
+      "system": {
+        "system_id": "secpr-opus55",
+        "model": "Claude Opus 5.5",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "target_recall",
+        "label": "Target-vulnerability diagnosis recall",
+        "definition": "Fraction of buggy tasks for which the judge credits at least one finding explaining the target's causal failure in the reviewed code.",
+        "value": 74,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "74.0%",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "target_recall",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "All findings may be considered; not top-five recall."
+      ]
+    },
+    {
+      "observation_id": "secpr-opus55-estimated-cost",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Claude Opus 5.5 / Claude Code",
+      "system": {
+        "system_id": "secpr-opus55",
+        "model": "Claude Opus 5.5",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "estimated_scan_cost_usd",
+        "label": "Estimated cost per scan",
+        "definition": "Paper-estimated model/tool cost per direct-review scan; construction and judging costs excluded.",
+        "value": 0.44,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "USD_per_scan",
+        "direction": "minimize",
+        "raw_display": "$0.44",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "estimated_scan_cost_usd",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Historical paper estimate, not a live provider price or all-in human/evaluator cost."
+      ]
+    },
+    {
+      "observation_id": "secpr-opus55-scan-minutes",
+      "comparator_id": "secprbench-direct-review",
+      "source_locator": "SecPRBench paper Table 2, direct-review results on 265 buggy tasks, Claude Opus 5.5 / Claude Code",
+      "system": {
+        "system_id": "secpr-opus55",
+        "model": "Claude Opus 5.5",
+        "harness": "Claude Code",
+        "configuration": "direct-review agent"
+      },
+      "metric": {
+        "metric_id": "mean_scan_minutes",
+        "label": "Mean minutes per scan",
+        "definition": "Paper-reported mean elapsed minutes per review scan.",
+        "value": 1.4,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "minutes_per_scan",
+        "direction": "minimize",
+        "raw_display": "1.4 min",
+        "uncertainty": {
+          "status": "not_reported",
+          "raw_notation": "not reported",
+          "margin": null,
+          "confidence_level": "not reported",
+          "method": "not reported by source",
+          "applies_to_metric_id": "mean_scan_minutes",
+          "applies_to_task_count": 265
+        }
+      },
+      "notes": [
+        "Per-scan timing; not reviewer adjudication burden."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt52-reflexion-kddr",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt52-reflexion",
+        "model": "GPT-5.2",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "known_defect_detection_rate",
+        "label": "Known-Defect Detection Rate (KDDR)",
+        "definition": "Fraction of instances in which at least one review comment identifies the single labeled known defect.",
+        "value": 33,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "33.0% ± 1.3 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±1.3 sample SD across three judges; not a sampling CI",
+          "margin": 1.3,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "known_defect_detection_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Single known defect per instance; not CEB Recall@5; values are mean across judges."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt52-reflexion-usefulness",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt52-reflexion",
+        "model": "GPT-5.2",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "comment_usefulness_rate",
+        "label": "Comment Usefulness Rate",
+        "definition": "Fraction of review comments classified as Bug Hit or Valid Suggestion rather than Noise.",
+        "value": 89.8,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "89.8% ± 9.5 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±9.5 sample SD across three judges; not a sampling CI",
+          "margin": 9.5,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "comment_usefulness_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Usefulness is not target-defect detection or identical to CEB actionable precision."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt5mini-reflexion-kddr",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt5mini-reflexion",
+        "model": "GPT-5-mini",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "known_defect_detection_rate",
+        "label": "Known-Defect Detection Rate (KDDR)",
+        "definition": "Fraction of instances in which at least one review comment identifies the single labeled known defect.",
+        "value": 33.7,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "33.7% ± 4.9 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±4.9 sample SD across three judges; not a sampling CI",
+          "margin": 4.9,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "known_defect_detection_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Single known defect per instance; not CEB Recall@5; values are mean across judges."
+      ]
+    },
+    {
+      "observation_id": "crbench-gpt5mini-reflexion-usefulness",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gpt5mini-reflexion",
+        "model": "GPT-5-mini",
+        "harness": "review harness with Reflexion",
+        "configuration": "balanced prompt; Reflexion"
+      },
+      "metric": {
+        "metric_id": "comment_usefulness_rate",
+        "label": "Comment Usefulness Rate",
+        "definition": "Fraction of review comments classified as Bug Hit or Valid Suggestion rather than Noise.",
+        "value": 72.6,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "72.6% ± 28.4 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±28.4 sample SD across three judges; not a sampling CI",
+          "margin": 28.4,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "comment_usefulness_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Usefulness is not target-defect detection or identical to CEB actionable precision."
+      ]
+    },
+    {
+      "observation_id": "crbench-gemini-code-assist-kddr",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gemini-code-assist",
+        "model": "Gemini Code Assist",
+        "harness": "commercial review product",
+        "configuration": "benchmark configuration; no matched Reflexion arm"
+      },
+      "metric": {
+        "metric_id": "known_defect_detection_rate",
+        "label": "Known-Defect Detection Rate (KDDR)",
+        "definition": "Fraction of instances in which at least one review comment identifies the single labeled known defect.",
+        "value": 8.1,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "8.1% ± 0.6 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±0.6 sample SD across three judges; not a sampling CI",
+          "margin": 0.6,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "known_defect_detection_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Single known defect per instance; not CEB Recall@5; values are mean across judges."
+      ]
+    },
+    {
+      "observation_id": "crbench-gemini-code-assist-usefulness",
+      "comparator_id": "cr-bench-v2-verified",
+      "source_locator": "CR-Bench-v2 paper Table 7, CR-Bench-Verified (174 instances), balanced prompt; mean and SD across three judges",
+      "system": {
+        "system_id": "crbench-gemini-code-assist",
+        "model": "Gemini Code Assist",
+        "harness": "commercial review product",
+        "configuration": "benchmark configuration; no matched Reflexion arm"
+      },
+      "metric": {
+        "metric_id": "comment_usefulness_rate",
+        "label": "Comment Usefulness Rate",
+        "definition": "Fraction of review comments classified as Bug Hit or Valid Suggestion rather than Noise.",
+        "value": 78,
+        "value_status": "reported",
+        "operator": "equal",
+        "unit": "percent",
+        "direction": "maximize",
+        "raw_display": "78.0% ± 20.0 SD",
+        "uncertainty": {
+          "status": "reported",
+          "raw_notation": "±20.0 sample SD across three judges; not a sampling CI",
+          "margin": 20,
+          "confidence_level": "sample SD across three judges; not a sampling confidence interval",
+          "method": "sample standard deviation across three evaluator judges",
+          "applies_to_metric_id": "comment_usefulness_rate",
+          "applies_to_task_count": 174
+        }
+      },
+      "notes": [
+        "Usefulness is not target-defect detection or identical to CEB actionable precision."
       ]
     }
   ]
