@@ -618,6 +618,61 @@ pub fn verify_independent_product(
     })
 }
 
+/// A deliberately small typed executable plan for the finite reference engine.
+///
+/// This is not the general strategy IR from #10899: it has no dynamic code,
+/// transformations, external solver adapters, serialized representation, or
+/// provenance identity. It does make the three currently qualified semantic
+/// operations executable through one typed entry point.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FiniteReferenceStrategy {
+    /// Exhaustive, disjoint Shannon/cofactor branching over one Boolean variable.
+    BranchSum { split_variable: usize },
+    /// Product of clause-disjoint components plus explicitly declared free variables.
+    IndependentProduct {
+        components: Vec<Vec<usize>>,
+        free_variables: Vec<usize>,
+    },
+    /// Project full models to an ordered visible variable scope using support semantics.
+    ProjectedSupport { visible_variables: Vec<usize> },
+}
+
+/// Typed result produced by the finite reference strategy interpreter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FiniteReferenceResult {
+    BranchSum(BranchSumReport),
+    IndependentProduct(IndependentProductReport),
+    ProjectedSupport(ProjectedSupportReport),
+}
+
+/// Execute one of the qualified finite reference strategies.
+///
+/// The selected operation and its aggregation semantics are fixed by the enum
+/// variant; callers cannot supply an arbitrary aggregation operator. Each
+/// operation compares its result with direct source enumeration under the
+/// same explicit bounded reference implementation.
+pub fn execute_finite_reference_strategy(
+    problem: &CnfProblem,
+    strategy: &FiniteReferenceStrategy,
+    budget: EnumerationBudget,
+) -> Result<FiniteReferenceResult, DecompositionError> {
+    match strategy {
+        FiniteReferenceStrategy::BranchSum { split_variable } => {
+            verify_branch_sum(problem, *split_variable, budget)
+                .map(FiniteReferenceResult::BranchSum)
+        }
+        FiniteReferenceStrategy::IndependentProduct {
+            components,
+            free_variables,
+        } => verify_independent_product(problem, components, free_variables, budget)
+            .map(FiniteReferenceResult::IndependentProduct),
+        FiniteReferenceStrategy::ProjectedSupport { visible_variables } => {
+            verify_projected_support(problem, visible_variables, budget)
+                .map(FiniteReferenceResult::ProjectedSupport)
+        }
+    }
+}
+
 /// Result of direct projected model counting over a visible variable scope.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectedSupportReport {
@@ -912,6 +967,60 @@ mod tests {
                 vec![Literal::positive(1), Literal::positive(2)],
             ],
         }
+    }
+
+    #[test]
+    fn typed_reference_strategy_executes_all_three_finite_semantics() {
+        let branch = execute_finite_reference_strategy(
+            &branch_fixture(),
+            &FiniteReferenceStrategy::BranchSum { split_variable: 0 },
+            budget(),
+        )
+        .unwrap();
+        assert!(matches!(
+            branch,
+            FiniteReferenceResult::BranchSum(BranchSumReport {
+                aggregate_count: 4,
+                direct_source_count: 4,
+                ..
+            })
+        ));
+
+        let independent = execute_finite_reference_strategy(
+            &independent_fixture(),
+            &FiniteReferenceStrategy::IndependentProduct {
+                components: vec![vec![0, 1], vec![2, 3]],
+                free_variables: vec![4],
+            },
+            budget(),
+        )
+        .unwrap();
+        assert!(matches!(
+            independent,
+            FiniteReferenceResult::IndependentProduct(IndependentProductReport {
+                aggregate_count: 12,
+                direct_source_count: 12,
+                free_variable_multiplier: 2,
+                ..
+            })
+        ));
+
+        let projected = execute_finite_reference_strategy(
+            &projection_fixture(),
+            &FiniteReferenceStrategy::ProjectedSupport {
+                visible_variables: vec![0],
+            },
+            budget(),
+        )
+        .unwrap();
+        assert!(matches!(
+            projected,
+            FiniteReferenceResult::ProjectedSupport(ProjectedSupportReport {
+                full_model_count: 3,
+                projected_count: 1,
+                ..
+            })
+        ));
     }
 
     #[test]
