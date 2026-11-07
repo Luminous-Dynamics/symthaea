@@ -3,11 +3,7 @@
 
 use std::error::Error;
 use std::f64::consts::PI;
-use symthaea_metric_geometry_lab::{
-    GeodesicState,
-    SchwarzschildExterior,
-    geodesic_rk4_step,
-};
+use symthaea_metric_geometry_lab::{GeodesicState, SchwarzschildExterior, geodesic_rk4_step};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mass = 1.0;
