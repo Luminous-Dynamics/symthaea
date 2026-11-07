@@ -68,6 +68,9 @@ jobs:
       - name: Test VocalPerformance construction and fail-closed validation
         run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::singing_engine::tests -- --test-threads=1
 
+      - name: Test Kokoro score-gap preservation
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features "singing,voice-tts" voice::kokoro_singing::tests -- --test-threads=1
+
       - name: Compile the integrated comparative vocal release gate
         run: cargo +1.96.0 check --locked -p symthaea --example muse_vocal_release_gate --features "singing,voice-tts"
 
