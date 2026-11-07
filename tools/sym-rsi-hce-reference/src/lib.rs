@@ -1,3 +1,6 @@
+pub mod operator_trace;
+pub use operator_trace::{parse_and_validate_operator_trace, OperatorTrace, OperatorTraceReport};
+
 //! Offline HCE epoch-contract validation and asynchronous worker-trace analysis.
 //!
 //! This crate does not run agents, schedule work, evaluate hidden data, sign
