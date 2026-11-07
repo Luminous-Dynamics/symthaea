@@ -259,3 +259,19 @@ The synthetic receipts distinguish exact full scan, exact safe pruning, approxim
 Certified-compression research also includes a blockwise residual-bound fixture:
 [hme_certified_compression_block_bounds_v0.json](fixtures/hme_certified_compression_block_bounds_v0.json).
 It shows a synthetic query-weighted block residual dot bound of 2.0 versus 10.1 for a global residual-radius bound. The corresponding cosine upper bounds are 0.01048 versus 0.05291 in real arithmetic. This motivates measuring blockwise certificate metadata overhead against saved full-payload reads; it is not a measured query-speed improvement.
+
+
+## 11. Concrete integration finding: SQLite conversation retrieval consumes ContinuousHV similarity
+
+A source audit found that `crates/domains/symthaea-memory/src/conversation.rs` implements `ConversationMemory::find_similar()` by loading SQLite hypervector BLOBs, deserializing `Vec<f32>`, constructing `ContinuousHV` and invoking `query_embedding.similarity(&hv)`.
+
+This makes #10918's hidden stride/build discrepancy relevant to persisted conversation retrieval. The method also lacks decoded-vector dimension and finite-value admission checks before calling an API that asserts equal dimensions; it sorts by score without a stable conversation-ID tie-break and maps NaN partial comparisons to Equal.
+
+HME integration must not silently alter this legacy behavior. The first exact baseline should compare:
+- existing method under its actual build/stride configuration;
+- a declared exact full-coordinate score contract;
+- invalid-dimension and non-finite BLOB handling;
+- corrupted-BLOB diagnostics;
+- deterministic score-descending / conversation-ID-ascending tie ordering.
+
+The semantic API owner is #10918; the read-only HME comparison is #10917. The intended result is an explicit migration decision, not a shadow scoring implementation.
