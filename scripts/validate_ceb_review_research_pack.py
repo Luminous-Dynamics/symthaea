@@ -140,6 +140,8 @@ def validate_documents(
         errors.append("engineering scorecard is missing the gold-completeness paradigm shift")
     if "3.12 From tool use to sequential evidence acquisition" not in scorecard:
         errors.append("engineering scorecard is missing the sequential evidence-acquisition paradigm shift")
+    if "3.13 From uptake to verified engineering impact" not in scorecard:
+        errors.append("engineering scorecard is missing the adoption-versus-correctness paradigm shift")
 
     required_states = (
         "P — Parent / pre-introduction",
@@ -177,8 +179,8 @@ def validate_documents(
         errors.append("triangulation must distinguish CodeReviewBench human-flagged-bug recall")
     if "Martian production review adoption" not in triangulation:
         errors.append("triangulation must distinguish Martian production adoption")
-    if "acceptance is not proof of correctness" not in triangulation.lower():
-        errors.append("triangulation must not equate production uptake with factual correctness")
+    if "suggestion adoption is not ground-truth correctness" not in triangulation.lower():
+        errors.append("triangulation must distinguish suggestion adoption from factual correctness")
     if "Gold-Completeness and Open-Set Discovery" not in triangulation:
         errors.append("triangulation must link the gold-completeness protocol")
     if "Sequential Evidence Acquisition" not in triangulation:
@@ -302,7 +304,7 @@ def self_test() -> list[str]:
         "MECHANISM_MISDIAGNOSIS grounded augmented fixed companion does not create another review lane",
         "candidate-specific and appears in both numerator and denominator",
         "CodeReviewBench human-flagged bug recall",
-        "Martian production review adoption; acceptance is not proof of correctness",
+        "Martian production review adoption; suggestion adoption is not ground-truth correctness",
         "Gold-Completeness and Open-Set Discovery",
         "Sequential Evidence Acquisition",
         "#10064 #10369",
@@ -326,7 +328,8 @@ def self_test() -> list[str]:
     scorecard = (
         "3.10 From code location to causal mechanism diagnosis\n"
         "3.11 From human-found gold to independently audited open-set discovery\n"
-        "3.12 From tool use to sequential evidence acquisition"
+        "3.12 From tool use to sequential evidence acquisition\\n"
+        "3.13 From uptake to verified engineering impact"
     )
     preregistration = "\n".join((
         "P — Parent / pre-introduction",
@@ -423,6 +426,7 @@ def self_test() -> list[str]:
         ("duplicate crosswalk scenario", "crosswalk", crosswalk.replace("ERG-S02", "ERG-S01", 1)),
         ("missing crosswalk scenario", "crosswalk", crosswalk.replace("| ERG-S02 |", "| ERG-SXX |", 1)),
         ("missing crosswalk execution gate", "crosswalk", crosswalk.replace("#10064", "gate removed")),
+        ("missing uptake scorecard shift", "scorecard", scorecard.replace("3.13 From uptake to verified engineering impact", "shift removed")),
         ("missing calibration case", "calibration_pack", calibration_pack.replace("Case CAL-02", "Case CAL-XX", 1)),
         ("missing calibration variant", "calibration_pack", calibration_pack.replace("#### Variant X6", "#### Variant X7", 1)),
         ("missing calibration key mapping", "calibration_key", calibration_key.replace("| CAL-02 | X3 |", "| CAL-02 | X8 |", 1)),
@@ -480,7 +484,7 @@ def main() -> int:
             for failure in failures:
                 print(f"SELF_TEST_FAIL: {failure}", file=sys.stderr)
             return 1
-        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 24 negative controls")
+        print("CEB_REVIEW_RESEARCH_SELF_TEST_PASS: 25 negative controls")
 
     try:
         triangulation = read_required(args.repo_root, TRIANGULATION)
