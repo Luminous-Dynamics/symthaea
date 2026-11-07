@@ -189,8 +189,12 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
                 "model expansion reduced robust posterior loss")
         require(expanded_values[action_id] <= base_values[action_id] + 1e-12,
                 "model expansion increased value per cost")
-    require(max(expanded_values.values()) <= max(base_values.values()) + 1e-12,
-            "best robust value increased after model expansion")
+    feasible_ids = [a["intervention_id"] for a in actions if a["feasibility_status"] == "FEASIBLE"]
+    require(
+        max((expanded_values[i] for i in feasible_ids), default=0.0)
+        <= max((base_values[i] for i in feasible_ids), default=0.0) + 1e-12,
+        "best achievable feasible robust value increased after model expansion",
+    )
 
     baseline_ancestry = set(model_index[data["baseline_model_id"]]["ancestry_group_ids"])
     ancestry_overlaps = {
@@ -211,7 +215,12 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
         require(abs(oracle["expanded_envelope_robust_loss"][action_id] - expanded_losses[action_id]) <= 1e-12,
                 f"expanded risk mismatch: {action_id}")
 
-    status = "NOT_PROMOTABLE_UNRESOLVED_CHALLENGE" if unresolved else "SYNTHETIC_CONTRACT_VALIDATED"
+    if unresolved:
+        status = "NOT_PROMOTABLE_UNRESOLVED_CHALLENGE"
+    elif expanded_best is None:
+        status = "NO_FEASIBLE_DISCRIMINATING_INTERVENTION"
+    else:
+        status = "SYNTHETIC_CONTRACT_VALIDATED"
     require(oracle["status"] == status, "oracle status mismatch")
     return {
         "baseline_expected_query_loss": prior_loss,
@@ -235,6 +244,27 @@ def self_test() -> None:
     ]
     loss, decision = baseline_risk(worlds, {"loss_false_true": 1.0, "loss_true_false": 1.0})
     require(abs(loss - 0.1) <= 1e-12 and decision is True, "binary Bayes-risk control failed")
+    toy_worlds = [
+        {"world_id": "TRUE", "query_decision": True, "prior_probability": 0.9},
+        {"world_id": "FALSE", "query_decision": False, "prior_probability": 0.1},
+    ]
+    toy_predictions = {
+        ("probe", "TRUE", "nominal"): {"X": 1.0},
+        ("probe", "FALSE", "nominal"): {"Y": 1.0},
+        ("probe", "TRUE", "challenger"): {"X": 1.0},
+        ("probe", "FALSE", "challenger"): {"X": 1.0},
+    }
+    nominal_risk = model_action_risk(
+        "probe", "nominal", toy_worlds, toy_predictions,
+        {"loss_false_true": 1.0, "loss_true_false": 1.0},
+    )
+    challenged_risk = model_action_risk(
+        "probe", "challenger", toy_worlds, toy_predictions,
+        {"loss_false_true": 1.0, "loss_true_false": 1.0},
+    )
+    require(abs(nominal_risk) <= 1e-12, "nominal discriminator should resolve the toy query")
+    require(abs(challenged_risk - 0.1) <= 1e-12, "saturation challenger should restore baseline risk")
+    require(challenged_risk >= nominal_risk, "model expansion must not lower worst-case risk")
     print("response-model adequacy oracle self-test: PASS")
 
 
