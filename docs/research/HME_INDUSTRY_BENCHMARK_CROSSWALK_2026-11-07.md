@@ -297,3 +297,12 @@ It includes the dense pair, theoretical multiply-accumulate counts, and exact fa
 
 
 The source-derived checkpoint inventory now includes the HdcLtcBridge adapter, not just its inner HdcLtcUnifiedNetwork: bridge config, input/output projection state, cached output, step/diversity/resize counters and GenesisSeed lineage. The Bridge type itself is not serde-derived; scratch buffers are transient. See [hme_dyn_checkpoint_field_matrix_v0.json](fixtures/hme_dyn_checkpoint_field_matrix_v0.json).
+
+
+## 14. Direct HDC projection prior art: Hadamard submatrix encoding (2026)
+
+The projection crosswalk now includes Salahudeen, Maalouf and Elfadel, “Deterministic orthogonal projections for hyperdimensional regression: A Hadamard submatrix approach,” *Intelligent Systems with Applications* 31 (September 2026), DOI [10.1016/j.iswa.2026.200707](https://doi.org/10.1016/j.iswa.2026.200707).
+
+The publisher abstract reports a deterministic Hadamard-submatrix encoder, tested on six regression datasets across associative, iterative-gradient and FLASH-style closed-form ridge learners; it reports up to 9× reduction in selected hyperspace dimension and up to 19× wall-clock speedup versus its default HDR baselines. The paper explicitly reports mixed but competitive predictive performance, dataset/learner dependence, strongest results with closed-form learning, and power-of-two / non-universal compression constraints. Its data is available on request. These are the paper's reported results, not Symthaea results or a reproduction.
+
+This is a direct prior-art baseline for #10981. HME/Symthaea must compare its current dense bridge projection and proposed structured/low-rank profiles against a Hadamard-submatrix arm, then test actual HDC-LTC temporal behavior separately from static regression.
