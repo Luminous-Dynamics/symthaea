@@ -144,12 +144,6 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(all(model_by_id[x]["role"] == "CHALLENGER" for x in challenger_ids), "challenger model role mismatch")
     require(challenge["adjudication_status"] == "ADMITTED_FOR_SENSITIVITY", "challenge not admitted for sensitivity")
     require(valid_sha(challenge["challenge_evidence_sha256"]), "bad challenge evidence digest")
-    require(set(challenge["challenger_discovery_unit_ids"]).issubset(discovery), "challenge evidence uses units outside the discovery partition")
-    shared_ancestry = set()
-    for baseline_id in baseline_ids:
-        for challenger_id in challenger_ids:
-            shared_ancestry.update(set(model_by_id[baseline_id]["ancestry_group_ids"]) & set(model_by_id[challenger_id]["ancestry_group_ids"]))
-    require(shared_ancestry.issubset(set(challenge["ancestry_group_ids"])), "challenge binding omits shared model ancestry")
 
     split = data["split_manifest"]
     fit, discovery, lockbox = (set(split["model_fit_units"]), set(split["challenger_discovery_units"]),
@@ -157,6 +151,21 @@ def verify(data: dict[str, Any]) -> dict[str, Any]:
     require(fit and discovery and lockbox, "empty data split partition")
     require(not (fit & discovery or fit & lockbox or discovery & lockbox), "model-fit/discovery/confirmation leakage")
     require(valid_sha(split["split_sha256"]), "bad split digest")
+    require(
+        set(challenge["challenger_discovery_unit_ids"]).issubset(discovery),
+        "challenge evidence uses units outside the discovery partition",
+    )
+    shared_ancestry = set()
+    for baseline_id in baseline_ids:
+        for challenger_id in challenger_ids:
+            shared_ancestry.update(
+                set(model_by_id[baseline_id]["ancestry_group_ids"])
+                & set(model_by_id[challenger_id]["ancestry_group_ids"])
+            )
+    require(
+        shared_ancestry.issubset(set(challenge["ancestry_group_ids"])),
+        "challenge binding omits shared model ancestry",
+    )
 
     expected_keys = {(a["action_id"], w["world_id"], m["model_id"]) for a in actions for w in worlds for m in models}
     pred: dict[tuple[str, str, str], dict[str, float]] = {}
