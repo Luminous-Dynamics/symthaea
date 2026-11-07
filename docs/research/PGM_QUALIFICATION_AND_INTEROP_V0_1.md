@@ -1,0 +1,376 @@
+# Probabilistic Graphical Model Qualification and Cross-Project Interoperability v0.1
+
+**Status:** Research specification; not an implementation or qualification claim  
+**Date:** 2026-11-07  
+**Related:** Symthaea #10889; Mycelix #5910, #5601, #5632, #5648; Symtropy #3973, #4017, #4026, #4027, #3018; Sol-Atlas #582, #583
+
+## 1. Executive decision
+
+Do not create a second generic PGM crate.
+
+The ecosystem already contains useful but specialized pieces:
+
+- **symthaea-factor-graph:** discrete factor tables with sum-product and max-product message passing.
+- **symthaea-fep:** action-conditioned hierarchical information gain over finite joint hypotheses.
+- **Symthaea ETH-015 / ETH-016:** exact factor elimination over selected output algebras and an independent certificate direction. This is related to PGM inference but is not automatically a normalized probabilistic posterior engine.
+- **Symthaea probabilistic HDC:** diagonal-Gaussian uncertainty attached to hypervectors. This is a representation/approximation layer, not a general graphical model.
+- **Mycelix Terra Preta:** finite sequential Bayesian experimental design, with planned covariance-aware likelihoods, model discrepancy, robust design and simulation-based calibration (SBC).
+- **Symtropy:** specialized uncertainty, correlated-sensor, coupled-fault and finite-horizon diagnostic work.
+- **Sol-Atlas:** explicit event-factor composition and continuous spatial detection-likelihood work.
+
+The priority is to **qualify existing engines, define interoperable typed contracts, and connect them through narrow adapters**. Do not replace deterministic physical simulators, provenance graphs, domain-specific observation operators, or decision policies with a universal probabilistic abstraction.
+
+## 2. Research hypothesis
+
+A useful next-generation inference capability is:
+
+> Incremental, provenance-aware, dependence-conscious probabilistic inference that combines discrete hypotheses, continuous state estimates, temporal transitions, physical constraints, and explicit model discrepancy—while reporting exactly which parts of an answer are exact, approximate, uncalibrated, or unsupported.
+
+The novelty is not using Bayesian networks, factor graphs, Kalman filters, message passing, variable elimination, particle filters, or probabilistic circuits. Those are established methods.
+
+The research opportunity is to join:
+1. **Evidence lineage:** source ancestry and measurement dependence remain inspectable.
+2. **Inference correctness:** small cases have independent exact oracles and invalid inputs fail closed.
+3. **Model adequacy:** parameter uncertainty is not confused with structural error or omitted mechanisms.
+4. **Decision relevance:** information gain is a diagnostic; expected value of sample information, regret, safety and cost determine whether a probe is worthwhile.
+5. **Incrementality:** local evidence/model changes trigger bounded recomputation without stale posterior reuse.
+6. **Independent verification:** important inference outputs become replayable artifacts, not opaque scores.
+
+## 3. Separation of concerns
+
+These objects must not be conflated:
+
+| Object | Meaning | Does not imply |
+|---|---|---|
+| Evidence artifact | Sourced observation, document, measurement, event or derived result | Independence, authenticity or truth |
+| Provenance/dependence graph | How artifacts share sources, processing, instruments, people, batches or selection | A causal model |
+| Statistical factor graph | Factorization of a joint probability distribution | Causal direction or validated physics |
+| Causal graph | Model of causal assumptions and interventions | That observational associations identify causal effects |
+| Physical model | Equations, constraints and solver state | That its parameterization is correct |
+| Posterior | Conditional uncertainty under a specified model and evidence | Model adequacy or social legitimacy |
+| Decision policy | Objective, utility/loss, constraints and decision authority | That the posterior alone determines what ought to be done |
+
+A distinct hash, file, model name, sensor, modality, witness, or attestation is not sufficient evidence of statistical independence. Unknown dependence remains unknown. Provenance edges may constrain a statistical model, but provenance itself is not a probability distribution.
+
+Causal interventions require explicit causal semantics; conditioning on a variable is not the same as applying do(variable = value).
+
+## 4. Common model and evidence contract
+
+A cross-project interface should describe the mathematical problem without forcing one storage or execution backend.
+
+### 4.1 Typed variables
+
+Minimum metadata:
+- stable variable ID and semantic name;
+- domain: finite categorical, integer, real-valued, vector, or versioned extension;
+- cardinality or shape where applicable;
+- units and coordinate frame for physical values;
+- temporal index or support interval;
+- optional physical/logical constraints;
+- model version and source references.
+
+No implicit conversion between categories, physical units, coordinate frames or time bases.
+
+### 4.2 Typed factors
+
+Each factor declares:
+- stable factor ID and ordered variable scope;
+- factor family and parameterization;
+- domain and units;
+- whether it is a normalized conditional likelihood, unnormalized potential, transition kernel, physical constraint, or prior;
+- treatment of parameter and model-structure uncertainty;
+- source, calibration and provenance references;
+- dependence group and declared dependence assumptions;
+- implementation/version digest;
+- validity domain and known exclusions.
+
+A factor potential is not automatically a normalized conditional distribution. A joint density cannot silently be consumed as a CPT.
+
+### 4.3 Evidence inputs
+
+Observation records bind:
+- immutable evidence ID and content digest;
+- observed variable(s) and value/distribution;
+- event time, acquisition time, arrival time and clock basis;
+- instrument, calibration and observation-operator identity;
+- spatial, temporal and sample support;
+- source ancestry and shared-dependence groups;
+- missingness, censoring, saturation and quality status;
+- units and coordinate frame;
+- admissibility status for the specific inference task.
+
+Missing observations are absent or explicitly missing; they are never encoded as zero-valued measurements by default.
+
+### 4.4 Inference receipt
+
+Every qualified result should emit a versioned receipt containing:
+- query and target variables;
+- canonical model digest and factor identities;
+- evidence IDs/digests and provenance-closure digest;
+- prior/model-family references;
+- algorithm, configuration, build and numeric backend;
+- exactness class: EXACT, APPROXIMATE, HEURISTIC, UNSUPPORTED;
+- posterior or requested estimate and normalization/evidence mass when valid;
+- solver status, convergence residual, iterations, tolerance and approximation diagnostics;
+- Monte Carlo seed/RNG identity and effective sample size where relevant;
+- numerical error estimates and known failure modes;
+- calibration scope, held-out split and calibration status;
+- sensitivity to priors, nuisance assumptions and model discrepancy;
+- explicit claim ceiling and abstention reason.
+
+A content digest binds identity; it does not prove the inference result. Independent replay or a sound checker is needed to validate the computation. A valid computation does not authenticate the evidence.
+
+## 5. Solver portfolio and algorithm-selection rules
+
+No single inference algorithm is appropriate for every model.
+
+| Problem shape | Preferred first method | Qualification rule |
+|---|---|---|
+| Small finite discrete graph | Exhaustive enumeration / exact variable elimination | Exact known-answer differential tests |
+| Acyclic factor graph | Sum-product / max-product tree message passing | Must match exact enumeration |
+| Small treewidth discrete graph | Variable elimination / junction tree | Report induced width and intermediate table size |
+| Loopy discrete graph | Damped or residual-scheduled loopy BP | Approximate only; disclose convergence and compare to exact small cases |
+| Linear-Gaussian factors | Kalman / information-form Gaussian elimination | Covariance consistency and exact linear-Gaussian oracle |
+| Nonlinear continuous factors | Linearization / smoothing; GTSAM is a strong comparator | Report linearization, initialization, local minima and covariance assumptions |
+| Nonlinear/non-Gaussian temporal state | Particle filtering / SMC or explicitly qualified alternatives | ESS, degeneracy, Monte Carlo error and likelihood quality |
+| Large differentiable discrete graph | Variational / differentiable BP methods | Bound approximation and calibration; compare exact subsets |
+| Tractable generative distributions | Probabilistic circuits where structure supports the query | Verify circuit assumptions and query guarantees |
+
+Algorithm selection must be explicit and report why a requested output is unsupported. A solver must never silently downgrade an exact request to an approximation.
+
+### 5.1 Semantic requirements
+
+- Zero evidence mass is an inconsistency/undefined-posterior state, not a uniform posterior.
+- Exact zeros in likelihoods and potentials are allowed.
+- Negative and non-finite probability potentials are rejected unless a distinct signed algebra explicitly permits them.
+- Products of many small probabilities require log-domain or scale-tracked arithmetic.
+- Marginal MAP (independent modes of each variable) is not joint MAP.
+- A factor belief is computed from the factor and incoming messages; it is not generally the product of its variable marginals.
+- Loopy BP convergence is not proof that its marginals are accurate.
+- Bethe free energy is an approximation under declared assumptions, not a generic exact log-partition function.
+- A parameter posterior cannot identify a missing causal mechanism without explicit model comparison/discrepancy work.
+- Model-structure, parameter, latent-state, observation-noise and model-discrepancy uncertainty remain distinct unless a joint posterior justifies their combination.
+
+## 6. Paradigm-shift research programme
+
+### 6.1 Dependence-aware evidence fusion
+
+Move from counting evidence records to modeling independent information pathways.
+
+Benchmark shared source images, common sensors, shared calibration, common training data, annotator exposure, repeated sampling, batch effects and copied reports. Unknown ancestry must not default to independence. Evaluate false corroboration, claim-promotion risk, sensitivity to missing dependence edges, calibration and abstention.
+
+Connect Mycelix evidence provenance with Symthaea evidence-dependence work (#10404). Do not invent an independence probability from a hash or a distinct identity.
+
+### 6.2 Joint physical-state and sensor-state inference
+
+Use a coherent transition-observation kernel such as:
+
+P(s_next, e_next, y, hazard | model, s, e, action)
+
+where s is physical state and e is sensor/instrument state.
+
+This is stronger than independently updating a physical model and a sensor-health estimate. Persistent sensor drift can imitate a physical regime change; physical carryover can imitate measurement persistence. Preserve the joint posterior until the relevant dependence is resolved.
+
+Start with the exact finite-state oracle in Symtropy's stochastic physical-state/sensor-state programme (#3018), then compare an explicitly named SMC/particle approximation. Keep deterministic physics replay as a separate source of physical-state trajectories.
+
+### 6.3 Model discrepancy as a first-class hypothesis
+
+Separate:
+- process/physical parameter uncertainty;
+- measurement noise and shared nuisance;
+- observation-operator uncertainty;
+- structural/model-family uncertainty;
+- omitted process/discrepancy.
+
+When all candidate models predict poorly, the answer should be MODEL_INADEQUATE, NOT_IDENTIFIABLE or ABSTAIN—not a concentrated posterior over the least-wrong available model.
+
+Use prior/posterior predictive checks, held-out mechanism families, counterexample-guided model expansion, and independent discrepancy controls.
+
+### 6.4 Decision-aware active inference
+
+Expected information gain is not expected decision value.
+
+Compare:
+- nominal EIG;
+- conditional EIG;
+- expected value of sample information (EVSI);
+- robust/lower-tail EVSI;
+- minimax regret;
+- explicit STOP / HUMAN_REVIEW / ABSTAIN;
+- random, fixed, cost-only and domain-expert baselines.
+
+A high-information measurement that cannot change a decision can be wasteful. A low-information measurement can be valuable if it prevents a high-cost wrong decision. The utility owner, budget, risk, authorization and reversible/irreversible effects remain outside the generic inference engine.
+
+### 6.5 Incremental, content-addressed inference
+
+Treat exact intermediate messages as immutable artifacts bound to:
+- canonical input factor digests;
+- variable domains and scopes;
+- algebra/model semantics version;
+- elimination order/schedule;
+- numeric backend;
+- checker identity.
+
+A changed local factor should invalidate dependent results only. Reuse is allowed only after exact identity and checker-receipt validation. This is not a claim that caching or incremental inference is novel; compare against existing incremental Bayesian and factor-graph systems.
+
+### 6.6 Tractable graph distributions
+
+Investigate probabilistic circuits and graph circuits for models where exact conditional queries over structured graph subsets matter. The 2025 UAI probabilistic graph-circuit work is a research comparator, not a drop-in general solution: graph invariance, expressiveness and efficiency trade-offs must be tested.
+
+### 6.7 HDC as a complementary representation
+
+Keep probabilistic HDC's diagonal-Gaussian assumption explicit. HDC may be useful for associative indexing, candidate retrieval and compressed representations. It does not provide a full covariance model, a calibrated posterior over arbitrary graph variables, or a replacement for exact factor inference. Shared-variable/correlated-coordinate operations need explicit dependence handling; independent-Gaussian product formulas are not valid when operands are the same or statistically dependent.
+
+## 7. Cross-project ownership
+
+### Symthaea
+
+Owns:
+- canonical discrete factor graph and inference semantics;
+- factor-graph correctness qualification;
+- hierarchical state/parameter/model information gain;
+- inference/decision separation and active information acquisition;
+- HDC-to-PGM retrieval/representation adapters;
+- shared inference receipts and exact small-model differential tests.
+
+Do not claim PGM calibration from HDC similarity or a novelty score. Do not treat EIG as a complete expected-free-energy policy.
+
+### Mycelix
+
+Owns:
+- evidence identity, ancestry, dependence and admissibility;
+- distributed provenance and evidence exchange;
+- domain-specific Bayesian model specifications for scientific claims;
+- sequential experimental-design and posterior-calibration programmes;
+- governance boundaries between posterior support and legitimate decisions.
+
+The existing mycelix-desci Bayesian module needs separate source remediation (#5910). Do not use it as a qualified backend until its sampling, message passing, evidence likelihood, graph and d-separation semantics pass independent tests.
+
+### Symtropy
+
+Owns:
+- deterministic physical solvers and replay;
+- physical observation operators and engineering constraints;
+- domain-specific correlated sensing and measurement uncertainty;
+- fault diagnosis and sequential passive measurement decisions;
+- calibrated coupling between physical state, sensor state and model discrepancy.
+
+Probabilistic inference is a sidecar or decision-support layer. It must not silently introduce nondeterminism into the deterministic physics hot path or authorize physical actuation.
+
+### Sol-Atlas
+
+Owns:
+- infrastructure/observation domain models and spatial/temporal support;
+- event and spatial likelihood composition;
+- integration with infrastructure data services;
+- user-facing maps and visualizations of posterior distributions, uncertainty, provenance and unsupported regions.
+
+The Leptos/WebGL renderer is not the inference engine. It should not turn uncertainty into a categorical certainty or hide unsupported geographic coverage.
+
+## 8. External industry and research comparators
+
+Use matched semantics, workloads, data and budgets. These projects solve different problem classes; a universal speed comparison is meaningless.
+
+| Comparator | Strength / role | What to compare |
+|---|---|---|
+| pgmpy 1.1.x | Discrete Bayesian networks, structure/parameter learning and causal graph utilities | BN semantics, exact posterior, structure-learning quality, causal assumptions and reference datasets |
+| GTSAM 4.3.x | Continuous nonlinear factor graphs, smoothing/mapping, incremental estimation and robotics | Matched continuous-state/sensor fusion tasks, batch vs incremental cost, covariance consistency and robustness |
+| Exact enumeration / variable elimination | Independent small-instance oracle | Correctness, not runtime leadership |
+| Probabilistic circuits / graph circuits | Tractable generative distributions for supported queries | Query tractability, circuit size, structural assumptions and incremental learning |
+| Conventional Kalman / EKF / UKF / particle filters | Continuous-state and temporal estimation baselines | Calibration, consistency, latency, robustness to nonlinearity/non-Gaussianity |
+| Domain-specific fault/reliability systems | Industrial diagnostic baseline | Fault isolation, false alarms, missed detection, cost and subgroup/domain transfer |
+
+Pin exact package releases, code commits, options, model parameterizations, stopping criteria, CPU/GPU resources and datasets in every comparison. GTSAM's continuous-estimation workload must not be compared directly against a discrete Bayesian-network benchmark.
+
+### Benchmark corpora and reference families
+
+- Discrete BN: Asia, Sachs, Alarm, Insurance, Hailfinder, Win95pts and larger public networks where licensing permits.
+- Exact factor-graph tests: enumerated trees, cycles, disconnected components, mixed cardinalities, zero likelihoods and high dynamic range.
+- Continuous estimation: standard synthetic linear-Gaussian and nonlinear state-estimation cases; add public robotics datasets only after source/license and split audits.
+- Sequential inference: independent-noise, correlated-noise, persistent sensor drift, physical-state carryover and out-of-family process shifts.
+- Evidence dependence: shared source, copied reports, shared calibration, shared batch, shared preprocessing and blinded independent observations.
+- Spatial inference: analytic infinite-strip and finite-domain detection integrals, irregular paths and support mismatch.
+
+## 9. Scorecard and advancement targets
+
+All numbers below are proposed qualification targets, not achieved results.
+
+| Dimension | Metric | Initial gate |
+|---|---|---|
+| Exact posterior correctness | TV distance / max absolute error vs exhaustive oracle | Every accepted exact fixture within preregistered tolerance (e.g. 1e-10 for stable f64 fixtures) |
+| Evidence mass | Partition function / log evidence error | Exact agreement on small reference cases; explicit zero-mass state |
+| MAP correctness | Joint assignment and joint score | 100% match to brute-force joint maximum on bounded tests |
+| Tree BP | Marginal error | Match exact enumeration for all tree fixtures |
+| Loopy BP | Convergence, residual, posterior error | Always labelled approximate; publish non-convergence and worst error |
+| Numerical robustness | Underflow/overflow, dynamic range, invalid inputs | No silent uniform fallback; invalid values reject |
+| Calibration | Prior/posterior SBC and held-out proper scores | No systematic pathology across preregistered families; subgroup results shown |
+| Predictive performance | Log score, Brier, CRPS/interval score as appropriate | Improve over strongest matched baseline on at least two independent mechanism families before superiority claim |
+| Decision quality | Paired regret, EVSI prediction error, wrong-decision rate | Target at least 10% lower held-out 90th-percentile regret at matched cost/risk, with paired uncertainty interval excluding zero |
+| Robustness | Worst-case/lower-tail risk and abstention | No hard-budget/eligibility violation; disclose ambiguity set |
+| Incrementality | Recompute operations, cache validity, stale-message rejection | Local changes recompute only affected dependents; exact cold-run parity |
+| Operational efficiency | Latency, memory, throughput, energy | Publish Pareto frontier vs exact and approximate baselines; do not optimize away correctness |
+
+SBC must specify prior draws, data-generation process, test quantities, independent replications and multiplicity. Prior SBC checks inference implementation under the prior-predictive model; posterior SBC or conditional calibration addresses selected observed-data regions. Neither establishes real-world model adequacy.
+
+Use proper scoring rules (log score, Brier, CRPS where appropriate), reliability diagrams and interval coverage. Expected calibration error alone is insufficient. Separate calibration from discrimination and sharpness.
+
+## 10. Implementation sequence
+
+### Phase 0 — immediate safety and inventory
+- Track Mycelix legacy module remediation (#5910).
+- Inventory call sites and public exports for all current probability modules.
+- Pin source revisions and mark exact/approximate/experimental semantics in docs.
+- Do not remove exports until downstream usage is checked.
+
+### Phase 1 — qualify the Symthaea factor-graph core
+- Fallible constructors and frozen/validated compiled model.
+- Explicit zero-mass, finite-value, non-negative-potential and scope contracts.
+- Exact enumeration/VE oracle for small finite graphs.
+- Tree-BP differential tests and adversarial marginal-MAP vs joint-MAP controls.
+- Correct factor beliefs and Bethe calculation, or remove unqualified output.
+- Log-domain or scale-tracked messages.
+- Distinct exact and approximate result types.
+
+### Phase 2 — bridge FEP and robust decisions
+- Feed action-conditioned likelihoods into hypothetical posterior calculations.
+- Preserve the existing hierarchical MI chain-rule identity.
+- Extend to EVSI/regret and robust scenario uncertainty through the existing REA line; do not create a competing active-inference policy stack.
+- Keep candidate posterior updates isolated from live belief/evidence state.
+
+### Phase 3 — connect domain work
+- Mycelix: source-bound dependence graph and calibrated posterior contract.
+- Symtropy: exact joint physical/sensor-state reference, then approximate temporal inference.
+- Sol-Atlas: factor-scope-safe event/spatial likelihood adapters and display layer.
+- Cross-project adapters preserve units, time, scope, provenance and claim ceilings.
+
+### Phase 4 — scalability and research frontier
+- Incremental exact message reuse with checked content-addressed artifacts.
+- Correlated continuous observations and state-space models.
+- Explicit discrepancy and model-family uncertainty.
+- Probabilistic circuits for supported large structured queries.
+- GPU, SIMD and hardware acceleration only after correctness parity and profiling.
+
+## 11. Release gates and evidence policy
+
+- A source-level audit is not a test pass.
+- Authored tests are not executed tests.
+- A queued or stale CI run is not a pass; record the exact tested commit SHA.
+- Benchmark fixtures must be frozen, versioned and split by independent mechanism/source groups.
+- Preserve null and negative results.
+- Exact and approximate algorithms must be compared on the same objective and data.
+- Any model change invalidates receipts derived from the previous digest.
+- No posterior is elevated to truth, causal proof, consciousness, physical qualification or governance legitimacy without separate evidence and authority.
+
+## 12. Key external references
+
+- Kschischang, Frey & Loeliger (2001), *Factor Graphs and the Sum-Product Algorithm*, IEEE Transactions on Information Theory.
+- GTSAM: https://gtsam.org/ (current 4.3.0 release and documentation; continuous factor-graph/robotics comparator).
+- pgmpy: https://pgmpy.org/ (1.1.x; discrete BN and causal modeling comparator).
+- Probabilistic Graph Circuits, UAI 2025: https://proceedings.mlr.press/v286/papez25a.html.
+- Rethinking Probabilistic Circuit Parameter Learning, AISTATS 2026: https://proceedings.mlr.press/v306/liu26a.html.
+- Simulation-based calibration: Talts et al. (2018), https://arxiv.org/abs/1804.06788; Modrák et al. (2025), https://doi.org/10.1214/23-BA1404.
+- NIST Sequential Bayesian Experiment Design: https://www.nist.gov/programs-projects/sequential-bayesian-experiment-design.
+
+---
+
+**Decision:** qualify what exists first. Build no new generic PGM package until factor-graph semantics, evidence/dependence contracts, and cross-project interoperability gaps are demonstrated by exact-oracle tests.
