@@ -21,3 +21,7 @@ path = "examples/minkowski_1p1.rs"
 [[example]]
 name = "minkowski_nd"
 path = "examples/minkowski_nd.rs"
+
+[[example]]
+name = "interval_histogram_benchmark"
+path = "examples/interval_histogram_benchmark.rs"
