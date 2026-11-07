@@ -805,9 +805,9 @@ mod tests {
     #[test]
     fn schwarzschild_timelike_geodesic_preserves_normalization() {
         let field = SchwarzschildExterior::new(1.0).unwrap();
-        let radius = 10.0;
-        let radial_tangent = -0.05;
-        let f = 1.0 - 2.0 / radius;
+        let radius: f64 = 10.0;
+        let radial_tangent: f64 = -0.05;
+        let f: f64 = 1.0 - 2.0 / radius;
         let time_tangent = ((1.0 + radial_tangent * radial_tangent / f) / f).sqrt();
         let mut state = GeodesicState {
             coordinates: [0.0, radius, PI / 2.0, 0.0],
@@ -827,10 +827,10 @@ mod tests {
     #[test]
     fn schwarzschild_geodesic_conserves_killing_energy_and_angular_momentum() {
         let field = SchwarzschildExterior::new(1.0).unwrap();
-        let radius = 10.0;
-        let radial_tangent = -0.02;
-        let azimuthal_tangent = 0.01;
-        let f = 1.0 - 2.0 / radius;
+        let radius: f64 = 10.0;
+        let radial_tangent: f64 = -0.02;
+        let azimuthal_tangent: f64 = 0.01;
+        let f: f64 = 1.0 - 2.0 / radius;
         let time_tangent = ((1.0
             + radial_tangent * radial_tangent / f
             + radius * radius * azimuthal_tangent * azimuthal_tangent)
