@@ -721,8 +721,8 @@ mod tests {
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 900,
             predictions: vec![
-                ProbePrediction { key: phase_zero, by_leg: common },
-                ProbePrediction { key: phase_half, by_leg: common },
+                ProbePrediction { key: phase_zero, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
+                ProbePrediction { key: phase_half, by_leg: common, cycle_slips_by_leg: [0; LEG_COUNT] },
             ],
         };
         let model_b = ModelSignature {
@@ -731,7 +731,7 @@ mod tests {
             steady_state_plv_milli: 900,
             predictions: vec![
                 ProbePrediction { key: phase_zero, by_leg: common },
-                ProbePrediction { key: phase_half, by_leg: separated },
+                ProbePrediction { key: phase_half, by_leg: separated, cycle_slips_by_leg: [0; LEG_COUNT] },
             ],
         };
         let separation = minimum_pairwise_probe_separation(&[model_a, model_b]).unwrap();
@@ -755,7 +755,7 @@ mod tests {
             model_id: "latent-shared-input".to_string(),
             steady_state_frequency_millihz: 11_000,
             steady_state_plv_milli: 920,
-            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer }],
+            predictions: vec![ProbePrediction { key: probe, by_leg: apparent_transfer, cycle_slips_by_leg: [0; LEG_COUNT] }],
         };
         assert_eq!(minimum_campaign_separation(&[central_path, common_drive]).unwrap(), 0);
     }
