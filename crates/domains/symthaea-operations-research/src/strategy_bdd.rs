@@ -1005,7 +1005,7 @@ mod tests {
 
     #[test]
     fn identity_function_uses_one_node() {
-        let source = function(&[7, 2], &[false, true, false, true]);
+        let source = function(&[7, 2], &[false, false, true, true]);
         let bdd = compile_strategy_function_to_robdd(&source, budget()).unwrap();
         assert_eq!(bdd.nodes.len(), 1);
         assert!(!evaluate_robdd(&bdd, &[false, false]).unwrap());
@@ -1159,7 +1159,7 @@ mod tests {
     #[test]
     fn support_minimization_removes_irrelevant_dependency() {
         // Function is the first dependency only; the second is unused.
-        let source = function(&[7, 2], &[false, false, true, true]);
+        let source = function(&[7, 2], &[false, true, false, true]);
         let reduced = minimize_strategy_function_support(&source, budget()).unwrap();
         assert_eq!(reduced.function.dependencies, vec![7]);
         assert_eq!(reduced.function.table.len(), 2);
