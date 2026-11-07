@@ -6,15 +6,23 @@
 //! Real-time audio processing for live transcription:
 //! - Ring buffer for continuous audio
 //! - Frame-by-frame processing
-//! - Incremental HDC projection
-//! - Low-latency phoneme decoding
+//! - Incremental log-mel to locality-preserving HDC projection
+//! - Separate LTC temporal-salience path and prototype-compatible phoneme lookup
 //!
 //! # Architecture
 //!
 //! ```text
-//! Audio In ─► Ring Buffer ─► Frame Extractor ─► LTC Projector ─► Decoder ─► Text Out
-//!                  ▲                                   │
-//!                  └───────── Feedback Loop ───────────┘
+//! Audio In ─► Ring Buffer ─► absolute frame window
+//!                                  │
+//!                       ┌──────────┴──────────┐
+//!                       ▼                     ▼
+//!                  log-mel frontend      low-cost features
+//!                       │                     │
+//!                       ▼                     ▼
+//!                shared HDC encoder        LTC salience
+//!                       │                     │
+//!                       ▼                     ▼
+//!               trained prototypes       turn-boundary cue
 //! ```
 
 use crate::audio::{AudioConfig, AudioFrontend, AudioProjector};
