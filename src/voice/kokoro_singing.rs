@@ -11,7 +11,10 @@ use anyhow::{Result, anyhow};
 use rustfft::{FftPlanner, num_complex::Complex};
 use symthaea_muse::Note;
 
-use super::singing_engine::{SingingVoiceEngine, VocalPerformance, VocalStem, VocalSyllable};
+use super::singing_engine::{
+    CapabilitySupport, ControlCapability, SingingBackendCapabilities, SingingControl,
+    SingingVoiceEngine, VocalPerformance, VocalStem, VocalSyllable,
+};
 use super::{KokoroConfig, KokoroEngine};
 
 const FFT_SIZE: usize = 1024;
@@ -41,6 +44,39 @@ impl KokoroSingingEngine {
 impl SingingVoiceEngine for KokoroSingingEngine {
     fn id(&self) -> &str {
         "kokoro-v2"
+    }
+
+    fn capabilities(&self) -> SingingBackendCapabilities {
+        use CapabilitySupport::{Approximated, Conditional, Native, Unsupported};
+        let control = |control, support, rationale: &str| ControlCapability {
+            control,
+            support,
+            rationale: rationale.to_string(),
+        };
+        SingingBackendCapabilities::new(
+            self.id(),
+            vec![
+                control(SingingControl::LyricText, Native, "Kokoro synthesizes the supplied lyric phrase directly"),
+                control(SingingControl::Language, Conditional, "v2 accepts English only; pronunciation quality depends on the selected Kokoro voice/model"),
+                control(SingingControl::ExactPhoneSequence, Approximated, "phone events guide syllable/phoneme slicing weights; generated speech phones come from Kokoro's text model"),
+                control(SingingControl::SyllableAlignment, Approximated, "syllable and phoneme boundaries are estimated from durations then acoustically snapped"),
+                control(SingingControl::NotePitch, Approximated, "vowel segments are pitch-retuned toward each note frequency"),
+                control(SingingControl::NoteDuration, Approximated, "syllable/note segments are time-stretched to target durations"),
+                control(SingingControl::AbsoluteOnsetAndRests, Native, "syllable stems are placed at absolute note onsets in a zero-initialized timeline"),
+                control(SingingControl::Melisma, Approximated, "vowel source segments are redistributed across melisma notes"),
+                control(SingingControl::ContinuousPitchCurve, Unsupported, "the renderer follows discrete note frequencies, not the VocalPerformance pitch_curve"),
+                control(SingingControl::PhraseExpressionCurve, Unsupported, "the phrase-level expression curve is not consumed"),
+                control(SingingControl::Breathiness, Unsupported, "the VocalSyllable breathiness field is not applied"),
+                control(SingingControl::Energy, Approximated, "syllable energy is mapped to a local gain factor"),
+                control(SingingControl::Tension, Unsupported, "tension controls are not consumed"),
+                control(SingingControl::Vibrato, Approximated, "vibrato is added to note segments using syllable-level rate/depth/onset controls"),
+                control(SingingControl::Portamento, Unsupported, "portamento amount is not consumed by the current note retuner"),
+                control(SingingControl::Articulation, Unsupported, "the legato/neutral/staccato enum does not currently alter synthesis"),
+                control(SingingControl::VoiceIdentity, Conditional, "voice identity is selected by the Kokoro voice identifier supplied at engine load"),
+                control(SingingControl::LocalEdits, Unsupported, "the renderer produces a whole phrase and exposes no localized cache/edit operation"),
+            ],
+        )
+        .expect("static Kokoro capability manifest is complete")
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
