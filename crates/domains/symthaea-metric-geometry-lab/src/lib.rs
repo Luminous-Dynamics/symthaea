@@ -793,6 +793,44 @@ mod tests {
     }
 
     #[test]
+    fn schwarzschild_geodesic_conserves_killing_energy_and_angular_momentum() {
+        let field = SchwarzschildExterior::new(1.0).unwrap();
+        let radius = 10.0;
+        let radial_tangent = -0.02;
+        let azimuthal_tangent = 0.01;
+        let f = 1.0 - 2.0 / radius;
+        let time_tangent = ((1.0
+            + radial_tangent * radial_tangent / f
+            + radius * radius * azimuthal_tangent * azimuthal_tangent)
+            / f)
+            .sqrt();
+        let mut state = GeodesicState {
+            coordinates: [0.0, radius, PI / 2.0, 0.0],
+            tangent: [time_tangent, radial_tangent, 0.0, azimuthal_tangent],
+        };
+
+        let initial_energy = f * time_tangent;
+        let initial_angular_momentum = radius * radius * azimuthal_tangent;
+        let initial_norm = state.norm_squared(&field).unwrap();
+        assert!((initial_norm + 1.0).abs() < 1e-12);
+
+        for _ in 0..1_000 {
+            geodesic_rk4_step(&field, &mut state, 1e-3).unwrap();
+        }
+
+        let final_radius = state.coordinates[1];
+        let final_f = 1.0 - 2.0 / final_radius;
+        let final_energy = final_f * state.tangent[0];
+        let final_angular_momentum =
+            final_radius * final_radius * state.tangent[3];
+        let final_norm = state.norm_squared(&field).unwrap();
+
+        assert!((final_norm + 1.0).abs() < 1e-7);
+        assert!((final_energy - initial_energy).abs() < 1e-8);
+        assert!((final_angular_momentum - initial_angular_momentum).abs() < 1e-8);
+    }
+
+    #[test]
     fn coordinate_chart_and_singular_metrics_fail_closed() {
         let schwarzschild = SchwarzschildExterior::new(1.0).unwrap();
         assert!(schwarzschild.metric([0.0, 2.0, PI / 2.0, 0.0]).is_err());
