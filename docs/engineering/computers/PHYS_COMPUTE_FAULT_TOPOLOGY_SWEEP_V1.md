@@ -86,3 +86,71 @@ The exact binomial-tail calculation gives:
 At n=53, the expected active count is 32.33, but the chance of having at least 32 active channels is only 59.61%. Therefore 53 is an expectation-only estimate and must not be used as a reliability design.
 
 These calculations assume independent identical Bernoulli failures. Spatially correlated/clustered defects, common-mode failures, nonuniform channel quality, repair/remapping and non-binomial aging violate that assumption. A physical design needs empirical fault distributions, confidence intervals and an explicit outage/availability target. Parameter ratios exclude all differential pairs, conductance, compensation, peripheral, routing, calibration and controller overhead.
+
+
+## 3. Correlated channel-survival stress model — beta-binomial
+
+The preceding availability table assumes independent, identically distributed channel survival. To expose sensitivity to shared array/die/environment conditions, a second analytical model uses an exchangeable beta-binomial distribution.
+
+Let a shared latent channel-survival probability be drawn for an array/group:
+
+```
+P ~ Beta(alpha, beta)
+X | P ~ Binomial(n, P)
+E[P] = p = 0.61
+ICC = rho = 1 / (alpha + beta + 1)
+alpha = p * (1/rho - 1)
+beta  = (1-p) * (1/rho - 1)
+```
+
+For rho=0, this reduces to the independent binomial model. For rho>0, outcomes share a random array-level survival condition and have positive pairwise correlation rho. This is an exchangeable common-cause stress model, **not a spatial layout or wafer defect map** and not a claim that actual K26/memristor devices have these correlation values.
+
+### Minimum channel count for at least 99% probability of retaining 32 active channels
+
+| Survival-outcome ICC rho | Minimum installed channels | Achieved P(X ≥ 32) |
+|---:|---:|---:|
+| 0% | 68 | 99.2878% |
+| 0.1% | 68 | 99.1112% |
+| 0.5% | 71 | 99.2416% |
+| 1% | 73 | 99.0157% |
+| 2% | 79 | 99.0401% |
+| 5% | 98 | 99.0538% |
+| 10% | 137 | 99.0124% |
+| 20% | 289 | 99.0008% |
+
+With 53 installed channels, the probability of retaining at least 32 falls from 59.61% at rho=0 to 55.37% at rho=20% under this model. The 53-channel figure is only an expected-capacity estimate.
+
+### Availability target sensitivity
+
+| ICC rho | 95% availability | 99% availability | 99.9% availability | 99.99% availability |
+|---:|---:|---:|---:|---:|
+| 0% | 63 | 68 | 74 | 79 |
+| 0.1% | 63 | 68 | 75 | 80 |
+| 0.5% | 64 | 71 | 78 | 85 |
+| 1% | 66 | 73 | 83 | 92 |
+| 2% | 69 | 79 | 93 | 107 |
+| 5% | 79 | 98 | 128 | 165 |
+| 10% | 96 | 137 | 220 | 344 |
+| 20% | 146 | 289 | 755 | 1,951 |
+
+Values are minimum installed channels under the exchangeable beta-binomial model, for 32 active channels and mean survival 0.61. The full probabilities and n−1 checks are in the JSON fixture.
+
+### Engineering interpretation
+
+1. A small positive common-cause correlation materially increases redundancy at high availability targets.
+2. At rho=5% and 99% availability, the model requires 98 installed channels rather than 68.
+3. At rho=20%, it requires 289. This is a stress test showing how sensitive overprovisioning can be—not a prediction of actual device yield.
+4. Redundancy alone may become uneconomic. The architecture should compare fault screening, spatial interleaving, independent power/control domains, spare rows/columns, remapping, compensation layers and array partitioning.
+5. Measure failure locations and covariance at cell, row, column, subarray, die and lot levels. Fit empirical hierarchical/spatial models; do not infer rho from a single global fail percentage.
+
+### Reproducible calculator
+
+`research/physical_compute/beta_binomial_redundancy.py` is a dependency-free Python research calculator. It uses a recurrence for the beta-binomial PMF and supports rho=0 as the binomial limit. It is research tooling, not production reliability software. The script was run locally against the tabulated scenarios and its outputs were checked against an independent SciPy calculation; repository CI/workflow records are still the qualification authority for the committed version.
+
+### Model limitations
+
+- The beta-binomial is exchangeable: every channel pair has the same correlation. It does not represent adjacent-cell clusters, row/column geometry, spatial gradients or multiple nested common-cause domains.
+- A single global random survival probability per array/group is only one possible shared-cause mechanism.
+- Actual channel-level dependence must be measured across multiple arrays, dies, lots, temperatures and aging conditions.
+- Correlated failure may affect outputs, power, clocks and sense amplifiers in ways not represented by a channel-count model.
+- The raw parameter ratio remains an abstract parameter count, not physical area, energy, yield or cost.
