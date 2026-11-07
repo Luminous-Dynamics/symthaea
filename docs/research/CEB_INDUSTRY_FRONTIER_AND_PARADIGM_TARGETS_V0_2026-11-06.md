@@ -202,6 +202,22 @@ The authors explicitly say that the gold contains only bugs human reviewers alre
 
 **CEB implication:** use as a contextual replay/cost comparator, not a direct Recall@5 equivalent. Extend CEB beyond human-found gold by blind-auditing zero-finding PRs and multi-producer "clean" consensus cases. Preserve a frozen target denominator, then separately adjudicate valid novel findings. Keep the unobserved defect remainder unknown.
 
+### 2.24 Kodus CodeReviewBench: controlled replay and a 30-PR uncertainty lesson
+
+Kodus's CodeReviewBench uses 30 merged PRs and 95 human-authored golden bugs from five production OSS repositories (cal.com, Discourse, Grafana, Keycloak and Sentry), across Go, Java, Python, Ruby and TypeScript. Every model uses the same Kodus production review harness and frozen repository replay; Claude Haiku 4.5 is the sole semantic finding matcher/judge. The current top model, DeepSeek V4 Pro, reports **43.9 F1 / 43.6% precision / 44.2% recall**, 42/95 golden bugs found, and approximately **$0.30 per PR / $0.21 per bug found**. Its 95% PR-bootstrap recall interval is **32.3–56.3 points** over 2,000 resamples of the 30 PRs. The benchmark separately re-scores the same finding output three times to estimate judge variability; this does not measure model run-to-run variability. Every model entry had one agent pass. [Leaderboard](https://www.codereviewbench.com/leaderboard) · [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro) · [benchmark method and limitations](https://www.codereviewbench.com/blog/ai-code-review-recall-2026).
+
+Its most important limitation is instructive: the 95 golden bugs are bugs already surfaced by human reviewers before merge. The benchmark measures recovery of human-found issues, not an exhaustive upper bound on defects in those PRs. There is no route for a defect missed by both original reviewers and other producers to enter the fixed gold denominator, unless found through a separate adjudication/dispute process. The authors also warn that the small 30-PR sample makes rank ordering weak.
+
+**CEB implication:** maintain fixed human-confirmed gold for paired recall, but add an independent audit of apparently clean PRs and multi-producer consensus negatives. Report newly discovered defects through a separate open-set adjudication channel; do not retroactively alter frozen task denominators. Compare on matched source revisions and disclose one-run versus multi-run uncertainty.
+
+### 2.25 Martian Code Review Benchmark: developer uptake as an outcome signal
+
+Martian's production review benchmark examines bot suggestions together with developer responses, later code changes and resolved conversation threads. The live dashboard accessed November 7, 2026 reports a recent-period overall view of **17,768 scored PRs**. Its table lists Greptile at **65.2 F1 / 82.9% precision / 53.7% recall**, Cubic Dev AI at 63.2 / 68.6 / 58.7, and Qodo Code Review at 62.3 / 75.3 / 53.1. Their recent-period sample sizes are 1,600, 1,525 and 2,435 PRs, respectively. These are distinct per-tool samples, not one paired denominator. [Live dashboard](https://www.codereviewbenchmark.com/) · [alternate dashboard](https://codereview.withmartian.com/?fscore_group=day).
+
+This adds an important production outcome: does a suggestion enter the developer's workflow and lead to a follow-up action? But acceptance is not proof of correctness. A developer may accept a false suggestion, reject a correct one due to scope or timing, make the same change independently, or resolve the comment without changing code. Its LLM-derived adoption labels must not replace independent defect adjudication.
+
+**CEB implication:** record four dimensions separately: factual/causal correctness, actionability/usefulness, human uptake/disposition, and downstream engineering outcome where observable. Test causal attribution of adoption rather than treating a subsequent diff as proof that the comment caused it. Reuse CEB-REVIEW and CEB-HUMAN; do not create an opaque adoption score or new metric lane.
+
 ## 3. What the industry does well — and what remains open
 
 | Industry benchmark | What it measures well | Remaining CEB research opportunity |
@@ -313,7 +329,7 @@ Tool use is not inherently intelligence. A reviewer should choose the next obser
 
 Compare static-first, unconstrained tool selection, transparent evidence-directed heuristics, calibrated sequential value-of-information, and ask/abstain policies under matched all-in budgets. Require an action proposal that states the claim, alternatives, observation, expected discriminating outcomes, applicability, authority, safety, cost and stopping implication. Do not reward number of tools or tests. Reuse the existing selective-escalation, causal-diagnosis and evidence-authority contracts; do not create a tool-use metric lane, execution scheduler or Bayesian confidence claim without calibrated probabilities.
 
-### Shift 13 — From comment acceptance to verified engineering impact
+### Shift 15 — From comment acceptance to verified engineering impact
 
 The next frontier is not maximizing accepted comments. It is understanding the chain from finding truth to practical change without confusing correlation for causation.
 
