@@ -27,8 +27,7 @@ fn radians_to_unwrapped_microturns(value: f64) -> Result<i64, PhaseError> {
         return Err(PhaseError::NonFinitePhase);
     }
     let microturns = value * (PHASE_SCALE as f64) / std::f64::consts::TAU;
-    if !microturns.is_finite() || microturns < i64::MIN as f64 || microturns >= i64::MAX as f64
-    {
+    if !microturns.is_finite() || microturns < i64::MIN as f64 || microturns >= i64::MAX as f64 {
         return Err(PhaseError::PhaseOutOfRange);
     }
     let rounded = microturns.round();
@@ -52,9 +51,9 @@ impl Phase {
     /// Construct a wrapped phase from an unwrapped phase in radians.
     /// Integer cycle winding is intentionally discarded by this type.
     pub fn from_unwrapped_radians(value: f64) -> Result<Self, PhaseError> {
-        Ok(Self::from_microturns(
-            radians_to_unwrapped_microturns(value)?,
-        ))
+        Ok(Self::from_microturns(radians_to_unwrapped_microturns(
+            value,
+        )?))
     }
 
     /// Return the canonical signed microturn count.
