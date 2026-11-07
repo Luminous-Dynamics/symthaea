@@ -5,6 +5,8 @@
 
 ## Findings addressed by this patch
 
+The shared VocalPerformance constructor now explicitly reflects the current English-only Muse G2P frontend. It rejects non-English language tags and rejects a melody with fewer notes than the lyric syllable count rather than silently dropping trailing lyrics. Surplus melody notes continue to be represented as melisma.
+
 The functional tract singer existed in src/voice/functional_singing.rs but was not declared by src/voice/mod.rs. Production examples import it as symthaea::voice::functional_singing, so it was not actually part of the compiled voice module graph.
 
 The same source mapper used a default-to-AX rule for unknown IPA. That silently transformed unsupported phones into schwa. The in-tree DiffSinger worker independently defaulted unknown IPA to ax, defaulted absent language IDs to zero, duplicated source-phone duration for composite mappings, and could carry the final consonant across melisma.
