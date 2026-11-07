@@ -1,6 +1,6 @@
 # CEB Review Evidence-Action Crosswalk V0 — 2026-11-07
 
-**Purpose:** Annotator worksheet linking the 26 public ERG synthetic cases to the smallest discriminating evidence action.  
+**Purpose:** Annotator worksheet linking the 32 public ERG synthetic cases to the smallest discriminating evidence action.  
 **Status:** Public design-only annotation aid. Not a task schema, run receipt, hidden label or evaluation result.  
 **Composes with:** [26-scenario evidence challenge](CEB_REVIEW_EVIDENCE_GROUNDING_CHALLENGE_V0_2026-11-06.md), [sequential evidence-acquisition policy](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md), [finding adjudication card](CEB_REVIEW_FINDING_ADJUDICATION_CARD_V0_2026-11-07.md), [causal-diagnosis preregistration](CEB_REVIEW_CAUSAL_DIAGNOSIS_PREREGISTRATION_V0_2026-11-07.md).
 
@@ -48,6 +48,12 @@ E3/E4 are design-only proposals in this crosswalk. They must not execute candida
 | ERG-S24 | Nearby edit repairs target vs irrelevant edit preserves trigger/path/operation | E0 bind I/IRR digests; E1 compare whether necessary causal links remain | Source-level counterfactual prediction | Predict target persistence if all required causal links remain; don't infer repair from line movement |
 | ERG-S25 | Repair removes all target paths vs residual caller remains reachable | E0 bind repair and contract; E1 enumerate all known callers and inspect residual path; E2 dependency/configuration scope | Source/syntax path; compiler/runtime only if exact results are available | Mark partial remediation or unresolved; do not trust commit message as proof |
 | ERG-S26 | Fixed companion removes target vs supplied source bytes are incomplete | E0 verify tree completeness and digests; E1 identify missing caller/dependency evidence | Source-declared completeness status only | Mark F counterfactual unresolved; request missing source or authorized evidence |
+| ERG-S27 | Is the correct finding rejected for scope/timing, or factually false? | Preserve the blinded truth/actionability label; inspect the explicit maintainer disposition and applicable issue/owner/scope contract | source_declared; inferred/unresolved for intent not explicitly stated | Record reject/defer/redirect separately; do not relabel truth based on uptake |
+| ERG-S28 | Did a false finding become accepted, and did the implementation create harm? | Independent blinded adjudication of the finding and resulting diff; check protected invariants and downstream behavior under an authorized qualified process | source_declared; runtime_observed only from qualified exact-revision evidence | Keep finding false regardless of adoption; escalate new regression separately |
+| ERG-S29 | Was the target already fixed independently before the review was visible? | Reconstruct event ordering and exact commit/tree lineage; compare repair timestamp and target source state with comment delivery/visibility | source_declared | Attribute as already fixed / independent; do not credit the bot with causation |
+| ERG-S30 | Did the review comment cause the subsequent change or merely precede it? | Inspect author-declared linkage, commit/thread references and competing work; absent a credible identification design, retain temporal association only | source_declared; inferred/unresolved for causation | Do not infer attribution from chronology or semantic diff similarity |
+| ERG-S31 | Was the target removed while a protected invariant regressed? | Independently check target mechanism absence and separately adjudicate the resulting patch against protected invariants and regression evidence | source_declared; runtime_observed only after #10064 | Report target remediation and new regression separately; never call net success from target absence alone |
+| ERG-S32 | Is no-response censored, and is the critical finding excluded from randomization? | Audit telemetry availability/observation horizon and treatment eligibility; verify immediate escalation policy for critical/security finding | source_declared | No-response remains censored; critical findings stay visible and immediate in all arms |
 
 ## 3. Two-author annotation procedure
 
