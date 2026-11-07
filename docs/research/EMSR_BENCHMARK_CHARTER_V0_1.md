@@ -70,6 +70,22 @@ Source: https://doi.org/10.1016/j.phycom.2026.103352
 
 This work is tracked separately in Symthaea #10893. It is adjacent to EMSR/PNT but does not establish navigation integrity.
 
+### 2.2.4 Domain-adversarial cross-scene comparator
+
+Lei et al., *Cross-Domain GNSS Spoofing Detection via Domain-Adversarial Neural Networks*, ION GNSS+ 2026, reports a dual-branch architecture combining physically interpretable signal-quality features (correlation peak shape, power correlation, phase locking and temporal evolution) with learned channel-attention features. In cross-scene simulations, the basic DANN reports 92.80% accuracy and 85.49% detection at a 1.38% false-alarm rate; the improved DANN reports 95.90% detection at the same false-alarm level.
+
+Source: https://doi.org/10.33012/2026.20876
+
+**Benchmark implication:** Add DANN and the physically interpretable feature branch as explicit comparators/ablations. Reproduce the published cross-scene simulation conditions first, then evaluate on independently recorded receiver/campaign holdouts. The reported figures are cross-scene simulation results, not field qualification.
+
+### 2.2.5 Lightweight multi-domain spatio-temporal fusion
+
+Ye and Chen, *Cross-Domain Feature Fusion for GNSS Spoofing Detection with Lightweight Spatio-Temporal Attention Networks*, ION GNSS+ 2026, combines correlation-, observation- and positioning-domain features, temporal per-satellite modeling and cross-satellite attention. Its abstract reports a satellite-wise TPR of 94.59% at 1% FPR, 229,507 trainable parameters and 0.173 ms/sample on its scenario-diverse evaluation dataset.
+
+Source: https://doi.org/10.33012/2026.20831
+
+**Benchmark implication:** This is a particularly relevant efficiency/feature-fusion comparator. Reproduce the same feature availability, masks, satellite/epoch alignment and evaluation protocol before comparing. Report inference latency on matched hardware, and test unseen receiver, campaign and scenario families. The abstract-level latency is not a device-independent real-time guarantee.
+
 ### 2.3 Collaborative integrity
 
 *Multicriteria Collaborative GNSS Integrity Monitoring*, IEEE Journal of Indoor and Seamless Positioning and Navigation (4 May 2026), combines PVT residuals and carrier-to-noise observations across receivers. It reports real jamming data and simulated spoofing data.
@@ -235,7 +251,9 @@ For aviation and other safety-critical domains, time-to-alert, protection levels
 5. Conventional supervised CNN or comparable feature model.
 6. Published cross-domain comparator from the 2026 IEEE Access study, subject to faithful reproduction.
 7. 2026 NAVITEC CNN versus MAML cross-testing comparator across TEXBAT, OAKBAT and FGI-SpoofRepo, subject to faithful reproduction.
-8. Spatio-temporal graph model cross-scenario comparator (ION GNSS+ 2026), if faithful data/protocol reproduction is possible.
+8. ION GNSS+ 2026 domain-adversarial neural network (DANN) cross-scene simulation comparator, plus physical-feature-only and learned-feature-only ablations.
+9. ION GNSS+ 2026 lightweight multi-domain spatio-temporal feature-fusion comparator, with matched hardware latency and per-domain performance.
+10. Spatio-temporal graph model cross-scenario comparator (ION GNSS+ 2026), if faithful data/protocol reproduction is possible.
 9. RAIM-driven semi-supervised maritime comparator (Advances in Space Research, 2026), if full-method and data reproduction conditions are available.
 10. Collaborative PVT-residual/C/N0 integrity comparator.
 11. Explainable multimodal statistical + 1D temporal + 2D time-frequency fusion baseline, with per-modality ablations and matched hardware profiling where data conditions permit.
