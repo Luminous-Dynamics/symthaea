@@ -1575,6 +1575,101 @@ mod tests {
     }
 
     #[test]
+    fn prospective_model_eig_is_invariant_to_exact_duplicate_model_labels() {
+        let full_prior = tensor(&[&[1.5, 1.5]], 'a');
+        let duplicated_models = vec![
+            ReducedDirichletModelHypothesis {
+                model_id: "red-labelled-a".into(),
+                prior_probability: 0.2,
+                parameter_prior: tensor(&[&[2.0, 1.0]], 'a'),
+            },
+            ReducedDirichletModelHypothesis {
+                model_id: "red-labelled-b".into(),
+                prior_probability: 0.3,
+                parameter_prior: tensor(&[&[2.0, 1.0]], 'a'),
+            },
+            ReducedDirichletModelHypothesis {
+                model_id: "blue".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[1.0, 2.0]], 'a'),
+            },
+        ];
+        let quotient_models = vec![
+            ReducedDirichletModelHypothesis {
+                model_id: "red-equivalence-class".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[2.0, 1.0]], 'a'),
+            },
+            ReducedDirichletModelHypothesis {
+                model_id: "blue-equivalence-class".into(),
+                prior_probability: 0.5,
+                parameter_prior: tensor(&[&[1.0, 2.0]], 'a'),
+            },
+        ];
+        let action = DirichletActionPrediction {
+            action_id: "one-observation".into(),
+            outcomes: vec![
+                DirichletPredictedOutcome {
+                    outcome_id: "success".into(),
+                    full_model_predictive_probability: 0.5,
+                    posterior_count_increment: vec![vec![1.0, 0.0]],
+                },
+                DirichletPredictedOutcome {
+                    outcome_id: "failure".into(),
+                    full_model_predictive_probability: 0.5,
+                    posterior_count_increment: vec![vec![0.0, 1.0]],
+                },
+            ],
+        };
+
+        let labelled = evaluate_dirichlet_model_information_gain(
+            &full_prior,
+            &full_prior,
+            &duplicated_models,
+            &action,
+        )
+        .expect("labelled model EIG");
+        let quotient = evaluate_dirichlet_model_information_gain(
+            &full_prior,
+            &full_prior,
+            &quotient_models,
+            &action,
+        )
+        .expect("quotient model EIG");
+
+        assert!(
+            (labelled.model_information_gain_nats - quotient.model_information_gain_nats).abs()
+                < 1e-12
+        );
+        assert!(
+            (labelled.expected_posterior_model_entropy_nats
+                - quotient.expected_posterior_model_entropy_nats
+                - 0.2_f64 * 0.2_f64.ln()
+                - 0.3_f64 * 0.3_f64.ln()
+                + 0.5_f64 * 0.5_f64.ln())
+            .abs()
+                < 1e-10
+        );
+
+        for (labelled_outcome, quotient_outcome) in labelled.outcomes.iter().zip(&quotient.outcomes)
+        {
+            let labelled_red_mass = labelled_outcome
+                .posterior_model_probabilities
+                .iter()
+                .filter(|(model_id, _)| model_id.starts_with("red-labelled-"))
+                .map(|(_, probability)| *probability)
+                .sum::<f64>();
+            let quotient_red_mass = quotient_outcome
+                .posterior_model_probabilities
+                .iter()
+                .find(|(model_id, _)| model_id == "red-equivalence-class")
+                .map(|(_, probability)| *probability)
+                .expect("red quotient posterior");
+            assert!((labelled_red_mass - quotient_red_mass).abs() < 1e-12);
+        }
+    }
+
+    #[test]
     fn prospective_model_eig_rejects_non_bma_priors_and_bad_predictive_mass() {
         let (full_prior, models) = symmetric_beta_model_family();
         let action = DirichletActionPrediction {
