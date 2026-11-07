@@ -233,3 +233,43 @@ Exact, PAC, high-precision floating-point and heuristic results must remain dist
 - #10884 — anytime result semantics.
 - #10887 — independent semantic verifier.
 - #10899 — executable strategy IR and interpreter workstream.
+
+
+## 14. Proof calculus is a strategy choice, not a post-processing detail
+
+A strategy's output semantics and its certificate calculus are related but distinct. Two strategies may compute the same exact #SAT result through different decompositions and emit very different certificates. The strategy plan therefore needs a proof-backend capability and cost profile, bound to the task and aggregation semantics. Do not hard-code one proof calculus as universally optimal.
+
+The July 2026 proof-complexity result **The Relative Strength of #SAT Proof Systems** establishes that CPOG simulates both MICE and kcps, while MICE and kcps are exponentially incomparable; CLIP simulates all three and is theoretically very strong. The authors further discuss CPOG and restricted CPOG/Decision-DNNF or kcps+resolution variants as potentially practical proof-logging candidates. This is a proof-complexity simulation result, not an empirical claim that CPOG always produces the smallest or fastest certificate.
+
+Source: Beyersdorff, Fichte, Hecher, Hoffmann & Kasche, *The Relative Strength of #SAT Proof Systems*, Journal of Automated Reasoning 70 (2026), 12, https://doi.org/10.1007/s10817-026-09757-w. Open full text: https://pmc.ncbi.nlm.nih.gov/articles/PMC13385077/.
+
+For SAT, CaDiCaL 3.0 (SAT 2026) is an important engineering baseline: it adapts Kissat's techniques to incremental solving, supports implied-literal extraction under assumptions and emphasizes efficient linear proof production with hints. That is evidence that solver features, incremental semantics and certificate production have to be co-designed. It does not mean a Symthaea strategy should replace CaDiCaL's core solver.
+
+Source: Pollitt et al., *CaDiCaL 3.0*, SAT 2026, https://doi.org/10.4230/LIPIcs.SAT.2026.40.
+
+### Required strategy proof-backend profile
+
+For each supported task/representation pair, record:
+- proof system and exact version / language revision;
+- which result claims the system can certify (decision UNSAT, exact count, projected count, optimization bound, completion, etc.);
+- checker implementation, independence and formal-verification status;
+- whether checking can stream or run concurrently with production;
+- certificate bytes, peak checker memory and checker wall/CPU time;
+- proof-generation overhead and whether proof logging changes the solver's search behavior;
+- supported transformations, preprocessing and incremental assumptions;
+- known lower bounds or incomparability results relevant to the selected proof system.
+
+A proof calculus is eligible only for the claims it actually supports. Do not infer that a #SAT proof system establishes projected counting, weighted counting, or optimization bounds without a separately established semantics and checker.
+
+### Initial #SAT proof-backend experiment
+
+Compare CPOG / Decision-DNNF-oriented certificates, MICE, and kcps or kcps+resolution where usable implementations and adapters exist. Use the same exact counting instances and pinned solver runs. Record count correctness, certificate size, generation overhead and independent checking throughput. Treat CLIP primarily as a theoretical comparison until a practical producer/checker pair exists.
+
+Required ablations:
+1. solver without certificate production;
+2. solver with native proof production;
+3. proof generation plus independent offline checking;
+4. streaming/on-the-fly checking where supported;
+5. representation/decomposition chosen without proof-cost awareness versus jointly chosen with proof-cost awareness.
+
+The scientific question is whether proof-aware strategy synthesis can improve time-to-trusted-answer or extend the set of instances with practically checkable results, without degrading mathematical correctness.
