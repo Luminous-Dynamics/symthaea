@@ -1,0 +1,208 @@
+{
+  "schema_version": "0.1.0",
+  "id": "los.liveaboard.mission-profile-set.v0.1",
+  "status": "provisional_research_profiles",
+  "units": "SI",
+  "authority_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10926",
+  "design_envelope": {
+    "length_m": {
+      "min": 16,
+      "max": 20,
+      "reference": 18,
+      "status": "assumption_for_trade_study"
+    },
+    "architectures": [
+      "monohull",
+      "catamaran",
+      "trimaran"
+    ],
+    "architecture_winner": null
+  },
+  "occupancy_profiles": [
+    {
+      "id": "coastal_pair",
+      "permanent_occupants": 2,
+      "guest_occupants": 0
+    },
+    {
+      "id": "couple_plus_guests",
+      "permanent_occupants": 2,
+      "guest_occupants": 2
+    },
+    {
+      "id": "four_residents",
+      "permanent_occupants": 4,
+      "guest_occupants": 0
+    }
+  ],
+  "resupply_intervals_days": [
+    7,
+    14,
+    30,
+    45
+  ],
+  "mission_profiles": [
+    {
+      "id": "coastal_residence",
+      "route_class": "coastal_near_offshore",
+      "ocean_crossing": false
+    },
+    {
+      "id": "island_hopping",
+      "route_class": "regional_passages",
+      "ocean_crossing": false
+    },
+    {
+      "id": "extended_offshore",
+      "route_class": "offshore_cruising",
+      "ocean_crossing": false
+    },
+    {
+      "id": "ocean_crossing",
+      "route_class": "declared_ocean_route",
+      "ocean_crossing": true,
+      "assurance_profile": "separate_higher_assurance_case"
+    }
+  ],
+  "propulsion_architectures": [
+    {
+      "id": "diesel_baseline",
+      "status": "comparison_baseline"
+    },
+    {
+      "id": "battery_electric",
+      "status": "mission_limited_candidate"
+    },
+    {
+      "id": "renewable_first_hybrid_electric",
+      "status": "primary_research_candidate"
+    },
+    {
+      "id": "sail_or_wind_assist",
+      "status": "conditional_candidate"
+    },
+    {
+      "id": "hydrogen_or_other_alternative_fuel",
+      "status": "separate_route_specific_research"
+    },
+    {
+      "id": "smr",
+      "status": "not_a_first_generation_liveaboard_dependency"
+    }
+  ],
+  "autonomy_dimensions": [
+    "energy",
+    "potable_water",
+    "food",
+    "waste_storage_and_treatment",
+    "consumables",
+    "critical_spares",
+    "medical_and_emergency_provisions",
+    "safe_return_reserve"
+  ],
+  "required_input_metadata": [
+    "value",
+    "unit",
+    "source_uri_or_reference",
+    "evidence_status",
+    "uncertainty",
+    "applicability_envelope",
+    "design_revision"
+  ],
+  "evidence_statuses": [
+    "requirement",
+    "sourced",
+    "measured",
+    "estimated",
+    "assumed",
+    "unknown"
+  ],
+  "benchmark_observables": [
+    {
+      "id": "propulsion_energy_per_distance",
+      "unit": "kWh/nmi"
+    },
+    {
+      "id": "total_energy_per_distance",
+      "unit": "kWh/nmi"
+    },
+    {
+      "id": "energy_per_occupied_berth_day",
+      "unit": "kWh/occupied_berth_day"
+    },
+    {
+      "id": "renewable_energy_fraction",
+      "unit": "1"
+    },
+    {
+      "id": "verified_range",
+      "unit": "nmi"
+    },
+    {
+      "id": "potable_water_demand",
+      "unit": "L/person/day"
+    },
+    {
+      "id": "desalination_specific_energy",
+      "unit": "kWh/m3"
+    },
+    {
+      "id": "food_provisioning_capacity",
+      "unit": "person_days"
+    },
+    {
+      "id": "waste_capacity",
+      "unit": "L/person/day"
+    },
+    {
+      "id": "vertical_acceleration",
+      "unit": "m/s2"
+    },
+    {
+      "id": "roll_rate",
+      "unit": "deg/s"
+    },
+    {
+      "id": "noise_level",
+      "unit": "dB re declared weighting and measurement method"
+    },
+    {
+      "id": "module_replacement_time",
+      "unit": "min"
+    },
+    {
+      "id": "manufacturing_labour",
+      "unit": "person_hours"
+    },
+    {
+      "id": "acquisition_cost",
+      "unit": "currency with price_date and scope"
+    },
+    {
+      "id": "lifecycle_cost",
+      "unit": "currency with discount_rate and service_life"
+    },
+    {
+      "id": "lifecycle_ghg",
+      "unit": "kgCO2e with declared boundary"
+    }
+  ],
+  "hard_gates": [
+    "applicable_stability_and_buoyancy",
+    "primary_structure_and_fatigue",
+    "fire_and_battery_safety",
+    "flooding_and_damage_scenarios",
+    "egress_and_life_saving",
+    "propulsion_and_steering_degraded_modes",
+    "route_and_weather_limits",
+    "applicable_external_approval"
+  ],
+  "rules": [
+    "Unknown is not zero.",
+    "A nameplate solar rating is not daily delivered energy.",
+    "Electric-mode time share is not zero-fuel or zero-lifecycle-emissions proof.",
+    "A candidate generator may not certify its own candidate.",
+    "A scalar Pareto score may not compensate for a failed hard gate.",
+    "A concept or simulation result does not establish seaworthiness or operating authority."
+  ]
+}
