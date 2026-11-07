@@ -52,16 +52,17 @@
     "binary64Rule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "intent", "unit_ref", "negative_zero_policy", "exponent_form_policy", "overflow_policy", "underflow_policy", "maximum_significant_digits", "comparison"],
+      "required": ["path", "intent", "unit_ref", "negative_zero_policy", "exponent_form_policy", "overflow_policy", "underflow_policy", "maximum_significant_digits", "precision_policy", "comparison"],
       "properties": {
         "path": { "type": "string" },
         "intent": { "const": "binary64" },
         "unit_ref": { "$ref": "#/$defs/unitReference" },
-        "negative_zero_policy": { "enum": ["preserve", "normalize_to_positive_zero", "reject"] },
+        "negative_zero_policy": { "enum": ["reject", "canonicalize_to_positive_zero", "retain_source_lexeme_only"] },
         "exponent_form_policy": { "enum": ["allow", "reject"] },
         "overflow_policy": { "const": "reject" },
-        "underflow_policy": { "enum": ["reject", "allow_zero_or_subnormal"] },
-        "maximum_significant_digits": { "type": "integer", "minimum": 1, "maximum": 17 },
+        "underflow_policy": { "enum": ["reject", "allow_subnormal_only", "allow_round_to_zero"] },
+        "maximum_significant_digits": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "precision_policy": { "enum": ["allow_ecmascript_binary64_rounding", "require_exact_binary64_value"] },
         "comparison": {
           "type": "object",
           "additionalProperties": false,
