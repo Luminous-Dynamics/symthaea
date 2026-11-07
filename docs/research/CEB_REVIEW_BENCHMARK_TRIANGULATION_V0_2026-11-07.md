@@ -83,6 +83,22 @@ The benchmark's distinctive contribution is operational: it examines whether rev
 
 **CEB implication — separate truth from uptake.** Keep four outcomes distinct: (1) independently adjudicated correctness/causal diagnosis, (2) actionability/usefulness, (3) human uptake or disposition, and (4) downstream engineering outcome such as recurrence/rework where observable. Do not add a single adoption score or use uptake to rewrite frozen gold. Record uptake as observed process data and investigate attribution; report silence, defer, correction and rejection separately from acceptance.
 
+### 2.7 SWE-sweep — open-world repository discovery and multi-bug repair (adjacent, not review-equivalent)
+
+SWE-sweep changes the task from reviewing a supplied PR to discovering and repairing multiple bugs in a repository without hints about bug type or location. Its October 1, 2026 paper covers **4,068 bugs across 100 repositories and 22 languages**. Each repository state is selected to maximize concurrent known bugs; candidate patches are checked against hidden fail-to-pass tests for each bug and the original test suite for regressions. The paper's main evaluated table reports its best system at **4.7% of all bugs resolved**; the authors conclude the hardest step is discovery rather than repair. [Paper](https://swesweep.com/paper).
+
+The live benchmark website's leaderboard snapshot viewed November 7, 2026 lists **Astra 6 + mini-SWE-agent at 9.5%**, followed by Sol 5.6 xhigh at 4.7% and Claude Opus 5.5 xhigh at 3.6%. This live board is a different model/harness snapshot from the paper's original seven-model evaluation. Do not splice the 9.5% live row into the October paper's evaluation table or infer an improvement without matching the exact model, harness, dataset snapshot and scoring run. [Live benchmark/leaderboard](https://swesweep.com/).
+
+**CEB relevance:** this is an adjacent frontier for open-world repository comprehension, proactive defect discovery and multi-issue planning, not a code-review metric comparator. It demonstrates the distinction between issue-conditioned repair and deciding what work exists. CEB should preserve a separate open-set discovery channel and evaluate it with fixed source snapshots, independently validated multi-bug gold, interaction controls between defects, and total discovery/repair cost. Do not translate its bug-resolved percentage into CEB Recall@5, PR review precision or a direct superiority claim.
+
+### 2.8 LoopControlBench — deterministic completion authority (adjacent, narrow population)
+
+LoopControlBench evaluates real merged Python library bug-fix PRs. Its gate checks that the maintainer's test fails on the buggy parent and passes after the real fix, with the scoring environment matching task certification. The published reference is **46/70 = 65.7% solved** for GPT-5-mini, one attempt per task, no escalation or repair loop. The maintainer says the pool subsequently grew to 89 tasks, while the 65.7% score remains scoped to the original 70. It explicitly limits the population to reproducible, maintainer-tested Python library bugs under a modern shared environment; it is not 65.7% of software bugs generally. [Repository/readme](https://github.com/kltownsend/loopcontrolbench).
+
+Its strongest design lesson is that the **validator, not the model, decides done**: test edits are prohibited, source paths are allowlisted, a named fail-to-pass test is the acceptance oracle, and setup/harness compatibility is checked at admission rather than silently removed mid-run. The default runner uses a disposable, network-disabled container with dropped Linux capabilities. The readme separately warns that its optional agentic path runs install/tests on the host and must only be used in a disposable VM. This makes it a useful methodological reference for explicit admission, deterministic outcome authority and precise denominator control, not a broad SOTA leaderboard. [Security and reference-score details](https://github.com/kltownsend/loopcontrolbench).
+
+**CEB relevance:** compose the deterministic-oracle principle with CEB's stronger provenance, evidence authority, hidden-test fidelity and independent regrade gates. A single fail-to-pass test is strong evidence for one declared behavior, not whole-repository correctness, causal uniqueness, broad language coverage or independent pristine regrade. Keep the Python-only 70-task denominator attached to the result.
+
 ## 3. Metric correspondence to the existing CEB-REVIEW lane
 
 The current CEB-REVIEW lane retains exactly three primary metrics. This triangulation is interpretive; it does not mutate their definitions.
@@ -224,6 +240,8 @@ No public scenario here is a sealed holdout task. No candidate-controlled code i
 - GitHub, [ReviewBench: An open benchmark for AI code review](https://github.blog/ai-and-ml/reviewbench-an-open-benchmark-for-ai-code-review/), October 5, 2026; [live high-severity grounded-F1 leaderboard](https://review-bench.ai/), viewed November 7, 2026.
 - Yang et al., [Can Agentic Code Review Catch Vulnerabilities Before They Are Merged? (SecPRBench)](https://arxiv.org/abs/2610.33509), submitted October 24, 2026.
 - Pereira et al., [CR-Bench-v2: Evaluating the Real-World Utility of AI Code Review Agents](https://arxiv.org/abs/2611.02566), submitted November 2, revised November 3, 2026.
+- Lieret et al., [SWE-sweep: Can Agents Autonomously Find and Fix Bugs?](https://swesweep.com/paper), October 1, 2026; [live leaderboard](https://swesweep.com/) viewed November 7, 2026.
+- Townsend, [LoopControlBench](https://github.com/kltownsend/loopcontrolbench), live repository/readme viewed November 7, 2026.
 - Yang et al., [CRBugBench](https://arxiv.org/abs/2610.13668), October 9, 2026; [Microsoft Research overview](https://www.microsoft.com/en-us/research/publication/when-should-a-software-factory-be-lights-off-benchmarking-code-review-agents-on-bug-detection/).
 - Arsentev, [PREreview of CRBugBench](https://prereview.org/reviews/23335998), October 13, 2026.
 - Kodus, [CodeReviewBench leaderboard](https://www.codereviewbench.com/leaderboard), [DeepSeek V4 Pro scorecard](https://www.codereviewbench.com/model/deepseek-v4-pro), and [method/limitations post](https://www.codereviewbench.com/blog/ai-code-review-recall-2026), data generated 2026-09-11; accessed November 7, 2026.
