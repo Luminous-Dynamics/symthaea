@@ -172,6 +172,7 @@
         "source_predicate_type",
         "requested_evidence_ids",
         "assumptions",
+        "numeric_precision_warnings",
         "evidence_assessments",
         "missing_evidence_ids",
         "unmet_obligations",
@@ -365,6 +366,42 @@
         "derivation_sha256": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "numeric_precision_warnings": {
+          "type": "array",
+          "description": "JCS unsafe-integer precision warnings from the asserted value and referenced Evidence records; bound by the embedded REA derivation.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "evidence_id",
+              "json_pointer",
+              "integer_value"
+            ],
+            "properties": {
+              "source": {
+                "enum": [
+                  "asserted_value",
+                  "evidence_record"
+                ]
+              },
+              "evidence_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^ev_[0-9a-f]{64}$"
+              },
+              "json_pointer": {
+                "type": "string"
+              },
+              "integer_value": {
+                "type": "string",
+                "pattern": "^-?(0|[1-9][0-9]*)$"
+              }
+            }
+          }
         }
       }
     },
