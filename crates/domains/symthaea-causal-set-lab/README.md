@@ -21,16 +21,22 @@ finite-sample validation in 1+1D, 2+1D and 3+1D flat Minkowski spacetime.
   relations, Myrheim–Meyer dimension estimation and boost tests.
 - The 1+1D pair counter and chain reconstruction are O(N log N); the generic
   higher-dimensional reference observables are O(N²).
-- A dimensionless 4D BDG action bracket built from the first four
-  exclusive interval-abundance bins: n - N0 + 9 N1 - 16 N2 + 8 N3.
-  The method returns the integer combinatorial bracket only; the standard
-  physical prefactor is 4 sqrt(6) (ell/ell_p)^2.
+- Dimensionless BDG action brackets in 1+1D and 3+1D, built from exclusive
+  open-interval abundance bins:
+  - 2D: 2N - 4N0 + 8N1 - 4N2.
+  - 4D: N - N0 + 9N1 - 16N2 + 8N3, with physical prefactor
+    4 sqrt(6) (ell/ell_p)^2.
+  Both APIs return the integer combinatorial bracket only; no physical length
+  scale is assumed. The 3D specialization is not yet implemented.
 - Deterministic seeds and bounded-input validation.
 - Open-interval cardinality histogram: for each related endpoint pair,
-  count the number of events strictly between them. A successor/predecessor
-  bitset intersection computes exact finite-set abundance counts and is
-  checked for Lorentz-boost invariance. This is a reference observable for
-  future causal-set action work, not a BDG action implementation.
+  count the number of events strictly between them. The 1+1D implementation
+  uses a merge-sort range tree to answer closed-rectangle cardinality queries
+  and subtract endpoint-coordinate multiplicities, with O(N^2 log^2 N) time
+  and O(N log N) memory. The dimension-generic 2+1D/3+1D implementation
+  retains a successor/predecessor bitset intersection reference with
+  O(N^2) bits of storage and O(R ceil(N/64)) interval-intersection work.
+  Both are differentially checked against brute force and Lorentz-boost tests.
 
 The implementation uses (u=t+x), (v=t-x). A 1+1D Alexandrov
 interval of endpoint proper-time separation (T) is the square
@@ -38,9 +44,11 @@ interval of endpoint proper-time separation (T) is the square
 
 ## Epistemic boundary
 
-This is a kinematics/estimator testbed. It does **not** implement causal-set
-quantum dynamics, a path-integral measure, a discrete d'Alembertian, Einstein
-equations, or a continuum-limit proof. It does not establish that spacetime is
+This is a kinematics, finite-set action-bracket and estimator testbed. It
+does **not** implement causal-set quantum dynamics, a path-integral measure,
+a discrete d'Alembertian, Einstein equations, or a continuum-limit proof.
+The BDG action brackets are finite causal-order observables; they do not by
+themselves establish a continuum spacetime or prove that spacetime is
 fundamentally discrete.
 
 The Myrheim–Meyer estimator is a finite-sample estimator. Its expected
