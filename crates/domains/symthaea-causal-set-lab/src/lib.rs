@@ -909,6 +909,11 @@ mod tests {
                 boosted.interval_size_histogram()
             );
             assert_eq!(
+                causet.bdg_action_2d_dimensionless_bracket(),
+                boosted.bdg_action_2d_dimensionless_bracket(),
+                "2D BD action bracket changed under rapidity={rapidity}"
+            );
+            assert_eq!(
                 causet.longest_chain_ids(),
                 boosted.longest_chain_ids(),
                 "selected maximum chain changed under boost eta={rapidity}"
