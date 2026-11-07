@@ -11,7 +11,8 @@
 //! - **Boltzmann Entropy**: S = k_B ln(Ω) - connects microscopic states to macroscopic entropy
 //! - **Shannon Entropy**: H = -Σ p_i log(p_i) - information-theoretic entropy
 //! - **Free Energy**: F = U - TS (Helmholtz), G = H - TS (Gibbs)
-//! - **Landauer's Principle**: Erasing 1 bit costs at least k_B T ln(2) energy
+//! - **Landauer's Principle**: logically irreversible one-bit erasure dissipates
+//!   at least k_B T ln(2) heat under the relevant thermal-bath assumptions
 //!
 //! ## Maxwell's Demon
 //!
@@ -29,6 +30,10 @@ use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
+
+#[path = "landauer_erasure.rs"]
+mod landauer_erasure;
+pub use landauer_erasure::PhysicalEnergyJoules;
 
 /// Thermodynamic state
 #[derive(Debug, Clone)]
@@ -139,11 +144,28 @@ impl ThermoEncoder {
         self.information.bind(&self.uncertainty).scale(h_normalized)
     }
 
-    /// Landauer's principle: minimum energy to erase 1 bit = k_B T ln(2)
+    /// Validated Landauer heat floor for logically irreversible bit erasure.
     ///
-    /// Returns the energy in Joules
+    /// Returns `None` for a negative or non-finite erased-bit count, or for a
+    /// non-positive / non-finite bath temperature. The returned value is in
+    /// joules and is a thermodynamic lower bound only for the declared bit
+    /// erasures under the relevant thermal-bath assumptions; it is not a
+    /// universal energy floor for arbitrary computation or information handling.
+    pub fn landauer_erasure_heat_floor(
+        &self,
+        bits_erased: f64,
+        temperature_k: f64,
+    ) -> Option<PhysicalEnergyJoules> {
+        landauer_erasure::erasure_heat_floor_j(bits_erased, temperature_k, K_BOLTZMANN)
+    }
+
+    /// Legacy one-bit Landauer reference: k_B * T * ln(2).
+    ///
+    /// This unchecked compatibility helper assumes a finite positive
+    /// temperature. Prefer `landauer_erasure_heat_floor` for validated inputs
+    /// and an explicit count of logically irreversible bit erasures.
     pub fn landauer_limit(&self, temp_k: f64) -> f64 {
-        K_BOLTZMANN * temp_k * 2.0_f64.ln()
+        K_BOLTZMANN * temp_k * std::f64::consts::LN_2
     }
 
     /// Encode a thermodynamic state
@@ -563,6 +585,44 @@ mod tests {
             (limit - expected).abs() < 1e-25,
             "Landauer limit should be k_B T ln(2)"
         );
+    }
+
+    #[test]
+    fn test_validated_landauer_erasure_heat_floor() {
+        let (encoder, _) = setup();
+
+        let one_bit_300k = encoder.landauer_erasure_heat_floor(1.0, 300.0).unwrap();
+        let two_bits_300k = encoder.landauer_erasure_heat_floor(2.0, 300.0).unwrap();
+        let one_bit_310k = encoder.landauer_erasure_heat_floor(1.0, 310.0).unwrap();
+
+        let one_bit_300k = one_bit_300k.get();
+        let two_bits_300k = two_bits_300k.get();
+        let one_bit_310k = one_bit_310k.get();
+
+        assert!((one_bit_300k - K_BOLTZMANN * 300.0 * std::f64::consts::LN_2).abs() < 1e-35);
+        assert!((two_bits_300k - 2.0 * one_bit_300k).abs() < 1e-35);
+        assert!((one_bit_310k - 2.966_678_181_248_014_7e-21).abs() < 1e-35);
+        assert!((one_bit_310k / one_bit_300k - 310.0 / 300.0).abs() < 1e-14);
+    }
+
+    #[test]
+    fn physical_energy_joules_rejects_non_finite_values() {
+        assert!(PhysicalEnergyJoules::new(f64::NAN).is_none());
+        assert!(PhysicalEnergyJoules::new(f64::INFINITY).is_none());
+        assert!(PhysicalEnergyJoules::new(f64::NEG_INFINITY).is_none());
+        assert_eq!(PhysicalEnergyJoules::new(1.25).unwrap().get(), 1.25);
+    }
+
+    #[test]
+    fn test_validated_landauer_erasure_heat_floor_rejects_invalid_inputs() {
+        let (encoder, _) = setup();
+
+        assert!(encoder.landauer_erasure_heat_floor(-1.0, 300.0).is_none());
+        assert!(encoder.landauer_erasure_heat_floor(f64::NAN, 300.0).is_none());
+        assert!(encoder.landauer_erasure_heat_floor(1.0, 0.0).is_none());
+        assert!(encoder.landauer_erasure_heat_floor(1.0, -300.0).is_none());
+        assert!(encoder.landauer_erasure_heat_floor(1.0, f64::INFINITY).is_none());
+        assert!(encoder.landauer_erasure_heat_floor(f64::MAX, f64::MAX).is_none());
     }
 
     #[test]
