@@ -804,6 +804,15 @@ mod tests {
 
     #[test]
     fn non_finite_provider_scores_and_incomplete_provenance_fail_closed() {
+        assert!(!valid_source_digest(""));
+        assert!(!valid_source_digest("fixture"));
+        assert!(!valid_source_digest("blake3:fixture"));
+        assert!(!valid_source_digest(&format!("blake3:{}", "A".repeat(64))));
+        assert!(!valid_source_digest(&format!("md5:{}", "0".repeat(32))));
+        assert!(valid_source_digest(&format!("blake3:{}", "0".repeat(64))));
+        assert!(valid_source_digest(&format!("sha256:{}", "a".repeat(64))));
+        assert!(valid_source_digest(&format!("git-sha1:{}", "1".repeat(40))));
+
         let mut bad_score = candidate("bad-score", "ɛ", CandidateSource::ModelG2p);
         bad_score.raw_provider_score = Some(f32::NAN);
         let plan = PronunciationPlan {
@@ -835,7 +844,7 @@ mod tests {
         assert!(
             plan.validate()
                 .unwrap_err()
-                .contains("incomplete provenance")
+                .contains("provenance digest")
         );
     }
     #[test]
