@@ -444,22 +444,7 @@ mod tests {
     #[test]
     fn row_orthogonal_transform_preserves_singular_values() {
         let original = &[vec![1.0, 2.0], vec![3.0, -1.0], vec![0.5, 4.0]];
-        let transformed = &[
-            vec![3.0_f64.sqrt(), 0.0, 0.0],
-            vec![0.0, 2.0_f64.sqrt(), 0.0],
-            vec![0.0, 0.0, 0.5_f64.sqrt()],
-        ];
-        let rows = original
-            .iter()
-            .map(|row| {
-                vec![
-                    transformed[0][0] * row[0],
-                    transformed[1][1] * row[1],
-                ]
-            })
-            .collect::<Vec<_>>();
-        // The transform above is a row scaling, not orthogonal; instead compare
-        // a two-row orthogonal rotation embedded in the first two rows.
+        // Apply a 2x2 orthogonal rotation to the first two observation rows.
         let rotated = vec![
             vec![
                 (original[0][0] + original[1][0]) / 2.0_f64.sqrt(),
@@ -473,7 +458,6 @@ mod tests {
         ];
         let baseline = analyze_jacobian(original, &[1.0, 1.0], 1.0e-10).unwrap();
         let rotated_report = analyze_jacobian(&rotated, &[1.0, 1.0], 1.0e-10).unwrap();
-        let _ = (rows, transformed);
         for (left, right) in baseline
             .singular_values
             .iter()
