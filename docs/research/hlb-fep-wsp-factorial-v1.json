@@ -504,7 +504,10 @@
         "model_entropy_before_after_each_trial",
         "winning_semantic_class_log_odds",
         "source_labelled_vs_quotient_metric_delta",
-        "receipt_replay_exactness"
+        "receipt_replay_exactness",
+        "trials_to_model_commitment",
+        "winning_semantic_class_posterior_by_trial",
+        "correct_semantic_class_commitment_rate"
       ],
       "negative_controls": [
         "no_model_information_gain",
@@ -1137,7 +1140,11 @@
     "The repeated three-ball finite-hypothesis evaluator is explicitly labelled a two-step-per-trial adaptation, not an exact reproduction of the published five-move SPM schedule or its continuous Dirichlet parameter-learning path.",
     "Each trial carries only semantic model posterior mass forward and resets the newly sampled hidden-state prior; the environment truth and hidden scene are available only to the evaluator receipt, not the action-selection function.",
     "Posterior entropy may increase after an individual surprising observation; only expected entropy reduction equals mutual information. Tests must not assert per-observation entropy monotonicity.",
-    "Source-labelled and semantic-quotient sequential runs with matched seeds must preserve semantic-class posterior, action scores, and commitment decisions within declared numerical tolerances."
+    "Source-labelled and semantic-quotient sequential runs with matched seeds must preserve semantic-class posterior, action scores, and commitment decisions within declared numerical tolerances.",
+    "Sequential three-ball result receipts bind the pinned SPM demo commit, rule-generator commit, canonical parameterization digest, model-family choice, seed, and deterministic RNG algorithm/version.",
+    "The sequential discovery runner carries only model posterior marginals across independent trials and resets the hidden-state prior; the hidden scene is never an input to action selection and appears only in evaluator-visible receipts.",
+    "Preference schedule values are validated before the first trial, including post-commitment preferences that may not be reached in a finite test episode.",
+    "An exactly certain semantic model posterior is represented in serialized receipts without non-finite JSON numbers; commitment logic treats posterior 1 as infinite log odds while the trace stores an explicit absence marker."
   ],
   "research_references": [
     {
