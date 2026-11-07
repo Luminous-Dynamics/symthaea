@@ -474,6 +474,7 @@ def self_test() -> list[str]:
         "Martian production review adoption; suggestion adoption is not ground-truth correctness",
         "SWE-sweep LoopControlBench 4,068 bugs across 100 repositories and 22 languages 4.7% 9.5% different model/harness snapshot",
         "### 2.7 SWE-sweep ### 2.8 LoopControlBench 46/70 = 65.7% not 65.7% of software bugs generally validator, not the model, decides done",
+        "### 2.9 Saving SWE-Bench prompt-framing evidence",
         "https://swesweep.com/paper https://swesweep.com/ https://github.com/kltownsend/loopcontrolbench",
         "Gold-Completeness and Open-Set Discovery",
         "Sequential Evidence Acquisition",
