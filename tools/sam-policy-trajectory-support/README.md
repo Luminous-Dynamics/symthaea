@@ -40,4 +40,4 @@ The support crate now exposes deterministic content bytes for three exact artifa
 
 These are canonical **content exports**, not hashes or signatures. Consumers choose and apply their digest algorithm to the returned bytes. The format is domain-separated and length-prefixed; a later schema/version change must use a new domain/version. The exports do not authenticate the SAM executable or the source manifest and do not validate the truth of caller-provided evidence.
 
-Tests check joint-action order normalization, query completeness/partial-query sensitivity, and deterministic finite manifest content export.
+Tests check joint-action order normalization, query completeness/partial-query sensitivity, deterministic finite manifest content export, and byte-for-byte golden vectors shared with Symtropy's reciprocal decision-evidence adapter.

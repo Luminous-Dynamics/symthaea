@@ -457,6 +457,54 @@ mod tests {
         assert_ne!(complete.canonical_bytes(), mutated.canonical_bytes());
     }
 
+    fn canonical_vector(name: &str) -> String {
+        include_str!("../fixtures/sam-canonical-artifact-vectors.v0.1.txt")
+            .lines()
+            .find_map(|line| line.strip_prefix(&format!("{name}=")))
+            .expect("canonical vector fixture is present")
+            .to_owned()
+    }
+
+    fn bytes_to_hex(bytes: &[u8]) -> String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for byte in bytes {
+            out.push(HEX[(byte >> 4) as usize] as char);
+            out.push(HEX[(byte & 0x0f) as usize] as char);
+        }
+        out
+    }
+
+    #[test]
+    fn canonical_artifact_exports_match_cross_repository_golden_vectors() {
+        let support = SupportManifest::new(
+            "evidence-v1",
+            "policy-v1",
+            "context-v1",
+            false,
+            vec![],
+        ).unwrap();
+        assert_eq!(bytes_to_hex(&support.canonical_bytes()), canonical_vector("manifest"));
+
+        let query = query(
+            "policy-v1",
+            "context-v1",
+            vec![step(
+                7,
+                "history-7",
+                vec![
+                    action("ego", "continue"),
+                    action("actor-1", "yield"),
+                ],
+            )],
+        );
+        assert_eq!(bytes_to_hex(&query.canonical_bytes()), canonical_vector("query"));
+
+        let assessment = assess(&support, &query).unwrap();
+        assert_eq!(assessment.disposition, Disposition::SupportUnknown);
+        assert_eq!(bytes_to_hex(&assessment.canonical_bytes()), canonical_vector("assessment"));
+    }
+
     #[test]
     fn marginal_actions_do_not_imply_path_support() {
         let corpus = vec![path(&["continue", "continue"]), path(&["yield", "yield"])];
