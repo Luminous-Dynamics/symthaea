@@ -89,6 +89,7 @@ pub enum Finding {
     InvalidNegative { dimension_id: String, field: String },
     InvertedInterval { dimension_id: String, field: String },
     DerivedOverflow { dimension_id: String, field: String },
+    ZeroStockZeroDepletionAmbiguous { dimension_id: String },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -364,6 +365,13 @@ fn assess_resource(
             None
         }
     };
+
+    if matches!((stock, rate), (Some(stock), Some(rate)) if stock.lower == 0.0 && rate.upper == 0.0) {
+        findings.push(Finding::ZeroStockZeroDepletionAmbiguous {
+            dimension_id: dimension_id.clone(),
+        });
+        indeterminate = true;
+    }
 
     let endurance = if !invalid {
         match (stock, rate) {
@@ -749,6 +757,18 @@ mod tests {
         let report = assess_case(&test_case);
         assert_eq!(report.disposition, OverallDisposition::Indeterminate);
         assert!(report.findings.contains(&Finding::MissingUsableStock {
+            dimension_id: "potable_water".to_owned()
+        }));
+    }
+
+    #[test]
+    fn zero_usable_stock_with_zero_depletion_is_indeterminate() {
+        let mut test_case = adequate_case();
+        test_case.resources[0].usable_stock = Some(Interval::new(0.0, 0.0));
+        test_case.resources[0].net_depletion_per_day = Some(Interval::new(0.0, 0.0));
+        let report = assess_case(&test_case);
+        assert_eq!(report.disposition, OverallDisposition::Indeterminate);
+        assert!(report.findings.contains(&Finding::ZeroStockZeroDepletionAmbiguous {
             dimension_id: "potable_water".to_owned()
         }));
     }
