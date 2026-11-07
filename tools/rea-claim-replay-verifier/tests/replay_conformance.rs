@@ -1537,6 +1537,11 @@ fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation
         .as_array()
         .expect("numeric precision warnings are a required result field");
     assert_eq!(warnings.len(), 3);
+    assert_eq!(replay.numeric_precision_warnings.len(), warnings.len());
+    assert_eq!(
+        replay.numeric_precision_warnings[0].integer_value,
+        "9007199254740993"
+    );
     assert_eq!(warnings[0]["source"], json!("asserted_value"));
     assert_eq!(warnings[0]["integer_value"], json!("9007199254740993"));
     assert_eq!(warnings[1]["source"], json!("evidence_record"));
@@ -1549,8 +1554,23 @@ fn independent_replay_reproduces_precision_warnings_and_binds_them_to_derivation
         json!("18446744073709551615")
     );
 
-    // A precision warning is part of the complete derivation, not a UI-only
-    // annotation. Removing or changing it must fail independent replay.
+    // The warning array is required, not a defaulted or UI-only annotation.
+    let mut missing_warnings = result.clone();
+    missing_warnings
+        .as_object_mut()
+        .unwrap()
+        .remove("numeric_precision_warnings");
+    let missing_bytes = serde_json::to_vec(&missing_warnings).unwrap();
+    let error = replay_claim_evaluation(
+        &claim_bytes,
+        &[&evidence_bytes],
+        &missing_bytes,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, ReplayErrorKind::InvalidJson);
+
+    // A precision warning is part of the complete derivation. Changing it
+    // must fail independent replay.
     result["numeric_precision_warnings"][0]["integer_value"] =
         json!("9007199254740992");
     let changed = serde_json::to_vec(&result).unwrap();
