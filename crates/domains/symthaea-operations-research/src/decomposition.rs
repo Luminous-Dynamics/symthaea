@@ -931,6 +931,33 @@ mod tests {
         (full_models, support)
     }
 
+    fn independent_projected_support_scope(
+        problem: &CnfProblem,
+        visible_variables: &[usize],
+    ) -> (u128, BTreeSet<Vec<bool>>) {
+        let rows = 1usize << problem.variables.len();
+        let mut full_models = 0u128;
+        let mut support = BTreeSet::new();
+        for mask in 0..rows {
+            let is_model = problem.clauses.iter().all(|clause| {
+                clause.iter().any(|literal| {
+                    let value = ((mask >> literal.variable) & 1) != 0;
+                    value == literal.positive
+                })
+            });
+            if is_model {
+                full_models += 1;
+                support.insert(
+                    visible_variables
+                        .iter()
+                        .map(|&variable| ((mask >> variable) & 1) != 0)
+                        .collect(),
+                );
+            }
+        }
+        (full_models, support)
+    }
+
     fn all_two_variable_clauses() -> Vec<Vec<Literal>> {
         let literals = [
             Literal::positive(0),
@@ -1472,6 +1499,100 @@ mod tests {
                 assert_eq!(report.full_model_count, expected_full);
                 assert_eq!(report.support, expected_support);
                 assert_eq!(report.projected_count, expected_support.len() as u128);
+            }
+        }
+    }
+
+    #[test]
+    fn generated_three_variable_cnfs_match_independent_truth_table_oracle() {
+        // Deterministic pseudo-random formula generation keeps the corpus
+        // reproducible and dependency-free. It deliberately includes empty
+        // clauses, repeated literals, tautologies and arbitrary clause sizes.
+        let mut state = 0x6a09_e667_f3bc_c909u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            state
+        };
+        let literals = [
+            Literal::positive(0),
+            Literal::negative(0),
+            Literal::positive(1),
+            Literal::negative(1),
+            Literal::positive(2),
+            Literal::negative(2),
+        ];
+
+        for formula_index in 0..512 {
+            let clause_count = (next() % 6) as usize;
+            let mut clauses = Vec::with_capacity(clause_count);
+            for _ in 0..clause_count {
+                let literal_count = (next() % 6) as usize;
+                let mut clause = Vec::with_capacity(literal_count);
+                for _ in 0..literal_count {
+                    clause.push(literals[(next() % literals.len() as u64) as usize]);
+                }
+                clauses.push(clause);
+            }
+
+            let problem = CnfProblem {
+                variables: vec!["x".into(), "y".into(), "z".into()],
+                clauses,
+            };
+            let expected_models = independent_model_count(&problem);
+            assert_eq!(
+                count_models(&problem, budget()).unwrap(),
+                expected_models,
+                "full model count disagreed for generated formula {formula_index}"
+            );
+
+            for split_variable in 0..3 {
+                let report = verify_branch_sum(&problem, split_variable, budget()).unwrap();
+                let false_count = (0..8usize)
+                    .filter(|mask| {
+                        ((mask >> split_variable) & 1) == 0
+                            && problem.clauses.iter().all(|clause| {
+                                clause.iter().any(|literal| {
+                                    let value = ((mask >> literal.variable) & 1) != 0;
+                                    value == literal.positive
+                                })
+                            })
+                    })
+                    .count() as u128;
+                let true_count = (0..8usize)
+                    .filter(|mask| {
+                        ((mask >> split_variable) & 1) != 0
+                            && problem.clauses.iter().all(|clause| {
+                                clause.iter().any(|literal| {
+                                    let value = ((mask >> literal.variable) & 1) != 0;
+                                    value == literal.positive
+                                })
+                            })
+                    })
+                    .count() as u128;
+                assert_eq!(report.direct_source_count, expected_models);
+                assert_eq!(report.false_branch_count, false_count);
+                assert_eq!(report.true_branch_count, true_count);
+                assert_eq!(report.aggregate_count, expected_models);
+            }
+
+            // Cover every visible scope: empty, each singleton, each pair,
+            // and the complete universe.
+            for visible_mask in 0..8usize {
+                let visible: Vec<usize> = (0..3)
+                    .filter(|variable| ((visible_mask >> variable) & 1) != 0)
+                    .collect();
+                let (expected_full, expected_support) =
+                    independent_projected_support_scope(&problem, &visible);
+                let report = verify_projected_support(&problem, &visible, budget()).unwrap();
+                assert_eq!(report.full_model_count, expected_full);
+                assert_eq!(report.support, expected_support);
+                assert_eq!(
+                    report.projected_count,
+                    expected_support.len() as u128,
+                    "projected count disagreed for formula {formula_index}, scope {visible_mask}"
+                );
             }
         }
     }
