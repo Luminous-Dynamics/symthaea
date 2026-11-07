@@ -1231,7 +1231,7 @@ mod tests {
     #[test]
     fn negative_probability_potential_fails_closed_for_the_whole_family() {
         let negative = graph([q(1, 1), q(-1, 1)]);
-        let id = digest(&negative);
+        let id = "a".repeat(64); // Valid syntax; invalid models cannot be canonically encoded.
         let models = [FiniteModelRef { model_digest: &id, graph: &negative }];
 
         assert!(matches!(
