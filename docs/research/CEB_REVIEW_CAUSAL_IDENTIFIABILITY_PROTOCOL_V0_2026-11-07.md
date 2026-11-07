@@ -81,6 +81,24 @@ Use the following wording discipline:
 **Relationship to the literature:** actual-causality fault localization such as SoftReX addresses responsibility/actual-cause questions over an execution- and mutation-grounded evaluation; dynamic slicing such as CausalRepair identifies executed dependencies relevant to a failing test; partially observed SCM theory studies whether interventional quantities are identified across compatible causal models. These are complementary constructs, not alternative names for one task. CEB must preserve each paper's target claim and evidence assumptions.
 
 
+
+### 2.4 The burden of proof is asymmetric
+
+A single valid pair of evidence-compatible models that predicts different outcomes for the same query is sufficient to demonstrate **non-identifiability** within the declared scope.
+
+The converse does not hold: failing to discover a competing model does not establish **identifiability**. A positive identified disposition requires a defensible completeness argument for the relevant model class and scope. The reviewer must state:
+
+- which source, caller, dependency, feature, target, environment and event-state space is included;
+- why relevant alternatives outside that boundary cannot affect the claim/query, or why they are explicitly excluded;
+- which structural, policy or causal assumptions close the model class;
+- how uninspected callers, hidden state, latent context, measurement/selection processes and alternate paths were audited;
+- what open-world remainder remains unknown.
+
+If the model class is closed only by an assumption (for example, “these are the only in-scope callers”), label the result **identified conditional on that assumption**. The assumption is part of the claim and must be visible. If the boundary/completeness argument is not defensible, use \`partially_identified\` or \`unresolved\` even if the reviewer did not find a counterexample.
+
+Do not reward breadth of imagination or unlimited alternative generation. A non-identifiability witness must be materially compatible with the evidence, and a completeness argument must be auditable against a concrete scope boundary. This is a rigor requirement, not a confidence score.
+
+
 ## 3. Evidence-compatible alternative models
 
 For each material claim, the reviewer records:
