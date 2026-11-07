@@ -442,9 +442,7 @@ fn constant_suffix_function(
                 key[dependency_index] = assignment[dependency];
             }
         }
-        for (free_index, &dependency_index) in
-            free_dependency_positions.iter().enumerate()
-        {
+        for (free_index, &dependency_index) in free_dependency_positions.iter().enumerate() {
             key[dependency_index] = ((mask >> free_index) & 1) != 0;
         }
         table.insert(key, value);
@@ -581,9 +579,7 @@ fn search(
             .partial_matrix_checks
             .checked_add(1)
             .ok_or(QuantifiedStrategyError::ResourceAccountingOverflow)?;
-        if let Some(value) =
-            partial_matrix_value(problem, assignment, variable_positions, position)
-        {
+        if let Some(value) = partial_matrix_value(problem, assignment, variable_positions, position) {
             if value {
                 stats.early_true_prunes = stats
                     .early_true_prunes
@@ -777,10 +773,7 @@ fn ordered_prefix(prefix: &ValidatedQuantifierPrefix) -> Vec<(Quantifier, usize)
         .collect()
 }
 
-fn variable_positions(
-    variable_count: usize,
-    order: &[(Quantifier, usize)],
-) -> Vec<usize> {
+fn variable_positions(variable_count: usize, order: &[(Quantifier, usize)]) -> Vec<usize> {
     let mut positions = vec![usize::MAX; variable_count];
     for (position, &(_, variable)) in order.iter().enumerate() {
         positions[variable] = position;
@@ -1190,7 +1183,10 @@ mod tests {
             .find(|function| function.variable == 3)
             .unwrap();
         assert_eq!(x.dependencies, vec![0]);
-        assert_eq!(x.table, BTreeMap::from([(vec![false], true), (vec![true], true)]));
+        assert_eq!(
+            x.table,
+            BTreeMap::from([(vec![false], true), (vec![true], true)])
+        );
         assert_eq!(z.dependencies, vec![0, 2]);
         assert_eq!(
             z.table,
