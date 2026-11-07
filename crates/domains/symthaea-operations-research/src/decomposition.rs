@@ -48,7 +48,7 @@ pub struct CnfProblem {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnumerationBudget {
     pub max_variables: usize,
-    pub max_assignments: u128,
+    pub max_total_assignment_evaluations: u128,
     pub max_projection_support: usize,
 }
 
@@ -56,7 +56,7 @@ impl Default for EnumerationBudget {
     fn default() -> Self {
         Self {
             max_variables: 20,
-            max_assignments: 1 << 20,
+            max_total_assignment_evaluations: 1 << 20,
             max_projection_support: 1 << 20,
         }
     }
@@ -121,6 +121,23 @@ fn validate_problem(problem: &CnfProblem) -> Result<(), DecompositionError> {
     Ok(())
 }
 
+fn check_total_assignment_evaluations(
+    variable_counts: &[usize],
+    budget: EnumerationBudget,
+) -> Result<(), DecompositionError> {
+    let total = variable_counts.iter().try_fold(0u128, |sum, &count| {
+        sum.checked_add(assignment_count(count, budget)?)
+            .ok_or(DecompositionError::CountOverflow)
+    })?;
+    if total > budget.max_total_assignment_evaluations {
+        return Err(DecompositionError::AssignmentBudgetExceeded {
+            required: total,
+            limit: budget.max_total_assignment_evaluations,
+        });
+    }
+    Ok(())
+}
+
 fn assignment_count(
     variable_count: usize,
     budget: EnumerationBudget,
@@ -138,10 +155,10 @@ fn assignment_count(
         .checked_shl(shift)
         .ok_or(DecompositionError::AssignmentSpaceOverflow { variable_count })?;
 
-    if required > budget.max_assignments {
+    if required > budget.max_total_assignment_evaluations {
         return Err(DecompositionError::AssignmentBudgetExceeded {
             required,
-            limit: budget.max_assignments,
+            limit: budget.max_total_assignment_evaluations,
         });
     }
     Ok(required)
@@ -247,9 +264,19 @@ pub fn verify_branch_sum(
         });
     }
 
+    let false_child = cofactor(problem, split_variable, false)?;
+    let true_child = cofactor(problem, split_variable, true)?;
+    check_total_assignment_evaluations(
+        &[
+            problem.variables.len(),
+            false_child.variables.len(),
+            true_child.variables.len(),
+        ],
+        budget,
+    )?;
     let source_count = count_models(problem, budget)?;
-    let false_count = count_models(&cofactor(problem, split_variable, false)?, budget)?;
-    let true_count = count_models(&cofactor(problem, split_variable, true)?, budget)?;
+    let false_count = count_models(&false_child, budget)?;
+    let true_count = count_models(&true_child, budget)?;
     let aggregate = false_count
         .checked_add(true_count)
         .ok_or(DecompositionError::CountOverflow)?;
@@ -361,6 +388,11 @@ pub fn verify_independent_product(
             }
         }
     }
+
+    let mut enumeration_sizes = Vec::with_capacity(components.len() + 1);
+    enumeration_sizes.push(problem.variables.len());
+    enumeration_sizes.extend(components.iter().map(Vec::len));
+    check_total_assignment_evaluations(&enumeration_sizes, budget)?;
 
     let source_count = count_models(problem, budget)?;
     let mut component_counts = Vec::with_capacity(components.len());
@@ -515,7 +547,7 @@ mod tests {
     fn budget() -> EnumerationBudget {
         EnumerationBudget {
             max_variables: 8,
-            max_assignments: 1 << 8,
+            max_total_assignment_evaluations: 1 << 8,
             max_projection_support: 1 << 8,
         }
     }
@@ -641,7 +673,7 @@ mod tests {
     fn resource_limit_is_unknown_not_zero_models() {
         let tight = EnumerationBudget {
             max_variables: 8,
-            max_assignments: 4,
+            max_total_assignment_evaluations: 4,
             max_projection_support: 8,
         };
         assert_eq!(
