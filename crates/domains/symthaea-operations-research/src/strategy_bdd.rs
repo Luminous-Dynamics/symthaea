@@ -166,6 +166,17 @@ pub struct StrategyBddReport {
     pub assignments_checked: u128,
 }
 
+/// Result of deterministic BDD variable-order sifting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyBddSiftingReport {
+    pub initial_variable_order: Vec<usize>,
+    pub optimized_variable_order: Vec<usize>,
+    pub initial_node_count: usize,
+    pub optimized_node_count: usize,
+    pub order_evaluations: usize,
+    pub bdd: ReducedOrderedBdd,
+}
+
 fn checked_power_of_two(exponent: usize) -> Result<u128, StrategyBddError> {
     let shift = u32::try_from(exponent).map_err(|_| StrategyBddError::AssignmentSpaceOverflow {
         dependency_count: exponent,
@@ -279,19 +290,61 @@ fn build_level(
     Ok(BddRef::Node(index))
 }
 
-/// Compile a complete strategy truth table into an ROBDD for its dependency
-/// order. Node IDs are assigned deterministically in post-order.
+/// Validate that a decision order is a permutation of the semantic
+/// dependency indices.
+fn validate_variable_order(
+    dependency_count: usize,
+    variable_order: &[usize],
+) -> Result<(), StrategyBddError> {
+    if variable_order.len() != dependency_count {
+        return Err(StrategyBddError::VariableOrderLengthMismatch {
+            expected: dependency_count,
+            actual: variable_order.len(),
+        });
+    }
+    let mut seen = vec![false; dependency_count];
+    for (position, &dependency_index) in variable_order.iter().enumerate() {
+        if dependency_index >= dependency_count {
+            return Err(StrategyBddError::VariableOrderEntryOutOfRange {
+                position,
+                dependency_index,
+                dependency_count,
+            });
+        }
+        if seen[dependency_index] {
+            return Err(StrategyBddError::DuplicateVariableOrderEntry { dependency_index });
+        }
+        seen[dependency_index] = true;
+    }
+    Ok(())
+}
+
+/// Compile a strategy function using its semantic dependency order as the
+/// default BDD decision order.
 pub fn compile_strategy_function_to_robdd(
     function: &BooleanStrategyFunction,
     budget: StrategyBddBudget,
 ) -> Result<ReducedOrderedBdd, StrategyBddError> {
+    let variable_order: Vec<usize> = (0..function.dependencies.len()).collect();
+    compile_strategy_function_to_robdd_with_order(function, &variable_order, budget)
+}
+
+/// Compile using a chosen permutation of dependency indices. Semantic scope
+/// order is preserved; only the order in which the BDD tests those variables
+/// changes.
+pub fn compile_strategy_function_to_robdd_with_order(
+    function: &BooleanStrategyFunction,
+    variable_order: &[usize],
+    budget: StrategyBddBudget,
+) -> Result<ReducedOrderedBdd, StrategyBddError> {
     validate_truth_table(function, budget)?;
+    validate_variable_order(function.dependencies.len(), variable_order)?;
     let mut nodes = Vec::new();
     let mut unique = BTreeMap::new();
-    let mut prefix = Vec::with_capacity(function.dependencies.len());
+    let mut prefix = vec![false; function.dependencies.len()];
     let root = build_level(
         0,
-        &function.dependencies,
+        variable_order,
         &function.table,
         &mut prefix,
         &mut nodes,
@@ -300,6 +353,7 @@ pub fn compile_strategy_function_to_robdd(
     )?;
     let bdd = ReducedOrderedBdd {
         dependencies: function.dependencies.clone(),
+        variable_order: variable_order.to_vec(),
         nodes,
         root,
     };
@@ -310,6 +364,15 @@ pub fn compile_strategy_function_to_robdd(
 /// Check topological node numbering, increasing variable order, reduction,
 /// uniqueness, and root/edge validity without consulting the source function.
 pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
+    validate_variable_order(bdd.dependencies.len(), &bdd.variable_order)?;
+
+    let mut dependencies_seen = BTreeSet::new();
+    for &variable in &bdd.dependencies {
+        if !dependencies_seen.insert(variable) {
+            return Err(StrategyBddError::DuplicateDependencyVariable { variable });
+        }
+    }
+
     if let BddRef::Node(root) = bdd.root {
         if root >= bdd.nodes.len() {
             return Err(StrategyBddError::RootNodeOutOfRange {
@@ -317,6 +380,11 @@ pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
                 node_count: bdd.nodes.len(),
             });
         }
+    }
+
+    let mut dependency_rank = vec![usize::MAX; bdd.dependencies.len()];
+    for (rank, &dependency_index) in bdd.variable_order.iter().enumerate() {
+        dependency_rank[dependency_index] = rank;
     }
 
     let mut unique = BTreeMap::new();
@@ -344,7 +412,7 @@ pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
                     return Err(StrategyBddError::NonTopologicalEdge { parent, child });
                 }
                 let child_dependency = bdd.nodes[child].dependency_index;
-                if child_dependency <= node.dependency_index {
+                if dependency_rank[child_dependency] <= dependency_rank[node.dependency_index] {
                     return Err(StrategyBddError::DependencyOrderViolation {
                         parent,
                         child,
@@ -363,6 +431,29 @@ pub fn validate_robdd(bdd: &ReducedOrderedBdd) -> Result<(), StrategyBddError> {
             });
         }
         unique.insert(key, parent);
+    }
+
+    // Every serialized node contributes to the claimed circuit size. Reject
+    // detached padding nodes rather than reporting inflated/non-canonical DAGs.
+    let mut reachable = vec![false; bdd.nodes.len()];
+    let mut pending = Vec::new();
+    if let BddRef::Node(root) = bdd.root {
+        pending.push(root);
+    }
+    while let Some(node_index) = pending.pop() {
+        if reachable[node_index] {
+            continue;
+        }
+        reachable[node_index] = true;
+        let node = &bdd.nodes[node_index];
+        for child in [node.low, node.high] {
+            if let BddRef::Node(child_index) = child {
+                pending.push(child_index);
+            }
+        }
+    }
+    if let Some(node) = reachable.iter().position(|visited| !visited) {
+        return Err(StrategyBddError::UnreachableNode { node });
     }
     Ok(())
 }
