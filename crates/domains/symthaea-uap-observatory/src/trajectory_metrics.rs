@@ -306,7 +306,6 @@ pub fn ospa2_track_sets(
     } else {
         (estimates, truth)
     };
-    let row_count = rows.len();
     let column_count = columns.len();
     if column_count > MAX_OSPA2_ASSIGNMENT_SIDE {
         return Err(Ospa2Error::AssignmentSideTooLarge {
@@ -375,10 +374,6 @@ pub fn ospa2_track_sets(
 mod tests {
     use super::*;
     use crate::tracking_metrics::{GospaConfig, gospa_frame};
-
-    fn point(x: f64) -> Option<Vector3> {
-        Some(Vector3::new(x, 0.0, 0.0))
-    }
 
     fn track(track_id: &str, xs: &[Option<f64>]) -> TrackSeries {
         TrackSeries {
