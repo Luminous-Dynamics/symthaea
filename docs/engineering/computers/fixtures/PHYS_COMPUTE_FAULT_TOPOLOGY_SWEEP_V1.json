@@ -180,5 +180,111 @@
       "assumption": "Independent identical Bernoulli channel failures only.",
       "caveat": "Spatially correlated defects, common-mode failures, nonuniform channel quality and aging invalidate the simple binomial model; use empirical device distributions and explicit availability requirements."
     }
+  },
+  "beta_binomial_correlated_channel_survival": {
+    "model": "exchangeable_beta_binomial",
+    "purpose": "stress-test sensitivity to common-cause variation in channel survival; not a spatial fault model or device-specific yield estimate",
+    "required_active_channels": 32,
+    "marginal_mean_survival": 0.61,
+    "parameterization": {
+      "rho_0": "independent binomial limit",
+      "rho_positive": "P~Beta(alpha,beta); X|P~Binomial(n,P); alpha=p*(1/rho-1), beta=(1-p)*(1/rho-1)",
+      "intraclass_correlation": "rho = 1/(alpha+beta+1)"
+    },
+    "rows": [
+      {
+        "rho": 0,
+        "p_at_least_32_with_53_installed": 0.5960826243149102,
+        "targets": {
+          "0.95": 63,
+          "0.99": 68,
+          "0.999": 74,
+          "0.9999": 79
+        }
+      },
+      {
+        "rho": 0.001,
+        "p_at_least_32_with_53_installed": 0.5940681649530533,
+        "targets": {
+          "0.95": 63,
+          "0.99": 68,
+          "0.999": 75,
+          "0.9999": 80
+        }
+      },
+      {
+        "rho": 0.005,
+        "p_at_least_32_with_53_installed": 0.5873589192735172,
+        "targets": {
+          "0.95": 64,
+          "0.99": 71,
+          "0.999": 78,
+          "0.9999": 85
+        }
+      },
+      {
+        "rho": 0.01,
+        "p_at_least_32_with_53_installed": 0.5811106773392263,
+        "targets": {
+          "0.95": 66,
+          "0.99": 73,
+          "0.999": 83,
+          "0.9999": 92
+        }
+      },
+      {
+        "rho": 0.02,
+        "p_at_least_32_with_53_installed": 0.5727056513714209,
+        "targets": {
+          "0.95": 69,
+          "0.99": 79,
+          "0.999": 93,
+          "0.9999": 107
+        }
+      },
+      {
+        "rho": 0.05,
+        "p_at_least_32_with_53_installed": 0.5608718919191079,
+        "targets": {
+          "0.95": 79,
+          "0.99": 98,
+          "0.999": 128,
+          "0.9999": 165
+        }
+      },
+      {
+        "rho": 0.1,
+        "p_at_least_32_with_53_installed": 0.5545789718231642,
+        "targets": {
+          "0.95": 96,
+          "0.99": 137,
+          "0.999": 220,
+          "0.9999": 344
+        }
+      },
+      {
+        "rho": 0.2,
+        "p_at_least_32_with_53_installed": 0.5536988624987238,
+        "targets": {
+          "0.95": 146,
+          "0.99": 289,
+          "0.999": 755,
+          "0.9999": 1951
+        }
+      }
+    ],
+    "caveats": [
+      "Intraclass correlations are hypothetical stress-test parameters, not measured device values.",
+      "Exchangeable correlation is not spatial correlation; it does not model adjacent-cell clusters, row/column geometry or wafer maps.",
+      "At rho=0.2 and 99% target, n=289 is a model output, not a production recommendation.",
+      "Physical design must use multi-die, multi-lot, temperature and aging measurements and a spatial/hierarchical reliability model.",
+      "Raw two-factor parameter ratio excludes differential pairs, compensation, routing, peripheral circuits, calibration, power/control domains and yield."
+    ],
+    "reproducibility": {
+      "script": "research/physical_compute/beta_binomial_redundancy.py",
+      "dependencies": "Python standard library only",
+      "validation": "Executed locally; 99% minimum channel counts match independent SciPy beta-binomial calculations to numerical tolerance.",
+      "status": "research calculator, not production reliability software"
+    }
   }
 }
