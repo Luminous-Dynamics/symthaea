@@ -148,6 +148,10 @@ impl Error for ClosedError {}
 pub struct ElementaryClaim {
     pub claim_id: String,
     pub null_spec_sha256: String,
+    pub global_filtration_sha256: String,
+    pub confirmation_split_sha256: String,
+    pub component_validity_receipt_sha256: String,
+    pub component_status: String,
     /// E_0,...,E_T. Every process must start at one.
     pub e_process_values: Vec<Rational>,
 }
@@ -262,9 +266,34 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
         if claim.claim_id.is_empty() || !ids.insert(claim.claim_id.as_str()) {
             return Err(ClosedError("empty or duplicate elementary claim ID".into()));
         }
-        if !valid_digest(&claim.null_spec_sha256) {
+        for (label, digest) in [
+            ("null specification", claim.null_spec_sha256.as_str()),
+            ("claim global filtration", claim.global_filtration_sha256.as_str()),
+            ("claim confirmation split", claim.confirmation_split_sha256.as_str()),
+            ("component validity receipt", claim.component_validity_receipt_sha256.as_str()),
+        ] {
+            if !valid_digest(digest) {
+                return Err(ClosedError(format!(
+                    "malformed {label} digest for {}",
+                    claim.claim_id
+                )));
+            }
+        }
+        if claim.global_filtration_sha256 != family.global_filtration_sha256 {
             return Err(ClosedError(format!(
-                "malformed null specification digest for {}",
+                "{} is not bound to the common global filtration",
+                claim.claim_id
+            )));
+        }
+        if claim.confirmation_split_sha256 != family.confirmation_split_sha256 {
+            return Err(ClosedError(format!(
+                "{} is not bound to the common confirmation split",
+                claim.claim_id
+            )));
+        }
+        if claim.component_status != "VALIDATED_GLOBAL_FILTRATION_EPROCESS" {
+            return Err(ClosedError(format!(
+                "{} lacks a validated global-filtration e-process receipt",
                 claim.claim_id
             )));
         }
@@ -284,7 +313,6 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
     let threshold = Rational::one().checked_div(family.alpha)?;
     let intersection_count = (1usize << claim_count) - 1;
     let mut intersections = Vec::with_capacity(intersection_count);
-    let mut first_crossing_by_mask = vec![None; intersection_count + 1];
     let mut rejection_by_mask = vec![Vec::new(); intersection_count + 1];
 
     // Enumerate all nonempty subsets. For each I, E_I is the fixed equal
@@ -320,7 +348,6 @@ pub fn audit_closed_family(family: &ClosedFamily) -> Result<ClosedAudit, ClosedE
             rejection_path.push(crossed);
         }
 
-        first_crossing_by_mask[mask] = first_crossing_stage;
         rejection_by_mask[mask] = rejection_path.clone();
         let claim_ids = member_indices
             .iter()
@@ -392,6 +419,10 @@ mod tests {
         ElementaryClaim {
             claim_id: id.into(),
             null_spec_sha256: digest(null_byte),
+            global_filtration_sha256: digest('2'),
+            confirmation_split_sha256: digest('3'),
+            component_validity_receipt_sha256: digest('d'),
+            component_status: "VALIDATED_GLOBAL_FILTRATION_EPROCESS".into(),
             e_process_values: path.to_vec(),
         }
     }
@@ -495,6 +526,27 @@ mod tests {
     fn rejects_mixed_global_filtrations() {
         let mut family = fixture();
         family.global_filtration_sha256 = digest('9');
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
+    fn rejects_claim_with_mixed_global_filtration_receipt() {
+        let mut family = fixture();
+        family.claims[1].global_filtration_sha256 = digest('9');
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
+    fn rejects_claim_with_mixed_confirmation_split() {
+        let mut family = fixture();
+        family.claims[1].confirmation_split_sha256 = digest('9');
+        assert!(audit_closed_family(&family).is_err());
+    }
+
+    #[test]
+    fn rejects_claim_without_component_validity_receipt() {
+        let mut family = fixture();
+        family.claims[1].component_status = "LOCAL_FILTRATION_ONLY".into();
         assert!(audit_closed_family(&family).is_err());
     }
 
