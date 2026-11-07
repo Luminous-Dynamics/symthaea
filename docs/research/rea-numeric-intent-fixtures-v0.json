@@ -305,5 +305,73 @@
       "expected_authority": "none",
       "reason": "A scale-two fixed decimal profile rejects a scale-one token when exact scale is required."
     }
+  ],
+  "profile_rule_examples": [
+    {
+      "id": "binary64-temperature-measurement",
+      "intent": "binary64",
+      "path": "/sensor/temperatureC",
+      "unit_ref": {
+        "profile_id": "quantity-units",
+        "profile_version": "1.0.0",
+        "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quantity_kind": "thermodynamic_temperature"
+      },
+      "negative_zero_policy": "reject",
+      "exponent_form_policy": "allow",
+      "overflow_policy": "reject",
+      "underflow_policy": "reject",
+      "maximum_significant_digits": 17,
+      "precision_policy": "allow_ecmascript_binary64_rounding",
+      "comparison": {
+        "mode": "absolute_tolerance",
+        "absolute_tolerance_decimal": "0.01"
+      }
+    },
+    {
+      "id": "safe-integer-observation-counter",
+      "intent": "safe_integer",
+      "path": "/counter",
+      "unit_ref": null,
+      "signedness": "unsigned",
+      "minimum_decimal": "0",
+      "maximum_decimal": "9007199254740991",
+      "token_form": "integer_token_only"
+    },
+    {
+      "id": "exact-unsigned-64-sequence",
+      "intent": "exact_integer_string",
+      "path": "/sequence",
+      "unit_ref": null,
+      "signedness": "unsigned",
+      "minimum_decimal": "0",
+      "maximum_decimal": "18446744073709551615",
+      "grammar": "canonical_decimal_integer",
+      "width_bits": 64
+    },
+    {
+      "id": "fixed-decimal-usd-amount",
+      "intent": "fixed_decimal_string",
+      "path": "/amount",
+      "unit_ref": {
+        "profile_id": "currency-units",
+        "profile_version": "1.0.0",
+        "profile_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "quantity_kind": "currency_amount"
+      },
+      "maximum_precision": 18,
+      "scale": 2,
+      "trailing_zero_policy": "require_exact_scale",
+      "rounding_mode": "reject",
+      "grammar": "canonical_base10_decimal_string"
+    },
+    {
+      "id": "opaque-vendor-number",
+      "intent": "opaque_numeric",
+      "path": "/vendor/code",
+      "accepted_json_type": "number",
+      "arithmetic_authority": "none",
+      "equivalence_authority": "none"
+    }
   ]
 }
