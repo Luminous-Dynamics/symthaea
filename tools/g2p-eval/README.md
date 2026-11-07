@@ -10,7 +10,7 @@ Each JSONL reference record represents one lexical item or fixed phrase:
 - `expected_oov`;
 - zero or more accepted pronunciation variants. Each variant contains canonical IPA phone tokens, exclusive syllable-ending phone indices, and one stress value per syllable (0 none, 1 primary, 2 secondary).
 
-Each candidate JSONL record carries the same case ID, candidate/system identity, source identity, canonical phone tokens, optional syllable boundaries and stress values, OOV decision, and optional probability that the complete pronunciation is exactly correct. A backend may omit syllable boundaries or stress; those metrics remain null while phone error rate is still calculated. An OOV candidate must return empty phones and null syllable metadata.
+Each candidate JSONL record carries the same case ID, candidate/system identity, source identity, explicit language tag, canonical phone tokens, optional syllable boundaries and stress values, OOV decision, and optional probability that the complete pronunciation is exactly correct. Candidate and reference language tags must match case-by-case. A backend may omit syllable boundaries or stress; those metrics remain null while phone error rate is still calculated. An OOV candidate must return empty phones and null syllable metadata.
 
 Accepted variants are explicit so contextual heteronyms and dialect variants can be represented without treating one dictionary entry as universal truth. The evaluator selects the candidate's closest accepted variant using deterministic phone-edit, boundary-error, and stress-error tie-breaking.
 
@@ -18,7 +18,7 @@ Accepted variants are explicit so contextual heteronyms and dialect variants can
 
 - In-vocabulary phone error rate: (substitutions + deletions + insertions) / in-vocabulary reference phone count. OOV cases are excluded from this denominator and numerator; guessed phones on an OOV case remain visible in the case-level candidate phone count and are evaluated separately by OOV detection.
 - Exact pronunciation rate by case.
-- Syllable-boundary precision, recall, and F1; final utterance terminators are excluded from internal-boundary scoring.
+- Syllable-boundary precision, recall, and F1 only when phone sequences are exactly aligned; indices are not compared across phone insertions/deletions. Final utterance terminators are excluded from internal-boundary scoring.
 - Lexical stress accuracy on cases where reference and candidate syllable counts agree.
 - OOV precision, recall, F1, and accuracy.
 - Optional Brier score for a system-provided exact-pronunciation confidence. It is omitted if no such probability is supplied.
