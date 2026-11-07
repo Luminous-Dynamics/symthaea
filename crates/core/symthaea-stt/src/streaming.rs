@@ -520,6 +520,8 @@ pub struct StreamSession {
     phonemes: Vec<String>,
     /// Word boundaries
     boundaries: Vec<usize>,
+    /// Phoneme positions at which source audio discontinuities occurred.
+    discontinuity_boundaries: Vec<usize>,
     /// Is session active
     active: bool,
 }
@@ -531,6 +533,7 @@ impl StreamSession {
             processor: StreamProcessor::new(config),
             phonemes: Vec::new(),
             boundaries: Vec::new(),
+            discontinuity_boundaries: Vec::new(),
             active: false,
         }
     }
@@ -546,6 +549,7 @@ impl StreamSession {
         self.processor.reset();
         self.phonemes.clear();
         self.boundaries.clear();
+        self.discontinuity_boundaries.clear();
     }
 
     /// Stop the session
@@ -565,6 +569,10 @@ impl StreamSession {
         let mut new_phonemes = Vec::new();
 
         for frame in frames {
+            if frame.discontinuity_before {
+                self.discontinuity_boundaries.push(self.phonemes.len());
+            }
+
             if let Some(phoneme) = frame.phoneme {
                 // Collapse repeated phonemes
                 if self.phonemes.last() != Some(&phoneme) {
@@ -604,6 +612,14 @@ impl StreamSession {
         }
 
         format!("/{result}/")
+    }
+
+    /// Phoneme offsets at which audio discontinuities occurred.
+    ///
+    /// Consumers must not interpret phoneme sequences on opposite sides of
+    /// these offsets as one continuous acoustic observation.
+    pub fn discontinuity_boundaries(&self) -> &[usize] {
+        &self.discontinuity_boundaries
     }
 
     /// Is session active
