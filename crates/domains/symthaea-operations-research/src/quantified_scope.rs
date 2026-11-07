@@ -296,7 +296,9 @@ impl ValidatedQuantifierPrefix {
             });
         };
         if quantifier != Quantifier::ForAll {
-            return Err(QuantifierScopeError::NotUniversal { variable: universal });
+            return Err(QuantifierScopeError::NotUniversal {
+                variable: universal,
+            });
         }
         if declared.len() > self.variable_count {
             return Err(
@@ -570,7 +572,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            prefix.validate_herbrand_dependencies(2, &[0, 0]).unwrap_err(),
+            prefix
+                .validate_herbrand_dependencies(2, &[0, 0])
+                .unwrap_err(),
             QuantifierScopeError::DuplicateHerbrandDependency {
                 universal: 2,
                 dependency: 0,
@@ -592,7 +596,9 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            prefix.validate_herbrand_dependencies(3, &[2, 0]).unwrap_err(),
+            prefix
+                .validate_herbrand_dependencies(3, &[2, 0])
+                .unwrap_err(),
             QuantifierScopeError::StrategyDependencyOrderMismatch {
                 variable: 3,
                 dependency: 0,
