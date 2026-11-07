@@ -37,6 +37,7 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
           python3 - <<'PY'
+          import hashlib
           import json
           from fractions import Fraction
           from itertools import combinations
@@ -60,7 +61,35 @@ jobs:
           threshold = 1 / alpha
           assert fixture["oracle_expectations"]["threshold"] == str(threshold)
           assert fixture["oracle_expectations"]["intersection_count"] == len(actual)
-          print("closed anytime-FWER schema/subset oracle: PASS")
+          ledger = fixture["global_ledger"]
+          assert ledger["campaign_id"] == fixture["campaign_id"]
+          assert ledger["global_filtration_sha256"] == fixture["global_filtration_sha256"]
+          event_sequences = {
+              entry["payload"]["event_id"]: entry["sequence"]
+              for entry in ledger["entries"] if entry["kind"] == "EVIDENCE"
+          }
+          for claim in claims:
+              path_bytes = ("symthaea-eprocess-path-v1\\n" + "".join(x + "\\n" for x in claim["e_process_values"])).encode()
+              path_sha = hashlib.sha256(path_bytes).hexdigest()
+              admission = claim["filtration_admission"]
+              assert claim["e_process_path_sha256"] == path_sha
+              assert admission["output_process_sha256"] == path_sha
+              assert admission["campaign_id"] == fixture["campaign_id"]
+              assert admission["process_id"] == claim["claim_id"]
+              assert admission["null_spec_sha256"] == claim["null_spec_sha256"]
+              assert admission["proof_receipt_sha256"] == claim["component_validity_receipt_sha256"]
+              assert admission["target_filtration_sha256"] == fixture["global_filtration_sha256"]
+              assert admission["mode"] in ("DIRECT_GLOBAL_SUPERMARTINGALE", "ADJUSTER_LIFTED")
+              assert all(event_id in event_sequences and event_sequences[event_id] < admission["process_output_sequence"]
+                         for event_id in admission["observed_event_ids"])
+              if admission["mode"] == "ADJUSTER_LIFTED":
+                  adjuster = admission["adjuster"]
+                  assert adjuster["source_process_sha256"] == admission["input_process_sha256"]
+                  assert adjuster["source_filtration_sha256"] == admission["source_filtration_sha256"]
+                  assert adjuster["target_filtration_sha256"] == admission["target_filtration_sha256"]
+                  assert adjuster["theorem_assumptions_sha256"] == admission["assumption_sha256"]
+                  assert adjuster["lifted_output_sha256"] == path_sha
+          print("closed anytime-FWER schema/admission/path oracle: PASS")
           PY
       - name: Format standalone Rust crate
         run: cargo fmt --manifest-path tools/connectome-closed-anytime-fwer/Cargo.toml -- --check
