@@ -67,11 +67,6 @@ pub mod orchestrator;
 #[cfg(feature = "singing")]
 pub mod singing;
 
-// Physical vocal-tract singing backend. It shares VocalPerformance with the
-// neural singing renderers and is enabled only with the complete singing stack.
-#[cfg(feature = "singing")]
-pub mod functional_singing;
-
 // Newer Kokoro-based singing pipeline (real STFT phase vocoder + acoustic-
 // boundary phoneme/syllable alignment, see kokoro_singing.rs module docs)
 // -- these files landed via a merge but were never wired into the module
