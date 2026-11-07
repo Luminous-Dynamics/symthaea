@@ -311,9 +311,7 @@ impl VocalPerformance {
                     || phoneme.natural_duration_s <= 0.0
                     || phoneme.stress > 2
                 {
-                    bail!(
-                        "invalid phoneme {phoneme_index} in vocal syllable {syllable_index}"
-                    );
+                    bail!("invalid phoneme {phoneme_index} in vocal syllable {syllable_index}");
                 }
             }
 
@@ -321,9 +319,7 @@ impl VocalPerformance {
             for (melisma_index, melisma) in syllable.melisma_notes.iter().enumerate() {
                 let melisma_end = validate_note(
                     melisma,
-                    &format!(
-                        "melisma note {melisma_index} in vocal syllable {syllable_index}"
-                    ),
+                    &format!("melisma note {melisma_index} in vocal syllable {syllable_index}"),
                 )?;
                 if melisma.start_time < previous_note_end {
                     bail!(
@@ -421,7 +417,6 @@ fn validate_note(note: &Note, context: &str) -> Result<f32> {
     }
     Ok(end_time)
 }
-
 
 impl VocalSyllable {
     pub fn notes(&self) -> impl Iterator<Item = &Note> {
@@ -613,5 +608,4 @@ mod tests {
             .to_string();
         assert!(error.contains("insufficient melody notes"), "{error}");
     }
-
 }
