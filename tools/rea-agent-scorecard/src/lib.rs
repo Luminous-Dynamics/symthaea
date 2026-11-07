@@ -87,9 +87,10 @@ pub struct SubmissionSet {
     pub submissions: Vec<Submission>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ReplayState {
+    #[default]
     NotSubmitted,
     MatchSupported,
     MatchNonPositive,
@@ -740,31 +741,6 @@ pub fn evaluate_scorecard(
     build_scorecard(oracle, submissions, evaluated)
 }
 
-fn pair_groups(evaluated: &[EvaluatedTask]) -> HashMap<&str, (&EvaluatedTask, &EvaluatedTask)> {
-    let mut pairs = HashMap::<&str, (&EvaluatedTask, &EvaluatedTask)>::new();
-    for task in evaluated {
-        let Some(pair_id) = task.oracle.pair_id.as_deref() else {
-            continue;
-        };
-        let entry = pairs.entry(pair_id).or_insert((task, task));
-        match task.oracle.pair_role {
-            PairRole::RelevantBase | PairRole::IrrelevantBase => entry.0 = task,
-            PairRole::RelevantVariant | PairRole::IrrelevantVariant => entry.1 = task,
-            PairRole::None => {}
-        }
-    }
-    pairs
-}
-
-fn pair_role_match(
-    base: &EvaluatedTask,
-    variant: &EvaluatedTask,
-    base_role: PairRole,
-    variant_role: PairRole,
-) -> bool {
-    base.oracle.pair_role == base_role && variant.oracle.pair_role == variant_role
-}
-
 fn pair_answer_changed(base: &EvaluatedTask, variant: &EvaluatedTask) -> Result<bool, ScorecardError> {
     match (&base.answer, &variant.answer) {
         (Some(left), Some(right)) => Ok(!jcs_equal(left, right)?),
@@ -941,6 +917,142 @@ mod tests {
             parse_submissions_json(submissions).unwrap_err().kind,
             ScorecardErrorKind::InvalidJson
         );
+    }
+
+
+    #[test]
+    fn scorecard_keeps_raw_accuracy_grounded_accuracy_and_plr_separate() {
+        let oracle = OracleCorpus {
+            schema: ORACLE_SCHEMA.to_owned(),
+            corpus_id: "fixture-corpus".to_owned(),
+            corpus_version: "v0".to_owned(),
+            tasks: vec![
+                OracleTask {
+                    task_id: "grounded".to_owned(),
+                    fault_family: "positive".to_owned(),
+                    expected_value: Some(json!({"fact": "observed"})),
+                    subject_sha256: "a".repeat(64),
+                    operation: "inspect_artifact".to_owned(),
+                    occurrence_id: None,
+                    pair_id: None,
+                    pair_role: PairRole::None,
+                    must_abstain: false,
+                },
+                OracleTask {
+                    task_id: "leaked".to_owned(),
+                    fault_family: "parametric".to_owned(),
+                    expected_value: Some(json!({"fact": "remembered"})),
+                    subject_sha256: "b".repeat(64),
+                    operation: "inspect_artifact".to_owned(),
+                    occurrence_id: None,
+                    pair_id: None,
+                    pair_role: PairRole::None,
+                    must_abstain: false,
+                },
+                OracleTask {
+                    task_id: "false-supported".to_owned(),
+                    fault_family: "false-positive".to_owned(),
+                    expected_value: Some(json!({"fact": "real"})),
+                    subject_sha256: "c".repeat(64),
+                    operation: "inspect_artifact".to_owned(),
+                    occurrence_id: None,
+                    pair_id: None,
+                    pair_role: PairRole::None,
+                    must_abstain: false,
+                },
+                OracleTask {
+                    task_id: "unsupported".to_owned(),
+                    fault_family: "unsupported".to_owned(),
+                    expected_value: None,
+                    subject_sha256: "d".repeat(64),
+                    operation: "inspect_artifact".to_owned(),
+                    occurrence_id: None,
+                    pair_id: None,
+                    pair_role: PairRole::None,
+                    must_abstain: true,
+                },
+            ],
+        };
+        let submissions = SubmissionSet {
+            schema: SUBMISSIONS_SCHEMA.to_owned(),
+            run_id: "run-1".to_owned(),
+            agent_id: "agent-1".to_owned(),
+            submissions: Vec::new(),
+        };
+        let assessment = |task_id: &str,
+                          fault_family: &str,
+                          answered: bool,
+                          raw_correct: bool,
+                          grounded_correct: bool,
+                          positive_claim: bool,
+                          false_supported: bool,
+                          correct_unsupported_abstention: bool,
+                          replay_state: ReplayState| TaskAssessment {
+            task_id: task_id.to_owned(),
+            fault_family: fault_family.to_owned(),
+            answered,
+            raw_correct,
+            grounded_correct,
+            positive_claim,
+            false_supported,
+            correct_unsupported_abstention,
+            exact_scope_match: grounded_correct,
+            exact_occurrence_match: grounded_correct,
+            replay_state,
+            replay_error: None,
+        };
+        let evaluated = vec![
+            EvaluatedTask {
+                oracle: oracle.tasks[0].clone(),
+                assessment: assessment(
+                    "grounded", "positive", true, true, true, true, false, false,
+                    ReplayState::MatchSupported,
+                ),
+                answer: Some(json!({"fact": "observed"})),
+            },
+            EvaluatedTask {
+                oracle: oracle.tasks[1].clone(),
+                assessment: assessment(
+                    "leaked", "parametric", true, true, false, false, false, false,
+                    ReplayState::NotSubmitted,
+                ),
+                answer: Some(json!({"fact": "remembered"})),
+            },
+            EvaluatedTask {
+                oracle: oracle.tasks[2].clone(),
+                assessment: assessment(
+                    "false-supported", "false-positive", true, false, false, true, true, false,
+                    ReplayState::MatchSupported,
+                ),
+                answer: Some(json!({"fact": "invented"})),
+            },
+            EvaluatedTask {
+                oracle: oracle.tasks[3].clone(),
+                assessment: assessment(
+                    "unsupported", "unsupported", false, false, false, false, false, true,
+                    ReplayState::NotSubmitted,
+                ),
+                answer: None,
+            },
+        ];
+
+        let result = build_scorecard(&oracle, &submissions, evaluated).unwrap();
+        let metrics = result.metrics;
+        assert_eq!(metrics.tasks, 4);
+        assert_eq!(metrics.answered, 3);
+        assert_eq!(metrics.raw_correct, 2);
+        assert_eq!(metrics.grounded_correct, 1);
+        assert_eq!(metrics.correct_but_ungrounded, 1);
+        assert_eq!(metrics.parametric_leakage_rate, Some(0.5));
+        assert_eq!(metrics.false_supported_claims, 1);
+        assert_eq!(metrics.false_supported_rate, Some(0.5));
+        assert_eq!(metrics.unsupported_controls, 1);
+        assert_eq!(metrics.correct_unsupported_abstentions, 1);
+        assert_eq!(metrics.correct_unsupported_abstention_rate, Some(1.0));
+        assert_eq!(metrics.raw_accuracy_full_suite, Some(0.5));
+        assert_eq!(metrics.raw_accuracy_when_answered, Some(2.0 / 3.0));
+        assert_eq!(metrics.answer_coverage, Some(0.75));
+        assert_eq!(metrics.grounded_accuracy_full_suite, Some(0.25));
     }
 
     #[test]
