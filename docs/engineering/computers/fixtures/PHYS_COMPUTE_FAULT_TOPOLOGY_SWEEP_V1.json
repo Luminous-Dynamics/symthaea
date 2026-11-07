@@ -1,0 +1,149 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "physical-compute-fault-topology-pilot-v1",
+  "status": "independent_toy_cpu_model_not_paper_reproduction_not_physical_measurement",
+  "protocol": {
+    "dimension": 32,
+    "fault_rate_setting": 0.39,
+    "k_values": [
+      8,
+      16,
+      24,
+      32
+    ],
+    "factor_seeds": 2,
+    "direct_seeds": 3,
+    "steps": 800,
+    "learning_rate": 0.03,
+    "topologies": [
+      "independent_cell",
+      "output_row_loss",
+      "output_column_loss",
+      "latent_channel_loss"
+    ],
+    "target_seed": 2026
+  },
+  "results": {
+    "dft_real": {
+      "rank": 17,
+      "independent_cell": {
+        "direct": 0.7835,
+        "k16": 0.9523,
+        "k24": 0.9998,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8102,
+        "k16": 0.813,
+        "k24": 0.813,
+        "k32": 0.813
+      },
+      "output_column_loss": {
+        "direct": 0.8102,
+        "k16": 0.813,
+        "k24": 0.813,
+        "k32": 0.813
+      },
+      "latent_channel_loss": {
+        "direct": 0.7835,
+        "k16": 0.723,
+        "k24": 0.9388,
+        "k32": 1
+      }
+    },
+    "hadamard": {
+      "rank": 32,
+      "independent_cell": {
+        "direct": 0.7808,
+        "k16": 0.7071,
+        "k24": 0.866,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "output_column_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "latent_channel_loss": {
+        "direct": 0.7808,
+        "k16": 0.527,
+        "k24": 0.6843,
+        "k32": 0.8099
+      }
+    },
+    "rank8": {
+      "rank": 8,
+      "independent_cell": {
+        "direct": 0.7692,
+        "k16": 0.9967,
+        "k24": 1,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8032,
+        "k16": 0.794,
+        "k24": 0.794,
+        "k32": 0.794
+      },
+      "output_column_loss": {
+        "direct": 0.8111,
+        "k16": 0.7965,
+        "k24": 0.7965,
+        "k32": 0.7965
+      },
+      "latent_channel_loss": {
+        "direct": 0.7692,
+        "k16": 0.9904,
+        "k24": 1,
+        "k32": 1
+      }
+    },
+    "random_orthogonal": {
+      "rank": 32,
+      "independent_cell": {
+        "direct": 0.7678,
+        "k16": 0.7071,
+        "k24": 0.866,
+        "k32": 1
+      },
+      "output_row_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "output_column_loss": {
+        "direct": 0.8034,
+        "k16": 0.7071,
+        "k24": 0.8099,
+        "k32": 0.8099
+      },
+      "latent_channel_loss": {
+        "direct": 0.7678,
+        "k16": 0.527,
+        "k24": 0.6843,
+        "k32": 0.8099
+      }
+    }
+  },
+  "caveats": [
+    "Fault topologies have different physical denominators; row/column and latent-channel failure cannot be treated as the same cell-level rate.",
+    "Survival fractions vary slightly with sampled masks; exact values are in full local results artifact.",
+    "Simplified real-valued factors only; no conductance mapping, circuitry, noise, temperature, calibration or physical device data.",
+    "No area/energy/yield/SOTA claim."
+  ],
+  "expected_latent_overprovisioning": {
+    "active_channels_required": 32,
+    "nominal_failure_probability": 0.39,
+    "expected_installed_channels": 52.459016393442624,
+    "rounded_up_design_probe": 53,
+    "caveat": "Expectation only; a high-confidence design needs a binomial tail/availability target and physically measured correlated faults."
+  }
+}
