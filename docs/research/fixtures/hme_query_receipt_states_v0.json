@@ -1,0 +1,123 @@
+{
+  "schema_version": "0.1.0",
+  "fixtures": [
+    {
+      "id": "exact_all_scored",
+      "status": "ExactComplete",
+      "stop_reason": "Completed",
+      "requested": {
+        "exactness": "exact_only",
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 65536,
+          "deadline_unix_ns": null
+        }
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 4,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 0
+      }
+    },
+    {
+      "id": "exact_with_safe_prunes",
+      "status": "ExactComplete",
+      "stop_reason": "Completed",
+      "requested": {
+        "exactness": "exact_only",
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 65536,
+          "deadline_unix_ns": null
+        }
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 2,
+        "safely_pruned_count": 2,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 0
+      }
+    },
+    {
+      "id": "approximate_candidate_policy",
+      "status": "ApproximateComplete",
+      "stop_reason": "Completed",
+      "requested": {
+        "exactness": "approximate_allowed",
+        "approximation_profile_id": "lsh-v1",
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 65536,
+          "deadline_unix_ns": null
+        }
+      },
+      "approximation": {
+        "profile_id": "lsh-v1",
+        "quality_receipt_id": "recall-fixture-v1",
+        "candidate_policy_completed": true,
+        "exact_rerank": true
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 0,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 3,
+        "excluded_by_approximate_policy_count": 1,
+        "unprocessed_count": 0
+      }
+    },
+    {
+      "id": "budget_exhausted_partial",
+      "status": "Incomplete",
+      "stop_reason": "BudgetExhausted",
+      "requested": {
+        "exactness": "best_effort",
+        "resource_budget": {
+          "max_candidate_evaluations": 2,
+          "max_payload_bytes": 4096,
+          "max_coordinates": 32768,
+          "deadline_unix_ns": null
+        }
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 2,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 2
+      }
+    },
+    {
+      "id": "stale_generation",
+      "status": "UnavailableOrInvalid",
+      "stop_reason": "StaleGeneration",
+      "requested": {
+        "exactness": "exact_only",
+        "resource_budget": {
+          "max_candidate_evaluations": 4,
+          "max_payload_bytes": 8192,
+          "max_coordinates": 65536,
+          "deadline_unix_ns": null
+        }
+      },
+      "candidate_accounting": {
+        "eligible_count": 4,
+        "fully_scored_count": 0,
+        "safely_pruned_count": 0,
+        "approximate_candidates_scored_count": 0,
+        "excluded_by_approximate_policy_count": 0,
+        "unprocessed_count": 4
+      }
+    }
+  ],
+  "note": "Fixtures illustrate semantic shapes only. The full QueryReceipt requires query, generation, resource_usage and results fields; they are intentionally omitted from these compact state examples."
+}
