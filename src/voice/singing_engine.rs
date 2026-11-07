@@ -45,6 +45,50 @@ pub struct VocalPhrase {
     pub expression_curve: Vec<ExpressionPoint>,
 }
 
+/// Relative shape of a phrase-level expression arc.
+///
+/// Energy multipliers scale the phrase's mean syllable energy. Breathiness
+/// offsets are added to its mean breathiness. Tension is an absolute [0, 1]
+/// control. Each array contains start, peak and release values.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PhraseExpressionProfile {
+    pub energy_multiplier: [f32; 3],
+    pub breathiness_offset: [f32; 3],
+    pub tension: [f32; 3],
+}
+
+impl Default for PhraseExpressionProfile {
+    fn default() -> Self {
+        Self {
+            energy_multiplier: [0.86, 1.12, 0.82],
+            breathiness_offset: [0.06, 0.0, 0.08],
+            tension: [0.28, 0.48, 0.22],
+        }
+    }
+}
+
+/// Authoring inputs for one phrase. The phrase end is an exclusive
+/// syllable index in the flattened lyric pronunciation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VocalPhraseSpec {
+    pub syllable_end: usize,
+    pub breath_before_s: f32,
+    pub breath_after_s: f32,
+    pub expression: PhraseExpressionProfile,
+}
+
+impl VocalPhraseSpec {
+    /// Default phrasing preserves the previous restrained expression arc.
+    pub fn with_end(syllable_end: usize) -> Self {
+        Self {
+            syllable_end,
+            breath_before_s: 0.12,
+            breath_after_s: 0.12,
+            expression: PhraseExpressionProfile::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VocalPhoneme {
     pub ipa: String,
@@ -131,17 +175,38 @@ impl VocalPerformance {
         Self::from_melody_with_phrase_ends(lyrics, melody, language, &[syllable_count])
     }
 
-    /// Bind lyrics and notes to explicit phrase-ending syllable indices.
-    ///
-    /// Each value is an exclusive syllable index. Values must be strictly
-    /// increasing and the final value must equal the G2P syllable count.
-    /// This lets a score author provide breath/phrase boundaries without
-    /// asking a renderer to infer them from an audio waveform.
+    /// Compatibility constructor using explicit phrase-ending syllable indices.
+    /// Phrase expression and breath values use the restrained defaults.
     pub fn from_melody_with_phrase_ends(
         lyrics: &str,
         melody: &[Note],
         language: impl Into<String>,
         phrase_ends: &[usize],
+    ) -> Result<Self> {
+        let phrase_specs: Vec<VocalPhraseSpec> = phrase_ends
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, syllable_end)| VocalPhraseSpec {
+                syllable_end,
+                breath_before_s: if index == 0 { 0.0 } else { 0.12 },
+                breath_after_s: 0.12,
+                expression: PhraseExpressionProfile::default(),
+            })
+            .collect();
+        Self::from_melody_with_phrase_specs(lyrics, melody, language, &phrase_specs)
+    }
+
+    /// Bind lyrics and notes to fully specified vocal phrases.
+    ///
+    /// Each phrase owns an exclusive syllable end, explicit breath durations,
+    /// and an independent start/peak/release expression profile. This avoids
+    /// imposing the same generic arc on every phrase in a song.
+    pub fn from_melody_with_phrase_specs(
+        lyrics: &str,
+        melody: &[Note],
+        language: impl Into<String>,
+        phrase_specs: &[VocalPhraseSpec],
     ) -> Result<Self> {
         let language = language.into();
         if language != "en" {
@@ -163,19 +228,43 @@ impl VocalPerformance {
                 melody.len()
             );
         }
-        if phrase_ends.is_empty() || phrase_ends.last().copied() != Some(lexical_syllables) {
+        if phrase_specs.is_empty()
+            || phrase_specs.last().map(|spec| spec.syllable_end) != Some(lexical_syllables)
+        {
             bail!(
-                "phrase_ends must be non-empty and terminate at the final lyric syllable ({lexical_syllables})"
+                "phrase specs must be non-empty and terminate at the final lyric syllable ({lexical_syllables})"
             );
         }
         let mut previous_phrase_end = 0usize;
-        for (phrase_index, phrase_end) in phrase_ends.iter().copied().enumerate() {
-            if phrase_end <= previous_phrase_end || phrase_end > lexical_syllables {
+        for (phrase_index, spec) in phrase_specs.iter().enumerate() {
+            if spec.syllable_end <= previous_phrase_end || spec.syllable_end > lexical_syllables {
                 bail!(
                     "phrase end {phrase_index} must be strictly increasing and within the lyric syllable count"
                 );
             }
-            previous_phrase_end = phrase_end;
+            if !spec.breath_before_s.is_finite()
+                || !(0.0..=5.0).contains(&spec.breath_before_s)
+                || !spec.breath_after_s.is_finite()
+                || !(0.0..=5.0).contains(&spec.breath_after_s)
+            {
+                bail!("phrase {phrase_index} breath durations must be finite and within [0, 5] seconds");
+            }
+            for value in spec.expression.energy_multiplier {
+                if !value.is_finite() || !(0.0..=2.0).contains(&value) {
+                    bail!("phrase {phrase_index} energy multipliers must be finite and within [0, 2]");
+                }
+            }
+            for value in spec.expression.breathiness_offset {
+                if !value.is_finite() || !(-1.0..=1.0).contains(&value) {
+                    bail!("phrase {phrase_index} breathiness offsets must be finite and within [-1, 1]");
+                }
+            }
+            for value in spec.expression.tension {
+                if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                    bail!("phrase {phrase_index} tension values must be finite and within [0, 1]");
+                }
+            }
+            previous_phrase_end = spec.syllable_end;
         }
         let sung = symthaea_muse::singing_bridge::sing(lyrics, melody);
         if sung.len() < lexical_syllables {
@@ -218,7 +307,7 @@ impl VocalPerformance {
                     melisma_notes,
                     articulation: VocalArticulation::Legato,
                     consonant_advance_s: 0.018,
-                    phrase_index: phrase_ends.partition_point(|end| index >= *end),
+                    phrase_index: phrase_specs.partition_point(|spec| index >= spec.syllable_end),
                     portamento: if sustained { 0.12 } else { 0.06 },
                     vibrato_onset: if sustained { 0.38 } else { 1.0 },
                     vibrato_rate_hz: 5.2 + aligned.note.velocity.clamp(0.0, 1.0) * 0.5,
@@ -265,9 +354,10 @@ impl VocalPerformance {
             }
         }
 
-        let mut phrases = Vec::with_capacity(phrase_ends.len());
+        let mut phrases = Vec::with_capacity(phrase_specs.len());
         let mut phrase_start_index = 0usize;
-        for (phrase_index, phrase_end_index) in phrase_ends.iter().copied().enumerate() {
+        for (phrase_index, phrase_spec) in phrase_specs.iter().enumerate() {
+            let phrase_end_index = phrase_spec.syllable_end;
             let phrase_syllables = &syllables[phrase_start_index..phrase_end_index];
             let start = phrase_syllables
                 .first()
@@ -290,30 +380,26 @@ impl VocalPerformance {
             phrases.push(VocalPhrase {
                 syllable_start: phrase_start_index,
                 syllable_end: phrase_end_index,
-                breath_before_s: if phrase_index == 0 { 0.0 } else { 0.12 },
-                breath_after_s: if phrase_index + 1 == phrase_ends.len() {
-                    0.10
-                } else {
-                    0.12
-                },
+                breath_before_s: phrase_spec.breath_before_s,
+                breath_after_s: phrase_spec.breath_after_s,
                 expression_curve: vec![
                     ExpressionPoint {
                         time_s: start,
-                        energy: base_energy * 0.86,
-                        breathiness: (base_breath + 0.06).min(1.0),
-                        tension: 0.28,
+                        energy: (base_energy * phrase_spec.expression.energy_multiplier[0]).clamp(0.0, 1.0),
+                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[0]).clamp(0.0, 1.0),
+                        tension: phrase_spec.expression.tension[0],
                     },
                     ExpressionPoint {
                         time_s: start + (end - start) * 0.68,
-                        energy: (base_energy + 0.12).min(1.0),
-                        breathiness: base_breath,
-                        tension: 0.48,
+                        energy: (base_energy * phrase_spec.expression.energy_multiplier[1]).clamp(0.0, 1.0),
+                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[1]).clamp(0.0, 1.0),
+                        tension: phrase_spec.expression.tension[1],
                     },
                     ExpressionPoint {
                         time_s: end,
-                        energy: base_energy * 0.82,
-                        breathiness: (base_breath + 0.08).min(1.0),
-                        tension: 0.22,
+                        energy: (base_energy * phrase_spec.expression.energy_multiplier[2]).clamp(0.0, 1.0),
+                        breathiness: (base_breath + phrase_spec.expression.breathiness_offset[2]).clamp(0.0, 1.0),
+                        tension: phrase_spec.expression.tension[2],
                     },
                 ],
             });
