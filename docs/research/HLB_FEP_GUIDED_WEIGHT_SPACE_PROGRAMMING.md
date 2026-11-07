@@ -505,6 +505,20 @@ For each possible visual colour, it conditions the joint belief, evaluates the f
 
 Qualification tests cover the `ln(3)` nats of state information from one uniformly distributed ball colour, zero model information under an independent model/state prior, preservation of model/state correlations after feedback, impossible-observation rejection, and invariance of gaze/choice scores between labelled and semantically quotient rule families.
 
+### G. Multi-trial finite-hypothesis rule-discovery adaptation
+
+The branch now includes `crates/core/symthaea-fep/src/three_ball_sequential_discovery.rs`, a deterministic multi-trial evaluator around the joint model/state belief and two-step gaze policy.
+
+Each trial independently samples a new left/centre/right colour arrangement, executes the current policy (one gaze → visual observation → one colour choice), observes correct/incorrect/no-feedback, updates the joint rule/state posterior, then marginalizes and carries the semantic rule posterior into the next trial while resetting only the hidden-scene prior. The runner has a versioned SplitMix64 seed stream and produces per-trial receipts containing the evaluator-only hidden scene, gaze, observed colour, choice, feedback, expected information terms, pre/post model entropy, true semantic-class posterior, winning-class odds, cumulative reward, and commitment state.
+
+The runner uses neutral feedback log preferences `[0,0,0]` during evidence gathering, then restores the source preference vector `[0,2,-6]` once the winning semantic-class log odds exceed 16 nats. The threshold is measured after aggregating source labels into semantic likelihood classes. The evaluator can run against either the 81 source-labelled hypotheses or the semantic quotient, and the benchmark compares their predictions and commitment traces.
+
+**Exact claim boundary:** this is a repeated two-step finite-hypothesis adaptation, not the published SPM simulation. It has one gaze/choice pair per independent scene, not the source's six time points / five moves per trial. It performs exact discrete Bayesian conditioning over known deterministic rule hypotheses; it does not learn a continuous Dirichlet likelihood posterior or reproduce SPM's BMR parameter-update sequence. The SPM-compatible Dirichlet BMR and known-state model-EIG path remain separate. The public source generator also yields 75 distinct complete feedback tensors against the paper's reported 79 unique rules, so 81 labelled / 75 semantic source-audit results must remain explicit pending reconciliation.
+
+The evaluator reports: trials to any 16-nat commitment, trials to *correct* semantic-rule commitment, final posterior on the planted semantic class, per-trial model entropy, Brier score, negative log probability, correct/incorrect/no-feedback counts, gaze count, and cumulative reward. It supports controlled ablations by setting model-information and conditional-state-information weights to zero individually or together. Source-labelled versus quotient runs must preserve the aggregated semantic-class posterior and commitment decision under matched seeds.
+
+Do not demand that posterior entropy decreases after every realised observation. A surprising observation can increase posterior entropy; the mutual-information identity constrains the expectation over all possible outcomes. Qualification should check finite traces and expected information accounting, not false per-sample monotonicity.
+
 ## 6. Baselines and fairness requirements
 
 ### Temporal models
