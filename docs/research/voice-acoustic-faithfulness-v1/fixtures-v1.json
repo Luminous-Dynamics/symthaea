@@ -141,6 +141,39 @@
         "reordered_frames_must_not_be_reported_as_contiguous",
         "duplicate_chunks_must_not_be_counted_twice"
       ]
+    },
+    {
+      "id": "gain_scaling_and_loudness_calibration",
+      "intervention": "Multiply an otherwise identical waveform by known gain factors; optionally record calibrated reference SPL with a calibrated microphone.",
+      "invariants": [
+        "normalized_within_utterance_energy_shape",
+        "lexical_content",
+        "f0_trajectory_when_not_clipped"
+      ],
+      "expected_changes": [
+        "raw_rms_scales_by_known_gain",
+        "calibrated_spl_changes_only_with_valid_calibration"
+      ],
+      "negative_controls": [
+        "per_utterance_peak_normalization_must_not_be_reported_as_absolute_loudness",
+        "gain_change_must_not_be_labeled_arousal_or_emotion"
+      ]
+    },
+    {
+      "id": "fundamental_frequency_range_and_octave_error",
+      "intervention": "Sweep voiced synthetic and human-reviewed reference pitches across, below and above the configured F0 search band, with harmonic-rich and noisy cases.",
+      "invariants": [
+        "known_reference_pitch_within_supported_band",
+        "source_frame_identity"
+      ],
+      "expected_changes": [
+        "measured_f0_tracks_reference_within_frozen_tolerance",
+        "out_of_range_pitch_is_explicitly_unresolved"
+      ],
+      "negative_controls": [
+        "octave_doubling_and_halving_are_counted",
+        "out_of_range_pitch_must_not_be_clamped_and_reported_as_valid"
+      ]
     }
   ],
   "required_case_metadata": [
