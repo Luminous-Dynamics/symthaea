@@ -13,7 +13,9 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use symthaea::voice::diffsinger::DiffSingerEngine;
 use symthaea::voice::kokoro_singing::KokoroSingingEngine;
-use symthaea::voice::singing_engine::{SingingVoiceEngine, VocalPerformance, VocalStem};
+use symthaea::voice::singing_engine::{
+    SingingBackendCapabilities, SingingVoiceEngine, VocalPerformance, VocalStem,
+};
 use symthaea::voice::singing_quality::{VocalQualityMetrics, analyze_vocal_stem};
 use symthaea_muse::{MusicalIntent, MusicalState, Style};
 
@@ -98,6 +100,7 @@ struct KeyEntry {
     case_id: usize,
     performance_blake3: Option<String>,
     audio_blake3: String,
+    capability_manifest_blake3: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -134,6 +137,8 @@ struct ObjectiveEntry {
     backend: String,
     case_id: usize,
     metrics: VocalQualityMetrics,
+    capability_manifest: SingingBackendCapabilities,
+    capability_manifest_blake3: String,
 }
 
 #[derive(Deserialize)]
@@ -255,12 +260,15 @@ fn render_one(
         case_id,
         performance_blake3: Some(performance_blake3),
         audio_blake3,
+        capability_manifest_blake3: Some(capability_manifest_blake3.clone()),
     });
     objective.push(ObjectiveEntry {
         clip_id: id,
         backend: stem.backend,
         case_id,
         metrics,
+        capability_manifest: capabilities,
+        capability_manifest_blake3,
     });
     Ok(())
 }
@@ -301,6 +309,7 @@ fn import_references(
             case_id: reference.case_id,
             performance_blake3: None,
             audio_blake3,
+            capability_manifest_blake3: None,
         });
     }
     Ok(())
