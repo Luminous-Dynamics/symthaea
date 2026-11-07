@@ -592,6 +592,12 @@
           }
         }
       }
+    },
+    "nullable_int": {
+      "type": [
+        "integer",
+        "null"
+      ]
     }
   }
 }
