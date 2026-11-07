@@ -116,6 +116,29 @@ SCITT offers signed-statement transparency and registration receipts, not statem
 
 Reference: https://www.rfc-editor.org/rfc/rfc9943.html
 
+
+### SLSA v1.2, TUF 1.0.37 and SCITT — complementary assurance layers
+
+SLSA v1.2 is the current approved specification and separates Build and Source tracks. Build provenance describes the builder, process and inputs so consumers can compare actual provenance with expected provenance. Source provenance describes how a source revision was created and change-managed. Neither track should be promoted into a semantic statement that the resulting program is correct or safe. REA should ingest these as typed, scoped evidence and preserve the source-owned claim ceiling.
+
+TUF's current specification repository identifies version 1.0.37 (dated October 8, 2026). Its trusted metadata roles and update procedure address specific update-system attacks, including rollback, freeze and mix-and-match. TUF metadata can support update freshness/integrity obligations when the exact trusted root, versions, expirations and role thresholds are verified. It does not establish that the target artifact is semantically benign or that a downstream provider claim is true.
+
+SCITT RFC 9943 provides signed-statement registration, receipts and transparent audit. Section 9.2 explicitly warns that issuers may make false statements; Section 9.3 notes that issuers may selectively withhold statements. Complete enumeration of a transparency service's registered set is not the same as complete issuer participation.
+
+REA's role is not to replace these specifications. It is to preserve their exact verified properties as premises and prevent invalid implication from a lower-level property to a stronger proposition.
+
+References:
+- [SLSA v1.2 specification and tracks](https://slsa.dev/spec/v1.2/tracks)
+- [SLSA v1.2 provenance](https://slsa.dev/spec/v1.2/provenance)
+- [TUF specification (1.0.37)](https://github.com/theupdateframework/specification/blob/master/tuf-spec.md)
+- [SCITT RFC 9943](https://www.rfc-editor.org/rfc/rfc9943.html)
+
+### Temporal retrieval research
+
+TEMPO (EMNLP 2026) provides a useful adjacent benchmark design: 1,730 multi-domain queries across 13 domains, decomposed into 3,976 retrieval steps, with Temporal Coverage@k and Temporal Precision@k to test whether answers cover the required periods. REA should adapt the *measurement principle*, not the dataset: a time-scoped claim should be scored on whether it retrieves and reasons over every required interval, not simply whether it finds a plausible recent document.
+
+Reference: [TEMPO: Realistic Multi-Domain Benchmark for Temporal Reasoning-Intensive Retrieval](https://aclanthology.org/2026.emnlp-main.291/).
+
 ## Next research/engineering steps
 
 1. Keep v0 authority fixed; do not add semantic predicates merely to improve benchmark scores.
