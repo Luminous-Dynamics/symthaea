@@ -220,17 +220,17 @@ def self_test() -> list[str]:
     )
     for label, mutant in mutations:
         if label == "duplicate scenario identity":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard)
+            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
         elif label == "missing evidence pack":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard)
+            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
         elif label == "missing expected behavior":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard)
+            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
         elif label == "missing comparator":
-            result = validate_documents(mutant, challenge, adjudication, scorecard)
+            result = validate_documents(mutant, challenge, adjudication, scorecard, preregistration)
         elif label == "missing evidence authority":
-            result = validate_documents(triangulation, challenge, mutant, scorecard)
+            result = validate_documents(triangulation, challenge, mutant, scorecard, preregistration)
         elif label == "missing isolation gate":
-            result = validate_documents(triangulation, mutant, adjudication, scorecard)
+            result = validate_documents(triangulation, mutant, adjudication, scorecard, preregistration)
         elif label == "missing counterfactual state" or label == "missing power rule" or label == "missing phase C":
             result = validate_documents(triangulation, challenge, adjudication, scorecard, mutant)
         else:
