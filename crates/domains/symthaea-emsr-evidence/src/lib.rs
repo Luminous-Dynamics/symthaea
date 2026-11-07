@@ -72,11 +72,7 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 /// Verify an exact-byte SHA-256 digest.
-pub fn verify_sha256(
-    bytes: &[u8],
-    expected: &str,
-    path: &str,
-) -> Result<(), ValidationError> {
+pub fn verify_sha256(bytes: &[u8], expected: &str, path: &str) -> Result<(), ValidationError> {
     if !is_lower_hex(expected, 64) {
         return Err(ValidationError::new(
             path,
@@ -197,7 +193,10 @@ pub fn validate_dataset_catalog(input: &str) -> Result<CatalogSummary, Validatio
         ));
     }
     if catalog.entries.is_empty() {
-        return Err(ValidationError::new("$.entries", "catalogue must contain at least one entry"));
+        return Err(ValidationError::new(
+            "$.entries",
+            "catalogue must contain at least one entry",
+        ));
     }
 
     let mut ids = HashSet::new();
@@ -263,20 +262,34 @@ pub fn validate_dataset_catalog(input: &str) -> Result<CatalogSummary, Validatio
             }
         }
         if rights.state == RightsState::Reviewed {
-            if rights.source_terms_uri.as_deref().is_none_or(|uri| !uri.starts_with("https://")) {
+            if rights
+                .source_terms_uri
+                .as_deref()
+                .is_none_or(|uri| !uri.starts_with("https://"))
+            {
                 return Err(ValidationError::new(
                     format!("{path}.rights.source_terms_uri"),
                     "reviewed rights require an HTTPS source-terms reference",
                 ));
             }
-            if rights.license_expression.as_deref().is_none_or(|value| !nonempty(value)) {
+            if rights
+                .license_expression
+                .as_deref()
+                .is_none_or(|value| !nonempty(value))
+            {
                 return Err(ValidationError::new(
                     format!("{path}.rights.license_expression"),
                     "reviewed rights require an exact license identifier or named agreement",
                 ));
             }
-            if rights.reviewed_by.as_deref().is_none_or(|value| !nonempty(value))
-                || rights.reviewed_at.as_deref().is_none_or(|value| !nonempty(value))
+            if rights
+                .reviewed_by
+                .as_deref()
+                .is_none_or(|value| !nonempty(value))
+                || rights
+                    .reviewed_at
+                    .as_deref()
+                    .is_none_or(|value| !nonempty(value))
             {
                 return Err(ValidationError::new(
                     format!("{path}.rights"),
@@ -406,7 +419,10 @@ pub fn validate_split_manifest(input: &str) -> Result<SplitSummary, ValidationEr
         .map_err(|error| ValidationError::new("$", format!("invalid split JSON: {error}")))?;
 
     if manifest.schema != SPLIT_SCHEMA {
-        return Err(ValidationError::new("$.schema", format!("expected {SPLIT_SCHEMA:?}")));
+        return Err(ValidationError::new(
+            "$.schema",
+            format!("expected {SPLIT_SCHEMA:?}"),
+        ));
     }
     if manifest.version != SPLIT_VERSION {
         return Err(ValidationError::new(
@@ -421,7 +437,10 @@ pub fn validate_split_manifest(input: &str) -> Result<SplitSummary, ValidationEr
         ));
     }
     if manifest.records.is_empty() {
-        return Err(ValidationError::new("$.records", "split manifest must contain records"));
+        return Err(ValidationError::new(
+            "$.records",
+            "split manifest must contain records",
+        ));
     }
 
     let mut dimensions = vec![SplitDimension::EventGroup, SplitDimension::RecordingGroup];
@@ -558,7 +577,10 @@ pub fn assess_common_mode_independence(
     sources: &[EvidenceSourceProfile],
 ) -> Result<IndependenceSummary, ValidationError> {
     if sources.is_empty() {
-        return Err(ValidationError::new("$.sources", "at least one source profile is required"));
+        return Err(ValidationError::new(
+            "$.sources",
+            "at least one source profile is required",
+        ));
     }
     let snapshot_id = &sources[0].snapshot_id;
     let as_of = &sources[0].as_of;
@@ -745,7 +767,10 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
         .map_err(|error| ValidationError::new("$", format!("invalid run receipt JSON: {error}")))?;
 
     if receipt.schema != RECEIPT_SCHEMA {
-        return Err(ValidationError::new("$.schema", format!("expected {RECEIPT_SCHEMA:?}")));
+        return Err(ValidationError::new(
+            "$.schema",
+            format!("expected {RECEIPT_SCHEMA:?}"),
+        ));
     }
     if receipt.version != RECEIPT_VERSION {
         return Err(ValidationError::new(
@@ -757,7 +782,10 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
         return Err(ValidationError::new("$.run_id", "run ID must be non-empty"));
     }
     if !nonempty(&receipt.executor_id) {
-        return Err(ValidationError::new("$.executor_id", "executor identity must be non-empty"));
+        return Err(ValidationError::new(
+            "$.executor_id",
+            "executor identity must be non-empty",
+        ));
     }
     if !is_lower_hex(&receipt.git_commit, 40) && !is_lower_hex(&receipt.git_commit, 64) {
         return Err(ValidationError::new(
@@ -767,11 +795,23 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
     }
 
     for (path, digest) in [
-        ("$.dataset_catalog_sha256", receipt.dataset_catalog_sha256.as_str()),
-        ("$.split_manifest_sha256", receipt.split_manifest_sha256.as_str()),
-        ("$.ground_truth_manifest_sha256", receipt.ground_truth_manifest_sha256.as_str()),
+        (
+            "$.dataset_catalog_sha256",
+            receipt.dataset_catalog_sha256.as_str(),
+        ),
+        (
+            "$.split_manifest_sha256",
+            receipt.split_manifest_sha256.as_str(),
+        ),
+        (
+            "$.ground_truth_manifest_sha256",
+            receipt.ground_truth_manifest_sha256.as_str(),
+        ),
         ("$.code_sha256", receipt.code_sha256.as_str()),
-        ("$.configuration_sha256", receipt.configuration_sha256.as_str()),
+        (
+            "$.configuration_sha256",
+            receipt.configuration_sha256.as_str(),
+        ),
         ("$.environment_sha256", receipt.environment_sha256.as_str()),
     ] {
         if !is_lower_hex(digest, 64) {
@@ -796,17 +836,27 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
             ));
         }
     }
-    if receipt.model_sha256.as_deref().is_some_and(|value| !is_lower_hex(value, 64)) {
+    if receipt
+        .model_sha256
+        .as_deref()
+        .is_some_and(|value| !is_lower_hex(value, 64))
+    {
         return Err(ValidationError::new(
             "$.model_sha256",
             "model digest must be a lowercase 64-character SHA-256 value when present",
         ));
     }
     if !nonempty(&receipt.toolchain) {
-        return Err(ValidationError::new("$.toolchain", "toolchain identity is required"));
+        return Err(ValidationError::new(
+            "$.toolchain",
+            "toolchain identity is required",
+        ));
     }
     if receipt.cases.is_empty() {
-        return Err(ValidationError::new("$.cases", "run receipt must contain case outcomes"));
+        return Err(ValidationError::new(
+            "$.cases",
+            "run receipt must contain case outcomes",
+        ));
     }
 
     let mut case_ids = HashSet::new();
@@ -848,7 +898,11 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
                     "an incomplete run cannot claim verified reconstruction",
                 ));
             }
-            if verification.verifier_id.as_deref().is_none_or(|value| !nonempty(value)) {
+            if verification
+                .verifier_id
+                .as_deref()
+                .is_none_or(|value| !nonempty(value))
+            {
                 return Err(ValidationError::new(
                     "$.independent_verification.verifier_id",
                     "verified reconstruction requires an independent verifier identity",
@@ -861,8 +915,14 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
                 ));
             }
             for (path, value) in [
-                ("$.independent_verification.verifier_sha256", verification.verifier_sha256.as_deref()),
-                ("$.independent_verification.report_sha256", verification.report_sha256.as_deref()),
+                (
+                    "$.independent_verification.verifier_sha256",
+                    verification.verifier_sha256.as_deref(),
+                ),
+                (
+                    "$.independent_verification.report_sha256",
+                    verification.report_sha256.as_deref(),
+                ),
             ] {
                 if value.is_none_or(|digest| !is_lower_hex(digest, 64)) {
                     return Err(ValidationError::new(
@@ -872,7 +932,9 @@ pub fn validate_run_receipt(input: &str) -> Result<ReceiptSummary, ValidationErr
                 }
             }
         }
-        VerificationState::Pending | VerificationState::Failed | VerificationState::Indeterminate => {
+        VerificationState::Pending
+        | VerificationState::Failed
+        | VerificationState::Indeterminate => {
             if verification.verifier_id.is_some()
                 || verification.verifier_sha256.is_some()
                 || verification.report_sha256.is_some()
@@ -935,24 +997,38 @@ pub fn verify_run_receipt_input_bindings(
         &receipt.ground_truth_manifest_sha256,
         "$.ground_truth_manifest_sha256",
     )?;
-    serde_json::from_slice::<serde_json::Value>(ground_truth_manifest_bytes)
-        .map_err(|error| ValidationError::new(
+    serde_json::from_slice::<serde_json::Value>(ground_truth_manifest_bytes).map_err(|error| {
+        ValidationError::new(
             "$.ground_truth_manifest",
             format!("ground-truth manifest is not valid JSON: {error}"),
-        ))?;
+        )
+    })?;
 
-    let catalog_text = std::str::from_utf8(catalog_bytes)
-        .map_err(|error| ValidationError::new("$.dataset_catalog", format!("catalogue is not UTF-8: {error}")))?;
-    let split_text = std::str::from_utf8(split_bytes)
-        .map_err(|error| ValidationError::new("$.split_manifest", format!("split manifest is not UTF-8: {error}")))?;
+    let catalog_text = std::str::from_utf8(catalog_bytes).map_err(|error| {
+        ValidationError::new(
+            "$.dataset_catalog",
+            format!("catalogue is not UTF-8: {error}"),
+        )
+    })?;
+    let split_text = std::str::from_utf8(split_bytes).map_err(|error| {
+        ValidationError::new(
+            "$.split_manifest",
+            format!("split manifest is not UTF-8: {error}"),
+        )
+    })?;
 
     validate_dataset_catalog(catalog_text)?;
     validate_split_manifest(split_text)?;
 
-    let catalog: DatasetCatalog = serde_json::from_str(catalog_text)
-        .map_err(|error| ValidationError::new("$.dataset_catalog", format!("invalid catalogue JSON: {error}")))?;
-    let split: SplitManifest = serde_json::from_str(split_text)
-        .map_err(|error| ValidationError::new("$.split_manifest", format!("invalid split JSON: {error}")))?;
+    let catalog: DatasetCatalog = serde_json::from_str(catalog_text).map_err(|error| {
+        ValidationError::new(
+            "$.dataset_catalog",
+            format!("invalid catalogue JSON: {error}"),
+        )
+    })?;
+    let split: SplitManifest = serde_json::from_str(split_text).map_err(|error| {
+        ValidationError::new("$.split_manifest", format!("invalid split JSON: {error}"))
+    })?;
 
     if split.dataset_id.is_empty() || split.dataset_version.is_empty() {
         return Err(ValidationError::new(
@@ -968,7 +1044,10 @@ pub fn verify_run_receipt_input_bindings(
         .ok_or_else(|| {
             ValidationError::new(
                 "$.split_manifest.dataset_id",
-                format!("dataset {:?} is absent from the exact catalogue", split.dataset_id),
+                format!(
+                    "dataset {:?} is absent from the exact catalogue",
+                    split.dataset_id
+                ),
             )
         })?;
 
@@ -981,7 +1060,9 @@ pub fn verify_run_receipt_input_bindings(
             ),
         ));
     }
-    if dataset.ingestion != IngestionState::Imported || dataset.rights.state != RightsState::Reviewed {
+    if dataset.ingestion != IngestionState::Imported
+        || dataset.rights.state != RightsState::Reviewed
+    {
         return Err(ValidationError::new(
             "$.dataset_catalog.entries",
             "a run receipt may bind only an imported dataset with reviewed rights",
@@ -1045,12 +1126,10 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    const FROZEN_CATALOG_FIXTURE: &str = include_str!(
-        "../../../../docs/research/emsr-v0.1/emsr-dataset-catalog-v0.1.json"
-    );
-    const SYNTHETIC_SPLIT_FIXTURE: &str = include_str!(
-        "../../../../docs/research/emsr-v0.1/emsr-split-manifest-example-v0.1.json"
-    );
+    const FROZEN_CATALOG_FIXTURE: &str =
+        include_str!("../../../../docs/research/emsr-v0.1/emsr-dataset-catalog-v0.1.json");
+    const SYNTHETIC_SPLIT_FIXTURE: &str =
+        include_str!("../../../../docs/research/emsr-v0.1/emsr-split-manifest-example-v0.1.json");
 
     #[test]
     fn validates_committed_rights_pending_dataset_catalogue() {
@@ -1145,8 +1224,10 @@ mod tests {
                 {"record_id":"r2","split":"test","event_group":"event-a","recording_group":"recording-b","receiver_group":"rx-b","campaign_group":"campaign-b","location_group":"site-b"},
                 {"record_id":"r3","split":"validation","event_group":"event-c","recording_group":"recording-c","receiver_group":"rx-c","campaign_group":"campaign-c","location_group":"site-c"}
             ]
-        }).to_string();
-        let error = validate_split_manifest(&input).expect_err("same event must not cross partitions");
+        })
+        .to_string();
+        let error =
+            validate_split_manifest(&input).expect_err("same event must not cross partitions");
         assert!(error.to_string().contains("crosses"));
     }
 
@@ -1163,7 +1244,8 @@ mod tests {
                 {"record_id":"r2","split":"validation","event_group":"event-b","recording_group":"recording-b","receiver_group":"rx-b","campaign_group":"campaign-b","location_group":"site-b"},
                 {"record_id":"r3","split":"test","event_group":"event-c","recording_group":"recording-c","receiver_group":"rx-c","campaign_group":"campaign-c","location_group":"site-c"}
             ]
-        }).to_string();
+        })
+        .to_string();
         let summary = validate_split_manifest(&input).expect("disjoint split manifest is valid");
         assert_eq!(summary.record_count, 3);
         assert_eq!(summary.test_count, 1);
@@ -1231,10 +1313,7 @@ mod tests {
 
         let summary = assess_common_mode_independence(&sources).expect("valid source profiles");
         assert_eq!(summary.unknown_pairs, 1);
-        assert_eq!(
-            summary.pairs[0].relation,
-            PairwiseRelation::Unknown
-        );
+        assert_eq!(summary.pairs[0].relation, PairwiseRelation::Unknown);
     }
 
     #[test]
@@ -1324,7 +1403,8 @@ mod tests {
                 "report_sha256":null
             }
         }).to_string();
-        let error = validate_run_receipt(&input).expect_err("verified state needs verifier evidence");
+        let error =
+            validate_run_receipt(&input).expect_err("verified state needs verifier evidence");
         assert!(error.to_string().contains("verifier identity"));
     }
 
@@ -1456,7 +1536,8 @@ mod tests {
             split.as_bytes(),
             ground_truth.as_bytes(),
             &payloads,
-        ).expect("exact input bindings should verify");
+        )
+        .expect("exact input bindings should verify");
         assert_eq!(summary.run_id, "bound-run-1");
         assert_eq!(summary.pass_count, 1);
     }
@@ -1474,7 +1555,8 @@ mod tests {
             split.as_bytes(),
             ground_truth.as_bytes(),
             &payloads,
-        ).expect_err("payload tampering must fail closed");
+        )
+        .expect_err("payload tampering must fail closed");
         assert!(error.to_string().contains("SHA-256 mismatch"));
     }
 
@@ -1491,7 +1573,8 @@ mod tests {
                 path: "receiver.bin",
                 bytes: b"synthetic-receiver-payload-v1",
             }],
-        ).expect_err("altered oracle manifest must fail digest verification");
+        )
+        .expect_err("altered oracle manifest must fail digest verification");
         assert!(error.to_string().contains("ground_truth_manifest_sha256"));
     }
 
@@ -1501,8 +1584,7 @@ mod tests {
         let wrong_split = split.replace("fixture-v1", "fixture-v2");
         let mut receipt_value: serde_json::Value =
             serde_json::from_str(&receipt).expect("valid run receipt fixture");
-        receipt_value["split_manifest_sha256"] =
-            json!(sha256_hex(wrong_split.as_bytes()));
+        receipt_value["split_manifest_sha256"] = json!(sha256_hex(wrong_split.as_bytes()));
         let rebound_receipt = receipt_value.to_string();
         let error = verify_run_receipt_input_bindings(
             &rebound_receipt,
@@ -1513,8 +1595,13 @@ mod tests {
                 path: "receiver.bin",
                 bytes: b"synthetic-receiver-payload-v1",
             }],
-        ).expect_err("split must bind exact catalogue version");
-        assert!(error.to_string().contains("does not match catalogue version"));
+        )
+        .expect_err("split must bind exact catalogue version");
+        assert!(
+            error
+                .to_string()
+                .contains("does not match catalogue version")
+        );
     }
 
     #[test]
