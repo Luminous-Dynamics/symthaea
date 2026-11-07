@@ -6,7 +6,7 @@
 //! and delegates all measurement to the existing trace analyzer.
 
 use crate::{AttemptDisposition, ExecutionRegime, WorkerAttempt, WorkerTrace};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 #[derive(Debug, Clone, Deserialize)]
