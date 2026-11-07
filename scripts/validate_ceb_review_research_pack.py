@@ -127,6 +127,10 @@ def validate_documents(
         errors.append("adjudication card must state that it does not create new metrics")
     if "3.10 From code location to causal mechanism diagnosis" not in scorecard:
         errors.append("engineering scorecard is missing the causal-diagnosis paradigm shift")
+    if "3.11 From human-found gold to independently audited open-set discovery" not in scorecard:
+        errors.append("engineering scorecard is missing the gold-completeness paradigm shift")
+    if "3.12 From tool use to sequential evidence acquisition" not in scorecard:
+        errors.append("engineering scorecard is missing the sequential evidence-acquisition paradigm shift")
 
     required_states = (
         "P — Parent / pre-introduction",
