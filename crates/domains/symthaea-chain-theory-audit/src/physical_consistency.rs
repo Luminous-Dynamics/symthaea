@@ -12,8 +12,6 @@
 //! These checks should be treated as a separate gate from the 172-record
 //! combinatorial reproduction.
 
-use std::f64::consts::FRAC_1_SQRT_2;
-
 /// Diagonal-generator audit on the 5D block representation C^2 (+) C^3.
 ///
 /// Values are represented in exact integer units, except the explicit
@@ -28,6 +26,11 @@ pub struct UnbrokenGeneratorDecomposition {
     pub twice_weak_isospin: [i8; 5],
     /// SU(3) colour generator diag(0, 0, 1, 1, -2).
     pub colour_generator: [i8; 5],
+    /// Numerators over decomposition_denominator in U = a*(6Y)+t*T3+b*colour.
+    pub hypercharge_coefficient_numerator: i8,
+    pub weak_isospin_coefficient_numerator: i8,
+    pub colour_coefficient_numerator: i8,
+    pub decomposition_denominator: i8,
     /// Exact identity: U = (1/3)(6Y) + 0*T3 - (1/3)colour.
     pub decomposition_exact: bool,
     pub weak_isospin_coefficient_is_zero: bool,
@@ -71,26 +74,28 @@ pub fn unbroken_generator_decomposition() -> UnbrokenGeneratorDecomposition {
     let colour_generator = [0, 0, 1, 1, -2];
 
     // Clear denominators: 3U = 6Y - colour. The T3 coefficient is exactly 0.
+    let hypercharge_coefficient_numerator = 1;
+    let weak_isospin_coefficient_numerator = 0;
+    let colour_coefficient_numerator = -1;
+    let decomposition_denominator = 3;
     let decomposition_exact = (0..5).all(|index| {
-        3 * unbroken_u[index] == six_hypercharge[index] - colour_generator[index]
+        decomposition_denominator * unbroken_u[index]
+            == hypercharge_coefficient_numerator * six_hypercharge[index]
+                + weak_isospin_coefficient_numerator * twice_weak_isospin[index]
+                + colour_coefficient_numerator * colour_generator[index]
     });
-    let weak_isospin_coefficient_is_zero = twice_weak_isospin
-        .iter()
-        .zip(unbroken_u.iter())
-        .all(|(basis, _)| {
-            // The exact decomposition above contains no T3 term; separately
-            // check the displayed weak generator is nonzero to avoid a
-            // vacuous "zero coefficient" result caused by a zero basis.
-            let _ = basis;
-            true
-        });
-    let colour_coefficient_is_nonzero = colour_generator.iter().any(|value| *value != 0);
+    let weak_isospin_coefficient_is_zero = weak_isospin_coefficient_numerator == 0;
+    let colour_coefficient_is_nonzero = colour_coefficient_numerator != 0;
 
     UnbrokenGeneratorDecomposition {
         unbroken_u,
         six_hypercharge,
         twice_weak_isospin,
         colour_generator,
+        hypercharge_coefficient_numerator,
+        weak_isospin_coefficient_numerator,
+        colour_coefficient_numerator,
+        decomposition_denominator,
         decomposition_exact,
         weak_isospin_coefficient_is_zero,
         colour_coefficient_is_nonzero,
@@ -154,6 +159,10 @@ mod tests {
         assert_eq!(audit.six_hypercharge, [3, 3, -2, -2, -2]);
         assert_eq!(audit.twice_weak_isospin, [1, -1, 0, 0, 0]);
         assert_eq!(audit.colour_generator, [0, 0, 1, 1, -2]);
+        assert_eq!(audit.hypercharge_coefficient_numerator, 1);
+        assert_eq!(audit.weak_isospin_coefficient_numerator, 0);
+        assert_eq!(audit.colour_coefficient_numerator, -1);
+        assert_eq!(audit.decomposition_denominator, 3);
         assert!(audit.decomposition_exact);
         assert!(audit.weak_isospin_coefficient_is_zero);
         assert!(audit.colour_coefficient_is_nonzero);
