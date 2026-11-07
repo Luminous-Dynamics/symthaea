@@ -244,7 +244,27 @@ The full rollout/stream is the replication unit when later outcomes depend on ea
 - Routed Continual Learning evaluates 398 interleaved instances over five complete rollouts per model. It finds both mechanism selection and cluster scope matter, but bad merges can increase cost; the authors did not evaluate simultaneous state updates or cross-model sharing.
 - AMA-Bench is a long-horizon trajectory-memory task benchmark, not evidence of correct cross-task state transfer by itself.
 
-## 7. Evaluator-research experiment (#10756)
+## 7. Research environment synthesis (compose with CEB #10419)
+
+ResearchEnvBench (IJCAI 2026) makes environment bootstrap a first-class prerequisite for autonomous research. Its 44-repository benchmark separates static dependency integrity from CPU entrypoint, CUDA/driver alignment, actual single-GPU computation, distributed DDP readiness and self-report hallucination. The best reported DDP success rate is 12/32 (37.5%); best single-GPU success is 21/43 (48.8%). The benchmark highlights incomplete dependency resolution, native-operator failures and brittle package/ABI coupling. [IJCAI proceedings](https://doi.org/10.24963/ijcai.2026/48) · [arXiv](https://arxiv.org/abs/2603.06739)
+
+For Symthaea, adapt the verification pyramid to Rust/Nix/WGPU rather than copying a Python/CUDA task verbatim:
+- **C0 — dependency/toolchain closure:** exact Nix flake/lock, Cargo.lock, rust-toolchain, features, target triple, native dependencies and environment declarations.
+- **C1 — CPU entrypoint:** execute the declared CPU entrypoint in a qualified isolated environment, with tracked product source frozen.
+- **C2 — target/ABI alignment:** compiler/linker/target/OS and graphics/API/driver compatibility; unsupported hardware is not applicable, not a pass.
+- **C3 — actual accelerator compute:** execute and verify a small GPU workload; device enumeration or adapter visibility is insufficient.
+- **C4 — distributed readiness:** multi-device/process execution only where the repository actually declares it; preserve applicability and denominator.
+- **C5 — capability-report calibration:** compare agent-reported paths, versions and readiness with independent runtime probes; report false positives separately.
+
+This lane belongs in CEB #10419 and composes with #10064 isolation, #10369 trust, #10370 evidence convergence and the existing canonical receipt/evaluator owners. It is distinct from RSI-Forge/#9332, which tests converting a paper's method into an executable environment. A repository may be runnable without its paper method being faithfully reproduced, and a paper task may be preconfigured by a human without the agent having solved environment synthesis.
+
+Runner-independent work: design-only 10–15 repository task blueprints across Rust/Nix CPU-only, native extensions, WGPU/Vulkan, CUDA-backed repositories and distributed settings where applicable; pin target hardware and capability applicability; define source-only views and no-tracked-source-modification rules; author positive/negative/false-self-report controls; audit licenses, secrets and leakage. Do not execute repository-controlled builds/tests before #10064 isolation qualification.
+
+Prospective pilot gates (not results): zero false claims of runtime capability; exact toolchain/lock provenance for every qualified run; separate C0–C4 denominators; initial hypotheses of 80% CPU entrypoint readiness and 50% applicable accelerator readiness, recalibrated after task-sample review. Never copy the DDP denominator to repositories without distributed capability.
+
+The claim ceiling is the exact repository revision and setup executing the tested entrypoint under the specified toolchain/hardware. It is not evidence of experiment reproduction, algorithm correctness, scientific validity or R4 improvement.
+
+## 8. Evaluator-research experiment (#10756)
 
 Compare a human-designed compact suite, deterministic rules, frontier-model evaluator builders and Symthaea under matched information and cost. Use separate discovery, development, calibration, sealed target and fresh-family transfer splits.
 
@@ -263,7 +283,7 @@ A high-concordance evaluator is a measurement instrument, not an authority. The 
 
 The first synthetic adversarial-control pack is tracked in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_V0_2026-11-06.json`, with its companion Draft 2020-12 schema in `docs/research/fixtures/SYM_RSI_EVALUATOR_RESEARCH_INTEGRITY_FIXTURES_SCHEMA_V0_2026-11-06.json`. It contains 16 hard-gate negative controls and four synthetic positive/inconclusive controls. A custom structural walk found zero schema errors, 16 unique negative-control IDs and the expected hard-gate/non-hard-gate split. These fixtures specify threat mutations and expected dispositions; they are not real task data, sealed tests or a substitute for an independently custodied target portfolio.
 
-## 8. Immediate execution sequence
+## 9. Immediate execution sequence
 
 1. Finish semantic R4 preregistration checks in #10749, including scope-routed research-state comparisons, and preserve TEMPLATE_NOT_PREREGISTERED until an actual experiment is frozen.
 2. Use #10844 to separate state representation from scope routing and test global, routed, shuffled and oracle assignments under matched complete-rollout cost.
@@ -274,7 +294,7 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 7. Audit Coral Discovery's best-of-three reporting against its per-task evaluation caps; do not treat six/tie/two as a mean-over-seeds effect.
 8. Use #10717 for causal attribution and #10497 for the same-start test of whether the inherited improvement procedure itself gets better.
 
-## 9. Claim boundaries and reproducibility
+## 10. Claim boundaries and reproducibility
 
 - A structural or semantic validator pass is not evidence that referenced files, digests, signatures or custodians are authentic.
 - A disjointness declaration is not proof of population independence; an independent custodian must inspect the actual manifests.
@@ -303,11 +323,10 @@ The first synthetic adversarial-control pack is tracked in `docs/research/fixtur
 16. ResearchEnvBench (IJCAI 2026): https://doi.org/10.24963/ijcai.2026/48 ; https://arxiv.org/abs/2603.06739
 17. Coral Autoresearch coordination study (September 2026): https://coral-labs.ai/autoresearch/
 18. Harness-RSI survey, revised author reading version (2026-11-04; not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
-16. AREX: https://arxiv.org/abs/2607.21461
-17. Harness-Zero: https://arxiv.org/abs/2609.24974
-18. Routed Continual Learning: https://arxiv.org/abs/2610.38796
-19. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
-20. Harness-RSI survey (revised 2026-11-04, not peer-reviewed): https://lucasxinyu.github.io/harness-rsi/paper/
-21. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
-22. RRSI: https://arxiv.org/abs/2609.24972
-23. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
+19. AREX: https://arxiv.org/abs/2607.21461
+20. Harness-Zero: https://arxiv.org/abs/2609.24974
+21. Routed Continual Learning: https://arxiv.org/abs/2610.38796
+22. AMA-Bench: https://proceedings.mlr.press/v306/zhao26bs.html
+23. Harness-Bench paper v2: https://arxiv.org/abs/2605.27922 ; live project, task matrix and current run snapshot: https://www.harness-bench.ai/
+24. RRSI: https://arxiv.org/abs/2609.24972
+25. RRSI public implementation (Apache-2.0, current repo README and protocol): https://github.com/google-research/rrsi
