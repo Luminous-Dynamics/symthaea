@@ -198,6 +198,60 @@ The singing programme therefore needs a separate licensed and consented collecti
 
 Build the language capability registry by task, not by language-count marketing. Text normalization, G2P, ASR, translation, speech generation, singing generation, code-switching, and community review each need their own evidence and status. isiZulu, isiXhosa, Sesotho, and the remaining languages should stay unverified for singing until speaker-reviewed held-out evidence exists.
 
+## 2026 multilingual phonology benchmark update
+
+Two recent EMNLP 2026 benchmarks materially change how the G2P replacement should be evaluated.
+
+### mPhonBench — cross-language phonological competence
+
+mPhonBench covers 10 tasks, 58 languages, and 19 scripts. Its reported findings are relevant to the South African roadmap: mid-sized language models can match or exceed expert systems on some G2P tasks, but underrepresented languages still suffer a performance penalty. Few-shot examples help partially; generic phonological descriptions alone are not reliably exploited.
+
+Source: https://aclanthology.org/2026.emnlp-main.2456/
+
+**Implication:** avoid a language-count target. A language is only supported for a task after word-level, phoneme-level, and dialect-specific held-out evaluation. The registry should explicitly record text normalization, G2P, code-switching, ASR, speech synthesis, singing synthesis, and community review separately.
+
+### UGTPHON — canonical and non-canonical text are different tasks
+
+UGTPHON evaluates English, Vietnamese, and Korean user-generated text. Its authors report a canonical-to-non-canonical pronunciation error gap of up to 66.8 PER points for existing systems; a retrieval-augmented, staged compositional method with fewer than 0.5B parameters reduced that gap by up to 83% in their experiments.
+
+Source: https://aclanthology.org/2026.findings-emnlp.1020/
+
+**Implication:** contractions, abbreviations, slang, names, dialect spellings, and code-switches should not be handled by a single spelling-to-phone fallback. Introduce a normalization/retrieval stage that retains the original surface form and context, proposes canonical-form hypotheses, and then asks the pronunciation lattice to resolve them. Retrieval results remain candidates, never ground truth.
+
+### Singing annotation and quality evaluation
+
+STARS (Findings ACL 2025) unifies singing transcription, phoneme alignment, note transcription, vocal-technique labels, and global style annotation. It is a useful reference for building the annotation pipeline, while the independent gold subset still needs human adjudication and singer/song-disjoint splits.
+
+Source: https://aclanthology.org/2025.findings-acl.781/
+
+SingMOS-Pro provides 7,981 clips from 41 systems and 12 datasets with at least five professional ratings per clip, including lyric, melody, and overall-quality dimensions. It should be used to calibrate and screen quality predictors, not as a replacement for blind human comparisons on our own languages and control tasks.
+
+Source: https://arxiv.org/abs/2510.01812/
+
+### Revised benchmark protocol and proposed gates
+
+Keep these as separate tracks; do not collapse them into a single score.
+
+| Track | Core measures | Proposed qualification target |
+|---|---|---|
+| Contextual G2P | PER, exact word-variant accuracy, heteronym selection, per-phone confusion | Report per language/dialect and by word-frequency/OOV stratum; target ≥95% exact accuracy on reviewed in-domain English pilot, with no silent fallback |
+| Selective prediction | Coverage versus selective PER, OOV precision/recall, Brier score and calibration | At an explicitly chosen coverage point, target ≤1% error among accepted high-confidence predictions; ambiguous/OOV words must remain unresolved |
+| Score/phone compliance | Missing/duplicated/reordered phones, event coverage, rest leakage, melisma legality | Zero hard symbolic-contract violations on synthetic controls and reviewed fixed-score test cases |
+| Temporal realization | Phone onset/offset median and p95 error, note FFE/GPE/VDE, coda-release error | Initial target: phone-boundary p95 ≤30 ms and zero overlap/rest violations; publish per-phone and per-register distributions |
+| Expressive control | One-factor-at-a-time control-response matrix, intended-change success, collateral change | Target ≥90% directional success for supported controls, with <5% collateral change outside the target region |
+| Perceptual quality | Blinded naturalness, intelligibility, expression, identity, artifacts and pairwise preference | Non-inferiority to the strongest reproducible score-conditioned baseline on shared cases before claiming a quality advantage |
+
+These are proposed qualification gates, not existing results or published SOTA. The 95% G2P target applies only to the initial reviewed English in-domain pilot, not to all accents or South African languages. The 30 ms boundary target is an engineering target to be validated against human annotator uncertainty and frame/sample resolution.
+
+A credible superiority claim should require:
+1. exact reproduction of at least one score-conditioned external baseline on the same held-out lyrics, score, language, singer and voice-reference cases;
+2. higher hard-constraint compliance and better controllability on the same cases;
+3. no statistically meaningful loss in human-rated naturalness or intelligibility;
+4. confidence intervals, per-case receipts, failures, abstentions and exclusions;
+5. separate reports for prompt-to-song systems and fixed-score singing systems.
+
+For South African languages, start with language-specific reviewer agreements and a small licensed, consented gold corpus. Do not infer isiZulu/isiXhosa singing competence from multilingual speech-model results or from a public dataset whose terms prohibit synthesis use.
+
 ## Next experiments
 
 1. Reconcile the unintegrated physical-tract prototype with the actual `symthaea-vocal-tract` API; create one canonical module graph and compile its example/renderer before exposing it.
