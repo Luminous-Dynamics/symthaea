@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/tools/rea-agent-scorecard/schemas/oracle-v0.schema.json",
+  "title": "REA agent hidden oracle v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "suite_id", "tasks"],
+  "properties": {
+    "schema": { "const": "luminous.rea.agent-oracle.v0" },
+    "suite_id": { "type": "string", "minLength": 1 },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "artifact_sha256",
+          "expected_scope",
+          "expected_answer",
+          "fault_family",
+          "pair",
+          "occurrence"
+        ],
+        "properties": {
+          "task_id": { "type": "string", "minLength": 1 },
+          "artifact_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "expected_scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "subject_sha256",
+              "operation",
+              "platform",
+              "platform_version",
+              "environment_id"
+            ],
+            "properties": {
+              "subject_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "operation": { "type": "string", "minLength": 1 },
+              "platform": { "type": ["string", "null"], "minLength": 1 },
+              "platform_version": { "type": ["string", "null"], "minLength": 1 },
+              "environment_id": { "type": ["string", "null"], "minLength": 1 }
+            }
+          },
+          "expected_answer": {},
+          "fault_family": { "type": "string", "minLength": 1 },
+          "pair": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["pair_id", "kind", "role"],
+                "properties": {
+                  "pair_id": { "type": "string", "minLength": 1 },
+                  "kind": { "enum": ["relevant_mutation", "irrelevant_mutation"] },
+                  "role": { "enum": ["baseline", "mutated"] }
+                }
+              }
+            ]
+          },
+          "occurrence": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "index_json_pointer",
+                  "occurrence_index",
+                  "raw_name_sha256_json_pointer",
+                  "raw_name_sha256"
+                ],
+                "properties": {
+                  "index_json_pointer": { "type": "string" },
+                  "occurrence_index": { "type": "integer", "minimum": 0 },
+                  "raw_name_sha256_json_pointer": { "type": ["string", "null"] },
+                  "raw_name_sha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
