@@ -321,7 +321,7 @@ mod tests {
                 ];
                 let pair01_index = assignment[0] * 2 + assignment[1];
                 let pair12_index = assignment[1] * 2 + assignment[2];
-                let mut weight = unary[0][assignment[0]]
+                let weight = unary[0][assignment[0]]
                     .checked_mul(unary[1][assignment[1]]).unwrap()
                     .checked_mul(unary[2][assignment[2]]).unwrap()
                     .checked_mul(pair01[pair01_index]).unwrap()
@@ -331,9 +331,6 @@ mod tests {
                     state_masses[variable][assignment[variable]] = state_masses[variable][assignment[variable]]
                         .checked_add(weight).unwrap();
                 }
-                // Keep the loop's assignment weight immutable across variables.
-                weight = CheckedRational::zero();
-                let _ = weight;
             }
 
             let expected = state_masses
