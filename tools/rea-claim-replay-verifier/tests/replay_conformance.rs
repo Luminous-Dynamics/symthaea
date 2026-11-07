@@ -1709,3 +1709,71 @@ fn terminal_pagination_and_self_reported_all_pages_do_not_prove_population_compl
     );
 }
 
+#[test]
+fn incomplete_downstream_processing_cannot_promote_whole_population_completeness() {
+    let mut value = rea_compat::verify_evidence_json(fixture_bytes())
+        .unwrap()
+        .value;
+    value["normalized_result"] = json!({
+        "declared_query": {
+            "query_id": "snapshot-query-23",
+            "source_snapshot_id": "snapshot-23",
+            "expected_items": ["item-a", "item-b", "item-c"]
+        },
+        "enumeration": {
+            "enumerated_item_ids": ["item-a", "item-b", "item-c"],
+            "terminal_cursor_seen": true
+        },
+        "acquisition": {
+            "acquired_item_ids": ["item-a", "item-b", "item-c"],
+            "acquisition_failures": []
+        },
+        "processing": {
+            "processed_item_ids": ["item-a", "item-c"],
+            "failed_item_ids": ["item-b"],
+            "failure_reasons": [{"item_id": "item-b", "reason": "unsupported_format"}],
+            "provider_claims_all_items_processed": true
+        }
+    });
+    value["evidence_id"] = json!(rea_compat::compute_evidence_id(&value).unwrap());
+    let evidence_bytes = serde_json::to_vec(&value).unwrap();
+    let evidence = rea_compat::verify_evidence_json(&evidence_bytes).unwrap();
+
+    // It is valid to establish exactly what the provider reported, including
+    // its inconsistent all-processed flag. That does not validate the flag.
+    let mut observation_claim = provider_claim(evidence.evidence_id.clone());
+    observation_claim.asserted_value = evidence.value["normalized_result"].clone();
+    let (observation_claim_bytes, observation_result_bytes) =
+        produce(&observation_claim, std::slice::from_ref(&evidence));
+    let observation_replay = replay_claim_evaluation(
+        &observation_claim_bytes,
+        &[&evidence_bytes],
+        &observation_result_bytes,
+    )
+    .unwrap();
+    assert_eq!(observation_replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(
+        observation_replay.expected_disposition,
+        Disposition::SupportedWithinScope
+    );
+
+    // v0 has no processing/population completeness rule. The explicit failed
+    // item and self-reported completion flag cannot promote the stronger claim.
+    let mut completeness_claim = observation_claim;
+    completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
+    completeness_claim.source_predicate_type = None;
+    let (claim_bytes, result_bytes) =
+        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let replay =
+        replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
+
+    assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
+    assert_eq!(replay.expected_disposition, Disposition::Unverified);
+    let result: Value = serde_json::from_slice(&result_bytes).unwrap();
+    assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
+}
+
