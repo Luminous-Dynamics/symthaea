@@ -264,7 +264,8 @@ fn render_one(
     let capability_manifest_blake3 = blake3::hash(&serde_json::to_vec(&capabilities)?)
         .to_hex()
         .to_string();
-    let stem = engine.render(performance)?;
+    let policy = SingingRenderPolicy::score_conditioned_comparison();
+    let stem = engine.render_with_policy(performance, &policy)?;
     let id = blind_id(salt, &stem.backend, case_id);
     let filename = format!("{id}.wav");
     let audio_path = output.join(&filename);
