@@ -46,8 +46,18 @@ module now also implements fixed-cardinality sprinkling, analytic interval
 volumes, causal order and Lorentz boosts for 2+1D and 3+1D. Independent
 Python reference sweeps over 12 seeds per dimension (N=1,500) recover the
 expected Myrheim–Meyer dimensions within about 0.02 on average. The higher-D
-reference pair-count and chain observables remain O(N²). All Rust tests are
-still pending the pinned toolchain.
+reference pair-count and chain observables remain O(N²).
+A successor/predecessor bitset interval histogram now counts exact open-order
+interval cardinalities and is checked against brute-force controls and Lorentz
+boosts in D=2,3,4. Its first four abundance bins also feed a dimensionless
+4D BDG action bracket, n-N0+9N1-16N2+8N3; tests cover hand-counted chains,
+antichains and reject non-4D inputs. This is a finite-set combinatorial
+implementation only, not a discrete d'Alembertian, path integral, quantum
+counting algorithm or continuum-limit demonstration.
+
+Pinned exact-head CI has now passed the causal-set and Chain Theory focused
+packages. The additional interval-histogram and BDG action tests added after
+that passing head are awaiting the next exact-head run.
 
 ### Time-crystal foundation
 
@@ -400,10 +410,12 @@ between competing hypotheses, not simply to the most complex simulation.
     cubic brute-force oracle on all small posets; verify invariance under
     Lorentz boosts in D=2,3,4 and test empty/chain/antichain/duplicate-coordinate
     controls.
-12. BDG action readiness: once the dimension-specific coefficients and
-    boundary conventions are independently fixed, compare every interval
-    abundance and total action against an independent implementation, then
-    test ensemble means and variance against continuum-curvature references.
+12. 4D BDG action: compare the exact integer bracket against an
+    independent pairwise oracle and published coefficient set; then test
+    ensemble means/variance on Poisson sprinklings against continuum
+    Einstein-Hilbert curvature for geometries with known scalar curvature.
+    Keep discreteness scale, Planck scale, boundary terms and sign convention
+    explicit in every physical action comparison.
 13. Complexity comparison: separate classical algorithms from quantum
     counting results. A 2026 PR Research paper gives a ~O(N²) quantum algorithm
     for BDG action evaluation; compare the correct oracle/query/hardware model
