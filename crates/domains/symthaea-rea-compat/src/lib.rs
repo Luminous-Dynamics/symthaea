@@ -1153,7 +1153,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn canonical_jcs_matches_rfc8785_appendix_b_finite_number_vectors() {
         let input = r#"[
