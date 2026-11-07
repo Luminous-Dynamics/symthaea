@@ -862,7 +862,7 @@ mod tests {
         SelectionReceipt::bind(
             SelectionAuthority::HumanReviewer,
             "review:fixture",
-            1,
+            2,
             language,
             source_text,
             word,
