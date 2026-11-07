@@ -287,7 +287,7 @@ pub fn verify_branch_sum(
     split_variable: usize,
     budget: EnumerationBudget,
 ) -> Result<BranchSumReport, DecompositionError> {
-    validate_problem(problem)?;
+    validate_problem(problem, budget)?;
     if split_variable >= problem.variables.len() {
         return Err(DecompositionError::SplitVariableOutOfRange {
             variable: split_variable,
@@ -349,7 +349,7 @@ pub fn verify_independent_product(
     free_variables: &[usize],
     budget: EnumerationBudget,
 ) -> Result<IndependentProductReport, DecompositionError> {
-    validate_problem(problem)?;
+    validate_problem(problem, budget)?;
     let variable_count = problem.variables.len();
     let mut seen = vec![false; variable_count];
     let mut component_owner = vec![None; variable_count];
@@ -512,7 +512,7 @@ pub fn verify_projected_support(
     visible_variables: &[usize],
     budget: EnumerationBudget,
 ) -> Result<ProjectedSupportReport, DecompositionError> {
-    validate_problem(problem)?;
+    validate_problem(problem, budget)?;
     let rows = assignment_count(problem.variables.len(), budget)?;
     let mut visible_seen = vec![false; problem.variables.len()];
     let mut visible_names = Vec::with_capacity(visible_variables.len());
