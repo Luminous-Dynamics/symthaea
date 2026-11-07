@@ -322,8 +322,8 @@ fn render_vowel_notes(
     // of concatenating every melisma note into continuous audio.
     for (index, note) in notes.iter().enumerate() {
         let start_fraction = ((note.start_time - timeline_start) / timeline_span).clamp(0.0, 1.0);
-        let end_fraction = ((note.start_time + note.duration - timeline_start) / timeline_span)
-            .clamp(0.0, 1.0);
+        let end_fraction =
+            ((note.start_time + note.duration - timeline_start) / timeline_span).clamp(0.0, 1.0);
         let start = (start_fraction * destination_len as f32).round() as usize;
         let end = (end_fraction * destination_len as f32).round() as usize;
         let start = start.min(destination_len);
@@ -667,9 +667,7 @@ mod tests {
             energy: 1.0,
         };
         let source: Vec<f32> = (0..9_600)
-            .map(|index| {
-                (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin()
-            })
+            .map(|index| (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin())
             .collect();
         let output = render_vowel_notes(&source, &syllable, sample_rate, 4_800);
 
@@ -679,12 +677,20 @@ mod tests {
                 / samples.len().max(1) as f32)
                 .sqrt()
         };
-        assert!(rms(&output[..1_400]) > 1e-3, "first note should contain audio");
         assert!(
-            output[1_600..3_200].iter().all(|sample| sample.abs() < 1e-8),
+            rms(&output[..1_400]) > 1e-3,
+            "first note should contain audio"
+        );
+        assert!(
+            output[1_600..3_200]
+                .iter()
+                .all(|sample| sample.abs() < 1e-8),
             "the 200ms gap must remain silent"
         );
-        assert!(rms(&output[3_400..4_700]) > 1e-3, "melisma note should contain audio");
+        assert!(
+            rms(&output[3_400..4_700]) > 1e-3,
+            "melisma note should contain audio"
+        );
     }
 
     #[test]
