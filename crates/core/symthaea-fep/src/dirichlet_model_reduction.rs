@@ -1641,9 +1641,8 @@ mod tests {
             (labelled.model_information_gain_nats - quotient.model_information_gain_nats).abs()
                 < 1e-12
         );
-        let expected_label_only_entropy = -0.2_f64 * 0.2_f64.ln()
-            - 0.3_f64 * 0.3_f64.ln()
-            + 0.5_f64 * 0.5_f64.ln();
+        let expected_label_only_entropy =
+            -0.2_f64 * 0.2_f64.ln() - 0.3_f64 * 0.3_f64.ln() + 0.5_f64 * 0.5_f64.ln();
         assert!(
             (labelled.expected_posterior_model_entropy_nats
                 - quotient.expected_posterior_model_entropy_nats
