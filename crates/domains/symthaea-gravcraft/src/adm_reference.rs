@@ -496,7 +496,10 @@ mod tests {
             },
             GravcraftConfig::default(),
         );
-        assert_eq!(result, Err(AdmReferenceError::InvalidConfiguration));
+        assert!(matches!(
+            result,
+            Err(AdmReferenceError::InvalidConfiguration)
+        ));
     }
 
     #[test]
