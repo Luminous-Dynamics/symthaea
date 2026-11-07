@@ -332,14 +332,10 @@ pub fn verify_support_reduction_equivalence(
             })
             .collect();
         let Some(&original_value) = original.table.get(&original_key) else {
-            return Err(StrategyBddError::MissingTruthTableRow {
-                key: original_key,
-            });
+            return Err(StrategyBddError::MissingTruthTableRow { key: original_key });
         };
         let Some(&reduced_value) = reduced.table.get(&reduced_key) else {
-            return Err(StrategyBddError::MissingTruthTableRow {
-                key: reduced_key,
-            });
+            return Err(StrategyBddError::MissingTruthTableRow { key: reduced_key });
         };
         if original_value != reduced_value {
             return Err(StrategyBddError::SupportReductionMismatch {
@@ -390,18 +386,16 @@ pub fn minimize_strategy_function_support(
                 .collect();
             let mut high_key = low_key.clone();
             high_key[dependency_index] = true;
-            let low = function
-                .table
-                .get(&low_key)
-                .ok_or_else(|| StrategyBddError::MissingTruthTableRow {
+            let low = function.table.get(&low_key).ok_or_else(|| {
+                StrategyBddError::MissingTruthTableRow {
                     key: low_key.clone(),
-                })?;
-            let high = function
-                .table
-                .get(&high_key)
-                .ok_or_else(|| StrategyBddError::MissingTruthTableRow {
+                }
+            })?;
+            let high = function.table.get(&high_key).ok_or_else(|| {
+                StrategyBddError::MissingTruthTableRow {
                     key: high_key.clone(),
-                })?;
+                }
+            })?;
             if low != high {
                 influential = true;
                 break;
@@ -432,12 +426,11 @@ pub fn minimize_strategy_function_support(
         for (reduced_index, &original_index) in support_indices.iter().enumerate() {
             original_key[original_index] = reduced_key[reduced_index];
         }
-        let value = *function
-            .table
-            .get(&original_key)
-            .ok_or_else(|| StrategyBddError::MissingTruthTableRow {
+        let value = *function.table.get(&original_key).ok_or_else(|| {
+            StrategyBddError::MissingTruthTableRow {
                 key: original_key.clone(),
-            })?;
+            }
+        })?;
         table.insert(reduced_key, value);
     }
 
@@ -446,8 +439,7 @@ pub fn minimize_strategy_function_support(
         dependencies,
         table,
     };
-    let mut report =
-        verify_support_reduction_equivalence(function, &reduced_function, budget)?;
+    let mut report = verify_support_reduction_equivalence(function, &reduced_function, budget)?;
     report.support_pair_checks = support_pair_checks;
 
     Ok(StrategyFunctionSupportReduction {
@@ -848,8 +840,7 @@ pub fn find_exact_minimum_robdd_order(
 
     let mut order: Vec<usize> = (0..dependency_count).collect();
     let initial_variable_order = order.clone();
-    let initial_bdd =
-        compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
+    let initial_bdd = compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
     let initial_node_count = initial_bdd.nodes.len();
     let mut best_order = order.clone();
     let mut best_bdd = initial_bdd;
@@ -1188,7 +1179,10 @@ mod tests {
 
     #[test]
     fn support_analysis_budget_is_fail_closed() {
-        let source = function(&[0, 1, 2], &[false, true, false, true, false, true, false, true]);
+        let source = function(
+            &[0, 1, 2],
+            &[false, true, false, true, false, true, false, true],
+        );
         let tight = StrategyBddBudget {
             max_support_checks: 0,
             ..budget()
@@ -1244,10 +1238,10 @@ mod tests {
             let sifted = sift_strategy_function_robdd(&support.function, budget()).unwrap();
             assert!(exact.minimum_node_count <= sifted.optimized_node_count);
             assert!(sifted.optimized_node_count <= sifted.initial_node_count);
-            verify_robdd_matches_strategy_function(&exact.bdd, &support.function, budget()).unwrap();
-            maximum_sift_gap = maximum_sift_gap.max(
-                sifted.optimized_node_count - exact.minimum_node_count,
-            );
+            verify_robdd_matches_strategy_function(&exact.bdd, &support.function, budget())
+                .unwrap();
+            maximum_sift_gap =
+                maximum_sift_gap.max(sifted.optimized_node_count - exact.minimum_node_count);
         }
         assert!(maximum_sift_gap <= 1);
     }
