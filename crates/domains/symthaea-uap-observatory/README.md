@@ -135,10 +135,11 @@ The trajectory_metrics module implements fixed-window OSPA(2):
 - Unmatched track sets receive the OSPA(2) cardinality penalty. Uniform time
   weights are the default; callers can provide nonnegative custom weights.
 
-The implementation caps the smaller assignment side at 20 tracks, validates
-window lengths and finite positions, and reports localization and cardinality
-contributions separately. It is an evaluation metric, not a tracker. It does
-not implement the explicit switch-cost term in T-GOSPA.
+The implementation caps the smaller assignment side at 20 tracks and the
+window at 100,000 frames, validates time weights and finite positions, and
+reports localization and cardinality contributions separately. It is an
+evaluation metric, not a tracker. It does not implement the explicit
+switch-cost term in T-GOSPA.
 
 Run the metric tests with:
 
