@@ -156,9 +156,16 @@ measurement-quality contract:
 - Raw observation digests, duplicate-record rejection and a data-quality tier.
 - Uncalibrated records are retained and marked, never silently repaired.
 
-This first milestone does not triangulate targets or classify objects. The
-next stages are clock synchronization, coordinate transforms, covariance
-propagation, track association and blinded known-object tests.
+The crate now also includes a bearing-only triangulation prototype:
+ECEF sensor origins, body-to-ECEF quaternions, azimuth/elevation uncertainties,
+line-intersection initialization, weighted Gauss-Newton refinement, a local
+linearized covariance, residual chi-square and geometry-conditioning gates.
+An independent Python experiment over 1,000 synthetic noisy four-sensor
+trials recovered the target with 3.1 cm 3D RMSE and 94.4% coverage of the
+nominal 95% covariance ellipsoid. These are synthetic Python reference values,
+not Rust execution or real sensor performance. Pose/clock covariance,
+asynchronous fusion, atmospheric effects, multi-target tracking and blind
+known-object tests remain open. No object classification is performed.
 
 ### Broader physics-module audit
 
@@ -333,7 +340,7 @@ between competing hypotheses, not simply to the most complex simulation.
 | CTGP-08 | DTC sensing | Frequency response and linewidth benchmark | Compare against matched conventional sensor baselines |
 | CTGP-09 | GR metric engine | Minkowski/Schwarzschild metric, signature, Christoffel, Riemann/Ricci and geodesic reference kernel (prototype added) | Rust tests + independent curvature, conserved quantities and weak-field regression; ADM constraints remain future work |
 | CTGP-10 | GravCraft physical audit | Stress-energy tensor and energy-condition ledger | No trajectory claim without source/constraint solution |
-| CTGP-11 | UAP evidence pipeline | Calibration/provenance contract (prototype added), then reconstruction | Blinded known-object challenge before anomaly claims |
+| CTGP-11 | UAP evidence pipeline | Calibration/provenance plus bearing-only triangulation and local covariance prototype added | Rust tests + pose/time covariance, Monte Carlo coverage and blind known-object challenge |
 | CTGP-12 | Cross-domain discovery | Typed causal/quantum/temporal/geometric hypothesis graph | Out-of-sample prediction beats null models |
 | CTGP-13 | Scientific evidence plane | Shared exact-head BLAKE3 manifest/receipt contract (prototype added) | Unit tests; reject dirty trees, stale heads, queued/skipped checks and missing log/output digests |
 
@@ -465,7 +472,7 @@ physical fidelity only count after matched benchmarks.
 | Chain Theory | Independent 172-row algebraic enumerator | Author's Python/Lean source and third-party audit | Full CSV byte diff, pinned Lean build and assumption audit | Formalize alternative grammars and falsify/derive the physical bridge |
 | Time crystals | Exact 1D/2D small-system kicked-Ising state vector | Exact diagonalization, TeNPy/quimb/ITensor, IBM experiments | Match exact small-system unitary and published observables | Validated MPS/TEBD, phase rigidity, heating/lifetime and sensing metrics |
 | GR / GravCraft | Minkowski/Schwarzschild metric, connection, curvature and geodesic kernel | Einstein Toolkit, SpECTRE, analytic GR references | Curvature, invariants, convergence and coordinate checks | Constraint-consistent 3+1 evolution and stress-energy/energy-condition audit |
-| UAP | Typed calibration/provenance contract | NASA-recommended calibrated multi-sensor methodology; sensor-fusion toolchains | Blind known-object calibration, timing, parallax and uncertainty reconstruction | Low false-positive track reconstruction on sealed data |
+| UAP | Typed calibration/provenance plus bearing-only triangulation and local covariance prototype | NASA-recommended calibrated multi-sensor methodology; sensor-fusion toolchains | Synthetic 93–97% 95%-ellipsoid coverage, then independent Rust/Python checks and blind known-object calibration | Low false-positive track reconstruction on sealed data with pose/time covariance |
 | Evidence plane | Exact-head BLAKE3 manifest and receipt prototype | Reproducible-build, SBOM and scientific workflow provenance systems | Tamper/stale-head/skip/dirty-tree negative controls | Reusable proof-carrying experiments across Symthaea, Mycelix and Sol-Atlas |
 
 ### Measurable targets
@@ -498,9 +505,9 @@ physical fidelity only count after matched benchmarks.
    heating and finite-size scaling.
 5. Add coordinate-transform and step-size convergence tests to the metric
    geometry kernel; only then begin replacing the GravCraft shift shortcut.
-6. Extend UAP sensor records into clock synchronization, frame transforms,
-   covariance propagation, multi-sensor track association and sealed
-   known-object challenges.
+6. Extend UAP triangulation into clock synchronization, pose/boresight
+   covariance, platform-motion/parallax estimation, asynchronous multi-sensor
+   track association and sealed known-object challenges.
 7. Bind each run to the shared science-evidence manifest, exact-head logs,
    input/output digests and explicit claim boundary.
 8. Preserve independent baselines, negative controls and failed results;
