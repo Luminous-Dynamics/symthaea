@@ -1,0 +1,659 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_count": 8,
+  "generated_as": "frozen contract fixtures; not physical vessel data",
+  "cases": [
+    {
+      "fixture_id": "adequate-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "adequate-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              150,
+              150
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "AllDimensionsCoverTargetWithinDeclaredBounds",
+        "notes": ""
+      }
+    },
+    {
+      "fixture_id": "water-limited-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "water-limited-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              30,
+              30
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              50,
+              50
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "AtLeastOneDimensionDoesNotCoverTarget",
+        "notes": "Endurance is 3d water, 30d protein, 5d blackwater headroom."
+      }
+    },
+    {
+      "fixture_id": "scalar-average-false-pass-7d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "scalar-average-false-pass-7d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 7,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              30,
+              30
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              50,
+              50
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "AtLeastOneDimensionDoesNotCoverTarget",
+        "notes": "A naive arithmetic mean is 12.67d and would falsely pass 7d; water and waste are each below target."
+      }
+    },
+    {
+      "fixture_id": "food-nutrient-limited-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "food-nutrient-limited-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_energy",
+            "food_protein",
+            "food_micronutrients",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_energy",
+            "quantity_unit": "kcal-thousand",
+            "rate_unit": "kcal-thousand/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_energy",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_micronutrients",
+            "quantity_unit": "g",
+            "rate_unit": "g/day",
+            "usable_stock": [
+              20,
+              20
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_micronutrients",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              200,
+              200
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "AtLeastOneDimensionDoesNotCoverTarget",
+        "notes": "Calorie, protein and water dimensions are sufficient, but micronutrient stock is only 2d."
+      }
+    },
+    {
+      "fixture_id": "missing-blackwater-dimension-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "missing-blackwater-dimension-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "Indeterminate",
+        "notes": "Required blackwater dimension is omitted and cannot be treated as zero or sufficient."
+      }
+    },
+    {
+      "fixture_id": "zero-depletion-rate-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "zero-depletion-rate-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              0,
+              0
+            ],
+            "net_depletion_per_day": [
+              0,
+              0
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              0,
+              2
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              200,
+              200
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "AllDimensionsCoverTargetWithinDeclaredBounds",
+        "notes": "Static interval arithmetic reports no finite upper endurance bound for zero lower depletion; this does not prove infinite real-world autonomy."
+      }
+    },
+    {
+      "fixture_id": "stale-condition-evidence-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "stale-condition-evidence-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              200,
+              200
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "Invalid",
+        "notes": "Potable-water budget is bound to a different conditions digest."
+      }
+    },
+    {
+      "fixture_id": "malformed-inverted-stock-14d",
+      "evidence_class": "synthetic",
+      "case": {
+        "profile": {
+          "profile_id": "malformed-inverted-stock-14d",
+          "profile_manifest_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "target_days": 14,
+          "required_dimension_ids": [
+            "potable_water",
+            "food_protein",
+            "blackwater_headroom"
+          ]
+        },
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "operating_case_id": "frozen-offshore-case-v1",
+        "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "resources": [
+          {
+            "dimension_id": "potable_water",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              30,
+              20
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:potable_water",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "food_protein",
+            "quantity_unit": "kg",
+            "rate_unit": "kg/day",
+            "usable_stock": [
+              300,
+              300
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:food_protein",
+            "evidence_class": "synthetic"
+          },
+          {
+            "dimension_id": "blackwater_headroom",
+            "quantity_unit": "L",
+            "rate_unit": "L/day",
+            "usable_stock": [
+              200,
+              200
+            ],
+            "net_depletion_per_day": [
+              10,
+              10
+            ],
+            "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "operating_case_id": "frozen-offshore-case-v1",
+            "conditions_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "evidence_ref": "synthetic:blackwater_headroom",
+            "evidence_class": "synthetic"
+          }
+        ]
+      },
+      "expected": {
+        "disposition": "Invalid",
+        "notes": "Stock lower bound exceeds upper bound."
+      }
+    }
+  ]
+}
