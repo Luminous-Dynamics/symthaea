@@ -11,7 +11,10 @@ use anyhow::{Result, anyhow};
 use rustfft::{FftPlanner, num_complex::Complex};
 use symthaea_muse::Note;
 
-use super::singing_engine::{SingingVoiceEngine, VocalPerformance, VocalStem, VocalSyllable};
+use super::singing_engine::{
+    CapabilitySupport, ControlCapability, SingingBackendCapabilities, SingingControl,
+    SingingVoiceEngine, VocalPerformance, VocalStem, VocalSyllable,
+};
 use super::{KokoroConfig, KokoroEngine};
 
 const FFT_SIZE: usize = 1024;
@@ -38,9 +41,47 @@ impl KokoroSingingEngine {
     }
 }
 
+fn kokoro_capability_manifest() -> SingingBackendCapabilities {
+    use CapabilitySupport::{Approximated, Conditional, Native, Unsupported};
+    let control = |control, support, rationale: &str| ControlCapability {
+        control,
+        support,
+        rationale: rationale.to_string(),
+    };
+    SingingBackendCapabilities::new(
+        "kokoro-v2",
+        vec![
+            control(SingingControl::LyricText, Native, "Kokoro synthesizes the supplied lyric phrase directly"),
+            control(SingingControl::Language, Conditional, "v2 accepts English only; pronunciation quality depends on the selected Kokoro voice/model"),
+            control(SingingControl::ExactPhoneSequence, Approximated, "phone events guide syllable/phoneme slicing weights; generated speech phones come from Kokoro's text model"),
+            control(SingingControl::SyllableAlignment, Approximated, "syllable and phoneme boundaries are estimated from durations then acoustically snapped"),
+            control(SingingControl::NotePitch, Approximated, "vowel segments are pitch-retuned toward each note frequency"),
+            control(SingingControl::NoteDuration, Approximated, "syllable/note segments are time-stretched to target durations"),
+            control(SingingControl::AbsoluteOnsetAndRests, Native, "syllable stems are placed at absolute note onsets in a zero-initialized timeline"),
+            control(SingingControl::ConsonantAnticipation, Approximated, "the syllable stem is placed before the note onset by the configured advance, without independent phone-boundary control"),
+            control(SingingControl::Melisma, Approximated, "vowel source segments are redistributed across melisma notes"),
+            control(SingingControl::ContinuousPitchCurve, Unsupported, "the renderer follows discrete note frequencies, not the VocalPerformance pitch_curve"),
+            control(SingingControl::PhraseExpressionCurve, Unsupported, "the phrase-level expression curve is not consumed"),
+            control(SingingControl::Breathiness, Unsupported, "the VocalSyllable breathiness field is not applied"),
+            control(SingingControl::Energy, Approximated, "syllable energy is mapped to a local gain factor"),
+            control(SingingControl::Tension, Unsupported, "tension controls are not consumed"),
+            control(SingingControl::Vibrato, Approximated, "vibrato is added to note segments using syllable-level rate/depth/onset controls"),
+            control(SingingControl::Portamento, Unsupported, "portamento amount is not consumed by the current note retuner"),
+            control(SingingControl::Articulation, Unsupported, "the legato/neutral/staccato enum does not currently alter synthesis"),
+            control(SingingControl::VoiceIdentity, Conditional, "voice identity is selected by the Kokoro voice identifier supplied at engine load"),
+            control(SingingControl::LocalEdits, Unsupported, "the renderer produces a whole phrase and exposes no localized cache/edit operation"),
+        ],
+    )
+    .expect("static Kokoro capability manifest is complete")
+}
+
 impl SingingVoiceEngine for KokoroSingingEngine {
     fn id(&self) -> &str {
         "kokoro-v2"
+    }
+
+    fn capabilities(&self) -> SingingBackendCapabilities {
+        kokoro_capability_manifest()
     }
 
     fn render(&mut self, performance: &VocalPerformance) -> Result<VocalStem> {
@@ -155,7 +196,11 @@ fn trim_outer_silence(samples: &[f32], sample_rate: u32) -> &[f32] {
 }
 
 fn render_syllable(source: &[f32], syllable: &VocalSyllable, sample_rate: u32) -> Vec<f32> {
-    let target_duration = (syllable.end_time_s() - syllable.note.start_time).max(0.06);
+    // render() places the stem at note.start_time - consonant_advance_s.
+    // Include that same pre-onset interval in its length so the rendered stem
+    // still reaches the final note/melisma boundary instead of ending early.
+    let onset_start_s = (syllable.note.start_time - syllable.consonant_advance_s).max(0.0);
+    let target_duration = (syllable.end_time_s() - onset_start_s).max(0.06);
     let target_len = (target_duration * sample_rate as f32) as usize;
     if source.is_empty() {
         return vec![0.0; target_len];
@@ -268,17 +313,35 @@ fn render_vowel_notes(
     destination_len: usize,
 ) -> Vec<f32> {
     let notes: Vec<_> = syllable.notes().collect();
-    let total_duration = notes.iter().map(|n| n.duration.max(0.01)).sum::<f32>();
-    let note_weights: Vec<f32> = notes.iter().map(|n| n.duration.max(0.01)).collect();
+    let note_weights: Vec<f32> = notes.iter().map(|note| note.duration.max(0.01)).collect();
     let source_boundaries = acoustic_boundaries(source, &note_weights, sample_rate);
-    let mut output = Vec::with_capacity(destination_len);
-    let mut assigned = 0usize;
+    let Some(first_note) = notes.first() else {
+        return vec![0.0; destination_len];
+    };
+    let Some(last_note) = notes.last() else {
+        return vec![0.0; destination_len];
+    };
+    let timeline_start = first_note.start_time;
+    let timeline_end = last_note.start_time + last_note.duration;
+    let timeline_span = (timeline_end - timeline_start).max(1e-6);
+    let mut output = vec![0.0f32; destination_len];
+
+    // Compress the full note-and-rest timeline into the available vowel
+    // budget. This preserves the relative position of explicit gaps instead
+    // of concatenating every melisma note into continuous audio.
     for (index, note) in notes.iter().enumerate() {
-        let length = if index + 1 == notes.len() {
-            destination_len.saturating_sub(assigned)
-        } else {
-            (destination_len as f32 * note.duration.max(0.01) / total_duration) as usize
-        };
+        let start_fraction = ((note.start_time - timeline_start) / timeline_span).clamp(0.0, 1.0);
+        let end_fraction =
+            ((note.start_time + note.duration - timeline_start) / timeline_span).clamp(0.0, 1.0);
+        let start = (start_fraction * destination_len as f32).round() as usize;
+        let end = (end_fraction * destination_len as f32).round() as usize;
+        let start = start.min(destination_len);
+        let end = end.min(destination_len).max(start);
+        let length = end - start;
+        if length == 0 {
+            continue;
+        }
+
         let chunk = &source[source_boundaries[index]..source_boundaries[index + 1]];
         let source_f0 = estimate_f0_track(chunk, sample_rate)
             .or_else(|| estimate_f0_track(source, sample_rate))
@@ -287,10 +350,10 @@ fn render_vowel_notes(
         let mut segment = retune_to_length(chunk, ratio, length);
         add_expression_vibrato(&mut segment, sample_rate, syllable);
         fade_edges(&mut segment, (sample_rate as f32 * 0.002) as usize);
-        output.extend(segment);
-        assigned += length;
+        for (destination, sample) in output[start..end].iter_mut().zip(segment) {
+            *destination += sample;
+        }
     }
-    output.resize(destination_len, 0.0);
     output
 }
 
@@ -582,6 +645,84 @@ mod tests {
     use super::*;
 
     #[test]
+    fn melisma_vowel_renderer_preserves_absolute_note_gaps() {
+        let sample_rate = 8_000u32;
+        let first = Note {
+            frequency: 220.0,
+            start_time: 0.0,
+            duration: 0.2,
+            velocity: 0.7,
+        };
+        let second = Note {
+            frequency: 220.0,
+            start_time: 0.4,
+            duration: 0.2,
+            velocity: 0.7,
+        };
+        let syllable = VocalSyllable {
+            lyric: "a".to_string(),
+            phonemes: Vec::new(),
+            note: first,
+            melisma_notes: vec![second],
+            slur: true,
+            articulation: super::super::singing_engine::VocalArticulation::Legato,
+            consonant_advance_s: 0.0,
+            phrase_index: 0,
+            portamento: 0.0,
+            vibrato_onset: 1.0,
+            vibrato_rate_hz: 0.0,
+            vibrato_depth_cents: 0.0,
+            breathiness: 0.0,
+            energy: 1.0,
+        };
+        let source: Vec<f32> = (0..9_600)
+            .map(|index| (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin())
+            .collect();
+        let output = render_vowel_notes(&source, &syllable, sample_rate, 4_800);
+
+        assert_eq!(output.len(), 4_800);
+        let rms = |samples: &[f32]| {
+            (samples.iter().map(|sample| sample * sample).sum::<f32>()
+                / samples.len().max(1) as f32)
+                .sqrt()
+        };
+        assert!(
+            rms(&output[..1_400]) > 1e-3,
+            "first note should contain audio"
+        );
+        assert!(
+            output[1_600..3_200]
+                .iter()
+                .all(|sample| sample.abs() < 1e-8),
+            "the 200ms gap must remain silent"
+        );
+        assert!(
+            rms(&output[3_400..4_700]) > 1e-3,
+            "melisma note should contain audio"
+        );
+    }
+
+    #[test]
+    fn syllable_render_duration_includes_consonant_anticipation() {
+        let sample_rate = 8_000u32;
+        let note = Note {
+            frequency: 220.0,
+            start_time: 0.5,
+            duration: 0.5,
+            velocity: 0.7,
+        };
+        let mut performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
+        performance.syllables[0].consonant_advance_s = 0.1;
+        let syllable = &performance.syllables[0];
+        let source: Vec<f32> = (0..9_600)
+            .map(|index| (std::f32::consts::TAU * 220.0 * index as f32 / sample_rate as f32).sin())
+            .collect();
+        let rendered = render_syllable(source.as_slice(), syllable, sample_rate);
+        // The output starts at 0.4s and still terminates at the 1.0s note end.
+        assert_eq!(rendered.len(), 4_800);
+    }
+
+    #[test]
     fn retune_preserves_requested_duration() {
         let input: Vec<f32> = (0..4000).map(|i| (i as f32 * 0.04).sin()).collect();
         for ratio in [0.75, 1.0, 1.5] {
@@ -589,5 +730,26 @@ mod tests {
             assert_eq!(output.len(), 6000);
             assert!(output.iter().all(|x| x.is_finite()));
         }
+    }
+}
+
+#[cfg(test)]
+mod capability_manifest_tests {
+    use super::*;
+
+    #[test]
+    fn static_backend_capability_manifest_is_complete_and_valid() {
+        let manifest = kokoro_capability_manifest();
+        manifest.validate().unwrap();
+        assert_eq!(manifest.controls.len(), SingingControl::ALL.len());
+        assert!(
+            manifest
+                .controls
+                .iter()
+                .any(|entry| entry.control == SingingControl::ConsonantAnticipation)
+        );
+        super::super::singing_engine::SingingRenderPolicy::score_conditioned_comparison()
+            .validate_against(&manifest)
+            .unwrap();
     }
 }

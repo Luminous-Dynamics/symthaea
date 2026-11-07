@@ -1,17 +1,21 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Blind, backend-comparative Muse vocal release gate.
+//! Blind, backend-comparative Muse vocal release gate for integrated backends.
+//! The unintegrated physical-tract prototype is tracked separately and is not
+//! represented as a selectable singing backend here.
 
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use symthaea::voice::diffsinger::DiffSingerEngine;
-use symthaea::voice::functional_singing::FunctionalSingingEngine;
 use symthaea::voice::kokoro_singing::KokoroSingingEngine;
-use symthaea::voice::singing_engine::{SingingVoiceEngine, VocalPerformance, VocalStem};
+use symthaea::voice::singing_engine::{
+    SingingBackendCapabilities, SingingVoiceEngine, VocalPerformance, VocalStem,
+};
 use symthaea::voice::singing_quality::{VocalQualityMetrics, analyze_vocal_stem};
 use symthaea_muse::{MusicalIntent, MusicalState, Style};
 
@@ -83,6 +87,8 @@ struct BlindClip {
     case_id: usize,
     lyrics: String,
     audio: String,
+    audio_blake3: String,
+    performance_blake3: Option<String>,
     category: String,
     challenge: String,
 }
@@ -92,6 +98,38 @@ struct KeyEntry {
     clip_id: String,
     backend: String,
     case_id: usize,
+    performance_blake3: Option<String>,
+    audio_blake3: String,
+    capability_manifest_blake3: Option<String>,
+}
+
+#[derive(Serialize)]
+struct CaseReceipt {
+    case_id: usize,
+    seed: u64,
+    lyrics: String,
+    challenge: String,
+    category: String,
+    style: String,
+    valence: f32,
+    arousal: f32,
+    composition_energy: f32,
+    bars: usize,
+    consciousness_level: f32,
+    transpose_semitones: f32,
+    melody: Vec<symthaea_muse::Note>,
+    performance_blake3: String,
+}
+
+#[derive(Serialize)]
+struct RunManifest {
+    schema: &'static str,
+    source_revision: String,
+    voice_id: String,
+    diffsinger_worker: Option<String>,
+    diffsinger_worker_blake3: Option<String>,
+    case_count: usize,
+    cases: Vec<CaseReceipt>,
 }
 
 #[derive(Serialize)]
@@ -100,6 +138,8 @@ struct ObjectiveEntry {
     backend: String,
     case_id: usize,
     metrics: VocalQualityMetrics,
+    capability_manifest: SingingBackendCapabilities,
+    capability_manifest_blake3: String,
 }
 
 #[derive(Deserialize)]
@@ -142,6 +182,49 @@ fn blind_id(salt: &str, backend: &str, case_id: usize) -> String {
     format!("vocal-{}", &digest.to_hex()[..12])
 }
 
+fn source_revision(args: &[String]) -> Result<String> {
+    let revision = arg(args, "--source-revision")
+        .or_else(|| std::env::var("VOCAL_PHONEME_REVISION").ok())
+        .or_else(|| std::env::var("GITHUB_SHA").ok())
+        .or_else(|| {
+            let status = Command::new("git")
+                .args(["status", "--porcelain", "--untracked-files=all"])
+                .output()
+                .ok()?;
+            if !status.status.success() || !status.stdout.is_empty() {
+                return None;
+            }
+            let output = Command::new("git").args(["rev-parse", "HEAD"]).output().ok()?;
+            if !output.status.success() {
+                return None;
+            }
+            String::from_utf8(output.stdout)
+                .ok()
+                .map(|value| value.trim().to_string())
+        })
+        .context(
+            "exact source revision unavailable; provide --source-revision, VOCAL_PHONEME_REVISION, or a clean Git checkout",
+        )?;
+    validate_source_revision(&revision)
+}
+
+fn validate_source_revision(revision: &str) -> Result<String> {
+    if revision.len() != 40 || !revision.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        anyhow::bail!("source revision must be a 40-character hexadecimal Git commit SHA");
+    }
+    Ok(revision.to_ascii_lowercase())
+}
+
+fn performance_digest(performance: &VocalPerformance) -> Result<String> {
+    let bytes = serde_json::to_vec(performance)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
+fn artifact_digest(path: &Path) -> Result<String> {
+    let bytes = std::fs::read(path)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
 fn blind_salt(args: &[String], output: &Path) -> Result<String> {
     if let Some(seed) = arg(args, "--blind-seed") {
         return Ok(blake3::hash(seed.as_bytes()).to_hex().to_string());
@@ -169,16 +252,34 @@ fn render_one(
     key: &mut Vec<KeyEntry>,
     objective: &mut Vec<ObjectiveEntry>,
 ) -> Result<()> {
-    let stem = engine.render(performance)?;
+    let capabilities = engine.capabilities();
+    capabilities.validate()?;
+    if capabilities.backend_id != engine.id() {
+        anyhow::bail!(
+            "backend capability ID {:?} does not match renderer ID {:?}",
+            capabilities.backend_id,
+            engine.id()
+        );
+    }
+    let capability_manifest_blake3 = blake3::hash(&serde_json::to_vec(&capabilities)?)
+        .to_hex()
+        .to_string();
+    let policy = SingingRenderPolicy::score_conditioned_comparison();
+    let stem = engine.render_with_policy(performance, &policy)?;
     let id = blind_id(salt, &stem.backend, case_id);
     let filename = format!("{id}.wav");
-    save(&output.join(&filename), &stem)?;
+    let audio_path = output.join(&filename);
+    save(&audio_path, &stem)?;
+    let audio_blake3 = artifact_digest(&audio_path)?;
+    let performance_blake3 = performance_digest(performance)?;
     let metrics = analyze_vocal_stem(performance, &stem);
     clips.push(BlindClip {
         clip_id: id.clone(),
         case_id,
         lyrics: performance.lyrics.clone(),
         audio: filename,
+        audio_blake3: audio_blake3.clone(),
+        performance_blake3: Some(performance_blake3.clone()),
         category: case.category.to_string(),
         challenge: case.challenge.to_string(),
     });
@@ -186,12 +287,17 @@ fn render_one(
         clip_id: id.clone(),
         backend: stem.backend.clone(),
         case_id,
+        performance_blake3: Some(performance_blake3),
+        audio_blake3,
+        capability_manifest_blake3: Some(capability_manifest_blake3.clone()),
     });
     objective.push(ObjectiveEntry {
         clip_id: id,
         backend: stem.backend,
         case_id,
         metrics,
+        capability_manifest: capabilities,
+        capability_manifest_blake3,
     });
     Ok(())
 }
@@ -213,12 +319,16 @@ fn import_references(
             anyhow::bail!("duplicate human-reference case_id {}", reference.case_id);
         }
         let filename = format!("{id}.wav");
-        std::fs::copy(&reference.audio, output.join(&filename))?;
+        let destination = output.join(&filename);
+        std::fs::copy(&reference.audio, &destination)?;
+        let audio_blake3 = artifact_digest(&destination)?;
         clips.push(BlindClip {
             clip_id: id.clone(),
             case_id: reference.case_id,
             lyrics: reference.lyrics,
             audio: filename,
+            audio_blake3: audio_blake3.clone(),
+            performance_blake3: None,
             category: reference.category,
             challenge: reference.challenge,
         });
@@ -226,9 +336,101 @@ fn import_references(
             clip_id: id,
             backend: "human-reference".to_string(),
             case_id: reference.case_id,
+            performance_blake3: None,
+            audio_blake3,
+            capability_manifest_blake3: None,
         });
     }
     Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+struct RatingCoverage {
+    clip_count: usize,
+    listener_count: usize,
+    rating_count: usize,
+    complete: bool,
+}
+
+fn validate_rating_inputs(
+    ratings: &[HumanRating],
+    clips: &[BlindClip],
+    minimum_listeners: usize,
+) -> Result<RatingCoverage> {
+    if minimum_listeners == 0 {
+        anyhow::bail!("minimum listener count must be at least one");
+    }
+
+    let mut clip_by_id = BTreeMap::new();
+    for clip in clips {
+        if clip.clip_id.trim().is_empty()
+            || clip_by_id.insert(clip.clip_id.as_str(), clip).is_some()
+        {
+            anyhow::bail!("blind manifest contains an empty or duplicate clip ID");
+        }
+    }
+
+    let listeners: std::collections::BTreeSet<_> = ratings
+        .iter()
+        .map(|rating| rating.listener_id.as_str())
+        .collect();
+    let mut by_clip_listener = BTreeMap::new();
+
+    for rating in ratings {
+        if rating.listener_id.trim().is_empty() {
+            anyhow::bail!("human rating has an empty listener ID");
+        }
+        let Some(clip) = clip_by_id.get(rating.clip_id.as_str()) else {
+            anyhow::bail!("human rating references unknown clip ID {}", rating.clip_id);
+        };
+
+        let rating_values = [
+            rating.naturalness,
+            rating.emotional_fit,
+            rating.identity_consistency,
+            rating.artifact_free,
+        ];
+        if rating_values
+            .iter()
+            .any(|value| !value.is_finite() || !(1.0..=5.0).contains(value))
+        {
+            anyhow::bail!("invalid or non-finite human rating for {}", rating.clip_id);
+        }
+
+        let expected_words = clip.lyrics.split_whitespace().count();
+        if expected_words == 0
+            || rating.lyric_words_total != expected_words
+            || rating.lyric_words_understood > rating.lyric_words_total
+        {
+            anyhow::bail!(
+                "invalid lyric comprehension denominator/count for {}: expected {expected_words}, got {}/{}",
+                rating.clip_id,
+                rating.lyric_words_understood,
+                rating.lyric_words_total
+            );
+        }
+
+        if by_clip_listener
+            .insert((rating.clip_id.as_str(), rating.listener_id.as_str()), ())
+            .is_some()
+        {
+            anyhow::bail!("duplicate listener/clip rating for {}", rating.clip_id);
+        }
+    }
+
+    let complete = listeners.len() >= minimum_listeners
+        && clips.iter().all(|clip| {
+            listeners
+                .iter()
+                .all(|listener| by_clip_listener.contains_key(&(clip.clip_id.as_str(), *listener)))
+        });
+
+    Ok(RatingCoverage {
+        clip_count: clips.len(),
+        listener_count: listeners.len(),
+        rating_count: ratings.len(),
+        complete,
+    })
 }
 
 fn main() -> Result<()> {
@@ -245,15 +447,16 @@ fn main() -> Result<()> {
         .unwrap_or("5")
         .parse()
         .context("invalid --minimum-listeners")?;
+    let source_revision = source_revision(&args)?;
     std::fs::create_dir_all(&output)?;
     let salt = blind_salt(&args, &output)?;
 
     let mut kokoro = KokoroSingingEngine::load(&voice)?;
-    let mut functional = FunctionalSingingEngine::default();
     let mut diffsinger = worker.as_deref().map(DiffSingerEngine::spawn).transpose()?;
     let mut clips = Vec::new();
     let mut key = Vec::new();
     let mut objective = Vec::new();
+    let mut case_receipts = Vec::new();
 
     let cases = cases();
     for (case_id, case) in cases.iter().enumerate() {
@@ -283,19 +486,24 @@ fn main() -> Result<()> {
         let ratio = 2.0f32.powf(case.transpose_semitones / 12.0);
         melody.iter_mut().for_each(|note| note.frequency *= ratio);
         let performance = VocalPerformance::from_melody(case.lyrics, &melody, "en")?;
+        case_receipts.push(CaseReceipt {
+            case_id,
+            seed: case_id as u64 + 9001,
+            lyrics: case.lyrics.to_string(),
+            challenge: case.challenge.to_string(),
+            category: case.category.to_string(),
+            style: format!("{:?}", case.style),
+            valence: case.valence,
+            arousal: case.arousal,
+            composition_energy: 0.55,
+            bars: 2,
+            consciousness_level: 0.72,
+            transpose_semitones: case.transpose_semitones,
+            melody: melody.clone(),
+            performance_blake3: performance_digest(&performance)?,
+        });
         render_one(
             &mut kokoro,
-            &performance,
-            case_id,
-            case,
-            &salt,
-            &output,
-            &mut clips,
-            &mut key,
-            &mut objective,
-        )?;
-        render_one(
-            &mut functional,
             &performance,
             case_id,
             case,
@@ -319,6 +527,23 @@ fn main() -> Result<()> {
             )?;
         }
     }
+    let run_manifest = RunManifest {
+        schema: "muse-vocal-run/v1",
+        source_revision,
+        voice_id: voice.clone(),
+        diffsinger_worker: worker.as_ref().map(|path| path.display().to_string()),
+        diffsinger_worker_blake3: worker
+            .as_ref()
+            .map(|path| artifact_digest(path))
+            .transpose()?,
+        case_count: case_receipts.len(),
+        cases: case_receipts,
+    };
+    std::fs::write(
+        output.join("run_manifest.json"),
+        serde_json::to_vec_pretty(&run_manifest)?,
+    )?;
+
     if let Some(manifest) = reference_manifest {
         import_references(&manifest, &salt, &output, &mut clips, &mut key)?;
     }
@@ -362,35 +587,16 @@ fn main() -> Result<()> {
     });
     if let Some(path) = ratings {
         let values: Vec<HumanRating> = serde_json::from_slice(&std::fs::read(path)?)?;
+        let coverage = validate_rating_inputs(&values, &clips, minimum_listeners)?;
         let backend_by_id: BTreeMap<_, _> = key
             .iter()
             .map(|entry| (entry.clip_id.as_str(), entry.backend.as_str()))
             .collect();
-        let listeners: std::collections::BTreeSet<_> =
-            values.iter().map(|r| r.listener_id.clone()).collect();
-        let mut by_clip_listener = BTreeMap::new();
-        for rating in &values {
-            if !(1.0..=5.0).contains(&rating.naturalness)
-                || !(1.0..=5.0).contains(&rating.emotional_fit)
-                || !(1.0..=5.0).contains(&rating.identity_consistency)
-                || !(1.0..=5.0).contains(&rating.artifact_free)
-                || rating.lyric_words_understood > rating.lyric_words_total
-            {
-                anyhow::bail!("invalid human rating for {}", rating.clip_id);
-            }
-            if by_clip_listener
-                .insert((rating.clip_id.clone(), rating.listener_id.clone()), ())
-                .is_some()
-            {
-                anyhow::bail!("duplicate listener/clip rating");
-            }
-        }
-        let complete = listeners.len() >= minimum_listeners
-            && clips.iter().all(|c| {
-                listeners.iter().all(|listener| {
-                    by_clip_listener.contains_key(&(c.clip_id.clone(), listener.clone()))
-                })
-            });
+        let listeners: std::collections::BTreeSet<_> = values
+            .iter()
+            .map(|rating| rating.listener_id.clone())
+            .collect();
+        let complete = coverage.complete;
         let model_values: Vec<_> = values
             .iter()
             .filter(|rating| backend_by_id.get(rating.clip_id.as_str()) != Some(&"human-reference"))
@@ -415,7 +621,7 @@ fn main() -> Result<()> {
         let comprehension = understood as f32 / total.max(1) as f32;
         status = serde_json::json!({
             "objective_pass": objective_pass, "human_complete": complete,
-            "listener_count": listeners.len(), "naturalness_mean": naturalness,
+            "listener_count": listeners.len(), "rating_coverage": coverage, "naturalness_mean": naturalness,
             "human_reference_rating_count": reference_values.len(),
             "emotional_fit_mean": emotional_fit, "identity_consistency_mean": identity_consistency,
             "artifact_free_mean": artifact_free, "word_comprehension": comprehension,
@@ -430,4 +636,102 @@ fn main() -> Result<()> {
     )?;
     println!("{}", serde_json::to_string_pretty(&status)?);
     Ok(())
+}
+
+#[cfg(test)]
+mod rating_validation_tests {
+    use super::*;
+
+    fn clip(id: &str, lyrics: &str) -> BlindClip {
+        BlindClip {
+            clip_id: id.to_string(),
+            case_id: 0,
+            lyrics: lyrics.to_string(),
+            audio: format!("{id}.wav"),
+            audio_blake3: "audio-digest".to_string(),
+            performance_blake3: Some("performance-digest".to_string()),
+            category: "test".to_string(),
+            challenge: "test".to_string(),
+        }
+    }
+
+    fn rating(clip_id: &str, listener_id: &str) -> HumanRating {
+        HumanRating {
+            listener_id: listener_id.to_string(),
+            clip_id: clip_id.to_string(),
+            naturalness: 4.0,
+            emotional_fit: 4.0,
+            identity_consistency: 4.0,
+            artifact_free: 4.0,
+            lyric_words_understood: 2,
+            lyric_words_total: 2,
+        }
+    }
+
+    #[test]
+    fn balanced_known_ratings_are_complete() {
+        let clips = vec![clip("a", "hello world"), clip("b", "hello world")];
+        let ratings = vec![
+            rating("a", "listener-1"),
+            rating("b", "listener-1"),
+            rating("a", "listener-2"),
+            rating("b", "listener-2"),
+        ];
+        let result = validate_rating_inputs(&ratings, &clips, 2).unwrap();
+        assert!(result.complete);
+        assert_eq!(result.rating_count, 4);
+        assert_eq!(result.listener_count, 2);
+    }
+
+    #[test]
+    fn unknown_clip_ids_cannot_contaminate_human_means() {
+        let clips = vec![clip("a", "hello world")];
+        let ratings = vec![rating("a", "listener-1"), rating("ghost", "listener-1")];
+        let error = validate_rating_inputs(&ratings, &clips, 1)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("unknown clip ID"), "{error}");
+    }
+
+    #[test]
+    fn lyric_comprehension_denominator_must_match_manifest_lyrics() {
+        let clips = vec![clip("a", "hello world")];
+        let mut invalid = rating("a", "listener-1");
+        invalid.lyric_words_total = 20;
+        let error = validate_rating_inputs(&[invalid], &clips, 1)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("denominator"), "{error}");
+    }
+
+    #[test]
+    fn non_finite_and_duplicate_ratings_are_rejected() {
+        let clips = vec![clip("a", "hello world")];
+        let mut nan_rating = rating("a", "listener-1");
+        nan_rating.naturalness = f32::NAN;
+        assert!(validate_rating_inputs(&[nan_rating], &clips, 1).is_err());
+
+        let duplicate = vec![rating("a", "listener-1"), rating("a", "listener-1")];
+        assert!(validate_rating_inputs(&duplicate, &clips, 1).is_err());
+    }
+
+    #[test]
+    fn incomplete_rating_matrix_never_counts_as_complete() {
+        let clips = vec![clip("a", "hello world"), clip("b", "hello world")];
+        let ratings = vec![rating("a", "listener-1")];
+        let result = validate_rating_inputs(&ratings, &clips, 1).unwrap();
+        assert!(!result.complete);
+    }
+    #[test]
+    fn source_revision_requires_exact_git_sha() {
+        let valid = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(validate_source_revision(valid).unwrap(), valid);
+        assert_eq!(
+            validate_source_revision("ABCDEF0123456789ABCDEF0123456789ABCDEF01").unwrap(),
+            "abcdef0123456789abcdef0123456789abcdef01"
+        );
+        assert!(validate_source_revision("queued").is_err());
+        assert!(validate_source_revision("0123456789abcdef").is_err());
+        assert!(validate_source_revision("z123456789abcdef0123456789abcdef01234567").is_err());
+    }
 }

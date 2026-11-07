@@ -1,5 +1,7 @@
 # Symthaea Functional Vocal Tract
 
+> **Integration status (7 November 2026):** This document records the physical-vocal design and prototype history, not a currently selectable production backend. An exact-head compile of the attempted root `functional_singing` adapter found that it references gesture, anatomy, physical-frame and waveguide APIs that are not exported by the current `symthaea-vocal-tract` crate. The adapter is therefore not declared in `src/voice/mod.rs`; the physical renderer described below must not be treated as available from the current `singing` feature. The compiled crate currently exposes the HDC vocal-tract controller/pipeline and FormantFrame/speech interfaces. Integration work is tracked in [issue #10860](https://github.com/Luminous-Dynamics/symthaea/issues/10860). No compatibility stubs or weakened compile gates are being used.
+
 Symthaea now has an experimental singing backend whose vocal identity is a
 compact, inspectable physiology rather than a recorded speaker embedding. It is
 intended as the controllable physical branch of a hybrid singer; it is not yet

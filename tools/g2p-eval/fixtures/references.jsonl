@@ -1,0 +1,3 @@
+{"case_id":"hello","language":"en","text":"hello","context":"neutral greeting","expected_oov":false,"accepted_variants":[{"variant_id":"standard","phones":["h","ə","l","oʊ"],"syllable_boundaries":[2,4],"syllable_stress":[0,1]}]}
+{"case_id":"read-past","language":"en","text":"read","context":"I read it yesterday","expected_oov":false,"accepted_variants":[{"variant_id":"present","phones":["ɹ","iː","d"],"syllable_boundaries":[3],"syllable_stress":[1]},{"variant_id":"past","phones":["ɹ","ɛ","d"],"syllable_boundaries":[3],"syllable_stress":[1]}]}
+{"case_id":"xqzpl","language":"en","text":"xqzpl","context":"synthetic OOV control","expected_oov":true,"accepted_variants":[]}

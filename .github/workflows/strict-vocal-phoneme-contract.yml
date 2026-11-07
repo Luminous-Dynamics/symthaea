@@ -1,0 +1,92 @@
+name: Strict vocal phoneme contract
+
+on:
+  pull_request:
+    paths:
+      - "src/voice/mod.rs"
+      - "src/voice/singing_engine.rs"
+      - "src/voice/kokoro_singing.rs"
+      - "src/voice/diffsinger.rs"
+      - "examples/muse_vocal_release_gate.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "scripts/diffsinger_worker.py"
+      - "scripts/diffsinger_phonemes.py"
+      - "scripts/test_diffsinger_phonemes.py"
+      - "tools/pronunciation-plan/**"
+      - ".github/workflows/pronunciation-plan-contract.yml"
+      - "docs/FUNCTIONAL_VOCAL_TRACT.md"
+      - "docs/VOCAL_PHYSIOLOGY_ARCHITECTURE.md"
+      - "docs/research/VOCAL_PHONEME_COVERAGE_AND_SA_SINGING_2026-11-07.md"
+      - "docs/research/VOCAL_CONTROL_AND_EVALUATION_BENCHMARK_V1.md"
+      - ".github/workflows/strict-vocal-phoneme-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-phoneme-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact checked-out revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_PHONEME_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test dependency-free IPA, duration, melisma and language contracts
+        run: python3 scripts/test_diffsinger_phonemes.py -v
+
+      - name: Check worker and helper syntax
+        run: python3 -m py_compile scripts/diffsinger_worker.py scripts/diffsinger_phonemes.py scripts/test_diffsinger_phonemes.py
+
+      - name: Install pinned Rust formatter
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check only the changed Rust files
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/mod.rs src/voice/singing_engine.rs src/voice/kokoro_singing.rs src/voice/diffsinger.rs examples/muse_vocal_release_gate.rs
+
+      - name: Format-check standalone pronunciation lattice
+        run: cargo +1.96.0 fmt --manifest-path tools/pronunciation-plan/Cargo.toml -- --check
+
+      - name: Resolve pinned pronunciation-plan dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/pronunciation-plan/Cargo.toml
+
+      - name: Test pronunciation lattice and phrase-aware score alignment
+        run: cargo +1.96.0 test --locked --manifest-path tools/pronunciation-plan/Cargo.toml
+
+      - name: Compile the feature-gated vocal renderer with frozen dependencies
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
+
+      - name: Test VocalPerformance construction and fail-closed validation
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::singing_engine::tests -- --test-threads=1
+
+      - name: Test Kokoro score-gap preservation
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features "singing,voice-tts" voice::kokoro_singing::tests -- --test-threads=1
+
+      - name: Compile the integrated comparative vocal release gate
+        run: cargo +1.96.0 check --locked -p symthaea --example muse_vocal_release_gate --features "singing,voice-tts"
+
+      - name: Test human rating coverage and provenance receipt validation
+        run: cargo +1.96.0 test --locked -p symthaea --example muse_vocal_release_gate --features "singing,voice-tts" rating_validation_tests -- --test-threads=1
+
+      - name: Confirm the frozen lockfile remained unchanged
+        run: git diff --exit-code -- Cargo.lock
