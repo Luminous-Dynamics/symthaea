@@ -801,3 +801,16 @@ pub mod tracking_metrics;
 pub use tracking_metrics::{
     GospaBreakdown, GospaConfig, GospaError, MAX_GOSPA_ASSIGNMENT_SIDE, gospa_frame,
 };
+
+/// Track-set temporal evaluation with a fixed-association OSPA(2) reference.
+pub mod trajectory_metrics;
+
+pub use trajectory_metrics::{
+    MAX_OSPA2_ASSIGNMENT_SIDE,
+    Ospa2Breakdown,
+    Ospa2Config,
+    Ospa2Error,
+    TrackSeries,
+    ospa2_track_distance,
+    ospa2_track_sets,
+};
