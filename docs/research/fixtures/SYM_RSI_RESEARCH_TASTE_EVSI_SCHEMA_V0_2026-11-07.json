@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea finite-state EVSI input with separate costs and downside-risk gate",
+  "description": "Structural schema for the offline research-taste reference calculator. Cross-array dimensional equalities and probability-mass constraints are enforced by the Rust semantic validator.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decision_id",
+    "states",
+    "prior",
+    "actions",
+    "utilities",
+    "outcomes",
+    "direct_experiment_cost",
+    "opportunity_cost",
+    "downside_loss_by_outcome",
+    "cvar_confidence",
+    "max_cvar_downside_loss"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "states": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "prior": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "description": "Must have the same length as states and sum to one."
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "utilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 2,
+        "items": {
+          "type": "number"
+        }
+      },
+      "description": "One row per action and one column per state."
+    },
+    "outcomes": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome_id",
+          "likelihood_by_state"
+        ],
+        "properties": {
+          "outcome_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "likelihood_by_state": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "description": "One value per state; outcome likelihoods must sum to one across outcomes for each state."
+          }
+        }
+      }
+    },
+    "direct_experiment_cost": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Direct resource cost converted into the preregistered utility unit."
+    },
+    "opportunity_cost": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Value of the best foregone alternative use, net of direct experiment cost and in the same utility unit."
+    },
+    "downside_loss_by_outcome": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "description": "Non-negative modeled downside loss for each outcome, in the same utility unit and in the same order as outcomes."
+    },
+    "cvar_confidence": {
+      "type": "number",
+      "minimum": 0,
+      "exclusiveMaximum": 1,
+      "description": "Confidence level for upper-tail CVaR; 0.95 evaluates the worst 5% of predictive downside-loss mass."
+    },
+    "max_cvar_downside_loss": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Maximum admissible CVaR loss; checked independently from positive net EVSI."
+    }
+  }
+}
