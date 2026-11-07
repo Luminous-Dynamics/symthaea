@@ -669,15 +669,17 @@ mod tests {
     fn extreme_dynamic_range_does_not_fall_back_to_uniform() {
         let mut graph = FactorGraph::new();
         let a = graph.add_variable("A", 2);
-        for _ in 0..600 {
+        for _ in 0..1200 {
             graph.add_factor(&[a], vec![1.0e-200, 2.0e-200]);
         }
 
         let result = run_sum_product(&graph, &BPConfig::default()).unwrap();
-        assert!(result.beliefs[0][0] < 1.0e-100);
+        assert_eq!(result.beliefs[0][0], 0.0);
         assert!(result.log_beliefs[0][0].is_finite());
-        assert!(result.log_beliefs[0][0] < -400.0);
+        assert!(result.log_beliefs[0][0] < -800.0);
         assert!((result.beliefs[0][1] - 1.0).abs() < 1.0e-12);
+        assert!(result.max_message_delta < BPConfig::default().tolerance);
+        assert!(result.max_log_message_delta < BPConfig::default().tolerance);
     }
 
     #[test]
