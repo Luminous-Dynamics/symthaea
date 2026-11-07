@@ -14,7 +14,7 @@ const CASES: &[(&str, &str)] = &[
     ("clusters", "quick queen strength sixth"),
     ("irregular_ough", "though through rough tough cough bough"),
     ("heteronym_read", "I read the book yesterday and I will read it tomorrow"),
-    ("heteronym_lead", "the lead singer will lead the band"),
+    ("heteronym_lead", "the lead pipe is heavy and the guide will lead the band"),
     ("silent_letters", "knight debt island subtle"),
     ("contractions", "don't we'll they're I'd"),
     ("multisyllabic", "colonel anemone phenomenon"),
