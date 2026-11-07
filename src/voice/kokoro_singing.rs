@@ -61,7 +61,7 @@ fn kokoro_capability_manifest() -> SingingBackendCapabilities {
             control(SingingControl::ConsonantAnticipation, Approximated, "the syllable stem is placed before the note onset by the configured advance, without independent phone-boundary control"),
             control(SingingControl::Melisma, Approximated, "vowel source segments are redistributed across melisma notes"),
             control(SingingControl::ContinuousPitchCurve, Unsupported, "the renderer follows discrete note frequencies, not the VocalPerformance pitch_curve"),
-            control(SingingControl::PhraseExpressionCurve, Unsupported, "the phrase-level expression curve is not consumed"),
+            control(SingingControl::PhraseExpressionCurve, Approximated, "the phrase energy curve scales per-syllable gain; phrase breathiness and tension are not applied by this renderer"),
             control(SingingControl::PhraseBreathTiming, Unsupported, "breath_before_s and breath_after_s are authoring metadata; Kokoro does not synthesize breath events or schedule them from these fields"),
             control(SingingControl::Breathiness, Unsupported, "the VocalSyllable breathiness field is not applied"),
             control(SingingControl::Energy, Approximated, "syllable energy is mapped to a local gain factor"),
@@ -106,10 +106,19 @@ impl SingingVoiceEngine for KokoroSingingEngine {
             .collect();
         let source_boundaries = acoustic_boundaries(voiced, &syllable_weights, sample_rate);
         let mut rendered: Vec<(usize, Vec<f32>)> = Vec::new();
-        for (syllable_index, syllable) in performance.syllables.iter().enumerate() {
+        for (syllable_index, source_syllable) in performance.syllables.iter().enumerate() {
             let source =
                 &voiced[source_boundaries[syllable_index]..source_boundaries[syllable_index + 1]];
-            let sung = render_syllable(source, syllable, sample_rate);
+            let mut syllable = source_syllable.clone();
+            if let Some((phrase_energy, base_energy)) = phrase_energy_target(
+                performance,
+                syllable_index,
+                syllable.note.start_time,
+            ) {
+                syllable.energy =
+                    (syllable.energy * phrase_energy / base_energy).clamp(0.0, 1.0);
+            }
+            let sung = render_syllable(source, &syllable, sample_rate);
             rendered.push((
                 ((syllable.note.start_time - syllable.consonant_advance_s).max(0.0)
                     * sample_rate as f32) as usize,
@@ -177,6 +186,36 @@ pub fn sing_with_kokoro(lyrics: &str, melody: &[Note], voice: &str) -> Result<(V
     let mut engine = KokoroSingingEngine::load(voice)?;
     let stem = engine.render(&performance)?;
     Ok((stem.samples, stem.sample_rate))
+}
+
+fn phrase_energy_target(performance: &VocalPerformance, syllable_index: usize, time_s: f32) -> Option<(f32, f32)> {
+    let phrase = performance
+        .phrases
+        .iter()
+        .find(|phrase| syllable_index >= phrase.syllable_start && syllable_index < phrase.syllable_end)?;
+    let first = *phrase.expression_curve.first()?;
+    let last = *phrase.expression_curve.last()?;
+    let target = if time_s <= first.time_s {
+        first.energy
+    } else if time_s >= last.time_s {
+        last.energy
+    } else {
+        let right = phrase
+            .expression_curve
+            .partition_point(|point| point.time_s < time_s);
+        let left = right.saturating_sub(1);
+        let from = phrase.expression_curve[left];
+        let to = phrase.expression_curve[right];
+        let span = (to.time_s - from.time_s).max(f32::EPSILON);
+        let ratio = ((time_s - from.time_s) / span).clamp(0.0, 1.0);
+        from.energy + (to.energy - from.energy) * ratio
+    };
+    let base = performance.syllables[phrase.syllable_start..phrase.syllable_end]
+        .iter()
+        .map(|syllable| syllable.energy)
+        .sum::<f32>()
+        / (phrase.syllable_end - phrase.syllable_start) as f32;
+    (base > f32::EPSILON).then_some((target, base))
 }
 
 fn trim_outer_silence(samples: &[f32], sample_rate: u32) -> &[f32] {
@@ -644,6 +683,43 @@ fn fade_edges(samples: &mut [f32], fade: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn phrase_energy_curve_is_interpolated_at_syllable_onset() {
+        let notes = [
+            Note {
+                frequency: 220.0,
+                start_time: 0.0,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+            Note {
+                frequency: 246.94,
+                start_time: 0.5,
+                duration: 0.5,
+                velocity: 0.7,
+            },
+        ];
+        let mut performance = VocalPerformance::from_melody("light bright", &notes, "en").unwrap();
+        performance.phrases[0].expression_curve = vec![
+            ExpressionPoint {
+                time_s: 0.0,
+                energy: 0.35,
+                breathiness: 0.3,
+                tension: 0.3,
+            },
+            ExpressionPoint {
+                time_s: 1.0,
+                energy: 0.7,
+                breathiness: 0.3,
+                tension: 0.3,
+            },
+        ];
+        let first = phrase_energy_target(&performance, 0, 0.0).unwrap();
+        let second = phrase_energy_target(&performance, 1, 0.5).unwrap();
+        assert_eq!(first, (0.35, 0.7));
+        assert_eq!(second, (0.525, 0.7));
+    }
 
     #[test]
     fn melisma_vowel_renderer_preserves_absolute_note_gaps() {
