@@ -55,6 +55,16 @@
         "path": "tasks/chemistry/sargent-lab/propylene-active-learning/README.md",
         "git_blob_sha": "05513bae497d1c66fa9dd39253bf6bbaa6bb054d",
         "purpose": "twin campaign task design, gates and measured/surrogate provenance"
+      },
+      {
+        "path": "tasks/biology/deepmind/nuclease-active-learning/environment/lab/campaign/campaign.json",
+        "git_blob_sha": "75681198b0ecc70d38130c08fd1b1d8e5a8e10fb",
+        "purpose": "private lab campaign rules pinned for public-card fixture derivation"
+      },
+      {
+        "path": "tasks/chemistry/sargent-lab/propylene-active-learning/environment/lab/campaign/campaign.json",
+        "git_blob_sha": "18920080073338f64500db4d0ccd4ffea425e9c1",
+        "purpose": "private lab campaign rules pinned for public-card fixture derivation"
       }
     ]
   },
