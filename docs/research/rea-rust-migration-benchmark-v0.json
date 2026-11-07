@@ -2375,7 +2375,8 @@
         "https://github.com/Luminous-Dynamics/symthaea/pull/10798",
         "https://github.com/Luminous-Dynamics/symthaea/pull/10847",
         "https://github.com/Luminous-Dynamics/symthaea/pull/10927",
-        "https://github.com/Luminous-Dynamics/symthaea/pull/10952"
+        "https://github.com/Luminous-Dynamics/symthaea/pull/10952",
+        "https://github.com/Luminous-Dynamics/symthaea/issues/10989"
       ],
       "objective": "Qualify whether an investigator's typed conclusion is entailed by exact, scoped, dependency-aware evidence; preserve contradictions, missing evidence, inapplicability and unknown provenance instead of turning them into confidence or majority votes.",
       "principle": "Evidence does not vote; claims must be entailed within declared scope. Receipt validity, cryptographic validity, signer trust, package authorization, completeness, runtime behavior and semantic truth are distinct propositions.",
@@ -2485,7 +2486,14 @@
         "provider_self_reported_all_pages_seen_and_all_issued_does_not_self_authorize_completeness",
         "different_provider_names_over_same_incomplete_upstream_collection_do_not_create_independent_completeness",
         "unrelated_population_change_does_not_invalidate_claims_outside_its_declared_dependency_closure",
-        "raw_token_audit_unavailable_on_value_constructed_evidence_must_not_claim_complete_lexical_coverage"
+        "raw_token_audit_unavailable_on_value_constructed_evidence_must_not_claim_complete_lexical_coverage",
+        "jcs_binary64_numeric_intent_is_distinct_from_exact_integer_and_fixed_decimal_intent",
+        "exact_integer_string_profile_rejects_binary64_coercion_and_range_overflow",
+        "fixed_decimal_string_profile_binds_scale_precision_rounding_and_unit",
+        "numeric_intent_is_not_inferred_from_lexical_form_or_magnitude",
+        "value_constructed_evidence_reports_lexical_coverage_unavailable_without_raw_source_binding",
+        "numeric_intent_profile_digest_change_invalidates_stale_typed_numeric_derivation",
+        "negative_zero_exponent_overflow_underflow_and_decimal_tie_controls_follow_declared_profile"
       ],
       "metrics": [
         "claim_disposition_accuracy_by_predicate_and_fault_family",
@@ -2542,7 +2550,13 @@
         "selective_completeness_invalidation_precision_recall",
         "resource_cost_by_population_page_count_and_retention_interval",
         "numeric_precision_warning_recall_by_original_token_availability",
-        "raw_lexeme_coverage_state_accuracy"
+        "raw_lexeme_coverage_state_accuracy",
+        "numeric_intent_profile_schema_accuracy",
+        "exact_integer_string_preservation_rate",
+        "fixed_decimal_exact_round_trip_rate",
+        "numeric_intent_false_inference_rate",
+        "numeric_profile_digest_scope_binding_accuracy",
+        "unit_scale_and_rounding_policy_conformance"
       ],
       "target": "100_percent correct disposition on the frozen finite non-implication suite; zero false entailments on explicit integrity/authenticity/completeness/signature/trust/safety controls; zero independence uplift from duplicated, relayed or unknown-lineage providers; 100_percent deterministic derivation replay for the supported claim subset.; first frozen public seed contains 18 labeled cases; do not generalize the finite conformance result to unseen artifacts or semantic predicates. Additional finite-suite gates: zero false CompleteWithin outcomes on seeded omitted-page, cursor-gap, selective-issuer-publication and incomplete-processing controls; 100% retention/accounting of partial, failed, unsupported and unresolved items; zero completeness uplift from self-assertion or provider-name diversity; and explicit lexical-coverage-state reporting for numeric precision.",
       "protocol": [
@@ -2590,7 +2604,13 @@
         "a complete archive member enumeration is separate from completeness of the broader package repository, device fleet, issuer history or real-world population",
         "use no-upgrade metamorphic tests: add self-reported completeness fields, provider aliases or more records from the same incomplete source; no stronger completeness disposition may result",
         "for raw numeric precision, distinguish source-token-audited, parsed-value-only, and lexical-coverage-unavailable; do not promote parsed-value warnings to complete token coverage",
-        "unknown lexical coverage for Value-constructed Evidence remains unknown; exact raw byte hash binding is required for a complete source-token audit"
+        "unknown lexical coverage for Value-constructed Evidence remains unknown; exact raw byte hash binding is required for a complete source-token audit",
+        "separate RFC 8785 binary64 canonicalization from domain numeric intent; JCS does not declare exact decimal or unit semantics",
+        "numeric intent must be declared by a versioned domain schema at exact JSON Pointers; do not infer intent from lexical shape, magnitude, provider confidence or model output",
+        "keep binary64, safe_integer, exact_integer_string, fixed_decimal_string and opaque_numeric as separate profiles with explicit range/scale/rounding/unit policy",
+        "for exact decimal or large exact integer domains, preserve strings and validate declared grammar rather than coercing through binary64",
+        "bind numeric-intent profile digest, raw source digest, pointer, unit, scale and rounding contract into the typed validation result",
+        "programmatically constructed Value-only evidence without a raw-byte audit has lexical coverage unavailable, not source-token-audited"
       ],
       "claim_boundaries": {
         "member_integrity": "A verified member receipt supports only the exact member occurrence and decompressed bytes under its declared checks and limits.",
@@ -2665,6 +2685,18 @@
           "lexical_coverage_unavailable"
         ],
         "claim_ceiling": "JCS binary64 semantic identity and raw source token preservation are separate. A parsed Value cannot claim complete lexical precision coverage."
+      },
+      "numeric_intent": {
+        "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/10989",
+        "proposed_profiles": [
+          "binary64",
+          "safe_integer",
+          "exact_integer_string",
+          "fixed_decimal_string",
+          "opaque_numeric"
+        ],
+        "integration_status": "design-only; no REA Evidence v1 identity or claim evaluator v0 behavior change",
+        "non_implication": "JCS canonical equality does not establish exact decimal semantics, measurement units or numeric truth"
       }
     }
   ],
