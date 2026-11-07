@@ -1,3 +1,3 @@
-{"case_id":"hello","candidate_id":"fixture-perfect","source_id":"synthetic-test-only","phones":["h","ə","l","oʊ"],"syllable_boundaries":[2,4],"syllable_stress":[0,1],"detected_oov":false,"confidence_exact":0.9}
-{"case_id":"read-past","candidate_id":"fixture-perfect","source_id":"synthetic-test-only","phones":["ɹ","ɛ","d"],"syllable_boundaries":[3],"syllable_stress":[1],"detected_oov":false,"confidence_exact":0.9}
-{"case_id":"xqzpl","candidate_id":"fixture-perfect","source_id":"synthetic-test-only","phones":[],"syllable_boundaries":null,"syllable_stress":null,"detected_oov":true,"confidence_exact":1.0}
+{"case_id":"hello","candidate_id":"fixture-perfect","source_id":"synthetic-test-only","language":"en","phones":["h","ə","l","oʊ"],"syllable_boundaries":[2,4],"syllable_stress":[0,1],"detected_oov":false,"confidence_exact":0.9}
+{"case_id":"read-past","candidate_id":"fixture-perfect","source_id":"synthetic-test-only","language":"en","phones":["ɹ","ɛ","d"],"syllable_boundaries":[3],"syllable_stress":[1],"detected_oov":false,"confidence_exact":0.9}
+{"case_id":"xqzpl","candidate_id":"fixture-perfect","source_id":"synthetic-test-only","language":"en","phones":[],"syllable_boundaries":null,"syllable_stress":null,"detected_oov":true,"confidence_exact":1.0}
