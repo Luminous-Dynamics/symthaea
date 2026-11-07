@@ -1554,7 +1554,6 @@ fn unknown_temporal_scope_fields_are_rejected_instead_of_ignored() {
     assert_eq!(error.kind, ReplayErrorKind::InvalidClaim);
 }
 
-
 #[test]
 fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_completeness() {
     let mut value = rea_compat::verify_evidence_json(fixture_bytes())
@@ -1605,7 +1604,10 @@ fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_com
             .as_array()
             .unwrap()
             .iter()
-            .any(|item| item.as_str().unwrap().contains("does not prove the underlying real-world proposition"))
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("does not prove the underlying real-world proposition"))
     );
 
     // A complete view of registered statements plus an issuer-signed
@@ -1615,20 +1617,25 @@ fn issuer_and_transparency_self_completeness_reports_do_not_prove_population_com
     let mut completeness_claim = report_claim;
     completeness_claim.predicate = ClaimPredicate::WholeArchiveCompleteness;
     completeness_claim.source_predicate_type = None;
-    let (claim_bytes, result_bytes) =
-        produce(&completeness_claim, std::slice::from_ref(&evidence));
+    let (claim_bytes, result_bytes) = produce(&completeness_claim, std::slice::from_ref(&evidence));
     let replay = replay_claim_evaluation(&claim_bytes, &[&evidence_bytes], &result_bytes).unwrap();
 
     assert_eq!(replay.outcome, ReplayOutcome::ReplayMatch);
     assert_eq!(replay.expected_disposition, Disposition::Unverified);
     let result: Value = serde_json::from_slice(&result_bytes).unwrap();
     assert_eq!(result["rule_id"], json!("no-registered-predicate-rule/v0"));
-    assert_eq!(result["evidence_assessments"][0]["kind"], json!("not_evaluated"));
+    assert_eq!(
+        result["evidence_assessments"][0]["kind"],
+        json!("not_evaluated")
+    );
     assert!(
         result["claim_ceiling"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|item| item.as_str().unwrap().contains("No predicate-specific verifier"))
+            .any(|item| item
+                .as_str()
+                .unwrap()
+                .contains("No predicate-specific verifier"))
     );
 }
