@@ -16,6 +16,7 @@ pub mod cognitive_coherence;
 pub mod correlation_auditor;
 pub mod exact_floquet;
 pub mod exact_heisenberg;
+pub mod frequency_locking;
 pub mod floquet_time_crystal;
 pub mod hofstadter;
 pub mod live_audit;
@@ -36,5 +37,9 @@ pub use metrics::{
     SubharmonicScore, effect_size, mean, scorecards_to_csv, scorecards_to_json_array, std_dev,
 };
 
+pub use frequency_locking::{
+    FrequencyLockingConfig, FrequencyLockingError, FrequencyLockingPoint, FrequencyLockingReport,
+    PulseSweepTrace, SubharmonicPeak, assess_frequency_locking, estimate_subharmonic_peak,
+};
 pub use report::{claim_scope_markdown, scorecards_to_markdown_report};
 pub use runner::{BenchmarkConfig, BenchmarkRun, run_all_benchmarks};
