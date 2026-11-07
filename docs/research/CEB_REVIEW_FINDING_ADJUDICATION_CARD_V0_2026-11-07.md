@@ -134,6 +134,7 @@ Complete only for the evaluator/benchmark maintainer, not the candidate reviewer
 - Does this evidence change the frozen target label? **no / propose review / re-adjudicated**
 
 Do not use the model being evaluated as the only truth authority. Report judge versions and per-judge disagreements. A fixed companion only checks whether the specific target mechanism remains live; it does not establish that the whole PR is defect-free.
+This card does not itself qualify an independent pristine regrade; that claim remains blocked until #10369 qualifies signer trust and runner attestation.
 
 ---
 
