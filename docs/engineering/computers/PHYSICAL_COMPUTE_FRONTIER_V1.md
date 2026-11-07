@@ -176,3 +176,42 @@ Do not combine aJ/op, TOPS/W, FPS, optical sample rate, neuron count or accuracy
 ## Claim ceiling
 
 Paper result != independent reproduction. Mathematical pilot != paper reproduction. Simulation != physical device. Core/array energy != full system energy. Neuron count != operations. Optical samples/s != useful task throughput. DFT fault tolerance != arbitrary-matrix fault tolerance. Public code != commercial-use permission. Physical device demonstration != local fabrication capability.
+
+
+## 8. Timescale-matched memory and computation — architectural decision matrix
+
+This is a design hypothesis for workload placement, not a claim that a photonic device replaces a memory product.
+
+| Required state / response regime | Candidate physical substrate | Best-fit role to test | Key failure mode / measurement |
+|---|---|---|---|
+| Sub-ns to ns optical propagation and GHz-scale dynamics | Integrated photonic / electro-optic networks | Fast transient transformations, wave propagation, selected reservoir/temporal compute | Optical loss, coupling, laser and driver power, phase stability, conversion and calibration |
+| ns–µs exact local state and control | SRAM, FPGA BRAM/URAM, register files | Deterministic pipelines, exact HDC reducers, buffering and control | Capacity/ports, timing closure, leakage/clock power, ECC and upset behavior |
+| µs–ms burst/event windows | SRAM/DRAM + event-driven or neuromorphic compute | Sensor fusion, sparse updates, temporal event processing | Burst buffering, queue tail latency, scheduler/host overhead, timestamp fidelity |
+| ms–seconds adaptive temporal state | Mixed-signal, photonic transient-memory, memristive or digital recurrent state | CfC-like state evolution, temporal context, short-term adaptive memory | Retention curve, state decay, read disturbance, temperature, calibration and update energy |
+| Minutes–hours working set | DDR/LPDDR/HBM and CXL only on compatible real systems | Large models, codebooks, working memory and shared accelerator state | Bandwidth/latency/NUMA, refresh, transfer cost, capacity and energy |
+| Power-cycle persistent configuration / journal state | MRAM / qualified embedded nonvolatile memory | Recovery metadata, configuration, small write-intensive journals | Endurance, retention, read/write latency, density, part qualification and cost |
+| Long-lived exact records and large corpora | NVMe NAND / managed persistent storage | Durable HDC stores, datasets, immutable segments and audit records | Flush/durability semantics, wear, power-loss behavior, recovery, write amplification and provenance |
+
+### Placement rules
+
+1. Match physical state lifetime to the required retention horizon. A reported 7.45-second photonic memory state is potentially useful for temporal state, but it does not replace durable storage.
+2. Keep exact identity, provenance, cryptographic integrity, deterministic tie-breaking and durable commit state in digital systems unless a separate exact physical guarantee exists.
+3. Use analog or photonic dynamics where approximation/noise is acceptable and where the operation naturally benefits from continuous-time or optical computation.
+4. Place sparse hot state close to the compute that consumes it; measure bytes moved and queueing before selecting a new memory technology.
+5. Include state refresh, calibration, re-encoding, migration, write/erase and recovery in lifecycle energy. A low-energy cell is not necessarily a low-energy memory system.
+6. Allow Symthaea to select multiple substrates within one task, but require explicit conversion/verification boundaries at every handoff.
+
+### New benchmark: temporal-memory contract
+
+For every candidate physical memory, define a retention profile rather than a single retention number:
+- required hold time and update frequency;
+- probability of exact/acceptable read after elapsed time;
+- error versus read count and write count;
+- state drift versus temperature and supply;
+- energy to write, read, refresh, calibrate and recover;
+- latency distribution and throughput under concurrent state access;
+- whether read is destructive or disturbs the stored state;
+- persistence across power loss and reset;
+- remapping/retraining cost after aging or device failure.
+
+The useful metric is not “memory seconds” in isolation. It is the Pareto frontier of **correct state delivered over the required horizon per total system joule, with declared reliability and update semantics**.
