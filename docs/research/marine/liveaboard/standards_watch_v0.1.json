@@ -71,6 +71,24 @@
       "scope": "Sailing-craft appendage loads and scantlings for monohull sailing craft up to 24 m.",
       "source": "https://www.iso.org/standard/85208.html",
       "note": "The ISO public record showed stage 60.00 under publication when checked. Verify publication and applicable edition at actual design review; do not assume the title year alone establishes current status."
+    },
+    {
+      "id": "ISO 2631-1:1997 + Amd 1:2010",
+      "edition": 2,
+      "amendment": "2010",
+      "publication_date": "1997-05",
+      "corrected_version": "1997-06",
+      "status": "published_current_pending_replacement",
+      "reviewed_confirmed": "2021-09-06",
+      "scope": "Methods for measuring periodic, random and transient whole-body vibration; informative guidance on health, comfort, perception and motion sickness. Current ISO page distinguishes 0.5–80 Hz for health/comfort/perception and 0.1–0.5 Hz for motion sickness in the replacement DIS preview.",
+      "next_revision": {
+        "id": "ISO/FDIS 2631-1",
+        "status_as_of_2026_11_07": "under development; ISO public record says expected to replace the 1997 edition within coming months",
+        "not_published_as_of": "2026-11-07"
+      },
+      "source": "https://www.iso.org/standard/7612.html",
+      "draft_preview": "https://www.iso.org/obp/ui?_escaped_fragment_=iso%3Astd%3Aiso%3A2631%3A-1%3Adis%3Aed-3%3Av1%3Aen",
+      "applicability_note": "A whole-body vibration method is not by itself a validated liveaboard habitability/seakeeping model. Use task-, posture-, location-, frequency- and exposure-specific criteria; no single ISO number proves comfort."
     }
   ],
   "registry_fields": [
