@@ -6,10 +6,10 @@
 //! supported models. It does not yet optimize over continuous credal sets,
 //! arbitrary joint query events, or model weights.
 //!
-//! Model digests are supplied by the caller and must be SHA-256 digests of the
-//! repository's canonical model transcript. This module validates their shape
-//! and uniqueness but does not recompute the transcript hash. A later
-//! proof-carrying family certificate must bind/recompute those canonical inputs.
+//! Model identity is derived from a versioned canonical transcript and SHA-256.
+//! Every finite-family query recomputes the content digest and checks it against
+//! the supplied model reference before inference, preventing a digest from being
+//! reused for altered factor content.
 //!
 //! A model with zero evidence mass contributes no conditional posterior. It is
 //! counted explicitly; its undefined posterior is never replaced by a uniform
@@ -158,9 +158,9 @@ fn append_len(
 
 /// One model in the caller-declared finite family.
 ///
-/// The digest must be computed from the canonical model transcript. Factor
-/// insertion order should not affect that transcript where the model semantics
-/// are equivalent; factor scope/table ordering must remain part of the identity.
+/// The digest is recomputed from the canonical model transcript at evaluation
+/// time. Factor insertion order does not affect identity; factor scope/table
+/// order and duplicate factor multiplicity remain part of the model semantics.
 #[derive(Clone, Copy, Debug)]
 pub struct FiniteModelRef<'a> {
     pub model_digest: &'a str,
@@ -319,11 +319,9 @@ pub struct FiniteFamilyPosteriorEnvelope {
 
 /// Evaluate exact unary posterior envelopes over a finite family.
 ///
-/// All models must share one variable/cardinality manifest and every digest
-/// must be a unique lowercase 64-character hexadecimal SHA-256 identifier.
-/// The digest bytes are not recomputed here; callers must generate them from
-/// the canonical model encoding and an independent certificate checker must
-/// bind those encodings to the evaluated models.
+/// All models must share one variable/cardinality manifest. Every supplied
+/// digest must be a lowercase SHA-256 hex string and must match the digest
+/// recomputed from that model's canonical transcript.
 ///
 /// The supplied elimination order is applied unchanged to every model. The
 /// expectation-semiring posterior evaluator computes the partition/evidence
@@ -1010,17 +1008,22 @@ fn ordered_model_refs<'a>(
         let computed = canonical_model_sha256_hex(model.graph).map_err(|source| {
             match source {
                 CanonicalModelTranscriptError::NegativeProbabilityPotential { factor_index } => {
-                    let factor = &model.graph.factors()[factor_index];
-                    let value = factor.values.iter()
-                        .find(|value| value.is_negative())
-                        .copied()
-                        .unwrap_or(CheckedRational::zero());
-                    FiniteFamilyError::ModelInference {
-                        model_digest: model.model_digest.to_owned(),
-                        source: RationalInferenceError::NegativePotential {
-                            factor_index,
-                            numerator: value.numerator(),
-                            denominator: value.denominator(),
+                    match model.graph.factors()[factor_index]
+                        .values.iter().find(|value| value.is_negative()).copied()
+                    {
+                        Some(value) => FiniteFamilyError::ModelInference {
+                            model_digest: model.model_digest.to_owned(),
+                            source: RationalInferenceError::NegativePotential {
+                                factor_index,
+                                numerator: value.numerator(),
+                                denominator: value.denominator(),
+                            },
+                        },
+                        None => FiniteFamilyError::CanonicalModelEncoding {
+                            index,
+                            source: CanonicalModelTranscriptError::NegativeProbabilityPotential {
+                                factor_index,
+                            },
                         },
                     }
                 }
