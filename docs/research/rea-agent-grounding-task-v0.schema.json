@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-agent-grounding-task-v0.schema.json",
+  "title": "REA source-grounded reverse-engineering task v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "task_id",
+    "pair_id",
+    "variant",
+    "scope",
+    "predicate",
+    "expected_answer",
+    "expected_disposition",
+    "assumptions"
+  ],
+  "properties": {
+    "schema": {"const": "luminous.rea.agent-grounding.v0"},
+    "task_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "pair_id": {"type": "string", "minLength": 1},
+    "variant": {
+      "enum": ["baseline", "relevant_mutation", "irrelevant_mutation", "unsupported", "conflict"]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_sha256", "operation", "platform", "platform_version", "environment_id", "source_predicate_type"],
+      "properties": {
+        "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "operation": {"type": "string", "minLength": 1},
+        "platform": {"type": ["string", "null"]},
+        "platform_version": {"type": ["string", "null"]},
+        "environment_id": {"type": ["string", "null"]},
+        "source_predicate_type": {"type": "string", "minLength": 1}
+      }
+    },
+    "predicate": {"type": "string", "minLength": 1},
+    "expected_answer": {},
+    "expected_disposition": {
+      "enum": [
+        "supported_within_scope",
+        "refuted_within_scope",
+        "underdetermined",
+        "conflicted",
+        "inapplicable",
+        "unverified"
+      ]
+    },
+    "assumptions": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  }
+}
