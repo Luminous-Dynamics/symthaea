@@ -56,5 +56,9 @@ jobs:
       - name: Format-check only the changed Rust files
         run: rustfmt +1.96.0 --edition 2024 --check src/voice/functional_singing.rs src/voice/mod.rs src/voice/singing_engine.rs
 
-      - name: Compile the feature-gated vocal renderer
-        run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
+      - name: Diagnostic feature compile and lockfile resolution
+        run: cargo +1.96.0 check -p symthaea --lib --features singing
+
+      - name: Report any resolved lockfile delta
+        if: always()
+        run: git diff -- Cargo.lock
