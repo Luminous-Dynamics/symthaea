@@ -291,3 +291,27 @@ Relevant research:
 - VeriPB general pseudo-Boolean proof ecosystem: https://veripb.org/
 
 Benchmark each producer/checker pair on the same instance family. Report proof bytes, generation overhead, independent checking time/memory, checker rejection rate under mutations, streaming support, and time-to-trusted-result. Do not compare only raw proof generation or only solver runtime. For MaxSAT, include proof-carrying lower-bound derivation cost in addition to incumbent feasibility.
+
+
+## 14. Incremental query workloads and amortized strategy reuse
+
+Industry-facing evaluation must include sequences of related requests, not only isolated instances. CaDiCaL 3.0 emphasizes incremental assumptions and proof logging; PBCount2 adds exact projected and incremental pseudo-Boolean model counting and reports completing at least 1.40x the projected and 1.18x the incremental benchmark count of competing methods; MaxSAT Evaluation 2026 includes an incremental IPAMIR track. These motivate a new workload benchmark, not a claimed Symthaea win.
+
+Sources:
+- CaDiCaL 3.0: https://doi.org/10.4230/LIPIcs.SAT.2026.40
+- PBCount2: https://doi.org/10.1609/aaai.v39i11.33240
+- MaxSAT Evaluation 2026: https://maxsat-evaluations.github.io/2026/rankings
+
+Compare restart-per-query, native incremental solver APIs, fixed cached portfolios, typed strategy reuse and a no-cross-query-reuse ablation. Use exact same workload traces and aggregate resource budgets.
+
+Required workload measurements:
+- total CPU/wall time and per-update p50/p95/worst latency;
+- time to first and first independently verified result;
+- proof generation/check time and bytes per query;
+- peak and retained memory;
+- cache reuse rate, invalidation rate, recomputation cost and false-reuse count;
+- cumulative verified result value across the full workload.
+
+Every reusable artifact must bind to source digest, task kind, assumptions/update revision, variable universe, objective and units, quantifier prefix/dependencies, transformation/hyperedge registry revision, solver/proof backend and checker contract. Any semantic mismatch must cause recomputation or rejection. Test stale bounds, witnesses, clauses, projected support, compiled representations and Skolem dependencies after query updates.
+
+The workload trace and per-transition evidence must use #10805's existing manifest/receipt format. Do not create a second provenance system. See [#10965](https://github.com/Luminous-Dynamics/symthaea/issues/10965) for the implementation workstream.
