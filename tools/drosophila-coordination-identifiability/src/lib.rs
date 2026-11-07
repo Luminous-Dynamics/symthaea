@@ -133,7 +133,12 @@ fn append_intervention(prediction: &InterventionPrediction, out: &mut Vec<i64>) 
                 .iter()
                 .map(|value| i64::from(*value)),
         );
-        out.extend(frame.cycle_slips_by_leg.iter().map(|value| i64::from(*value)));
+        out.extend(
+            frame
+                .cycle_slips_by_leg
+                .iter()
+                .map(|value| i64::from(*value)),
+        );
         out.extend(
             frame
                 .frequency_by_leg_millihz
@@ -144,11 +149,7 @@ fn append_intervention(prediction: &InterventionPrediction, out: &mut Vec<i64>) 
     }
 }
 
-fn signature(
-    world: &MechanismWorld,
-    view: ObservationView,
-    feasible_ids: &[String],
-) -> Vec<i64> {
+fn signature(world: &MechanismWorld, view: ObservationView, feasible_ids: &[String]) -> Vec<i64> {
     let mut out = Vec::new();
     append_summary(&world.baseline_summary, &mut out);
     match view {
@@ -206,9 +207,7 @@ fn validate_world(world: &MechanismWorld) -> Result<(), IdentifiabilityError> {
             "world_id and mechanism_family must be non-empty".into(),
         ));
     }
-    if !valid_sha256(&world.source_revision_sha256)
-        || !valid_sha256(&world.world_spec_sha256)
-    {
+    if !valid_sha256(&world.source_revision_sha256) || !valid_sha256(&world.world_spec_sha256) {
         return Err(IdentifiabilityError(format!(
             "{} has a malformed source/world digest",
             world.world_id
@@ -224,10 +223,7 @@ fn validate_world(world: &MechanismWorld) -> Result<(), IdentifiabilityError> {
             world.world_id
         )));
     }
-    for offset in world
-        .baseline_trajectory
-        .pairwise_phase_offsets_microturns
-    {
+    for offset in world.baseline_trajectory.pairwise_phase_offsets_microturns {
         if !(-500_000..500_000).contains(&offset) {
             return Err(IdentifiabilityError(format!(
                 "{} has a non-canonical phase offset",
