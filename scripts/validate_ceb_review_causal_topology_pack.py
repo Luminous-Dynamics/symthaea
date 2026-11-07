@@ -89,7 +89,7 @@ def validate(
         "#10064",
         "#10369",
         "not a new Rust API",
-        "not new metric IDs",
+        "new metric id",
     ):
         if required.lower() not in protocol.lower():
             errors.append(f"protocol: missing required concept {required}")
@@ -151,13 +151,17 @@ def self_test() -> list[str]:
         "no candidate code",
     ))
     challenge = "\n".join(
-        [f"## {case_id}\nFrozen invariant\nEvidence scope\nReviewer question"] +
-        [f"| {state} |" for state in STATES]
+        "\n".join(
+            [f"## {case_id}", "Frozen invariant", "Evidence scope", "Reviewer question"] +
+            [f"| {state} |" for state in STATES]
+        )
         for case_id in CASE_IDS
     )
     key = "\n".join(
-        [f"## {i}. {case_id}\nExpected target mechanism\nCanonical topology\nNearest wrong mechanisms"] +
-        [f"| {state} |" for state in STATES]
+        "\n".join(
+            [f"## {i}. {case_id}", "Expected target mechanism", "Canonical topology", "Nearest wrong mechanisms"] +
+            [f"| {state} |" for state in STATES]
+        )
         for i, case_id in enumerate(CASE_IDS, 1)
     )
     preregistration = "\n".join((
