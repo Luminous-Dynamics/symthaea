@@ -170,6 +170,10 @@ def validate_documents(
         errors.append("triangulation must link the gold-completeness protocol")
     if "Sequential Evidence Acquisition" not in triangulation:
         errors.append("triangulation must link the sequential evidence-acquisition protocol")
+    if "Gold-Completeness and Open-Set Discovery" not in preregistration:
+        errors.append("causal-diagnosis preregistration must compose with gold-completeness protocol")
+    if "Sequential Evidence Acquisition" not in preregistration:
+        errors.append("causal-diagnosis preregistration must compose with sequential evidence policy")
 
     for required in (
         "Frozen target set",
