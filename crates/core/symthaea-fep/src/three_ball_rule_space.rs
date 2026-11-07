@@ -38,8 +38,7 @@ pub const THREE_BALL_HIDDEN_STATE_COLUMN_COUNT: usize = 432;
 pub const THREE_BALL_FEEDBACK_OUTCOME_COUNT: usize = 3;
 
 /// Canonical, byte-exact descriptor hashed for the ordered likelihood tensor.
-pub const THREE_BALL_PARAMETERIZATION_DESCRIPTOR: &str =
-    "symthaea-three-ball-feedback-v1|outcomes=no-feedback,correct,incorrect|factors=left,centre,right,gaze,choice|left-fastest";
+pub const THREE_BALL_PARAMETERIZATION_DESCRIPTOR: &str = "symthaea-three-ball-feedback-v1|outcomes=no-feedback,correct,incorrect|factors=left,centre,right,gaze,choice|left-fastest";
 
 /// SHA-256 of the canonical descriptor above.
 ///
@@ -47,10 +46,8 @@ pub const THREE_BALL_PARAMETERIZATION_DESCRIPTOR: &str =
 pub const THREE_BALL_PARAMETERIZATION_DIGEST: &str =
     "69d3c6e3c7ea7609efc79f6ba58a69fc0979733d59589f61cbbeafc68156a332";
 
-pub const SPM_DEM_REASONING_COMMIT: &str =
-    "28d1f103b021f729266cb7ea07baaf4d0285b22a";
-pub const SPM_MDP_RULES_COMMIT: &str =
-    "5852cadb300a81fd3f30e7056ee329bca20f0efe";
+pub const SPM_DEM_REASONING_COMMIT: &str = "28d1f103b021f729266cb7ea07baaf4d0285b22a";
+pub const SPM_MDP_RULES_COMMIT: &str = "5852cadb300a81fd3f30e7056ee329bca20f0efe";
 
 /// A ball's spatial location. Indices match the SPM feedback tensor factors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -172,16 +169,15 @@ pub fn build_three_ball_rule_space() -> ThreeBallRuleSpace {
                         location_from_index(green_criterion),
                         location_from_index(blue_criterion),
                     ];
-                    let parameter_prior = build_rule_prior(
-                        context_factor,
-                        criterion_by_context_colour,
-                    );
+                    let parameter_prior =
+                        build_rule_prior(context_factor, criterion_by_context_colour);
                     let existing = first_seen.iter().find(|(columns, support, _)| {
                         *columns == parameter_prior.columns
                             && *support == parameter_prior.active_support
                     });
                     let source_index = rules.len() + 1;
-                    let duplicate_of_one_based_index = existing.map(|(_, _, first_index)| *first_index);
+                    let duplicate_of_one_based_index =
+                        existing.map(|(_, _, first_index)| *first_index);
 
                     if let Some((_, _, first_index)) = existing {
                         if let Some(group) = duplicate_groups
@@ -206,8 +202,7 @@ pub fn build_three_ball_rule_space() -> ThreeBallRuleSpace {
                         criterion_by_context_colour,
                         duplicate_of_one_based_index,
                         model_id: format!("three-ball-rule-{source_index:02}"),
-                        prior_probability: 1.0
-                            / THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT as f64,
+                        prior_probability: 1.0 / THREE_BALL_CONTEXT_RULE_HYPOTHESIS_COUNT as f64,
                         parameter_prior,
                     });
                 }
@@ -358,7 +353,10 @@ mod tests {
         let space = build_three_ball_rule_space();
         assert_eq!(space.rules.len(), 81);
         assert_eq!(space.planted_rule().one_based_index, 65);
-        assert_eq!(space.planted_rule().context_factor, ThreeBallLocation::Centre);
+        assert_eq!(
+            space.planted_rule().context_factor,
+            ThreeBallLocation::Centre
+        );
         assert_eq!(
             space.planted_rule().criterion_by_context_colour,
             [
@@ -371,28 +369,44 @@ mod tests {
         let rule = space.planted_rule();
         assert_eq!(
             rule.feedback(
-                [ThreeBallColour::Red, ThreeBallColour::Red, ThreeBallColour::Blue],
+                [
+                    ThreeBallColour::Red,
+                    ThreeBallColour::Red,
+                    ThreeBallColour::Blue
+                ],
                 Some(ThreeBallColour::Red)
             ),
             ThreeBallFeedback::Correct
         );
         assert_eq!(
             rule.feedback(
-                [ThreeBallColour::Blue, ThreeBallColour::Green, ThreeBallColour::Red],
+                [
+                    ThreeBallColour::Blue,
+                    ThreeBallColour::Green,
+                    ThreeBallColour::Red
+                ],
                 Some(ThreeBallColour::Green)
             ),
             ThreeBallFeedback::Correct
         );
         assert_eq!(
             rule.feedback(
-                [ThreeBallColour::Red, ThreeBallColour::Blue, ThreeBallColour::Green],
+                [
+                    ThreeBallColour::Red,
+                    ThreeBallColour::Blue,
+                    ThreeBallColour::Green
+                ],
                 Some(ThreeBallColour::Green)
             ),
             ThreeBallFeedback::Incorrect
         );
         assert_eq!(
             rule.feedback(
-                [ThreeBallColour::Red, ThreeBallColour::Green, ThreeBallColour::Blue],
+                [
+                    ThreeBallColour::Red,
+                    ThreeBallColour::Green,
+                    ThreeBallColour::Blue
+                ],
                 None
             ),
             ThreeBallFeedback::NoFeedback
@@ -405,10 +419,12 @@ mod tests {
         assert_eq!(space.semantic_unique_rule_count, 75);
         assert_eq!(space.semantic_duplicate_count(), 6);
         assert_eq!(space.semantic_duplicate_groups.len(), 3);
-        assert!(space
-            .semantic_duplicate_groups
-            .iter()
-            .all(|group| group.len() == 3));
+        assert!(
+            space
+                .semantic_duplicate_groups
+                .iter()
+                .all(|group| group.len() == 3)
+        );
         assert_eq!(
             space.paper_reported_unique_rule_count,
             THREE_BALL_PAPER_REPORTED_UNIQUE_RULE_COUNT
@@ -485,12 +501,9 @@ mod tests {
         let space = build_three_ball_rule_space();
         let hypotheses = space.reduced_model_hypotheses();
         let posterior = space.full_model_average_prior.clone();
-        let result = reduce_dirichlet_models(
-            &posterior,
-            &space.full_model_average_prior,
-            &hypotheses,
-        )
-        .expect("initial BMR");
+        let result =
+            reduce_dirichlet_models(&posterior, &space.full_model_average_prior, &hypotheses)
+                .expect("initial BMR");
         assert_eq!(result.models.len(), 81);
         for model in result.models {
             assert!((model.posterior_probability - 1.0 / 81.0).abs() < 1e-9);
