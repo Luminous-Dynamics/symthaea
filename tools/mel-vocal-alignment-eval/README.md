@@ -36,4 +36,4 @@ The existing singing release path has score-conditioned pitch/timing checks, wav
 
 ## Test status
 
-Nine deterministic unit tests are authored. No local compile/test pass is claimed until the exact commit is built with the pinned Rust toolchain. The dedicated PR workflow checks out the exact commit and executes formatting plus tests. A queued or skipped workflow is not a pass.
+Ten deterministic unit tests are authored. No local compile/test pass is claimed until the exact commit is built with the pinned Rust toolchain. The dedicated PR workflow checks out the exact commit and executes formatting plus tests. A queued or skipped workflow is not a pass.
