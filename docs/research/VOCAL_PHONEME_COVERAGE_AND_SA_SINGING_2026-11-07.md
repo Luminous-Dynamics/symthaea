@@ -91,6 +91,20 @@ Do not use a library's own output as ground truth for scoring that library. For 
 An isolated schema/validator now exists at `tools/pronunciation-plan/`, with exact-head checks in `.github/workflows/pronunciation-plan-contract.yml`. It represents each source-text word span with multiple candidates, candidate provenance (source/provider/version/digest), normalized IPA phones, syllabification, stress, explicit review/OOV/unsupported state, and a selection receipt. Its renderer-facing `validate_renderable()` allows only explicitly selected candidates. This is a contract prototype; it does not perform G2P or contextual selection. The intended integration is: G2P systems propose candidates, a context/lexicon/human layer resolves them, and every renderer consumes the same frozen pronunciation artifact without making a new pronunciation decision.
 
 
+## Integrated formant-vocoder baseline
+
+The compiled voice tree already contained a real three-stage path: Muse singing bridge (lyrics/notes to sung phoneme events), formant-frame generation, and the root FormantVocoder. It was callable through a low-level `sing_to_pcm` helper but did not implement the shared `SingingVoiceEngine` contract, so it could not participate in the capability-qualified comparative gate.
+
+A new `FormantSingingEngine` adapter now:
+- consumes a frozen VocalPerformance and verifies that the current English Muse G2P reproduces its exact IPA/vowel/stress sequence;
+- rejects phone or note-binding mismatches rather than silently re-running a different pronunciation;
+- checks chronological non-overlapping note events;
+- re-times irregularly spaced formant frames onto a fixed 200 Hz frame clock and inserts explicit silent frames for leading, internal and trailing rests;
+- declares each of the 19 singing controls as native, approximated, conditional or unsupported;
+- explicitly marks melisma and fixed vibrato as approximations and voice identity, local edits, breathiness, phrase-expression controls, and custom portamento as unsupported.
+
+This is a **conventional formant/source-filter baseline**. It is not the missing waveguide/gesture physical renderer tracked in issue #10860, and it does not establish human-level naturalness. It is useful because it adds a third integrated renderer to the identical-case release gate without pretending that an uncompiled prototype is functional.
+
 ## Research framing: benchmark different tasks separately
 
 There is no single leaderboard that answers whether a system is a good singer under a prescribed score.
