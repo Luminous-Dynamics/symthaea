@@ -6,7 +6,8 @@
 //! causal correctness, provider independence, or security-control compliance.
 
 use super::{
-    EVIDENCE_ID_PREFIX, VerifiedEvidence, canonical_jcs_bytes, sha256_hex, verify_evidence_value,
+    EVIDENCE_ID_PREFIX, VerifiedEvidence, canonical_jcs_bytes, jcs_integer_precision_warnings,
+    sha256_hex, verify_evidence_value,
 };
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize as SerdeDeserialize, Serialize};
@@ -108,6 +109,22 @@ pub struct EvidenceAssessment {
     pub reason: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, SerdeDeserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimPrecisionSource {
+    AssertedValue,
+    EvidenceRecord,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, SerdeDeserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClaimPrecisionWarning {
+    pub source: ClaimPrecisionSource,
+    pub evidence_id: Option<String>,
+    pub json_pointer: String,
+    pub integer_value: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, SerdeDeserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ClaimEvaluation {
@@ -123,6 +140,7 @@ pub struct ClaimEvaluation {
     pub source_predicate_type: Option<String>,
     pub requested_evidence_ids: Vec<String>,
     pub assumptions: Vec<String>,
+    pub numeric_precision_warnings: Vec<ClaimPrecisionWarning>,
     pub evidence_assessments: Vec<EvidenceAssessment>,
     pub missing_evidence_ids: Vec<String>,
     pub unmet_obligations: Vec<String>,
@@ -531,12 +549,18 @@ fn canonical_json_equal(left: &Value, right: &Value) -> Result<bool, ClaimError>
     Ok(left_bytes == right_bytes)
 }
 
-fn claim_ceiling(predicate: ClaimPredicate) -> Vec<String> {
+fn claim_ceiling(predicate: ClaimPredicate, has_precision_warnings: bool) -> Vec<String> {
     let mut ceiling = vec![
         "A supported result is scoped to the exact subject, operation, environment fields and Evidence IDs in this derivation.".to_owned(),
         "This evaluator verifies what a REA Evidence record reports; it does not prove the underlying real-world proposition is true.".to_owned(),
         "Evidence ID verification is a semantic commitment, not producer authentication or trusted-time evidence.".to_owned(),
     ];
+    if has_precision_warnings {
+        ceiling.push(
+            "One or more JSON integer tokens exceed the ECMAScript safe-integer range; RFC 8785 evaluates their binary64 interpretation, so exact integer preservation is not established. See numeric_precision_warnings and encode exact large integers as decimal strings."
+                .to_owned(),
+        );
+    }
     if predicate == ClaimPredicate::ProviderReportedObservation {
         ceiling.push(
             "Exact normalized_result equality establishes a recorded provider observation only; it does not establish artifact semantics, completeness, authenticity or safety.".to_owned(),
@@ -563,6 +587,7 @@ struct EvaluationBody<'a> {
     source_predicate_type: &'a Option<String>,
     requested_evidence_ids: &'a [String],
     assumptions: &'a [String],
+    numeric_precision_warnings: &'a [ClaimPrecisionWarning],
     evidence_assessments: &'a [EvidenceAssessment],
     missing_evidence_ids: &'a [String],
     unmet_obligations: &'a [String],
@@ -620,6 +645,28 @@ pub fn evaluate_claim(
                 ClaimErrorKind::DuplicateEvidence,
                 "duplicate Evidence ID supplied to claim evaluator",
             ));
+        }
+    }
+
+    let mut numeric_precision_warnings = Vec::new();
+    for warning in jcs_integer_precision_warnings(&claim.asserted_value) {
+        numeric_precision_warnings.push(ClaimPrecisionWarning {
+            source: ClaimPrecisionSource::AssertedValue,
+            evidence_id: None,
+            json_pointer: warning.json_pointer,
+            integer_value: warning.integer_value,
+        });
+    }
+    for evidence_id in &claim.evidence_ids {
+        if let Some(evidence) = verified_by_id.get(evidence_id) {
+            for warning in jcs_integer_precision_warnings(&evidence.value) {
+                numeric_precision_warnings.push(ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::EvidenceRecord,
+                    evidence_id: Some(evidence_id.clone()),
+                    json_pointer: warning.json_pointer,
+                    integer_value: warning.integer_value,
+                });
+            }
         }
     }
 
@@ -813,7 +860,7 @@ pub fn evaluate_claim(
         .map_err(|error| ClaimError::new(ClaimErrorKind::Canonicalization, error.to_string()))?;
     let claim_request_sha256 = sha256_hex(&claim_bytes);
 
-    let claim_ceiling = claim_ceiling(claim.predicate);
+    let claim_ceiling = claim_ceiling(claim.predicate, !numeric_precision_warnings.is_empty());
     let body = EvaluationBody {
         schema: CLAIM_EVALUATION_SCHEMA,
         evaluator_version: CLAIM_EVALUATOR_VERSION,
@@ -827,6 +874,7 @@ pub fn evaluate_claim(
         source_predicate_type: &claim.source_predicate_type,
         requested_evidence_ids: &claim.evidence_ids,
         assumptions: &claim.assumptions,
+        numeric_precision_warnings: &numeric_precision_warnings,
         evidence_assessments: &assessments,
         missing_evidence_ids: &missing,
         unmet_obligations: &unmet,
@@ -852,6 +900,7 @@ pub fn evaluate_claim(
         source_predicate_type: claim.source_predicate_type.clone(),
         requested_evidence_ids: claim.evidence_ids.clone(),
         assumptions: claim.assumptions.clone(),
+        numeric_precision_warnings,
         evidence_assessments: assessments,
         missing_evidence_ids: missing,
         unmet_obligations: unmet,
@@ -941,6 +990,55 @@ mod tests {
         numeric_claim.asserted_value["entries"][0]["size"] = json!(42.0001);
         let changed = evaluate_claim(&numeric_claim, &[evidence]).unwrap();
         assert_eq!(changed.disposition, ClaimDisposition::RefutedWithinScope);
+    }
+
+    #[test]
+    fn exposes_unsafe_integer_precision_warnings_without_changing_jcs_support() {
+        let original = verified_fixture();
+        let mut evidence_value = original.value.clone();
+        evidence_value["normalized_result"]["large_count"] = json!(9_007_199_254_740_993_u64);
+        evidence_value["parameters"]["large_offset"] = json!(18_446_744_073_709_551_615_u64);
+        evidence_value["evidence_id"] =
+            json!(super::super::compute_evidence_id(&evidence_value).unwrap());
+        let evidence = verify_evidence_value(&evidence_value).unwrap();
+
+        let mut claim = claim(
+            ClaimPredicate::ProviderReportedObservation,
+            vec![evidence.evidence_id.clone()],
+        );
+        claim.asserted_value = evidence.value["normalized_result"].clone();
+        let result = evaluate_claim(&claim, std::slice::from_ref(&evidence)).unwrap();
+
+        assert_eq!(result.disposition, ClaimDisposition::SupportedWithinScope);
+        assert_eq!(
+            result.numeric_precision_warnings,
+            vec![
+                ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::AssertedValue,
+                    evidence_id: None,
+                    json_pointer: "/large_count".to_owned(),
+                    integer_value: "9007199254740993".to_owned(),
+                },
+                ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::EvidenceRecord,
+                    evidence_id: Some(evidence.evidence_id.clone()),
+                    json_pointer: "/normalized_result/large_count".to_owned(),
+                    integer_value: "9007199254740993".to_owned(),
+                },
+                ClaimPrecisionWarning {
+                    source: ClaimPrecisionSource::EvidenceRecord,
+                    evidence_id: Some(evidence.evidence_id.clone()),
+                    json_pointer: "/parameters/large_offset".to_owned(),
+                    integer_value: "18446744073709551615".to_owned(),
+                },
+            ]
+        );
+        assert!(
+            result
+                .claim_ceiling
+                .iter()
+                .any(|line| line.contains("exact integer preservation is not established"))
+        );
     }
 
     #[test]

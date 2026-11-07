@@ -129,6 +129,78 @@ impl fmt::Display for EvidenceError {
 
 impl std::error::Error for EvidenceError {}
 
+/// A precision warning for an integer value still represented exactly by
+/// serde_json::Number before ECMAScript binary64 JCS serialization.
+///
+/// This Value-based helper cannot recover the original source lexeme once a
+/// parser has converted an integer outside i64/u64 to f64. For complete raw
+/// token coverage, audit the original JSON bytes before constructing Value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JcsIntegerPrecisionWarning {
+    pub json_pointer: String,
+    pub integer_value: String,
+}
+
+const MAX_ECMASCRIPT_SAFE_INTEGER: &str = "9007199254740991";
+
+fn integer_outside_ecmascript_safe_range(integer: &str) -> bool {
+    let digits = integer.strip_prefix('-').unwrap_or(integer);
+    digits.len() > MAX_ECMASCRIPT_SAFE_INTEGER.len()
+        || (digits.len() == MAX_ECMASCRIPT_SAFE_INTEGER.len()
+            && digits > MAX_ECMASCRIPT_SAFE_INTEGER)
+}
+
+fn join_json_pointer(parent: &str, token: &str) -> String {
+    format!("{parent}/{}", token.replace('~', "~0").replace('/', "~1"))
+}
+
+/// Report unsafe integer values still represented exactly as i64/u64 in Value.
+///
+/// This does not change the value, JCS bytes, or Evidence semantic identity.
+/// Floating-form tokens and integers already converted to f64 are not reported.
+pub fn jcs_integer_precision_warnings(value: &Value) -> Vec<JcsIntegerPrecisionWarning> {
+    let mut warnings = Vec::new();
+    let mut pending = vec![(value, String::new())];
+
+    while let Some((current, pointer)) = pending.pop() {
+        match current {
+            Value::Number(number) => {
+                let integer = number
+                    .as_i64()
+                    .map(|value| value.to_string())
+                    .or_else(|| number.as_u64().map(|value| value.to_string()));
+
+                if let Some(integer_value) = integer
+                    .filter(|integer_value| integer_outside_ecmascript_safe_range(integer_value))
+                {
+                    warnings.push(JcsIntegerPrecisionWarning {
+                        json_pointer: pointer,
+                        integer_value,
+                    });
+                }
+            }
+            Value::Array(items) => {
+                for (index, item) in items.iter().enumerate().rev() {
+                    pending.push((item, join_json_pointer(&pointer, &index.to_string())));
+                }
+            }
+            Value::Object(items) => {
+                for (key, item) in items.iter().rev() {
+                    pending.push((item, join_json_pointer(&pointer, key)));
+                }
+            }
+            Value::Null | Value::Bool(_) | Value::String(_) => {}
+        }
+    }
+
+    warnings.sort_by(|left, right| {
+        left.json_pointer
+            .cmp(&right.json_pointer)
+            .then_with(|| left.integer_value.cmp(&right.integer_value))
+    });
+    warnings
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct VerifiedEvidence {
     /// REA semantic identifier, prefixed with ev_.
@@ -1150,6 +1222,46 @@ mod tests {
         assert_eq!(
             canonical,
             r#"{"large":9007199254740992,"minus":-9007199254740992,"u64":18446744073709552000}"#
+        );
+    }
+
+    #[test]
+    fn canonical_jcs_matches_rfc8785_appendix_b_finite_number_vectors() {
+        let input = r#"[
+            0, -0, 5e-324, -5e-324,
+            1.7976931348623157e+308, -1.7976931348623157e+308,
+            9007199254740992, -9007199254740992,
+            295147905179352830000,
+            9.999999999999997e+22, 1e+23, 1.0000000000000001e+23,
+            999999999999999700000, 999999999999999900000, 1e+21,
+            9.999999999999997e-7, 0.000001,
+            333333333.3333332, 333333333.33333325,
+            333333333.3333333, 333333333.3333334, 333333333.33333343,
+            -0.0000033333333333333333, 1424953923781206.2
+        ]"#;
+        let value: Value = serde_json::from_str(input).unwrap();
+        let canonical = String::from_utf8(canonical_jcs_bytes(&value).unwrap()).unwrap();
+        assert_eq!(
+            canonical,
+            "[0,0,5e-324,-5e-324,1.7976931348623157e+308,-1.7976931348623157e+308,9007199254740992,-9007199254740992,295147905179352830000,9.999999999999997e+22,1e+23,1.0000000000000001e+23,999999999999999700000,999999999999999900000,1e+21,9.999999999999997e-7,0.000001,333333333.3333332,333333333.33333325,333333333.3333333,333333333.3333334,333333333.33333343,-0.0000033333333333333333,1424953923781206.2]"
+        );
+
+        // Precision warnings are an orthogonal diagnostic. Only exact integer
+        // tokens outside the safe range are listed; floating-point vectors are
+        // still serialized according to RFC 8785 without false-positive warnings.
+        let warnings = jcs_integer_precision_warnings(&value);
+        assert_eq!(
+            warnings,
+            vec![
+                JcsIntegerPrecisionWarning {
+                    json_pointer: "/6".to_owned(),
+                    integer_value: "9007199254740992".to_owned(),
+                },
+                JcsIntegerPrecisionWarning {
+                    json_pointer: "/7".to_owned(),
+                    integer_value: "-9007199254740992".to_owned(),
+                },
+            ]
         );
     }
 
