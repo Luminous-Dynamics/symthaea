@@ -257,6 +257,10 @@ pub enum SummaryState {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MetricCoverage {
     pub metric_id: MetricId,
+    /// Channel identity is a grouping coordinate for local rhythmicity and
+    /// per-leg stepping; distinct channels are never pooled into one
+    /// six-leg coverage claim.
+    pub channel_id: Option<String>,
     pub method_sha256: String,
     pub preprocessing_sha256: Option<String>,
     pub phase_estimator_sha256: Option<String>,
@@ -914,8 +918,16 @@ fn grouped_metric_coverage(
     endpoint: EndpointKind,
     required: usize,
 ) -> Vec<MetricCoverage> {
-    let mut groups: BTreeMap<(MetricId, String, Option<String>, Option<String>), BTreeSet<String>> =
-        BTreeMap::new();
+    let mut groups: BTreeMap<
+        (
+            MetricId,
+            Option<String>,
+            String,
+            Option<String>,
+            Option<String>,
+        ),
+        BTreeSet<String>,
+    > = BTreeMap::new();
     for measurement in &packet.measurements {
         if measurement.endpoint != endpoint || !measured(measurement) {
             continue;
@@ -923,14 +935,15 @@ fn grouped_metric_coverage(
         let method = measurement.method_sha256.clone();
         let preprocessing = measurement.preprocessing_sha256.clone();
         let phase_estimator = measurement.phase_estimator_sha256.clone();
+        let channel_id = match endpoint {
+            EndpointKind::LocalJointRhythmicity | EndpointKind::PerLegStepping => {
+                measurement.channel_id.clone()
+            }
+            _ => None,
+        };
         let identity = match endpoint {
             EndpointKind::LocalJointRhythmicity | EndpointKind::PerLegStepping => {
-                measurement.leg.map(|leg| {
-                    format!(
-                        "{leg:?}:{}",
-                        measurement.channel_id.as_deref().unwrap_or("")
-                    )
-                })
+                measurement.leg.map(|leg| format!("{leg:?}"))
             }
             EndpointKind::PairwiseInterlegCoupling => measurement
                 .pair
@@ -944,6 +957,7 @@ fn grouped_metric_coverage(
             groups
                 .entry((
                     measurement.metric_id,
+                    channel_id,
                     method,
                     preprocessing,
                     phase_estimator,
@@ -957,12 +971,19 @@ fn grouped_metric_coverage(
         .into_iter()
         .map(
             |(
-                (metric_id, method_sha256, preprocessing_sha256, phase_estimator_sha256),
+                (
+                    metric_id,
+                    channel_id,
+                    method_sha256,
+                    preprocessing_sha256,
+                    phase_estimator_sha256,
+                ),
                 identities,
             )| {
                 let measured = identities.len();
                 MetricCoverage {
                     metric_id,
+                    channel_id,
                     method_sha256,
                     preprocessing_sha256,
                     phase_estimator_sha256,
