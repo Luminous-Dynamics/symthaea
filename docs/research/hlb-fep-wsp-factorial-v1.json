@@ -443,13 +443,17 @@
     },
     {
       "id": "three_ball_joint_belief_active_perception",
-      "environment": "Finite-hypothesis three-ball task with a joint posterior over source or semantic-quotient rule identity and 27 hidden ball-colour configurations. Candidate policies compare immediate colour choice against one gaze observation, posterior conditioning, and a downstream choice. This is a two-step receding-horizon adapter, not the full SPM POMDP or a parameter-learning benchmark.",
+      "environment": "Finite-hypothesis three-ball task with a joint posterior over source or semantic-quotient rule identity and 27 hidden ball-colour configurations. Candidate policies compare immediate colour choice against one gaze observation, posterior conditioning, and a downstream choice. This is a two-step receding-horizon adapter, not the full SPM POMDP or a parameter-learning benchmark. A deterministic multi-trial finite-hypothesis evaluator now reuses the two-step policy across independent scenes, preserves semantic rule posterior mass, resets only hidden-state priors, records per-trial feedback/entropy/Brier/log-loss receipts, and switches from neutral discovery preferences to [0,2,-6] after a 16-nat semantic-class log-odds commitment. This is an adaptation: one gaze then one choice per trial, not the source's five moves per trial, and no continuous Dirichlet parameter posterior.",
       "primary_outcomes": [
         "correct_choice_after_observation",
         "rule_identification_accuracy",
         "trials_to_rule_identification",
         "gaze_observation_cost",
-        "two_step_policy_regret"
+        "two_step_policy_regret",
+        "trials_to_correct_rule_commitment",
+        "mean_true_class_brier_score",
+        "mean_true_class_negative_log_probability",
+        "cumulative_reward"
       ],
       "diagnostics": [
         "model_information_gain_nats",
@@ -460,7 +464,12 @@
         "posterior_state_entropy",
         "selected_gaze_location",
         "contingent_choice_by_visual_outcome",
-        "immediate_choice_when_no_gaze"
+        "immediate_choice_when_no_gaze",
+        "semantic_class_posterior_per_trial",
+        "model_entropy_trajectory",
+        "preference_phase_transition_trial",
+        "source_vs_quotient_posterior_equivalence",
+        "seeded_episode_receipt_replay"
       ],
       "negative_controls": [
         "immediate_choice_without_gaze",
@@ -468,7 +477,43 @@
         "constant_visual_sensor_independent_of_hidden_state",
         "model_state_independent_prior",
         "semantic_quotient_vs_source_labelled_hypotheses",
-        "impossible_gaze_feedback_observations_rejected"
+        "impossible_gaze_feedback_observations_rejected",
+        "model_information_weight_zero",
+        "state_information_weight_zero",
+        "both_epistemic_weights_zero",
+        "source_labelled_vs_semantic_quotient_multi_trial_invariance",
+        "repeated_scene_without_state_prior_reset"
+      ]
+    },
+    {
+      "id": "three_ball_sequential_finite_hypothesis_adaptation",
+      "environment": "Deterministic seeded multi-trial adaptation over the source-pinned three-ball rule family. Each trial independently samples a hidden left/centre/right colour configuration, runs the two-step finite-hypothesis gaze→observe→choice policy, receives feedback from planted rule 65, carries semantic model posterior mass forward, and resets only the hidden-state prior. Discovery uses neutral feedback preferences until semantic-class posterior log odds exceed 16 nats, then restores [0,2,-6]. It deliberately differs from the published SPM schedule (one gaze/choice pair per trial rather than five moves per trial) and does not maintain a continuous Dirichlet parameter posterior.",
+      "primary_outcomes": [
+        "trials_to_correct_rule_commitment",
+        "final_true_semantic_class_posterior",
+        "final_model_entropy_nats",
+        "mean_true_class_brier_score",
+        "mean_true_class_negative_log_probability",
+        "cumulative_reward"
+      ],
+      "diagnostics": [
+        "correct_feedback_count",
+        "incorrect_feedback_count",
+        "no_feedback_count",
+        "gaze_count",
+        "model_entropy_before_after_each_trial",
+        "winning_semantic_class_log_odds",
+        "source_labelled_vs_quotient_metric_delta",
+        "receipt_replay_exactness"
+      ],
+      "negative_controls": [
+        "no_model_information_gain",
+        "no_state_information_gain",
+        "no_epistemic_information_gain",
+        "source_labelled_vs_semantic_quotient",
+        "seed_change_replay_canary",
+        "one_trial_only",
+        "mislabelled_planted_rule"
       ]
     }
   ],
@@ -800,6 +845,26 @@
     {
       "id": "immediate_choice_without_gaze",
       "scope": "Choose from current joint belief without taking an additional visual observation"
+    },
+    {
+      "id": "three_ball_two_step_finite_hypothesis_fep",
+      "scope": "Repeated two-step gaze/observe/choice policy with joint finite posterior, neutral discovery preferences, posterior class commitment, and preference restoration; adaptation only"
+    },
+    {
+      "id": "three_ball_state_information_only",
+      "scope": "Same seeded scenes and trial horizon, with model_information_weight=0"
+    },
+    {
+      "id": "three_ball_model_information_only",
+      "scope": "Same seeded scenes and trial horizon, with conditional_state_information_weight=0"
+    },
+    {
+      "id": "three_ball_pragmatic_only",
+      "scope": "Same seeded scenes and trial horizon, with both epistemic weights=0"
+    },
+    {
+      "id": "three_ball_source_labelled_vs_semantic_quotient",
+      "scope": "Paired seeded episodes comparing 81 source labels to semantically deduplicated likelihood-tensor classes, scored after aggregating equivalent labels"
     }
   ],
   "seeds": {
@@ -895,7 +960,11 @@
       "correct_choice_after_observation",
       "trials_to_rule_identification",
       "gaze_observation_cost",
-      "two_step_policy_regret"
+      "two_step_policy_regret",
+      "trials_to_correct_rule_commitment",
+      "mean_true_class_brier_score",
+      "mean_true_class_negative_log_probability",
+      "model_entropy_trajectory"
     ],
     "guardrails": [
       "constraint_violation_rate",
@@ -1064,7 +1133,11 @@
     "The three-ball partial-observation policy maintains a normalized joint P(model,state) belief; it must not replace it with independent marginals after evidence introduces model/state correlation.",
     "Gaze information is measured as model information plus conditional state information I(State; Observation | Model); the joint mutual-information chain-rule residual is reported and bounded.",
     "The two-step gaze/choice policy is labelled a bounded receding-horizon approximation; it is not called a full SPM POMDP reproduction or a continuous-parameter learner.",
-    "A constant visual sensor independent of hidden state must produce zero conditional state information gain; impossible observations must fail closed."
+    "A constant visual sensor independent of hidden state must produce zero conditional state information gain; impossible observations must fail closed.",
+    "The repeated three-ball finite-hypothesis evaluator is explicitly labelled a two-step-per-trial adaptation, not an exact reproduction of the published five-move SPM schedule or its continuous Dirichlet parameter-learning path.",
+    "Each trial carries only semantic model posterior mass forward and resets the newly sampled hidden-state prior; the environment truth and hidden scene are available only to the evaluator receipt, not the action-selection function.",
+    "Posterior entropy may increase after an individual surprising observation; only expected entropy reduction equals mutual information. Tests must not assert per-observation entropy monotonicity.",
+    "Source-labelled and semantic-quotient sequential runs with matched seeds must preserve semantic-class posterior, action scores, and commitment decisions within declared numerical tolerances."
   ],
   "research_references": [
     {
