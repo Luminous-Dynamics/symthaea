@@ -417,9 +417,9 @@ impl VocalPerformance {
                     melisma,
                     &format!("melisma note {melisma_index} in vocal syllable {syllable_index}"),
                 )?;
-                if melisma.start_time < previous_note_end {
+                if (melisma.start_time - previous_note_end).abs() > 0.000_01 {
                     bail!(
-                        "melisma notes overlap or are not chronological in vocal syllable {syllable_index}"
+                        "melisma notes must be contiguous; represent rests outside the melisma in vocal syllable {syllable_index}"
                     );
                 }
                 previous_note_end = melisma_end;
@@ -865,6 +865,14 @@ mod tests {
             error.contains("overlaps the preceding syllable or melisma"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn melisma_gaps_are_rejected_until_rest_events_are_explicit() {
+        let mut performance = performance_with_melisma();
+        performance.syllables[0].melisma_notes[0].start_time += 0.03;
+        let error = performance.validate().unwrap_err().to_string();
+        assert!(error.contains("must be contiguous"), "{error}");
     }
 
     #[test]
