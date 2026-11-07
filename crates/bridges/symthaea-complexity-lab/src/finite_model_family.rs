@@ -81,7 +81,7 @@ pub fn canonical_model_transcript(
 
     let mut factors = graph.factors().iter().collect::<Vec<_>>();
     for (factor_index, factor) in factors.iter().enumerate() {
-        if factor.values.iter().any(CheckedRational::is_negative) {
+        if factor.values.iter().any(|value| value.is_negative()) {
             return Err(CanonicalModelTranscriptError::NegativeProbabilityPotential {
                 factor_index,
             });
