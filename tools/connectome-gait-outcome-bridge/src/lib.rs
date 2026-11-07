@@ -151,10 +151,19 @@ pub enum Availability {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ProbeClass {
+    LocalPhaseKick,
+    LoadOrContact,
+    ProprioceptiveChannel,
+    DescendingCommand,
+    MechanicalBodyOrSubstrate,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TransferProbeKey {
-    /// None denotes a declared global descending command; Some denotes a
-    /// leg-local perturbation. Recipient remains explicit in either case.
+    /// None denotes a declared global input; Some denotes a leg-local source.
     pub sender: Option<LegId>,
+    pub probe_class: ProbeClass,
     pub recipient: LegId,
     pub phase_bin: u8,
     pub magnitude_bin: u8,
@@ -257,6 +266,17 @@ pub struct MetricCoverage {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BridgeReport {
     pub packet_id: String,
+    pub dataset_id: String,
+    pub dataset_revision_sha256: String,
+    pub raw_trajectory_sha256: String,
+    pub source_code_sha256: String,
+    pub analysis_pipeline_sha256: String,
+    pub source_access: SourceAccess,
+    pub animal_id: String,
+    pub session_id: String,
+    pub trial_id: String,
+    pub condition: Condition,
+    pub stimulus: Stimulus,
     pub local_rhythm_measured_legs: usize,
     pub local_rhythm_state: CoverageState,
     pub per_leg_stepping_measured_legs: usize,
@@ -673,6 +693,24 @@ fn validate_measurement(
                     key.magnitude_bin >= MAGNITUDE_BINS,
                     ReasonCode::InvalidMagnitudeBin,
                 );
+                match key.probe_class {
+                    ProbeClass::LocalPhaseKick => {
+                        add(key.sender.is_none(), ReasonCode::MissingLegIdentity);
+                    }
+                    ProbeClass::DescendingCommand => {
+                        add(key.sender.is_some(), ReasonCode::UnexpectedLegIdentity);
+                        add(
+                            !matches!(
+                                packet.stimulus,
+                                Stimulus::DNg100 | Stimulus::DNg97 | Stimulus::DNb08
+                            ),
+                            ReasonCode::InvalidMetricEndpoint,
+                        );
+                    }
+                    ProbeClass::LoadOrContact
+                    | ProbeClass::ProprioceptiveChannel
+                    | ProbeClass::MechanicalBodyOrSubstrate => {}
+                }
             }
         }
         EndpointKind::EmbodiedBehaviour => {
@@ -965,6 +1003,17 @@ pub fn audit_packet(packet: &GaitOutcomePacket) -> Result<BridgeReport, BridgeEr
 
     Ok(BridgeReport {
         packet_id: packet.packet_id.clone(),
+        dataset_id: packet.dataset_id.clone(),
+        dataset_revision_sha256: packet.dataset_revision_sha256.clone(),
+        raw_trajectory_sha256: packet.raw_trajectory_sha256.clone(),
+        source_code_sha256: packet.source_code_sha256.clone(),
+        analysis_pipeline_sha256: packet.analysis_pipeline_sha256.clone(),
+        source_access: packet.source_access,
+        animal_id: packet.animal_id.clone(),
+        session_id: packet.session_id.clone(),
+        trial_id: packet.trial_id.clone(),
+        condition: packet.condition,
+        stimulus: packet.stimulus,
         local_rhythm_measured_legs: local_rhythm_legs,
         local_rhythm_state: coverage_state(local_rhythm_legs, LEG_COUNT),
         per_leg_stepping_measured_legs: stepping_legs,
@@ -1058,6 +1107,11 @@ mod tests {
     fn full_rhythm_fixture(stimulus: Stimulus, fictrac: bool) -> GaitOutcomePacket {
         let mut packet = base_packet();
         packet.stimulus = stimulus;
+        packet.condition = if stimulus == Stimulus::DNb08 {
+            Condition::AirStepping
+        } else {
+            Condition::BallContact
+        };
         packet.fictrac_columns_available = fictrac;
 
         for leg in LegId::ALL {
@@ -1092,6 +1146,7 @@ mod tests {
         );
         fractional.transfer_probe = Some(TransferProbeKey {
             sender: Some(LegId::LeftFore),
+            probe_class: ProbeClass::LocalPhaseKick,
             recipient: LegId::RightFore,
             phase_bin: 2,
             magnitude_bin: 1,
@@ -1533,6 +1588,7 @@ mod tests {
         );
         phase.transfer_probe = Some(TransferProbeKey {
             sender: Some(LegId::LeftFore),
+            probe_class: ProbeClass::LocalPhaseKick,
             recipient: LegId::RightFore,
             phase_bin: 1,
             magnitude_bin: 0,
