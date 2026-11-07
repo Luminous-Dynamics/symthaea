@@ -288,6 +288,12 @@ These are prospective targets, not established performance and not new registere
 6. Obtain independent task-admission, security, statistical and human-review sign-off.
 7. Only then consider a sealed sample and execution after #10064/#10369.
 
+## 12.1 Gold-completeness protocol and sequential evidence-policy composition
+
+The six-state counterfactual design must be evaluated within a defect-provenance process that does not assume human-found gold is exhaustive. Use [CEB Review Gold-Completeness and Open-Set Discovery V0](CEB_REVIEW_GOLD_COMPLETENESS_AND_OPEN_SET_DISCOVERY_V0_2026-11-07.md) to keep frozen targets separate from independently adjudicated novel findings and the unknown remainder. Blind audits of zero-finding PRs and multi-producer clean consensus are required before making a gold-completeness claim. Do not use naïve capture–recapture under correlated producer populations.
+
+For Phase B, use [CEB Review Sequential Evidence Acquisition V0](CEB_REVIEW_SEQUENTIAL_EVIDENCE_ACQUISITION_V0_2026-11-07.md) as the action-policy contract: name the claim and competing mechanisms, select the smallest safe discriminating observation, bind it to exact revision/scope/authority, and account for all-in cost and stopping behavior. It expands the Phase B policy contrast; it does not add a metric or authorize execution before #10064.
+
 ## 13. Claim boundary
 
 This document specifies an experiment; it reports no experiment. The historical benchmark findings above are contextual external claims with their own limitations. The counterfactual ladder is a proposed CEB design, not an established state-of-the-art method. No model has been scored, no task admitted, no holdout constructed, no hidden label created, and no candidate-controlled code, tests, PoCs, graders or attack payloads executed.
