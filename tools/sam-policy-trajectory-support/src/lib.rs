@@ -450,7 +450,7 @@ mod tests {
         let result = assess(&manifest(vec![first.steps.clone()], true), &first).unwrap();
         assert_eq!(
             result.canonical_bytes().len(),
-            8 + "sam.policy-trajectory-support.assessment.v0.1".len() + 1 + 8 + 1
+            "sam.policy-trajectory-support.assessment.v0.1".len() + 1 + 1 + 8 + 1
         );
     }
 
@@ -500,7 +500,18 @@ mod tests {
             vec![step(
                 7,
                 "history-7",
-                vec![action("ego", "continue"), action("actor-1", "yield")],
+                vec![
+                    ActorAction {
+                        actor_id: "ego".to_owned(),
+                        action_id: "continue".to_owned(),
+                        payload_digest: "payload-ego-continue".to_owned(),
+                    },
+                    ActorAction {
+                        actor_id: "actor-1".to_owned(),
+                        action_id: "yield".to_owned(),
+                        payload_digest: "payload-actor-1-yield".to_owned(),
+                    },
+                ],
             )],
         );
         assert_eq!(
