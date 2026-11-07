@@ -46,11 +46,7 @@ fn inject_precision_risk(value: &mut Value) {
     value["parameters"]["large_offset"] = json!(18_446_744_073_709_551_615_u64);
 }
 
-fn build_scenario(
-    evidence_count: usize,
-    padding_bytes: usize,
-    precision_mode: bool,
-) -> Scenario {
+fn build_scenario(evidence_count: usize, padding_bytes: usize, precision_mode: bool) -> Scenario {
     assert!((1..=MAX_EVIDENCE_RECORDS).contains(&evidence_count));
 
     let base = rea_compat::verify_evidence_json(EVIDENCE_FIXTURE)
@@ -132,7 +128,11 @@ fn build_scenario(
     let precision_warning_count = produced.numeric_precision_warnings.len();
     assert_eq!(
         precision_warning_count,
-        if precision_mode { 2 + evidence_count * 3 } else { 0 },
+        if precision_mode {
+            2 + evidence_count * 3
+        } else {
+            0
+        },
         "fixture's precision warning count must be deterministic"
     );
     let result_bytes = serde_json::to_vec(&produced).expect("serialize benchmark result");
@@ -263,7 +263,9 @@ fn run_scenario(
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let smoke_mode = arguments.first().is_some_and(|argument| argument == "--smoke");
+    let smoke_mode = arguments
+        .first()
+        .is_some_and(|argument| argument == "--smoke");
     let sample_count = if smoke_mode {
         1
     } else {
