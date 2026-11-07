@@ -12,8 +12,8 @@ use rustfft::{FftPlanner, num_complex::Complex};
 use symthaea_muse::Note;
 
 use super::singing_engine::{
-    CapabilitySupport, ControlCapability, SingingBackendCapabilities, SingingControl,
-    SingingVoiceEngine, VocalPerformance, VocalStem, VocalSyllable,
+    CapabilitySupport, ControlCapability, ExpressionPoint, SingingBackendCapabilities,
+    SingingControl, SingingVoiceEngine, VocalPerformance, VocalStem, VocalSyllable,
 };
 use super::{KokoroConfig, KokoroEngine};
 
