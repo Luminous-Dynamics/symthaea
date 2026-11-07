@@ -1,0 +1,165 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_id": "physical-compute-frontier-v1",
+  "as_of_date": "2026-11-07",
+  "status": "evidence_map_not_leaderboard",
+  "owner_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/9236",
+  "child_issues": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10932",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10933",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10906"
+  ],
+  "studies": [
+    {
+      "id": "FLARE_2026",
+      "family": "integrated_photonic_memory",
+      "reference": "Zhou, Wu & Fang, Nature Sensors 1, 998-1010 (2026)",
+      "publication_date": "2026-08-27",
+      "doi": "10.1038/s44460-026-00123-2",
+      "url": "https://www.nature.com/articles/s44460-026-00123-2",
+      "paper_reported": {
+        "neurons": 7378,
+        "long_term_memory_retention_seconds": 7.45,
+        "short_term_dynamics": "GHz-scale",
+        "multilayer_cores": 10,
+        "architecture_layers": 4,
+        "reported_energy_attojoules_per_operation": 61.87,
+        "controller_board_dac_channels": 256,
+        "controller_board_fpga": true,
+        "calibration_controller_channels": 72
+      },
+      "demonstrated_application": "autonomous racing-drone navigation, sensing, exploration and adaptation",
+      "evidence_class": "peer_reviewed_physical_chip_and_system_paper_report",
+      "caveats": [
+        "Operation denominator and exact energy boundary must be extracted from methods/supplement.",
+        "7.45-second state retention is not durable digital storage.",
+        "Neuron count is not general-purpose operation throughput.",
+        "System has optical coupling and electronic control; do not assume all control/laser/conversion costs are included in 61.87 aJ/op."
+      ],
+      "source_data": "paper states source data are provided",
+      "code": "no reusable public source code identified in the current source audit"
+    },
+    {
+      "id": "FAST_ONN_2026",
+      "family": "free_space_optical_in_memory_matrix_engine",
+      "reference": "Liang et al., Light: Science & Applications 15, 115 (2026)",
+      "publication_date": "2026-02-13",
+      "doi": "10.1038/s41377-026-02206-8",
+      "url": "https://www.nature.com/articles/s41377-026-02206-8",
+      "paper_reported": {
+        "yolo_convolution_feature_extraction_frames_per_second": 100000000,
+        "operating_sample_rate_samples_per_second": 25000000000,
+        "stated_precision_bits": [
+          7,
+          8
+        ],
+        "optical_power_budget_watts_for_32x32_channels": 1,
+        "optical_detector_power_milliwatts": 1,
+        "slm_pixels": 2304000
+      },
+      "architecture": [
+        "VCSEL arrays",
+        "spatial light modulators",
+        "photodetectors",
+        "optoelectronic conversion"
+      ],
+      "evidence_class": "peer_reviewed_physical_optical_system_paper_report",
+      "caveats": [
+        "FPS, optical sample rate and useful end-to-end inference throughput are different metrics.",
+        "1 W is an optical power figure, not a complete wall-input system measurement.",
+        "Include VCSEL drive, SLM control, detection, conversion, synchronization, cooling and host processing."
+      ],
+      "code": "not established by the source audit"
+    },
+    {
+      "id": "MEMRISTIVE_HDC_2026",
+      "family": "memristive_analog_compute_in_memory_hdc",
+      "reference": "Huang et al., Nature Communications 17, 9162 (2026)",
+      "publication_date": "2026-07-28",
+      "doi": "10.1038/s41467-026-76067-5",
+      "url": "https://www.nature.com/articles/s41467-026-76067-5",
+      "paper_reported": {
+        "language_classes": 21,
+        "hypervector_dimensions": 1024,
+        "simulated_accuracy_percent": 98.87,
+        "physical_soc_accuracy_percent": 95.24,
+        "reported_tops_per_watt": 2.58,
+        "reported_latency_microseconds": 302.5,
+        "soc_cores": 10,
+        "crossbar_rows": 248,
+        "crossbar_columns": 256,
+        "crossbar_cell": "1T1R",
+        "train_corpus": "Wortschatz",
+        "test_corpus": "Europarl"
+      },
+      "evidence_class": "peer_reviewed_physical_memristive_soc_paper_report",
+      "caveats": [
+        "Language classification is not exact 16K BinaryHV top-1 retrieval.",
+        "The published dimensionality and algorithm are not the canonical Symthaea binary representation.",
+        "TOPS/W and latency are task/system-specific; audit full energy and latency boundaries before cross-paper comparison.",
+        "Two authors disclose TetraMem co-founder and paid-consultant relationships."
+      ],
+      "rights": {
+        "article_license": "CC BY-NC-ND 4.0",
+        "article_url": "https://www.nature.com/articles/s41467-026-76067-5",
+        "code_and_dataset_rights": "separate; must be audited before reuse"
+      }
+    },
+    {
+      "id": "FAULT_ADAPTIVE_ANALOG_2026",
+      "family": "fault_adaptive_analog_matrix_representation",
+      "reference": "Xu et al., Nature Electronics 9, 811-824 (2026)",
+      "publication_date": "2026-06-12",
+      "doi": "10.1038/s41928-026-01638-9",
+      "url": "https://www.nature.com/articles/s41928-026-01638-9",
+      "paper_reported": {
+        "dft_matrix_cosine_similarity_percent": 99.999,
+        "stuck_fault_rate_percent": 39,
+        "wireless_bit_error_rate_reduction_factor": 56,
+        "cross_domain_density_improvement_percent": 194,
+        "cross_domain_energy_efficiency_improvement_percent": 164
+      },
+      "evidence_class": "peer_reviewed_physical_memristive_system_paper_report",
+      "caveats": [
+        "Fault rate and fidelity are specific to the tested matrix/circuit and defect model.",
+        "Target matrix rank, latent dimension, conditioning and device count must be matched.",
+        "Density and energy comparisons are paper-specific; require full peripheral/compensation boundary."
+      ],
+      "source_data": "https://doi.org/10.6084/m9.figshare.31813117",
+      "author_code": "https://github.com/ZCXU0421/Fault_free_analog_computing",
+      "author_code_license": "AGPLv3 plus Commons Clause per repository LICENSE",
+      "commercial_reuse": "Do not copy/adapt into commercial Luminous product without explicit additional permission and legal review; patent/FTO review is separate.",
+      "later_repository_addition": {
+        "name": "Variation-Enhanced Training (VET)",
+        "repository_readme_date": "2026-08-11",
+        "status": "optional training feature in author repository; not to be conflated with the original physical paper result"
+      }
+    }
+  ],
+  "benchmark_axes": [
+    "target_matrix_rank_and_singular_spectrum",
+    "matrix_sparsity_locality_and_conditioning",
+    "fault_rate_and_fault_topology",
+    "stuck_off_and_stuck_on",
+    "write_programming_error_and_per_read_noise_separately",
+    "drift_retention_endurance_and_temperature",
+    "precision_and_task_quality",
+    "latency_distribution_and_useful_throughput",
+    "peripheral_inclusive_energy_and_wall_input_energy",
+    "device_count_active_area_and_package",
+    "calibration_update_and_recovery_cost",
+    "repairability_and_supply_chain"
+  ],
+  "comparison_tracks": [
+    "same_algorithm_same_representation_same_task_different_substrate",
+    "best_competent_algorithm_plus_substrate_codesign_under_matched_budget"
+  ],
+  "no_cross_metric_leaderboard": true,
+  "prohibited_unqualified_comparisons": [
+    "aJ_per_op_vs_TOPS_per_W",
+    "neuron_count_vs_vector_dimension",
+    "optical_samples_per_second_vs_end_to_end_inference_fps",
+    "paper_specific_classification_accuracy_vs_exact_retrieval_accuracy",
+    "array_core_energy_vs_wall_input_system_energy"
+  ]
+}
