@@ -44,6 +44,7 @@ pub struct StrategyBddBudget {
     pub max_dependency_variables: usize,
     pub max_table_entries: u128,
     pub max_bdd_nodes: usize,
+    pub max_support_checks: u128,
     pub max_variable_order_evaluations: usize,
     pub max_sifting_passes: usize,
 }
@@ -54,6 +55,7 @@ impl Default for StrategyBddBudget {
             max_dependency_variables: 20,
             max_table_entries: 1 << 20,
             max_bdd_nodes: 1 << 20,
+            max_support_checks: 1 << 22,
             max_variable_order_evaluations: 512,
             max_sifting_passes: 2,
         }
@@ -114,6 +116,19 @@ pub enum StrategyBddError {
     VariableOrderSearchBudgetExceeded {
         required: usize,
         limit: usize,
+    },
+    SupportCheckBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    StrategyVariableMismatch {
+        original: usize,
+        reduced: usize,
+    },
+    SupportReductionMismatch {
+        assignment: Vec<bool>,
+        original_value: bool,
+        reduced_value: bool,
     },
     RootNodeOutOfRange {
         node: usize,
@@ -177,6 +192,34 @@ pub struct StrategyBddSiftingReport {
     pub bdd: ReducedOrderedBdd,
 }
 
+/// Evidence for exact semantic-support reduction of one strategy function.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategySupportReductionReport {
+    pub original_dependency_count: usize,
+    pub reduced_dependency_count: usize,
+    pub support_pair_checks: u128,
+    pub original_assignments_checked: u128,
+    pub reduced_table_entries: u128,
+}
+
+/// A support-minimized strategy function and its independent equivalence report.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyFunctionSupportReduction {
+    pub function: BooleanStrategyFunction,
+    pub report: StrategySupportReductionReport,
+}
+
+/// Exact minimum BDD order among all permutations within the declared budget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyBddExactOrderSearchReport {
+    pub initial_variable_order: Vec<usize>,
+    pub optimal_variable_order: Vec<usize>,
+    pub initial_node_count: usize,
+    pub minimum_node_count: usize,
+    pub orders_evaluated: usize,
+    pub bdd: ReducedOrderedBdd,
+}
+
 fn checked_power_of_two(exponent: usize) -> Result<u128, StrategyBddError> {
     let shift = u32::try_from(exponent).map_err(|_| StrategyBddError::AssignmentSpaceOverflow {
         dependency_count: exponent,
@@ -219,7 +262,198 @@ fn validate_truth_table(
             });
         }
     }
+    let mut seen_dependencies = BTreeSet::new();
+    for &variable in &function.dependencies {
+        if !seen_dependencies.insert(variable) {
+            return Err(StrategyBddError::DuplicateDependencyVariable { variable });
+        }
+    }
     Ok(expected)
+}
+
+/// Independently verify that a reduced-support strategy function has the
+/// same value as the original for every original dependency assignment.
+pub fn verify_support_reduction_equivalence(
+    original: &BooleanStrategyFunction,
+    reduced: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategySupportReductionReport, StrategyBddError> {
+    if original.variable != reduced.variable {
+        return Err(StrategyBddError::StrategyVariableMismatch {
+            original: original.variable,
+            reduced: reduced.variable,
+        });
+    }
+    let original_entries = validate_truth_table(original, budget)?;
+    let reduced_entries = validate_truth_table(reduced, budget)?;
+
+    for (reduced_position, dependency) in reduced.dependencies.iter().enumerate() {
+        let Some(original_position) = original
+            .dependencies
+            .iter()
+            .position(|candidate| candidate == dependency)
+        else {
+            return Err(StrategyBddError::DependencyScopeMismatch {
+                expected: original.dependencies.clone(),
+                actual: reduced.dependencies.clone(),
+            });
+        };
+        if reduced.dependencies[..reduced_position]
+            .iter()
+            .any(|earlier| {
+                original
+                    .dependencies
+                    .iter()
+                    .position(|candidate| candidate == earlier)
+                    .is_some_and(|earlier_position| earlier_position >= original_position)
+            })
+        {
+            return Err(StrategyBddError::DependencyScopeMismatch {
+                expected: original.dependencies.clone(),
+                actual: reduced.dependencies.clone(),
+            });
+        }
+    }
+
+    for mask in 0..original_entries {
+        let original_key: Vec<bool> = (0..original.dependencies.len())
+            .map(|index| ((mask >> index) & 1) != 0)
+            .collect();
+        let reduced_key: Vec<bool> = reduced
+            .dependencies
+            .iter()
+            .map(|dependency| {
+                let position = original
+                    .dependencies
+                    .iter()
+                    .position(|candidate| candidate == dependency)
+                    .expect("dependency scope checked above");
+                original_key[position]
+            })
+            .collect();
+        let Some(&original_value) = original.table.get(&original_key) else {
+            return Err(StrategyBddError::MissingTruthTableRow {
+                key: original_key,
+            });
+        };
+        let Some(&reduced_value) = reduced.table.get(&reduced_key) else {
+            return Err(StrategyBddError::MissingTruthTableRow {
+                key: reduced_key,
+            });
+        };
+        if original_value != reduced_value {
+            return Err(StrategyBddError::SupportReductionMismatch {
+                assignment: original_key,
+                original_value,
+                reduced_value,
+            });
+        }
+    }
+
+    Ok(StrategySupportReductionReport {
+        original_dependency_count: original.dependencies.len(),
+        reduced_dependency_count: reduced.dependencies.len(),
+        support_pair_checks: 0,
+        original_assignments_checked: original_entries,
+        reduced_table_entries: reduced_entries,
+    })
+}
+
+/// Remove every declared dependency on which the Boolean function does not
+/// actually depend. This is exact semantic support analysis, not syntactic
+/// reachability. The result is exhaustively checked against the source table.
+pub fn minimize_strategy_function_support(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategyFunctionSupportReduction, StrategyBddError> {
+    let entries = validate_truth_table(function, budget)?;
+    let mut support_indices = Vec::new();
+    let mut support_pair_checks = 0u128;
+
+    for dependency_index in 0..function.dependencies.len() {
+        let mut influential = false;
+        for mask in 0..entries {
+            if ((mask >> dependency_index) & 1) != 0 {
+                continue;
+            }
+            support_pair_checks = support_pair_checks
+                .checked_add(1)
+                .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+            if support_pair_checks > budget.max_support_checks {
+                return Err(StrategyBddError::SupportCheckBudgetExceeded {
+                    required: support_pair_checks,
+                    limit: budget.max_support_checks,
+                });
+            }
+            let low_key: Vec<bool> = (0..function.dependencies.len())
+                .map(|index| ((mask >> index) & 1) != 0)
+                .collect();
+            let mut high_key = low_key.clone();
+            high_key[dependency_index] = true;
+            let low = function
+                .table
+                .get(&low_key)
+                .ok_or_else(|| StrategyBddError::MissingTruthTableRow {
+                    key: low_key.clone(),
+                })?;
+            let high = function
+                .table
+                .get(&high_key)
+                .ok_or_else(|| StrategyBddError::MissingTruthTableRow {
+                    key: high_key.clone(),
+                })?;
+            if low != high {
+                influential = true;
+                break;
+            }
+        }
+        if influential {
+            support_indices.push(dependency_index);
+        }
+    }
+
+    let reduced_entries = checked_power_of_two(support_indices.len())?;
+    if reduced_entries > budget.max_table_entries {
+        return Err(StrategyBddError::TableEntryBudgetExceeded {
+            required: reduced_entries,
+            limit: budget.max_table_entries,
+        });
+    }
+    let dependencies: Vec<usize> = support_indices
+        .iter()
+        .map(|&index| function.dependencies[index])
+        .collect();
+    let mut table = BTreeMap::new();
+    for mask in 0..reduced_entries {
+        let reduced_key: Vec<bool> = (0..support_indices.len())
+            .map(|index| ((mask >> index) & 1) != 0)
+            .collect();
+        let mut original_key = vec![false; function.dependencies.len()];
+        for (reduced_index, &original_index) in support_indices.iter().enumerate() {
+            original_key[original_index] = reduced_key[reduced_index];
+        }
+        let value = *function
+            .table
+            .get(&original_key)
+            .ok_or_else(|| StrategyBddError::MissingTruthTableRow {
+                key: original_key.clone(),
+            })?;
+        table.insert(reduced_key, value);
+    }
+
+    let reduced_function = BooleanStrategyFunction {
+        variable: function.variable,
+        dependencies,
+        table,
+    };
+    let mut report =
+        verify_support_reduction_equivalence(function, &reduced_function, budget)?;
+    report.support_pair_checks = support_pair_checks;
+
+    Ok(StrategyFunctionSupportReduction {
+        function: reduced_function,
+        report,
+    })
 }
 
 fn build_level(
@@ -550,6 +784,83 @@ pub fn sift_strategy_function_robdd(
     })
 }
 
+fn next_permutation(values: &mut [usize]) -> bool {
+    if values.len() < 2 {
+        return false;
+    }
+    let Some(pivot) = (0..values.len() - 1)
+        .rev()
+        .find(|&index| values[index] < values[index + 1])
+    else {
+        return false;
+    };
+    let successor = (pivot + 1..values.len())
+        .rev()
+        .find(|&index| values[index] > values[pivot])
+        .expect("a pivot has a greater successor");
+    values.swap(pivot, successor);
+    values[pivot + 1..].reverse();
+    true
+}
+
+/// Find the exact smallest ROBDD among every variable permutation. This is
+/// intended as a small-scope oracle for measuring heuristic order quality.
+/// The factorial work is preflighted against max_variable_order_evaluations.
+pub fn find_exact_minimum_robdd_order(
+    function: &BooleanStrategyFunction,
+    budget: StrategyBddBudget,
+) -> Result<StrategyBddExactOrderSearchReport, StrategyBddError> {
+    validate_truth_table(function, budget)?;
+    let dependency_count = function.dependencies.len();
+    let mut permutation_count = 1usize;
+    for factor in 2..=dependency_count {
+        permutation_count = permutation_count
+            .checked_mul(factor)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+    }
+    if permutation_count > budget.max_variable_order_evaluations {
+        return Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+            required: permutation_count,
+            limit: budget.max_variable_order_evaluations,
+        });
+    }
+
+    let mut order: Vec<usize> = (0..dependency_count).collect();
+    let initial_variable_order = order.clone();
+    let initial_bdd =
+        compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
+    let initial_node_count = initial_bdd.nodes.len();
+    let mut best_order = order.clone();
+    let mut best_bdd = initial_bdd;
+    let mut orders_evaluated = 0usize;
+
+    loop {
+        let candidate_bdd =
+            compile_strategy_function_to_robdd_with_order(function, &order, budget)?;
+        orders_evaluated = orders_evaluated
+            .checked_add(1)
+            .ok_or(StrategyBddError::ResourceAccountingOverflow)?;
+        if candidate_bdd.nodes.len() < best_bdd.nodes.len()
+            || (candidate_bdd.nodes.len() == best_bdd.nodes.len() && order < best_order)
+        {
+            best_order = order.clone();
+            best_bdd = candidate_bdd;
+        }
+        if !next_permutation(&mut order) {
+            break;
+        }
+    }
+
+    Ok(StrategyBddExactOrderSearchReport {
+        initial_variable_order,
+        optimal_variable_order: best_order,
+        initial_node_count,
+        minimum_node_count: best_bdd.nodes.len(),
+        orders_evaluated,
+        bdd: best_bdd,
+    })
+}
+
 /// Evaluate an ROBDD for one assignment in dependency-list order.
 pub fn evaluate_robdd(
     bdd: &ReducedOrderedBdd,
@@ -640,6 +951,7 @@ mod tests {
             max_dependency_variables: 8,
             max_table_entries: 1 << 8,
             max_bdd_nodes: 1 << 8,
+            max_support_checks: 1 << 12,
             max_variable_order_evaluations: 128,
             max_sifting_passes: 2,
         }
@@ -822,6 +1134,93 @@ mod tests {
             validate_robdd(&bdd),
             Err(StrategyBddError::DuplicateDependencyVariable { variable: 0 })
         ));
+    }
+
+    #[test]
+    fn support_minimization_removes_irrelevant_dependency() {
+        // Function is the first dependency only; the second is unused.
+        let source = function(&[7, 2], &[false, false, true, true]);
+        let reduced = minimize_strategy_function_support(&source, budget()).unwrap();
+        assert_eq!(reduced.function.dependencies, vec![7]);
+        assert_eq!(reduced.function.table.len(), 2);
+        assert_eq!(reduced.report.original_dependency_count, 2);
+        assert_eq!(reduced.report.reduced_dependency_count, 1);
+        assert_eq!(reduced.report.original_assignments_checked, 4);
+    }
+
+    #[test]
+    fn support_minimization_reduces_constant_function_to_zero_dependencies() {
+        let source = function(&[4, 2, 9], &[true; 8]);
+        let reduced = minimize_strategy_function_support(&source, budget()).unwrap();
+        assert!(reduced.function.dependencies.is_empty());
+        assert_eq!(reduced.function.table.get(&vec![]), Some(&true));
+        assert_eq!(reduced.report.reduced_dependency_count, 0);
+    }
+
+    #[test]
+    fn support_analysis_budget_is_fail_closed() {
+        let source = function(&[0, 1, 2], &[false, true, false, true, false, true, false, true]);
+        let tight = StrategyBddBudget {
+            max_support_checks: 0,
+            ..budget()
+        };
+        assert!(matches!(
+            minimize_strategy_function_support(&source, tight),
+            Err(StrategyBddError::SupportCheckBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn exact_order_search_finds_oracle_minimum_and_sifting_is_not_larger() {
+        let source = function(
+            &[11, 12, 10],
+            &[false, true, false, true, false, false, true, true],
+        );
+        let exact = find_exact_minimum_robdd_order(&source, budget()).unwrap();
+        let sifted = sift_strategy_function_robdd(&source, budget()).unwrap();
+        assert_eq!(exact.orders_evaluated, 6);
+        assert_eq!(exact.minimum_node_count, 3);
+        assert!(sifted.optimized_node_count >= exact.minimum_node_count);
+        assert!(sifted.optimized_node_count <= exact.initial_node_count);
+        verify_robdd_matches_strategy_function(&exact.bdd, &source, budget()).unwrap();
+    }
+
+    #[test]
+    fn exact_order_search_refuses_factorial_budget_overrun() {
+        let source = function(&[0, 1, 2, 3], &[false; 16]);
+        let tight = StrategyBddBudget {
+            max_variable_order_evaluations: 23,
+            ..budget()
+        };
+        assert!(matches!(
+            find_exact_minimum_robdd_order(&source, tight),
+            Err(StrategyBddError::VariableOrderSearchBudgetExceeded {
+                required: 24,
+                limit: 23
+            })
+        ));
+    }
+
+    #[test]
+    fn every_three_variable_boolean_function_preserves_support_and_bdd_semantics() {
+        let mut maximum_sift_gap = 0usize;
+        for function_mask in 0..256usize {
+            let values: Vec<bool> = (0..8)
+                .map(|assignment| ((function_mask >> assignment) & 1) != 0)
+                .collect();
+            let source = function(&[0, 1, 2], &values);
+            let support = minimize_strategy_function_support(&source, budget()).unwrap();
+            verify_support_reduction_equivalence(&source, &support.function, budget()).unwrap();
+            let exact = find_exact_minimum_robdd_order(&support.function, budget()).unwrap();
+            let sifted = sift_strategy_function_robdd(&support.function, budget()).unwrap();
+            assert!(exact.minimum_node_count <= sifted.optimized_node_count);
+            assert!(sifted.optimized_node_count <= sifted.initial_node_count);
+            verify_robdd_matches_strategy_function(&exact.bdd, &support.function, budget()).unwrap();
+            maximum_sift_gap = maximum_sift_gap.max(
+                sifted.optimized_node_count - exact.minimum_node_count,
+            );
+        }
+        assert!(maximum_sift_gap <= 1);
     }
 
     #[test]
