@@ -971,6 +971,22 @@ mod tests {
     }
 
     #[test]
+    fn test_direct_mel_hdc_preserves_local_level_similarity() {
+        // With one active bin and no delta channel, adjacent quantization
+        // levels share basis vectors; a distant level should be less similar.
+        let low = AudioProjector::direct_mel_hv(&[-0.5], None);
+        let adjacent = AudioProjector::direct_mel_hv(&[-0.3], None);
+        let distant = AudioProjector::direct_mel_hv(&[0.9], None);
+
+        let adjacent_similarity = low.similarity(&adjacent);
+        let distant_similarity = low.similarity(&distant);
+        assert!(
+            adjacent_similarity > distant_similarity,
+            "adjacent mel levels should retain more Hamming similarity ({adjacent_similarity:.3}) than distant levels ({distant_similarity:.3})"
+        );
+    }
+
+    #[test]
     fn test_audio_projector() {
         let mut projector = AudioProjector::default_config();
 
