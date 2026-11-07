@@ -93,7 +93,9 @@ No one score combines these. Publish the full service and energy ledger plus har
 
 ## 7. Frozen scenario corpus
 
-The companion JSON defines four synthetic profiles:
+The companion JSON defines four synthetic profiles with critical, hotel, thermal-protection and propulsion load series. Their sum is checked against the aggregate load profile passed to the existing grid-physics harness. Each scenario also declares synthetic generator availability/ramp/start/minimum-run/fuel state, shore-power availability, battery temperature/SoH, sea state/wind/air/sea temperature, solar forecast error bound and RO feed salinity/temperature qualification. These are synthetic contract fields, not vendor- or class-qualified equipment parameters.
+
+The four cases are:
 - clear solar surplus with scheduled watermaking and hot-water service;
 - cloud / low-solar event concurrent with fixed underway propulsion load;
 - low battery reserve with increased water demand and a watermaker service deadline;
