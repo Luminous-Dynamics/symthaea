@@ -1840,6 +1840,94 @@ mod tests {
     }
 
     #[test]
+    fn model_eig_rejects_normalized_but_inconsistent_full_predictive_mixture() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        let action = DirichletActionPrediction {
+            action_id: "inconsistent-model-mixture".into(),
+            outcomes: vec![
+                predicted_outcome(
+                    "success",
+                    0.6,
+                    &[("success-favouring", 0.8), ("failure-favouring", 0.2)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.4,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.8)],
+                    vec![vec![0.0, 1.0]],
+                ),
+            ],
+        };
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &action),
+            Err(DirichletModelInformationGainError::FullPredictiveProbabilityMismatch {
+                outcome_id,
+                ..
+            }) if outcome_id == "success"
+        ));
+    }
+
+    #[test]
+    fn model_eig_rejects_per_model_predictive_mass_that_does_not_normalize() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        let action = DirichletActionPrediction {
+            action_id: "bad-model-predictive-mass".into(),
+            outcomes: vec![
+                predicted_outcome(
+                    "success",
+                    0.55,
+                    &[("success-favouring", 0.8), ("failure-favouring", 0.3)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    0.45,
+                    &[("success-favouring", 0.2), ("failure-favouring", 0.7)],
+                    vec![vec![0.0, 1.0]],
+                ),
+            ],
+        };
+        assert!(matches!(
+            evaluate_dirichlet_model_information_gain(&full_prior, &full_prior, &models, &action),
+            Err(DirichletModelInformationGainError::ModelPredictiveProbabilityMassNotNormalized {
+                model_id,
+                ..
+            }) if model_id == "success-favouring"
+        ));
+    }
+
+    #[test]
+    fn full_predictive_mixture_uses_current_posterior_model_weights_not_model_priors() {
+        let (full_prior, models) = symmetric_beta_model_family();
+        // One observed success makes the current BMR model posterior 0.8 / 0.2.
+        let posterior = tensor(&[&[3.5, 2.5]], 'a');
+        let action = DirichletActionPrediction {
+            action_id: "second-observation".into(),
+            outcomes: vec![
+                predicted_outcome(
+                    "success",
+                    11.0 / 15.0,
+                    &[("success-favouring", 5.0 / 6.0), ("failure-favouring", 1.0 / 3.0)],
+                    vec![vec![1.0, 0.0]],
+                ),
+                predicted_outcome(
+                    "failure",
+                    4.0 / 15.0,
+                    &[("success-favouring", 1.0 / 6.0), ("failure-favouring", 2.0 / 3.0)],
+                    vec![vec![0.0, 1.0]],
+                ),
+            ],
+        };
+        let result =
+            evaluate_dirichlet_model_information_gain(&posterior, &full_prior, &models, &action)
+                .expect("posterior-weighted predictive mixture");
+        assert!((result.outcomes[0].predictive_probability - 11.0 / 15.0).abs() < 1e-10);
+        assert!((result.outcomes[1].predictive_probability - 4.0 / 15.0).abs() < 1e-10);
+        assert!((result.predictive_probability_mass - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn parameter_order_permutation_is_invariant_when_digest_tracks_same_ordering() {
         let first = reduce_dirichlet_models(
             &tensor(&[&[4.0, 2.0]], 'a'),
