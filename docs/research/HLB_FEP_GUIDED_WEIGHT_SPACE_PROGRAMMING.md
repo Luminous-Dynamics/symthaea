@@ -221,6 +221,27 @@ A deterministic Beta/Bernoulli unit test reproduces the analytic two-model case:
 
 **Scope boundary:** this is a one-step model-EIG scorer, not a complete expected-free-energy planner. The caller must still produce calibrated action-conditioned predictive outcomes and state/posterior increments. Parameter EIG, state EIG, risk/preference cost, ambiguity, action costs, multi-step planning, the full three-ball POMDP, and production `ActiveInferenceAgent::select_action` integration remain separate work. The full expected-free-energy score should add the components once, with consistent sign conventions; do not double-count BMR log evidence as a separate reward term.
 
+### 2.3.4 A scoped known-state feedback decision score
+
+The branch now adds an executable one-step action evaluator in `crates/core/symthaea-fep/src/three_ball_rule_space.rs`:
+
+- `build_three_ball_feedback_action_prediction` derives each reduced model's posterior predictive categorical distribution from the full posterior and reduced prior using (a_m = a + a_m^0 - a_0). It weights these distributions by the current posterior model belief, not the original model priors.
+- `score_three_ball_known_state_feedback_actions` evaluates legal colour choices plus no-choice for a fixed known ball-colour state and fixed gaze.
+- `ThreeBallFeedbackDecisionConfig::default()` uses the paper's relative log preferences `[0, 2, -6]` nats in `[no-feedback, correct, incorrect]` order, normalized to a categorical preference distribution, and an explicit epistemic weight of one.
+- `ThreeBallFeedbackActionScore` returns the pragmatic-risk KL, model-structure information gain, weighted epistemic value, action cost, predictive feedback distribution, and combined score for each action. The decision chooses the minimum score with deterministic tie-breaking.
+
+The scoped objective is:
+
+```text
+G(a) = KL[Q(feedback | a, D) || C(feedback)]
+       - lambda_info * I(model; feedback | a, D)
+       + action_cost(a)
+```
+
+This is a **known-state feedback-only, one-step FEP-style decision slice**. It is not the full expected-free-energy functional: state uncertainty/visual information gain, ambiguity, gaze/vision transitions, multi-step planning, and safety constraints are not present. It is not wired to production `ActiveInferenceAgent::select_action`. The earlier shared count-increment limitation still applies: it is exact for the fixed known parent state, not a full partially observed parent-state posterior update.
+
+Tests now check the decomposition, normalized predictive feedback, the no-choice zero-information control, rejection of negative action cost and invalid epistemic weight, and a posterior-evidence example in which one observed correct feedback removes rules incompatible with that event and a pragmatic-only policy selects the planted green choice. The full EIG-plus-pragmatics trade-off remains a benchmark to compare across `lambda_info`, action costs, and matched random/pragmatic-only/model-EIG-only controls—not a demonstrated advantage over other policies yet.
+
 ### 2.4 WSP must pass exact-protocol replication, not headline comparison
 
 An important reproducibility update appeared on 6 November 2026. The independent [OpenWSP replication](https://github.com/openwsp/openwsp) reports that its recorded live Experiment 8 edit scored **12.9% on MATH-500**, versus the MIT authors' reported 48.1% and OpenWSP's local calibration of the released edit at 50.6%. OpenWSP reports that 84.25% of its live MATH-500 generations hit the token limit, and that its live evaluation used four samples per problem while the local calibration used one. GSM8K and IFEval were still pending in that repository snapshot.
