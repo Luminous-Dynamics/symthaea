@@ -79,7 +79,11 @@
         "null_spec_sha256",
         "global_filtration_sha256",
         "confirmation_split_sha256",
-        "e_process_values"
+        "e_process_values",
+        "global_filtration_sha256",
+        "confirmation_split_sha256",
+        "component_validity_receipt_sha256",
+        "component_status"
       ],
       "properties": {
         "claim_id": {
@@ -101,6 +105,12 @@
           "items": {
             "$ref": "#/$defs/rational"
           }
+        },
+        "component_validity_receipt_sha256": {
+          "$ref": "#/$defs/sha64"
+        },
+        "component_status": {
+          "const": "VALIDATED_GLOBAL_FILTRATION_EPROCESS"
         }
       }
     },
