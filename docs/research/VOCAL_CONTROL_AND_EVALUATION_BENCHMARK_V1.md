@@ -109,6 +109,20 @@ Current source-level dispositions:
 
 These are implementation declarations, not listening-quality results. The benchmark must score only controls common to candidates in the shared comparison track. Unsupported controls remain visible in the receipt and must not be counted as successfully applied. Model/voicebank byte-tree digests remain separate work tracked by issue #10872.
 
+## Capability-aware renderer admission
+
+The Rust singing API now has an executable `SingingRenderPolicy`. A controlled score-conditioned comparison can require language profile, explicit phone sequence, syllable alignment, note pitch/duration, absolute onset/rest handling, and melisma. Before a renderer is called, its complete capability manifest is checked against that policy.
+
+The policy makes three support levels meaningful:
+- `native`: accepted without qualification;
+- `approximated`: accepted only when the caller explicitly permits approximations;
+- `conditional`: accepted only when the caller explicitly permits conditional support (for example, a language/voicebank limitation);
+- `unsupported`: always rejected when required.
+
+The shared comparison policy currently permits documented approximations and conditional language support, because Kokoro and DiffSinger have different but useful control profiles. It does not require continuous pitch curves, breathiness, portamento, phrase-expression curves, or local edits, so those must remain separately reported as unsupported rather than silently counted as successful. The per-backend manifest tests also verify that all 19 controls—including consonant anticipation—are declared.
+
+This is **admission to a fair comparison**, not proof that approximated controls are equivalent to native controls or that either backend achieved good perceptual quality. Report capability support class alongside all benchmark scores.
+
 ## Fair comparison protocol
 
 1. Freeze the exact lyrics, language, pronunciation, score, tempo, controls, voice reference, source commits, and dataset split before generating any candidate audio.
