@@ -45,7 +45,7 @@ fn import_worker(job: ImportJob) -> Result<()> {
 }
 \`\`\`
 
-The worker's signature verifies that the job was issued by a trusted scheduler. It does not establish tenant/resource authorization for the original actor.
+The job contains a user-originated import request. The trusted scheduler signs the envelope after structural validation, but does not evaluate the original actor's tenant/resource policy. The worker's signature therefore proves scheduler authenticity only; it does not establish authorization for the original actor.
 
 **State deltas:**
 
