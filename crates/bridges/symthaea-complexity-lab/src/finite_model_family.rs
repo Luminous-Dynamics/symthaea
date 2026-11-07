@@ -153,6 +153,7 @@ pub enum FiniteFamilyError {
     InvalidModelDigest { index: usize, digest: String },
     DuplicateModelDigest { digest: String },
     MissingStateBounds { variable_index: usize, state_index: usize },
+    MissingQueryAssignmentWitness { query_assignment_index: usize },
     InvalidQueryVariable { variable_index: usize },
     DuplicateQueryVariable { variable_index: usize },
     QueryStateOutOfRange { variable_index: usize, state: usize, cardinality: usize },
@@ -188,6 +189,10 @@ impl fmt::Display for FiniteFamilyError {
             Self::MissingStateBounds { variable_index, state_index } => write!(
                 f,
                 "no posterior bound was accumulated for variable {variable_index}, state {state_index}"
+            ),
+            Self::MissingQueryAssignmentWitness { query_assignment_index } => write!(
+                f,
+                "no model witness was accumulated for query assignment {query_assignment_index}"
             ),
             Self::InvalidQueryVariable { variable_index } => {
                 write!(f, "query references unknown variable {variable_index}")
@@ -807,9 +812,7 @@ pub fn evaluate_finite_family_credal_map(
         }
 
         for (factor_index, factor) in model.graph.factors().iter().enumerate() {
-            if factor.values.iter().any(|value| value.is_negative()) {
-                let value = factor.values.iter().find(|value| value.is_negative())
-                    .expect("negative factor value was detected");
+            if let Some(value) = factor.values.iter().find(|value| value.is_negative()) {
                 return Err(FiniteFamilyError::ModelInference {
                     model_digest: model.model_digest.to_owned(),
                     source: RationalInferenceError::NegativePotential {
@@ -911,8 +914,11 @@ pub fn evaluate_finite_family_credal_map(
                             model_index,
                         });
                     }
-                    let current_min = min_by_query[query_index]
-                        .expect("max and min witnesses are initialized together");
+                    let current_min = min_by_query[query_index].ok_or(
+                        FiniteFamilyError::MissingQueryAssignmentWitness {
+                            query_assignment_index: query_index,
+                        },
+                    )?;
                     if probability < current_min.probability {
                         min_by_query[query_index] = Some(ProbabilityWitness {
                             probability,
@@ -945,7 +951,9 @@ pub fn evaluate_finite_family_credal_map(
     } else {
         let mut best: Option<(usize, ProbabilityWitness)> = None;
         for (query_index, witness) in max_by_query.iter().enumerate() {
-            let witness = witness.expect("supported model initializes each query assignment");
+            let witness = witness.ok_or(FiniteFamilyError::MissingQueryAssignmentWitness {
+                query_assignment_index: query_index,
+            })?;
             if best.map_or(true, |(_, current)| witness.probability > current.probability) {
                 best = Some((query_index, witness));
             }
@@ -962,7 +970,9 @@ pub fn evaluate_finite_family_credal_map(
     } else {
         let mut best: Option<(usize, ProbabilityWitness)> = None;
         for (query_index, witness) in min_by_query.iter().enumerate() {
-            let witness = witness.expect("complete family initializes every query assignment");
+            let witness = witness.ok_or(FiniteFamilyError::MissingQueryAssignmentWitness {
+                query_assignment_index: query_index,
+            })?;
             if best.map_or(true, |(_, current)| witness.probability > current.probability) {
                 best = Some((query_index, witness));
             }
