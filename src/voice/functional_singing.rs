@@ -34,7 +34,7 @@ struct PhoneSpan {
 }
 
 fn ipa_to_arpa(ipa: &str) -> Result<&'static str> {
-    match ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit()) {
+    let mapped = match ipa.trim_matches(|c: char| c == 'ː' || c.is_ascii_digit()) {
         "i" | "iː" => "IY",
         "ɪ" => "IH",
         "e" | "eɪ" => "EY",
@@ -76,10 +76,10 @@ fn ipa_to_arpa(ipa: &str) -> Result<&'static str> {
         "w" => "W",
         "j" => "Y",
         unsupported => bail!(
-            "unsupported IPA phoneme {ipa:?} (normalized to {unsupported:?});              refusing silent AX substitution in the functional singing renderer"
+            "unsupported IPA phoneme {ipa:?} (normalized to {unsupported:?}); refusing silent AX substitution in the functional singing renderer"
         ),
-    }
-    .pipe(Ok)
+    };
+    Ok(mapped)
 }
 
 fn phone_spans(performance: &VocalPerformance) -> Result<Vec<PhoneSpan>> {
