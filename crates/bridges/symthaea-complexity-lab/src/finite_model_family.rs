@@ -1350,6 +1350,37 @@ mod tests {
         let right = evaluate_finite_family_credal_map(&models, &[2, 0], &[0, 1, 2], 8).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.query_variables, vec![0, 2]);
+        assert_eq!(
+            left.model_records[0].query_probabilities.as_ref().unwrap(),
+            &vec![q(4, 23), q(5, 46), q(10, 23), q(13, 46)]
+        );
+        assert_eq!(left.model_records[0].evidence_mass, q(46, 1));
+    }
+
+    #[test]
+    fn empty_credal_map_query_is_the_certain_event() {
+        let model = graph([q(3, 1), q(1, 1)]);
+        let id = digest('a');
+        let models = [FiniteModelRef { model_digest: &id, graph: &model }];
+        let result = evaluate_finite_family_credal_map(&models, &[], &[0], 2).unwrap();
+        assert_eq!(result.maximax.as_ref().unwrap().assignment, Vec::<usize>::new());
+        assert_eq!(result.maximax.as_ref().unwrap().probability, CheckedRational::one());
+        assert_eq!(result.maximin.as_ref().unwrap().probability, CheckedRational::one());
+    }
+
+    #[test]
+    fn credal_map_rejects_unknown_or_duplicate_query_variables() {
+        let model = graph([q(3, 1), q(1, 1)]);
+        let id = digest('a');
+        let models = [FiniteModelRef { model_digest: &id, graph: &model }];
+        assert!(matches!(
+            evaluate_finite_family_credal_map(&models, &[1], &[0], 2),
+            Err(FiniteFamilyError::InvalidQueryVariable { variable_index: 1 })
+        ));
+        assert!(matches!(
+            evaluate_finite_family_credal_map(&models, &[0, 0], &[0], 2),
+            Err(FiniteFamilyError::DuplicateQueryVariable { variable_index: 0 })
+        ));
     }
 
     #[test]
