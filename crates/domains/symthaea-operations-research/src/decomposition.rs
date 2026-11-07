@@ -23,11 +23,17 @@ pub struct Literal {
 
 impl Literal {
     pub const fn positive(variable: usize) -> Self {
-        Self { variable, positive: true }
+        Self {
+            variable,
+            positive: true,
+        }
     }
 
     pub const fn negative(variable: usize) -> Self {
-        Self { variable, positive: false }
+        Self {
+            variable,
+            positive: false,
+        }
     }
 
     fn satisfied_by(self, assignment: &[bool]) -> bool {
@@ -71,7 +77,9 @@ impl Default for EnumerationBudget {
 /// Typed failure. A failed finite check never returns a partial count.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecompositionError {
-    EmptyVariableName { index: usize },
+    EmptyVariableName {
+        index: usize,
+    },
     DuplicateVariableName(String),
     LiteralVariableOutOfRange {
         clause: usize,
@@ -79,30 +87,72 @@ pub enum DecompositionError {
         variable: usize,
         variable_count: usize,
     },
-    SplitVariableOutOfRange { variable: usize, variable_count: usize },
-    AssignmentSpaceOverflow { variable_count: usize },
-    VariableBudgetExceeded { required: usize, limit: usize },
-    VariableNameBudgetExceeded { required: usize, limit: usize },
-    AssignmentBudgetExceeded { required: u128, limit: u128 },
-    ClauseBudgetExceeded { required: usize, limit: usize },
-    LiteralBudgetExceeded { required: usize, limit: usize },
-    ProjectionVariableOutOfRange { variable: usize, variable_count: usize },
+    SplitVariableOutOfRange {
+        variable: usize,
+        variable_count: usize,
+    },
+    AssignmentSpaceOverflow {
+        variable_count: usize,
+    },
+    VariableBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    VariableNameBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    AssignmentBudgetExceeded {
+        required: u128,
+        limit: u128,
+    },
+    ClauseBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    LiteralBudgetExceeded {
+        required: usize,
+        limit: usize,
+    },
+    ProjectionVariableOutOfRange {
+        variable: usize,
+        variable_count: usize,
+    },
     DuplicateProjectionVariable(usize),
-    ProjectionSupportBudgetExceeded { required_at_least: usize, limit: usize },
-    EmptyComponent { component: usize },
+    ProjectionSupportBudgetExceeded {
+        required_at_least: usize,
+        limit: usize,
+    },
+    EmptyComponent {
+        component: usize,
+    },
     ComponentVariableOutOfRange {
         component: usize,
         variable: usize,
         variable_count: usize,
     },
-    VariableRepeatedInPartition { variable: usize },
-    VariableMissingFromPartition { variable: usize },
-    FreeVariableOccursInClause { variable: usize, clause: usize },
-    ClauseCrossesComponents { clause: usize },
-    EmptyClauseNotSupportedByComponentWitness { clause: usize },
+    VariableRepeatedInPartition {
+        variable: usize,
+    },
+    VariableMissingFromPartition {
+        variable: usize,
+    },
+    FreeVariableOccursInClause {
+        variable: usize,
+        clause: usize,
+    },
+    ClauseCrossesComponents {
+        clause: usize,
+    },
+    EmptyClauseNotSupportedByComponentWitness {
+        clause: usize,
+    },
     CountOverflow,
     ResourceAccountingOverflow,
-    SemanticMismatch { source_count: u128, aggregate_count: u128 },
+    SemanticMismatch {
+        source_count: u128,
+        aggregate_count: u128,
+    },
 }
 
 fn validate_problem(
@@ -213,10 +263,11 @@ fn assignment_count(
 }
 
 fn satisfies(problem: &CnfProblem, assignment: &[bool]) -> bool {
-    problem
-        .clauses
-        .iter()
-        .all(|clause| clause.iter().any(|literal| literal.satisfied_by(assignment)))
+    problem.clauses.iter().all(|clause| {
+        clause
+            .iter()
+            .any(|literal| literal.satisfied_by(assignment))
+    })
 }
 
 /// Count satisfying full assignments by bounded direct enumeration.
@@ -236,7 +287,9 @@ pub fn count_models(
             .map(|index| ((mask >> index) & 1) == 1)
             .collect();
         if satisfies(problem, &assignment) {
-            count = count.checked_add(1).ok_or(DecompositionError::CountOverflow)?;
+            count = count
+                .checked_add(1)
+                .ok_or(DecompositionError::CountOverflow)?;
         }
     }
     Ok(count)
@@ -374,7 +427,9 @@ pub fn verify_independent_product(
 
     for (component_index, component) in components.iter().enumerate() {
         if component.is_empty() {
-            return Err(DecompositionError::EmptyComponent { component: component_index });
+            return Err(DecompositionError::EmptyComponent {
+                component: component_index,
+            });
         }
         for &variable in component {
             if variable >= variable_count {
@@ -415,9 +470,11 @@ pub fn verify_independent_product(
 
     for (clause_index, clause) in problem.clauses.iter().enumerate() {
         if clause.is_empty() {
-            return Err(DecompositionError::EmptyClauseNotSupportedByComponentWitness {
-                clause: clause_index,
-            });
+            return Err(
+                DecompositionError::EmptyClauseNotSupportedByComponentWitness {
+                    clause: clause_index,
+                },
+            );
         }
         let mut owner = None;
         for literal in clause {
@@ -430,9 +487,11 @@ pub fn verify_independent_product(
             match (owner, component_owner[literal.variable]) {
                 (None, Some(component)) => owner = Some(component),
                 (Some(previous), Some(component)) if previous == component => {}
-                _ => return Err(DecompositionError::ClauseCrossesComponents {
-                    clause: clause_index,
-                }),
+                _ => {
+                    return Err(DecompositionError::ClauseCrossesComponents {
+                        clause: clause_index,
+                    });
+                }
             }
         }
     }
@@ -455,9 +514,10 @@ pub fn verify_independent_product(
 
         let mut clauses = Vec::new();
         for (clause_index, clause) in problem.clauses.iter().enumerate() {
-            if clause.first().is_some_and(|literal| {
-                component_owner[literal.variable] == Some(component_index)
-            }) {
+            if clause
+                .first()
+                .is_some_and(|literal| component_owner[literal.variable] == Some(component_index))
+            {
                 let mut local_clause = Vec::with_capacity(clause.len());
                 for literal in clause {
                     if component_owner[literal.variable] != Some(component_index) {
@@ -482,14 +542,16 @@ pub fn verify_independent_product(
             variable_count: free_variables.len(),
         }
     })?;
-    let free_multiplier = 1u128
-        .checked_shl(free_shift)
-        .ok_or(DecompositionError::AssignmentSpaceOverflow {
-            variable_count: free_variables.len(),
-        })?;
+    let free_multiplier =
+        1u128
+            .checked_shl(free_shift)
+            .ok_or(DecompositionError::AssignmentSpaceOverflow {
+                variable_count: free_variables.len(),
+            })?;
 
     let product = component_counts.iter().try_fold(1u128, |acc, count| {
-        acc.checked_mul(*count).ok_or(DecompositionError::CountOverflow)
+        acc.checked_mul(*count)
+            .ok_or(DecompositionError::CountOverflow)
     })?;
     let aggregate = product
         .checked_mul(free_multiplier)
@@ -583,10 +645,11 @@ pub fn verify_projected_support(
 }
 
 /// Combine projected supports by existential union, deduplicating witnesses.
-pub fn existential_support_union(
-    supports: &[BTreeSet<Vec<bool>>],
-) -> BTreeSet<Vec<bool>> {
-    supports.iter().flat_map(|support| support.iter().cloned()).collect()
+pub fn existential_support_union(supports: &[BTreeSet<Vec<bool>>]) -> BTreeSet<Vec<bool>> {
+    supports
+        .iter()
+        .flat_map(|support| support.iter().cloned())
+        .collect()
 }
 
 #[cfg(test)]
