@@ -55,9 +55,7 @@ impl Form {
         Self::new(
             self.terms
                 .iter()
-                .map(|(assignment, coefficient)| {
-                    (exchange_assignment(*assignment), *coefficient)
-                })
+                .map(|(assignment, coefficient)| (exchange_assignment(*assignment), *coefficient))
                 .collect(),
         )
     }
@@ -275,7 +273,9 @@ fn product_records(products: &[Assignment]) -> Vec<Record> {
         let slot_kinds = product_slot_kinds(product);
         if product == exchanged {
             let form = Form::single(product);
-            let reads = form.has_two_letters_at_same_end().then(|| form.exchange_reads());
+            let reads = form
+                .has_two_letters_at_same_end()
+                .then(|| form.exchange_reads());
             records.push(Record {
                 form,
                 sign: 1,
@@ -311,11 +311,7 @@ type Matrix2 = [[i32; 2]; 2];
 /// The integer, traceless basis used at a qubit: symmetric off-diagonal,
 /// antisymmetric off-diagonal, and diagonal.
 fn qubit_traceless_basis() -> [Matrix2; 3] {
-    [
-        [[0, 1], [1, 0]],
-        [[0, 1], [-1, 0]],
-        [[1, 0], [0, -1]],
-    ]
+    [[[0, 1], [1, 0]], [[0, 1], [-1, 0]], [[1, 0], [0, -1]]]
 }
 
 fn matrix_product(a: Matrix2, b: Matrix2) -> Matrix2 {
@@ -554,12 +550,16 @@ fn build_records() -> (usize, usize, usize, Vec<Record>) {
             record.slot_kinds.sort_rank(),
         )
     });
-    (products.len(), product_record_count, commutator_record_count, all_records)
+    (
+        products.len(),
+        product_record_count,
+        commutator_record_count,
+        all_records,
+    )
 }
 
 fn record_weight_squared(signature_x: i32, signature_y: i32) -> usize {
-    (if signature_x == -1 { 3 } else { 1 })
-        * (if signature_y == -1 { 2 } else { 1 })
+    (if signature_x == -1 { 3 } else { 1 }) * (if signature_y == -1 { 2 } else { 1 })
 }
 
 fn record_ends_passed(signature_x: i32, signature_y: i32) -> &'static str {
@@ -613,9 +613,7 @@ fn count_record_categories(rows: &[RecordRow]) -> RecordCategoryCounts {
             ("exchange-fixed", "same", -1, 1, "qutrit", 3) => {
                 counts.exchange_fixed_same_minus_plus += 1
             }
-            ("commutator", "bracket", -1, -1, "both", 6) => {
-                counts.commutator_minus_minus += 1
-            }
+            ("commutator", "bracket", -1, -1, "both", 6) => counts.commutator_minus_minus += 1,
             other => panic!("unexpected Chain Theory CSV row classification: {other:?}"),
         }
     }
@@ -625,8 +623,7 @@ fn count_record_categories(rows: &[RecordRow]) -> RecordCategoryCounts {
 /// Reproduce the record count, row classifications, exchange sectors and
 /// weighted scalar under the published four-slot qutrit-qubit definitions.
 pub fn reproduce() -> ChainAlphaAudit {
-    let (product_assignments, product_records, commutator_records, all_records) =
-        build_records();
+    let (product_assignments, product_records, commutator_records, all_records) = build_records();
 
     let mut sectors = ExchangeSectors::default();
     for record in &all_records {
