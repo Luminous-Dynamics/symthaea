@@ -708,7 +708,7 @@ mod tests {
 
     #[test]
     fn functional_singing_rejects_unqualified_language_profiles() {
-        let performance = VocalPerformance::from_melody(
+        let mut performance = VocalPerformance::from_melody(
             "light",
             &[Note {
                 frequency: 220.0,
@@ -716,9 +716,10 @@ mod tests {
                 duration: 0.3,
                 velocity: 0.7,
             }],
-            "zu",
+            "en",
         )
         .unwrap();
+        performance.language = "zu".into();
         let error = phone_spans(&performance).unwrap_err().to_string();
         assert!(error.contains("language='en' only"));
         assert!(error.contains("zu"));
