@@ -129,14 +129,18 @@ The bounded API currently:
 - records actual failed, aborted, out-of-domain and non-converged outcomes without turning them into decision-eligible evidence;
 - reports a completed, in-domain evaluation as within its declared model scope only—not as a physical validation or feasibility finding.
 
-Every dry-run review has `execution_started = false`. No external process, solver, CAD system, network client or aircraft-control interface is invoked by this module. It cannot grant flight approval. The SHA-256 checks are syntax and reference-equality checks; artifact authentication and source acquisition are separate responsibilities.
+Every dry-run review has `execution_started = false`. No external process, solver, CAD system, network client or aircraft-control interface is invoked by this module. It cannot grant flight approval.
+
+The module now computes canonical SHA-256 identities for the exact study manifest, proposal and returned receipt payloads. Canonicalization recursively sorts object keys, preserves array order and uses compact UTF-8 JSON; it does not use debug formatting or unspecified map iteration order. The review outputs carry those digests so a human reviewer can bind a decision to the same serialized objects.
+
+These computed digests make the payloads reproducibly identifiable. They do **not** authenticate referenced artifacts or source bytes, prove that a solver executable is trustworthy, establish calibration traceability, or validate physical truth. Artifact acquisition and independent source authentication remain separate responsibilities.
 
 ## 10. Immediate follow-on gates
 
-1. Add a canonical, independently recomputable digest for the serialized study and proposal payloads; do not use debug formatting or map iteration order.
-2. Bind an evaluation receipt to the exact runner artifact, executable/environment identity, raw inputs, output bundle, applicability result and uncertainty profile.
-3. Add independent fixtures for stale model profiles, case/configuration mismatch, budget overruns, missing run artifacts, non-convergence and false-feasible labels.
-4. Compose with the existing Symtropy run manifest / receipt work. Do not create a second solver execution registry.
-5. Keep human approval as a distinct, externally recorded review event before any engineering action outside the dry-run boundary.
+1. Bind a receipt to the exact runner artifact, executable/environment identity, raw inputs, output bundle, applicability result and uncertainty profile.
+2. Add independent fixtures for stale model profiles, case/configuration mismatch, budget overruns, missing run artifacts, non-convergence and false-feasible labels.
+3. Compose with the existing Symtropy run manifest / receipt work. Do not create a second solver execution registry.
+4. Keep human approval as a distinct, externally recorded review event before any engineering action outside the dry-run boundary.
+5. Build the aircraft-specific decision-value adapter on top of #7803 and the robust interval frontier #7787, rather than implementing a second generic experiment selector.
 
 The first Rust implementation is intentionally a study/receipt admission gate, not yet an adaptive experiment selector or a physics tool.
