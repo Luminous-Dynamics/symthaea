@@ -254,7 +254,8 @@ fn assess_resource(
     match resource.rate_unit.as_deref() {
         Some(unit) if nonempty(unit) => {
             if let Some(quantity_unit) = quantity_unit {
-                if unit != format!("{quantity_unit}/day") {
+                let expected_rate_unit = format!("{quantity_unit}/day");
+                if unit != expected_rate_unit.as_str() {
                     findings.push(Finding::RateUnitMismatch {
                         dimension_id: dimension_id.clone(),
                     });
