@@ -478,6 +478,7 @@ def self_test() -> list[str]:
         "https://swesweep.com/paper https://swesweep.com/ https://github.com/kltownsend/loopcontrolbench",
         "Gold-Completeness and Open-Set Discovery",
         "Sequential Evidence Acquisition",
+        "Cross-Framing Anchor Protocol V0",
         "#10064 #10369",
     ))
     challenge = "\n\n".join(
@@ -518,6 +519,7 @@ def self_test() -> list[str]:
         "same total inference budget no new primary metric lane #10064 #10369 No tasks are admitted by this preregistration",
         "Gold-Completeness and Open-Set Discovery",
         "Sequential Evidence Acquisition",
+        "Cross-Framing Anchor Protocol V0",
         *PRIMARY_METRICS,
     ))
     gold_completeness = "\n".join((
