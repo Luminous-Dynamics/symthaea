@@ -309,7 +309,15 @@
         "model_commitment_trial",
         "exact_paper_rule_65_posterior_probability",
         "occams_razor_log_odds_nats",
-        "trials_to_log_odds_threshold_16_nats"
+        "trials_to_log_odds_threshold_16_nats",
+        "spm_pinned_demo_commit_28d1f103b021f729266cb7ea07baaf4d0285b22a",
+        "spm_rule_generator_commit_5852cadb300a81fd3f30e7056ee329bca20f0efe",
+        "spm_combinations_left_fastest_order",
+        "source_generated_hypothesis_count_81",
+        "exact_feedback_tensor_semantic_class_count_75",
+        "paper_reported_unique_rule_count_79",
+        "semantic_duplicate_groups_3_triplets",
+        "planted_rule_65_context_centre_red_left_green_centre_blue_right"
       ],
       "negative_controls": [
         "random_partial_observation_policy",
@@ -317,7 +325,10 @@
         "model_information_channel_disabled_with_preferences_and_costs_fixed",
         "state_information_only",
         "parameter_information_only",
-        "oracle_rule_label_for_analysis_only"
+        "oracle_rule_label_for_analysis_only",
+        "public_spm_rule_generator_exact_tensor_semantic_deduplication",
+        "paper_reported_rule_count_79_vs_source_audit_count_75_discrepancy",
+        "constant_criterion_mapping_duplicate_across_context_factor_labels"
       ]
     }
   ],
@@ -625,7 +636,11 @@
       "architecture_mismatch_rejection_rate",
       "manifest_mismatch_rejection_rate",
       "probe_set_mismatch_rejection_rate",
-      "held_out_alignment_acceptance_false_positive_rate"
+      "held_out_alignment_acceptance_false_positive_rate",
+      "source_rule_hypothesis_count",
+      "source_semantic_unique_likelihood_tensor_count",
+      "paper_reported_unique_rule_count",
+      "model_space_count_discrepancy"
     ],
     "efficiency": [
       "diagnostic_probes",
@@ -692,7 +707,8 @@
     "The parent Dirichlet prior used for prospective model EIG must equal the reduced-model-prior arithmetic mean under the registered model probabilities; predictive outcome probabilities must be normalized, and hypothetical sufficient-statistic increments must match the exact parameterization and be finite and non-negative.",
     "Adaptive functional-probe selection must report the full frozen candidate pool, selected probe, per-candidate accumulated assignment margin and mean activation error, source/candidate/architecture/manifest digests, and the final ordered probe-set digest. It must be deterministic and must not mutate either model.",
     "Probe selection and alignment fitting must use a declared selection-probe pool; final functional-equivalence and acceptance metrics must use a disjoint held-out probe sequence not used for selection, threshold tuning, or assignment fitting.",
-    "Accumulated assignment margin is computed from summed squared activation differences across probes, while the reported fit error remains mean-squared activation error; the same mapping repeated across independent probes must increase the margin in proportion to probe count without changing mean fit error."
+    "Accumulated assignment margin is computed from summed squared activation differences across probes, while the reported fit error remains mean-squared activation error; the same mapping repeated across independent probes must increase the margin in proportion to probe count without changing mean fit error.",
+    "The three-ball source audit preserves the 81 labelled SPM hypotheses and equal 1/81 prior mass. It independently canonicalizes the exact full feedback likelihood tensors and records the current public-generator result of 75 semantic classes (three triplicate constant mappings) against the paper-reported 79. The exact-reproduction status remains blocked until this discrepancy is reconciled against the paper's archived code/uniqueness criterion; neither model labels nor priors may be silently deduplicated."
   ],
   "research_references": [
     {
