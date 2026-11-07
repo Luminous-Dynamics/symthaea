@@ -43,6 +43,9 @@ pub enum FiniteFamilyError {
     InvalidModelDigest { index: usize, digest: String },
     DuplicateModelDigest { digest: String },
     MissingStateBounds { variable_index: usize, state_index: usize },
+    InvalidQueryVariable { variable_index: usize },
+    DuplicateQueryVariable { variable_index: usize },
+    QueryStateOutOfRange { variable_index: usize, state: usize, cardinality: usize },
     CardinalityManifestMismatch {
         model_digest: String,
         expected: Vec<usize>,
@@ -68,6 +71,16 @@ impl fmt::Display for FiniteFamilyError {
             Self::MissingStateBounds { variable_index, state_index } => write!(
                 f,
                 "no posterior bound was accumulated for variable {variable_index}, state {state_index}"
+            ),
+            Self::InvalidQueryVariable { variable_index } => {
+                write!(f, "joint event references unknown variable {variable_index}")
+            }
+            Self::DuplicateQueryVariable { variable_index } => {
+                write!(f, "joint event assigns variable {variable_index} more than once")
+            }
+            Self::QueryStateOutOfRange { variable_index, state, cardinality } => write!(
+                f,
+                "joint event state {state} is outside variable {variable_index} cardinality {cardinality}"
             ),
             Self::CardinalityManifestMismatch {
                 model_digest,
@@ -298,6 +311,224 @@ pub fn evaluate_finite_model_family(
     })
 }
 
+
+/// Exact posterior lower/upper probability for an arbitrary joint assignment event.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JointEventProbabilityBounds {
+    pub lower: CheckedRational,
+    pub upper: CheckedRational,
+    pub lower_witness_model: String,
+    pub upper_witness_model: String,
+}
+
+/// Per-model exact evaluation record for a joint assignment event.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JointEventModelRecord {
+    pub model_digest: String,
+    pub evidence_mass: CheckedRational,
+    pub event_mass: Option<CheckedRational>,
+    pub conditional_probability: Option<CheckedRational>,
+    pub evidence_elimination_stats: Option<EliminationStats>,
+    pub event_elimination_stats: Option<EliminationStats>,
+}
+
+/// Exact envelope for one joint assignment event over a finite model family.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FiniteFamilyJointEventEnvelope {
+    /// Canonically sorted (variable, state) pairs.
+    pub query_assignments: Vec<(usize, usize)>,
+    pub model_count: usize,
+    pub supported_model_count: usize,
+    pub zero_evidence_model_count: usize,
+    pub conditioning_status: ConditioningDomainStatus,
+    pub bounds: Option<JointEventProbabilityBounds>,
+    pub model_records: Vec<JointEventModelRecord>,
+}
+
+/// Evaluate exact conditional probability bounds for a conjunction of assignments.
+///
+/// The event is a conjunction X_i = state_i. It is evaluated with exact
+/// variable elimination after adding indicator factors to each model. This
+/// computes joint factor mass directly; it never multiplies singleton
+/// marginals and therefore preserves dependencies.
+///
+/// The empty assignment list denotes the certain event, conditional on the
+/// evidence being supported by a model. Evidence is already encoded in each
+/// candidate graph as factors.
+pub fn evaluate_finite_model_joint_event(
+    models: &[FiniteModelRef<'_>],
+    query_assignments: &[(usize, usize)],
+    elimination_order: &[usize],
+) -> Result<FiniteFamilyJointEventEnvelope, FiniteFamilyError> {
+    if models.is_empty() {
+        return Err(FiniteFamilyError::EmptyFamily);
+    }
+
+    let mut ordered = models.iter().copied().collect::<Vec<_>>();
+    for (index, model) in ordered.iter().enumerate() {
+        if !is_sha256_digest(model.model_digest) {
+            return Err(FiniteFamilyError::InvalidModelDigest {
+                index,
+                digest: model.model_digest.to_owned(),
+            });
+        }
+    }
+    ordered.sort_by(|left, right| left.model_digest.cmp(right.model_digest));
+
+    let mut seen = BTreeSet::new();
+    for model in &ordered {
+        if !seen.insert(model.model_digest) {
+            return Err(FiniteFamilyError::DuplicateModelDigest {
+                digest: model.model_digest.to_owned(),
+            });
+        }
+    }
+
+    let cardinalities = ordered[0].graph.cardinalities().to_vec();
+    let mut canonical_query = query_assignments.to_vec();
+    canonical_query.sort_unstable_by_key(|(variable, _)| *variable);
+
+    for (position, &(variable, state)) in canonical_query.iter().enumerate() {
+        let cardinality = cardinalities.get(variable).copied().ok_or(
+            FiniteFamilyError::InvalidQueryVariable { variable_index: variable },
+        )?;
+        if position > 0 && canonical_query[position - 1].0 == variable {
+            return Err(FiniteFamilyError::DuplicateQueryVariable {
+                variable_index: variable,
+            });
+        }
+        if state >= cardinality {
+            return Err(FiniteFamilyError::QueryStateOutOfRange {
+                variable_index: variable,
+                state,
+                cardinality,
+            });
+        }
+    }
+
+    let mut model_records = Vec::with_capacity(ordered.len());
+    let mut supported_model_count = 0usize;
+    let mut zero_evidence_model_count = 0usize;
+    let mut endpoint_bounds: Option<JointEventProbabilityBounds> = None;
+
+    for model in ordered {
+        let model_cardinalities = model.graph.cardinalities();
+        if model_cardinalities != cardinalities.as_slice() {
+            return Err(FiniteFamilyError::CardinalityManifestMismatch {
+                model_digest: model.model_digest.to_owned(),
+                expected: cardinalities.clone(),
+                actual: model_cardinalities.to_vec(),
+            });
+        }
+
+        for (factor_index, factor) in model.graph.factors().iter().enumerate() {
+            for value in &factor.values {
+                if value.is_negative() {
+                    return Err(FiniteFamilyError::ModelInference {
+                        model_digest: model.model_digest.to_owned(),
+                        source: RationalInferenceError::NegativePotential {
+                            factor_index,
+                            numerator: value.numerator(),
+                            denominator: value.denominator(),
+                        },
+                    });
+                }
+            }
+        }
+
+        let (evidence_mass, evidence_stats) = model.graph.evaluate(elimination_order)
+            .map_err(|source| FiniteFamilyError::ModelInference {
+                model_digest: model.model_digest.to_owned(),
+                source: RationalInferenceError::Elimination(source),
+            })?;
+
+        if evidence_mass.is_zero() {
+            zero_evidence_model_count += 1;
+            model_records.push(JointEventModelRecord {
+                model_digest: model.model_digest.to_owned(),
+                evidence_mass: CheckedRational::zero(),
+                event_mass: None,
+                conditional_probability: None,
+                evidence_elimination_stats: None,
+                event_elimination_stats: None,
+            });
+            continue;
+        }
+
+        let mut conditioned = model.graph.clone();
+        for &(variable, state) in &canonical_query {
+            let mut indicator = vec![CheckedRational::zero(); cardinalities[variable]];
+            indicator[state] = CheckedRational::one();
+            conditioned.add_factor(vec![variable], indicator)
+                .map_err(|source| FiniteFamilyError::ModelInference {
+                    model_digest: model.model_digest.to_owned(),
+                    source: RationalInferenceError::Elimination(source),
+                })?;
+        }
+
+        let (event_mass, event_stats) = conditioned.evaluate(elimination_order)
+            .map_err(|source| FiniteFamilyError::ModelInference {
+                model_digest: model.model_digest.to_owned(),
+                source: RationalInferenceError::Elimination(source),
+            })?;
+        let probability = event_mass.checked_div(evidence_mass)
+            .map_err(|source| FiniteFamilyError::ModelInference {
+                model_digest: model.model_digest.to_owned(),
+                source: RationalInferenceError::Arithmetic(source),
+            })?;
+
+        supported_model_count += 1;
+        match &mut endpoint_bounds {
+            None => {
+                endpoint_bounds = Some(JointEventProbabilityBounds {
+                    lower: probability,
+                    upper: probability,
+                    lower_witness_model: model.model_digest.to_owned(),
+                    upper_witness_model: model.model_digest.to_owned(),
+                });
+            }
+            Some(bounds) => {
+                // Digest order plus strict comparisons gives stable first witnesses.
+                if probability < bounds.lower {
+                    bounds.lower = probability;
+                    bounds.lower_witness_model = model.model_digest.to_owned();
+                }
+                if probability > bounds.upper {
+                    bounds.upper = probability;
+                    bounds.upper_witness_model = model.model_digest.to_owned();
+                }
+            }
+        }
+
+        model_records.push(JointEventModelRecord {
+            model_digest: model.model_digest.to_owned(),
+            evidence_mass,
+            event_mass: Some(event_mass),
+            conditional_probability: Some(probability),
+            evidence_elimination_stats: Some(evidence_stats),
+            event_elimination_stats: Some(event_stats),
+        });
+    }
+
+    let conditioning_status = if supported_model_count == 0 {
+        ConditioningDomainStatus::NoSupportedModels
+    } else if zero_evidence_model_count > 0 {
+        ConditioningDomainStatus::PartialConditioningDomain
+    } else {
+        ConditioningDomainStatus::Complete
+    };
+
+    Ok(FiniteFamilyJointEventEnvelope {
+        query_assignments: canonical_query,
+        model_count: models.len(),
+        supported_model_count,
+        zero_evidence_model_count,
+        conditioning_status,
+        bounds: endpoint_bounds,
+        model_records,
+    })
+}
+
 fn is_sha256_digest(value: &str) -> bool {
     value.len() == 64
         && value
@@ -486,4 +717,69 @@ mod tests {
             })
         ));
     }
+
+    #[test]
+    fn arbitrary_joint_event_bounds_use_joint_factor_mass_not_singleton_products() {
+        let mut model_a = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        model_a.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
+
+        let mut model_b = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        model_b.add_factor(vec![0, 1], vec![q(4, 1), q(3, 1), q(2, 1), q(1, 1)]).unwrap();
+
+        let id_a = digest('a');
+        let id_b = digest('b');
+        let models = [
+            FiniteModelRef { model_digest: &id_a, graph: &model_a },
+            FiniteModelRef { model_digest: &id_b, graph: &model_b },
+        ];
+        let result = evaluate_finite_model_joint_event(&models, &[(0, 1), (1, 0)], &[0, 1]).unwrap();
+
+        let bounds = result.bounds.unwrap();
+        assert_eq!(bounds.lower, q(1, 5));
+        assert_eq!(bounds.upper, q(3, 10));
+        assert_eq!(bounds.lower_witness_model, id_b);
+        assert_eq!(bounds.upper_witness_model, id_a);
+        assert_eq!(result.conditioning_status, ConditioningDomainStatus::Complete);
+    }
+
+    #[test]
+    fn joint_event_query_order_is_canonical_and_duplicate_variables_reject() {
+        let mut model = ExactFactorGraph::new(
+            vec![2, 2],
+            CheckedRational::zero(),
+            CheckedRational::one(),
+        ).unwrap();
+        model.add_factor(vec![0, 1], vec![q(1, 1), q(2, 1), q(3, 1), q(4, 1)]).unwrap();
+        let id = digest('a');
+        let models = [FiniteModelRef { model_digest: &id, graph: &model }];
+
+        let forward = evaluate_finite_model_joint_event(&models, &[(0, 1), (1, 0)], &[0, 1]).unwrap();
+        let reverse = evaluate_finite_model_joint_event(&models, &[(1, 0), (0, 1)], &[0, 1]).unwrap();
+        assert_eq!(forward, reverse);
+
+        assert!(matches!(
+            evaluate_finite_model_joint_event(&models, &[(0, 0), (0, 1)], &[0, 1]),
+            Err(FiniteFamilyError::DuplicateQueryVariable { variable_index: 0 })
+        ));
+    }
+
+    #[test]
+    fn empty_joint_event_is_certain_for_every_supported_model() {
+        let model = graph([q(3, 1), q(1, 1)]);
+        let id = digest('a');
+        let models = [FiniteModelRef { model_digest: &id, graph: &model }];
+        let result = evaluate_finite_model_joint_event(&models, &[], &[0]).unwrap();
+        let bounds = result.bounds.unwrap();
+        assert_eq!(bounds.lower, CheckedRational::one());
+        assert_eq!(bounds.upper, CheckedRational::one());
+    }
+
 }
